@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TEMPLATE_CATEGORIES } from '../../../services/debt-config';
-import { formatDate, formatFileSize } from '../../../services/format.service';
-import type { DocumentTemplate, TemplateVersion } from '../../../models/debt.models';
+import { TEMPLATE_CATEGORIES } from '../../../core/services/debt-config';
+import { formatDate, formatFileSize } from '../../../core/services/format.service';
+import type { DocumentTemplate, TemplateVersion } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-document-templates',

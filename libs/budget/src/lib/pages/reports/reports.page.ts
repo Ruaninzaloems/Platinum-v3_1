@@ -6,8 +6,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatTabsModule } from '@angular/material/tabs';
-import { ApiService } from '../../services/api.service';
-import { BudgetVersionSummary, BudgetOverview, MtrefSummary } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { BudgetVersionSummary, BudgetOverview, MtrefSummary } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-reports',

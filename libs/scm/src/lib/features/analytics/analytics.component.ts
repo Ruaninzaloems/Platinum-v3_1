@@ -13,7 +13,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 

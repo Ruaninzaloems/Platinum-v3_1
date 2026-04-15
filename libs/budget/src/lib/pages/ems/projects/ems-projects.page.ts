@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { EmsApiService, EmsProjectSummary, EmsProjectDetail, EmsProjectItemDto, EmsAvailableBudget } from '../../../services/ems-api.service';
+import { EmsApiService, EmsProjectSummary, EmsProjectDetail, EmsProjectItemDto, EmsAvailableBudget } from '../../../core/services/ems-api.service';
 
 @Component({
   selector: 'app-ems-projects',

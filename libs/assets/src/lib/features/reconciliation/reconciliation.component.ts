@@ -80,7 +80,7 @@ export class ReconciliationComponent implements OnInit {
   }.bind(this));
 
   totalVariance = computed(function(this: ReconciliationComponent) {
-    return Math.round((this.totalAsset() - this.totalGl()) * 100) / 100;
+    return Math.round(((this.totalAsset() as number) - (this.totalGl() as number)) * 100) / 100;
   }.bind(this));
 
   allBalanced = computed(function(this: ReconciliationComponent) {

@@ -5,8 +5,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { ApiService } from '../../services/api.service';
-import { CfoDashboard } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { CfoDashboard } from '../../core/models/budget.models';
 import Chart from 'chart.js/auto';
 
 @Component({

@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { DOC_TYPES, SIGNATURE_STATUS_LABELS } from '../../../services/debt-config';
-import { formatDate, formatCurrency } from '../../../services/format.service';
-import type { SignatureRequest } from '../../../models/debt.models';
+import { DOC_TYPES, SIGNATURE_STATUS_LABELS } from '../../../core/services/debt-config';
+import { formatDate, formatCurrency } from '../../../core/services/format.service';
+import type { SignatureRequest } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-digital-signatures',

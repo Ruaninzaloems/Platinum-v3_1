@@ -18,7 +18,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { Chart, registerables } from 'chart.js';
 

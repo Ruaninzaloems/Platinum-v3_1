@@ -4,8 +4,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ApiService } from '../../services/api.service';
-import { CfoDashboard } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { CfoDashboard } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-dashboard',

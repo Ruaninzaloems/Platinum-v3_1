@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
-import { PosBasketService } from '../../services/pos-basket.service';
+import { PosBasketService } from '../../core/services/pos-basket.service';
 import { EnquiriesGeneralComponent } from '../enquiries/enquiries-general.component';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -19,7 +19,7 @@ import {
   UnifiedSearchResult,
   TYPE_LABELS,
   PROCESSING_ORDER,
-} from '../../models/pos-basket.models';
+} from '../../core/models/pos-basket.models';
 
 interface BankItem {
   bankID: number;

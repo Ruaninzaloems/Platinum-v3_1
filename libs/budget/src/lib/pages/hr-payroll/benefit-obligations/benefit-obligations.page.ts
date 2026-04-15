@@ -5,8 +5,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../../services/api.service';
-import { DefinedBenefitObligation, LongServiceAward, DboSummary } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { DefinedBenefitObligation, LongServiceAward, DboSummary } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-benefit-obligations-page',

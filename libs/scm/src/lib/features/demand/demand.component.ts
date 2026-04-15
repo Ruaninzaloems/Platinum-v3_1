@@ -13,7 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { DemandService } from '../../core/services/demand.service';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { Chart, registerables } from 'chart.js';

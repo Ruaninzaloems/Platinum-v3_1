@@ -31,15 +31,7 @@ args = "Backend API"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "POS UI"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "IDP UI"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Payroll UI"
+args = "Platinum Shell"
 
 [[workflows.workflow]]
 name = "Backend API"
@@ -54,40 +46,16 @@ args = "cd ASSETS-PSQL-API && dotnet run"
 waitForPort = 3000
 
 [[workflows.workflow]]
-name = "POS UI"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd POS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8080 --proxy-config proxy.conf.json"
-waitForPort = 8080
-
-[[workflows.workflow]]
-name = "IDP UI"
+name = "Platinum Shell"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd IDP-UI/platinum-idp-client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 9000 --proxy-config proxy.conf.json --serve-path /idp-app/"
-waitForPort = 9000
+args = "cd apps/shell && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Payroll UI"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd PAYROLL-APP/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8099 --proxy-config proxy.conf.json --serve-path /payroll-app/"
-waitForPort = 8099
-
-[workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
 [[ports]]
 localPort = 3000

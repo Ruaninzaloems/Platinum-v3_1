@@ -4,8 +4,8 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../services/api.service';
-import { BudgetVersionDetail, Approval } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { BudgetVersionDetail, Approval } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-version-detail',

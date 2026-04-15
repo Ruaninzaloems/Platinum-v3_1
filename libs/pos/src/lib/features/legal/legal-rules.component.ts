@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { LegalRuleVersion, RuleFormData } from '../../models/legal.models';
-import { LEGAL_CATEGORIES, LEGAL_CATEGORY_LABELS } from '../../services/debt-config';
+import { LegalRuleVersion, RuleFormData } from '../../core/models/legal.models';
+import { LEGAL_CATEGORIES, LEGAL_CATEGORY_LABELS } from '../../core/services/debt-config';
 import { firstValueFrom } from 'rxjs';
 
 @Component({

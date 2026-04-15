@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { BATCH_JOB_TYPE_LABELS, BATCH_STATUS_LABELS } from '../../../services/debt-config';
-import { formatDateShort, formatDuration } from '../../../services/format.service';
+import { BATCH_JOB_TYPE_LABELS, BATCH_STATUS_LABELS } from '../../../core/services/debt-config';
+import { formatDateShort, formatDuration } from '../../../core/services/format.service';
 
 @Component({
   selector: 'app-batch-processing',

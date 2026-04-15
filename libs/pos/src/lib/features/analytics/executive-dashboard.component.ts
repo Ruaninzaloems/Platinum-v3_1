@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { formatCurrencyCompact } from '../../services/format.service';
+import { formatCurrencyCompact } from '../../core/services/format.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({

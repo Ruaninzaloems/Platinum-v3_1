@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { QUALIFICATION_FIELD_OPTIONS, QUALIFICATION_OPERATOR_OPTIONS } from '../../../services/debt-config';
-import { Condition } from '../../../models/debt.models';
+import { QUALIFICATION_FIELD_OPTIONS, QUALIFICATION_OPERATOR_OPTIONS } from '../../../core/services/debt-config';
+import { Condition } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-qualification-rules',

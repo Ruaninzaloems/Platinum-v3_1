@@ -5,8 +5,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../../services/api.service';
-import { ServiceCategory, Tariff } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { ServiceCategory, Tariff } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-tariffs-page',

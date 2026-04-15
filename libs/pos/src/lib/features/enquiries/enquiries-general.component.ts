@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
-import { ExportService, ExportOptions } from '../../services/export.service';
+import { ExportService, ExportOptions } from '../../core/services/export.service';
 import { firstValueFrom } from 'rxjs';
 
 interface SearchCriteria {

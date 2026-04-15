@@ -4,10 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../../services/api.service';
+import { ApiService } from '../../../core/services/api.service';
 import {
   PostEstablishment, SalaryStructure, PostEstablishmentSummary
-} from '../../../models/budget.models';
+} from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-post-establishment-page',

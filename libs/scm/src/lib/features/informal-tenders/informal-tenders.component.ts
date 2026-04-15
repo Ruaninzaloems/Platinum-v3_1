@@ -16,7 +16,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { DashboardService } from '../../core/services/dashboard.service';
 
 @Component({

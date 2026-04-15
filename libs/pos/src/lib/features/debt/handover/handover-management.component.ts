@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { PAGE_SIZE } from '../../../services/debt-config';
-import { formatCurrency, formatDate } from '../../../services/format.service';
-import { Attorney, HandoverRecord, HandoverOption } from '../../../models/debt.models';
+import { PAGE_SIZE } from '../../../core/services/debt-config';
+import { formatCurrency, formatDate } from '../../../core/services/format.service';
+import { Attorney, HandoverRecord, HandoverOption } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-handover-management',

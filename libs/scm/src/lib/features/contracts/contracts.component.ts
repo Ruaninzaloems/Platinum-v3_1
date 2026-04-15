@@ -17,7 +17,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);

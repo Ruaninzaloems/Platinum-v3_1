@@ -39,19 +39,19 @@ export class WipListComponent implements OnInit {
 
   totalProjects = computed(function(this: WipListComponent) { return this.projects().length; }.bind(this));
 
-  totalContractValue = computed(function(this: WipListComponent) {
+  totalContractValue = computed((): number => {
     let sum = 0;
     const list = this.projects();
     for (let i = 0; i < list.length; i++) { sum += Number(list[i].contractValue) || 0; }
     return sum;
-  }.bind(this));
+  });
 
-  totalWipClosing = computed(function(this: WipListComponent) {
+  totalWipClosing = computed((): number => {
     let sum = 0;
     const list = this.projects();
     for (let i = 0; i < list.length; i++) { sum += Number(list[i].wipClosingBalance) || 0; }
     return sum;
-  }.bind(this));
+  });
 
   constructor(private api: ApiService, private router: Router, private snack: MatSnackBar) {}
 

@@ -8,8 +8,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ApiService } from '../../services/api.service';
-import { ProjectItem, ProjectBudgetLine, Department, ScoaSegment } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { ProjectItem, ProjectBudgetLine, Department, ScoaSegment } from '../../core/models/budget.models';
 
 interface BudgetLineForm {
   id?: number;

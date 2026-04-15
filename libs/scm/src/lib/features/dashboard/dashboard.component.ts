@@ -13,7 +13,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardService, ExecutiveDashboard, ComplianceDashboard, OperationalDashboard, AiInsight, KpiCard, PipelineStage, TurnaroundMetric, ComplianceComponent, Bottleneck, WorkloadItem, BudgetCommitment, RecentTransaction, ControlTowerDashboard, AttentionTile, BlockingEntry, FunnelStage, Escalation } from '../../core/services/dashboard.service';
 import { DrillThroughService } from '../../core/services/drill-through.service';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-dashboard',

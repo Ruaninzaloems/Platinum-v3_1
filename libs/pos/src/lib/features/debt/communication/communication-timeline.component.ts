@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { CHANNEL_CONFIG } from '../../../services/debt-config';
-import { CommunicationStep, CommunicationTimeline } from '../../../models/debt.models';
+import { CHANNEL_CONFIG } from '../../../core/services/debt-config';
+import { CommunicationStep, CommunicationTimeline } from '../../../core/models/debt.models';
 
 type Step = CommunicationStep;
 

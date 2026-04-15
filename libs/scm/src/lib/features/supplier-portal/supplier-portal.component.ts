@@ -20,7 +20,7 @@ import { MatStepperModule } from '@angular/material/stepper';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-supplier-portal',

@@ -8,8 +8,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatStepperModule } from '@angular/material/stepper';
-import { ApiService } from '../../services/api.service';
-import { BudgetVersionSummary, ScoaSegment } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { BudgetVersionSummary, ScoaSegment } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-virements-list',

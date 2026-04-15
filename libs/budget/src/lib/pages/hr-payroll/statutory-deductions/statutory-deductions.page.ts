@@ -5,8 +5,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../../services/api.service';
-import { StatutoryDeduction, PayrollLiability } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { StatutoryDeduction, PayrollLiability } from '../../../core/models/budget.models';
 
 interface PayeDepartment {
   department: string;

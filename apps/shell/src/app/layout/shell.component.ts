@@ -138,6 +138,6 @@ export class ShellComponent {
     { label: 'IDP', path: '/idp', icon: 'account_tree', color: '#ab47bc' },
     { label: 'Budget', path: '/budget', icon: 'account_balance', color: '#26a69a' },
     { label: 'AFS', path: '/afs', icon: 'description', color: '#ef5350' },
-    { label: 'Performance', path: '/insight', icon: 'insights', color: '#7e57c2' }
+    { label: 'Insights', path: '/ins', icon: 'insights', color: '#7e57c2' }
   ];
 }

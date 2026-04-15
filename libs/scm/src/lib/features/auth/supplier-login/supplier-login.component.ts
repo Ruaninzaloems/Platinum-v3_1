@@ -12,7 +12,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDividerModule } from '@angular/material/divider';
-import { environment } from '../../../../environments/environment';
+import { environment } from '../../../environment';
 
 @Component({
   selector: 'app-supplier-login',

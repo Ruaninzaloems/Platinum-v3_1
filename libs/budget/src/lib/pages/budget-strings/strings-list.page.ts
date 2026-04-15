@@ -6,8 +6,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { ApiService } from '../../services/api.service';
-import { BudgetStringList, BudgetVersionSummary, ScoaSegment, ValidationRun } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { BudgetStringList, BudgetVersionSummary, ScoaSegment, ValidationRun } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-strings-list',

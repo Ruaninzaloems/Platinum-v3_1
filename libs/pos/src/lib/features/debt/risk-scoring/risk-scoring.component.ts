@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RISK_COLORS } from '../../../services/debt-config';
-import { TabMode } from '../../../models/debt.models';
+import { RISK_COLORS } from '../../../core/services/debt-config';
+import { TabMode } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-risk-scoring',

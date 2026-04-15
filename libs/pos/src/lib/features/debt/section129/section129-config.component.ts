@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { getFinancialYear } from '../../../services/format.service';
-import { SECTION129_DEFAULTS } from '../../../services/debt-config';
-import type { Section129ConfigEntry, Attorney, CostItem, AttorneyRotationItem, ConfigViewMode } from '../../../models/debt.models';
+import { getFinancialYear } from '../../../core/services/format.service';
+import { SECTION129_DEFAULTS } from '../../../core/services/debt-config';
+import type { Section129ConfigEntry, Attorney, CostItem, AttorneyRotationItem, ConfigViewMode } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-section129-config',

@@ -3,10 +3,10 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { GeoItem, ViewTab, SortField, SortDir } from '../../models/analytics.models';
-import { RISK_COLORS } from '../../services/debt-config';
-import { formatCurrency } from '../../services/format.service';
-import { sortByField } from '../../services/validation.service';
+import { GeoItem, ViewTab, SortField, SortDir } from '../../core/models/analytics.models';
+import { RISK_COLORS } from '../../core/services/debt-config';
+import { formatCurrency } from '../../core/services/format.service';
+import { sortByField } from '../../core/services/validation.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({

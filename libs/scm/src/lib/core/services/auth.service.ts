@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { tap, map, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 export interface UserPermissions {
   canCreate: string[];

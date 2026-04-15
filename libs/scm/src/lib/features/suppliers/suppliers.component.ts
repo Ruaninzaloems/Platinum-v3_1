@@ -16,7 +16,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatStepperModule } from '@angular/material/stepper';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);

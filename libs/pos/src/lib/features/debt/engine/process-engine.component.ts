@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RULE_FIELDS, RULE_OPERATORS, WORKFLOW_ACTION_TYPES, CHANNEL_OPTIONS } from '../../../services/debt-config';
-import { formatDate } from '../../../services/format.service';
-import type { ProcessWorkflow, WorkflowStage, StageRule, StageTemplate, StageAction, StageTimer } from '../../../models/debt.models';
+import { RULE_FIELDS, RULE_OPERATORS, WORKFLOW_ACTION_TYPES, CHANNEL_OPTIONS } from '../../../core/services/debt-config';
+import { formatDate } from '../../../core/services/format.service';
+import type { ProcessWorkflow, WorkflowStage, StageRule, StageTemplate, StageAction, StageTimer } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-process-engine',

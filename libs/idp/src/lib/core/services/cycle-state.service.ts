@@ -2,7 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { IdpCycle } from '../models/idp.models';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Injectable({ providedIn: 'root' })
 export class CycleStateService {

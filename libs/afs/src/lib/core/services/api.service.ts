@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, throwError, timer, Subject } from 'rxjs';
 import { timeout, switchMap, catchError, take } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {

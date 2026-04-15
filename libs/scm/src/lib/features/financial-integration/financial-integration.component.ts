@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatMenuModule } from '@angular/material/menu';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-financial-integration',

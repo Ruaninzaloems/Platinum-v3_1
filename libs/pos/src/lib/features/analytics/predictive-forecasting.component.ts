@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { getConfidenceLabel } from '../../services/validation.service';
+import { getConfidenceLabel } from '../../core/services/validation.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({

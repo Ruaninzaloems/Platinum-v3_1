@@ -5,11 +5,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { ApiService } from '../../../services/api.service';
+import { ApiService } from '../../../core/services/api.service';
 import {
   SalaryIncrease, SalaryStructure, TemporaryContract,
   PerformanceBonus, PostEstablishment
-} from '../../../models/budget.models';
+} from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-salary-calculations-page',

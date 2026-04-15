@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { ApiService } from '../../../services/api.service';
-import { RevenueProjection, RevenueProjectionSummary, TariffScenarioSummary } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { RevenueProjection, RevenueProjectionSummary, TariffScenarioSummary } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-revenue-page',

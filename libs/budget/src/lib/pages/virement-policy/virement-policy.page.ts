@@ -7,8 +7,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { ApiService } from '../../services/api.service';
-import { FinancialYear } from '../../models/budget.models';
+import { ApiService } from '../../core/services/api.service';
+import { FinancialYear } from '../../core/models/budget.models';
 
 @Component({
   selector: 'app-virement-policy',

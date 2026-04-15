@@ -13,8 +13,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
-import { ApiService } from '../../../services/api.service';
-import { ConstantsApiService } from '../../../services/constants-api.service';
+import { ApiService } from '../../../core/services/api.service';
+import { ConstantsApiService } from '../../../core/services/constants-api.service';
 
 export type WizardTab = 'details' | 'idp' | 'scoa-funding' | 'scoa-items' | 'register';
 

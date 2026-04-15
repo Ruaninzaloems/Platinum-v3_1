@@ -126,18 +126,57 @@ When "Assets" is selected, the normal Assets layout with router-outlet and flat 
 
 The SCM-UI serves under the `/scm-app/` path prefix. The POS-UI serves under the `/pos-app/` path prefix (configured via `servePath: /pos-app/` in `POS-UI/angular.json`). The IDP-UI serves under the `/idp-app/` path prefix (configured via `servePath: /idp-app/` in `IDP-UI/platinum-idp-client/angular.json`). All allow proxying through port 5000 and rendering inside iframes without cross-origin issues.
 
-## Nx Monorepo Migration (In Progress)
-An Nx monorepo consolidating all 7 Angular apps into a single Angular 21 workspace:
-- **Root**: `package.json` (Angular 21 + Nx 21.6), `nx.json`, `tsconfig.base.json`
-- **Shell app**: `apps/shell/` — unified login, dashboard, sidebar nav, lazy routes to all modules
-- **Feature libs**: `libs/{assets,scm,pos,idp,payroll,afs,budget}/src/lib/` — each exports *_ROUTES
-- **Shared libs**: `libs/shared/{auth,core,ui}/` — AuthService, AuthGuard, AuthInterceptor
-- **Path aliases**: `@platinumv3/assets`, `@platinumv3/scm`, etc. (defined in `tsconfig.base.json`)
-- **Proxy**: `apps/shell/proxy.conf.json` routes to all backend APIs
-- **Total**: ~270 routes migrated across 7 modules, 313+ component files
-- **NOT included**: Insight-Performance-Hub (React/Vite) — stays as separate workspace
-- **PERFORMANCE-UI/**: New standalone Angular 21 app converting Insight-Performance-Hub to Angular (50+ routes)
-- Serve: `cd apps/shell && npx ng serve --port=5000 --host=0.0.0.0 --proxy-config=proxy.conf.json`
+## Nx Monorepo (ACTIVE — One Process, One Port)
+A single Angular 21 shell on port 5000 with 8 lazy-loaded feature libraries:
+
+### Architecture
+```
+SHELL (apps/shell/) — Login · Auth · Nav · Router outlet · port 5000
+  └── Lazy-loaded routes
+      ├── AFS        (libs/afs/)
+      ├── ASSETS     (libs/assets/)
+      ├── IDP        (libs/idp/)
+      ├── POS        (libs/pos/)
+      ├── SCM        (libs/scm/)
+      ├── BUDGET     (libs/budget/)
+      ├── PAYROLL    (libs/payroll/)
+      └── INS        (libs/ins/)
+  └── Shared libs (one copy, all modules use)
+      ├── Auth Lib   (libs/shared/auth/) — AuthService, AuthGuard, AuthInterceptor (JWT)
+      ├── Core Svcs  (libs/shared/core/) — ApiService, AppStateService, LookupService
+      └── Shared UI  (libs/shared/ui/)  — PageHeader, StatusBadge, SearchInput, ConfirmDialog, etc.
+  └── Backend APIs unchanged
+      ├── ASSETS-API  (port 3000, .NET/PostgreSQL)
+      ├── POS-API     (port 3003, Express)
+      ├── SCM-API     (port 3002, .NET)
+      ├── AFS-API     (port 3004, Express)
+      ├── Payroll-API (port 6000, Express)
+      ├── IDP-API     (port 8008, .NET)
+      ├── Budget-API  (port 3001, .NET)
+      └── Insights-API(port 6800, Express)
+```
+
+### What This Solves
+- 1 Replit workflow · 1 port (5000)
+- All modules share login session
+- Add modules = add a folder + route
+- APIs remain independent (correct)
+
+### Key Files
+- `apps/shell/src/app/app.routes.ts` — lazy routes for all 8 modules
+- `apps/shell/src/app/layout/shell.component.ts` — sidebar with nav items
+- `apps/shell/proxy.conf.json` — 9 backend API proxy entries
+- `tsconfig.base.json` — 11 path aliases (@platinumv3/*)
+- `libs/shared/auth/src/index.ts` — exports AuthService, authGuard, authInterceptor
+- `libs/shared/core/src/index.ts` — exports ApiService, AppStateService, LookupService
+- `libs/shared/ui/src/index.ts` — exports 7 reusable UI components
+
+### Workflow
+- **Platinum Shell**: `cd apps/shell && npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json`
+- **Backend API**: Runs .NET API + spawns AFS/POS/Payroll/IDP APIs
+- Total: 500+ TS files, 320+ routes across 8 modules + shell
+- Uses zoneless change detection (`provideZonelessChangeDetection()`)
+- NOT included: Insight-Performance-Hub React app (stays as separate workspace)
 
 ## Important Notes
 - SCM-UI and POS-UI use Angular 21.2 (incompatible with ASSETS-UI Angular 19) — must run as separate apps

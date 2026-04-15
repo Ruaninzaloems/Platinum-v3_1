@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatBadgeModule } from '@angular/material/badge';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-interest-charges',

@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { ApiService } from '../../../services/api.service';
-import { CreditorCategoryDetail, CreditorPaymentArrangement, AgeAnalysis } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { CreditorCategoryDetail, CreditorPaymentArrangement, AgeAnalysis } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-creditor-categories-page',

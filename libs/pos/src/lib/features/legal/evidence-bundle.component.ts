@@ -4,9 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { EvidenceBundle } from '../../models/legal.models';
-import { EVIDENCE_BUNDLE_SECTIONS } from '../../services/debt-config';
-import { formatDate } from '../../services/format.service';
+import { EvidenceBundle } from '../../core/models/legal.models';
+import { EVIDENCE_BUNDLE_SECTIONS } from '../../core/services/debt-config';
+import { formatDate } from '../../core/services/format.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({

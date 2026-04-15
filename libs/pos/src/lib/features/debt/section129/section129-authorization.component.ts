@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import type { Section129Run, ReviewDecision, AuthorizationRow } from '../../../models/debt.models';
+import type { Section129Run, ReviewDecision, AuthorizationRow } from '../../../core/models/debt.models';
 
 @Component({
   selector: 'app-section129-authorization',

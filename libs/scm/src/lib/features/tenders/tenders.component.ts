@@ -16,7 +16,7 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environment';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { Chart, registerables } from 'chart.js';

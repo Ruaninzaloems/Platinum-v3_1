@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { getFinancialYearList } from '../../../services/format.service';
+import { getFinancialYearList } from '../../../core/services/format.service';
 
 @Component({
   selector: 'app-section129-report',

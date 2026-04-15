@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { CHANNEL_CONFIG, COMM_STATUS_CONFIG } from '../../../services/debt-config';
-import type { CommunicationStats } from '../../../models/debt.models';
+import { CHANNEL_CONFIG, COMM_STATUS_CONFIG } from '../../../core/services/debt-config';
+import type { CommunicationStats } from '../../../core/models/debt.models';
 
 type TabMode = 'dashboard' | 'log' | 'scheduled' | 'send';
 

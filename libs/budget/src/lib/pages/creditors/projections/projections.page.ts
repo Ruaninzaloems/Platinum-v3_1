@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { ApiService } from '../../../services/api.service';
-import { ExpenditureProjection, ExpenditureProjectionSummary } from '../../../models/budget.models';
+import { ApiService } from '../../../core/services/api.service';
+import { ExpenditureProjection, ExpenditureProjectionSummary } from '../../../core/models/budget.models';
 
 @Component({
   selector: 'app-creditor-projections-page',
