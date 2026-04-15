@@ -1,0 +1,143 @@
+I have a Replit project called Platinumv3. It is an ERP system. Right now it has multiple separate Angular apps and APIs all living as sibling folders in one repo. Here is the current folder structure:
+
+platinumv3/
+  AFS-UI/              ← Angular app (Asset Financial System UI)
+  ASSETS-API/          ← Backend API
+  ASSETS-PSQL-API/     ← Backend API (PostgreSQL)
+  ASSETS-UI/           ← Angular app
+  BUDGET-APP/          ← Angular app (Budget module)
+  IDP-UI/              ← Angular app (Identity/Portal UI)
+  Insight-Performance-Hub/  ← Angular app (reporting/analytics)
+  PAYROLL-APP/         ← Angular app (Payroll module)
+  POS-API/             ← Backend API (Point of Sale)
+  POS-UI/              ← Angular app (Point of Sale UI)
+  SCM-API/             ← Backend API (Supply Chain)
+  SCM-UI/              ← Angular app (Supply Chain UI)
+  main.py              ← entry point
+
+THE PROBLEM: Each Angular UI app runs as its own process on its own port, consuming a Replit workflow slot. I am hitting Replit's workflow limits and have port/routing conflicts when trying to add more modules. I need to add at least 5 more Angular modules.
+
+---
+
+GOAL: Refactor all Angular UI apps into a single Angular Nx monorepo workspace so that:
+1. All Angular code runs from ONE dev server on ONE port (4200) using ONE Replit workflow slot.
+2. There is a single login shared across all modules (auth happens once in a shell app).
+3. Each ERP module (AFS, Assets, Budget, IDP, Insight, Payroll, POS, SCM) becomes a lazy-loaded Angular feature library — keeping all its own routes, sub-navigation, and components intact.
+4. The backend APIs (ASSETS-API, ASSETS-PSQL-API, POS-API, SCM-API) remain as separate folders/processes and are NOT changed.
+5. The codebase stays in one Replit project (monorepo).
+6. Adding future modules requires only: create a new lib folder + add a lazy route. No new ports or workflows needed.
+
+---
+
+ARCHITECTURE: Angular Nx Monorepo with Shell + Lazy Feature Libraries
+
+Target folder structure:
+platinumv3/
+  apps/
+    shell/             ← NEW: host Angular app (login, top nav, router outlet)
+  libs/
+    afs/               ← migrated from AFS-UI
+    assets/            ← migrated from ASSETS-UI
+    budget/            ← migrated from BUDGET-APP
+    idp/               ← migrated from IDP-UI
+    insight/           ← migrated from Insight-Performance-Hub
+    payroll/           ← migrated from PAYROLL-APP
+    pos/               ← migrated from POS-UI
+    scm/               ← migrated from SCM-UI
+    shared/
+      ui/              ← shared components, pipes, directives
+      auth/            ← AuthService, AuthGuard, AuthInterceptor, JWT handling
+      core/            ← HttpClient config, environment, global state
+  ASSETS-API/          ← unchanged
+  ASSETS-PSQL-API/     ← unchanged
+  POS-API/             ← unchanged
+  SCM-API/             ← unchanged
+  main.py              ← unchanged
+
+---
+
+STEPS TO EXECUTE:
+
+Step 1 — Initialise Nx workspace at the root of platinumv3:
+  npx create-nx-workspace@latest . --preset=angular-monorepo --appName=shell --no-interactive
+  (Use "." to scaffold inside the existing folder, not a new subfolder)
+
+Step 2 — Generate shared libraries:
+  npx nx g @nx/angular:lib shared-ui --directory=libs/shared/ui
+  npx nx g @nx/angular:lib shared-auth --directory=libs/shared/auth
+  npx nx g @nx/angular:lib shared-core --directory=libs/shared/core
+
+Step 3 — Generate a library for each ERP module:
+  npx nx g @nx/angular:lib afs --directory=libs/afs
+  npx nx g @nx/angular:lib assets --directory=libs/assets
+  npx nx g @nx/angular:lib budget --directory=libs/budget
+  npx nx g @nx/angular:lib idp --directory=libs/idp
+  npx nx g @nx/angular:lib insight --directory=libs/insight
+  npx nx g @nx/angular:lib payroll --directory=libs/payroll
+  npx nx g @nx/angular:lib pos --directory=libs/pos
+  npx nx g @nx/angular:lib scm --directory=libs/scm
+
+Step 4 — Migrate existing code:
+  Copy the src/ contents of each old Angular app into its matching new lib folder.
+  Example: AFS-UI/src/app/ → libs/afs/src/lib/
+  Each lib must export its own routing using a Routes array (standalone routing, no NgModule required if using Angular 17+).
+
+Step 5 — Build the shell app (apps/shell):
+  The shell must contain:
+  a) A login page component (route: /login)
+  b) An AuthGuard that checks for a valid JWT token in localStorage
+  c) A top navigation bar showing all module links
+  d) A main  where lazy modules load
+
+Step 6 — Wire lazy routes in apps/shell/src/app/app.routes.ts:
+  export const routes: Routes = [
+    { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+    { path: 'login', component: LoginComponent },
+    { path: 'afs',     canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
+    { path: 'assets',  canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/assets').then(m => m.ASSETS_ROUTES) },
+    { path: 'budget',  canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/budget').then(m => m.BUDGET_ROUTES) },
+    { path: 'idp',     canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/idp').then(m => m.IDP_ROUTES) },
+    { path: 'insight', canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/insight').then(m => m.INSIGHT_ROUTES) },
+    { path: 'payroll', canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/payroll').then(m => m.PAYROLL_ROUTES) },
+    { path: 'pos',     canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/pos').then(m => m.POS_ROUTES) },
+    { path: 'scm',     canActivate: [AuthGuard], loadChildren: () => import('@platinumv3/scm').then(m => m.SCM_ROUTES) },
+  ];
+
+Step 7 — Build shared auth library (libs/shared/auth):
+  Create AuthService with: login(email, password), logout(), isAuthenticated(), getToken()
+  Create AuthGuard implementing CanActivate — redirects to /login if no valid token
+  Create AuthInterceptor — attaches Bearer token to all outgoing HTTP requests
+
+Step 8 — Update .replit to run only ONE workflow:
+  [workflows]
+  [[workflows.workflow]]
+  name = "ERP Dev Server"
+  mode = "sequential"
+  [[workflows.workflow.tasks]]
+  task = "shell.run"
+  args = "npx nx serve shell --port=4200"
+  Keep API workflows separate (they are backend, not Angular).
+
+---
+
+RULES:
+- Use Angular 17+ standalone components throughout (no NgModule unless existing code requires it)
+- Use Angular signals or NgRx for shared state if state needs to cross module boundaries
+- Each feature lib (afs, assets, etc.) must keep its own internal routing and sub-navigation working exactly as before — do not flatten or remove child routes
+- Do NOT touch or restructure ASSETS-API, ASSETS-PSQL-API, POS-API, or SCM-API
+- All API base URLs must be read from environment files (environment.ts / environment.prod.ts) in libs/shared/core — no hardcoded localhost ports in components
+- The shell nav bar must highlight the active module route
+- AuthGuard must protect all module routes except /login
+- After migration, running "npx nx serve shell" must be the only command needed to run the entire frontend
+
+---
+
+DEFINITION OF DONE:
+1. "npx nx serve shell" starts successfully on port 4200 with zero errors
+2. Navigating to /login shows the login form
+3. After login, the top nav shows all module links (AFS, Assets, Budget, IDP, Insight, Payroll, POS, SCM)
+4. Clicking each nav item lazy-loads that module and its internal routes work correctly
+5. Refreshing the browser on any module route keeps the user logged in (token persists)
+6. All API calls from each module include the Authorization header with the JWT token
+7. There is only ONE Replit workflow running for the entire Angular frontend
+8. Adding a new module in future requires only: (a) npx nx g @nx/angular:lib newmodule and (b) adding one route entry to app.routes.ts
