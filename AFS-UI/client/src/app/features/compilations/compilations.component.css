@@ -1,0 +1,54 @@
+.form-grid { display: flex; flex-direction: column; gap: 4px; min-width: 400px; }
+.period-row { display: flex; gap: 12px; }
+.period-row mat-form-field { flex: 1; }
+
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  color: #2e7d32;
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 400px;
+}
+
+.success-icon {
+  color: #2e7d32;
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  background: #fbe9e7;
+  border-radius: 6px;
+  color: #c62828;
+  font-size: 13px;
+}
+
+.error-icon {
+  color: #c62828;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.btn-spinner {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+button .btn-spinner ::ng-deep circle {
+  stroke: white;
+}

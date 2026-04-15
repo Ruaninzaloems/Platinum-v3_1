@@ -1,0 +1,335 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Draft Payroll Budget</h1>
+      <p class="page-subtitle">Consolidated HR & payroll budget with mSCOA integration, scenario comparison, and approval workflows (HRPB6, HRPB7, HRPB46, HRPB49, HRPB65–67, HRPB89)</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-outline" (click)="calculateFullBudget()" [disabled]="calculating">
+        <mat-icon>calculate</mat-icon> {{calculating ? 'Calculating...' : 'Calculate Full Budget'}}
+      </button>
+      <button class="btn-secondary" (click)="generateBudgetStrings()" [disabled]="generating">
+        <mat-icon>code</mat-icon> {{generating ? 'Generating...' : 'Generate Budget Strings'}}
+      </button>
+      <button class="btn-secondary" (click)="validateMscoa()" [disabled]="validating">
+        <mat-icon>verified</mat-icon> {{validating ? 'Validating...' : 'Validate mSCOA'}}
+      </button>
+      <button class="btn-primary" (click)="submitAll()" [disabled]="submitting">
+        <mat-icon>send</mat-icon> {{submitting ? 'Submitting...' : 'Submit All'}}
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">CONSOLIDATED BUDGET TABLE</div>
+  <div class="card-container">
+    <div class="card-body" style="padding: 20px">
+      <div class="budget-totals" *ngIf="summary">
+        <div class="total-item">
+          <span class="total-label">Fixed Costs</span>
+          <span class="total-value">R {{summary.totalFixedCosts | number:'1.0-0'}}</span>
+        </div>
+        <div class="total-item">
+          <span class="total-label">Variable Costs</span>
+          <span class="total-value">R {{summary.totalVariableCosts | number:'1.0-0'}}</span>
+        </div>
+        <div class="total-item highlight-total">
+          <span class="total-label">Total Payroll Budget</span>
+          <span class="total-value">R {{summary.totalPayrollBudget | number:'1.0-0'}}</span>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table class="data-table" *ngIf="budgetLines.length; else noLines">
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Cost Category</th>
+              <th>Sub-Category</th>
+              <th>mSCOA Item</th>
+              <th>mSCOA Fund</th>
+              <th>mSCOA Function</th>
+              <th class="text-right">Year 1</th>
+              <th class="text-right">Year 2</th>
+              <th class="text-right">Year 3</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let l of budgetLines">
+              <td>{{l.department || '—'}}</td>
+              <td class="fw-600">{{l.costCategory}}</td>
+              <td>{{l.subCategory || '—'}}</td>
+              <td><span class="mscoa-tag" *ngIf="l.scoaItemCode">{{l.scoaItemCode}}</span></td>
+              <td><span class="mscoa-tag" *ngIf="l.scoaFundCode">{{l.scoaFundCode}}</span></td>
+              <td><span class="mscoa-tag" *ngIf="l.scoaFunctionCode">{{l.scoaFunctionCode}}</span></td>
+              <td class="text-right mono">R {{l.year1Amount | number:'1.0-0'}}</td>
+              <td class="text-right mono">R {{l.year2Amount | number:'1.0-0'}}</td>
+              <td class="text-right mono">R {{l.year3Amount | number:'1.0-0'}}</td>
+              <td>
+                <span class="status-badge" [ngClass]="'status-' + l.status.toLowerCase()">{{l.status}}</span>
+              </td>
+              <td>
+                <button class="btn-icon" (click)="showMonthlyBreakdown(l)" title="Monthly Breakdown"><mat-icon>calendar_month</mat-icon></button>
+                <button class="btn-icon" (click)="approveLine(l)" title="Approve" *ngIf="l.status !== 'Approved'"><mat-icon>check_circle</mat-icon></button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="summary">
+            <tr class="total-row">
+              <td class="fw-600" colspan="6">TOTAL</td>
+              <td class="text-right mono fw-600">R {{summary.year1Total | number:'1.0-0'}}</td>
+              <td class="text-right mono fw-600">R {{summary.year2Total | number:'1.0-0'}}</td>
+              <td class="text-right mono fw-600">R {{summary.year3Total | number:'1.0-0'}}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+        <ng-template #noLines>
+          <div class="empty-state">
+            <mat-icon>info_outline</mat-icon>
+            <p>No budget lines generated yet. Click "Calculate Full Budget" to begin.</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">COUNCILLOR BUDGET</div>
+  <div class="card-container">
+    <div class="card-body" style="padding: 20px">
+      <table class="data-table" *ngIf="councillorPositions.length; else noCouncillors">
+        <thead>
+          <tr>
+            <th>Position</th>
+            <th>Type</th>
+            <th class="text-right">Basic Salary</th>
+            <th class="text-right">Travel Allowance</th>
+            <th class="text-right">Cellphone</th>
+            <th class="text-right">Medical</th>
+            <th class="text-right">Anticipated Increase %</th>
+            <th class="text-right">Total Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of councillorPositions">
+            <td class="fw-600">{{c.positionTitle}}</td>
+            <td><span class="type-pill">{{c.councillorType}}</span></td>
+            <td class="text-right mono">R {{c.basicSalary | number:'1.0-0'}}</td>
+            <td class="text-right mono">R {{c.travelAllowance | number:'1.0-0'}}</td>
+            <td class="text-right mono">R {{c.cellphoneAllowance | number:'1.0-0'}}</td>
+            <td class="text-right mono">R {{c.medicalContribution | number:'1.0-0'}}</td>
+            <td class="text-right mono">{{c.anticipatedIncreasePercent | number:'1.1-1'}}%</td>
+            <td class="text-right mono fw-600">R {{(c.basicSalary + c.travelAllowance + c.cellphoneAllowance + c.medicalContribution) | number:'1.0-0'}}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td class="fw-600" colspan="7">TOTAL COUNCILLOR COSTS</td>
+            <td class="text-right mono fw-600">R {{councillorTotal | number:'1.0-0'}}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <ng-template #noCouncillors>
+        <div class="empty-state">
+          <mat-icon>groups</mat-icon>
+          <p>No councillor positions configured</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="section-label">WARD COMMITTEE BUDGET</div>
+  <div class="card-container">
+    <div class="card-body" style="padding: 20px">
+      <table class="data-table" *ngIf="wardBudgets.length; else noWards">
+        <thead>
+          <tr>
+            <th>Ward</th>
+            <th class="text-right">Members</th>
+            <th class="text-right">Meetings</th>
+            <th class="text-right">Rate/Meeting</th>
+            <th class="text-right">Increase %</th>
+            <th class="text-right">Total Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let w of wardBudgets">
+            <td class="fw-600">Ward {{w.wardNumber}}</td>
+            <td class="text-right mono">{{w.numberOfMembers}}</td>
+            <td class="text-right mono">{{w.numberOfMeetings}}</td>
+            <td class="text-right mono">R {{w.ratePerMeeting | number:'1.2-2'}}</td>
+            <td class="text-right mono">{{w.anticipatedRateIncreasePercent | number:'1.1-1'}}%</td>
+            <td class="text-right mono fw-600">R {{w.totalEstimatedCost | number:'1.0-0'}}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td class="fw-600" colspan="5">TOTAL WARD COMMITTEE COSTS</td>
+            <td class="text-right mono fw-600">R {{wardTotal | number:'1.0-0'}}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <ng-template #noWards>
+        <div class="empty-state">
+          <mat-icon>location_city</mat-icon>
+          <p>No ward committee budgets configured</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="section-label">SCENARIO COMPARISON</div>
+  <div class="card-container">
+    <div class="card-body" style="padding: 20px">
+      <div *ngIf="scenarios.length; else noScenarios">
+        <div class="scenario-grid">
+          <div class="scenario-card" *ngFor="let s of scenarios" [ngClass]="{'scenario-approved': s.status === 'Approved'}">
+            <div class="scenario-header">
+              <h3>{{s.name}}</h3>
+              <span class="status-badge" [ngClass]="'status-' + s.status.toLowerCase()">{{s.status}}</span>
+            </div>
+            <div class="scenario-body">
+              <div class="scenario-metric">
+                <span class="scenario-label">Salary Increase</span>
+                <span class="scenario-value">{{s.salaryIncreasePercent | number:'1.1-1'}}%</span>
+              </div>
+              <div class="scenario-metric">
+                <span class="scenario-label">Vacancy Filling</span>
+                <span class="scenario-value">{{s.vacancyFillingPercent | number:'1.0-0'}}%</span>
+              </div>
+              <div class="scenario-metric">
+                <span class="scenario-label">Baseline Cost</span>
+                <span class="scenario-value mono">R {{s.totalBaselineCost | number:'1.0-0'}}</span>
+              </div>
+              <div class="scenario-metric">
+                <span class="scenario-label">Scenario Cost</span>
+                <span class="scenario-value mono">R {{s.totalScenarioCost | number:'1.0-0'}}</span>
+              </div>
+              <div class="scenario-metric variance-metric">
+                <span class="scenario-label">Variance</span>
+                <span class="scenario-value" [ngClass]="s.varianceAmount >= 0 ? 'text-red' : 'text-green'">
+                  R {{s.varianceAmount | number:'1.0-0'}} ({{s.variancePercent | number:'1.1-1'}}%)
+                </span>
+              </div>
+            </div>
+            <div class="scenario-actions">
+              <button class="btn-icon" (click)="calculateScenario(s.id)" title="Calculate"><mat-icon>calculate</mat-icon></button>
+              <button class="btn-icon" (click)="submitScenarioReport(s)" title="Submit Report" *ngIf="s.status === 'Draft'"><mat-icon>send</mat-icon></button>
+              <button class="btn-icon" (click)="approveScenarioReport(s)" title="Approve Report" *ngIf="s.status === 'Submitted'"><mat-icon>check_circle</mat-icon></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ng-template #noScenarios>
+        <div class="empty-state">
+          <mat-icon>compare_arrows</mat-icon>
+          <p>No payroll scenarios to compare</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="section-label">mSCOA VALIDATION</div>
+  <div class="card-container">
+    <div class="card-body" style="padding: 20px">
+      <div *ngIf="validationResults.length; else noValidation">
+        <div class="validation-summary">
+          <div class="validation-stat stat-pass">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{validationPassed}} Passed</span>
+          </div>
+          <div class="validation-stat stat-warning">
+            <mat-icon>warning</mat-icon>
+            <span>{{validationWarnings}} Warnings</span>
+          </div>
+          <div class="validation-stat stat-error">
+            <mat-icon>error</mat-icon>
+            <span>{{validationErrors}} Errors</span>
+          </div>
+        </div>
+        <table class="data-table" *ngIf="validationResults.length">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Rule</th>
+              <th>Message</th>
+              <th>Suggested Fix</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let v of validationResults">
+              <td>
+                <span class="validation-indicator" [ngClass]="'indicator-' + v.status.toLowerCase()">
+                  <mat-icon>{{v.status === 'Pass' ? 'check_circle' : v.status === 'Warning' ? 'warning' : 'error'}}</mat-icon>
+                  {{v.status}}
+                </span>
+              </td>
+              <td class="mono">{{v.ruleCode}}</td>
+              <td>{{v.message}}</td>
+              <td>{{v.suggestedFix || '—'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noValidation>
+        <div class="empty-state">
+          <mat-icon>verified</mat-icon>
+          <p>Run mSCOA validation to see results</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showMonthlyDialog" (click)="showMonthlyDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>Monthly Distribution — {{selectedLine?.costCategory}}</h2>
+        <button class="btn-icon" (click)="showMonthlyDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body" *ngIf="selectedLine">
+        <div class="monthly-grid">
+          <div class="monthly-item" *ngFor="let m of months; let i = index">
+            <span class="month-label">{{m}}</span>
+            <span class="month-value mono">R {{getMonthValue(selectedLine, i) | number:'1.0-0'}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showMonthlyDialog = false">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showApproveDialog" (click)="showApproveDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>Approve Budget Line</h2>
+        <button class="btn-icon" (click)="showApproveDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-group">
+          <label>Comments</label>
+          <textarea [(ngModel)]="approvalComments" rows="3" placeholder="Approval comments..."></textarea>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showApproveDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="confirmApproval()">Approve</button>
+      </div>
+    </div>
+  </div>
+</div>

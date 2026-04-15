@@ -1,0 +1,523 @@
+﻿BillOfQuantityId,RequisitionID,TenderID,PurchaseItem,PurchaseItem2,PurchaseItem3,UOM,Quantity,RequisitionDetailID,ProjectID,SCOAItemID,PreviousBillOfQuantityId
+67,647,61,Qolorha Access Road,,,4,1.0000,940,8837,41285,NULL
+71,648,63,Construction of Thanga Outdoor Sports Facility,,,5,1.0000,941,8683,41198,NULL
+73,651,64,Outdoor sports facility,,,4,1.0000,944,8905,41198,NULL
+75,652,65,Paving of King and Blyth Street,,,4,1.0000,945,9079,41285,NULL
+110,1191,69,Four Tone Cherry Picker,-,-,5,1.0000,2126,11757,24607,NULL
+111,1191,69,Skip Loader truck,-,-,5,1.0000,2127,11757,24607,NULL
+112,1191,69,Tractors,-,-,5,2.0000,2128,11757,24607,NULL
+113,1191,69,Bus,-,-,5,1.0000,2129,11757,24607,NULL
+114,1191,69,Taxi,-,-,5,1.0000,2130,11757,24607,NULL
+115,1191,69,Double Cab Bakkies,-,-,5,2.0000,2131,11757,24607,NULL
+116,1191,69,Double Cab Bakkie,-,-,5,1.0000,2132,11757,24607,NULL
+117,1191,69,Long Base Bakkies,-,-,5,3.0000,2133,11757,24607,NULL
+118,1191,69,Sedans,-,-,5,2.0000,2134,11757,24607,NULL
+119,1191,69,Hash Back Vehicle,-,-,5,1.0000,2135,11757,24607,NULL
+208,1812,82,Silver line 5 seater,-,-,5,5.0000,3550,11838,117,NULL
+209,1812,82,Chairman high Back Chair with Headrest Black Netted Back- Fabric Contract,-,-,5,10.0000,3551,11838,117,NULL
+210,1812,82,Desks-Based Screen-Curved Aluminium Frame= Burgundy,-,-,5,2.0000,3552,11838,117,NULL
+211,1812,82,Bow Front Desk-PM,-,-,5,2.0000,3553,11838,117,NULL
+212,1812,82," Bookcase floor standing-Glass and Solid Hinged Doors- Mahogany",-,-,5,2.0000,3554,11838,117,NULL
+213,1812,82,4 TIER Book Case,-,-,5,1.0000,3555,11838,117,NULL
+214,1812,82,Top retrieval Filling Cabinet,-,-,5,2.0000,3556,11838,117,NULL
+215,1812,82,OPTI-Plan Mobile Unit and accessories- high density 5 bay unit,-,-,5,2.0000,3557,11838,117,NULL
+252,1920,89,Construction of Butterworth Tourism Information Centre- MNQ/SCM/43/20-21,-,-,5,1.0000,3861,11844,41198,NULL
+255,1922,90,Rehabilitation of Msobomvu Msobomvu Main Road,-,-,5,1.0000,3868,11594,41285,NULL
+267,1927,95,Paving of Vuli - Valley Main Road,-,-,5,1.0000,3886,11823,41285,NULL
+269,1949,97,Refurbishment of Butterworth Town Hall,-,-,5,1.0000,3938,11848,41198,NULL
+308,1942,98,Supply and Installation 90 Hawkers Stalls 20/21 Financial Year,-,-,5,1.0000,3926,11595,41198,NULL
+350,1976,103,Construction of Thongwana Sports facility (Phase 1),-,-,5,1.0000,3982,11375,41198,NULL
+351,1977,104,Construction of Fihlani Access Road,-,-,5,1.0000,3983,11591,41285,NULL
+355,1992,106,Construction of Zizamele Internal Streets (Gravel),-,-,5,1.0000,4039,11370,41285,NULL
+362,1988,107,Construction OF MASIZAKHE TO NZANZANA  ACCESS ROAD,,,5,1.0000,4012,11872,41285,NULL
+380,3059,118,"Tar surface repairs and asphalt overlay Blyth, Standford, Robison and daly street",-,-,5,1.0000,5331,11829,41285,NULL
+485,3157,128,Construction of Rhaladiya-Jingqi Access Road,,,5,1.0000,5648,11590,41285,NULL
+486,3160,130,Construction of Gcina (Esingeni) Access Road,-,-,5,1.0000,5651,11217,41285,NULL
+487,3072,129,Tar Surface repairs and asphalt overlay at Blyth and King Link Roads,-,-,5,1.0000,5361,11828,41285,NULL
+558,3162,134,Request for Supply and Delivery of Docking Station,-,-,5,1.0000,5656,11833,87,NULL
+559,3162,134,Request for Supply and Delivery of Docking Station,-,-,5,1.0000,5657,11833,87,NULL
+560,3162,134,Request for Supply and Delivery of Docking Station,-,-,5,1.0000,5658,11833,87,NULL
+561,3162,134,Request for Supply and Delivery of Docking Station,-,-,5,1.0000,5659,11833,87,NULL
+603,3328,140,Construction of Ntseshe Community Hall,,,5,1.0000,6137,14840,41198,NULL
+612,4191,141,Upgrading of Ngqamakwe Internal Streets - Phase 1,,,5,1.0000,8375,15417,41285,NULL
+625,4236,144,each,Construction of Fihlani Access Road,-,5,1.0000,8569,16612,41285,NULL
+630,3269,145,Paving of Vuli Valley Internal Streets (Phase1),,,5,1.0000,5909,15489,41285,NULL
+631,4285,146,"Refurbishment of Robinson street, Stanford Cres, Fitzpatrick Road and McCleanagham Road",-,-,5,1.0000,8678,15495,41285,NULL
+634,4284,148,Construction of Mbongendlu Access Road,-,-,5,1.0000,8677,15142,41285,NULL
+635,4283,149,"Construction of Mkrwaqa, Zagwa, Thongwana and Vulihlanga Access Road",-,-,5,1.0000,8676,14909,41285,NULL
+637,4281,151,Construction of Zixhotyeni via Lalini-Hom to Mthonjeni Access Road,-,-,5,1.0000,8674,14892,41285,NULL
+640,4280,153,Construction of Phola Park Access Road,-,-,5,1.0000,8673,15144,41285,NULL
+645,4332,158,Rehabilitation of Ext 6 Ring Road (Surfaced),-,-,5,1.0000,8790,15452,41285,NULL
+647,4336,159,Construction of Cebe Community Hall,,,5,1.0000,8845,14927,41198,NULL
+683,4353,164,Construction of Rhwantsana Outdoor Sports Facility,-,-,5,1.0000,8869,15034,41198,NULL
+685,3333,163,Refurbishment of N2-Mchubakazi streetlights,,,5,1.0000,6142,15486,50725,NULL
+688,4038,166,Refurbishment of Ibika Street Lights,-,-,5,1.0000,7856,15484,50725,NULL
+689,4277,167,Construction of Construction Ntshamanzi Access Road,-,-,5,1.0000,8670,14861,41285,NULL
+690,4276,168,Construction of Ntshatshongo to  Mthonjeni Access,-,-,5,1.0000,8669,15223,41285,NULL
+691,4261,169,"Provision of professional Electrical Services for Planning, Design & Project Management  of 2022/2023 FY   ",-,-,5,1.0000,8623,14970,51065,NULL
+692,4363,170,Construction of Qombolo access road,-,-,5,1.0000,8961,14902,41285,NULL
+693,4395,171,Construction of Cuba Community Hall,-,-,5,1.0000,9095,16610,41198,NULL
+762,4568,176,Construction of Thanga Sportfield,,,5,1.0000,9582,16626,41198,NULL
+769,4670,182,"Construction of Ngqamakhwe Satellite Offices ",-,-,5,1.0000,10095,15384,41198,NULL
+775,3332,187,Refurbishment of Centane Streetlights,-,-,5,69.0000,6141,15483,50725,NULL
+777,4260,189,Electrification of Rural Households in Mnquma ( 2022/2023 FY),-,-,5,1.0000,8622,14970,51065,NULL
+778,4256,190,Desk,-,-,5,1.0000,8592,15290,117,NULL
+779,4256,190,"Wall Unit ",-,-,5,1.0000,8593,15290,117,NULL
+780,4259,190,Chair,-,-,5,23.0000,8617,15541,117,NULL
+781,4259,190,Office Desk,-,-,5,5.0000,8618,15541,117,NULL
+782,4259,190,Pedestal,-,-,5,5.0000,8619,15541,117,NULL
+783,4259,190,Cabinet,-,-,5,2.0000,8620,15541,117,NULL
+784,4259,190,Office Chair,-,-,5,5.0000,8621,15541,117,NULL
+785,4334,190,"Symphony Elite executive L-Shape Desk ",-,-,5,1.0000,8795,15513,117,NULL
+786,4334,190,Filing Cabinet/ Universal Storage,-,-,5,1.0000,8796,15513,117,NULL
+787,4334,190,"Coat & Hat Stands ",-,-,5,1.0000,8797,15513,117,NULL
+788,4334,190,Highback Chair,-,-,5,1.0000,8798,15513,117,NULL
+789,4334,190,Visitors Chairs,-,-,5,4.0000,8799,15513,117,NULL
+790,4334,190,"Table ",-,-,5,1.0000,8800,15513,117,NULL
+791,4334,190,Chairs,-,-,5,15.0000,8801,15513,117,NULL
+792,4354,190,Expenditure - Office Chairs x 08,-,-,5,8.0000,8870,15314,117,NULL
+793,4354,190,Asset - Office Chairs x 07,-,-,5,7.0000,8871,15314,117,NULL
+794,4354,190,Asset - Visitors Chairs x 03,-,-,5,3.0000,8872,15314,117,NULL
+795,4354,190,Budget - Office Chairs x 03,-,-,5,3.0000,8873,15314,117,NULL
+796,4354,190,Revenue - Desk x 04,-,-,5,4.0000,8874,15314,117,NULL
+797,4354,190,Revenue- Desk x 01,-,-,5,1.0000,8875,15314,117,NULL
+798,4354,190,Revenue - Credenza x 01,-,-,5,1.0000,8876,15314,117,NULL
+799,4354,190,Revenue - Executive Chairs x 06,-,-,5,6.0000,8877,15314,117,NULL
+800,4354,190,Revenue - Chair x 01,-,-,5,1.0000,8878,15314,117,NULL
+801,4354,190,Revenue - Visitors Chairs x 05,-,-,5,5.0000,8879,15314,117,NULL
+802,4354,190,Secretary Strategic - Office Chair x 01,-,-,5,1.0000,8880,15314,117,NULL
+803,4354,190,Special Programme unit - Strategic - Office Chairs x 04,-,-,5,4.0000,8881,15314,117,NULL
+804,4354,190,IDP/PMS Division - Office Desk x 01,-,-,5,1.0000,8882,15314,117,NULL
+805,4354,190,IDP /PMS Division - Office Chairs x 04,-,-,5,4.0000,8883,15314,117,NULL
+806,4354,190,Public Participation Division - Office Chairs x 05,-,-,5,5.0000,8884,15314,117,NULL
+807,4354,190,Public Participation Division - Desk x 01,-,-,5,1.0000,8885,15314,117,NULL
+808,4354,190,Chief Whip - Visitors Chairs x 02,-,-,5,2.0000,8886,15314,117,NULL
+809,4354,190,Chief Whip - High Back Chair x 01,-,-,5,1.0000,8887,15314,117,NULL
+810,4354,190,Chief Whip - Desk x 01,-,-,5,1.0000,8888,15314,117,NULL
+867,12986,201,Request for Construction of Concrete Side Channels,-,-,5,1.0000,19224,15496,41285,NULL
+868,4549,202,"Request of  Service Provider for Final Design for new municipal offices/Architectural  ",-,-,5,1.0000,9406,15493,41198,NULL
+873,13064,206,Request for 2x Motor Vehicles.,-,-,5,2.0000,19614,16644,24607,NULL
+874,13035,207,Supply & Installation of 20Led lights along Mthatha & King Street,-,-,5,20.0000,19393,15441,50725,NULL
+877,13130,210,Request for Road Marking Paint Machine.,-,-,5,1.0000,19785,16655,6141,NULL
+1207,13646,240,"REQUEST FOR PROFESSIONAL SERVICES FOR Planning, Design and Project Management of Ngqamakwe Internal Streets ",-,-,5,1.0000,20931,15417,6417,NULL
+1268,4537,248,Refurbishment of Traffic Department,-,-,5,1.0000,9375,16622,41198,NULL
+1298,13898,255,"Request for procurement of Endpoint Data Protection License ",-,-,5,1.0000,21834,15458,9472,NULL
+1402,13973,271,Request for Construction of New Butterworth DLTC Examination Room and Offices,-,-,5,1.0000,22025,15490,6417,NULL
+1404,14030,273,REQUEST FOR SPECIFICATION & ADVERTISEMENT FOR REHABILITATION OF NGCWAZI-NTWALA MANTUNZELENI ACCESS ROAD,-,-,5,1.0000,22268,14901,6417,NULL
+1405,13850,274,"Caseware License ",-,-,5,1.0000,21704,15567,9472,NULL
+1426,14012,276,"Request for 2x Office Desk Melanine Dimensions 1600x700x750 Melanine finish,Colour Walnut.",-,-,5,2.0000,22122,15513,137,NULL
+1427,14012,276,"Request for 2x Luxury executive leather highback office chairs,Color Black.",-,-,5,2.0000,22123,15513,137,NULL
+1428,14012,276,"Request for 4x elegant office visitors chairs,leather,color black",-,-,5,4.0000,22124,15513,137,NULL
+1429,14012,276,Request for 16 seater boardroom table-Indigo Boardroom table.,-,-,5,1.0000,22125,15513,137,NULL
+1430,14012,276,"Request for 16x Highback Boardroom Chairs,Color Black.",-,-,5,16.0000,22126,15513,137,NULL
+1431,14012,276,Request for a 2.2x2.2 Morden Reception desk in color White with black topping,-,-,5,1.0000,22127,15513,137,NULL
+1432,14012,276,Request for 1x Highback Reception Chair.,-,-,5,1.0000,22128,15513,137,NULL
+1433,14012,276,"Request for 2x2 seater couches,Amazon Grey Chesterfield Tufted with Removable and Reversable Seat.",-,-,5,2.0000,22129,15513,137,NULL
+1434,14012,276,"Request for 1x Glass Cofee table,white ",-,-,5,1.0000,22130,15513,137,NULL
+1435,14012,276,Request for 3x200m exhibishin tables covered in black cloths with Mnquma Logo.,-,-,5,3.0000,22131,15513,137,NULL
+1436,14012,276,"Request for 2 door Refridgerator, Color white ",-,-,5,1.0000,22132,15513,137,NULL
+1437,14012,276,Request for 1x flipchart Magnetic Deluxe Castors 1000x680mm,-,-,5,1.0000,22133,15513,137,NULL
+1438,14012,276,"Request for 1x 32ltr Microwve, Color Black, Stainless.",-,-,5,1.0000,22134,15513,137,NULL
+1439,14012,276,Request for an overhead Projector,-,-,5,1.0000,22135,15513,137,NULL
+1440,14012,276,"Request for a Television set,Size 55',Color Black, High quality pictures,Must be able to play usb.",-,-,5,1.0000,22136,15513,137,NULL
+1441,14012,276,Request for an Airconditioner.:AR Wall split 9000 btu/hr Non Inverter.,-,-,5,1.0000,22137,15513,137,NULL
+1442,14012,276,"Request for an A4 Aluminium Brochure stand,Cream white and Steel.",-,-,5,1.0000,22138,15513,137,NULL
+1443,14012,276,"Request for Office Cabinet credenza with aluminium roller door,lock and shelf.",-,-,5,4.0000,22139,15513,137,NULL
+1444,14012,276,Request for 1x 25ltr water dispenser,-,-,5,1.0000,22140,15513,137,NULL
+1445,14012,276,Highback Reception Chair,Highback reception chair,,5,1.0000,22129,15513,137,NULL
+1465,4550,278,"Request for Supply and Installation of two High mast Lights in Centane ",-,-,5,2.0000,9407,15487,50725,NULL
+1466,13516,278,30m High mast light,"aggregate sand stone: SANS 1083, cement: SANS 50413-1, SANS 50413-2 Arndt 1",concrete (ready mix): SANS 878,5,1.0000,20676,15505,6417,NULL
+1502,14255,285,Medium Cage Truck,-,-,5,1.0000,22801,15509,6141,NULL
+1503,14255,285,New Refuse Compactor,-,-,5,1.0000,22802,16604,6141,NULL
+1504,14255,285,Mechenical Street Broom,-,-,5,1.0000,22803,15508,6141,NULL
+1505,14255,285,Tractor,-,-,5,1.0000,22804,15536,6141,NULL
+1506,14255,285,Mower,-,-,5,2.0000,22805,15536,6141,NULL
+1507,14255,285,Truck Tractor,-,-,5,1.0000,22806,15498,30621,NULL
+1508,14255,285,Lowbed Trailer,-,-,5,1.0000,22807,15498,30621,NULL
+1509,14255,285,LDV Base Bakkie,-,-,5,1.0000,22808,15512,30621,NULL
+1510,14255,285,Police Double Cab Bakkie,-,-,5,1.0000,22809,15512,30621,NULL
+1547,14299,290,9xLaptops-BTO,-,-,5,9.0000,22958,15386,107,NULL
+1548,14299,290,2xLaptops-Director Corporate Services,-,-,5,2.0000,22959,15386,107,NULL
+1554,13532,293,FENCING OF CENTANE CONTAINER CITY,-,-,5,1.0000,20694,15583,6417,NULL
+1555,4359,294,Refurbishment of Vulley Valley Park - Professional Services.,-,-,5,1.0000,8905,15539,41198,NULL
+1557,14306,296,"Request  for procurement of Provision of Professional Electrical Services for Planning, Design and Project Management of 2023/2024 financial Year Electrification Programme within Mnquma Area                         ",-,-,5,1.0000,22976,14970,51065,NULL
+1558,14014,297,Specification & Advertisement for iZixhotyeni via Lalini-Hom To Mthonjeni Access Road,-,-,5,1.0000,22191,14892,41285,NULL
+1559,13430,298,"APPOINTMENT OF A PROFESSIONAL SERVICE PROVIDER FOR PLANNING, DESIGN AND PROJECT  MANAGEMENT OF UPGRADING OF MSOBOMVU SPORTS FACILITY",-,-,5,1.0000,20476,16659,6417,NULL
+1561,14326,300,"Electrification of Nqanguleni, Ntandathu, Ntshatshonga ,Nqilleni, Machibe, Phesheya KweDiphu villages",-,-,5,1.0000,23022,14970,6417,NULL
+1562,14327,301,"PROVISION OF PROFESSIONAL ELECTRICAL SERVICES FOR PLANNING, DESIGN AND PROJECT MANAGEMENT OF 2023/24 FINANCIAL YEAR",-,-,5,1.0000,23023,14970,6417,NULL
+1563,14307,302,Request for Refurbishment of Centane TRC Hall,-,-,5,1.0000,22977,16621,6417,NULL
+1564,14330,304,"Request for procurement of provision of Professional Quantity Surveyor and Architect for Planning, Design and Project Management for Construction of Butterworth Town Hall",-,-,5,1.0000,23033,15401,41198,NULL
+1612,14487,321,Specification & Advertisement for Construction of Jojweni and Happy Valley Access,-,-,5,1.0000,23561,17600,6417,NULL
+1613,14482,322,Specification & Advertisement for Construction of Ngcingcinikwe Access Road,-,-,5,1.0000,23556,17599,6417,NULL
+1614,14480,323,Specification & Advertisement for Construction of Mgomanzi kwa R1 & R4 to Ntshamanzi (Eskom) Access Road,-,-,5,1.0000,23554,17598,6417,NULL
+1615,14486,324,"Specification & Advertisement for Construction of Nibe, Debese to Zigqwabele Access Road",-,-,5,1.0000,23560,17601,6417,NULL
+1616,14485,325,Specification & Advertisement for Construction of Sidutyini Access Road,-,-,5,1.0000,23559,17597,6417,NULL
+1618,14489,326,Specification & Advertisement for Construction of Ngunduza to Jebe Access Road,-,-,5,1.0000,23565,17596,6417,NULL
+1619,14496,327,Construction of Kwa-L to Adams Access Road,-,-,5,1.0000,23575,17604,6417,NULL
+1620,14525,328,PAVING OF EXT.24 INTERNAL STREETS,-,-,5,1.0000,23693,17595,6417,NULL
+1621,14526,329,Construction of Thala to Qina Access Road,-,-,5,1.0000,23694,17602,6417,NULL
+1622,14491,330,"Construction of Lunda, Mahlubini & Ngxalawe Access Road",-,-,5,1.0000,23567,16689,6417,NULL
+1625,14612,332,PAVING OF CUBA INTERNAL STREETS,-,-,5,1.0000,24118,17608,6417,NULL
+2063,14907,354,Construction of DLTC Examination Block,-,-,5,1.0000,26319,17407,6417,NULL
+2310,15006,367,Request for Fencing of Centane Container City,-,-,5,1.0000,27048,17500,6417,NULL
+2312,14957,369,Request for Appointment of a contractor for 2023-2024 financial year Electrification of 447 Households within Mnquma Local Municipality Area,-,-,5,1.0000,26537,16889,6417,NULL
+2319,15015,375,Upgrading of Msobomvu Sports Ground Phase 1,-,-,5,1.0000,27132,17574,6417,NULL
+2854,15146,392,Mechanical Street Broom,-,-,5,1.0000,27528,17528,30621,NULL
+2855,15146,392,Low Bed Trailer,-,-,5,1.0000,27529,17528,30621,NULL
+2921,15180,396,"Refurbishment of two High Mast Lights in Butterworth ( 2 Ibika) ",-,-,5,1.0000,27653,17627,6417,NULL
+3043,15178,402,Upgrading of Mchubakazi & Ngqamakwe Internal Streets - Designs and Project Management,-,-,5,1.0000,27651,17611,6417,NULL
+3044,15198,403," Designs and Project Management - Erection of Public Lighting(51 Street Lights & 3 Highmast Lights) at Ngqamakwe CBD",-,-,5,1.0000,27688,17615,6417,NULL
+3045,15214,404,Refurbishment of Customer care Offices,-,-,5,1.0000,27735,17137,6417,NULL
+3046,15213,405,Refurbishment of Centane Offices,-,-,5,1.0000,27734,17579,6417,NULL
+3057,15222,408,Concrete Bridge Deck for Mazizini to Ngozana Access Road,-,-,5,1.0000,27748,17795,6417,NULL
+3060,15223,412,Rehabilitation of Mphesheya to Ndabakazi Low- Level Bridge and Approaches,-,-,5,1.0000,27749,17794,6417,NULL
+3061,15224,411,Rehabilitation of Bridge Approaches and Retaining Structure for Mqambeli to Ndotshanga AR,-,-,5,1.0000,27750,17796,6417,NULL
+3087,15199,417,"Procurement of Overhead projector ",-,-,5,1.0000,27689,17432,137,NULL
+3088,15199,417,"Procurement of Television set to be instead ",-,-,5,1.0000,27690,17432,137,NULL
+3089,15199,417,Procurement of Air conditioners,-,-,5,4.0000,27691,17432,137,NULL
+3090,14976,419,Ngcisininde to Gedwood Access Road-Designs and Project Management,-,-,5,1.0000,26575,17607,6417,NULL
+3092,15142,421,CONSTRUCTION OF NEW MUNICIPAL OFFICES,-,-,5,1.0000,27509,17411,6417,NULL
+3103,15389,427,Supply and Delivery of Excavator,-,-,5,1.0000,28348,17230,6141,NULL
+3104,15389,427,Supply and Delivery of Grader,-,-,5,3.0000,28349,17230,6141,NULL
+3120,15396,428,Request for procurement of Endpoint Data Protection License,-,-,5,1.0000,28362,17669,9472,NULL
+3135,14977,435,"Professional Services - Develop designs for Construction of Nxaxho, Nombanjana to Ngcizela Access Road ",-,-,5,1.0000,26576,17606,6417,NULL
+3186,15527,442,2023-2024 Financial Year Electrification of 447 Households within Mnquma Local Municipal Area,-,-,5,1.0000,28811,16889,6417,NULL
+3187,15530,443,"Provision of Professional Electrical Services for Planning,Design and Project Management of ",-,-,5,1.0000,28814,16889,6417,NULL
+3207,15384,452,Casting and Installation of 30 Concrete Catchpit Covers in Butterworth CBD,-,-,5,1.0000,28343,17621,41547,NULL
+3218,15013,460,Erect 124 Street Lights at Ext 6 and Fitzpatrick Road,-,-,5,124.0000,27055,17628,6417,NULL
+3253,15921,465,Fencing of Staff House no 55 and 57 Blyth street Butterworth,-,-,5,1.0000,30343,17811,6417,NULL
+3254,15915,466,Procurement of i7 16GB 512GB SSD,-,-,5,3.0000,30332,17305,107,NULL
+3255,15915,466,Procurement of i7 16GB 512GB SSD,-,-,5,10.0000,30333,17305,107,NULL
+3256,15915,466,"Procurement of laptop bag ",-,-,5,52.0000,30334,17305,107,NULL
+3257,15915,466,Procurement of i5 8GB RAM 500GB SSD,-,-,5,51.0000,30335,17305,107,NULL
+3258,15931,467,Upgrading of Msobomvu Msobomvu Sports Ground Phase 1,-,-,5,1.0000,30378,17574,6417,NULL
+3259,15893,468,"Procurement of SUV for Executive Mayor ",-,-,5,1.0000,30298,17809,30621,NULL
+3260,15970,469,Anti-Virus License,-,-,5,1.0000,30498,17668,9472,NULL
+3261,15986,469,Request for Antivirus training for 11 ICT Officials,-,-,5,11.0000,30553,17018,32634,NULL
+3274,16081,475,Upgrading of Mchubakazi Internal Streets (Surfaced),-,-,5,1.0000,30937,17618,6417,NULL
+3275,15336,477,Casewear Licenses,-,-,5,3.0000,28258,17484,9472,NULL
+3282,16116,481,Construction of Jojweni to Happy Valley Access Road,-,-,5,1.0000,31026,17600,6417,NULL
+3283,16051,482,Procurement of 4 Sedans for Traffic department.,-,-,5,4.0000,30793,17528,30621,NULL
+3298,16119,487,Planning and Designs for the Construction of Ngcisininde to Gedwood Access Road,-,-,5,1.0000,31030,17607,6417,NULL
+3714,16246,501,HIRE OF PLANT FOR ZINGCUKA TO MTHAWELANGA WARD 21,"Transportation, Establishment, Overhaul on Gravel Material and Tipping",-,18,26094.0000,31822,17814,6417,NULL
+3715,16246,501,"WATER CARTER (WITH A MINIMUM TANK CAPACITY OF 15KL) ",Watering of Spread Gravel material,-,13,90000.0000,31823,17814,6417,NULL
+3716,16246,501,"EXCAVATOR ","Transport, Establishment, Excavation of Hard material, Stockpiling and loading",-,18,5056.5000,31824,17814,6417,NULL
+3717,16246,501,"GRID ROLLER ","Transportation, Establishment, Gravel material in compacted layer thickness of 150mm and less and Compacted to 93% of modified AASHTO density",-,27,169800.0000,31825,17814,6417,NULL
+3718,16246,501,"MOTOR GRADER ","Transportation, Establishment, Rip Existing Gravel wearing course layer 150mm deep, formation, spreading, shaping of wearing coarse (gravel material) and cutting of side drains",-,27,38960.0000,31826,17814,6417,NULL
+3719,16246,501,15% ESTABLISHMENT,-,-,5,1.0000,31827,17814,6417,NULL
+3721,16247,502,HIRE OF TIPPER TRUCK FOR ZINGCUKA TO MTHAWELANGA WARD 21,"Transportation, Establishment, Overhaul on Gravel Material and Tipping",-,18,26094.0000,31829,17814,6417,NULL
+3722,16247,502,WATER CARTER (WITH A MINIMUM TANK CAPACITY OF 15KL),Watering of Spread Gravel material,-,13,90000.0000,31830,17814,6417,NULL
+3723,16247,502,"EXCAVATOR ","Transport, Establishment, Excavation of Hard material, Stockpiling and loading",-,18,5056.5000,31831,17814,6417,NULL
+3724,16247,502,GRID ROLLER," Transportation, Establishment, Gravel material in compacted layer thickness of 150mm and less and Compacted to 93% of modified AASHTO density",-,27,169800.0000,31832,17814,6417,NULL
+3725,16247,502,"MOTOR GRADER ","Transportation, Establishment, Rip Existing Gravel wearing course layer 150mm deep, formation, spreading, shaping of wearing coarse (gravel material) and cutting of side drains",-,27,38960.0000,31833,17814,6417,NULL
+3726,16247,502,15% ESTABLISHMENT,-,-,5,1.0000,31834,17814,6417,NULL
+3834,16112,518,"Professional Services - Develop designs for Construction of Nxaxho, Nombanjana to Ngcizela Access Road",-,-,5,1.0000,31017,17606,6417,NULL
+3837,16396,520,3 Furrow plate plough-disk plough,-,-,5,2.0000,32241,17519,41265,NULL
+3838,16396,520,3 Furrow plough with three hooks,-,-,5,4.0000,32242,17519,41265,NULL
+3839,15929,521,"Professional Service Provider For Planning, Design and Project Management for Upgrading of Msobomvu Sports Ground.",-,-,5,1.0000,30376,17574,6417,NULL
+3924,14648,528,Request for Fencing of Tally Cemetery,-,-,5,1.0000,24367,17616,6417,NULL
+3932,15444,532,Procurement of Contractor for paving of Centane Container City,-,-,5,1.0000,28582,17500,6417,NULL
+3939,16527,539,Procurement of i7 16gb 512GB SSD 1,-,-,5,1.0000,32837,17305,107,NULL
+3940,16527,539,Procurement of i7 Notebook_2 512GB SSD,-,-,5,2.0000,32838,17305,107,NULL
+3941,16527,539,Procurement of i5 Notebook,-,-,5,4.0000,32839,17305,107,NULL
+3942,16527,539,Procurement of Laptop bags,-,-,5,4.0000,32840,17305,107,NULL
+3943,16527,539,Laptop Accessories-USB Type-C Ethernet,-,-,5,4.0000,32841,17305,107,NULL
+3944,16527,539,Laptop Accessories USB-VGA/HDMI or HDMI-VGA,-,-,5,4.0000,32842,17305,107,NULL
+3945,16527,539,Procurement of i5 Notebook,-,-,5,1.0000,32843,17707,107,NULL
+3946,16527,539,Procurement of Laptop bag,-,-,5,1.0000,32844,17707,107,NULL
+3949,15718,542,"Procurement of 6 High back chair ",-,-,5,6.0000,29731,17210,137,NULL
+3950,15718,542,"Procurement of 3 high back chair ",-,-,5,3.0000,29732,17233,137,NULL
+3951,15718,542,"Procurement 0f 144 key deposit safe ",-,-,5,1.0000,29733,17233,137,NULL
+3952,15718,542,"Procurement of 03 high back chair ",-,-,5,3.0000,29734,17467,137,NULL
+3953,15718,542,"Procurement of 14 High back chairs for Supply Chain  Management ",-,-,5,14.0000,29735,17233,137,NULL
+3954,15718,542,Procurement of High Back Chair for Revenue interns,-,-,5,10.0000,29736,17233,137,NULL
+3956,15996,544,Procurement of preliminary designs for refurbishment of Msobomvu Hall,-,-,5,1.0000,30599,17610,6417,NULL
+3961,16023,546,Microsoft Office 365,-,-,5,1.0000,30666,17668,9472,NULL
+3962,16023,546,Windows Server,-,-,5,1.0000,30667,17668,9472,NULL
+3963,16169,547,Rehabilitation of Zingcuka to Mthawelanga Access Road Storm Water,-,-,5,1.0000,31304,17814,6417,NULL
+3964,16049,548,Fencing of animal pound,-,-,5,1.0000,30791,17420,6417,NULL
+3965,16109,549,Procurement for fencing of Municipal Offices,-,-,5,1.0000,31014,17812,6417,NULL
+3966,16662,550,Request for Concrete Waste Bins,-,-,5,80.0000,33400,17564,41198,NULL
+3973,16718,554,"Request for procurement of Planning,Designs and Project Management for Upgrading of Msobomvu Sports Ground",-,-,5,1.0000,33586,17574,6417,NULL
+3974,16719,555,Request for Procurement of Msobomvu Sports Ground Phase 1,-,-,5,1.0000,33587,17574,6417,NULL
+3975,15901,556,Procurement of Tractor,-,-,5,1.0000,30307,17335,30621,NULL
+3976,15901,556,Handling Fees and Registration,,,5,1.0000,30307,17335,30621,NULL
+3977,15901,556,Delivery Fees,,,5,1.0000,30307,17335,30621,NULL
+3980,16374,558,"Procurement of Lowbed Trailer ",-,-,5,1.0000,32188,17528,6141,NULL
+3990,15385,562,Fencing of Butterworth town Cemetery (Pallisade Fence Concrete),-,-,5,1.0000,28344,17614,6417,NULL
+4083,16274,566,Double Cab Vehicle,,,5,1.0000,31925,17789,30621,NULL
+4084,16274,566,Double Cab Vehicle Solid Waste and Amenities,,,5,1.0000,31926,17528,30621,NULL
+4085,16274,566,Double Cab Vehicle Security Services,,,5,1.0000,31927,17230,30621,NULL
+4086,16274,566,Double Cab Vehicle Building and Housing,,,5,1.0000,31927,17230,30621,NULL
+4096,15101,570,"LED Display size 4(W) x 2.5(H)  Double sided Screen warranty of 10 years ",-,-,5,1.0000,27353,17646,107,NULL
+4097,15101,570,Controller and Operating Software with Windows Pro and modem for remote connection,-,-,5,1.0000,27354,17646,9472,NULL
+4098,15101,570,Software maintenance - 3 years,-,-,5,1.0000,27355,17646,9472,NULL
+4099,15101,570,Internet connectivity modem for remote connection (wifi),-,-,5,1.0000,27356,17646,9472,NULL
+4100,15101,570,"Steel structure for Double sided screen including all excavations, concrete works, etc. Engineer to approve excavations, concrete works, steel structure, Electrical connection, etc.",-,-,5,1.0000,27357,17646,107,NULL
+4101,15101,570,Installation,-,-,5,1.0000,27358,17646,107,NULL
+4102,15101,570,Engineer Certificates and Electrical CoC,-,-,5,1.0000,27359,17646,107,NULL
+4103,15101,570,Uninterrupted Power Supply with minimum of 2 hours backup,-,-,5,1.0000,27360,17646,107,NULL
+4104,15101,570,"Theft and vandalist solution, and fencing",-,-,5,1.0000,27361,17646,107,NULL
+4155,17149,596,17824 | Construction of Khobonqaba -Seku Access Road,-,-,5,1.0000,35125,18970,6417,NULL
+4156,17148,597,"17823 | Construction of Bhisiniya, Ndende-Mbangweni & Matidaleni Access Road",-,-,5,1.0000,35124,18969,6417,NULL
+4157,17146,598,17826 | Construction of Nciba Access Road (ward 11),-,-,5,1.0000,35122,18972,6417,NULL
+4158,17147,599,Construction of Mjo to Chwebeni Access Road (ward 29),-,-,5,1.0000,35123,18971,6417,NULL
+4159,17144,600,17871 | Rehabilitation of Gxakhulu Access Road (Ward 12),-,-,5,1.0000,35120,19017,6417,NULL
+4160,17145,601,Construction of Tshoveni- Bhongweni Gravel Road (ward 09),-,-,5,1.0000,35121,18976,6417,NULL
+4161,17153,602,Construction of Nxaxho A-Nombanjana to Ngcizela Access Road-AFA,-,-,5,1.0000,35132,18974,6417,NULL
+4162,17152,603,Construction of Ngcisininde-Gedwood Access Road (Ward 16)-AFA,-,-,5,1.0000,35131,18973,6417,NULL
+4163,16965,604," Paving of Msobomvu Internal Streets",-,-,5,1.0000,34365,19004,6417,NULL
+4164,17151,605,17878 | Tar Surafce Repairs and Asphalt Overlay From Cuba (Sdima)  to eMziyoni Taxi Route,-,-,5,1.0000,35130,19024,6417,NULL
+4165,16966,606,"Tar Surafce Repairs and Asphalt Overlay (Geash, Fuller, Fennel, Brown-Lee and Taylor Streets)",-,-,5,1.0000,34366,18762,6417,NULL
+4166,17163,607,Paving of Ibika Taxi Route,-,-,5,1.0000,35157,19003,6417,NULL
+4167,17156,608,Ngcisininde to Gedwood Access Road-Designs and Project Management,-,-,5,1.0000,35135,18749,6417,NULL
+4168,17164,609,"17960 | Planning , design and project management for Upgrading of Msobomvu Sports Ground",-,-,5,1.0000,35158,19103,6417,NULL
+4169,17165,610,16656 | Upgrading of Msobomvu Msobomvu Sports Ground Phase 1,-,-,5,1.0000,35159,18718,6417,NULL
+4250,17225,615,16710 | Upgrading of Ngqamakwe Internal Streets Phase 2 (Surfaced),-,-,5,1.0000,35521,18768,6417,NULL
+4251,17227,615,16702 | Upgrading of Mchubakazi Internal Streets (Surfaced),-,-,5,1.0000,35523,18760,6417,NULL
+4443,17674,647,Hire of Tipper Truck for Rehabilitation of Malongweni Access Road - Section 1,-,-,18,22275.0000,36975,18954,6417,NULL
+4444,17674,647,Water Carter(with a minimum tank capacity of 15KL),-,-,13,150000.0000,36976,18954,6417,NULL
+4445,17674,647,Excavator,-,-,27,4500.0000,36977,18954,6417,NULL
+4446,17674,647,Grid-Roller,-,-,27,112200.0000,36978,18954,6417,NULL
+4447,17674,647,Motor Grader,-,-,27,31800.0000,36979,18954,6417,NULL
+4448,17674,647,15% SITE ESTABLISHMENT,-,-,5,1.0000,36980,18954,6417,NULL
+4449,17669,648,Hire of Tipper Truck for Rehabilitation of Malongweni Access Road - Section 2,-,-,18,7965.0000,36963,18954,6417,NULL
+4450,17669,648,Water Carter(With a minimum tank capacity of 15KL),-,-,13,90000.0000,36964,18954,6417,NULL
+4451,17669,648,Excavator,-,-,18,3600.0000,36965,18954,6417,NULL
+4452,17669,648,GRID ROLLER,-,-,27,105500.0000,36966,18954,6417,NULL
+4453,17669,648,MOTOR GRADER,-,-,27,30000.0000,36967,18954,6417,NULL
+4454,17669,648,10% Establishment,-,-,5,1.0000,36968,18954,6417,NULL
+4456,17229,650,"Request for Erection and Refurbishment of 162 Streetlights at Extension 7 ",-,-,5,162.0000,35525,19015,6417,NULL
+4459,17183,652,Procurement of Storage Container,-,-,5,1.0000,35250,18978,41616,NULL
+4460,17183,652,Procurement of Container for Store Tractor Implements,-,-,5,1.0000,35251,18663,41265,NULL
+4461,17205,653,Paving of parking at municipal main building,-,-,5,1.0000,35391,19069,6417,NULL
+4476,17923,659,"Procurement of Double Cab  -Library ",-,-,5,1.0000,37641,18929,30621,NULL
+4477,17923,659,Procurement of Double Cab -BTO,-,-,5,1.0000,37642,18672,30621,NULL
+4478,17923,659,"Procurement of Double Cab Housing & Housing  ",-,-,5,1.0000,37643,18374,30621,NULL
+4479,17923,659,Procurement of Double Cab -Security Services,-,-,5,1.0000,37644,18374,6141,NULL
+4480,18025,660,LED Display size 4(W) x2.5(H) Double sided screen warranty of 10 years,-,-,5,1.0000,37979,18788,107,NULL
+4481,18025,660,Contoller and operating software with widows Pro and modem for remote connection,-,-,5,1.0000,37980,18788,107,NULL
+4482,18025,660,Software maintenance -3 years,-,-,5,1.0000,37981,18788,107,NULL
+4483,18025,660,Internet connectivity modem for remote connection (wifi),-,-,5,1.0000,37982,18788,107,NULL
+4484,18025,660,"Steel structure for double sided screen including all excavations,concrete works ,etc.Engineer to approve excavations , contrite works,steel structure,Electrical connection,etc.",-,-,5,1.0000,37983,18788,107,NULL
+4485,18025,660,Installation,-,-,5,1.0000,37984,18788,107,NULL
+4486,18025,660,Engineer certificates and electrical CoC,-,-,5,1.0000,37985,18788,107,NULL
+4487,18025,660,"Uninterrupted power supply with minimum of 2 hours backup ",-,-,5,1.0000,37986,18788,107,NULL
+4488,18025,660,"Theft and vandalise solution and fencing ",-,-,5,1.0000,37987,18788,107,NULL
+4491,17212,662,"Request for Refurbishment of Six High mast Lights ",-,-,5,6.0000,35434,18957,6417,NULL
+4492,17211,663,Request for Construction of Mnquma Public Toilets,-,-,5,1.0000,35433,18975,6417,NULL
+4494,18105,666,Request for Procurement of Fencing of Municipal Main Offices,-,-,5,1.0000,38352,18952,6417,NULL
+4495,18108,667,Request for Fencing of Butterworth Cemetery,-,-,5,1.0000,38356,18756,6417,NULL
+4505,17228,670,Request for Fencing of SMME Innovation Hub,-,-,5,1.0000,35524,18989,6417,NULL
+4506,17320,669,Rehabilitation of Malongweni Access Road Stormwater Facility,-,-,5,1.0000,35836,18954,6417,NULL
+4544,18388,678,Straight shape office desk,-,-,5,21.0000,39116,18963,137,NULL
+4545,18388,678,Screen desktop mounted,-,-,5,15.0000,39117,18963,137,NULL
+4546,18388,678,"Screen desktop mounted ",-,-,5,25.0000,39118,18963,137,NULL
+4547,18388,678,"3 drawer Pedestal ",-,-,5,21.0000,39119,18963,137,NULL
+4548,18388,678,"L shape desk ",-,-,5,1.0000,39120,18963,137,NULL
+4549,18388,678,L shape desk,-,-,5,12.0000,39121,18963,137,NULL
+4550,18388,678,Roller door filling cabinet,-,-,5,13.0000,39122,18963,137,NULL
+4551,18388,678,"High back chair ",-,-,5,29.0000,39123,18963,137,NULL
+4552,18388,678,Visitors mid back chairs,-,-,5,12.0000,39124,18963,137,NULL
+4553,18388,678,"High back chair ",-,-,5,1.0000,39125,18968,137,NULL
+4554,18388,678,"Boardroom table ",-,-,5,1.0000,39126,18968,137,NULL
+4555,18388,678,"Chairs ",-,-,5,15.0000,39127,18968,137,NULL
+4638,18678,691,Laptop i7 notebook,-,-,5,1.0000,39925,19059,107,NULL
+4639,18678,691,Laptop i5 Notebook,-,-,5,1.0000,39926,19059,107,NULL
+4640,18678,691,Laptop bag (i5),-,-,5,1.0000,39927,19059,107,NULL
+4641,18678,691,Laptop i5 Notebook-LED,-,-,5,1.0000,39928,20128,107,NULL
+4642,18678,691,Laptop bag (i5) - LED,-,-,5,1.0000,39929,20128,107,NULL
+4643,18721,692,Procurement of Water Carter,-,-,5,1.0000,40007,19006,30621,NULL
+4644,18721,692,Procurement of all purpose platform Truck,-,-,5,1.0000,40008,19006,30621,NULL
+4646,18755,694,Motor Grader.,-,-,5,1.0000,40075,19006,30621,NULL
+4647,17928,695,"Procurement of 2 Hatch back -Traffic vehicles ",-,-,5,2.0000,37652,18573,30621,NULL
+4649,17210,697,Request for Refurbishment of Msobomvu Hall,-,-,5,1.0000,35432,18751,6417,NULL
+4707,18888,706,Padfoot Drum Vibratory Compactor,12 Ton Single Drum,-,5,1.0000,40442,19006,6141,NULL
+4744,19025,714,"Procurement of Tractor 4x4 ",-,-,5,1.0000,40790,18479,30621,NULL
+4768,18502,721,Fencing of DLTC,-,-,5,1.0000,39449,20130,6417,NULL
+4769,18503,722,Request for Procurement of Appointment of Service Provider for Designs and Project Management for Refurbishment of Main Municipal Building,-,-,5,1.0000,39450,20129,6417,NULL
+4796,19259,728,"Planning, design and project management for Upgrading of Msobomvu Sports Ground",-,-,5,1.0000,41664,19103,6417,NULL
+4916,17599,749,"Procurement of double Cab - BTO ",-,-,5,1.0000,36737,18498,30621,NULL
+4917,18845,750,Request for procurement of Fencing of Animal Pound,-,-,5,1.0000,40325,18564,6417,NULL
+4918,18449,751,"Procurement of Truck mounted jetting unit ",-,-,5,1.0000,39294,19006,30621,NULL
+4931,19466,756,Upgrading of Msobomvu Sports Ground phase 2,-,-,5,1.0000,42332,19030,6417,NULL
+4970,19770,776,"Construction of Sivangxa, Matshanganeni via Jojweni to Majamaneni Access Road (Ward 15)",-,-,5,1.0000,43373,21658,6417,NULL
+4971,19769,777,Construction of Jan Nomjana Access Road (Ward 20),-,-,5,1.0000,43372,21651,6417,NULL
+4972,19768,778,Construction of Huku to Njingini Access Road (Ward 32),-,-,5,1.0000,43371,21650,6417,NULL
+4974,19766,780,Construction of Xhibeni via Maqoma Access Road,-,-,5,1.0000,43369,21142,6417,NULL
+4975,19767,781,Construction of Nciba Access Road (ward 11),-,-,5,1.0000,43370,21367,6417,NULL
+4976,19787,782,Paving of Centane Internal Streets,-,-,5,1.0000,43431,21724,6417,NULL
+4977,19776,783,Erection and Refurbishment of Ext 2 Streetlights,-,-,5,1.0000,43379,21673,6417,NULL
+4978,19771,784,Ibika Internal Streets,-,-,5,1.0000,43374,20366,6417,NULL
+4984,19873,789,Municipal Offices,-,-,5,1.0000,43803,20952,6417,NULL
+5005,19889,797,Rehabilitation of Jojweni-Mzitheni Access Road (Ward 10),-,-,5,1.0000,43840,21744,6417,NULL
+5006,19920,798,Refurbishment of Msobomvu Hall,-,-,5,1.0000,43943,21148,6417,NULL
+5007,19909,799,Municipal Offices- Professional Services,-,-,5,1.0000,43911,20951,6417,NULL
+5015,19927,802,Animal Pound - Fencing and ground levelling,-,-,5,1.0000,43957,20961,6417,NULL
+5016,19891,803,Paving of Side Parking in King and Merriman Streets,-,-,5,1.0000,43843,21726,6417,NULL
+5021,19774,808,Paving of Ext 15 Ring Road ( Ematankini),-,-,5,1.0000,43377,21725,6417,NULL
+5202,20058,819,Construction of Link road from Mambabaleni Mealie land (uLutshalendalo),-,-,5,1.0000,44544,21653,6417,NULL
+5204,19945,821,Refurbishment of streetlights to LED lights in Butterworth town,-,-,5,1.0000,44061,21740,6417,NULL
+5397,20240,836,Assets:Non-current Assets:Construction Work-in-progress:Acquisitions:Outsourced,-,-,5,1.0000,45385,21840,6417,NULL
+5398,19918,837,"Planning , design and project management for Upgrading of Msobomvu Sports Ground",-,-,5,1.0000,43941,21497,6417,NULL
+5407,19703,840,Procurement of i5 laptops - Infrastructure,-,-,5,16.0000,43101,21785,107,NULL
+5408,19703,840,Procurement of laptop bags - Infrastructure,-,-,5,16.0000,43102,21785,107,NULL
+5411,20233,843,Procurement of Bakkie BTO,-,-,5,1.0000,45363,20970,30621,NULL
+5468,20262,852,Request for procurement of Rehabilitation of Maxelegwini - Mangondini Access Road Storm Water Facilities ( Section2 ),-,-,5,1.0000,45517,21714,6417,NULL
+5469,20260,853,Request for Rehabilitation of  Maxelegwini - Mangondini Access Road  Storm Water Facilities ( Section 1),-,-,5,1.0000,45515,21714,6417,NULL
+5549,20509,866,Procurement of all purpose platform truck,-,-,5,1.0000,46499,21401,30621,NULL
+5550,20469,867,Establishment of PSC,-,-,5,1.0000,46342,21839,6417,NULL
+5551,20469,867,CLO Appointment,-,-,5,1.0000,46343,21839,6417,NULL
+5552,20469,867,Progress Report,-,-,5,2.0000,46344,21839,6417,NULL
+5553,20469,867,PSC Meeting,-,-,5,2.0000,46345,21839,6417,NULL
+5554,20469,867,Reimbursement of PSC,-,-,5,2.0000,46346,21839,6417,NULL
+5555,20469,867,Construction Monitoring,-,-,5,2.0000,46347,21839,6417,NULL
+5556,20469,867,Traveling,-,-,5,368.8000,46348,21839,6417,NULL
+5557,20460,868,Establishment of PSC,-,-,5,1.0000,46281,21839,6417,NULL
+5558,20460,868,CLO Appointment,-,-,5,1.0000,46282,21839,6417,NULL
+5559,20460,868,Progress Report,-,-,5,1.0000,46283,21839,6417,NULL
+5560,20460,868,PSC Meeting,-,-,5,1.0000,46284,21839,6417,NULL
+5561,20460,868,Reimbursment of PSC,-,-,5,2.0000,46285,21839,6417,NULL
+5562,20460,868,Construction Monitoring,-,-,5,1.0000,46286,21839,6417,NULL
+5563,20460,868,Traveling,-,-,5,496.4000,46287,21839,6417,NULL
+5564,20474,869,Establishment of PSC,-,-,5,1.0000,46367,21839,6417,NULL
+5565,20474,869,CLO Appointment,-,-,5,1.0000,46368,21839,6417,NULL
+5566,20474,869,Progress Report,-,-,5,2.0000,46369,21839,6417,NULL
+5567,20474,869,PSC Meeting,-,-,5,2.0000,46370,21839,6417,NULL
+5568,20474,869,Reimbursement of PSC,-,-,5,2.0000,46371,21839,6417,NULL
+5569,20474,869,Construction Monitoring,-,-,5,2.0000,46372,21839,6417,NULL
+5570,20474,869,Traveling,-,-,5,1338.0000,46373,21839,6417,NULL
+5572,20462,871,Establishment of PSC,-,-,5,1.0000,46295,21839,6417,NULL
+5573,20462,871,CLO Appointment,-,-,5,1.0000,46296,21839,6417,NULL
+5574,20462,871,Progress Report,-,-,5,1.0000,46297,21839,6417,NULL
+5575,20462,871,PSC Meeting,-,-,5,2.0000,46298,21839,6417,NULL
+5576,20462,871,Reimbursement of PSC,-,-,5,2.0000,46299,21839,6417,NULL
+5577,20462,871,Traveling,-,-,5,1180.0000,46300,21839,6417,NULL
+5579,20139,873,"Request for procurement of Beautification of Butterworth Monument at Umtata Street,Corner King street/ Blyth Street",-,-,5,1.0000,44935,21791,6417,NULL
+5580,19778,874,Upgrading of Msobomvu Msobomvu Sports Ground Phase 2,-,-,5,1.0000,43394,21425,6417,NULL
+5581,20627,874,Upgrading of Msobomvu Msobomvu Sports Ground Phase 2,-,-,5,1.0000,46773,21425,6417,NULL
+5582,20530,875,"Procurement of Truck Mounted Jetting Machine ",-,-,5,1.0000,46564,21401,30621,NULL
+5583,20481,876,Establishment of PSC,-,-,5,1.0000,46404,21839,6417,NULL
+5584,20481,876,CLO Appointment,-,-,5,1.0000,46405,21839,6417,NULL
+5585,20481,876,Progress Report,-,-,5,1.0000,46406,21839,6417,NULL
+5586,20481,876,PSC Meeting,-,-,5,2.0000,46407,21839,6417,NULL
+5587,20481,876,Reimbursement of PSC,-,-,5,2.0000,46408,21839,6417,NULL
+5588,20481,876,Traveling,-,-,5,584.0000,46409,21839,6417,NULL
+5596,20465,878,Establishment of PSC,-,-,5,1.0000,46314,21839,6417,NULL
+5597,20465,878,CLO Appointment,-,-,5,1.0000,46315,21839,6417,NULL
+5598,20465,878,Progress Report,-,-,5,1.0000,46316,21839,6417,NULL
+5599,20465,878,PSC Meeting,-,-,5,1.0000,46317,21839,6417,NULL
+5600,20465,878,Reimbursement of PSC,-,-,5,1.0000,46318,21839,6417,NULL
+5601,20465,878,Construction Monitoring,-,-,5,1.0000,46319,21839,6417,NULL
+5602,20465,878,Traveling,-,-,5,70.0000,46320,21839,6417,NULL
+5604,20467,880,Establishment of PSC,-,-,5,1.0000,46328,21839,6417,NULL
+5605,20467,880,CLO Appointment,-,-,5,1.0000,46329,21839,6417,NULL
+5606,20467,880,Progress Report,-,-,5,2.0000,46330,21839,6417,NULL
+5607,20467,880,PSC Meeting,-,-,5,2.0000,46331,21839,6417,NULL
+5608,20467,880,Reimbursement of PSC,-,-,5,2.0000,46332,21839,6417,NULL
+5609,20467,880,Construction Monitoring,-,-,5,1.0000,46333,21839,6417,NULL
+5610,20467,880,Traveling,-,-,5,420.0000,46334,21839,6417,NULL
+5621,20458,883,"REQUEST FOR OHS CONSULTANT FOR PAVING OF EXT. 15 RING ROAD (EMANTANKINI)- (SURFACED) ",FILE EVALUATION,-,5,1.0000,46271,21839,6417,NULL
+5622,20458,883,AUDITS,-,-,5,1.0000,46272,21839,6417,NULL
+5623,20458,883,CONSTRUCTION MONITORING STAFF,-,-,5,2.0000,46273,21839,6417,NULL
+5624,20458,883,TRAVEL,-,-,4,50.0000,46274,21839,6417,NULL
+5625,20458,883,TIME BASIS,-,-,5,4.0000,46275,21839,6417,NULL
+5626,20479,884,REQUEST FOR OHS CONSULTANT FOR CONSTRUCTION OF HUKU TO NJINGINI ACCESS ROAD (WARD 32),FILE EVALUATION,-,5,1.0000,46394,21839,6417,NULL
+5627,20479,884,AUDITS,-,-,5,1.0000,46395,21839,6417,NULL
+5628,20479,884,CONSTRUCTION MONITORING STAFF,-,-,5,1.0000,46396,21839,6417,NULL
+5629,20479,884,TRAVEL,-,-,4,672.0000,46397,21839,6417,NULL
+5630,20479,884,TIME BASIS,-,-,5,4.0000,46398,21839,6417,NULL
+5631,20459,885,"REQUEST FOR OHS CONSULTANT FOR PAVING OF IBIKA INTERNAL STREETS PHASE 1 (SURFACED) ",FILE EVALUATION,-,5,1.0000,46276,21839,6417,NULL
+5632,20459,885,AUDITS,-,-,5,1.0000,46277,21839,6417,NULL
+5633,20459,885,CONSTRUCTION MONITORING STAFF,-,-,5,2.0000,46278,21839,6417,NULL
+5634,20459,885,TRAVEL,-,-,4,50.0000,46279,21839,6417,NULL
+5635,20459,885,TIME BASIS,-,-,5,4.0000,46280,21839,6417,NULL
+5636,20480,886,REQUEST FOR OHS CONSULTANT FOR CONSTRUCTION OF XHIBENI VIA MAQOMA AVVESS ROAD (WARD 27),FILE EVALUATION,-,5,1.0000,46399,21839,6417,NULL
+5637,20480,886,AUDIT,-,-,5,1.0000,46400,21839,6417,NULL
+5638,20480,886,CONSTRUCTION MONITORING,-,-,5,1.0000,46401,21839,6417,NULL
+5639,20480,886,TRAVEL,-,-,4,824.0000,46402,21839,6417,NULL
+5640,20480,886,TIME BASIS,-,-,5,4.0000,46403,21839,6417,NULL
+5641,20572,887,REQUEST FOR OHS CONSULTANT FOR CONSTRUCTION OF JAN-NOMJANA ACCESS ROAD,FILE EVALUATION,-,5,1.0000,46668,21839,6417,NULL
+5642,20572,887,AUDITS,-,-,5,1.0000,46669,21839,6417,NULL
+5643,20572,887,CONSTRUCTION MONITORING,-,-,5,1.0000,46670,21839,6417,NULL
+5644,20572,887,TRAVEL,-,-,4,261.4000,46671,21839,6417,NULL
+5645,20572,887,TIME BASIS,-,-,5,1.0000,46672,21839,6417,NULL
+5646,20457,888,"REQUEST FOR OHS CONSULTANT FOR THE CONSTRUCTION OF LINK ROAD FROM MAMBALENI MEALIE LAND (ULUTSHALENDALO) ",FILE EVALUATION,-,5,1.0000,46266,21839,6417,NULL
+5647,20457,888,AUDITS,-,-,5,3.0000,46267,21839,6417,NULL
+5648,20457,888,CONSTRUCTION MONITORING STAFF,-,-,5,1.0000,46268,21839,6417,NULL
+5649,20457,888,TRAVEL,-,-,4,56.0000,46269,21839,6417,NULL
+5650,20457,888,TIME BASIS,-,-,5,4.0000,46270,21839,6417,NULL
+5651,20456,889,"REQUEST FOR OHS CONSULTANT FORCONSTRUCTION OF SIVANGXA, MATSHANGANENI VIA JOJWENI TO MAJAMANENI ACCESS ROAD (WARD 15) ",FILE EVALUATION,-,5,1.0000,46261,21839,6417,NULL
+5652,20456,889,AUDITS,-,-,5,3.0000,46262,21839,6417,NULL
+5653,20456,889,CONSTRUCTION MONITORING STAFF,-,-,5,1.0000,46263,21839,6417,NULL
+5654,20456,889,TRAVEL,(KM),-,4,520.0000,46264,21839,6417,NULL
+5655,20456,889,TIME BASIS,-,-,5,4.0000,46265,21839,6417,NULL
+5656,20455,890,REQUEST FOR OHS CONSULTANT FOR CONSTRUCTION OF NCIBA ACCESS ROAD,FILE EVALUATION,-,5,1.0000,46256,21839,6417,NULL
+5657,20455,890,AUDITS,-,-,5,2.0000,46257,21839,6417,NULL
+5658,20455,890,CONSTRUCTION MONITORING,-,-,5,1.0000,46258,21839,6417,NULL
+5659,20455,890,TRAVEL,-,-,4,210.0000,46259,21839,6417,NULL
+5660,20455,890,TIME BASIS,(Rate Only),-,5,2.0000,46260,21839,6417,NULL
+5661,20601,891,REQUEST FOR OHS CONSULTANT FOR PAVING OF CENTANE INTERNAL STREETS (SURFACED),FILE EVALUATION,-,5,1.0000,46735,21839,6417,NULL
+5662,20601,891,AUDITS,-,-,5,1.0000,46736,21839,6417,NULL
+5663,20601,891,CONSTRUCTION MONITORING STAFF,-,-,5,1.0000,46737,21839,6417,NULL
+5664,20601,891,TRAVEL,-,-,4,356.0000,46738,21839,6417,NULL
+5665,20601,891,TIME BASIS,-,-,5,1.0000,46739,21839,6417,NULL
+5666,20573,892,REQUEST FOR OHS CONSULTANT FOR REHABILITATION OF JOJWENI-MZITHENI ACCESS ROAD (WARD 10),FILE EVALUATION,-,5,1.0000,46673,21839,6417,NULL
+5667,20573,892,AUDITS,-,-,5,1.0000,46674,21839,6417,NULL
+5668,20573,892,CONSTRUCTION MONITORING,-,-,5,1.0000,46675,21839,6417,NULL
+5669,20573,892,TRAVEL,-,-,4,242.0000,46676,21839,6417,NULL
+5670,20573,892,TIME BASIS,-,-,5,1.0000,46677,21839,6417,NULL
+5688,20709,895,Procurement of Truck Mounted Jetting Machine,-,-,5,1.0000,47127,21401,30621,NULL
+5689,20735,896,"Request for procurement of Website Enhancements ",-,-,5,1.0000,47215,21494,9472,NULL
+5690,20461,897,Establishment of PSC,-,-,5,1.0000,46288,21839,6417,NULL
+5691,20461,897,CLO Appointment,-,-,5,1.0000,46289,21839,6417,NULL
+5692,20461,897,Progress Report,-,-,5,1.0000,46290,21839,6417,NULL
+5693,20461,897,PSC Meeting,-,-,5,1.0000,46291,21839,6417,NULL
+5694,20461,897,Reimbursement of PSC,-,-,5,1.0000,46292,21839,6417,NULL
+5695,20461,897,Construction Monitoring,-,-,5,1.0000,46293,21839,6417,NULL
+5696,20461,897,Traveling,-,-,5,70.0000,46294,21839,6417,NULL
+5738,20169,906,"Procurement of 17 for Director - Community Services ",-,-,5,1.0000,45119,21453,107,NULL
+5739,20169,906,"Procurement of laptop - Mrs L Ndlela ",-,-,5,1.0000,45120,21453,107,NULL
+5740,20169,906,Procurement of laptop Mrs U Dukada,-,-,5,1.0000,45121,21453,107,NULL
+5741,20169,906,Procurement of laptop Mrs S Mcingane,-,-,5,1.0000,45122,21453,107,NULL
+5742,20169,906,"Procurement of i7 for Mrs B Gumede ",-,-,5,1.0000,45123,21453,107,NULL
+5743,20169,906,Procurement of i5 - BTO,-,-,5,4.0000,45124,21453,107,NULL
+5744,20169,906,Procurement of i7 - BTO,-,-,5,2.0000,45125,21453,107,NULL
+5745,20169,906,Procurement of i5 BTO,-,-,5,5.0000,45126,21453,107,NULL
+5746,20169,906,"Procurement of laptop - Secretary Community Services  ",-,-,5,1.0000,45127,21453,107,NULL
+5747,20169,906,"Procurement of laptop bags ",-,-,5,12.0000,45128,21453,107,NULL
+5756,20231,908,Request for procurement for Upgrading of Cuba Hall External Works,-,-,5,1.0000,45361,21771,6417,NULL
+5827,20936,920,Platform Truck,-,-,5,1.0000,47839,21401,30621,NULL
+5828,19934,910,Construction of 1 destitute house for a physically challenged person (45 sqm),-,-,5,1.0000,43972,21646,6417,NULL
+5829,19932,921,Construction of 1 destitute houses. Disability 2 (45 sqm),-,-,5,1.0000,43970,21642,6417,NULL
+5830,19933,922,Construction of 1 destitute houses. elderly (45 sqm),-,-,5,1.0000,43971,21644,6417,NULL
+5856,19702,926,Procurement of heavy duty chainsaw,-,-,5,5.0000,43097,21194,6141,NULL
+5857,19702,926,Procurement of Pole pruner machines,-,-,5,2.0000,43098,20982,6141,NULL
+5858,19702,926,"Procurement of grass cutting machine ",-,-,5,30.0000,43099,20682,6141,NULL
+5859,19702,926,Procurement of Lawnmower,-,-,5,2.0000,43100,21703,6141,NULL
+5860,19702,926,"Nylon Heads ",,,5,16.0000,43097,21194,6141,NULL
+5861,19702,926,Blades set,,,5,5.0000,43097,21194,6141,NULL
+5862,19702,926,Helmets,,,5,20.0000,43097,21194,6141,NULL
+5863,19702,926,Knee guards,,,5,20.0000,43097,21194,6141,NULL
+5864,19702,926,Reusable masks,,,5,20.0000,43097,21194,6141,NULL
+5865,19702,926,White aprons,,,5,30.0000,43097,21194,6141,NULL
+5866,19702,926,Leather suede hand gloves,,,5,30.0000,43097,21194,6141,NULL
+5936,20966,930," N2 CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV",-,-,5,1.0000,47945,21072,6478,NULL
+5937,20966,930,"N2 CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Merriman and Umtata Street""",-,-,5,1.0000,47946,21072,6478,NULL
+5938,20966,930,"N2 CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Blyth and Umtata Street",-,-,5,1.0000,47947,21072,6478,NULL
+5939,20966,930,"Internal CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for High and King Street",-,-,5,1.0000,47948,21072,6478,NULL
+5940,20966,930,"Internal CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Taylor and High Street",-,-,5,1.0000,47949,21072,6478,NULL
+5941,20966,930,"N2 CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Academy and Umtata Street",-,-,5,1.0000,47950,21072,6478,NULL
+5942,20966,930,"Internal CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Taylor and Grubb Street",-,-,5,1.0000,47951,21072,6478,NULL
+5943,20966,930,"Internal CCTV Cameras - Supply, installation, configuration, testing, commissioning and linked back to CCTV Control Centre for Saure and King Street",-,-,5,1.0000,47952,21072,6478,NULL
+5944,20966,930,"CCTV at Drivers Licensing Test (DLTC) Facility - Supply, installation, configuration, testing commissioning and linked back to CCTV Control Centre:",-,-,5,1.0000,47953,21072,6478,NULL
+5945,20966,930,"Internal CCTV Cameras - Supply, Installation, configuration, testing, commissioning and linked back to CCTV Control Centre for High site Extension 7",-,-,5,1.0000,47954,21072,6478,NULL
+5946,20966,930,"CCTV Cameras for 4 Municipal buildings - Supply, installation, configuration, testing commission and linked back to CCTV Control centre:",-,-,5,1.0000,47955,21072,6478,NULL
+5947,20966,930,Control Room,-,-,5,1.0000,47956,21072,6478,NULL
+5948,19935,931,Construction of Shearing Shed - Masiphumelele,-,-,5,1.0000,43973,21656,6417,NULL
+5949,20259,932,"Request for procurement of Debilitation of Maxelegwini - Mangondini Access Road Storm Water Facilities ",-,-,5,1.0000,45514,21714,6417,NULL
+5972,20204,938,Request for procurement of construction of Qhubani Shearing Shed,-,-,5,1.0000,45278,21783,6417,NULL
+5973,19936,939,Construction of dipping tank- Ncityana,-,-,5,1.0000,43974,21784,6417,NULL
+5977,20337,941,"Request for procurement of Installation of Gabions on Bridge Approaches, Kunene (Ward 17), Ngxalawe (Ward 19) and Concrete Deck in Mpahleni Bridge (Ward 18)",-,-,5,1.0000,45789,21757,6417,NULL
+6071,21288,945,"Planning, design and Project Management for construction of Ngcisininde to Gedwood Access Road Phase 2",-,-,5,1.0000,49355,21876,6417,NULL
+6174,20035,949,Request for Procurement of Rrefurbishment  of Mnquma Main Building Offices,-,-,5,1.0000,44393,21736,6417,NULL

@@ -1,0 +1,2726 @@
+    <div class="tenders-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+      @if (currentView() === 'list') {
+        <!-- PIPELINE STRIP -->
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatus('draft')">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'specifications'" (click)="filterByStatus('specifications')">
+            <mat-icon>description</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.specifications || 0}}</span>
+            <span class="pipe-label">BSC</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'published'" (click)="filterByStatus('published')">
+            <mat-icon>campaign</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.published || 0}}</span>
+            <span class="pipe-label">Published</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'closed'" (click)="filterByStatus('closed')">
+            <mat-icon>lock</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.closed || 0}}</span>
+            <span class="pipe-label">Closed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'evaluation'" (click)="filterByStatus('evaluation')">
+            <mat-icon>rate_review</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.evaluation || 0}}</span>
+            <span class="pipe-label">BEC</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'adjudication'" (click)="filterByStatus('adjudication')">
+            <mat-icon>gavel</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.adjudication || 0}}</span>
+            <span class="pipe-label">BAC</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'awarded'" (click)="filterByStatus('awarded')">
+            <mat-icon>emoji_events</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.awarded || 0}}</span>
+            <span class="pipe-label">Awarded</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'cancelled'" (click)="filterByStatus('cancelled')">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.cancelled || 0}}</span>
+            <span class="pipe-label">Cancelled</span>
+          </div>
+        </div>
+
+        <!-- SUMMARY STRIP -->
+        <div class="summary-strip">
+          <div class="summary-card">
+            <span class="sc-label">Total Active Value</span>
+            <span class="sc-value">{{formatCurrency(pipeline().totalValue || 0)}}</span>
+            <span class="sc-detail">{{pipeline().totalTenders || 0}} tenders</span>
+          </div>
+          <div class="summary-card">
+            <span class="sc-label">Overdue Evaluations</span>
+            <span class="sc-value" [style.color]="(pipeline().overdueEvaluations || 0) > 0 ? '#c62828' : '#2e7d32'">{{pipeline().overdueEvaluations || 0}}</span>
+            <span class="sc-detail">exceeding 30-day SLA</span>
+          </div>
+          <div class="summary-card">
+            <span class="sc-label">Expiring Validity</span>
+            <span class="sc-value" [style.color]="(pipeline().expiringValidity || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{pipeline().expiringValidity || 0}}</span>
+            <span class="sc-detail">within 14 days</span>
+          </div>
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn active">Tender List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <!-- AI INSIGHTS PANEL -->
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; cursor: pointer;" (click)="showAiPanel.set(!showAiPanel())">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <mat-icon style="color: #7c3aed;">psychology</mat-icon>
+              <span style="font-size: 14px; font-weight: 600; color: #1e293b;">AI Tender Intelligence</span>
+              <span style="font-size: 11px; color: #94a3b8; padding: 2px 8px; background: #f8fafc; border-radius: 4px;">
+                {{tenderAiInsights().length > 0 && tenderAiInsights()[0].aiGenerated ? 'Powered by AI' : 'Rule-based'}}
+              </span>
+            </div>
+            <mat-icon style="color: #94a3b8;">{{showAiPanel() ? 'expand_less' : 'expand_more'}}</mat-icon>
+          </div>
+          @if (showAiPanel() && tenderAiInsights().length > 0) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+              @for (insight of tenderAiInsights(); track insight.id) {
+                <div style="display: flex; gap: 10px; padding: 14px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 3px solid {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}}; box-shadow: 0 1px 3px rgba(0,0,0,0.04);" [matTooltip]="insight.recommendation || ''">
+                  <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: {{insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'}}; color: {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}};">
+                    <mat-icon style="font-size: 18px; width: 18px; height: 18px;">{{insight.icon || 'gavel'}}</mat-icon>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 3px;">{{insight.title}}</div>
+                    <div style="font-size: 11px; color: #64748b; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{insight.message}}</div>
+                    @if (insight.legislationRef) {
+                      <div style="display: inline-flex; align-items: center; gap: 3px; background: #f3e8ff; color: #7c3aed; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; margin-top: 4px;">
+                        <mat-icon style="font-size: 10px; width: 10px; height: 10px;">menu_book</mat-icon>
+                        {{insight.legislationRef}}
+                      </div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size: 10px; color: #0d9488; background: #f0fdfa; padding: 3px 6px; border-radius: 3px; margin-top: 4px; line-height: 1.3;">{{insight.recommendation}}</div>
+                    }
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                      @if (insight.financialImpact) {
+                        <span style="font-size: 10px; color: #059669; font-weight: 500;">{{insight.financialImpact}}</span>
+                      } @else { <span></span> }
+                      @if (insight.confidence) {
+                        <span style="font-size: 9px; color: #94a3b8;">{{(insight.confidence * 100).toFixed(0)}}%</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search tenders..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="specifications">BSC Review</mat-option>
+              <mat-option value="published">Published</mat-option>
+              <mat-option value="closed">Closed</mat-option>
+              <mat-option value="evaluation">BEC Evaluation</mat-option>
+              <mat-option value="adjudication">BAC Adjudication</mat-option>
+              <mat-option value="awarded">Awarded</mat-option>
+              <mat-option value="cancelled">Cancelled</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="applyFilters()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments; track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Method" [(ngModel)]="filterMethod" (selectionChange)="applyFilters()">
+              <mat-option value="">All Methods</mat-option>
+              <mat-option value="petty_cash">Petty Cash</mat-option>
+              <mat-option value="informal_written">Informal Quotation</mat-option>
+              <mat-option value="formal_written">Formal Quotation</mat-option>
+              <mat-option value="competitive_bid">Competitive Bidding</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Category" [(ngModel)]="filterCategory" (selectionChange)="applyFilters()">
+              <mat-option value="">All Categories</mat-option>
+              <mat-option value="goods">Goods</mat-option>
+              <mat-option value="services">Services</mat-option>
+              <mat-option value="works">Works</mat-option>
+              <mat-option value="consulting">Consulting</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="applyFilters()" matTooltip="Filter tenders created from this date">
+            <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterFromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="applyFilters()" matTooltip="Filter tenders created up to this date">
+            <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterToPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Min Value (ZAR)</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMin" (change)="applyFilters()" placeholder="0" matTooltip="Minimum estimated value">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Max Value (ZAR)</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMax" (change)="applyFilters()" placeholder="0" matTooltip="Maximum estimated value">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="CIDB Grading" [(ngModel)]="filterCidbGrading" (selectionChange)="applyFilters()" matTooltip="Filter by CIDB grading class">
+              <mat-option value="">All Gradings</mat-option>
+              <mat-option value="1CE">1CE</mat-option>
+              <mat-option value="2CE">2CE</mat-option>
+              <mat-option value="3CE">3CE</mat-option>
+              <mat-option value="4CE">4CE</mat-option>
+              <mat-option value="5CE">5CE</mat-option>
+              <mat-option value="6CE">6CE</mat-option>
+              <mat-option value="7CE">7CE</mat-option>
+              <mat-option value="8CE">8CE</mat-option>
+              <mat-option value="9CE">9CE</mat-option>
+              <mat-option value="1GB">1GB</mat-option>
+              <mat-option value="2GB">2GB</mat-option>
+              <mat-option value="3GB">3GB</mat-option>
+              <mat-option value="4GB">4GB</mat-option>
+              <mat-option value="5GB">5GB</mat-option>
+              <mat-option value="6GB">6GB</mat-option>
+              <mat-option value="7GB">7GB</mat-option>
+              <mat-option value="8GB">8GB</mat-option>
+              <mat-option value="9GB">9GB</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()" matTooltip="Clear all applied filters">
+            <mat-icon>filter_alt_off</mat-icon> Clear All
+          </button>
+
+          <button mat-flat-button color="primary" (click)="openNewTender()">
+            <mat-icon>add</mat-icon> New Tender
+          </button>
+        </div>
+
+        <!-- TENDER TABLE -->
+        <div class="tender-table-wrapper">
+          <table class="tender-table">
+            <thead>
+              <tr>
+                <th (click)="sort('referenceNumber')">Reference <mat-icon>unfold_more</mat-icon></th>
+                <th>Title</th>
+                <th>Department</th>
+                <th (click)="sort('estimatedValue')">Est. Value <mat-icon>unfold_more</mat-icon></th>
+                <th>Method</th>
+                <th>Status</th>
+                <th>Closing Date</th>
+                <th>Bids</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tender of tenders(); track tender.id) {
+                <tr class="tender-row" (click)="viewTender(tender)">
+                  <td class="ref-cell">{{tender.referenceNumber}}</td>
+                  <td class="title-cell">
+                    <span class="tender-title">{{tender.title}}</span>
+                    @if (tender.twoEnvelope) {
+                      <span class="badge badge-info">2-Envelope</span>
+                    }
+                  </td>
+                  <td>{{tender.department}}</td>
+                  <td class="value-cell">{{formatCurrency(tender.estimatedValue?.amount)}}</td>
+                  <td><span class="method-badge" [class]="'method-' + tender.procurementMethod">{{getMethodLabel(tender.procurementMethod)}}</span></td>
+                  <td><span class="status-badge" [class]="'status-' + tender.status">{{getStatusLabel(tender.status)}}</span></td>
+                  <td>
+                    {{formatDate(tender.closingDate)}}
+                    @if (getDaysRemaining(tender) !== null && getDaysRemaining(tender)! <= 5 && getDaysRemaining(tender)! >= 0) {
+                      <span class="badge badge-warning">{{getDaysRemaining(tender)}}d left</span>
+                    }
+                  </td>
+                  <td class="bids-cell">
+                    <span class="bid-count">{{tender.bidders?.length || 0}}</span>
+                    @if (hasNonResponsiveBids(tender)) {
+                      <mat-icon class="warn-icon" matTooltip="Has non-responsive bids">warning</mat-icon>
+                    }
+                  </td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #actionMenu="matMenu">
+                      <button mat-menu-item (click)="viewTender(tender)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (tender.status === 'draft') {
+                        <button mat-menu-item (click)="editTender(tender)"><mat-icon>edit</mat-icon> Edit</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No tenders found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAGINATION -->
+        <div class="pagination">
+          <span class="page-info">Showing {{pageStart()}} – {{pageEnd()}} of {{totalTenders()}} tenders</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== DETAIL VIEW ===================== -->
+      @if (currentView() === 'detail' && selectedTender()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedTender()!.referenceNumber}} — {{selectedTender()!.title}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedTender()!.status">{{getStatusLabel(selectedTender()!.status)}}</span>
+              <span class="method-badge" [class]="'method-' + selectedTender()!.procurementMethod">{{getMethodLabel(selectedTender()!.procurementMethod)}}</span>
+              <span class="scoring-badge">{{selectedTender()!.scoringMethod || 'Price Only'}}</span>
+              @if (selectedTender()!.twoEnvelope) {
+                <span class="badge badge-info">Two-Envelope</span>
+              }
+              <span class="dept-tag">{{selectedTender()!.department}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Estimated Value</span>
+            <span class="value-amount">{{formatCurrencyFull(selectedTender()!.estimatedValue?.amount)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedTender()!.status === 'draft') {
+              <button mat-stroked-button (click)="editTender(selectedTender()!)"><mat-icon>edit</mat-icon> Edit</button>
+              @if (!selectedTender()!.assignedBuyer) {
+                <button mat-stroked-button (click)="assignBuyerDialog()" [disabled]="saving()"><mat-icon>person_add</mat-icon> Assign Buyer</button>
+              }
+              <button mat-flat-button color="primary" (click)="submitToBsc()" [disabled]="saving() || !canSubmitToBsc()" matTooltip="Submit specifications for BSC committee review"><mat-icon>send</mat-icon> Submit to BSC</button>
+              <button mat-stroked-button color="warn" (click)="deleteTender()"><mat-icon>delete</mat-icon> Delete</button>
+            }
+            @if (selectedTender()!.status === 'specifications') {
+              <button mat-flat-button color="primary" (click)="publishTender()" [disabled]="!isReadyToPublish()" [matTooltip]="!isReadyToPublish() ? 'BSC must approve specifications, budget must be verified, and buyer must be assigned before publishing' : 'Publish tender for bidding'"><mat-icon>campaign</mat-icon> Publish</button>
+            }
+            @if (selectedTender()!.status === 'published') {
+              <button mat-flat-button color="primary" (click)="closeTender()"><mat-icon>lock</mat-icon> Close Tender</button>
+            }
+            @if (selectedTender()!.status === 'closed') {
+              <button mat-flat-button color="primary" (click)="startEvaluation()"><mat-icon>rate_review</mat-icon> Start Evaluation</button>
+            }
+            @if (selectedTender()!.status === 'awarded' && !selectedTender()!.aoApproval) {
+              <button mat-flat-button style="background:#1b5e20;color:white" (click)="aoApprove()" [disabled]="saving()"><mat-icon>verified</mat-icon> AO Approve</button>
+              <button mat-stroked-button color="warn" (click)="aoReject()" [disabled]="saving()"><mat-icon>block</mat-icon> AO Reject</button>
+            }
+            @if (selectedTender()!.status === 'contract_active') {
+              <button mat-flat-button style="background:#1565c0;color:white" (click)="createPurchaseOrderFromTender()" [disabled]="saving() || selectedTender()!.linkedPurchaseOrder"><mat-icon>shopping_cart</mat-icon> Create Purchase Order</button>
+            }
+            @if (['closed','evaluation','cancelled'].includes(selectedTender()!.status)) {
+              <button mat-stroked-button (click)="reInviteBids()" [disabled]="saving()"><mat-icon>refresh</mat-icon> Re-Invite</button>
+            }
+            @if (!['awarded', 'contract_active', 'cancelled'].includes(selectedTender()!.status)) {
+              <button mat-stroked-button color="warn" (click)="requestVoid()"><mat-icon>cancel</mat-icon> Cancel</button>
+            }
+            <button mat-stroked-button (click)="printTender()"><mat-icon>print</mat-icon> Print</button>
+          </div>
+        </div>
+
+        @if (showBuyerSelector) {
+          <div class="buyer-selector-overlay" style="background:rgba(0,0,0,0.3);position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000;display:flex;align-items:center;justify-content:center" (click)="cancelAssignBuyer()">
+            <div class="buyer-selector-dialog" style="background:white;border-radius:12px;padding:24px;width:400px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.2)" (click)="$event.stopPropagation()">
+              <h3 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1e293b"><mat-icon style="vertical-align:middle;margin-right:8px">person_add</mat-icon>Assign Buyer</h3>
+              <p style="color:#64748b;font-size:13px;margin-bottom:16px">Select a buyer to assign to this tender:</p>
+              <mat-form-field appearance="outline" style="width:100%">
+                <mat-label>Select Buyer</mat-label>
+                <mat-select [(ngModel)]="selectedBuyerForAssign">
+                  @for (buyer of predefinedBuyers; track buyer.id) {
+                    <mat-option [value]="buyer.id">{{buyer.name}} — {{buyer.role}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
+                <button mat-stroked-button (click)="cancelAssignBuyer()">Cancel</button>
+                <button mat-flat-button color="primary" [disabled]="!selectedBuyerForAssign" (click)="confirmAssignBuyer()">Assign Buyer</button>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- WORKFLOW STEPPER — each step maps to a tab -->
+        <div class="workflow-stepper">
+          @for (step of workflowSteps; track step.key; let last = $last) {
+            <div class="step" [class.active]="isStepActive(step.key)" [class.completed]="isStepCompleted(step.key)" [class.current]="isStepCurrent(step.key)" [class.future]="!isStepActive(step.key)" (click)="isStepActive(step.key) ? selectDetailTab(step.key) : null" [style.cursor]="isStepActive(step.key) ? 'pointer' : 'default'" [matTooltip]="'Opens ' + step.tab + ' tab'">
+              <div class="step-indicator">
+                @if (isStepCompleted(step.key)) {
+                  <mat-icon>check_circle</mat-icon>
+                } @else if (isStepCurrent(step.key)) {
+                  <mat-icon>{{step.icon}}</mat-icon>
+                } @else {
+                  <mat-icon>radio_button_unchecked</mat-icon>
+                }
+              </div>
+              <span class="step-label">{{step.label}}</span>
+            </div>
+            @if (!last) {
+              <div class="step-connector" [class.completed]="isStepCompleted(step.key)"></div>
+            }
+          }
+        </div>
+
+        <!-- TAB NAV — workflow-aware with access control -->
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'overview'" (click)="detailTab.set('overview')">Overview</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'bsc'" [class.disabled]="!isTabAccessible('bsc')" [matTooltip]="getTabLockReason('bsc')" (click)="navigateTab('bsc')">
+            BSC
+            @if (!isTabAccessible('bsc')) { <mat-icon class="lock-icon">lock</mat-icon> }
+          </button>
+          <button class="tab-btn" [class.active]="detailTab() === 'boq'" [class.disabled]="!isTabAccessible('boq')" [matTooltip]="getTabLockReason('boq')" (click)="navigateTab('boq')">BOQ ({{boqItems().length}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'bidders'" [class.disabled]="!isTabAccessible('bidders')" [matTooltip]="getTabLockReason('bidders')" (click)="navigateTab('bidders')">
+            Bidders ({{selectedTender()!.bidders?.length || 0}})
+            @if (!isTabAccessible('bidders')) { <mat-icon class="lock-icon">lock</mat-icon> }
+          </button>
+          <button class="tab-btn" [class.active]="detailTab() === 'bec'" [class.disabled]="!isTabAccessible('bec')" [matTooltip]="getTabLockReason('bec')" (click)="navigateTab('bec')">
+            BEC
+            @if (!isTabAccessible('bec')) { <mat-icon class="lock-icon">lock</mat-icon> }
+          </button>
+          <button class="tab-btn" [class.active]="detailTab() === 'bac'" [class.disabled]="!isTabAccessible('bac')" [matTooltip]="getTabLockReason('bac')" (click)="navigateTab('bac')">
+            BAC
+            @if (!isTabAccessible('bac')) { <mat-icon class="lock-icon">lock</mat-icon> }
+          </button>
+          <button class="tab-btn" [class.active]="detailTab() === 'award'" [class.disabled]="!isTabAccessible('award')" [matTooltip]="getTabLockReason('award')" (click)="navigateTab('award')">
+            Award
+            @if (!isTabAccessible('award')) { <mat-icon class="lock-icon">lock</mat-icon> }
+          </button>
+          <div class="tab-separator"></div>
+          <button class="tab-btn" [class.active]="detailTab() === 'briefing'" (click)="detailTab.set('briefing')">Briefing</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'subcontracting'" (click)="detailTab.set('subcontracting'); loadSubcontracting()">Sub-contracting</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents'); loadTenderDocuments()">Documents</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'reports'" (click)="detailTab.set('reports')">Reports</button>
+        </div>
+
+        <!-- WORKFLOW GATE BANNER — prerequisite checklist for the next step -->
+        @if (getNextStepGateMessage()) {
+          <div class="workflow-gate-banner">
+            <div class="gate-header">
+              <mat-icon>{{getPhaseIcon()}}</mat-icon>
+              <strong>{{getNextStepLabel()}}</strong>
+            </div>
+            <div class="gate-checklist">
+              @for (gate of getPhaseGates(); track gate.label) {
+                <div class="gate-item" [class.gate-met]="gate.met" [class.gate-unmet]="!gate.met">
+                  <mat-icon [style.color]="gate.met ? '#2e7d32' : '#c62828'">{{gate.met ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
+                  <span>{{gate.label}}</span>
+                </div>
+              }
+            </div>
+            @if (getNextStepAction()) {
+              <button mat-flat-button color="primary" class="gate-action-btn" (click)="executeNextStepAction()" [disabled]="saving() || !allGatesMet()">
+                <mat-icon>{{getNextStepActionIcon()}}</mat-icon> {{getNextStepAction()}}
+              </button>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: OVERVIEW ========== -->
+        @if (detailTab() === 'overview') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>info</mat-icon> Tender Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Description</label>
+                    <span class="desc-text">{{selectedTender()!.description}}</span>
+                  </div>
+                </div>
+                <div class="detail-grid" style="margin-top: 16px;">
+                  <div class="detail-field">
+                    <label>Category</label>
+                    <span>{{selectedTender()!.category | titlecase}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Procurement Method</label>
+                    <span>{{getMethodLabel(selectedTender()!.procurementMethod)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Scoring Method</label>
+                    <span>{{selectedTender()!.scoringMethod || 'Price Only'}}</span>
+                  </div>
+                  @if (selectedTender()!.cidbGrading) {
+                    <div class="detail-field">
+                      <label>CIDB Grading</label>
+                      <span>{{selectedTender()!.cidbGrading}}</span>
+                    </div>
+                  }
+                  <div class="detail-field">
+                    <label>Validity Period</label>
+                    <span>{{selectedTender()!.validityPeriod || 90}} days</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Two-Envelope</label>
+                    <span>{{selectedTender()!.twoEnvelope ? 'Yes' : 'No'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Assigned Buyer</label>
+                    <span>{{selectedTender()!.assignedBuyer?.name || selectedTender()!.assignedBuyer || '—'}}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>calendar_today</mat-icon> Key Dates</h3>
+                <div class="dates-list">
+                  <div class="date-item">
+                    <span class="date-label">Created</span>
+                    <span class="date-value">{{formatDate(selectedTender()!.createdDate)}}</span>
+                  </div>
+                  @if (selectedTender()!.publishedDate) {
+                    <div class="date-item">
+                      <span class="date-label">Published</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.publishedDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.briefingDate) {
+                    <div class="date-item">
+                      <span class="date-label">Briefing</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.briefingDate)}}</span>
+                    </div>
+                  }
+                  <div class="date-item">
+                    <span class="date-label">Closing</span>
+                    <span class="date-value">{{formatDate(selectedTender()!.closingDate)}}</span>
+                  </div>
+                  @if (selectedTender()!.awardDate) {
+                    <div class="date-item">
+                      <span class="date-label">Awarded</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.awardDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.validityFromDate) {
+                    <div class="date-item">
+                      <span class="date-label">Validity From</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.validityFromDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.validityToDate) {
+                    <div class="date-item">
+                      <span class="date-label">Validity To</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.validityToDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.bscPlannedDate) {
+                    <div class="date-item">
+                      <span class="date-label">BSC Planned</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.bscPlannedDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.bscActualDate) {
+                    <div class="date-item">
+                      <span class="date-label">BSC Actual</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.bscActualDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.advertisePlannedDate) {
+                    <div class="date-item">
+                      <span class="date-label">Advertisement Planned</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.advertisePlannedDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.evaluationPlannedDate) {
+                    <div class="date-item">
+                      <span class="date-label">Evaluation Planned</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.evaluationPlannedDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.adjudicationPlannedDate) {
+                    <div class="date-item">
+                      <span class="date-label">Adjudication Planned</span>
+                      <span class="date-value">{{formatDate(selectedTender()!.adjudicationPlannedDate)}}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (selectedTender()!.briefingDate) {
+              <div class="detail-card">
+                <h3><mat-icon>groups</mat-icon> Briefing Session</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Date</label>
+                    <span>{{formatDate(selectedTender()!.briefingDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Venue</label>
+                    <span>{{selectedTender()!.briefingVenue || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Mandatory</label>
+                    <span>{{selectedTender()!.briefingMandatory ? 'Yes — attendance compulsory' : 'No — optional'}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.linkedRequisitionId || selectedTender()!.linkedRequisition || selectedTender()!.linkedRequisitionData) {
+              <div class="detail-card">
+                <h3><mat-icon>link</mat-icon> Linked Requisition</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Reference</label>
+                    <span style="color:#3b82f6;cursor:pointer" (click)="navigateToRequisition()">{{selectedTender()!.linkedRequisitionData?.referenceNumber || selectedTender()!.linkedRequisitionId || selectedTender()!.linkedRequisition || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Title</label>
+                    <span>{{selectedTender()!.linkedRequisitionData?.title || selectedTender()!.title || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Value</label>
+                    <span>{{formatCurrencyFull(selectedTender()!.linkedRequisitionData?.totalEstimatedValue?.amount || selectedTender()!.estimatedValue?.amount)}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <div class="detail-card" style="border-left: 4px solid #3b82f6; background: #f8faff;">
+              <h3><mat-icon>lightbulb</mat-icon> Current Phase: {{getPhaseLabel()}} — What To Do</h3>
+              <div class="next-steps-content">
+                @switch (selectedTender()!.status) {
+                  @case ('draft') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">Complete all tender details before submitting to the Bid Specification Committee (BSC) for review.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item" [class.completed]="!!selectedTender()!.title && !!selectedTender()!.description"><span class="step-number" [style.background]="!!selectedTender()!.title && !!selectedTender()!.description ? '#2e7d32' : ''">{{!!selectedTender()!.title && !!selectedTender()!.description ? '&#10003;' : '1'}}</span><span>Fill in tender details, closing date, and specifications (<strong>Edit</strong> button)</span></div>
+                      <div class="step-item" [class.completed]="boqItems().length > 0"><span class="step-number" [style.background]="boqItems().length > 0 ? '#2e7d32' : ''">{{boqItems().length > 0 ? '&#10003;' : '2'}}</span><span>Add Bill of Quantities items (<strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('boq')">BOQ tab</strong>)</span></div>
+                      <div class="step-item" [class.completed]="!!selectedTender()!.assignedBuyer"><span class="step-number" [style.background]="!!selectedTender()!.assignedBuyer ? '#2e7d32' : ''">{{!!selectedTender()!.assignedBuyer ? '&#10003;' : '3'}}</span><span>Assign a procurement buyer (<strong>Assign Buyer</strong> button)</span></div>
+                      <div class="step-item" [class.completed]="(selectedTender()!.documents?.length || 0) > 0"><span class="step-number" [style.background]="(selectedTender()!.documents?.length || 0) > 0 ? '#2e7d32' : ''">{{(selectedTender()!.documents?.length || 0) > 0 ? '&#10003;' : '4'}}</span><span>Upload mandatory documents (<strong style="cursor:pointer;color:#3b82f6" (click)="detailTab.set('documents'); loadTenderDocuments()">Documents tab</strong>)</span></div>
+                      <div class="step-item"><span class="step-number">5</span><span>Click <strong>Submit to BSC</strong> to send for specification review</span></div>
+                    </div>
+                    <div style="margin-top:12px;padding:10px;background:#fffde7;border-radius:8px;border:1px solid #fff9c4;font-size:12px;color:#5d4037">
+                      <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle;margin-right:4px;color:#f9a825">warning</mat-icon>
+                      <strong>Note:</strong> You cannot publish this tender until the BSC approves the specifications. Bidders can only be registered after publication.
+                    </div>
+                  }
+                  @case ('specifications') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">The Bid Specification Committee is reviewing the tender specifications. BSC must approve before you can publish.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item current"><span class="step-number" style="background:#1565c0">!</span><span>Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('bsc')">BSC tab</strong> to approve or revise the specifications</span></div>
+                      <div class="step-item"><span class="step-number">2</span><span>Once BSC approves, the <strong>Publish</strong> button will become active</span></div>
+                      <div class="step-item"><span class="step-number">3</span><span>Click <strong>Publish</strong> to advertise the tender for bidding</span></div>
+                    </div>
+                  }
+                  @case ('published') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">Tender is published and open for bidding. Register incoming bids and wait for the closing date.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item current"><span class="step-number" style="background:#1565c0">!</span><span>Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('bidders')">Bidders tab</strong> to register incoming bids</span></div>
+                      <div class="step-item"><span class="step-number">2</span><span>Conduct briefing session if required (<strong style="cursor:pointer;color:#3b82f6" (click)="detailTab.set('briefing')">Briefing tab</strong>)</span></div>
+                      <div class="step-item"><span class="step-number">3</span><span>After the closing date, click <strong>Close Tender</strong> to stop accepting bids</span></div>
+                    </div>
+                  }
+                  @case ('closed') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">Tender is closed. Approve the opening and start BEC evaluation to score bidders.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item" [class.completed]="selectedTender()!.openingApproval?.status === 'approved'"><span class="step-number" [style.background]="selectedTender()!.openingApproval?.status === 'approved' ? '#2e7d32' : ''">{{selectedTender()!.openingApproval?.status === 'approved' ? '&#10003;' : '1'}}</span><span>Approve tender opening (scroll down to Opening Approval section)</span></div>
+                      <div class="step-item"><span class="step-number">2</span><span>Click <strong>Start Evaluation</strong> to begin BEC scoring</span></div>
+                    </div>
+                  }
+                  @case ('evaluation') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">BEC evaluation in progress. Score all responsive bidders and submit the recommendation.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item current"><span class="step-number" style="background:#1565c0">!</span><span>Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('bec')">BEC tab</strong> to score bidders and submit evaluation</span></div>
+                      <div class="step-item"><span class="step-number">2</span><span>After scoring, the tender advances to BAC adjudication</span></div>
+                    </div>
+                  }
+                  @case ('adjudication') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">BAC adjudication in progress. Review the BEC recommendation and make the award decision.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item current"><span class="step-number" style="background:#1565c0">!</span><span>Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('bac')">BAC tab</strong> to make the award decision</span></div>
+                      <div class="step-item"><span class="step-number">2</span><span>BAC can <strong>Award</strong>, <strong>Reject</strong>, or <strong>Refer Back</strong> to BEC</span></div>
+                    </div>
+                  }
+                  @case ('awarded') {
+                    <div class="phase-instruction">
+                      <p style="color:#475569;font-size:13px;margin:0 0 12px">Tender awarded. The Accounting Officer must approve or reject the award before a contract can be issued.</p>
+                    </div>
+                    <div class="step-guide">
+                      <div class="step-item current"><span class="step-number" style="background:#1565c0">!</span><span>Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('award')">Award tab</strong> for AO final approval</span></div>
+                    </div>
+                  }
+                  @case ('contract_active') {
+                    <div class="step-guide">
+                      <div class="step-item" style="color: #2e7d32;"><span class="step-number" style="background:#2e7d32">&#10003;</span><span><strong>Complete.</strong> Contract is active. Create a Purchase Order to begin procurement.</span></div>
+                      <button mat-flat-button style="background:#1565c0;color:white;margin-top:12px;font-weight:600;" (click)="createPurchaseOrderFromTender()" [disabled]="saving()"><mat-icon>shopping_cart</mat-icon> Create Purchase Order</button>
+                      @if (selectedTender()!.linkedPurchaseOrder) {
+                        <div style="margin-top:8px;padding:8px 12px;background:#e8f5e9;border-radius:8px;font-size:13px;color:#2e7d32;display:flex;align-items:center;gap:8px;">
+                          <mat-icon style="font-size:18px;width:18px;height:18px;">check_circle</mat-icon>
+                          <span>PO <strong>{{selectedTender()!.linkedPurchaseOrder}}</strong> created — <span style="color:#1565c0;cursor:pointer;text-decoration:underline" (click)="navigateToPurchaseOrder()">View Order</span></span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @default {
+                    <p class="empty-text">No further actions required.</p>
+                  }
+                }
+              </div>
+            </div>
+
+            @if (selectedTender()!.specPurpose || selectedTender()!.specBackground || selectedTender()!.specScope) {
+              <div class="detail-card">
+                <h3><mat-icon>article</mat-icon> Specification Details</h3>
+                <div class="detail-grid">
+                  @if (selectedTender()!.specPurpose) {
+                    <div class="detail-field">
+                      <label>Purpose</label>
+                      <span class="desc-text">{{selectedTender()!.specPurpose}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.specBackground) {
+                    <div class="detail-field">
+                      <label>Background</label>
+                      <span class="desc-text">{{selectedTender()!.specBackground}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.specScope) {
+                    <div class="detail-field">
+                      <label>Scope of Works</label>
+                      <span class="desc-text">{{selectedTender()!.specScope}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.specGeneralConditions) {
+                    <div class="detail-field">
+                      <label>General Conditions</label>
+                      <span class="desc-text">{{selectedTender()!.specGeneralConditions}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.specSpecificConditions) {
+                    <div class="detail-field">
+                      <label>Specific Conditions</label>
+                      <span class="desc-text">{{selectedTender()!.specSpecificConditions}}</span>
+                    </div>
+                  }
+                  @if (selectedTender()!.specComments) {
+                    <div class="detail-field">
+                      <label>Specification Comments</label>
+                      <span class="desc-text">{{selectedTender()!.specComments}}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="detail-cards-row">
+              <div class="detail-card flex-1">
+                <h3><mat-icon>folder</mat-icon> Documents ({{selectedTender()!.documents?.length || 0}})</h3>
+                @if (selectedTender()!.documents?.length) {
+                  <div class="doc-list">
+                    @for (doc of selectedTender()!.documents; track doc.name) {
+                      <div class="doc-item">
+                        <mat-icon class="doc-icon">description</mat-icon>
+                        <div class="doc-info">
+                          <span class="doc-name">{{doc.name}}</span>
+                          <span class="doc-meta">{{doc.type | titlecase}} · {{formatDate(doc.uploadDate)}}</span>
+                          @if (doc.documentDate) {
+                            <span class="doc-meta"> · Doc Date: {{formatDate(doc.documentDate)}}</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="empty-text">No documents uploaded yet</p>
+                }
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>verified_user</mat-icon> Compliance Checklist</h3>
+                <div class="checklist">
+                  <div class="check-item">
+                    <mat-icon [style.color]="selectedTender()!.complianceChecks?.budgetVerified ? '#2e7d32' : '#c62828'">
+                      {{selectedTender()!.complianceChecks?.budgetVerified ? 'check_circle' : 'cancel'}}
+                    </mat-icon>
+                    <span>Budget Verified</span>
+                  </div>
+                  <div class="check-item">
+                    <mat-icon [style.color]="selectedTender()!.complianceChecks?.demandPlanAligned ? '#2e7d32' : '#c62828'">
+                      {{selectedTender()!.complianceChecks?.demandPlanAligned ? 'check_circle' : 'cancel'}}
+                    </mat-icon>
+                    <span>Demand Plan Aligned</span>
+                  </div>
+                  <div class="check-item" [style.cursor]="!selectedTender()!.complianceChecks?.specificationApproved && selectedTender()!.committees?.bsc?.status !== 'approved' ? 'pointer' : 'default'" (click)="!selectedTender()!.complianceChecks?.specificationApproved && selectedTender()!.committees?.bsc?.status !== 'approved' ? detailTab.set('bsc') : null">
+                    <mat-icon [style.color]="selectedTender()!.complianceChecks?.specificationApproved || selectedTender()!.committees?.bsc?.status === 'approved' ? '#2e7d32' : '#c62828'">
+                      {{selectedTender()!.complianceChecks?.specificationApproved || selectedTender()!.committees?.bsc?.status === 'approved' ? 'check_circle' : 'cancel'}}
+                    </mat-icon>
+                    <span>Specification Approved (BSC)</span>
+                    @if (!selectedTender()!.complianceChecks?.specificationApproved && selectedTender()!.committees?.bsc?.status !== 'approved') {
+                      <span style="color:#3b82f6;font-size:11px;margin-left:4px">→ Go to BSC tab</span>
+                    }
+                  </div>
+                  <div class="check-item">
+                    <mat-icon [style.color]="selectedTender()!.complianceChecks?.segregationOfDuties ? '#2e7d32' : '#c62828'">
+                      {{selectedTender()!.complianceChecks?.segregationOfDuties ? 'check_circle' : 'cancel'}}
+                    </mat-icon>
+                    <span>Segregation of Duties</span>
+                  </div>
+                  @if (selectedTender()!.complianceChecks?.advertisedMinDays != null) {
+                    <div class="check-item">
+                      <mat-icon [style.color]="selectedTender()!.complianceChecks!.advertisedMinDays! >= 21 ? '#2e7d32' : '#c62828'">
+                        {{selectedTender()!.complianceChecks!.advertisedMinDays! >= 21 ? 'check_circle' : 'cancel'}}
+                      </mat-icon>
+                      <span>Advertised {{selectedTender()!.complianceChecks!.advertisedMinDays}} days (min 21)</span>
+                    </div>
+                  }
+                </div>
+                @if (selectedTender()!.status === 'draft') {
+                  <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;border-left:3px solid #f9a825;font-size:13px;color:#5d4037">
+                    <mat-icon style="font-size:16px;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:#f9a825">info</mat-icon>
+                    <strong>Workflow:</strong> Complete all details, then click <strong>Submit to BSC</strong>. The BSC must approve specifications before you can publish the tender.
+                  </div>
+                }
+                @if (selectedTender()!.status === 'specifications' && !isReadyToPublish()) {
+                  <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;border-left:3px solid #f9a825;font-size:13px;color:#5d4037">
+                    <mat-icon style="font-size:16px;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:#f9a825">info</mat-icon>
+                    <strong>Awaiting BSC:</strong> Go to the <strong style="cursor:pointer;color:#3b82f6" (click)="navigateTab('bsc')">BSC tab</strong> to approve specifications. Once approved, the Publish button will become active.
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>history</mat-icon> Audit Trail</h3>
+              @if (selectedTender()!.auditTrail?.length) {
+                <ul class="audit-list">
+                  @for (entry of selectedTender()!.auditTrail; track $index) {
+                    <li class="audit-item">
+                      <div class="audit-dot"></div>
+                      <div class="audit-content">
+                        <span class="audit-action">{{entry.action}}</span>
+                        <span class="audit-detail">{{entry.details}}</span>
+                        <span class="audit-date">{{formatDate(entry.date)}} · {{entry.user}}</span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty-text">No audit entries</p>
+              }
+            </div>
+
+            @if (selectedTender()!.status === 'closed' && !selectedTender()!.openingApproval?.status) {
+              <div class="detail-card">
+                <h3><mat-icon>how_to_reg</mat-icon> Tender Opening Approval</h3>
+                <p class="meta-text">Approve tender opening before proceeding to evaluation</p>
+                <div class="approval-upload-section">
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>Opening Comments</mat-label>
+                    <textarea matInput [(ngModel)]="openingComments" rows="2" placeholder="Comments for tender opening approval"></textarea>
+                  </mat-form-field>
+                </div>
+                <div class="action-btn-row">
+                  <button mat-flat-button color="primary" (click)="approveOpening()" [disabled]="saving()">
+                    <mat-icon>check</mat-icon> Approve Opening
+                  </button>
+                  <button mat-stroked-button color="warn" (click)="rejectOpening()" [disabled]="saving()">
+                    <mat-icon>close</mat-icon> Reject Opening
+                  </button>
+                </div>
+              </div>
+            }
+            @if (selectedTender()!.openingApproval?.status) {
+              <div class="detail-card">
+                <h3><mat-icon>how_to_reg</mat-icon> Opening Approval</h3>
+                <span class="badge" [class]="selectedTender()!.openingApproval?.status === 'approved' ? 'badge-green' : 'badge-red'">
+                  {{selectedTender()!.openingApproval?.status | titlecase}}
+                </span>
+                <span class="meta-text" style="margin-left:8px">{{formatDate(selectedTender()!.openingApproval?.approvedDate || selectedTender()!.openingApproval?.rejectedDate)}}</span>
+                @if (selectedTender()!.openingApproval?.comments) {
+                  <p class="meta-text">{{selectedTender()!.openingApproval?.comments}}</p>
+                }
+              </div>
+            }
+
+            @if (selectedTender()!.voidRequest?.status === 'pending') {
+              <div class="detail-card" style="border-left:3px solid #ef5350">
+                <h3><mat-icon>cancel</mat-icon> Pending Void Request</h3>
+                <p><strong>Reason:</strong> {{selectedTender()!.voidRequest?.reason}}</p>
+                <p class="meta-text">Requested: {{formatDate(selectedTender()!.voidRequest?.requestedDate)}}</p>
+                <div class="action-btn-row">
+                  <button mat-flat-button color="warn" (click)="approveVoid()" [disabled]="saving()">
+                    <mat-icon>check</mat-icon> Approve Void
+                  </button>
+                  <button mat-stroked-button (click)="rejectVoid()" [disabled]="saving()">
+                    <mat-icon>undo</mat-icon> Reject Void
+                  </button>
+                </div>
+              </div>
+            }
+
+            <div class="detail-card">
+              <h3><mat-icon>speed</mat-icon> SLA Performance</h3>
+              @if (tenderSla().stages?.length) {
+                <div class="sla-grid">
+                  @for (stage of tenderSla().stages; track stage.stage) {
+                    <div class="sla-stage-card">
+                      <span class="sla-stage-label">{{stage.stage}}</span>
+                      <div class="sla-stage-values">
+                        <span class="sla-actual-val" [style.color]="stage.actualDays <= stage.targetDays ? '#2e7d32' : stage.actualDays <= stage.targetDays * 1.5 ? '#ef6c00' : '#c62828'">
+                          {{stage.actualDays || 0}}d
+                        </span>
+                        <span class="sla-target-val">/ {{stage.targetDays}}d target</span>
+                      </div>
+                      <div class="sla-bar-track">
+                        <div class="sla-bar-fill" [style.width.%]="getSlaWidth(stage.actualDays, stage.targetDays)" [style.background]="stage.actualDays <= stage.targetDays ? '#2e7d32' : stage.actualDays <= stage.targetDays * 1.5 ? '#ef6c00' : '#c62828'"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">SLA data will populate as the tender progresses through workflow stages</p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ========== TAB: BSC ========== -->
+        @if (detailTab() === 'bsc') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>groups</mat-icon> BSC — Bid Specification Committee</h3>
+              <div class="committee-status-row">
+                <span class="status-badge" [class]="'status-' + getBscStatus()">{{getBscStatusLabel()}}</span>
+              </div>
+              @if (selectedTender()!.committees?.bsc) {
+                <div class="committee-card">
+                  <div class="committee-members-title">Committee Members</div>
+                  @if (selectedTender()!.committees.bsc.chairperson) {
+                    <div class="committee-member chairperson">
+                      <mat-icon>star</mat-icon>
+                      <span>{{selectedTender()!.committees.bsc.chairperson}} <strong>(Chairperson)</strong></span>
+                    </div>
+                  }
+                  @for (member of selectedTender()!.committees.bsc.members; track member) {
+                    @if (member !== selectedTender()!.committees.bsc.chairperson) {
+                      <div class="committee-member">
+                        <mat-icon>person</mat-icon>
+                        <span>{{member}}</span>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+
+            @if (selectedTender()!.committees?.bsc?.specifications) {
+              <div class="detail-card">
+                <h3><mat-icon>article</mat-icon> Specification Summary</h3>
+                <p class="spec-text">{{selectedTender()!.committees.bsc.specifications}}</p>
+              </div>
+            }
+
+            @if (selectedTender()!.twoEnvelope && selectedTender()!.functionalityCriteria?.length) {
+              <div class="detail-card">
+                <h3><mat-icon>functions</mat-icon> Functionality Criteria</h3>
+                <p class="threshold-note">Minimum threshold: {{selectedTender()!.functionalityThreshold || 70}} points out of 100</p>
+                <table class="scoring-table">
+                  <thead>
+                    <tr>
+                      <th>Criterion</th>
+                      <th>Weight</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (fc of selectedTender()!.functionalityCriteria; track fc.criterion) {
+                      <tr>
+                        <td><strong>{{fc.criterion}}</strong></td>
+                        <td>{{fc.weight}}</td>
+                        <td>{{fc.description || '—'}}</td>
+                      </tr>
+                    }
+                    <tr class="total-row">
+                      <td><strong>Total</strong></td>
+                      <td><strong>{{getTotalWeight()}}</strong></td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            @if (selectedTender()!.committees?.bsc?.minutes) {
+              <div class="detail-card">
+                <h3><mat-icon>note</mat-icon> Minutes / Recommendations</h3>
+                <p class="spec-text">{{selectedTender()!.committees.bsc.minutes}}</p>
+              </div>
+            }
+
+            @if ((getBscStatus() !== 'approved') && (getBscStatus() === 'pending' || getBscStatus() === 'in_progress' || getBscStatus() === 'not_started' || selectedTender()!.status === 'draft' || selectedTender()!.status === 'specifications')) {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>how_to_vote</mat-icon> BSC Actions</h3>
+                <div class="approval-upload-section">
+                  <div class="doc-upload-inline">
+                    <span class="doc-upload-label">Attach Document (Optional)</span>
+                    <div class="doc-upload-row">
+                      <input type="file" (change)="onApprovalDocSelected($event, 'bsc')" style="font-size:12px">
+                    </div>
+                  </div>
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>Comments</mat-label>
+                    <textarea matInput [(ngModel)]="bscComments" rows="2" placeholder="BSC approval/rejection comments"></textarea>
+                  </mat-form-field>
+                </div>
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="bscApprove()" [disabled]="saving()">
+                    <mat-icon>check_circle</mat-icon> Approve Specifications
+                  </button>
+                  <button mat-stroked-button color="warn" (click)="bscReject()" [disabled]="saving()">
+                    <mat-icon>cancel</mat-icon> Reject Specifications
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.committees?.bsc?.status === 'approved') {
+              <div class="detail-card">
+                <h3><mat-icon>verified</mat-icon> BSC Level 2 Approval</h3>
+                <div class="approval-status-row">
+                  <span class="badge" [class]="selectedTender()!.committees?.bsc?.level2Status === 'approved' ? 'badge-green' : selectedTender()!.committees?.bsc?.level2Status === 'revision_requested' ? 'badge-red' : 'badge-amber'">
+                    {{selectedTender()!.committees?.bsc?.level2Status || 'Pending'}}
+                  </span>
+                  @if (selectedTender()!.committees?.bsc?.level2ApprovedDate) {
+                    <span class="meta-text">Approved: {{formatDate(selectedTender()!.committees?.bsc?.level2ApprovedDate)}}</span>
+                  }
+                </div>
+                @if (selectedTender()!.committees?.bsc?.level2Status !== 'approved') {
+                  <div class="approval-upload-section" style="margin-top:12px">
+                    <mat-form-field appearance="outline" style="width:100%">
+                      <mat-label>Level 2 Recommendation</mat-label>
+                      <textarea matInput [(ngModel)]="bscL2Comments" rows="2" placeholder="BSC Level 2 approval recommendation"></textarea>
+                    </mat-form-field>
+                  </div>
+                  <div class="action-btn-row">
+                    <button mat-flat-button color="primary" (click)="bscLevel2Approve()" [disabled]="saving()">
+                      <mat-icon>check</mat-icon> Level 2 Approve
+                    </button>
+                    <button mat-stroked-button color="warn" (click)="bscLevel2Revise()" [disabled]="saving()">
+                      <mat-icon>undo</mat-icon> Request Revision
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: BIDDERS ========== -->
+        @if (detailTab() === 'bidders') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>people</mat-icon> Bidders ({{selectedTender()!.bidders?.length || 0}})</h3>
+              @if (['published', 'closed'].includes(selectedTender()!.status)) {
+                <div class="committee-action-buttons" style="margin-bottom: 16px;">
+                  <button mat-flat-button color="primary" (click)="showBidderForm = !showBidderForm">
+                    <mat-icon>person_add</mat-icon> {{showBidderForm ? 'Cancel' : 'Register Bidder'}}
+                  </button>
+                </div>
+              }
+
+              @if (showBidderForm) {
+                <div class="detail-card" style="border: 2px dashed #3b82f6; margin-bottom: 16px;">
+                  <h4 style="margin: 0 0 12px 0;"><mat-icon style="vertical-align:middle">person_add</mat-icon> Register New Bidder</h4>
+                  <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Supplier Name</mat-label>
+                      <input matInput [(ngModel)]="newBidderForm.supplierName" placeholder="Company name">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Bid Amount (ZAR)</mat-label>
+                      <input matInput type="number" [(ngModel)]="newBidderForm.bidAmount" placeholder="0.00">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>B-BBEE Level</mat-label>
+                      <mat-select [(ngModel)]="newBidderForm.bbbeeLevel">
+                        @for (lvl of [1,2,3,4,5,6,7,8]; track lvl) {
+                          <mat-option [value]="lvl">Level {{lvl}}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Contact Email</mat-label>
+                      <input matInput [(ngModel)]="newBidderForm.contactEmail" placeholder="email@company.co.za">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Contact Person</mat-label>
+                      <input matInput [(ngModel)]="newBidderForm.contactPerson" placeholder="Full name">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Registration Number</mat-label>
+                      <input matInput [(ngModel)]="newBidderForm.registrationNumber" placeholder="CSD/CIPC number">
+                    </mat-form-field>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:8px">
+                    <mat-checkbox [(ngModel)]="newBidderForm.briefingAttended">Briefing Attended</mat-checkbox>
+                  </div>
+                  <div class="committee-action-buttons" style="margin-top: 12px;">
+                    <button mat-flat-button color="primary" (click)="registerBidder()" [disabled]="saving() || !newBidderForm.supplierName || !newBidderForm.bidAmount">
+                      <mat-icon>save</mat-icon> Register Bid
+                    </button>
+                    <button mat-stroked-button (click)="showBidderForm = false">Cancel</button>
+                  </div>
+                </div>
+              }
+
+              @if (selectedTender()!.bidders?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Supplier</th>
+                        <th>Submitted</th>
+                        <th>Bid Amount</th>
+                        <th>Tax</th>
+                        <th>CSD</th>
+                        <th>Rates</th>
+                        <th>Briefing</th>
+                        <th>B-BBEE</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bidder of selectedTender()!.bidders; track bidder.id) {
+                        <tr [class.non-responsive-row]="!bidder.responsive">
+                          <td>
+                            <strong>{{bidder.supplierName}}</strong>
+                            @if (!bidder.responsive && bidder.nonResponsiveReasons?.length) {
+                              <div class="non-responsive-reasons">
+                                @for (reason of bidder.nonResponsiveReasons; track reason) {
+                                  <span class="reason-tag">{{reason}}</span>
+                                }
+                              </div>
+                            }
+                          </td>
+                          <td>{{formatDate(bidder.submittedDate)}}</td>
+                          <td class="value-cell">{{formatCurrencyFull(bidder.bidAmount?.amount)}}</td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.taxClearance?.status)">
+                              {{getComplianceIcon(bidder.taxClearance?.status)}}
+                            </mat-icon>
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.csdRegistration?.status)">
+                              {{getComplianceIcon(bidder.csdRegistration?.status)}}
+                            </mat-icon>
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.municipalRates?.status)">
+                              {{getComplianceIcon(bidder.municipalRates?.status)}}
+                            </mat-icon>
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="bidder.briefingAttended ? '#2e7d32' : '#c62828'">
+                              {{bidder.briefingAttended ? 'check_circle' : 'cancel'}}
+                            </mat-icon>
+                          </td>
+                          <td>
+                            <span class="bbbee-badge" [class]="'bbbee-' + bidder.bbbeeLevel">Level {{bidder.bbbeeLevel}}</span>
+                          </td>
+                          <td>
+                            @if (bidder.responsive) {
+                              <span class="badge badge-success">Responsive</span>
+                            } @else {
+                              <span class="badge badge-danger">Non-Responsive</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No bids received yet. @if (['published', 'closed'].includes(selectedTender()!.status)) { Click "Register Bidder" above to capture incoming bids. }</p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ========== TAB: BOQ ========== -->
+        @if (detailTab() === 'boq') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>list_alt</mat-icon> Bill of Quantities ({{boqItems().length}} items)</h3>
+              @if (['draft', 'specifications'].includes(selectedTender()!.status)) {
+                <div class="boq-actions-bar">
+                  <button mat-flat-button color="primary" (click)="showBoqForm = true"><mat-icon>add</mat-icon> Add Item</button>
+                  <button mat-stroked-button (click)="importBoqDialog()"><mat-icon>upload_file</mat-icon> Import CSV</button>
+                </div>
+              }
+              
+              @if (showBoqForm) {
+                <div class="boq-form-card">
+                  <div class="form-grid">
+                    <mat-form-field appearance="outline" class="form-field-full">
+                      <mat-label>Description</mat-label>
+                      <input matInput [(ngModel)]="boqForm.description" placeholder="Item description">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Section</mat-label>
+                      <input matInput [(ngModel)]="boqForm.section" placeholder="e.g., General, Civil, Electrical">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Unit of Measure</mat-label>
+                      <mat-select [(ngModel)]="boqForm.unit">
+                        <mat-option value="each">Each</mat-option>
+                        <mat-option value="m">Metre (m)</mat-option>
+                        <mat-option value="m2">Square Metre (m²)</mat-option>
+                        <mat-option value="m3">Cubic Metre (m³)</mat-option>
+                        <mat-option value="kg">Kilogram (kg)</mat-option>
+                        <mat-option value="ton">Tonne</mat-option>
+                        <mat-option value="litre">Litre</mat-option>
+                        <mat-option value="hour">Hour</mat-option>
+                        <mat-option value="day">Day</mat-option>
+                        <mat-option value="lot">Lot</mat-option>
+                        <mat-option value="sum">Provisional Sum</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Quantity</mat-label>
+                      <input matInput type="number" [(ngModel)]="boqForm.quantity" placeholder="0">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Estimated Rate (ZAR)</mat-label>
+                      <input matInput type="number" [(ngModel)]="boqForm.estimatedRate" placeholder="0.00">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Project Item</mat-label>
+                      <input matInput [(ngModel)]="newBoqProjectItem" placeholder="e.g., PRJ-001-A">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Notes</mat-label>
+                      <input matInput [(ngModel)]="boqForm.notes" placeholder="Optional notes">
+                    </mat-form-field>
+                  </div>
+                  <div class="boq-form-actions">
+                    <button mat-stroked-button (click)="showBoqForm = false">Cancel</button>
+                    <button mat-flat-button color="primary" (click)="addBoqItem()" [disabled]="!boqForm.description || !boqForm.quantity">
+                      <mat-icon>add</mat-icon> Add to BOQ
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (boqItems().length) {
+                <div class="tender-table-wrapper" style="margin-top:12px">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Project Item</th>
+                        <th>Section</th>
+                        <th>Description</th>
+                        <th>UoM</th>
+                        <th>Qty</th>
+                        <th>Est. Rate</th>
+                        <th>Est. Total</th>
+                        @if (['draft','specifications'].includes(selectedTender()!.status)) {
+                          <th>Actions</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of boqItems(); track item.id) {
+                        <tr>
+                          <td>{{item.itemNumber}}</td>
+                          <td>{{item.projectItem || selectedTender()!.linkedRequisitionRef || '—'}}</td>
+                          <td><span class="badge badge-info">{{item.section}}</span></td>
+                          <td>{{item.description}}</td>
+                          <td>{{item.unit}}</td>
+                          <td>{{item.quantity}}</td>
+                          <td class="value-cell">{{formatCurrencyFull(item.estimatedRate)}}</td>
+                          <td class="value-cell">{{formatCurrencyFull(item.estimatedTotal)}}</td>
+                          @if (['draft','specifications'].includes(selectedTender()!.status)) {
+                            <td>
+                              <button mat-icon-button color="warn" (click)="deleteBoqItem(item.id)" matTooltip="Remove item">
+                                <mat-icon>delete</mat-icon>
+                              </button>
+                            </td>
+                          }
+                        </tr>
+                      }
+                      <tr class="total-row">
+                        <td colspan="7" style="text-align:right"><strong>BOQ Total</strong></td>
+                        <td class="value-cell"><strong>{{formatCurrencyFull(getBoqTotal())}}</strong></td>
+                        @if (['draft','specifications'].includes(selectedTender()!.status)) { <td></td> }
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No BOQ items added yet. Add items manually or import from CSV.</p>
+              }
+            </div>
+
+            @if (boqItems().length && selectedTender()!.bidders?.length && ['closed','evaluation'].includes(selectedTender()!.status)) {
+              <div class="detail-card">
+                <h3><mat-icon>payments</mat-icon> Bidder BOQ Pricing</h3>
+                <div class="form-grid" style="margin-bottom:12px">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Select Bidder</mat-label>
+                    <mat-select [(ngModel)]="selectedBidderForPricing">
+                      @for (bidder of getResponsiveBidders(); track bidder.id) {
+                        <mat-option [value]="bidder.id">{{bidder.supplierName}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                @if (selectedBidderForPricing) {
+                  <div class="tender-table-wrapper">
+                    <table class="scoring-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Project Item</th>
+                          <th>Description</th>
+                          <th>UoM</th>
+                          <th>Qty</th>
+                          <th>Rate (ZAR)</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of boqItems(); track item.id) {
+                          <tr>
+                            <td>{{item.itemNumber}}</td>
+                            <td>{{item.projectItem || selectedTender()!.linkedRequisitionRef || '—'}}</td>
+                            <td>{{item.description}}</td>
+                            <td>{{item.unit}}</td>
+                            <td>{{item.quantity}}</td>
+                            <td>
+                              <input type="number" [(ngModel)]="bidderPricing[item.id]" placeholder="0.00" style="width:100px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+                            </td>
+                            <td class="value-cell">{{formatCurrencyFull((bidderPricing[item.id] || 0) * (item.quantity || 0))}}</td>
+                          </tr>
+                        }
+                        <tr class="total-row">
+                          <td colspan="6" style="text-align:right"><strong>Total Bid</strong></td>
+                          <td class="value-cell"><strong>{{formatCurrencyFull(getBidderPricingTotal())}}</strong></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style="margin-top:12px;text-align:right">
+                    <button mat-flat-button color="primary" (click)="saveBidderPricing()" [disabled]="saving()">
+                      <mat-icon>save</mat-icon> Save Bidder Pricing
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (boqComparison().length) {
+              <div class="detail-card">
+                <h3><mat-icon>compare_arrows</mat-icon> BOQ Price Comparison</h3>
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Project Item</th>
+                        <th>UoM</th>
+                        <th>Qty</th>
+                        <th>Est. Rate</th>
+                        @for (bidder of comparisonBidders(); track bidder.bidderId) {
+                          <th>{{bidder.supplierName}}</th>
+                        }
+                        <th>Lowest</th>
+                        <th>Avg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of boqComparison(); track row.boqItem.id) {
+                        <tr>
+                          <td>{{row.boqItem.description}}</td>
+                          <td>{{row.boqItem.projectItem || selectedTender()!.linkedRequisitionRef || '—'}}</td>
+                          <td>{{row.boqItem.unit}}</td>
+                          <td>{{row.boqItem.quantity}}</td>
+                          <td class="value-cell">{{formatCurrencyFull(row.estimatedRate)}}</td>
+                          @for (bp of row.bidderPrices; track bp.bidderId) {
+                            <td class="value-cell" [style.color]="bp.rate === row.lowestRate && bp.rate > 0 ? '#2e7d32' : bp.rate === row.highestRate && bp.rate > 0 ? '#c62828' : '#1e293b'" [style.fontWeight]="bp.rate === row.lowestRate ? '700' : '400'">
+                              {{bp.rate > 0 ? formatCurrencyFull(bp.rate) : '—'}}
+                            </td>
+                          }
+                          <td class="value-cell" style="color:#2e7d32;font-weight:600">{{formatCurrencyFull(row.lowestRate)}}</td>
+                          <td class="value-cell" style="color:#64748b">{{formatCurrencyFull(row.averageRate)}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: BEC ========== -->
+        @if (detailTab() === 'bec') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>rate_review</mat-icon> BEC — Bid Evaluation Committee</h3>
+              <div class="committee-status-row">
+                <span class="status-badge" [class]="'status-' + getBecStatus()">{{getBecStatusLabel()}}</span>
+              </div>
+              @if (selectedTender()!.committees?.bec) {
+                <div class="committee-card">
+                  <div class="committee-members-title">Committee Members</div>
+                  @if (selectedTender()!.committees.bec.chairperson) {
+                    <div class="committee-member chairperson">
+                      <mat-icon>star</mat-icon>
+                      <span>{{selectedTender()!.committees.bec.chairperson}} <strong>(Chairperson)</strong></span>
+                    </div>
+                  }
+                  @for (member of getBecMembers(); track member) {
+                    <div class="committee-member">
+                      <mat-icon>person</mat-icon>
+                      <span>{{member}}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (getResponsiveBidders().length) {
+              <div class="detail-card">
+                <h3><mat-icon>checklist</mat-icon> Administrative Compliance Check</h3>
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Bidder</th>
+                        <th>Tax Clearance</th>
+                        <th>CSD Registration</th>
+                        <th>Municipal Rates</th>
+                        <th>Briefing</th>
+                        <th>Responsive</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bidder of selectedTender()!.bidders; track bidder.id) {
+                        <tr>
+                          <td><strong>{{bidder.supplierName}}</strong></td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.taxClearance?.status)">
+                              {{getComplianceIcon(bidder.taxClearance?.status)}}
+                            </mat-icon>
+                            {{bidder.taxClearance?.status | titlecase}}
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.csdRegistration?.status)">
+                              {{getComplianceIcon(bidder.csdRegistration?.status)}}
+                            </mat-icon>
+                            {{bidder.csdRegistration?.status | titlecase}}
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="getComplianceColor(bidder.municipalRates?.status)">
+                              {{getComplianceIcon(bidder.municipalRates?.status)}}
+                            </mat-icon>
+                            {{bidder.municipalRates?.status | titlecase}}
+                          </td>
+                          <td>
+                            <mat-icon class="compliance-icon" [style.color]="bidder.briefingAttended ? '#2e7d32' : '#c62828'">
+                              {{bidder.briefingAttended ? 'check_circle' : 'cancel'}}
+                            </mat-icon>
+                          </td>
+                          <td>
+                            @if (bidder.responsive) {
+                              <span class="badge badge-success">Yes</span>
+                            } @else {
+                              <span class="badge badge-danger">No</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.twoEnvelope && hasFunctionalityScores()) {
+              <div class="detail-card">
+                <h3><mat-icon>functions</mat-icon> Functionality Scoring</h3>
+                <p class="threshold-note">Minimum threshold: <strong>{{selectedTender()!.functionalityThreshold || 70}}</strong> / 100</p>
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Bidder</th>
+                        @for (fc of selectedTender()!.functionalityCriteria; track fc.criterion) {
+                          <th>{{fc.criterion}} ({{fc.weight}})</th>
+                        }
+                        <th>Total</th>
+                        <th>Pass/Fail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bidder of getResponsiveBidders(); track bidder.id) {
+                        <tr>
+                          <td><strong>{{bidder.supplierName}}</strong></td>
+                          @for (fc of selectedTender()!.functionalityCriteria; track fc.criterion) {
+                            <td>{{getFunctionalityScore(bidder, fc.criterion)}}</td>
+                          }
+                          <td class="total-score">{{bidder.functionalityTotal ?? '—'}}</td>
+                          <td>
+                            @if (bidder.functionalityPass === true) {
+                              <span class="badge badge-success">Pass</span>
+                            } @else if (bidder.functionalityPass === false) {
+                              <span class="badge badge-danger">Fail</span>
+                            } @else {
+                              <span class="badge">Pending</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+            <div class="detail-card">
+              <h3><mat-icon>calculate</mat-icon> Price & Preference Points (PPPFA)</h3>
+              <div class="formula-card">
+                <h4>PPPFA Scoring Formula — {{selectedTender()!.scoringMethod || '80/20'}} System</h4>
+                @if (selectedTender()!.scoringMethod === '90/10') {
+                  <p><code>Ps = 90 × (1 - (Pt - Pmin) / Pmin)</code></p>
+                  <p class="formula-note">Where Ps = price score, Pt = bid price, Pmin = lowest acceptable bid. Max 90 points for price, 10 points for B-BBEE.</p>
+                } @else {
+                  <p><code>Ps = 80 × (1 - (Pt - Pmin) / Pmin)</code></p>
+                  <p class="formula-note">Where Ps = price score, Pt = bid price, Pmin = lowest acceptable bid. Max 80 points for price, 20 points for B-BBEE.</p>
+                }
+              </div>
+
+              <div class="formula-card">
+                <h4>B-BBEE Points Allocation — {{selectedTender()!.scoringMethod || '80/20'}}</h4>
+                <table class="bbbee-table">
+                  <thead>
+                    <tr>
+                      <th>B-BBEE Level</th>
+                      @for (lvl of [1,2,3,4,5,6,7,8]; track lvl) {
+                        <th>{{lvl}}</th>
+                      }
+                      <th>Non-compliant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Points</strong></td>
+                      @if (selectedTender()!.scoringMethod === '90/10') {
+                        <td>10</td><td>9</td><td>8</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+                      } @else {
+                        <td>20</td><td>18</td><td>16</td><td>12</td><td>8</td><td>6</td><td>4</td><td>2</td><td>0</td>
+                      }
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              @if (getScoredBidders().length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Bidder</th>
+                        <th>Bid Amount</th>
+                        <th>Price Points</th>
+                        <th>B-BBEE Level</th>
+                        <th>B-BBEE Points</th>
+                        <th>Total Score</th>
+                        <th>Ranking</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bidder of getScoredBidders(); track bidder.id) {
+                        <tr [class.rank-1]="bidder.ranking === 1">
+                          <td>{{bidder.ranking || '—'}}</td>
+                          <td>
+                            <strong>{{bidder.supplierName}}</strong>
+                            @if (bidder.ranking === 1) {
+                              <mat-icon class="recommended-icon" matTooltip="Recommended">emoji_events</mat-icon>
+                            }
+                          </td>
+                          <td class="value-cell">{{formatCurrencyFull(bidder.bidAmount?.amount)}}</td>
+                          <td>{{bidder.priceScore != null ? bidder.priceScore.toFixed(2) : '—'}}</td>
+                          <td><span class="bbbee-badge" [class]="'bbbee-' + bidder.bbbeeLevel">Level {{bidder.bbbeeLevel}}</span></td>
+                          <td>{{bidder.bbbeePoints ?? '—'}}</td>
+                          <td class="total-score">{{bidder.totalScore != null ? bidder.totalScore.toFixed(2) : '—'}}</td>
+                          <td>
+                            @if (bidder.ranking === 1) {
+                              <span class="badge badge-success">#1</span>
+                            } @else if (bidder.ranking) {
+                              <span>#{{bidder.ranking}}</span>
+                            } @else {
+                              <span>—</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+
+            @if (selectedTender()!.committees?.bec?.recommendation) {
+              <div class="detail-card">
+                <h3><mat-icon>recommend</mat-icon> BEC Recommendation</h3>
+                <p class="spec-text">{{selectedTender()!.committees.bec.recommendation}}</p>
+                @if (selectedTender()!.committees.bec.minutesSummary) {
+                  <div class="minutes-section">
+                    <strong>Minutes Summary:</strong>
+                    <p>{{selectedTender()!.committees.bec.minutesSummary}}</p>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (selectedTender()!.status === 'closed' && getBecStatus() === 'not_started') {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>play_circle</mat-icon> Start BEC Evaluation</h3>
+                <p style="font-size:13px;color:#475569;margin:0 0 12px 0">The tender is closed. Start the BEC evaluation to begin scoring and ranking bidders.</p>
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="startEvaluation()" [disabled]="saving()">
+                    <mat-icon>play_arrow</mat-icon> Start BEC Evaluation
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.status === 'evaluation' || selectedTender()!.status === 'closed' || (getBecStatus() !== 'completed' && getBecStatus() !== 'not_started')) {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>how_to_vote</mat-icon> BEC Actions</h3>
+                <div class="approval-upload-section">
+                  <div class="doc-upload-inline">
+                    <span class="doc-upload-label">Attach Document (Optional)</span>
+                    <div class="doc-upload-row">
+                      <input type="file" (change)="onApprovalDocSelected($event, 'bec')" style="font-size:12px">
+                    </div>
+                  </div>
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>BEC Recommendation</mat-label>
+                    <textarea matInput [(ngModel)]="becComments" rows="2" placeholder="BEC recommendation and evaluation notes"></textarea>
+                  </mat-form-field>
+                </div>
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="becSubmit()" [disabled]="saving()">
+                    <mat-icon>send</mat-icon> Submit BEC Evaluation
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: BAC ========== -->
+        @if (detailTab() === 'bac') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>gavel</mat-icon> BAC — Bid Adjudication Committee</h3>
+              <div class="committee-status-row">
+                <span class="status-badge" [class]="'status-' + getBacStatus()">{{getBacStatusLabel()}}</span>
+              </div>
+              @if (selectedTender()!.committees?.bac) {
+                <div class="committee-card">
+                  <div class="committee-members-title">Committee Members</div>
+                  @if (selectedTender()!.committees.bac.chairperson) {
+                    <div class="committee-member chairperson">
+                      <mat-icon>star</mat-icon>
+                      <span>{{selectedTender()!.committees.bac.chairperson}} <strong>(Chairperson)</strong></span>
+                    </div>
+                  }
+                  @for (member of getBacMembers(); track member) {
+                    <div class="committee-member">
+                      <mat-icon>person</mat-icon>
+                      <span>{{member}}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (selectedTender()!.committees?.bec?.recommendation) {
+              <div class="detail-card">
+                <h3><mat-icon>summarize</mat-icon> BEC Recommendation Summary</h3>
+                <p class="spec-text">{{selectedTender()!.committees.bec.recommendation}}</p>
+              </div>
+            }
+
+            @if (getScoredBidders().length) {
+              <div class="detail-card">
+                <h3><mat-icon>leaderboard</mat-icon> Scoring Summary</h3>
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Bidder</th>
+                        <th>Bid Amount</th>
+                        <th>Price Points</th>
+                        <th>B-BBEE Points</th>
+                        <th>Total Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bidder of getScoredBidders(); track bidder.id) {
+                        <tr [class.rank-1]="bidder.ranking === 1">
+                          <td>{{bidder.ranking || '—'}}</td>
+                          <td><strong>{{bidder.supplierName}}</strong></td>
+                          <td class="value-cell">{{formatCurrencyFull(bidder.bidAmount?.amount)}}</td>
+                          <td>{{bidder.priceScore != null ? bidder.priceScore.toFixed(2) : '—'}}</td>
+                          <td>{{bidder.bbbeePoints ?? '—'}}</td>
+                          <td class="total-score">{{bidder.totalScore != null ? bidder.totalScore.toFixed(2) : '—'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.committees?.bac?.decision) {
+              <div class="detail-card">
+                <h3><mat-icon>check_circle</mat-icon> BAC Decision</h3>
+                <div class="decision-badge-row">
+                  <span class="decision-badge" [class]="'decision-' + selectedTender()!.committees.bac.decision">
+                    {{selectedTender()!.committees.bac.decision | titlecase}}
+                  </span>
+                  @if (selectedTender()!.committees.bac.adjudicationDate) {
+                    <span class="decision-date">{{formatDate(selectedTender()!.committees.bac.adjudicationDate)}}</span>
+                  }
+                </div>
+                @if (selectedTender()!.committees.bac.recommendation) {
+                  <p class="spec-text" style="margin-top: 12px;">{{selectedTender()!.committees.bac.recommendation}}</p>
+                }
+                @if (selectedTender()!.committees.bac.minutesSummary) {
+                  <div class="minutes-section">
+                    <strong>Minutes Summary:</strong>
+                    <p>{{selectedTender()!.committees.bac.minutesSummary}}</p>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="detail-card">
+                <h3><mat-icon>pending</mat-icon> BAC Decision</h3>
+                <p class="empty-text">Awaiting BAC adjudication</p>
+              </div>
+            }
+
+            @if (selectedTender()!.status === 'evaluation' && getBecStatus() === 'completed' && getBacStatus() === 'not_started') {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>play_circle</mat-icon> Start BAC Adjudication</h3>
+                <p style="font-size:13px;color:#475569;margin:0 0 12px 0">BEC evaluation is complete. Start BAC adjudication to make the final award decision.</p>
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="startAdjudication()" [disabled]="saving()">
+                    <mat-icon>gavel</mat-icon> Start BAC Adjudication
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (selectedTender()!.status === 'adjudication' || getBacStatus() === 'pending' || getBacStatus() === 'in_progress') {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>how_to_vote</mat-icon> BAC Actions</h3>
+                <div class="approval-upload-section">
+                  <div class="doc-upload-inline">
+                    <span class="doc-upload-label">Attach Document (Optional)</span>
+                    <div class="doc-upload-row">
+                      <input type="file" (change)="onApprovalDocSelected($event, 'bac')" style="font-size:12px">
+                    </div>
+                  </div>
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>BAC Recommendation</mat-label>
+                    <textarea matInput [(ngModel)]="bacComments" rows="2" placeholder="BAC decision recommendation"></textarea>
+                  </mat-form-field>
+                </div>
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="bacDecide('award')" [disabled]="saving()">
+                    <mat-icon>emoji_events</mat-icon> Award
+                  </button>
+                  <button mat-stroked-button color="warn" (click)="bacDecide('cancel')" [disabled]="saving()">
+                    <mat-icon>cancel</mat-icon> Reject
+                  </button>
+                  <button mat-stroked-button (click)="bacDecide('refer_back')" [disabled]="saving()">
+                    <mat-icon>undo</mat-icon> Refer Back
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: AWARD ========== -->
+        @if (detailTab() === 'award') {
+          <div class="detail-content">
+            @if (selectedTender()!.status === 'awarded' || selectedTender()!.status === 'contract_active') {
+              <div class="detail-card award-card">
+                <h3><mat-icon>emoji_events</mat-icon> Award Summary</h3>
+                @if (getWinningBidder(); as winner) {
+                  <div class="award-highlight">
+                    <div class="award-winner">
+                      <span class="award-label">Awarded To</span>
+                      <span class="award-name">{{winner.supplierName}}</span>
+                    </div>
+                    <div class="award-amount-section">
+                      <span class="award-label">Award Amount</span>
+                      <span class="award-amount">{{formatCurrencyFull(winner.bidAmount?.amount)}}</span>
+                    </div>
+                    <div class="award-date-section">
+                      <span class="award-label">Award Date</span>
+                      <span class="award-date-val">{{formatDate(selectedTender()!.awardDate)}}</span>
+                    </div>
+                  </div>
+                  <div class="detail-grid" style="margin-top: 16px;">
+                    <div class="detail-field">
+                      <label>B-BBEE Level</label>
+                      <span>Level {{winner.bbbeeLevel}}</span>
+                    </div>
+                    <div class="detail-field">
+                      <label>Total Score</label>
+                      <span>{{winner.totalScore?.toFixed(2) || '—'}}</span>
+                    </div>
+                    <div class="detail-field">
+                      <label>Scoring Method</label>
+                      <span>{{selectedTender()!.scoringMethod}}</span>
+                    </div>
+                  </div>
+                } @else {
+                  <p class="empty-text">Award details not available</p>
+                }
+              </div>
+
+              <div class="detail-card">
+                <h3><mat-icon>assignment</mat-icon> Letter of Award</h3>
+                @if (hasAwardLetter()) {
+                  <div class="award-letter-status">
+                    <mat-icon style="color: #2e7d32;">check_circle</mat-icon>
+                    <span>Letter of award has been issued</span>
+                  </div>
+                } @else {
+                  <div class="award-letter-status">
+                    <mat-icon style="color: #ef6c00;">pending</mat-icon>
+                    <span>Letter of award pending</span>
+                  </div>
+                }
+              </div>
+
+              @if (selectedTender()!.status === 'contract_active') {
+                <div class="detail-card" style="border: 2px solid #1565c0; background: #e3f2fd;">
+                  <h3><mat-icon>shopping_cart</mat-icon> Purchase Order</h3>
+                  @if (selectedTender()!.linkedPurchaseOrder) {
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                      <div style="background:white;padding:12px 20px;border-radius:10px;border:1px solid #90caf9;">
+                        <span style="font-size:12px;color:#64748b;display:block;">Purchase Order</span>
+                        <span style="font-size:18px;font-weight:700;color:#1565c0;">{{selectedTender()!.linkedPurchaseOrder}}</span>
+                      </div>
+                      <button mat-flat-button style="background:#1565c0;color:white" (click)="navigateToPurchaseOrder()"><mat-icon>open_in_new</mat-icon> View Order</button>
+                    </div>
+                  } @else {
+                    <p style="color:#37474f;font-size:14px;margin-bottom:12px;">Contract is active. Create a Purchase Order to begin procurement against this awarded tender.</p>
+                    <button mat-flat-button style="background:#1565c0;color:white;font-weight:600;padding:8px 24px;" (click)="createPurchaseOrderFromTender()" [disabled]="saving()">
+                      <mat-icon>add_shopping_cart</mat-icon> Create Purchase Order from Tender
+                    </button>
+                  }
+                </div>
+              }
+            } @else {
+              <div class="detail-card">
+                <h3><mat-icon>emoji_events</mat-icon> Award</h3>
+                <p class="empty-text">This tender has not yet been awarded. Current status: {{getStatusLabel(selectedTender()!.status)}}</p>
+              </div>
+            }
+
+            @if (selectedTender()!.aoApproval) {
+              <div class="detail-card">
+                <h3><mat-icon>verified</mat-icon> Accounting Officer Decision</h3>
+                <div class="decision-badge-row">
+                  <span class="decision-badge" [class]="'decision-' + (selectedTender()!.aoApproval.status === 'approved' ? 'award' : 'cancel')">
+                    AO {{selectedTender()!.aoApproval.status | titlecase}}
+                  </span>
+                  <span class="decision-date">{{formatDate(selectedTender()!.aoApproval.decidedAt)}}</span>
+                </div>
+                @if (selectedTender()!.aoApproval.comments) {
+                  <p class="spec-text" style="margin-top:12px">{{selectedTender()!.aoApproval.comments}}</p>
+                }
+              </div>
+            }
+
+            @if (selectedTender()!.status === 'awarded' && !selectedTender()!.aoApproval) {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>verified</mat-icon> Accounting Officer Final Approval</h3>
+                <p class="spec-text">This tender has been awarded and requires Accounting Officer (Municipal Manager) final approval before the contract can be activated.</p>
+                <div class="committee-action-buttons" style="margin-top:12px">
+                  <button mat-flat-button style="background:#1b5e20;color:white" (click)="aoApprove()" [disabled]="saving()">
+                    <mat-icon>check_circle</mat-icon> Approve & Activate Contract
+                  </button>
+                  <button mat-stroked-button color="warn" (click)="aoReject()" [disabled]="saving()">
+                    <mat-icon>cancel</mat-icon> Reject — Refer Back to BAC
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'reports') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>assessment</mat-icon> Tender Reports</h3>
+              <div class="report-buttons">
+                <button mat-flat-button color="primary" (click)="generateReport('tender')">
+                  <mat-icon>description</mat-icon> Tender Report
+                </button>
+                <button mat-flat-button style="background:#6a1b9a;color:white" (click)="generateReport('bbbee')">
+                  <mat-icon>diversity_3</mat-icon> B-BBEE Report
+                </button>
+                <button mat-flat-button style="background:#00695c;color:white" (click)="generateReport('nt')">
+                  <mat-icon>account_balance</mat-icon> NT Tender Report
+                </button>
+              </div>
+            </div>
+
+            @if (reportData()) {
+              <div class="detail-card">
+                <h3><mat-icon>table_chart</mat-icon> {{reportData().title}}</h3>
+                <div class="report-summary">
+                  <div class="report-stat"><span class="rs-label">Total Tenders</span><span class="rs-value">{{reportData().totalTenders}}</span></div>
+                  <div class="report-stat"><span class="rs-label">Total Value</span><span class="rs-value">{{formatCurrencyFull(reportData().totalValue)}}</span></div>
+                  <div class="report-stat"><span class="rs-label">Awarded</span><span class="rs-value">{{reportData().awarded}}</span></div>
+                </div>
+                @if (reportData().rows?.length) {
+                  <div class="tender-table-wrapper" style="margin-top:12px">
+                    <table class="scoring-table">
+                      <thead>
+                        <tr>
+                          @for (col of reportData().columns; track col) {
+                            <th>{{col}}</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of reportData().rows; track $index) {
+                          <tr>
+                            @for (col of reportData().columns; track col) {
+                              <td>{{row[col] ?? '—'}}</td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+                <div class="report-actions" style="margin-top:12px">
+                  <button mat-stroked-button (click)="printTender()"><mat-icon>print</mat-icon> Print Report</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'briefing') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>groups</mat-icon> Briefing Session</h3>
+                @if (selectedTender()!.briefingSession) {
+                  <div class="detail-grid">
+                    <div class="detail-field">
+                      <label>Date</label>
+                      <span matTooltip="Briefing session date">{{formatDate(selectedTender()!.briefingSession.date)}}</span>
+                    </div>
+                    <div class="detail-field">
+                      <label>Venue</label>
+                      <span matTooltip="Briefing venue">{{selectedTender()!.briefingSession.venue || '—'}}</span>
+                    </div>
+                    <div class="detail-field">
+                      <label>Mandatory</label>
+                      <span class="status-badge" [style.background]="selectedTender()!.briefingSession.mandatory ? '#fff3e0' : '#e8f5e9'" [style.color]="selectedTender()!.briefingSession.mandatory ? '#e65100' : '#2e7d32'" matTooltip="Whether attendance is mandatory">{{selectedTender()!.briefingSession.mandatory ? 'Yes' : 'No'}}</span>
+                    </div>
+                    <div class="detail-field">
+                      <label>Recorded By</label>
+                      <span matTooltip="User who recorded the session">{{selectedTender()!.briefingSession.recordedBy || '—'}}</span>
+                    </div>
+                  </div>
+                  @if (selectedTender()!.briefingSession.minutes) {
+                    <div style="margin-top: 16px;">
+                      <label style="font-size: 12px; color: #888; text-transform: uppercase; font-weight: 600;">Minutes Summary</label>
+                      <p class="spec-text">{{selectedTender()!.briefingSession.minutes}}</p>
+                    </div>
+                  }
+                } @else {
+                  <p class="spec-text">No briefing session recorded yet.</p>
+                }
+                @if (!selectedTender()!.briefingSession) {
+                  <div style="margin-top: 16px;">
+                    <h4 style="margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #444;">Record Briefing Session</h4>
+                    <div class="form-grid">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Briefing Date</mat-label>
+                        <input matInput [matDatepicker]="briefingRecordPicker" [(ngModel)]="briefingForm.date" placeholder="Select date">
+                        <mat-datepicker-toggle matIconSuffix [for]="briefingRecordPicker"></mat-datepicker-toggle>
+                        <mat-datepicker #briefingRecordPicker></mat-datepicker>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Venue</mat-label>
+                        <input matInput [(ngModel)]="briefingForm.venue" placeholder="Enter venue">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Mandatory</mat-label>
+                        <mat-select [(ngModel)]="briefingForm.mandatory">
+                          <mat-option [value]="false">No</mat-option>
+                          <mat-option [value]="true">Yes</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="form-field-full">
+                        <mat-label>Minutes</mat-label>
+                        <textarea matInput [(ngModel)]="briefingForm.minutes" rows="3" placeholder="Summarise the briefing session minutes"></textarea>
+                      </mat-form-field>
+                    </div>
+                    <button mat-flat-button color="primary" (click)="recordBriefingSession()" [disabled]="saving()" style="margin-top: 8px;">
+                      <mat-icon>save</mat-icon> Record Briefing Session
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>how_to_reg</mat-icon> Attendance</h3>
+              @if (selectedTender()!.briefingSession?.attendees?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Company Name</th>
+                        <th>Representative</th>
+                        <th>Attended</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (att of selectedTender()!.briefingSession.attendees; track $index) {
+                        <tr>
+                          <td matTooltip="Company name">{{att.companyName}}</td>
+                          <td matTooltip="Representative name">{{att.representative}}</td>
+                          <td>
+                            <mat-icon [style.color]="att.attended ? '#2e7d32' : '#c62828'" matTooltip="Attendance status">{{att.attended ? 'check_circle' : 'cancel'}}</mat-icon>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="spec-text">No attendees recorded.</p>
+              }
+              @if (selectedTender()!.briefingSession) {
+                <div style="margin-top: 12px;">
+                  <h4 style="margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #444;">Add / Update Attendee</h4>
+                  <div class="form-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Company Name</mat-label>
+                      <input matInput [(ngModel)]="briefingAttendeeForm.companyName" placeholder="Enter company name">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Representative</mat-label>
+                      <input matInput [(ngModel)]="briefingAttendeeForm.representative" placeholder="Enter representative name">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Attended</mat-label>
+                      <mat-select [(ngModel)]="briefingAttendeeForm.attended">
+                        <mat-option [value]="true">Yes</mat-option>
+                        <mat-option [value]="false">No</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                  <button mat-stroked-button color="primary" (click)="addBriefingAttendee()" [disabled]="saving()" style="margin-top: 4px;">
+                    <mat-icon>person_add</mat-icon> Add Attendee
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>quiz</mat-icon> Questions Raised</h3>
+              @if (selectedTender()!.briefingSession?.questionsRaised?.length) {
+                @for (q of selectedTender()!.briefingSession.questionsRaised; track $index) {
+                  <div style="padding: 10px 14px; margin-bottom: 8px; background: #fafafa; border-radius: 8px; border: 1px solid #eee;">
+                    <div style="font-size: 13px; font-weight: 600; color: #333;" matTooltip="Question raised at briefing">{{q.question}}</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;" matTooltip="Answer provided">{{q.answer || 'Pending answer'}}</div>
+                    @if (q.answeredBy) {
+                      <div style="font-size: 11px; color: #999; margin-top: 2px;">Answered by: {{q.answeredBy}}</div>
+                    }
+                  </div>
+                }
+              } @else {
+                <p class="spec-text">No questions recorded.</p>
+              }
+              @if (selectedTender()!.briefingSession) {
+                <div style="margin-top: 12px;">
+                  <h4 style="margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #444;">Add Question</h4>
+                  <div class="form-grid">
+                    <mat-form-field appearance="outline" class="form-field-full">
+                      <mat-label>Question</mat-label>
+                      <input matInput [(ngModel)]="briefingQuestionForm.question" placeholder="Enter question">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="form-field-full">
+                      <mat-label>Answer</mat-label>
+                      <input matInput [(ngModel)]="briefingQuestionForm.answer" placeholder="Enter answer">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Answered By</mat-label>
+                      <input matInput [(ngModel)]="briefingQuestionForm.answeredBy" placeholder="Name">
+                    </mat-form-field>
+                  </div>
+                  <button mat-stroked-button color="primary" (click)="addBriefingQuestion()" [disabled]="saving()" style="margin-top: 4px;">
+                    <mat-icon>add_circle</mat-icon> Add Question
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'subcontracting') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>engineering</mat-icon> Sub-contracting Plan</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Sub-contracting Required</label>
+                  <span class="status-badge" [style.background]="subcontractingPlan()?.required ? '#e3f2fd' : '#fafafa'" [style.color]="subcontractingPlan()?.required ? '#1565c0' : '#888'" matTooltip="Whether sub-contracting is required for this tender">{{subcontractingPlan()?.required ? 'Yes' : 'No'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Minimum Percentage</label>
+                  <span matTooltip="Minimum sub-contracting percentage required">{{subcontractingPlan()?.minimumPercentage || 0}}%</span>
+                </div>
+                <div class="detail-field">
+                  <label>Total Sub-contracting</label>
+                  <span matTooltip="Sum of all sub-contractor percentages" [style.color]="getSubcontractingTotal() >= (subcontractingPlan()?.minimumPercentage || 0) ? '#2e7d32' : '#c62828'">{{getSubcontractingTotal()}}%</span>
+                </div>
+                <div class="detail-field">
+                  <label>Sub-contractors</label>
+                  <span matTooltip="Number of registered sub-contractors">{{subcontractingPlan()?.plans?.length || 0}}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>list_alt</mat-icon> Sub-contractors</h3>
+              @if (subcontractingPlan()?.plans?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Registration No.</th>
+                        <th>B-BBEE Level</th>
+                        <th>Work Description</th>
+                        <th>%</th>
+                        <th>Value (ZAR)</th>
+                        <th>Verified</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (sub of subcontractingPlan()!.plans; track sub.id) {
+                        <tr>
+                          <td matTooltip="Sub-contractor name">{{sub.subcontractorName}}</td>
+                          <td matTooltip="Registration number">{{sub.registrationNumber || '—'}}</td>
+                          <td matTooltip="B-BBEE contributor level">
+                            <span class="status-badge" style="background: #f3e5f5; color: #6a1b9a;">Level {{sub.bbbeeLevel || '—'}}</span>
+                          </td>
+                          <td matTooltip="Description of work to be sub-contracted">{{sub.workDescription || '—'}}</td>
+                          <td matTooltip="Sub-contracting percentage">{{sub.percentage}}%</td>
+                          <td matTooltip="Sub-contract value">{{formatCurrency(sub.value || 0)}}</td>
+                          <td>
+                            <mat-icon [style.color]="sub.verified ? '#2e7d32' : '#bdbdbd'" matTooltip="Verification status">{{sub.verified ? 'verified' : 'pending'}}</mat-icon>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="spec-text">No sub-contractors registered.</p>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>person_add</mat-icon> Add Sub-contractor</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Sub-contractor Name</mat-label>
+                  <input matInput [(ngModel)]="subcontractorForm.subcontractorName" placeholder="Enter sub-contractor name">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Registration Number</mat-label>
+                  <input matInput [(ngModel)]="subcontractorForm.registrationNumber" placeholder="CIPC/CSD number">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>B-BBEE Level</mat-label>
+                  <mat-select [(ngModel)]="subcontractorForm.bbbeeLevel">
+                    <mat-option [value]="1">Level 1</mat-option>
+                    <mat-option [value]="2">Level 2</mat-option>
+                    <mat-option [value]="3">Level 3</mat-option>
+                    <mat-option [value]="4">Level 4</mat-option>
+                    <mat-option [value]="5">Level 5</mat-option>
+                    <mat-option [value]="6">Level 6</mat-option>
+                    <mat-option [value]="7">Level 7</mat-option>
+                    <mat-option [value]="8">Level 8</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Work Description</mat-label>
+                  <input matInput [(ngModel)]="subcontractorForm.workDescription" placeholder="Describe the sub-contracted work">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Percentage (%)</mat-label>
+                  <input matInput type="number" [(ngModel)]="subcontractorForm.percentage" placeholder="0">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Value (ZAR)</mat-label>
+                  <input matInput type="number" [(ngModel)]="subcontractorForm.value" placeholder="0">
+                </mat-form-field>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button mat-flat-button color="primary" (click)="addSubcontractor()" [disabled]="saving()">
+                  <mat-icon>add</mat-icon> Add Sub-contractor
+                </button>
+                <button mat-flat-button style="background: #1b5e20; color: white;" (click)="saveSubcontractingPlan()" [disabled]="saving()">
+                  <mat-icon>save</mat-icon> Save Plan
+                </button>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>settings</mat-icon> Plan Settings</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Sub-contracting Required</mat-label>
+                  <mat-select [(ngModel)]="subcontractingRequired">
+                    <mat-option [value]="false">No</mat-option>
+                    <mat-option [value]="true">Yes</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Minimum Percentage (%)</mat-label>
+                  <input matInput type="number" [(ngModel)]="subcontractingMinPct" placeholder="30">
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'documents') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>folder</mat-icon> Tender Documents</h3>
+              <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+                <mat-form-field appearance="outline" style="width: 200px;">
+                  <mat-select placeholder="Filter by Type" [(ngModel)]="docTypeFilter" (selectionChange)="loadTenderDocuments()">
+                    <mat-option value="">All Types</mat-option>
+                    @for (dt of tenderDocumentTypes; track dt) {
+                      <mat-option [value]="dt">{{formatDocType(dt)}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <span style="font-size: 12px; color: #888;">{{tenderDocuments().length}} document(s)</span>
+              </div>
+              @if (tenderDocuments().length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Uploaded By</th>
+                        <th>Date</th>
+                        <th>Version</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (doc of tenderDocuments(); track doc.id) {
+                        <tr>
+                          <td>
+                            <span class="status-badge" [style.background]="getDocTypeBadgeColor(doc.type)" style="color: #333; font-size: 11px;" matTooltip="Document type">{{formatDocType(doc.type)}}</span>
+                          </td>
+                          <td matTooltip="Document name">{{doc.name}}</td>
+                          <td matTooltip="Document description">{{doc.description || '—'}}</td>
+                          <td matTooltip="Uploaded by user">{{doc.uploadedBy}}</td>
+                          <td matTooltip="Upload date">{{formatDate(doc.uploadedDate)}}</td>
+                          <td matTooltip="Document version">v{{doc.version}}</td>
+                          <td>
+                            <button mat-icon-button color="warn" (click)="deleteTenderDocument(doc)" matTooltip="Remove document">
+                              <mat-icon>delete</mat-icon>
+                            </button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="spec-text">No documents attached.</p>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>cloud_upload</mat-icon> Upload Document</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Document Type</mat-label>
+                  <mat-select [(ngModel)]="newDocForm.type">
+                    @for (dt of tenderDocumentTypes; track dt) {
+                      <mat-option [value]="dt">{{formatDocType(dt)}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Document Name</mat-label>
+                  <input matInput [(ngModel)]="newDocForm.name" placeholder="Enter document name">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Description</mat-label>
+                  <input matInput [(ngModel)]="newDocForm.description" placeholder="Brief description of the document">
+                </mat-form-field>
+              </div>
+              <button mat-flat-button color="primary" (click)="uploadTenderDocument()" [disabled]="saving() || !newDocForm.type || !newDocForm.name" style="margin-top: 8px;">
+                <mat-icon>upload</mat-icon> Upload Document
+              </button>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('list')">Tender List</button>
+          <button class="tab-btn active">AI Analytics</button>
+        </div>
+
+        @if (tenderAnalyticsData()) {
+          <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+            <!-- TENDER TIMELINE -->
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">timeline</mat-icon>
+                  Tender Timeline (Gantt View)
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112, s114</span>
+              </div>
+              <div style="overflow-x: auto;">
+                @for (tender of tenderAnalyticsData().timeline; track tender.ref) {
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9;">
+                    <div style="width: 200px; flex-shrink: 0;">
+                      <div style="font-size: 11px; font-weight: 600; color: #1e293b;">{{tender.ref}}</div>
+                      <div style="font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{tender.title}}</div>
+                      <div style="font-size: 10px; color: #3b82f6; font-weight: 500;">R{{(tender.value/1000000).toFixed(1)}}M</div>
+                    </div>
+                    <div style="flex: 1; display: flex; gap: 2px; height: 24px;">
+                      <div style="flex: 1; background: {{tender.phases.advertised ? '#bbf7d0' : '#f1f5f9'}}; border-radius: 4px 0 0 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #166534;" [matTooltip]="'Advertised: ' + (tender.phases.advertised || 'N/A')">ADV</div>
+                      <div style="flex: 1; background: {{tender.phases.clarification ? '#bfdbfe' : '#f1f5f9'}}; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #1e40af;" [matTooltip]="'Clarification: ' + (tender.phases.clarification || 'N/A')">CLR</div>
+                      <div style="flex: 1; background: {{tender.phases.closing ? '#e9d5ff' : '#f1f5f9'}}; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #6b21a8;" [matTooltip]="'Closing: ' + (tender.phases.closing || 'N/A')">CLS</div>
+                      <div style="flex: 1; background: {{tender.phases.evaluation ? '#fde68a' : '#f1f5f9'}}; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #92400e;" [matTooltip]="'Evaluation: ' + (tender.phases.evaluation || 'Pending')">BEC</div>
+                      <div style="flex: 1; background: {{tender.phases.adjudication ? '#fed7aa' : '#f1f5f9'}}; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #c2410c;" [matTooltip]="'Adjudication: ' + (tender.phases.adjudication || 'Pending')">BAC</div>
+                      <div style="flex: 1; background: {{tender.phases.award ? '#bbf7d0' : '#f1f5f9'}}; border-radius: 0 4px 4px 0; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #166534;" [matTooltip]="'Award: ' + (tender.phases.award || 'Pending')">AWD</div>
+                    </div>
+                    <div style="width: 80px; text-align: right;">
+                      <span style="font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; background: {{tender.status === 'awarded' ? '#dcfce7' : tender.status === 'evaluation' ? '#fef9c3' : tender.status === 'closed' ? '#e9d5ff' : '#dbeafe'}}; color: {{tender.status === 'awarded' ? '#166534' : tender.status === 'evaluation' ? '#854d0e' : tender.status === 'closed' ? '#6b21a8' : '#1e40af'}};">{{tender.status}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <!-- DISQUALIFICATION PARETO -->
+              <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                    <mat-icon style="color: #ef4444; font-size: 20px; width: 20px; height: 20px;">block</mat-icon>
+                    Disqualification Reasons (Pareto)
+                  </h3>
+                  <span style="font-size: 10px; color: #94a3b8; background: #fef2f2; padding: 2px 8px; border-radius: 4px;">MFMA s117</span>
+                </div>
+                <div style="height: 250px; position: relative;">
+                  <canvas id="disqualPareto"></canvas>
+                </div>
+              </div>
+
+              <!-- APPEALS TREND -->
+              <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                    <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">gavel</mat-icon>
+                    Appeals & Objections Trend
+                  </h3>
+                  <span style="font-size: 10px; color: #94a3b8; background: #fffbeb; padding: 2px 8px; border-radius: 4px;">MFMA s114</span>
+                </div>
+                <div style="height: 250px; position: relative;">
+                  <canvas id="appealsTrendChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'create' || currentView() === 'edit') {
+        <div class="create-form">
+          <div class="form-header">
+            <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+            <h2>{{currentView() === 'edit' ? 'Edit Tender' : 'New Tender'}}</h2>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>info</mat-icon> Basic Information</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="tenderForm.title" required placeholder="Enter tender title">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.description" required rows="4" placeholder="Describe the tender requirements"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="tenderForm.department">
+                  @for (dept of departments; track dept) {
+                    <mat-option [value]="dept">{{dept}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Category</mat-label>
+                <mat-select [(ngModel)]="tenderForm.category">
+                  <mat-option value="goods">Goods</mat-option>
+                  <mat-option value="services">Services</mat-option>
+                  <mat-option value="works">Works</mat-option>
+                  <mat-option value="consulting">Consulting</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Estimated Value (ZAR)</mat-label>
+                <input matInput type="number" [(ngModel)]="tenderForm.estimatedValue" required placeholder="0.00">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Procurement Method</mat-label>
+                <mat-select [(ngModel)]="tenderForm.procurementMethod">
+                  <mat-option value="competitive_bid">Competitive Bidding</mat-option>
+                  <mat-option value="formal_written">Formal Quotation</mat-option>
+                  <mat-option value="informal_written">Informal Quotation</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Scoring Method</mat-label>
+                <mat-select [(ngModel)]="tenderForm.scoringMethod">
+                  <mat-option value="80/20">80/20</mat-option>
+                  <mat-option value="90/10">90/10</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Two-Envelope System</mat-label>
+                <mat-select [(ngModel)]="tenderForm.twoEnvelope">
+                  <mat-option [value]="false">No</mat-option>
+                  <mat-option [value]="true">Yes</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              @if (tenderForm.twoEnvelope) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Functionality Threshold</mat-label>
+                  <input matInput type="number" [(ngModel)]="tenderForm.functionalityThreshold" placeholder="70">
+                </mat-form-field>
+              }
+
+              <mat-form-field appearance="outline">
+                <mat-label>Assigned Buyer</mat-label>
+                <mat-select [(ngModel)]="tenderForm.assignedBuyer">
+                  @for (buyer of buyers; track buyer) {
+                    <mat-option [value]="buyer">{{buyer}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>calendar_today</mat-icon> Dates & Briefing</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Closing Date</mat-label>
+                <input matInput [matDatepicker]="closingPicker" [(ngModel)]="tenderForm.closingDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="closingPicker"></mat-datepicker-toggle>
+                <mat-datepicker #closingPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Briefing Date (Optional)</mat-label>
+                <input matInput [matDatepicker]="briefingPicker" [(ngModel)]="tenderForm.briefingDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="briefingPicker"></mat-datepicker-toggle>
+                <mat-datepicker #briefingPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Briefing Venue (Optional)</mat-label>
+                <input matInput [(ngModel)]="tenderForm.briefingVenue" placeholder="Enter venue">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Briefing Mandatory</mat-label>
+                <mat-select [(ngModel)]="tenderForm.briefingMandatory">
+                  <mat-option [value]="false">No</mat-option>
+                  <mat-option [value]="true">Yes</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Validity From Date</mat-label>
+                <input matInput [matDatepicker]="validityFromPicker" [(ngModel)]="tenderForm.validityFromDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="validityFromPicker"></mat-datepicker-toggle>
+                <mat-datepicker #validityFromPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Validity To Date</mat-label>
+                <input matInput [matDatepicker]="validityToPicker" [(ngModel)]="tenderForm.validityToDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="validityToPicker"></mat-datepicker-toggle>
+                <mat-datepicker #validityToPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>BSC Plan Date</mat-label>
+                <input matInput [matDatepicker]="bscPlannedPicker" [(ngModel)]="tenderForm.bscPlannedDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="bscPlannedPicker"></mat-datepicker-toggle>
+                <mat-datepicker #bscPlannedPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>BSC Actual Date</mat-label>
+                <input matInput [matDatepicker]="bscActualPicker" [(ngModel)]="tenderForm.bscActualDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="bscActualPicker"></mat-datepicker-toggle>
+                <mat-datepicker #bscActualPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Advertisement Plan Date</mat-label>
+                <input matInput [matDatepicker]="advertisePicker" [(ngModel)]="tenderForm.advertisePlannedDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="advertisePicker"></mat-datepicker-toggle>
+                <mat-datepicker #advertisePicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Evaluation Plan Date</mat-label>
+                <input matInput [matDatepicker]="evaluationPicker" [(ngModel)]="tenderForm.evaluationPlannedDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="evaluationPicker"></mat-datepicker-toggle>
+                <mat-datepicker #evaluationPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Adjudication Plan Date</mat-label>
+                <input matInput [matDatepicker]="adjudicationPicker" [(ngModel)]="tenderForm.adjudicationPlannedDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="adjudicationPicker"></mat-datepicker-toggle>
+                <mat-datepicker #adjudicationPicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>settings</mat-icon> Additional Settings</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>CIDB Grading (Optional)</mat-label>
+                <input matInput [(ngModel)]="tenderForm.cidbGrading" placeholder="e.g., 7CE">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Validity Period (Days)</mat-label>
+                <input matInput type="number" [(ngModel)]="tenderForm.validityPeriod" placeholder="90">
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>link</mat-icon> Requisition Linkage</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Link to Requisition</mat-label>
+                <mat-select [(ngModel)]="tenderForm.linkedRequisitionId" (selectionChange)="onRequisitionSelected($event.value)">
+                  <mat-option [value]="''">— None —</mat-option>
+                  @for (req of linkedRequisitions(); track req.id) {
+                    <mat-option [value]="req.id">{{req.referenceNumber}} — {{req.title}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            @if (tenderForm.linkedRequisitionId) {
+              <div class="linked-req-info" style="margin-top: 8px; padding: 10px 14px; background: #f0fdf4; border-radius: 8px; border: 1px solid #a5d6a7;">
+                <span style="font-size: 12px; color: #2e7d32; font-weight: 500;">
+                  <mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">link</mat-icon>
+                  Linked: {{tenderForm.linkedRequisitionRef || tenderForm.linkedRequisitionId}}
+                </span>
+              </div>
+            }
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>article</mat-icon> Specification Details</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Purpose</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specPurpose" rows="3" placeholder="Describe the purpose"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Background</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specBackground" rows="3" placeholder="Provide background context"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Scope of Works</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specScope" rows="3" placeholder="Define the scope of works"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>General Conditions</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specGeneralConditions" rows="3" placeholder="General conditions"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Specific Conditions</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specSpecificConditions" rows="3" placeholder="Specific conditions"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Specification Comments</mat-label>
+                <textarea matInput [(ngModel)]="tenderForm.specComments" rows="3" placeholder="Additional comments on specifications"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>cloud_upload</mat-icon> Documents</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Document Type</mat-label>
+                <mat-select [(ngModel)]="formDocType">
+                  @for (dtype of tenderDocTypes; track dtype) {
+                    <mat-option [value]="dtype">{{dtype | titlecase}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Document Date</mat-label>
+                <input matInput [matDatepicker]="docDatePicker" [(ngModel)]="formDocDate" placeholder="Select date">
+                <mat-datepicker-toggle matIconSuffix [for]="docDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #docDatePicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+            <div class="upload-area" (click)="docFileInput.click()">
+              <input #docFileInput type="file" style="display: none;" (change)="onDocFileSelected($event)">
+              <mat-icon style="font-size: 32px; width: 32px; height: 32px; color: #94a3b8;">cloud_upload</mat-icon>
+              <p style="margin: 8px 0 0; font-size: 13px; color: #64748b;">
+                {{formDocFile ? formDocFile.name : 'Click to select a file'}}
+              </p>
+            </div>
+            <div style="margin-top: 12px; text-align: right;">
+              <button mat-flat-button color="primary" (click)="addFormDocument()" [disabled]="!formDocFile || !formDocType">
+                <mat-icon>add</mat-icon> Add Document
+              </button>
+            </div>
+            @if (formDocuments().length > 0) {
+              <div class="upload-file-list" style="margin-top: 16px;">
+                @for (doc of formDocuments(); track doc.name; let i = $index) {
+                  <div class="upload-file-item">
+                    <mat-icon class="doc-icon">description</mat-icon>
+                    <span class="doc-name" style="flex: 1;">{{doc.name}}</span>
+                    <span class="doc-meta">{{doc.type | titlecase}}</span>
+                    <span class="doc-meta">{{doc.date}}</span>
+                    <button mat-icon-button color="warn" (click)="removeFormDocument(i)">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()" [disabled]="saving()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveTender()" [disabled]="saving() || !tenderForm.title || !tenderForm.description">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save as Draft'}}
+            </button>
+          </div>
+        </div>
+      }
+    </div>

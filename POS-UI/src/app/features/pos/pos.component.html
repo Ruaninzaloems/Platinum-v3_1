@@ -1,0 +1,1821 @@
+<div class="pos-workstation">
+  <div class="pos-header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      </div>
+      <div class="header-titles">
+        <h1 class="header-title" data-testid="text-pos-title">POS Cashier</h1>
+        <span class="header-subtitle header-subtitle-full">
+          @if (cashierInfo()?.cashOfficeDesc) {
+            {{ cashierInfo()?.cashOfficeDesc }}
+          } @else {
+            George Municipality
+          }
+          @if (user()?.firstName) {
+            &mdash; {{ user()?.firstName }} {{ user()?.lastName }}
+          }
+          @if (sessionActive()) {
+            <span class="session-indicator session-active">Session Active</span>
+          }
+        </span>
+        <span class="header-subtitle header-subtitle-compact">
+          @if (cashierInfo()?.cashOfficeDesc) {
+            {{ cashierInfo()?.cashOfficeDesc }}
+          } @else {
+            George
+          }
+        </span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="header-btn" (click)="navigateToEnquiries()" title="Account Enquiry" data-testid="button-enquiries">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span class="btn-label">Enquiry</span>
+      </button>
+      <button class="header-btn" (click)="openDropBoxDialog()" [disabled]="!sessionActive()" title="Cash Drop Box" data-testid="button-dropbox">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        <span class="btn-label">Drop Box</span>
+      </button>
+      <button class="header-btn" (click)="openCsvImport()" [disabled]="!sessionActive()" title="Import CSV/Excel File" data-testid="button-csv-import">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="btn-label">Import</span>
+      </button>
+      <button class="header-btn" (click)="openCancelDialog()" [disabled]="!sessionActive()" title="Cancel Receipt" data-testid="button-cancel-receipt">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        <span class="btn-label">Cancel</span>
+      </button>
+      <button class="header-btn header-btn-accent" (click)="navigateToDayEnd()" title="Day End" data-testid="button-dayend">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><path d="M5 17h14"/></svg>
+        <span class="btn-label">Day End</span>
+      </button>
+      <button class="header-btn" (click)="navigateToCashierSetup()" title="Session Setup" data-testid="button-setup">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="btn-label">Setup</span>
+      </button>
+    </div>
+  </div>
+
+  @if (sessionLoading()) {
+    <div class="session-banner session-banner-loading">
+      <div class="spinner-sm"></div>
+      <span>Checking cashier session...</span>
+    </div>
+  } @else if (!sessionActive()) {
+    <div class="session-banner session-banner-blocked" data-testid="session-blocked-banner">
+      <div class="session-banner-content">
+        @if (sessionStatus() === 'pending_approval') {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <div>
+            <strong>Day-End Pending Approval</strong>
+            <p>Your day-end reconciliation is awaiting supervisor approval.</p>
+          </div>
+        } @else if (sessionStatus() === 'returned') {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <strong>Day-End Returned</strong>
+            <p>Your day-end was returned by the supervisor. Please review and re-submit.</p>
+            @if (sessionReturnReason()) {
+              <p class="return-reason">Reason: {{ sessionReturnReason() }}</p>
+            }
+          </div>
+        } @else if (sessionStatus() === 'needs_reconcile') {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <strong>Reconciliation Required</strong>
+            <p>{{ reconcileMessage() || 'You need to submit your day-end reconciliation before you can process transactions.' }}</p>
+          </div>
+          <button class="session-setup-btn" (click)="navigateToDayEnd()" data-testid="button-goto-dayend">Go to Day-End Reconciliation</button>
+        } @else {
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <div>
+            <strong>No Active Cashier Session</strong>
+            <p>You must complete cashier setup before you can process transactions.</p>
+          </div>
+        }
+        @if (sessionStatus() !== 'needs_reconcile') {
+          <button class="session-setup-btn" (click)="navigateToCashierSetup()" data-testid="button-goto-setup">Go to Cashier Setup</button>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Search Mode Toggle + Payment Type Tabs -->
+  <div class="pos-toolbar">
+    <div class="search-mode-toggle" data-testid="search-mode-toggle">
+      <button class="mode-toggle-btn" [class.active]="searchMode() === 'unified'" (click)="searchMode.set('unified')" data-testid="toggle-unified">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        Dynamic Search
+      </button>
+      <button class="mode-toggle-btn" [class.active]="searchMode() === 'tabs'" (click)="searchMode.set('tabs')" data-testid="toggle-tabs">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/></svg>
+        Category Tabs
+      </button>
+    </div>
+
+    @if (searchMode() === 'tabs') {
+      <div class="pos-tabs">
+        <button class="pos-tab" [class.active]="activeMode() === 'account'" (click)="setMode('account')" [disabled]="!sessionActive() || !canDoAccountPayments()" data-testid="tab-account">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Account
+        </button>
+        <button class="pos-tab" [class.active]="activeMode() === 'clearance'" (click)="setMode('clearance')" [disabled]="!sessionActive() || !canDoClearance()" data-testid="tab-clearance">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+          Clearance
+        </button>
+        <button class="pos-tab" [class.active]="activeMode() === 'prepaid'" (click)="setMode('prepaid')" [disabled]="!sessionActive() || !canDoPrepaid()" data-testid="tab-prepaid">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Prepaid
+        </button>
+        <button class="pos-tab" [class.active]="activeMode() === 'misc'" (click)="setMode('misc')" [disabled]="!sessionActive() || !canDoMisc()" data-testid="tab-misc">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          Misc
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="pos-body">
+    <div class="pos-split">
+      <!-- LEFT: Search + Basket -->
+      <div class="pos-left">
+
+        <!-- Unified Dynamic Search -->
+        @if (searchMode() === 'unified') {
+          <div class="search-section">
+            <div class="search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                class="search-input"
+                type="text"
+                [placeholder]="sessionActive() ? 'Type account number, name, or meter to search...' : 'Start cashier session to search'"
+                [ngModel]="unifiedSearchQuery()"
+                (ngModelChange)="onUnifiedSearchInput($event)"
+                (keydown)="onUnifiedSearchKeydown($event)"
+                [disabled]="!sessionActive()"
+                data-testid="input-unified-search"
+              />
+              @if (unifiedSearchQuery()) {
+                <button class="search-clear-btn" (click)="clearUnifiedSearch()" data-testid="button-clear-unified">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              }
+              <button class="search-go-btn" (click)="unifiedSearch()" [disabled]="unifiedSearchLoading() || !sessionActive()" data-testid="button-unified-search">
+                @if (unifiedSearchLoading()) {
+                  <div class="spinner-sm"></div>
+                } @else {
+                  Search
+                }
+              </button>
+            </div>
+          </div>
+
+          @if (unifiedSearchLoading()) {
+            <div class="search-results-panel" data-testid="unified-loading">
+              <div class="search-loading-bar">
+                <div class="spinner-sm"></div>
+                <span>Searching accounts...</span>
+              </div>
+              <div class="skeleton-row"></div>
+              <div class="skeleton-row skeleton-short"></div>
+              <div class="skeleton-row"></div>
+            </div>
+          }
+
+          @if (unifiedSearchActive() && !unifiedSearchLoading() && unifiedSearchResults().length > 0) {
+            <div class="search-results-panel" data-testid="unified-results">
+              <div class="results-header">
+                <span>{{ unifiedSearchResults().length }} result(s) found</span>
+                <button class="link-btn" (click)="clearUnifiedSearch()">Clear</button>
+              </div>
+              @for (result of unifiedSearchResults(); track result.id + '-' + result.resultType) {
+                <div class="search-result-card unified-result clickable-result" (click)="addUnifiedResult(result)" [class.result-loading]="accountDetailLoading()" [attr.data-testid]="'result-' + result.resultType + '-' + result.id">
+                  @if (result.resultType === 'account') {
+                    <div class="account-result-detail">
+                      <div class="account-result-header">
+                        <div class="result-type-badge" [style.background]="getTypeColor('account')">ACCOUNT</div>
+                        <div class="account-result-name">{{ result.label }}</div>
+                        <div class="account-result-status" [class.active]="(result.status || '').toLowerCase() === 'active'">{{ result.status }}</div>
+                      </div>
+                      <div class="account-result-info">
+                        <div class="account-info-row">
+                          <span class="info-label">Account:</span>
+                          <span class="info-value">{{ result.rawData?.accountNo || result.rawData?.accountNumber || '' }}</span>
+                        </div>
+                        <div class="account-info-row">
+                          <span class="info-label">Address:</span>
+                          <span class="info-value">{{ result.rawData?.address || 'No address on file' }}</span>
+                        </div>
+                        <div class="account-info-row">
+                          <span class="info-label">Balance:</span>
+                          <span class="info-value balance-value" [class.owing]="result.balance > 0" [class.credit]="result.balance < 0">R {{ formatCurrency(result.balance) }}</span>
+                          @if (result.balance < 0) {
+                            <span class="credit-badge">Credit</span>
+                          }
+                        </div>
+                        @if (result.rawData?.erfNumber || result.rawData?.sgNumber) {
+                          <div class="account-info-row">
+                            <span class="info-label">SG Number:</span>
+                            <span class="info-value">{{ result.rawData.erfNumber || result.rawData.sgNumber }}</span>
+                          </div>
+                        }
+                        @if (result.rawData?.hasPrepaidMeter) {
+                          <div class="account-info-row">
+                            <span class="info-label">Prepaid {{ result.rawData.prepaidType || 'Electricity' }}:</span>
+                            <span class="info-value meter-value">{{ result.rawData.prepaidMeterNo }}</span>
+                          </div>
+                        }
+                      </div>
+                      <div class="result-click-hint">
+                        @if (accountDetailLoading()) {
+                          <div class="spinner-sm"></div> <span>Adding...</span>
+                        } @else {
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                          <span>Click to add</span>
+                        }
+                      </div>
+                      @if (result.rawData?.hasPrepaidMeter) {
+                        <button class="add-prepaid-inline" (click)="addPrepaidPlaceholder(result.rawData.prepaidMeterNo); $event.stopPropagation()" [attr.data-testid]="'button-prepaid-' + result.id">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                          Add Prepaid {{ result.rawData.prepaidType || 'Electricity' }}
+                        </button>
+                      }
+                    </div>
+                  } @else {
+                    <div class="result-top-row">
+                      @if (result.resultType === 'misc') {
+                        <div class="misc-icon-badge" [style.background]="getMiscIconInfo(result.label).bg" [style.color]="getMiscIconInfo(result.label).color">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" [attr.stroke]="getMiscIconInfo(result.label).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path [attr.d]="getMiscIconInfo(result.label).icon"/>
+                          </svg>
+                        </div>
+                      } @else {
+                        <div class="result-type-badge" [style.background]="getTypeColor(result.resultType === 'group' ? 'account' : result.resultType)">
+                          {{ result.resultType === 'group' ? 'GROUP' : result.resultType.toUpperCase() }}
+                        </div>
+                      }
+                      <div class="result-name-col" style="flex:1;min-width:0">
+                        <span class="result-name">{{ result.label }}</span>
+                        <span class="result-address">
+                          @if (result.resultType === 'misc') {
+                            <span class="misc-category-tag" [style.color]="getMiscIconInfo(result.label).color">{{ getMiscIconInfo(result.label).label }}</span>
+                            <span style="margin:0 4px;opacity:0.3">|</span>
+                          }
+                          {{ result.description }}
+                        </span>
+                      </div>
+                      @if (result.balance) {
+                        <div class="result-balance-col">
+                          <span class="result-balance" [class.owing]="result.balance > 0">R {{ formatCurrency(result.balance) }}</span>
+                        </div>
+                      }
+                      <span class="result-click-hint" style="opacity:0.5; padding:0; margin-left:auto;">
+                        @if (result.resultType === 'group') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Expand
+                        } @else {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Add
+                        }
+                      </span>
+                    </div>
+                  }
+
+                  @if (result.resultType === 'group' && expandedGroupId() === result.id + '') {
+                    <div class="group-accounts-panel">
+                      @if (groupAccountsLoading()) {
+                        <div class="group-loading"><div class="spinner-sm"></div> Loading accounts...</div>
+                      } @else if (result.groupAccounts && result.groupAccounts.length > 0) {
+                        <div class="group-actions-bar">
+                          <span class="group-count">{{ result.groupAccounts.length }} account(s)</span>
+                          <button class="link-btn accent" (click)="addAllGroupAccounts(result.groupAccounts); $event.stopPropagation()" data-testid="button-add-all-group">Add All to Basket</button>
+                        </div>
+                        @for (ga of result.groupAccounts; track getAccountId(ga) || $index) {
+                          <div class="group-account-row" (click)="addGroupAccountAndClear(ga); $event.stopPropagation()">
+                            <span class="ga-name">{{ getAccountName(ga) }}</span>
+                            <span class="ga-acct">{{ getAccountNo(ga) }}</span>
+                            <span class="ga-bal" [class.owing]="getAccountBalance(ga) > 0">R {{ formatCurrency(getAccountBalance(ga)) }}</span>
+                            <span class="ga-add-hint">Add</span>
+                          </div>
+                        }
+                      } @else {
+                        <div class="group-empty">No accounts found in this group.</div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          } @else if (unifiedSearchActive() && !unifiedSearchLoading() && unifiedSearchResults().length === 0) {
+            <div class="search-results-panel" data-testid="unified-no-results">
+              <div class="empty-results">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.4; margin-bottom:8px">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/>
+                </svg>
+                <span class="empty-results-title">No results found</span>
+                <span class="empty-results-hint">Try a different account number, name, or check for typos.</span>
+              </div>
+            </div>
+          }
+        }
+
+        <!-- Tab-based search (Account mode) -->
+        @if (searchMode() === 'tabs' && activeMode() === 'account') {
+          <div class="search-section">
+            <div class="search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                class="search-input"
+                type="text"
+                [placeholder]="sessionActive() ? 'Search account number, name, address...' : 'Start cashier session to search'"
+                [ngModel]="tabSearchQuery()"
+                (ngModelChange)="onTabSearchInput($event)"
+                (keydown)="onTabSearchKeydown($event)"
+                [disabled]="!sessionActive()"
+                data-testid="input-tab-search"
+              />
+              @if (tabSearchQuery()) {
+                <button class="search-clear-btn" (click)="clearTabSearch()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              }
+              <button class="search-go-btn" (click)="tabSearch()" [disabled]="tabSearchLoading() || !sessionActive()" data-testid="button-tab-search">
+                @if (tabSearchLoading()) {
+                  <div class="spinner-sm"></div>
+                } @else {
+                  Search
+                }
+              </button>
+            </div>
+          </div>
+
+          @if (tabSearchActive() && tabSearchResults().length > 0) {
+            <div class="search-results-panel" data-testid="tab-search-results">
+              <div class="results-header">
+                <span>{{ tabSearchResults().length }} result(s)</span>
+                <button class="link-btn" (click)="clearTabSearch()">Close</button>
+              </div>
+              @for (result of tabSearchResults(); track getAccountId(result) || $index) {
+                <div class="search-result-card" (click)="selectTabAccount(result)" [attr.data-testid]="'result-' + getAccountNo(result)">
+                  <div class="result-top-row">
+                    <div class="result-name-col">
+                      <span class="result-name">{{ getAccountName(result) }}</span>
+                      <span class="result-address">{{ getAccountAddress(result) }}</span>
+                    </div>
+                    <div class="result-balance-col">
+                      <span class="result-balance" [class.owing]="getAccountBalance(result) > 0" [class.credit]="getAccountBalance(result) < 0">
+                        R {{ formatCurrency(getAccountBalance(result)) }}
+                      </span>
+                      <span class="result-acct-no">{{ getAccountNo(result) }}</span>
+                    </div>
+                  </div>
+                  <div class="result-bottom-row">
+                    <span class="result-badge" [class.badge-active]="getAccountStatus(result) === 'Active'">{{ getAccountStatus(result) }}</span>
+                    <span class="result-add-hint">Click to add</span>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else if (tabSearchActive() && !tabSearchLoading() && tabSearchResults().length === 0) {
+            <div class="search-results-panel">
+              <div class="empty-results">No accounts found.</div>
+            </div>
+          }
+        }
+
+        <!-- Tab-based: Clearance search -->
+        @if (searchMode() === 'tabs' && activeMode() === 'clearance') {
+          <div class="tab-form-section">
+            <h3 class="section-title">Clearance Certificate Payment</h3>
+            <p class="section-desc">Search for a clearance certificate by ID to add it to the basket.</p>
+            <div class="search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+              <input class="search-input" type="text" placeholder="Enter clearance certificate ID..." [ngModel]="clearanceSearchId()" (ngModelChange)="clearanceSearchId.set($event)" (keydown.enter)="searchClearance()" data-testid="input-clearance-id" />
+              <button class="search-go-btn" (click)="searchClearance()" [disabled]="clearanceSearching() || !sessionActive()" data-testid="button-search-clearance">
+                @if (clearanceSearching()) { <div class="spinner-sm"></div> } @else { Search }
+              </button>
+            </div>
+            @if (clearanceError()) {
+              <div class="alert alert-error" data-testid="text-clearance-error">{{ clearanceError() }}</div>
+            }
+          </div>
+        }
+
+        <!-- Tab-based: Prepaid form -->
+        @if (searchMode() === 'tabs' && activeMode() === 'prepaid') {
+          <div class="tab-form-section">
+            <h3 class="section-title">Prepaid Recharge</h3>
+            <p class="section-desc">Get breakdown and add prepaid token to basket.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Service Type</label>
+                <select class="form-select" [ngModel]="prepaidSelectedService()" (ngModelChange)="prepaidSelectedService.set($event)" data-testid="select-prepaid-service">
+                  <option value="">Electricity</option>
+                  @for (st of prepaidServiceTypes(); track $index) {
+                    <option [value]="st.serviceType || st.name || st.description">{{ st.serviceType || st.name || st.description }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Meter Number</label>
+                <input class="form-input" type="text" placeholder="Enter meter number" [ngModel]="prepaidMeterNo()" (ngModelChange)="prepaidMeterNo.set($event)" data-testid="input-prepaid-meter" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount (R)</label>
+                <input class="form-input" type="number" min="1" step="1" placeholder="Enter amount" [ngModel]="prepaidAmount() || null" (ngModelChange)="prepaidAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-prepaid-amount" />
+              </div>
+            </div>
+            <button class="search-go-btn" style="margin-top:12px" (click)="searchPrepaid()" [disabled]="prepaidSearching() || !sessionActive()" data-testid="button-prepaid-breakdown">
+              @if (prepaidSearching()) { <div class="spinner-sm"></div> } @else { Get Breakdown & Add }
+            </button>
+            @if (prepaidError()) {
+              <div class="alert alert-error">{{ prepaidError() }}</div>
+            }
+          </div>
+        }
+
+        <!-- Tab-based: Misc form -->
+        @if (searchMode() === 'tabs' && activeMode() === 'misc') {
+          <div class="tab-form-section">
+            <h3 class="section-title">Miscellaneous Payment</h3>
+            <p class="section-desc">Select group, fill details, and add to basket.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Payment Group</label>
+                @if (miscGroupsLoading()) {
+                  <div class="spinner-sm"></div>
+                } @else {
+                  <select class="form-select" [ngModel]="miscSelectedGroupId()" (ngModelChange)="onMiscGroupChange(+$event)" data-testid="select-misc-group">
+                    <option [ngValue]="0">-- Select Group --</option>
+                    @for (g of miscGroups(); track g.groupId) {
+                      <option [ngValue]="g.groupId">{{ g.groupName }}</option>
+                    }
+                  </select>
+                }
+              </div>
+              <div class="form-group">
+                <label class="form-label">SCOA Item (Vote)</label>
+                @if (miscScoaLoading()) {
+                  <div class="spinner-sm"></div>
+                } @else if (miscScoaItems().length > 1) {
+                  <select class="form-select" [ngModel]="miscSelectedScoaId()" (ngModelChange)="miscSelectedScoaId.set(+$event)" data-testid="select-misc-scoa">
+                    @for (s of miscScoaItems(); track s.scoaItemId) {
+                      <option [ngValue]="s.scoaItemId">{{ s.scoaItemName }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input class="form-input" type="text" [value]="getSelectedScoaName()" readonly data-testid="text-misc-scoa" />
+                }
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input class="form-input" type="text" placeholder="Payer last name" [ngModel]="miscLastName()" (ngModelChange)="miscLastName.set($event)" data-testid="input-misc-lastname" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Initials</label>
+                <input class="form-input" type="text" placeholder="Initials" [ngModel]="miscInitials()" (ngModelChange)="miscInitials.set($event)" data-testid="input-misc-initials" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount (R) <span class="misc-vat-badge" [class.vat-inclusive]="miscIsVatable()" [class.vat-exempt]="!miscIsVatable()" data-testid="text-vat-status">{{ miscIsVatable() ? 'VAT Incl.' : 'VAT Exempt' }}</span></label>
+                <input class="form-input" type="number" min="0" step="0.01" placeholder="Enter amount" [ngModel]="miscAmount() || null" (ngModelChange)="miscAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-misc-amount" />
+              </div>
+            </div>
+            @if (miscIsVatable() && miscAmount() > 0) {
+              <div class="misc-vat-breakdown" data-testid="misc-vat-breakdown">
+                <div class="vat-breakdown-row">
+                  <span class="vat-breakdown-label">Excl. VAT</span>
+                  <span class="vat-breakdown-value">R {{ formatCurrency(miscLiveExclAmount()) }}</span>
+                </div>
+                <div class="vat-breakdown-row">
+                  <span class="vat-breakdown-label">VAT ({{ miscEffectiveVatPct() }}%)</span>
+                  <span class="vat-breakdown-value">R {{ formatCurrency(miscLiveVatAmount()) }}</span>
+                </div>
+                <div class="vat-breakdown-row vat-breakdown-total">
+                  <span class="vat-breakdown-label">Total Incl. VAT</span>
+                  <span class="vat-breakdown-value">R {{ formatCurrency(miscAmount()) }}</span>
+                </div>
+              </div>
+            }
+            <div class="form-row">
+              <div class="form-group" style="flex:2">
+                <label class="form-label">Description</label>
+                <input class="form-input" type="text" placeholder="Payment description" [ngModel]="miscDescription()" (ngModelChange)="miscDescription.set($event)" data-testid="input-misc-desc" />
+              </div>
+            </div>
+            <div class="misc-tender-section">
+              <label class="form-label">Payment Method</label>
+              <div class="misc-tender-blocks">
+                <button class="misc-tender-block" [class.active]="miscTenderType() === 'cash'" (click)="miscTenderType.set('cash')" data-testid="button-misc-cash">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M2 10h2M20 10h2M2 14h2M20 14h2"/></svg>
+                  <span>Cash</span>
+                </button>
+                <button class="misc-tender-block" [class.active]="miscTenderType() === 'card'" (click)="miscTenderType.set('card')" data-testid="button-misc-card">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>
+                  <span>Card</span>
+                </button>
+              </div>
+            </div>
+            @if (miscTenderType() === 'card') {
+              <div class="form-row misc-card-fields">
+                <div class="form-group">
+                  <label class="form-label">Card Number</label>
+                  <input class="form-input" type="text" placeholder="0000 0000 0000 0000" maxlength="19" [ngModel]="miscCardNumber()" (ngModelChange)="formatMiscCardNumber($event)" data-testid="input-misc-card-number" />
+                </div>
+                <div class="form-group" style="max-width:120px">
+                  <label class="form-label">Expiry</label>
+                  <input class="form-input" type="text" placeholder="MM/YY" maxlength="5" [ngModel]="miscCardExpiry()" (ngModelChange)="formatMiscCardExpiry($event)" data-testid="input-misc-card-expiry" />
+                </div>
+              </div>
+            }
+            <button class="search-go-btn" style="margin-top:12px" (click)="addMiscFromTab()" [disabled]="miscSelectedGroupId() === 0 || miscAmount() <= 0 || !sessionActive()" data-testid="button-add-misc">
+              Add to Basket ({{ miscTenderType() === 'cash' ? 'Cash' : 'Card' }})
+            </button>
+          </div>
+        }
+
+        @if (accountDetailLoading()) {
+          <div class="detail-loading">
+            <div class="spinner-sm"></div>
+            <span>Loading account details...</span>
+          </div>
+        }
+
+        <!-- BASKET -->
+        @if (!basket.hasItems() && !unifiedSearchActive() && !tabSearchActive()) {
+          <div class="empty-cart-state" data-testid="empty-transaction">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--platinum-primary)" stroke-width="1" opacity="0.3">
+              <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+            </svg>
+            <h3 class="empty-title">Ready for Transactions</h3>
+            <p class="empty-subtitle">
+              @if (searchMode() === 'unified') {
+                Use the search above to find accounts, groups, misc items, or prepaid meters
+              } @else {
+                Select a payment type tab and search to add items
+              }
+            </p>
+          </div>
+        }
+
+        @if (basket.hasItems()) {
+          <div class="cart-section">
+            <div class="cart-header">
+              <h3 class="cart-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                Basket ({{ basket.itemCount() }})
+              </h3>
+              <div class="cart-actions">
+                <button class="link-btn" (click)="basket.payAllFull()" data-testid="button-pay-all-full">Pay All Full</button>
+                <button class="link-btn danger" (click)="requestClearAll()" data-testid="button-clear-all">Clear All</button>
+              </div>
+            </div>
+
+            <div class="cart-items">
+              @for (item of basket.orderedItems(); track item.id) {
+                <div class="cart-item" [attr.data-testid]="'item-' + item.id">
+                  <div class="cart-item-top">
+                    @if (item.type === 'misc') {
+                      <div class="cart-item-type-badge cart-misc-badge" [style.background]="getMiscIconInfo(item.miscData?.groupName || item.label).bg" [style.color]="getMiscIconInfo(item.miscData?.groupName || item.label).color" [style.border]="'1px solid ' + getMiscIconInfo(item.miscData?.groupName || item.label).color + '30'">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" [attr.stroke]="getMiscIconInfo(item.miscData?.groupName || item.label).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path [attr.d]="getMiscIconInfo(item.miscData?.groupName || item.label).icon"/>
+                        </svg>
+                        {{ getMiscIconInfo(item.miscData?.groupName || item.label).label }}
+                      </div>
+                    } @else {
+                      <div class="cart-item-type-badge" [style.background]="getTypeColor(item.type)">
+                        <span class="type-order">{{ getTypeOrder(item.type) }}</span>
+                        {{ typeLabels[item.type] }}
+                      </div>
+                    }
+                    <button class="remove-btn" (click)="basket.removeItem(item.id)" title="Remove" [attr.data-testid]="'button-remove-' + item.id">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+                  <div class="cart-item-info">
+                    <span class="cart-item-name">{{ item.label }}
+                      @if (item.type === 'account' && item.accountData?.accountStatus) {
+                        <span class="account-status-badge" [class.status-active]="item.accountData?.accountStatus === 'Active'" [class.status-inactive]="item.accountData?.accountStatus !== 'Active'">{{ item.accountData?.accountStatus }}</span>
+                      }
+                    </span>
+                    <span class="cart-item-desc">{{ item.description }}</span>
+                    @if (item.type === 'account' && item.accountData) {
+                      <div class="acct-detail-grid">
+                        @if (item.accountData.address || item.accountData.locationAddress) {
+                          <div class="acct-detail-row">
+                            <span class="acct-detail-icon">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            </span>
+                            <span class="acct-detail-text">{{ item.accountData.address || item.accountData.locationAddress }}</span>
+                          </div>
+                        }
+                        @if (item.accountData.idNumber) {
+                          <div class="acct-detail-row">
+                            <span class="acct-detail-label">ID:</span>
+                            <span class="acct-detail-text">{{ item.accountData.idNumber }}</span>
+                          </div>
+                        }
+                        @if (item.accountData.registrationNumber) {
+                          <div class="acct-detail-row">
+                            <span class="acct-detail-label">Reg:</span>
+                            <span class="acct-detail-text">{{ item.accountData.registrationNumber }}</span>
+                          </div>
+                        }
+                        @if (item.accountData.sgNumber) {
+                          <div class="acct-detail-row">
+                            <span class="acct-detail-label">SG:</span>
+                            <span class="acct-detail-text">{{ item.accountData.sgNumber }}</span>
+                          </div>
+                        }
+                        @if (item.accountData.erfNumber) {
+                          <div class="acct-detail-row">
+                            <span class="acct-detail-label">Erf:</span>
+                            <span class="acct-detail-text">{{ item.accountData.erfNumber }}</span>
+                          </div>
+                        }
+                        @if (item.accountData.suburb || item.accountData.ward) {
+                          <div class="acct-detail-row">
+                            @if (item.accountData.suburb) {
+                              <span class="acct-detail-label">Suburb:</span>
+                              <span class="acct-detail-text">{{ item.accountData.suburb }}</span>
+                            }
+                            @if (item.accountData.ward) {
+                              <span class="acct-detail-label" style="margin-left:8px">Ward:</span>
+                              <span class="acct-detail-text">{{ item.accountData.ward }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (item.type === 'account' && item.accountData?.hasPrepaidMeter) {
+                      <button class="prepaid-chip" (click)="addPrepaidFromAccount(item)" [attr.data-testid]="'button-prepaid-' + item.id">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        Prepaid {{ item.accountData?.prepaidType || 'Electricity' }}: {{ item.accountData?.prepaidMeterNo }}
+                      </button>
+                    }
+                    @if (item.type === 'clearance' && item.clearanceData) {
+                      <div class="clearance-detail-mini">
+                        <span>Owner: {{ item.clearanceData.ownerName }}</span>
+                        <span>Status: {{ item.clearanceData.status }}</span>
+                        <span>Accounts: {{ item.clearanceData.accounts.length }}</span>
+                      </div>
+                    }
+                    @if (item.type === 'misc' && item.miscData) {
+                      <div class="misc-inline-fields">
+                        <input class="form-input-sm" type="text" placeholder="Last name" [value]="item.miscData.lastName" (input)="updateMiscItemField(item.id, 'lastName', $any($event.target).value)" />
+                        <input class="form-input-sm" type="text" placeholder="Initials" [value]="item.miscData.initials" (input)="updateMiscItemField(item.id, 'initials', $any($event.target).value)" />
+                      </div>
+                    }
+                  </div>
+                  <div class="cart-item-amounts">
+                    <div class="amount-col">
+                      <span class="amount-label">Due</span>
+                      <span class="amount-value" [class.owing]="item.amountDue > 0" [class.credit-balance]="item.amountDue < 0" [attr.data-testid]="'text-due-' + item.id">R {{ formatCurrency(item.amountDue) }}</span>
+                      @if (item.amountDue < 0) {
+                        <span class="credit-badge">Credit</span>
+                      }
+                    </div>
+                    <div class="amount-col pay-col">
+                      <span class="amount-label">Pay</span>
+                      <div class="pay-input-group">
+                        <span class="pay-prefix">R</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="Enter amount"
+                          class="pay-input"
+                          [value]="item.amountToPay > 0 ? item.amountToPay : null"
+                          (input)="basket.updateAmount(item.id, $any($event.target).valueAsNumber || 0)"
+                          (focus)="$event.target.select()"
+                          [attr.data-testid]="'input-amount-' + item.id"
+                        />
+                        @if (item.amountDue > 0) {
+                          <button class="full-btn" (click)="basket.payFullAmount(item.id)" title="Pay full amount" [attr.data-testid]="'button-full-' + item.id">FULL</button>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- RIGHT: Payment Summary -->
+      <div class="pos-right">
+        <div class="summary-panel">
+          <div class="summary-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <span>Payment Summary</span>
+          </div>
+          <div class="summary-body">
+            <div class="summary-row" style="border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin-bottom:4px">
+              <span>Items</span>
+              <span data-testid="text-item-count">{{ basket.itemCount() }}</span>
+            </div>
+
+            @if (basket.itemsByType()['account'].length > 0) {
+              <div class="summary-type-header">
+                <span class="type-dot" [style.background]="getTypeColor('account')"></span>
+                <span class="summary-type-label">Consumer ({{ basket.itemsByType()['account'].length }})</span>
+                <span class="mono summary-type-total">R {{ formatCurrency(getTypeSubtotal('account')) }}</span>
+              </div>
+              @for (item of basket.itemsByType()['account']; track item.id) {
+                <div class="summary-item-detail">
+                  <div class="summary-item-name">{{ item.accountData?.name || item.label }}</div>
+                  <div class="summary-item-meta">
+                    <span>Acc: {{ item.accountData?.accountNumber }}</span>
+                    <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (basket.itemsByType()['clearance'].length > 0) {
+              <div class="summary-type-header">
+                <span class="type-dot" [style.background]="getTypeColor('clearance')"></span>
+                <span class="summary-type-label">Clearance ({{ basket.itemsByType()['clearance'].length }})</span>
+                <span class="mono summary-type-total">R {{ formatCurrency(getTypeSubtotal('clearance')) }}</span>
+              </div>
+              @for (item of basket.itemsByType()['clearance']; track item.id) {
+                <div class="summary-item-detail">
+                  <div class="summary-item-name">{{ item.clearanceData?.ownerName || item.label }}</div>
+                  <div class="summary-item-meta">
+                    <span>{{ item.clearanceData?.propertyDesc || item.clearanceData?.clearanceId }}</span>
+                    <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (basket.itemsByType()['prepaid'].length > 0) {
+              <div class="summary-type-header">
+                <span class="type-dot" [style.background]="getTypeColor('prepaid')"></span>
+                <span class="summary-type-label">Prepaid ({{ basket.itemsByType()['prepaid'].length }})</span>
+                <span class="mono summary-type-total">R {{ formatCurrency(getTypeSubtotal('prepaid')) }}</span>
+              </div>
+              @for (item of basket.itemsByType()['prepaid']; track item.id) {
+                <div class="summary-item-detail">
+                  <div class="summary-item-name">{{ item.prepaidData?.serviceType || 'Electricity' }} Recharge</div>
+                  <div class="summary-item-meta">
+                    <span>Meter: {{ item.prepaidData?.meterNumber }}</span>
+                    <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (basket.itemsByType()['misc'].length > 0) {
+              <div class="summary-type-header">
+                <span class="type-dot" [style.background]="getTypeColor('misc')"></span>
+                <span class="summary-type-label">Misc ({{ basket.itemsByType()['misc'].length }})</span>
+                <span class="mono summary-type-total">R {{ formatCurrency(getTypeSubtotal('misc')) }}</span>
+              </div>
+              @for (item of basket.itemsByType()['misc']; track item.id) {
+                <div class="summary-item-detail basket-misc-item">
+                  <div class="basket-misc-icon" [style.background]="getMiscIconInfo(item.miscData?.groupName || item.label).bg" [style.color]="getMiscIconInfo(item.miscData?.groupName || item.label).color">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" [attr.stroke]="getMiscIconInfo(item.miscData?.groupName || item.label).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path [attr.d]="getMiscIconInfo(item.miscData?.groupName || item.label).icon"/>
+                    </svg>
+                  </div>
+                  <div class="basket-misc-content">
+                    <div class="summary-item-name">
+                      {{ item.miscData?.groupName || item.label }}
+                      <span class="misc-tender-tag" [class.misc-tender-card]="item.miscData?.tenderType === 'card'">{{ item.miscData?.tenderType === 'card' ? 'Card' : 'Cash' }}</span>
+                    </div>
+                    <div class="summary-item-meta">
+                      <span>{{ item.miscData?.scoaItemName }}</span>
+                      <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
+                    </div>
+                  </div>
+                </div>
+              }
+            }
+
+            <div class="summary-row" style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:8px">
+              <span>Total Due</span>
+              <span class="mono" data-testid="text-total-due">R {{ formatCurrency(basket.totalDue()) }}</span>
+            </div>
+            <div class="summary-row total-row">
+              <span>Total to Pay</span>
+              <span class="mono" data-testid="text-total-pay">R {{ formatCurrency(basket.totalToPay()) }}</span>
+            </div>
+          </div>
+
+          @if (cashRoundingDiff() !== 0) {
+            <div class="rounding-indicator">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              Cash rounded {{ cashRoundingDiff() > 0 ? 'up' : 'down' }} by {{ formatCurrency(absVal(cashRoundingDiff())) }}c (SA 10c rounding)
+            </div>
+          }
+
+          <button
+            class="process-btn"
+            (click)="openPaymentPanel()"
+            [disabled]="!basket.hasItems() || basket.totalToPay() <= 0 || !sessionActive() || basket.hasZeroAmountItems()"
+            data-testid="button-open-payment"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Process Payment
+          </button>
+        </div>
+
+        <!-- Processing order legend -->
+        @if (basket.hasItems()) {
+          <div class="processing-legend">
+            <h4 class="legend-title">Processing Order</h4>
+            <div class="legend-items">
+              <div class="legend-item"><span class="legend-dot" style="background:#2563eb"></span> 1. Consumer</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#16a34a"></span> 2. Clearance</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#d97706"></span> 3. Prepaid</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#7c3aed"></span> 4. Misc</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYMENT TENDER PANEL -->
+  @if (showPaymentPanel()) {
+    <div class="payment-overlay" (click)="closePaymentPanel()">
+      <div class="payment-panel" (click)="$event.stopPropagation()" data-testid="payment-panel">
+        <div class="payment-panel-header">
+          <div class="panel-header-left">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <div>
+              <h2>Payment Tender</h2>
+              @if (cashierInfo()) {
+                <div class="panel-header-sub">{{ cashierInfo().cashOfficeDesc || 'Office' }} &bull; {{ cashierInfo().name || cashierInfo().userName || 'Cashier' }}</div>
+              }
+            </div>
+          </div>
+          <button class="close-btn" (click)="closePaymentPanel()" data-testid="button-close-payment">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="payment-amount-banner">
+          <div class="payment-banner-left">
+            <span class="payment-label">Amount Due</span>
+            <span class="payment-due" data-testid="text-payment-due">R {{ formatCurrency(basket.totalToPay()) }}</span>
+          </div>
+          <div class="payment-banner-right">
+            <span class="payment-items-count">{{ basket.itemCount() }} item{{ basket.itemCount() !== 1 ? 's' : '' }}</span>
+            @if (isSplitTender()) {
+              <span class="split-badge">Split Tender</span>
+            }
+          </div>
+        </div>
+
+        <div class="tender-order-summary" data-testid="tender-order-summary">
+          <div class="order-summary-toggle" (click)="tenderOrderExpanded.set(!tenderOrderExpanded())">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H2v7"/><path d="M22 19h-7v-7"/><path d="M2 12a10 10 0 0 1 17.5-6.5"/><path d="M22 12A10 10 0 0 1 4.5 18.5"/></svg>
+            <span class="order-summary-title">Order Summary</span>
+            <svg class="order-chevron" [class.order-chevron-open]="tenderOrderExpanded()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          @if (tenderOrderExpanded()) {
+            <div class="order-items-list">
+              @for (item of basket.orderedItems(); track item.id) {
+                <div class="order-item-row">
+                  <div class="order-item-info">
+                    @if (item.type === 'misc') {
+                      <span class="order-item-misc-icon" [style.background]="getMiscIconInfo(item.miscData?.groupName || item.label).bg" [style.color]="getMiscIconInfo(item.miscData?.groupName || item.label).color">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" [attr.stroke]="getMiscIconInfo(item.miscData?.groupName || item.label).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path [attr.d]="getMiscIconInfo(item.miscData?.groupName || item.label).icon"/>
+                        </svg>
+                      </span>
+                    } @else {
+                      <span class="order-item-type-badge" [attr.data-type]="item.type">
+                        @switch (item.type) {
+                          @case ('account') { ACC }
+                          @case ('clearance') { CLR }
+                          @case ('prepaid') { PRE }
+                        }
+                      </span>
+                    }
+                    <div class="order-item-detail">
+                      <span class="order-item-label">{{ item.label }}</span>
+                      <span class="order-item-desc">{{ item.description }}</span>
+                    </div>
+                  </div>
+                  <div class="order-item-amounts">
+                    <span class="order-item-pay">R {{ formatCurrency(item.amountToPay) }}</span>
+                    @if (item.miscData && item.miscData.isVatable && item.miscData.vatAmount) {
+                      <span class="order-item-vat">incl. VAT R {{ formatCurrency(item.miscData!.vatAmount) }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="tender-tabs">
+          @if (canTenderCash()) {
+            <button class="tender-tab" [class.active]="activeTender() === 'cash'" (click)="setTenderType('cash')" data-testid="tender-tab-cash">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+              Cash
+            </button>
+          }
+          @if (canTenderCard()) {
+            <button class="tender-tab" [class.active]="activeTender() === 'card'" (click)="setTenderType('card')" data-testid="tender-tab-card">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              Card
+            </button>
+          }
+          @if (canTenderCheque()) {
+            <button class="tender-tab" [class.active]="activeTender() === 'cheque'" (click)="setTenderType('cheque')" data-testid="tender-tab-cheque">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17V7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M6 15h12"/></svg>
+              Cheque
+            </button>
+          }
+          @if (canTenderEft()) {
+            <button class="tender-tab" [class.active]="activeTender() === 'eft'" (click)="setTenderType('eft')" data-testid="tender-tab-eft">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="m17 7-5-5-5 5"/></svg>
+              EFT
+            </button>
+          }
+          @if (canTenderCashCard()) {
+            <button class="tender-tab tender-tab-split" [class.active]="activeTender() === 'cash+card'" (click)="setTenderType('cash+card')" data-testid="tender-tab-cashcard">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+              Cash + Card
+            </button>
+          }
+        </div>
+
+        <div class="tender-body">
+          @if (activeTender() === 'cash') {
+            <div class="tender-section">
+              <label class="form-label">Cash Amount (R)</label>
+              <input type="number" class="form-input tender-amount-input" step="0.10" min="0" placeholder="0.00" [ngModel]="cashAmount() || null" (ngModelChange)="cashAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-cash-amount" />
+              @if (cashRoundingDiff() !== 0) {
+                <div class="rounding-note">Rounded to R {{ formatCurrency(cashRoundedAmount()) }} (nearest 10c)</div>
+              }
+              <div class="denomination-grid">
+                @for (d of denominations; track d) {
+                  <button class="denom-btn" (click)="addDenomination(d)" [attr.data-testid]="'btn-denom-' + d">
+                    @if (d >= 1) { R{{ d }} } @else { {{ d * 100 }}c }
+                  </button>
+                }
+              </div>
+              <button class="link-btn" style="margin-top:8px" (click)="setCashExact()">Exact Amount (Rounded)</button>
+            </div>
+          }
+          @if (activeTender() === 'card') {
+            <div class="tender-section">
+              <label class="form-label">Card Amount (R)</label>
+              <input type="number" class="form-input tender-amount-input" step="0.01" min="0" placeholder="0.00" [ngModel]="cardAmount() || null" (ngModelChange)="onCardOnlyAmountChange(+$event || 0)" (focus)="$event.target.select()" data-testid="input-card-amount" />
+              <label class="form-label">Card Number</label>
+              <input type="text" class="form-input" placeholder="0000 0000 0000 0000" [ngModel]="cardNumber()" (ngModelChange)="formatCardNumber($event)" maxlength="19" data-testid="input-card-number" />
+              <label class="form-label">Expiry Date</label>
+              <input type="text" class="form-input" placeholder="MM/YY" [ngModel]="cardExpiry()" (ngModelChange)="formatExpiry($event)" maxlength="5" data-testid="input-card-expiry" />
+              <label class="form-label">Card Reference</label>
+              <input type="text" class="form-input" placeholder="Auth/reference number" [ngModel]="cardReference()" (ngModelChange)="cardReference.set($event)" data-testid="input-card-ref" />
+            </div>
+          }
+          @if (activeTender() === 'cheque') {
+            <div class="tender-section">
+              <label class="form-label">Cheque Amount (R)</label>
+              <input type="number" class="form-input tender-amount-input" step="0.01" min="0" placeholder="0.00" [ngModel]="chequeAmount() || null" (ngModelChange)="chequeAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-cheque-amount" />
+              <label class="form-label">Cheque Number</label>
+              <input type="text" class="form-input" placeholder="Cheque number" [ngModel]="chequeNumber()" (ngModelChange)="chequeNumber.set($event)" data-testid="input-cheque-number" />
+              <label class="form-label">Bank</label>
+              <select class="form-select" [ngModel]="chequeBankId()" (ngModelChange)="chequeBankId.set(+$event)" data-testid="select-cheque-bank">
+                <option [value]="0">-- Select Bank --</option>
+                @for (bank of banks(); track bank.bankID) {
+                  <option [value]="bank.bankID">{{ bank.bankName }}</option>
+                }
+              </select>
+              <label class="form-label">Name on Cheque</label>
+              <input type="text" class="form-input" placeholder="Account holder name" [ngModel]="chequeName()" (ngModelChange)="chequeName.set($event)" data-testid="input-cheque-name" />
+            </div>
+          }
+          @if (activeTender() === 'eft') {
+            <div class="tender-section">
+              <label class="form-label">EFT Amount (R)</label>
+              <input type="number" class="form-input tender-amount-input" step="0.01" min="0" placeholder="0.00" [ngModel]="eftAmount() || null" (ngModelChange)="eftAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-eft-amount" />
+              <label class="form-label">EFT Reference</label>
+              <input type="text" class="form-input" placeholder="Bank reference number" [ngModel]="eftReference()" (ngModelChange)="eftReference.set($event)" data-testid="input-eft-ref" />
+            </div>
+          }
+          @if (activeTender() === 'cash+card') {
+            <div class="tender-section cashcard-section">
+              <div class="cashcard-split-header">
+                <span class="split-badge">Split: Cash + Card</span>
+                <span class="cashcard-total">Total Due: R {{ formatCurrency(basket.totalToPay()) }}</span>
+              </div>
+              <div class="cashcard-grid">
+                <div class="cashcard-col">
+                  <div class="cashcard-col-header cash-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                    Cash Portion
+                  </div>
+                  <label class="form-label">Cash Amount (R)</label>
+                  <input type="number" class="form-input tender-amount-input" step="0.10" min="0" placeholder="0.00" [ngModel]="cashAmount() || null" (ngModelChange)="onCashCardCashChange(+$event || 0)" (focus)="$event.target.select()" data-testid="input-cashcard-cash" />
+                  @if (cashRoundingDiff() !== 0) {
+                    <div class="rounding-note">Rounded to R {{ formatCurrency(cashRoundedAmount()) }} (nearest 10c)</div>
+                  }
+                  <div class="denomination-grid denomination-grid-sm">
+                    @for (d of denominations; track d) {
+                      <button class="denom-btn denom-btn-sm" (click)="addDenominationCashCard(d)" [attr.data-testid]="'btn-cashcard-denom-' + d">
+                        @if (d >= 1) { R{{ d }} } @else { {{ d * 100 }}c }
+                      </button>
+                    }
+                  </div>
+                </div>
+                <div class="cashcard-divider"></div>
+                <div class="cashcard-col">
+                  <div class="cashcard-col-header card-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    Card Portion
+                  </div>
+                  <label class="form-label">Card Amount (R)</label>
+                  <input type="number" class="form-input tender-amount-input" step="0.01" min="0" placeholder="0.00" [ngModel]="cardAmount() || null" (ngModelChange)="onCashCardCardChange(+$event || 0)" (focus)="$event.target.select()" data-testid="input-cashcard-card" />
+                  <label class="form-label">Card Number</label>
+                  <input type="text" class="form-input" placeholder="0000 0000 0000 0000" [ngModel]="cardNumber()" (ngModelChange)="formatCardNumber($event)" maxlength="19" data-testid="input-cashcard-cardnum" />
+                  <label class="form-label">Expiry Date</label>
+                  <input type="text" class="form-input" placeholder="MM/YY" [ngModel]="cardExpiry()" (ngModelChange)="formatExpiry($event)" maxlength="5" data-testid="input-cashcard-expiry" />
+                </div>
+              </div>
+              <div class="cashcard-summary">
+                <div class="cashcard-summary-row">
+                  <span>Cash:</span>
+                  <span class="mono">R {{ formatCurrency(cashRoundedAmount()) }}</span>
+                </div>
+                <div class="cashcard-summary-row">
+                  <span>Card:</span>
+                  <span class="mono">R {{ formatCurrency(cardAmount()) }}</span>
+                </div>
+                <div class="cashcard-summary-row cashcard-summary-total">
+                  <span>Combined:</span>
+                  <span class="mono">R {{ formatCurrency(effectiveTotalTendered()) }}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="payment-totals">
+          <div class="totals-section-label">Payment Summary</div>
+          <div class="total-line total-due-line">
+            <span>Amount Due</span>
+            <span class="mono">R {{ formatCurrency(basket.totalToPay()) }}</span>
+          </div>
+          @if (cashAmount() > 0) {
+            <div class="total-line tender-line">
+              <span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                Cash
+              </span>
+              <span class="mono">R {{ formatCurrency(cashRoundedAmount()) }}</span>
+            </div>
+          }
+          @if (cardAmount() > 0) {
+            <div class="total-line tender-line">
+              <span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                Card
+              </span>
+              <span class="mono">R {{ formatCurrency(cardAmount()) }}</span>
+            </div>
+          }
+          @if (chequeAmount() > 0) {
+            <div class="total-line tender-line"><span>Cheque</span><span class="mono">R {{ formatCurrency(chequeAmount()) }}</span></div>
+          }
+          @if (eftAmount() > 0) {
+            <div class="total-line tender-line"><span>EFT</span><span class="mono">R {{ formatCurrency(eftAmount()) }}</span></div>
+          }
+          <div class="total-line total-main">
+            <span>Total Tendered</span>
+            <span class="mono" data-testid="text-total-tendered">R {{ formatCurrency(effectiveTotalTendered()) }}</span>
+          </div>
+          @if (changeAmount() > 0) {
+            <div class="total-line change-line" [class.change-exceeded]="changeExceedsLimit()">
+              <span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="m17 7-5-5-5 5"/></svg>
+                Change (Cash)
+              </span>
+              <span class="mono" data-testid="text-change">R {{ formatCurrency(changeAmount()) }}</span>
+            </div>
+            @if (changeExceedsLimit()) {
+              <div class="tender-limit-warning">Max change allowed: R 200.00</div>
+            }
+          }
+          @if (cardOverpay() > 0) {
+            <div class="total-line overpay-line">
+              <span>Card Overpay</span>
+              <span class="mono" data-testid="text-card-overpay">R {{ formatCurrency(cardOverpay()) }}</span>
+            </div>
+          }
+          @if (shortfall() > 0) {
+            <div class="total-line shortfall-line">
+              <span>Shortfall</span>
+              <span class="mono" data-testid="text-shortfall">R {{ formatCurrency(shortfall()) }}</span>
+            </div>
+          }
+          @if (tenderValidationErrors().length > 0) {
+            <div class="tender-validation-errors" data-testid="tender-validation-errors">
+              @for (err of tenderValidationErrors(); track $index) {
+                <div class="tender-error-msg">{{ err }}</div>
+              }
+            </div>
+          }
+        </div>
+
+        @if (processingPayment() && paymentProgressTotal() > 0) {
+          <div class="payment-progress-panel" data-testid="payment-progress">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" [style.width.%]="(paymentProgressCurrent() / paymentProgressTotal()) * 100"></div>
+            </div>
+            <div class="progress-text">
+              <span class="progress-counter">{{ paymentProgressCurrent() }} of {{ paymentProgressTotal() }}</span>
+              <span class="progress-label">{{ paymentProgressLabel() }}</span>
+            </div>
+          </div>
+        }
+        <button
+          class="complete-btn"
+          (click)="processPayment()"
+          [disabled]="!canCompletePayment()"
+          data-testid="button-complete-payment"
+        >
+          @if (processingPayment()) {
+            <div class="spinner-sm"></div>
+            Processing {{ paymentProgressCurrent() }}/{{ paymentProgressTotal() }}...
+          } @else {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+            Complete Payment
+          }
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- RECEIPT MODAL -->
+  @if (showReceipt() && receiptResults().length > 0) {
+    <div class="payment-overlay" (click)="closeReceipt()">
+      <div class="receipt-panel-v2" (click)="$event.stopPropagation()" data-testid="receipt-modal">
+        <div class="rcpt-header-v2">
+          <div class="rcpt-header-left">
+            <div class="rcpt-check-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="m9 11 3 3L22 4"/></svg>
+            </div>
+            <div>
+              <h2>Payment Successful</h2>
+              <span class="rcpt-header-sub">{{ getReceiptTimestamp() }}</span>
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeReceipt()" data-testid="button-close-receipt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="rcpt-body-v2">
+          <div class="rcpt-totals-bar" data-testid="receipt-summary-banner">
+            <div class="rcpt-totals-left">
+              <span class="rcpt-totals-label">Total Paid</span>
+              <span class="rcpt-totals-amount">R {{ formatCurrency(getReceiptGrandTotal()) }}</span>
+            </div>
+            <div class="rcpt-totals-right">
+              <span class="rcpt-totals-count">{{ receiptResults().length }} Receipt(s)</span>
+              <span class="rcpt-totals-items">{{ getReceiptTotalItems() }} Item(s)</span>
+            </div>
+          </div>
+
+          @if (hasSplitPayments()) {
+            <div class="rcpt-split-notice">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              Split Payment: Cash R {{ formatCurrency(getSplitCashTotal()) }} + Card R {{ formatCurrency(getSplitCardTotal()) }}
+            </div>
+          }
+
+          <div class="rcpt-items-list">
+            @for (r of receiptResults(); track $index) {
+              <div class="rcpt-card-v2" [class.rcpt-card-cash]="r.tenderType === 'cash'" [class.rcpt-card-card]="r.tenderType === 'card'">
+                <div class="rcpt-card-top">
+                  <div class="rcpt-card-type-badge" [class.type-account]="r.items[0]?.type === 'account'" [class.type-clearance]="r.items[0]?.type === 'clearance'" [class.type-prepaid]="r.items[0]?.type === 'prepaid'" [class.type-misc]="r.items[0]?.type === 'misc'">
+                    {{ getReceiptTypeLabel(r) }}
+                  </div>
+                  <div class="rcpt-card-tender">
+                    <span class="receipt-tender-badge" [class.badge-cash]="r.tenderType === 'cash'" [class.badge-card]="r.tenderType === 'card'">{{ r.tenderType === 'cash+card' ? 'SPLIT' : (r.tenderType | uppercase) }}</span>
+                  </div>
+                </div>
+
+                <div class="rcpt-card-receipt-row">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+                  <span class="rcpt-card-receipt-no" data-testid="text-receipt-no">{{ r.receiptNumber }}</span>
+                </div>
+
+                <div class="rcpt-card-details">
+                  @if (r.items[0]?.type === 'account') {
+                    @for (item of r.items; track item.id) {
+                      <div class="rcpt-detail-row">
+                        <span class="rcpt-detail-label">Account</span>
+                        <span class="rcpt-detail-value">{{ item.accountData?.accountNumber || '-' }}</span>
+                      </div>
+                      <div class="rcpt-detail-row">
+                        <span class="rcpt-detail-label">Name</span>
+                        <span class="rcpt-detail-value">{{ item.accountData?.name || '-' }}</span>
+                      </div>
+                      @if (item.accountData?.address) {
+                        <div class="rcpt-detail-row">
+                          <span class="rcpt-detail-label">Address</span>
+                          <span class="rcpt-detail-value rcpt-detail-truncate">{{ item.accountData?.address }}</span>
+                        </div>
+                      }
+                    }
+                  }
+                  @if (r.items[0]?.type === 'clearance') {
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Clearance ID</span>
+                      <span class="rcpt-detail-value">{{ r.items[0]?.clearanceData?.clearanceId || '-' }}</span>
+                    </div>
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Owner</span>
+                      <span class="rcpt-detail-value">{{ r.items[0]?.clearanceData?.ownerName || '-' }}</span>
+                    </div>
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Property</span>
+                      <span class="rcpt-detail-value rcpt-detail-truncate">{{ r.items[0]?.clearanceData?.propertyDesc || '-' }}</span>
+                    </div>
+                  }
+                  @if (r.items[0]?.type === 'prepaid') {
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Meter No</span>
+                      <span class="rcpt-detail-value font-mono">{{ r.items[0]?.prepaidData?.meterNumber || '-' }}</span>
+                    </div>
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Service</span>
+                      <span class="rcpt-detail-value">{{ r.items[0]?.prepaidData?.serviceType || 'Electricity' }}</span>
+                    </div>
+                  }
+                  @if (r.items[0]?.type === 'misc') {
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">Payment Group</span>
+                      <span class="rcpt-detail-value">{{ r.items[0]?.miscData?.groupName || '-' }}</span>
+                    </div>
+                    <div class="rcpt-detail-row">
+                      <span class="rcpt-detail-label">SCOA Item</span>
+                      <span class="rcpt-detail-value rcpt-detail-truncate">{{ r.items[0]?.miscData?.scoaItemName || '-' }}</span>
+                    </div>
+                    @if (r.items[0]?.miscData?.lastName || r.items[0]?.miscData?.initials) {
+                      <div class="rcpt-detail-row">
+                        <span class="rcpt-detail-label">Payer</span>
+                        <span class="rcpt-detail-value">{{ getMiscPayerName(r.items[0]?.miscData) }}</span>
+                      </div>
+                    }
+                    @if (r.items[0]?.miscData?.description) {
+                      <div class="rcpt-detail-row">
+                        <span class="rcpt-detail-label">Description</span>
+                        <span class="rcpt-detail-value rcpt-detail-truncate">{{ r.items[0]?.miscData?.description }}</span>
+                      </div>
+                    }
+                    @if (r.items[0]?.miscData?.isVatable) {
+                      <div class="rcpt-detail-row">
+                        <span class="rcpt-detail-label">VAT ({{ r.items[0]?.miscData?.vatPercentage }}%)</span>
+                        <span class="rcpt-detail-value">R {{ formatCurrency(r.items[0]?.miscData?.vatAmount || 0) }}</span>
+                      </div>
+                    }
+                  }
+                </div>
+
+                <div class="rcpt-card-amount-row">
+                  <span class="rcpt-card-amount-label">Amount Paid</span>
+                  <span class="rcpt-card-amount-value">R {{ formatCurrency(r.amount) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="rcpt-transaction-info">
+            <div class="rcpt-info-row">
+              <span>Cashier</span>
+              <span>{{ (user()?.firstName || '') + ' ' + (user()?.lastName || '') | titlecase }}</span>
+            </div>
+            <div class="rcpt-info-row">
+              <span>Cash Office</span>
+              <span data-testid="text-receipt-cashoffice">{{ sessionCashOfficeName() || cashierInfo()?.cashOfficeDesc || cashierInfo()?.cashOfficeName || '-' }}</span>
+            </div>
+          </div>
+
+          @if (receiptResults().length > 1) {
+            <div class="rcpt-consolidated-section">
+              <button class="consolidated-btn" (click)="printConsolidatedReceipt()" [disabled]="printingReceipt()" data-testid="button-print-consolidated">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                @if (printingReceipt()) {
+                  <span class="spinner-sm"></span> Generating...
+                } @else {
+                  Print Consolidated Receipt
+                }
+              </button>
+            </div>
+          }
+
+          <div class="rcpt-delivery-v2">
+            <h4>Send Receipt</h4>
+            <div class="delivery-buttons">
+              <button class="delivery-btn" (click)="sendReceiptVia('print')" [disabled]="printingReceipt()" data-testid="button-print-receipt">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                Print
+              </button>
+              <button class="delivery-btn" (click)="receiptDeliveryMethod.set('email')" data-testid="button-email-receipt">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                Email
+              </button>
+              <button class="delivery-btn" (click)="receiptDeliveryMethod.set('whatsapp')" data-testid="button-whatsapp-receipt">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                WhatsApp
+              </button>
+              <button class="delivery-btn" (click)="receiptDeliveryMethod.set('sms')" data-testid="button-sms-receipt">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                SMS
+              </button>
+            </div>
+
+            @if (receiptDeliveryMethod() === 'email') {
+              <div class="delivery-input-row">
+                <input class="form-input" type="email" placeholder="Enter email address" [ngModel]="receiptEmail()" (ngModelChange)="receiptEmail.set($event)" data-testid="input-receipt-email" />
+                <button class="search-go-btn" (click)="sendReceiptVia('email')" [disabled]="sendingReceipt()" data-testid="button-send-email">
+                  @if (sendingReceipt()) { <div class="spinner-sm"></div> } @else { Send }
+                </button>
+              </div>
+            }
+            @if (receiptDeliveryMethod() === 'whatsapp' || receiptDeliveryMethod() === 'sms') {
+              <div class="delivery-input-row">
+                <input class="form-input" type="tel" placeholder="Enter phone number" [ngModel]="receiptPhone()" (ngModelChange)="receiptPhone.set($event)" data-testid="input-receipt-phone" />
+                <button class="search-go-btn" (click)="sendReceiptVia(receiptDeliveryMethod())" [disabled]="sendingReceipt()" data-testid="button-send-phone">
+                  @if (sendingReceipt()) { <div class="spinner-sm"></div> } @else { Send }
+                </button>
+              </div>
+            }
+          </div>
+
+          <button class="done-btn-v2" (click)="closeReceipt()" data-testid="button-done">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 3 3L22 4"/></svg>
+            Done — Next Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- CANCEL DIALOG -->
+  @if (showCancelDialog()) {
+    <div class="payment-overlay" (click)="closeCancelDialog()">
+      <div class="dialog-panel" (click)="$event.stopPropagation()" data-testid="cancel-dialog">
+        <div class="dialog-header">
+          <h3>Cancel Receipt</h3>
+          <button class="close-btn" (click)="closeCancelDialog()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="dialog-body">
+          <label class="form-label">Receipt Number</label>
+          <input class="form-input" type="text" placeholder="Enter receipt number" [ngModel]="cancelReceiptNo()" (ngModelChange)="cancelReceiptNo.set($event)" data-testid="input-cancel-receipt-no" />
+          <label class="form-label">Reason</label>
+          <textarea class="form-textarea" placeholder="Reason for cancellation" [ngModel]="cancelReason()" (ngModelChange)="cancelReason.set($event)" data-testid="input-cancel-reason"></textarea>
+          <button class="process-btn danger-btn" (click)="submitCancelRequest()" [disabled]="cancellingReceipt()" data-testid="button-submit-cancel">
+            @if (cancellingReceipt()) { <div class="spinner-sm"></div> Submitting... } @else { Submit Cancellation Request }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <input type="file" #csvFileInput accept=".csv,.txt" style="display:none" (change)="onCsvFileSelected($event)" data-testid="input-csv-file" />
+
+  <!-- CSV IMPORT DIALOG -->
+  @if (csvImportOpen()) {
+    <div class="payment-overlay" (click)="closeCsvImport()">
+      <div class="csv-dialog-panel" (click)="$event.stopPropagation()" data-testid="csv-import-dialog">
+        <div class="dialog-header">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import Accounts from File
+          </h3>
+          <button class="close-btn" (click)="closeCsvImport()" data-testid="button-close-csv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+
+        <div class="csv-step-indicator">
+          <div class="csv-step" [class.csv-step-active]="csvStep() === 'upload'" [class.csv-step-done]="csvStep() !== 'upload'">1. Upload</div>
+          <div class="csv-step-arrow">&rarr;</div>
+          <div class="csv-step" [class.csv-step-active]="csvStep() === 'preview'" [class.csv-step-done]="csvStep() === 'validate' || csvStep() === 'done'">2. Preview</div>
+          <div class="csv-step-arrow">&rarr;</div>
+          <div class="csv-step" [class.csv-step-active]="csvStep() === 'validate'" [class.csv-step-done]="csvStep() === 'done'">3. Validate</div>
+          <div class="csv-step-arrow">&rarr;</div>
+          <div class="csv-step" [class.csv-step-active]="csvStep() === 'done'">4. Add to Basket</div>
+        </div>
+
+        <div class="dialog-body csv-dialog-body">
+          <!-- UPLOAD STEP -->
+          @if (csvStep() === 'upload') {
+            <div class="csv-upload-zone" (click)="triggerCsvFileInput()" data-testid="csv-dropzone">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--platinum-primary)" stroke-width="1.5" opacity="0.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <p class="csv-upload-title">Click to select a CSV file</p>
+              <p class="csv-upload-hint">Supported: .csv, .txt</p>
+            </div>
+            <div class="csv-format-info">
+              <h4>File Format</h4>
+              <p>Your file should contain at minimum two columns:</p>
+              <ul>
+                <li><strong>Account Number</strong> — The municipal account number</li>
+                <li><strong>Amount</strong> — Payment amount (e.g. 150.00)</li>
+                <li><strong>Receipt Date</strong> (optional) — Date for the receipt</li>
+              </ul>
+              <p>Headers are auto-detected. Comma, semicolon, and tab delimiters are supported.</p>
+              <button class="csv-template-btn" (click)="csvDownloadTemplate(); $event.stopPropagation()" data-testid="button-csv-template">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Template
+              </button>
+            </div>
+          }
+
+          <!-- PREVIEW STEP -->
+          @if (csvStep() === 'preview') {
+            <div class="csv-preview-header">
+              <div class="csv-preview-stats">
+                <span class="csv-stat"><strong>{{ csvParsedRows().length }}</strong> row(s) found</span>
+                <span class="csv-stat">Total: <strong>R {{ formatCurrency(csvTotalImportAmount()) }}</strong></span>
+                <span class="csv-stat csv-file-label">{{ csvFileName() }}</span>
+              </div>
+              <button class="csv-change-file-btn" (click)="csvChangeFile()" data-testid="button-csv-change-file">Change File</button>
+            </div>
+            <div class="csv-table-wrap">
+              <table class="csv-table" data-testid="csv-preview-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Account Number</th>
+                    <th>Amount</th>
+                    @if (csvParsedRows()[0]?.receiptDate) { <th>Receipt Date</th> }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of getCsvPreviewPage(); track row.accountNo + row.amount; let i = $index) {
+                    <tr>
+                      <td class="csv-row-num">{{ (csvPage() - 1) * csvPageSize + i + 1 }}</td>
+                      <td class="font-mono">{{ row.accountNo }}</td>
+                      <td class="font-mono text-right">R {{ formatCurrency(row.amount) }}</td>
+                      @if (csvParsedRows()[0]?.receiptDate) { <td>{{ formatDate(row.receiptDate) }}</td> }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (csvTotalPages() > 1) {
+              <div class="csv-pagination">
+                <button class="csv-page-btn" (click)="csvPrevPage()" [disabled]="csvPage() <= 1">&laquo; Prev</button>
+                <span>Page {{ csvPage() }} of {{ csvTotalPages() }}</span>
+                <button class="csv-page-btn" (click)="csvNextPage()" [disabled]="csvPage() >= csvTotalPages()">Next &raquo;</button>
+              </div>
+            }
+            <button class="process-btn csv-validate-btn" (click)="csvValidateAccounts()" data-testid="button-csv-validate">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Validate {{ csvParsedRows().length }} Account(s) Against Platinum
+            </button>
+          }
+
+          <!-- VALIDATE STEP -->
+          @if (csvStep() === 'validate') {
+            <div class="csv-validation-header">
+              <div class="csv-progress-bar">
+                <div class="csv-progress-fill" [style.width.%]="csvValidationProgress()"></div>
+              </div>
+              <div class="csv-validation-status">
+                @if (csvValidating()) {
+                  <div class="spinner-sm"></div>
+                  <span>Validating... {{ csvValidationProgress() }}% ({{ csvFoundCount() }} found, {{ csvNotFoundCount() }} not found)</span>
+                  <button class="csv-cancel-btn" (click)="csvCancelValidation()" data-testid="button-csv-cancel-validate">Cancel</button>
+                } @else {
+                  <span>Validation complete — {{ csvFoundCount() }} found, {{ csvNotFoundCount() }} not found, {{ csvErrorCount() }} error(s)</span>
+                }
+              </div>
+            </div>
+            <div class="csv-table-wrap">
+              <table class="csv-table" data-testid="csv-validate-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Account</th>
+                    <th>Name</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Outstanding</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of getCsvValidatedPage(); track row.accountNo; let i = $index) {
+                    <tr [class.csv-row-found]="row.status === 'found'" [class.csv-row-error]="row.status === 'not_found' || row.status === 'error'" [class.csv-row-dup]="row.status === 'duplicate'">
+                      <td class="csv-row-num">{{ (csvPage() - 1) * csvPageSize + i + 1 }}</td>
+                      <td class="font-mono">{{ row.accountNo }}</td>
+                      <td>{{ row.name || '-' }}</td>
+                      <td class="font-mono text-right">R {{ formatCurrency(row.amount) }}</td>
+                      <td class="font-mono text-right" [class.csv-balance-negative]="row.outstandingAmount < 0" [class.csv-balance-positive]="row.outstandingAmount > 0">
+                        @if (row.status === 'found') { R {{ formatCurrency(row.outstandingAmount) }} }
+                        @else { - }
+                      </td>
+                      <td>
+                        @if (row.status === 'pending') { <span class="csv-status-badge csv-badge-pending">Pending</span> }
+                        @else if (row.status === 'validating') { <span class="csv-status-badge csv-badge-validating"><div class="spinner-xs"></div> Checking</span> }
+                        @else if (row.status === 'found') { <span class="csv-status-badge csv-badge-found">&#10003; Found</span> }
+                        @else if (row.status === 'not_found') { <span class="csv-status-badge csv-badge-notfound">&#10007; Not Found</span> }
+                        @else if (row.status === 'error') { <span class="csv-status-badge csv-badge-error" [title]="row.errorMsg">&#9888; Error</span> }
+                        @else if (row.status === 'duplicate') { <span class="csv-status-badge csv-badge-dup">Duplicate</span> }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (csvTotalPages() > 1) {
+              <div class="csv-pagination">
+                <button class="csv-page-btn" (click)="csvPrevPage()" [disabled]="csvPage() <= 1">&laquo; Prev</button>
+                <span>Page {{ csvPage() }} of {{ csvTotalPages() }}</span>
+                <button class="csv-page-btn" (click)="csvNextPage()" [disabled]="csvPage() >= csvTotalPages()">Next &raquo;</button>
+              </div>
+            }
+          }
+
+          <!-- DONE STEP -->
+          @if (csvStep() === 'done') {
+            <div class="csv-done-stats">
+              <div class="csv-stat-card csv-stat-found">
+                <span class="csv-stat-value">{{ csvFoundCount() }}</span>
+                <span class="csv-stat-label">Found</span>
+              </div>
+              <div class="csv-stat-card csv-stat-notfound">
+                <span class="csv-stat-value">{{ csvNotFoundCount() }}</span>
+                <span class="csv-stat-label">Not Found</span>
+              </div>
+              <div class="csv-stat-card csv-stat-errors">
+                <span class="csv-stat-value">{{ csvErrorCount() }}</span>
+                <span class="csv-stat-label">Errors</span>
+              </div>
+              @if (csvDuplicateCount() > 0) {
+                <div class="csv-stat-card csv-stat-dup">
+                  <span class="csv-stat-value">{{ csvDuplicateCount() }}</span>
+                  <span class="csv-stat-label">Already in Basket</span>
+                </div>
+              }
+            </div>
+
+            @if (csvFoundCount() > 0) {
+              <div class="csv-done-summary">
+                <p><strong>{{ csvFoundCount() }}</strong> valid account(s) ready to add to basket.</p>
+                <p>Total payment amount: <strong>R {{ formatCurrency(csvValidTotalAmount()) }}</strong></p>
+                <p class="csv-done-note">Amounts from the CSV will be pre-filled. You can adjust individual amounts in the basket before processing payment.</p>
+              </div>
+            } @else {
+              <div class="csv-done-summary csv-done-empty">
+                <p>No valid accounts found in the imported file. Please check your file and try again.</p>
+              </div>
+            }
+
+            <div class="csv-table-wrap">
+              <table class="csv-table" data-testid="csv-done-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Account</th>
+                    <th>Name</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Outstanding</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of getCsvValidatedPage(); track row.accountNo; let i = $index) {
+                    <tr [class.csv-row-found]="row.status === 'found'" [class.csv-row-error]="row.status === 'not_found' || row.status === 'error'" [class.csv-row-dup]="row.status === 'duplicate'">
+                      <td class="csv-row-num">{{ (csvPage() - 1) * csvPageSize + i + 1 }}</td>
+                      <td class="font-mono">{{ row.accountNo }}</td>
+                      <td>{{ row.name || (row.errorMsg || '-') }}</td>
+                      <td class="font-mono text-right">R {{ formatCurrency(row.amount) }}</td>
+                      <td class="font-mono text-right" [class.csv-balance-negative]="row.outstandingAmount < 0" [class.csv-balance-positive]="row.outstandingAmount > 0">
+                        @if (row.status === 'found') { R {{ formatCurrency(row.outstandingAmount) }} }
+                        @else { - }
+                      </td>
+                      <td>
+                        @if (row.status === 'found') { <span class="csv-status-badge csv-badge-found">&#10003; Valid</span> }
+                        @else if (row.status === 'not_found') { <span class="csv-status-badge csv-badge-notfound">&#10007; Not Found</span> }
+                        @else if (row.status === 'error') { <span class="csv-status-badge csv-badge-error" [title]="row.errorMsg">&#9888; Error</span> }
+                        @else if (row.status === 'duplicate') { <span class="csv-status-badge csv-badge-dup">In Basket</span> }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (csvTotalPages() > 1) {
+              <div class="csv-pagination">
+                <button class="csv-page-btn" (click)="csvPrevPage()" [disabled]="csvPage() <= 1">&laquo; Prev</button>
+                <span>Page {{ csvPage() }} of {{ csvTotalPages() }}</span>
+                <button class="csv-page-btn" (click)="csvNextPage()" [disabled]="csvPage() >= csvTotalPages()">Next &raquo;</button>
+              </div>
+            }
+
+            @if (csvFoundCount() > 0) {
+              <button class="process-btn csv-add-btn" (click)="csvAddToBasket()" data-testid="button-csv-add-to-basket">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                Add {{ csvFoundCount() }} Account(s) to Basket
+              </button>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- DROP BOX DIALOG -->
+  @if (showDropBoxDialog()) {
+    <div class="payment-overlay" (click)="closeDropBoxDialog()">
+      <div class="dropbox-dialog" (click)="$event.stopPropagation()" data-testid="dropbox-dialog">
+        <div class="dropbox-dialog-header">
+          <div class="dropbox-header-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          </div>
+          <div>
+            <h3 class="dropbox-title">Drop Box — Cash Drop</h3>
+            <p class="dropbox-subtitle">Remove cash from your drawer and place it in the drop box/safe.</p>
+          </div>
+          @if (dropBoxStep() !== 'submitting') {
+            <button class="close-btn dropbox-close" (click)="closeDropBoxDialog()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          }
+        </div>
+
+        @if (dropBoxStep() === 'input') {
+          <div class="dropbox-body">
+            <div class="dropbox-field">
+              <label class="form-label">Drop Amount</label>
+              <div class="dropbox-amount-wrap">
+                <span class="dropbox-currency-prefix">R</span>
+                <input class="form-input dropbox-amount-input" type="number" min="0" step="0.01" placeholder="0.00" [ngModel]="dropBoxAmount() || null" (ngModelChange)="dropBoxAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-dropbox-amount" />
+              </div>
+            </div>
+
+            <div class="dropbox-denom-row">
+              @for (d of dropBoxDenominations; track d.value) {
+                <button class="dropbox-denom-btn" (click)="addDropBoxDenom(d.value)" [attr.data-testid]="'btn-drop-add-' + d.value">
+                  +{{ d.label }}
+                </button>
+              }
+              <button class="dropbox-denom-btn dropbox-clear-btn" (click)="clearDropBoxAmount()" data-testid="btn-drop-clear">Clear</button>
+            </div>
+
+            <div class="dropbox-field">
+              <label class="form-label dropbox-label-muted">Description (optional)</label>
+              <input class="form-input" type="text" placeholder="e.g. Midday cash drop, Shift change drop..." [ngModel]="dropBoxReference()" (ngModelChange)="dropBoxReference.set($event)" data-testid="input-dropbox-ref" />
+            </div>
+
+            <button class="dropbox-history-toggle" (click)="toggleDropBoxHistory()" data-testid="btn-toggle-drop-history">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {{ showDropBoxHistory() ? 'Hide' : 'Show' }} Today's Drops
+            </button>
+
+            @if (showDropBoxHistory()) {
+              <div class="dropbox-history-panel">
+                @if (dropBoxHistoryLoading()) {
+                  <div class="dropbox-history-loading"><div class="spinner-sm"></div> Loading...</div>
+                } @else if (dropBoxHistory().length === 0) {
+                  <div class="dropbox-history-empty">No drop box entries found for today</div>
+                } @else {
+                  <table class="dropbox-history-table">
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th>Reference</th>
+                        <th class="text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of dropBoxHistory(); track $index) {
+                        <tr>
+                          <td>{{ item.description || item.accountNumber || '-' }}</td>
+                          <td class="font-mono">{{ item.referenceNumber || item.receiptNo || '-' }}</td>
+                          <td class="text-right font-mono font-bold">R {{ (item.amount || item.paidAmount || 0).toFixed(2) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </div>
+            }
+          </div>
+          <div class="dropbox-footer">
+            <button class="btn-outline" (click)="closeDropBoxDialog()">Cancel</button>
+            <button class="dropbox-review-btn" (click)="reviewDropBox()" [disabled]="dropBoxAmount() <= 0" data-testid="button-review-drop">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+              Review Drop
+            </button>
+          </div>
+        }
+
+        @if (dropBoxStep() === 'confirm') {
+          <div class="dropbox-body">
+            <div class="dropbox-confirm-card">
+              <div class="dropbox-confirm-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+              </div>
+              <p class="dropbox-confirm-label">Confirm Cash Drop</p>
+              <p class="dropbox-confirm-hint">This amount will be removed from your cash-on-hand.</p>
+              <div class="dropbox-confirm-amount-box">
+                <span class="dropbox-confirm-amount-label">Drop Amount</span>
+                <span class="dropbox-confirm-amount-value">R {{ formatCurrency(dropBoxAmount()) }}</span>
+              </div>
+              @if (dropBoxReference()) {
+                <p class="dropbox-confirm-note">Note: <em>{{ dropBoxReference() }}</em></p>
+              }
+            </div>
+          </div>
+          <div class="dropbox-footer">
+            <button class="btn-outline" (click)="dropBoxStep.set('input')">Back</button>
+            <button class="dropbox-confirm-btn" (click)="submitDropBox()" data-testid="button-confirm-drop">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              Confirm Drop
+            </button>
+          </div>
+        }
+
+        @if (dropBoxStep() === 'submitting') {
+          <div class="dropbox-body dropbox-center-state">
+            <div class="spinner"></div>
+            <p class="dropbox-state-title">Processing Drop Box</p>
+            <p class="dropbox-state-subtitle">Recording your cash drop...</p>
+          </div>
+        }
+
+        @if (dropBoxStep() === 'success') {
+          <div class="dropbox-body dropbox-center-state">
+            <div class="dropbox-success-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <p class="dropbox-state-title" style="color:#166534">Cash Drop Recorded</p>
+            <p class="dropbox-success-amount">R {{ formatCurrency(dropBoxAmount()) }}</p>
+            <p class="dropbox-state-subtitle">has been moved to the drop box.</p>
+            @if (dropBoxReceiptNo()) {
+              <span class="dropbox-receipt-badge">Receipt: {{ dropBoxReceiptNo() }}</span>
+            }
+          </div>
+          <div class="dropbox-footer">
+            <button class="dropbox-done-btn" (click)="closeDropBoxDialog()" data-testid="button-drop-done">Done</button>
+          </div>
+        }
+
+        @if (dropBoxStep() === 'error') {
+          <div class="dropbox-body">
+            <div class="dropbox-error-card">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div>
+                <p class="dropbox-error-title">Drop Box Failed</p>
+                <p class="dropbox-error-msg">{{ dropBoxError() }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="dropbox-footer">
+            <button class="btn-outline" (click)="dropBoxStep.set('input')">Back to Edit</button>
+            <button class="dropbox-review-btn" (click)="submitDropBox()">Retry</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (showEnquiryOverlay()) {
+    <div class="enquiry-overlay" data-testid="enquiry-overlay">
+      <div class="enquiry-overlay-header">
+        <div class="enquiry-overlay-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Account Enquiry
+        </div>
+        <button class="enquiry-overlay-close" (click)="closeEnquiryOverlay()" data-testid="btn-close-enquiry">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          Close
+        </button>
+      </div>
+      <div class="enquiry-overlay-body">
+        <app-enquiries-general></app-enquiries-general>
+      </div>
+    </div>
+  }
+
+  @if (showClearConfirm()) {
+    <div class="clear-confirm-overlay" (click)="showClearConfirm.set(false)" data-testid="clear-confirm-overlay">
+      <div class="clear-confirm-dialog" (click)="$event.stopPropagation()" data-testid="clear-confirm-dialog">
+        <div class="clear-confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+        </div>
+        <h3 class="clear-confirm-title">Clear all {{ basket.itemCount() }} items?</h3>
+        <p class="clear-confirm-msg">This will remove all items from the basket and reset tender amounts.</p>
+        <div class="clear-confirm-actions">
+          <button class="btn-outline" (click)="showClearConfirm.set(false)" data-testid="clear-confirm-cancel">Keep Items</button>
+          <button class="btn-danger" (click)="confirmClearAll()" data-testid="clear-confirm-accept">Clear All</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

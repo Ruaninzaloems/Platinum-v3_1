@@ -1,0 +1,516 @@
+<div class="page-header">
+  <div>
+    <h1>Project Budgets</h1>
+    <p class="subtitle">IDP-linked capital and operational project budget management</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-secondary" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon> Quick Add
+    </button>
+    <button class="btn-primary" (click)="captureNewProject()">
+      <mat-icon>edit_note</mat-icon> Capture / Edit Project
+    </button>
+  </div>
+</div>
+
+<div class="filters-bar">
+  <mat-form-field appearance="outline" class="filter-field">
+    <mat-label>Department</mat-label>
+    <mat-select [(ngModel)]="filterDept" (selectionChange)="loadProjects()">
+      <mat-option [value]="0">All Departments</mat-option>
+      <mat-option *ngFor="let d of departments" [value]="d.id">{{d.name}}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" class="filter-field">
+    <mat-label>Type</mat-label>
+    <mat-select [(ngModel)]="filterType" (selectionChange)="loadProjects()">
+      <mat-option value="">All Types</mat-option>
+      <mat-option value="Capital">Capital</mat-option>
+      <mat-option value="Operational">Operational</mat-option>
+      <mat-option value="Revenue">Revenue</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <div class="filter-spacer"></div>
+  <div class="project-count">{{projects.length}} projects</div>
+</div>
+
+<div class="summary-cards">
+  <div class="summary-card">
+    <div class="summary-icon capital"><mat-icon>domain</mat-icon></div>
+    <div class="summary-info">
+      <div class="summary-value">{{capitalCount}}</div>
+      <div class="summary-label">Capital Projects</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon operational"><mat-icon>settings</mat-icon></div>
+    <div class="summary-info">
+      <div class="summary-value">{{operationalCount}}</div>
+      <div class="summary-label">Operational</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon revenue"><mat-icon>trending_up</mat-icon></div>
+    <div class="summary-info">
+      <div class="summary-value">{{revenueCount}}</div>
+      <div class="summary-label">Revenue</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon total"><mat-icon>account_balance_wallet</mat-icon></div>
+    <div class="summary-info">
+      <div class="summary-value">{{formatCurrency(totalBudget)}}</div>
+      <div class="summary-label">Total Budget (Y1)</div>
+    </div>
+  </div>
+</div>
+
+<div class="card-container">
+  <div class="card-title-bar">
+    <h2><mat-icon>business</mat-icon> Projects Register</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" *ngIf="projects.length > 0">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Project Name</th>
+          <th>Type</th>
+          <th>Department</th>
+          <th>Status</th>
+          <th class="text-right">SCOA Lines</th>
+          <th class="text-right">Year 1</th>
+          <th class="text-right">Year 2</th>
+          <th class="text-right">Year 3</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of projects" class="clickable-row" (click)="openProjectDetail(p)">
+          <td><span class="project-code">{{p.projectCode}}</span></td>
+          <td class="name-cell">{{p.projectName}}</td>
+          <td><span class="type-badge" [ngClass]="'type-' + p.type.toLowerCase()">{{p.type}}</span></td>
+          <td>{{p.departmentName || '—'}}</td>
+          <td><span class="status-badge" [ngClass]="'status-' + p.status.toLowerCase()">{{p.status}}</span></td>
+          <td class="text-right">{{p.scoaLineCount}}</td>
+          <td class="text-right value-cell">{{formatCurrency(p.totalBudgetYear1)}}</td>
+          <td class="text-right value-cell">{{formatCurrency(p.totalBudgetYear2)}}</td>
+          <td class="text-right value-cell">{{formatCurrency(p.totalBudgetYear3)}}</td>
+          <td class="action-cell">
+            <button mat-icon-button (click)="openProjectDetail(p); $event.stopPropagation()">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="empty-state" *ngIf="projects.length === 0">
+      <mat-icon class="empty-icon">business</mat-icon>
+      <p>No projects found. Create a new project to get started.</p>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE/EDIT PROJECT DIALOG -->
+<div class="dialog-overlay" *ngIf="showCreateDialog" (click)="showCreateDialog = false">
+  <div class="dialog-box project-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h3>{{editingProject ? 'Edit Project' : 'Create New Project'}}</h3>
+      <button mat-icon-button (click)="showCreateDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-tabs">
+        <button [class.active]="activeTab === 'details'" (click)="activeTab = 'details'">
+          <mat-icon>info</mat-icon> Project Details
+        </button>
+        <button [class.active]="activeTab === 'scoa'" (click)="activeTab = 'scoa'">
+          <mat-icon>account_tree</mat-icon> SCOA Budget Lines ({{budgetLines.length}})
+        </button>
+      </div>
+
+      <!-- TAB: PROJECT DETAILS -->
+      <div class="tab-content" *ngIf="activeTab === 'details'">
+        <div class="form-section">
+          <h4>Basic Information</h4>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Project Code *</mat-label>
+              <input matInput [(ngModel)]="newProject.projectCode" [disabled]="!!editingProject">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Project Type *</mat-label>
+              <mat-select [(ngModel)]="newProject.type">
+                <mat-option value="Capital">Capital</mat-option>
+                <mat-option value="Operational">Operational</mat-option>
+                <mat-option value="Revenue">Revenue</mat-option>
+                <mat-option value="Mixed">Mixed</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Project Name *</mat-label>
+              <input matInput [(ngModel)]="newProject.projectName">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Description</mat-label>
+              <textarea matInput [(ngModel)]="newProject.description" rows="3"></textarea>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4>Organisation & Location</h4>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Department</mat-label>
+              <mat-select [(ngModel)]="newProject.departmentId">
+                <mat-option [value]="null">— None —</mat-option>
+                <mat-option *ngFor="let d of departments" [value]="d.id">{{d.name}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Ward</mat-label>
+              <input matInput [(ngModel)]="newProject.ward">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>GPS Coordinates</mat-label>
+              <input matInput [(ngModel)]="newProject.gpsCoordinates" placeholder="-33.9580, 22.4614">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Funding Source</mat-label>
+              <input matInput [(ngModel)]="newProject.fundingSource" placeholder="e.g. MIG, Own Funding">
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4>IDP Linkage</h4>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>IDP Link Reference</mat-label>
+              <input matInput [(ngModel)]="newProject.idpLink">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>IDP Priority Area</mat-label>
+              <input matInput [(ngModel)]="newProject.idpPriorityArea" placeholder="e.g. Basic Service Delivery">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>IDP Strategic Objective</mat-label>
+              <input matInput [(ngModel)]="newProject.idpStrategicObjective">
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4>Project Management</h4>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Project Manager</mat-label>
+              <input matInput [(ngModel)]="newProject.projectManager">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Contractor Name</mat-label>
+              <input matInput [(ngModel)]="newProject.contractorName">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Contract Number</mat-label>
+              <input matInput [(ngModel)]="newProject.contractNumber">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Total Project Cost (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="newProject.totalProjectCost">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Start Date</mat-label>
+              <input matInput type="date" [(ngModel)]="newProject.startDate">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>End Date</mat-label>
+              <input matInput type="date" [(ngModel)]="newProject.endDate">
+            </mat-form-field>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SCOA BUDGET LINES -->
+      <div class="tab-content" *ngIf="activeTab === 'scoa'">
+        <div class="scoa-header">
+          <p class="scoa-intro">Add SCOA items with budget allocations and cashflow. Each line links to Item, Function, Fund, Region, Costing and Department segments.</p>
+          <button class="btn-secondary" (click)="addBudgetLine()">
+            <mat-icon>add</mat-icon> Add SCOA Line
+          </button>
+        </div>
+
+        <div *ngIf="budgetLines.length === 0" class="empty-lines">
+          <mat-icon>playlist_add</mat-icon>
+          <p>No SCOA budget lines added yet. Click "Add SCOA Line" to start.</p>
+        </div>
+
+        <div *ngFor="let line of budgetLines; let i = index" class="budget-line-card">
+          <div class="line-header">
+            <span class="line-number">Line {{i + 1}}</span>
+            <button mat-icon-button class="remove-line-btn" (click)="removeBudgetLine(i)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+
+          <div class="segment-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Item *</mat-label>
+              <mat-select [(ngModel)]="line.scoaItemId">
+                <mat-option *ngFor="let s of scoaItems" [value]="s.id">{{s.code}} — {{s.description}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Function *</mat-label>
+              <mat-select [(ngModel)]="line.scoaFunctionId">
+                <mat-option *ngFor="let s of scoaFunctions" [value]="s.id">{{s.code}} — {{s.description}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Fund *</mat-label>
+              <mat-select [(ngModel)]="line.scoaFundId">
+                <mat-option *ngFor="let s of scoaFunds" [value]="s.id">{{s.code}} — {{s.description}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Region *</mat-label>
+              <mat-select [(ngModel)]="line.scoaRegionId">
+                <mat-option *ngFor="let s of scoaRegions" [value]="s.id">{{s.code}} — {{s.description}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Costing *</mat-label>
+              <mat-select [(ngModel)]="line.scoaCostingId">
+                <mat-option *ngFor="let s of scoaCostings" [value]="s.id">{{s.code}} — {{s.description}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Department/Division</mat-label>
+              <mat-select [(ngModel)]="line.departmentId">
+                <mat-option [value]="null">— None —</mat-option>
+                <mat-option *ngFor="let d of departments" [value]="d.id">{{d.name}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <h5 class="sub-heading">Budget (MTREF)</h5>
+          <div class="budget-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Year 1 (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="line.year1Amount" (ngModelChange)="autoDistributeCashflow(line)">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Year 2 (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="line.year2Amount">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Year 3 (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="line.year3Amount">
+            </mat-form-field>
+          </div>
+
+          <div class="cashflow-section">
+            <div class="cashflow-header">
+              <h5 class="sub-heading">Monthly Cashflow (Year 1)</h5>
+              <div class="cashflow-actions">
+                <button class="btn-text" (click)="evenDistribute(line)">Even Split</button>
+                <span class="cashflow-total" [class.mismatch]="getCashflowTotal(line) !== line.year1Amount">
+                  Total: {{formatCurrency(getCashflowTotal(line))}}
+                  <mat-icon *ngIf="getCashflowTotal(line) !== line.year1Amount" class="warn-icon">warning</mat-icon>
+                </span>
+              </div>
+            </div>
+            <div class="month-grid">
+              <div *ngFor="let m of months; let mi = index">
+                <mat-form-field appearance="outline">
+                  <mat-label>{{m}}</mat-label>
+                  <input matInput type="number" [ngModel]="getMonthValue(line, mi + 1)" (ngModelChange)="setMonthValue(line, mi + 1, $event)">
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="budgetLines.length > 0" class="scoa-summary">
+          <div class="summary-row">
+            <span>Total SCOA Lines:</span>
+            <strong>{{budgetLines.length}}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total Year 1:</span>
+            <strong class="amount">{{formatCurrency(scoaTotalYear1)}}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total Year 2:</span>
+            <strong class="amount">{{formatCurrency(scoaTotalYear2)}}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total Year 3:</span>
+            <strong class="amount">{{formatCurrency(scoaTotalYear3)}}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button class="btn-secondary" (click)="showCreateDialog = false">Cancel</button>
+      <button class="btn-primary" (click)="saveProject()" [disabled]="saving">
+        <mat-icon *ngIf="saving">hourglass_empty</mat-icon>
+        {{editingProject ? 'Update Project' : 'Create Project'}}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT DETAIL DIALOG -->
+<div class="dialog-overlay" *ngIf="showDetailDialog && selectedProject" (click)="showDetailDialog = false">
+  <div class="dialog-box project-dialog detail-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <div>
+        <h3>{{selectedProject.projectName}}</h3>
+        <span class="project-code">{{selectedProject.projectCode}}</span>
+        <span class="type-badge" [ngClass]="'type-' + selectedProject.type.toLowerCase()">{{selectedProject.type}}</span>
+        <span class="status-badge" [ngClass]="'status-' + selectedProject.status.toLowerCase()">{{selectedProject.status}}</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" (click)="editProject(selectedProject)"><mat-icon>edit</mat-icon> Edit</button>
+        <button mat-icon-button (click)="showDetailDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+    </div>
+    <div class="dialog-body">
+      <div class="detail-grid">
+        <div class="detail-section">
+          <h4>Project Information</h4>
+          <div class="detail-fields">
+            <div class="detail-field" *ngIf="selectedProject.description">
+              <label>Description</label>
+              <span>{{selectedProject.description}}</span>
+            </div>
+            <div class="detail-field">
+              <label>Department</label>
+              <span>{{selectedProject.departmentName || '—'}}</span>
+            </div>
+            <div class="detail-field">
+              <label>Ward</label>
+              <span>{{selectedProject.ward || '—'}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.gpsCoordinates">
+              <label>GPS Coordinates</label>
+              <span>{{selectedProject.gpsCoordinates}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.fundingSource">
+              <label>Funding Source</label>
+              <span>{{selectedProject.fundingSource}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.projectManager">
+              <label>Project Manager</label>
+              <span>{{selectedProject.projectManager}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.contractorName">
+              <label>Contractor</label>
+              <span>{{selectedProject.contractorName}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.contractNumber">
+              <label>Contract No</label>
+              <span>{{selectedProject.contractNumber}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.totalProjectCost">
+              <label>Total Project Cost</label>
+              <span class="amount">{{formatCurrency(selectedProject.totalProjectCost)}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.startDate">
+              <label>Start Date</label>
+              <span>{{selectedProject.startDate | date:'dd MMM yyyy'}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.endDate">
+              <label>End Date</label>
+              <span>{{selectedProject.endDate | date:'dd MMM yyyy'}}</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail-section" *ngIf="selectedProject.idpLink || selectedProject.idpPriorityArea || selectedProject.idpStrategicObjective">
+          <h4>IDP Linkage</h4>
+          <div class="detail-fields">
+            <div class="detail-field" *ngIf="selectedProject.idpLink">
+              <label>IDP Reference</label>
+              <span>{{selectedProject.idpLink}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.idpPriorityArea">
+              <label>Priority Area</label>
+              <span>{{selectedProject.idpPriorityArea}}</span>
+            </div>
+            <div class="detail-field" *ngIf="selectedProject.idpStrategicObjective">
+              <label>Strategic Objective</label>
+              <span>{{selectedProject.idpStrategicObjective}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section budget-section">
+        <div class="budget-header">
+          <h4>SCOA Budget Lines ({{selectedProject.budgetLines?.length || 0}})</h4>
+          <div class="budget-totals">
+            <span>Y1: <strong>{{formatCurrency(selectedProject.totalBudgetYear1)}}</strong></span>
+            <span>Y2: <strong>{{formatCurrency(selectedProject.totalBudgetYear2)}}</strong></span>
+            <span>Y3: <strong>{{formatCurrency(selectedProject.totalBudgetYear3)}}</strong></span>
+          </div>
+        </div>
+        <div class="budget-lines-table" *ngIf="selectedProject.budgetLines?.length">
+          <table class="data-table compact">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Function</th>
+                <th>Fund</th>
+                <th>Region</th>
+                <th>Costing</th>
+                <th>Department</th>
+                <th class="text-right">Year 1</th>
+                <th class="text-right">Year 2</th>
+                <th class="text-right">Year 3</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let bl of selectedProject.budgetLines; let i = index">
+                <td>{{i + 1}}</td>
+                <td><span class="scoa-tag">{{bl.scoaItemCode}}</span></td>
+                <td><span class="scoa-tag fn">{{bl.scoaFunctionCode}}</span></td>
+                <td><span class="scoa-tag fund">{{bl.scoaFundCode}}</span></td>
+                <td><span class="scoa-tag region">{{bl.scoaRegionCode}}</span></td>
+                <td><span class="scoa-tag costing">{{bl.scoaCostingCode}}</span></td>
+                <td>{{bl.departmentName || '—'}}</td>
+                <td class="text-right value-cell">{{formatCurrency(bl.year1Amount)}}</td>
+                <td class="text-right value-cell">{{formatCurrency(bl.year2Amount)}}</td>
+                <td class="text-right value-cell">{{formatCurrency(bl.year3Amount)}}</td>
+                <td>
+                  <button mat-icon-button class="expand-btn" (click)="toggleCashflow(i)">
+                    <mat-icon>{{expandedLine === i ? 'expand_less' : 'expand_more'}}</mat-icon>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="expandedLine !== null && selectedProject.budgetLines![expandedLine]" class="cashflow-row">
+                <td colspan="11">
+                  <div class="cashflow-detail">
+                    <span class="cf-label">Monthly Cashflow:</span>
+                    <div class="cf-months">
+                      <div *ngFor="let m of months; let mi = index" class="cf-month">
+                        <span class="cf-month-name">{{m}}</span>
+                        <span class="cf-month-value">{{formatCurrency(getMonthValue(selectedProject.budgetLines![expandedLine], mi + 1))}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="empty-lines" *ngIf="!selectedProject.budgetLines?.length">
+          <mat-icon>playlist_add</mat-icon>
+          <p>No SCOA budget lines linked to this project yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

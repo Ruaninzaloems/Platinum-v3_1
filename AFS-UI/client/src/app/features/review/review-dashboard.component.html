@@ -1,0 +1,183 @@
+<div class="review-dashboard">
+  <div class="dashboard-header">
+    <h3>Review Distribution</h3>
+    <button class="create-btn" (click)="openWizard()">+ New Review Request</button>
+  </div>
+
+  <div class="loading-indicator" *ngIf="loading">Loading review requests...</div>
+
+  <div class="empty-state" *ngIf="!loading && requests.length === 0">
+    <p>No review requests yet. Create one to share this compilation for external review or comment.</p>
+  </div>
+
+  <div class="requests-list" *ngIf="!loading && requests.length > 0">
+    <div class="request-card" *ngFor="let req of requests">
+      <div class="request-card-header">
+        <span class="request-type">{{ getRequestTypeLabel(req.requestType) }}</span>
+        <span class="request-scope">{{ getScopeLabel(req.scope) }}</span>
+        <span class="request-status" [style.background]="getStatusColor(req.status)">{{ req.status }}</span>
+        <span class="request-date">{{ req.createdAt | date:'shortDate' }}</span>
+      </div>
+      <div class="request-message" *ngIf="req.message">{{ req.message }}</div>
+      <div class="recipients-row">
+        <div class="recipient-chip" *ngFor="let r of req.recipients">
+          <span class="recipient-icon">{{ r.recipientType === 'internal' ? '👤' : '✉' }}</span>
+          <span class="recipient-name">{{ r.displayName || r.email || 'Internal User' }}</span>
+          <span class="recipient-status" [style.color]="getStatusColor(r.status)">{{ r.status }}</span>
+          <button class="revoke-recipient-btn" *ngIf="req.status === 'sent' && r.status !== 'revoked'" (click)="revokeRecipient(req.id, r.id)" title="Revoke access">✕</button>
+        </div>
+      </div>
+      <div class="request-actions">
+        <button class="action-btn" (click)="viewComments(req)">Comments ({{ req.commentCount || 0 }})</button>
+        <button class="action-btn close-btn" *ngIf="req.status === 'sent'" (click)="closeRequest(req.id)">Close</button>
+        <button class="action-btn revoke-btn" *ngIf="req.status === 'sent' || req.status === 'draft'" (click)="revokeRequest(req.id)">Revoke</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="comments-panel" *ngIf="selectedRequest">
+    <div class="comments-panel-header">
+      <h4>Comments — {{ getRequestTypeLabel(selectedRequest.requestType) }}</h4>
+      <button class="close-panel-btn" (click)="closeComments()">✕</button>
+    </div>
+    <div class="comments-loading" *ngIf="loadingComments">Loading comments...</div>
+    <div class="comments-empty" *ngIf="!loadingComments && selectedComments.length === 0">No comments yet.</div>
+    <div class="comments-list" *ngIf="!loadingComments && selectedComments.length > 0">
+      <div class="comment-item" *ngFor="let c of selectedComments">
+        <div class="comment-meta">
+          <span class="comment-author">{{ c.recipientName }}</span>
+          <span class="comment-type-badge">{{ c.recipientType }}</span>
+          <span class="comment-target">{{ c.targetType }}{{ c.targetType !== 'compilation' ? ': ' + c.targetId : '' }}</span>
+          <span class="comment-date">{{ c.createdAt | date:'medium' }}</span>
+        </div>
+        <p class="comment-text">{{ c.commentText }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wizard-overlay" *ngIf="showWizard">
+    <div class="wizard-modal">
+      <div class="wizard-header">
+        <h3>Create Review Request</h3>
+        <button class="close-wizard-btn" (click)="closeWizard()">✕</button>
+      </div>
+
+      <div class="wizard-steps-indicator">
+        <div class="step-dot" [class.active]="wizardStep >= 1" [class.current]="wizardStep === 1">1</div>
+        <div class="step-line" [class.active]="wizardStep >= 2"></div>
+        <div class="step-dot" [class.active]="wizardStep >= 2" [class.current]="wizardStep === 2">2</div>
+        <div class="step-line" [class.active]="wizardStep >= 3"></div>
+        <div class="step-dot" [class.active]="wizardStep >= 3" [class.current]="wizardStep === 3">3</div>
+        <div class="step-line" [class.active]="wizardStep >= 4"></div>
+        <div class="step-dot" [class.active]="wizardStep >= 4" [class.current]="wizardStep === 4">4</div>
+      </div>
+
+      <div class="wizard-body" *ngIf="wizardStep === 1">
+        <h4>Scope Selection</h4>
+        <p class="wizard-desc">Choose what content to share for review.</p>
+        <div class="radio-group">
+          <label><input type="radio" name="scope" [(ngModel)]="wizardData.scope" value="full_compilation" (change)="onScopeChange()"> Full Compilation</label>
+          <label><input type="radio" name="scope" [(ngModel)]="wizardData.scope" value="selected_statements" (change)="onScopeChange()"> Selected Statements</label>
+          <label><input type="radio" name="scope" [(ngModel)]="wizardData.scope" value="selected_disclosures" (change)="onScopeChange()"> Selected Disclosure Notes</label>
+        </div>
+
+        <div class="scope-details" *ngIf="wizardData.scope === 'selected_statements'">
+          <p class="scope-hint">Select which statement types to include:</p>
+          <div class="checkbox-group">
+            <label *ngFor="let st of availableStatementTypes">
+              <input type="checkbox" [checked]="isStatementTypeSelected(st.value)" (change)="toggleStatementType(st.value)">
+              {{ st.label }}
+            </label>
+          </div>
+        </div>
+
+        <div class="scope-details" *ngIf="wizardData.scope === 'selected_disclosures'">
+          <p class="scope-hint">Enter note numbers to include (comma-separated):</p>
+          <input type="text" [(ngModel)]="noteNumbersInput" placeholder="e.g. 1, 2.1, 5, 10" class="scope-input" (blur)="updateNoteNumbers()">
+        </div>
+      </div>
+
+      <div class="wizard-body" *ngIf="wizardStep === 2">
+        <h4>Recipients</h4>
+        <p class="wizard-desc">Add internal users or external email addresses as recipients.</p>
+        <div class="recipient-form">
+          <input type="email" [(ngModel)]="newRecipientEmail" placeholder="Email address">
+          <input type="text" [(ngModel)]="newRecipientName" placeholder="Display name (optional)">
+          <button class="add-recipient-btn" (click)="addRecipient()">Add</button>
+        </div>
+        <div class="recipient-list" *ngIf="wizardData.recipients.length > 0">
+          <div class="recipient-entry" *ngFor="let r of wizardData.recipients; let i = index">
+            <span class="recipient-icon">{{ r.recipientType === 'internal' ? '👤' : '✉' }}</span>
+            <span>{{ r.displayName || r.email || 'Internal User' }}</span>
+            <button class="remove-btn" (click)="removeRecipient(i)">✕</button>
+          </div>
+        </div>
+        <div class="no-recipients" *ngIf="wizardData.recipients.length === 0">No recipients added yet.</div>
+      </div>
+
+      <div class="wizard-body" *ngIf="wizardStep === 3">
+        <h4>Request Details</h4>
+        <div class="form-field">
+          <label>Request Type</label>
+          <select [(ngModel)]="wizardData.requestType">
+            <option value="comment">Comment</option>
+            <option value="input_requested">Input Requested</option>
+            <option value="factual_verification">Factual Verification</option>
+            <option value="review_only">Review Only</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Message (optional)</label>
+          <textarea [(ngModel)]="wizardData.message" rows="3" placeholder="Add an optional message for recipients..."></textarea>
+        </div>
+        <div class="form-field">
+          <label>Due Date (optional)</label>
+          <input type="date" [(ngModel)]="wizardData.dueDate">
+        </div>
+      </div>
+
+      <div class="wizard-body" *ngIf="wizardStep === 4">
+        <h4>Review & Send</h4>
+        <div class="summary-table">
+          <div class="summary-row"><span class="summary-label">Scope:</span><span>{{ getScopeLabel(wizardData.scope) }}</span></div>
+          <div class="summary-row"><span class="summary-label">Type:</span><span>{{ getRequestTypeLabel(wizardData.requestType) }}</span></div>
+          <div class="summary-row"><span class="summary-label">Recipients:</span><span>{{ wizardData.recipients.length }}</span></div>
+          <div class="summary-row" *ngIf="wizardData.dueDate"><span class="summary-label">Due Date:</span><span>{{ wizardData.dueDate }}</span></div>
+          <div class="summary-row" *ngIf="wizardData.message"><span class="summary-label">Message:</span><span>{{ wizardData.message }}</span></div>
+        </div>
+        <div class="submit-error" *ngIf="submitError">{{ submitError }}</div>
+      </div>
+
+      <div class="wizard-body" *ngIf="wizardStep === 5">
+        <h4>Request Sent</h4>
+        <div class="success-message">
+          <p>Review request has been created and sent successfully.</p>
+          <div *ngIf="sendResult">
+            <p *ngIf="sendResult.emailsSent > 0">{{ sendResult.emailsSent }} email(s) sent.</p>
+            <div *ngIf="sendResult.tokensForManualSharing && sendResult.tokensForManualSharing.length > 0">
+              <p class="manual-share-note">The following tokens could not be emailed. Share them manually:</p>
+              <div class="token-entry" *ngFor="let t of sendResult.tokensForManualSharing">
+                <span>{{ t.email || t.displayName || 'Recipient' }}</span>
+                <code class="token-code">{{ t.token }}</code>
+                <small>Expires: {{ t.expiresAt | date:'shortDate' }}</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-footer" *ngIf="wizardStep < 5">
+        <button class="wizard-btn secondary" *ngIf="wizardStep > 1" (click)="prevStep()">Back</button>
+        <div class="wizard-spacer"></div>
+        <button class="wizard-btn primary" *ngIf="wizardStep < 4" (click)="nextStep()">Next</button>
+        <button class="wizard-btn primary" *ngIf="wizardStep === 4" (click)="createAndSend()" [disabled]="submitting">
+          {{ submitting ? 'Sending...' : 'Create & Send' }}
+        </button>
+      </div>
+      <div class="wizard-footer" *ngIf="wizardStep === 5">
+        <div class="wizard-spacer"></div>
+        <button class="wizard-btn primary" (click)="closeWizard()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>

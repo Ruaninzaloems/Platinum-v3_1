@@ -1,0 +1,1052 @@
+    <div class="ic-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error-bar]="notification().startsWith('Error') || notification().startsWith('Failed')">
+          <mat-icon>{{notification().startsWith('Error') || notification().startsWith('Failed') ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Interest Charges</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Creditor Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('ageAnalysis')">Age Analysis</button>
+          <button class="tab-btn" (click)="navigateTo('outstanding')">Outstanding Payments</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total interest accrued: ' + formatCurrencyFull(summaryData().totalAmount?.amount || 0)">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summaryData().totalAmount?.amount || 0)}}</span>
+            <span class="kpi-label">Total Interest Accrued</span>
+          </div>
+          <div class="kpi-tile" (click)="filterByStatus('submitted')" [matTooltip]="summaryData().byStatus?.submitted + ' charges pending approval'" [style.border-left-color]="(summaryData().byStatus?.submitted || 0) > 0 ? '#f59e0b' : '#10b981'" style="cursor:pointer">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(summaryData().byStatus?.submitted || 0) > 0 ? '#f59e0b' : '#10b981'">{{summaryData().byStatus?.submitted || 0}}</span>
+            <span class="kpi-label">Pending Charges</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Overdue invoices with MFMA Section 65 risk'" [style.border-left-color]="(overdueCount() || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>warning</mat-icon>
+            <span class="kpi-value" [style.color]="(overdueCount() || 0) > 0 ? '#dc2626' : '#10b981'">{{overdueCount()}}</span>
+            <span class="kpi-label">Overdue Invoices</span>
+            <span class="kpi-detail">MFMA S65 Risk</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Current repo rate: ' + (configData().currentRate || 0) + '%'">
+            <mat-icon>trending_up</mat-icon>
+            <span class="kpi-value">{{configData().currentRate || 0}}%</span>
+            <span class="kpi-label">Repo Rate</span>
+            <span class="kpi-detail">{{configData().rateSource || ''}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average days overdue across all charges'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{avgDaysOverdue()}}</span>
+            <span class="kpi-label">Avg Days Overdue</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Section 65 compliance score based on payment timeliness'" [style.border-left-color]="complianceScore() >= 80 ? '#10b981' : complianceScore() >= 50 ? '#f59e0b' : '#dc2626'">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value" [style.color]="complianceScore() >= 80 ? '#10b981' : complianceScore() >= 50 ? '#f59e0b' : '#dc2626'">{{complianceScore()}}%</span>
+            <span class="kpi-label">S65 Compliance</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-col-left">
+            <div class="detail-card">
+              <h3><mat-icon>bar_chart</mat-icon> Status Pipeline</h3>
+              <div class="pipeline-strip">
+                <div class="pipe-tile" (click)="filterByStatus('draft')" style="cursor:pointer" matTooltip="Draft charges">
+                  <mat-icon>edit_note</mat-icon>
+                  <span class="pipe-count">{{summaryData().byStatus?.draft || 0}}</span>
+                  <span class="pipe-label">Draft</span>
+                </div>
+                <div class="pipe-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                <div class="pipe-tile" (click)="filterByStatus('submitted')" style="cursor:pointer" matTooltip="Submitted for approval">
+                  <mat-icon>send</mat-icon>
+                  <span class="pipe-count">{{summaryData().byStatus?.submitted || 0}}</span>
+                  <span class="pipe-label">Submitted</span>
+                </div>
+                <div class="pipe-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                <div class="pipe-tile" (click)="filterByStatus('approved')" style="cursor:pointer" matTooltip="Approved charges">
+                  <mat-icon>check_circle</mat-icon>
+                  <span class="pipe-count">{{summaryData().byStatus?.approved || 0}}</span>
+                  <span class="pipe-label">Approved</span>
+                </div>
+                <div class="pipe-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                <div class="pipe-tile" (click)="filterByStatus('paid')" style="cursor:pointer" matTooltip="Paid charges">
+                  <mat-icon>payments</mat-icon>
+                  <span class="pipe-count">{{summaryData().byStatus?.paid || 0}}</span>
+                  <span class="pipe-label">Paid</span>
+                </div>
+                <div class="pipe-tile" (click)="filterByStatus('voided')" style="cursor:pointer" matTooltip="Voided charges">
+                  <mat-icon>cancel</mat-icon>
+                  <span class="pipe-count">{{summaryData().byStatus?.voided || 0}}</span>
+                  <span class="pipe-label">Voided</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>leaderboard</mat-icon> Top 10 Creditors by Overdue Amount</h3>
+              @if (topCreditors().length) {
+                <div class="creditor-list">
+                  @for (cred of topCreditors(); track cred.supplierId; let i = $index) {
+                    <div class="creditor-row">
+                      <span class="cred-rank">{{i + 1}}</span>
+                      <span class="cred-name">{{cred.supplierName}}</span>
+                      <span class="cred-amount" [matTooltip]="formatCurrencyFull(cred.totalInterest || 0)">{{formatCurrency(cred.totalInterest || 0)}}</span>
+                      <div class="cred-bar-track">
+                        <div class="cred-bar-fill" [style.width.%]="getCreditorBarWidth(cred)"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="empty-text">No creditor data available</div>
+              }
+            </div>
+          </div>
+
+          <div class="dashboard-col-right">
+            <div class="detail-card">
+              <h3><mat-icon>show_chart</mat-icon> Monthly Interest Trend</h3>
+              @if (monthlyTrend().length) {
+                <div class="trend-chart">
+                  @for (month of monthlyTrend(); track month.label) {
+                    <div class="trend-bar-col" [matTooltip]="month.label + ': ' + formatCurrencyFull(month.amount)">
+                      <div class="trend-bar" [style.height.%]="getTrendBarHeight(month)"></div>
+                      <span class="trend-label">{{month.shortLabel}}</span>
+                      <span class="trend-value">{{formatCurrency(month.amount)}}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="empty-text">No trend data available</div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>speed</mat-icon> Quick Actions</h3>
+              <div class="quick-actions-grid">
+                <button class="quick-action-btn" (click)="navigateTo('create')" matTooltip="Create a new interest charge">
+                  <mat-icon>add_circle</mat-icon>
+                  <span>New Charge</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('reconciliation')" matTooltip="View creditor reconciliation">
+                  <mat-icon>compare_arrows</mat-icon>
+                  <span>Reconciliation</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('ageAnalysis')" matTooltip="Invoice age analysis report">
+                  <mat-icon>assessment</mat-icon>
+                  <span>Age Analysis</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('outstanding')" matTooltip="Outstanding payments report">
+                  <mat-icon>receipt_long</mat-icon>
+                  <span>Outstanding</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>info</mat-icon> Interest Config</h3>
+              <div class="summary-stats">
+                <div class="summary-stat">
+                  <span class="ss-label">Calculation Method</span>
+                  <span class="ss-value">{{configData().calculationMethod || 'Simple'}}</span>
+                </div>
+                <div class="summary-stat">
+                  <span class="ss-label">Formula</span>
+                  <span class="ss-value">{{configData().formula || 'Principal x Rate x Days / 365'}}</span>
+                </div>
+                <div class="summary-stat">
+                  <span class="ss-label">Effective Rate</span>
+                  <span class="ss-value">{{configData().currentRate || 0}}%</span>
+                </div>
+                <div class="summary-stat">
+                  <span class="ss-label">Total Charges</span>
+                  <span class="ss-value">{{summaryData().totalCharges || 0}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn active">Interest Charges</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Creditor Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('ageAnalysis')">Age Analysis</button>
+          <button class="tab-btn" (click)="navigateTo('outstanding')">Outstanding Payments</button>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === ''" (click)="filterByStatus('')" matTooltip="All charges">
+            <mat-icon>all_inclusive</mat-icon>
+            <span class="pipe-count">{{summaryData().totalCharges || 0}}</span>
+            <span class="pipe-label">All</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatus('draft')" matTooltip="Draft charges">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{summaryData().byStatus?.draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'submitted'" (click)="filterByStatus('submitted')" matTooltip="Submitted for approval">
+            <mat-icon>send</mat-icon>
+            <span class="pipe-count">{{summaryData().byStatus?.submitted || 0}}</span>
+            <span class="pipe-label">Submitted</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'approved'" (click)="filterByStatus('approved')" matTooltip="Approved">
+            <mat-icon>check_circle</mat-icon>
+            <span class="pipe-count">{{summaryData().byStatus?.approved || 0}}</span>
+            <span class="pipe-label">Approved</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'paid'" (click)="filterByStatus('paid')" matTooltip="Paid">
+            <mat-icon>payments</mat-icon>
+            <span class="pipe-count">{{summaryData().byStatus?.paid || 0}}</span>
+            <span class="pipe-label">Paid</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'voided'" (click)="filterByStatus('voided')" matTooltip="Voided">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{summaryData().byStatus?.voided || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search charges..." [(ngModel)]="searchQuery" (keyup.enter)="loadCharges()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadCharges()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="submitted">Submitted</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+              <mat-option value="paid">Paid</mat-option>
+              <mat-option value="voided">Voided</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Supplier" [(ngModel)]="filterSupplierId" (selectionChange)="loadCharges()">
+              <mat-option value="">All Suppliers</mat-option>
+              @for (s of suppliers(); track s.id) {
+                <mat-option [value]="s.id">{{s.name}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="loadCharges()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterFromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="loadCharges()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterToPicker></mat-datepicker>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear All
+          </button>
+
+          <button mat-flat-button color="primary" (click)="navigateTo('create')">
+            <mat-icon>add</mat-icon> New Charge
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="ic-table">
+            <thead>
+              <tr>
+                <th>Charge ID</th>
+                <th>Supplier</th>
+                <th>Invoice #</th>
+                <th>Principal Amount</th>
+                <th>Interest Amount</th>
+                <th>Total</th>
+                <th>Rate</th>
+                <th>Days Overdue</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (charge of charges(); track charge.id) {
+                <tr class="order-row" (click)="viewCharge(charge)">
+                  <td class="ref-cell">{{charge.referenceNumber}}</td>
+                  <td>{{charge.supplierName}}</td>
+                  <td>{{charge.invoiceNumber || '-'}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(charge.invoiceAmount?.amount || 0)">{{formatCurrencyFull(charge.invoiceAmount?.amount || 0)}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(charge.interestAmount?.amount || 0)">{{formatCurrencyFull(charge.interestAmount?.amount || 0)}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull((charge.invoiceAmount?.amount || 0) + (charge.interestAmount?.amount || 0))">{{formatCurrencyFull((charge.invoiceAmount?.amount || 0) + (charge.interestAmount?.amount || 0))}}</td>
+                  <td>{{charge.interestRate}}%</td>
+                  <td>
+                    <span [style.color]="charge.daysOverdue > 60 ? '#dc2626' : charge.daysOverdue > 30 ? '#f59e0b' : '#10b981'" style="font-weight:600">{{charge.daysOverdue}}</span>
+                  </td>
+                  <td><span class="status-badge" [class]="'status-' + charge.status">{{getStatusLabel(charge.status)}}</span></td>
+                  <td>{{formatDate(charge.capturedDate)}}</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button (click)="viewCharge(charge)" matTooltip="View">
+                      <mat-icon>visibility</mat-icon>
+                    </button>
+                    @if (charge.status === 'draft') {
+                      <button mat-icon-button (click)="submitCharge(charge.id)" matTooltip="Submit for approval">
+                        <mat-icon>send</mat-icon>
+                      </button>
+                    }
+                    @if (charge.status === 'submitted') {
+                      <button mat-icon-button (click)="approveCharge(charge.id)" matTooltip="Approve">
+                        <mat-icon>thumb_up</mat-icon>
+                      </button>
+                    }
+                    @if (['submitted', 'approved'].includes(charge.status)) {
+                      <button mat-icon-button color="warn" (click)="promptVoid(charge.id)" matTooltip="Void">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="11" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No interest charges found</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <div class="page-info-section">
+            <span class="page-info">Showing {{pageStart()}} - {{pageEnd()}} of {{totalCharges()}}</span>
+            <mat-form-field appearance="outline" class="page-size-select">
+              <mat-select [(ngModel)]="pageSizeValue" (selectionChange)="onPageSizeChange()">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'create') {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('list')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>Create Interest Charge</h2>
+            <div class="detail-meta">
+              <span class="status-badge status-draft">New</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>business</mat-icon> Supplier & Invoice Details</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Supplier</mat-label>
+              <mat-select [(ngModel)]="newCharge.supplierId" (selectionChange)="onSupplierSelect()">
+                @for (s of suppliers(); track s.id) {
+                  <mat-option [value]="s.id">{{s.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Invoice Number</mat-label>
+              <input matInput [(ngModel)]="newCharge.invoiceNumber">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Invoice Amount (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="newCharge.invoiceAmount" (ngModelChange)="recalcInterest()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Invoice Date</mat-label>
+              <input matInput [matDatepicker]="invoicePicker" [(ngModel)]="newCharge.invoiceDate">
+              <mat-datepicker-toggle matIconSuffix [for]="invoicePicker"></mat-datepicker-toggle>
+              <mat-datepicker #invoicePicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Due Date</mat-label>
+              <input matInput [matDatepicker]="duePicker" [(ngModel)]="newCharge.dueDate" (ngModelChange)="recalcInterest()">
+              <mat-datepicker-toggle matIconSuffix [for]="duePicker"></mat-datepicker-toggle>
+              <mat-datepicker #duePicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Payment Date (if paid)</mat-label>
+              <input matInput [matDatepicker]="paymentPicker" [(ngModel)]="newCharge.paymentDate" (ngModelChange)="recalcInterest()">
+              <mat-datepicker-toggle matIconSuffix [for]="paymentPicker"></mat-datepicker-toggle>
+              <mat-datepicker #paymentPicker></mat-datepicker>
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (calcPreview().daysOverdue > 0) {
+          <div class="detail-card" style="margin-bottom:16px">
+            <h3><mat-icon>calculate</mat-icon> Auto-Calculation Preview</h3>
+            <div class="calc-preview">
+              <div class="table-wrapper">
+                <table class="ic-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice</th>
+                      <th>Amount</th>
+                      <th>Days Overdue</th>
+                      <th>Rate (Repo + 3.5%)</th>
+                      <th>Interest Calculated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="ref-cell">{{newCharge.invoiceNumber || 'N/A'}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(newCharge.invoiceAmount || 0)">{{formatCurrencyFull(newCharge.invoiceAmount || 0)}}</td>
+                      <td><span style="font-weight:600" [style.color]="calcPreview().daysOverdue > 60 ? '#dc2626' : '#f59e0b'">{{calcPreview().daysOverdue}}</span></td>
+                      <td>{{configData().currentRate || 10.75}}%</td>
+                      <td class="value-cell" style="color:#dc2626;font-weight:700" [matTooltip]="formatCurrencyFull(calcPreview().interest)">{{formatCurrencyFull(calcPreview().interest)}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="calc-summary">
+                <div class="calc-stat">
+                  <span class="ss-label">Effective Rate</span>
+                  <span class="ss-value">{{configData().currentRate || 10.75}}%</span>
+                </div>
+                <div class="calc-stat">
+                  <span class="ss-label">Total Interest</span>
+                  <span class="ss-value" style="color:#dc2626" [matTooltip]="formatCurrencyFull(calcPreview().interest)">{{formatCurrencyFull(calcPreview().interest)}}</span>
+                </div>
+                <div class="calc-stat">
+                  <span class="ss-label">Formula</span>
+                  <span class="ss-value" style="font-size:12px">{{calcPreview().formula}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>notes</mat-icon> Additional Information</h3>
+          <mat-form-field appearance="outline" style="width:100%">
+            <mat-label>Notes / Comments</mat-label>
+            <textarea matInput [(ngModel)]="newCharge.comments" rows="3" placeholder="MFMA Section 65(2)(e) reference..."></textarea>
+          </mat-form-field>
+          <button mat-flat-button color="primary" (click)="createCharge()" [disabled]="!newCharge.supplierId || !newCharge.invoiceAmount || !newCharge.dueDate || saving()">
+            <mat-icon>add_circle</mat-icon> Create Interest Charge
+          </button>
+        </div>
+      }
+
+      @if (currentView() === 'detail' && selectedCharge()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('list')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedCharge().referenceNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedCharge().status">{{getStatusLabel(selectedCharge().status)}}</span>
+              <span style="font-size:13px;color:#64748b">{{selectedCharge().supplierName}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Interest Amount</span>
+            <span class="value-amount" [matTooltip]="formatCurrencyFull(selectedCharge().interestAmount?.amount || 0)">{{formatCurrencyFull(selectedCharge().interestAmount?.amount || 0)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedCharge().status === 'draft') {
+              <button mat-flat-button color="primary" (click)="submitCharge(selectedCharge().id)">
+                <mat-icon>send</mat-icon> Submit
+              </button>
+            }
+            @if (selectedCharge().status === 'submitted') {
+              <button mat-flat-button color="primary" (click)="approveCharge(selectedCharge().id)">
+                <mat-icon>thumb_up</mat-icon> Approve
+              </button>
+            }
+            @if (['submitted', 'approved', 'rejected'].includes(selectedCharge().status)) {
+              <button mat-stroked-button color="warn" (click)="promptVoid(selectedCharge().id)">
+                <mat-icon>cancel</mat-icon> Void
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>calculate</mat-icon> Calculation Breakdown</h3>
+          <div class="table-wrapper">
+            <table class="ic-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Original Amount</th>
+                  <th>Due Date</th>
+                  <th>Days Overdue</th>
+                  <th>Rate %</th>
+                  <th>Interest Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="ref-cell">{{selectedCharge().invoiceNumber}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(selectedCharge().invoiceAmount?.amount || 0)">{{formatCurrencyFull(selectedCharge().invoiceAmount?.amount || 0)}}</td>
+                  <td>{{formatDate(selectedCharge().dueDate)}}</td>
+                  <td>
+                    <span style="font-weight:600" [style.color]="selectedCharge().daysOverdue > 60 ? '#dc2626' : selectedCharge().daysOverdue > 30 ? '#f59e0b' : '#10b981'">{{selectedCharge().daysOverdue}}</span>
+                  </td>
+                  <td>{{selectedCharge().interestRate}}%</td>
+                  <td class="value-cell" style="color:#dc2626;font-weight:700" [matTooltip]="formatCurrencyFull(selectedCharge().interestAmount?.amount || 0)">{{formatCurrencyFull(selectedCharge().interestAmount?.amount || 0)}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rate-info">
+            <div class="rate-box">
+              <span class="rate-label">Repo Rate</span>
+              <span class="rate-val">{{(configData().currentRate || 10.75) - 3.5}}%</span>
+            </div>
+            <span class="rate-plus">+</span>
+            <div class="rate-box">
+              <span class="rate-label">Penalty</span>
+              <span class="rate-val">3.5%</span>
+            </div>
+            <span class="rate-equals">=</span>
+            <div class="rate-box rate-box-highlight">
+              <span class="rate-label">Effective Rate</span>
+              <span class="rate-val">{{configData().currentRate || 10.75}}%</span>
+            </div>
+          </div>
+          <div class="mfma-ref">
+            <mat-icon>gavel</mat-icon>
+            <span>MFMA Section 65(2)(e) - Interest on overdue accounts payable to creditors within 30 days of receipt of invoice</span>
+          </div>
+        </div>
+
+        <div class="detail-cards-row">
+          <div class="flex-1">
+            <div class="detail-card">
+              <h3><mat-icon>info</mat-icon> Charge Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Reference</label>
+                  <span>{{selectedCharge().referenceNumber}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Supplier</label>
+                  <span>{{selectedCharge().supplierName}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Invoice Date</label>
+                  <span>{{formatDate(selectedCharge().invoiceDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Due Date</label>
+                  <span>{{formatDate(selectedCharge().dueDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Payment Date</label>
+                  <span>{{selectedCharge().paymentDate ? formatDate(selectedCharge().paymentDate) : 'Unpaid'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Financial Year</label>
+                  <span>{{selectedCharge().financialYear}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Source</label>
+                  <span class="status-badge status-draft">{{selectedCharge().source}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Calculation</label>
+                  <span class="desc-text">{{selectedCharge().calculationDetails}}</span>
+                </div>
+              </div>
+              @if (selectedCharge().comments) {
+                <div style="margin-top:16px">
+                  <label style="font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">Comments</label>
+                  <p class="desc-text">{{selectedCharge().comments}}</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="flex-1">
+            <div class="detail-card">
+              <h3><mat-icon>verified</mat-icon> Approval Information</h3>
+              @if (selectedCharge().approvedByName) {
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Approved By</label>
+                    <span>{{selectedCharge().approvedByName}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Approved Date</label>
+                    <span>{{formatDate(selectedCharge().approvedDate)}}</span>
+                  </div>
+                </div>
+              } @else if (selectedCharge().rejectedByName) {
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Rejected By</label>
+                    <span>{{selectedCharge().rejectedByName}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Rejection Reason</label>
+                    <span class="desc-text">{{selectedCharge().rejectionReason}}</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="empty-text">Awaiting approval action</div>
+              }
+
+              @if (selectedCharge().voidedByName) {
+                <div class="detail-grid" style="margin-top:16px">
+                  <div class="detail-field">
+                    <label>Voided By</label>
+                    <span>{{selectedCharge().voidedByName}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Void Reason</label>
+                    <span class="desc-text">{{selectedCharge().voidReason}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card" style="margin-top:16px">
+              <h3><mat-icon>timeline</mat-icon> Lifecycle Timeline</h3>
+              <div class="timeline">
+                <div class="timeline-step" [class.timeline-active]="true" [class.timeline-done]="selectedCharge().capturedDate">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <span class="timeline-title">Draft</span>
+                    <span class="timeline-date">{{selectedCharge().capturedDate ? formatDate(selectedCharge().capturedDate) : '-'}}</span>
+                  </div>
+                </div>
+                <div class="timeline-step" [class.timeline-done]="selectedCharge().submittedDate">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <span class="timeline-title">Submitted</span>
+                    <span class="timeline-date">{{selectedCharge().submittedDate ? formatDate(selectedCharge().submittedDate) : '-'}}</span>
+                  </div>
+                </div>
+                <div class="timeline-step" [class.timeline-done]="selectedCharge().approvedDate">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <span class="timeline-title">Approved</span>
+                    <span class="timeline-date">{{selectedCharge().approvedDate ? formatDate(selectedCharge().approvedDate) : '-'}}</span>
+                  </div>
+                </div>
+                <div class="timeline-step" [class.timeline-done]="selectedCharge().paidDate || selectedCharge().voidedDate">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <span class="timeline-title">{{selectedCharge().voidedDate ? 'Voided' : 'Paid'}}</span>
+                    <span class="timeline-date">{{selectedCharge().paidDate ? formatDate(selectedCharge().paidDate) : selectedCharge().voidedDate ? formatDate(selectedCharge().voidedDate) : '-'}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'reconciliation') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Interest Charges</button>
+          <button class="tab-btn active">Creditor Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('ageAnalysis')">Age Analysis</button>
+          <button class="tab-btn" (click)="navigateTo('outstanding')">Outstanding Payments</button>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Supplier</mat-label>
+            <mat-select [(ngModel)]="reconSupplierId" (selectionChange)="loadReconciliation()">
+              <mat-option value="">All Suppliers</mat-option>
+              @for (s of suppliers(); track s.id) {
+                <mat-option [value]="s.id">{{s.name}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="reconFromPicker" [(ngModel)]="reconDateFrom" (dateChange)="loadReconciliation()">
+            <mat-datepicker-toggle matIconSuffix [for]="reconFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #reconFromPicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="reconToPicker" [(ngModel)]="reconDateTo" (dateChange)="loadReconciliation()">
+            <mat-datepicker-toggle matIconSuffix [for]="reconToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #reconToPicker></mat-datepicker>
+          </mat-form-field>
+          <button mat-stroked-button (click)="printRecon()" matTooltip="Export / Print reconciliation">
+            <mat-icon>print</mat-icon> Export / Print
+          </button>
+        </div>
+
+        @for (recon of reconData(); track recon.supplierId) {
+          <div class="detail-card" style="margin-bottom:16px">
+            <h3><mat-icon>business</mat-icon> {{recon.supplierName}}</h3>
+            <div class="recon-summary-strip">
+              <div class="recon-stat">
+                <span class="recon-stat-label">Opening Balance</span>
+                <span class="recon-stat-value" [matTooltip]="formatCurrencyFull(recon.openingBalance?.amount || 0)">{{formatCurrencyFull(recon.openingBalance?.amount || 0)}}</span>
+              </div>
+              <div class="recon-stat">
+                <span class="recon-stat-label">Total Invoiced</span>
+                <span class="recon-stat-value" [matTooltip]="formatCurrencyFull(recon.totalInvoices?.amount || 0)">{{formatCurrencyFull(recon.totalInvoices?.amount || 0)}}</span>
+              </div>
+              <div class="recon-stat">
+                <span class="recon-stat-label">Total Paid</span>
+                <span class="recon-stat-value" style="color:#10b981" [matTooltip]="formatCurrencyFull(recon.totalPayments?.amount || 0)">{{formatCurrencyFull(recon.totalPayments?.amount || 0)}}</span>
+              </div>
+              <div class="recon-stat">
+                <span class="recon-stat-label">Interest Charges</span>
+                <span class="recon-stat-value" style="color:#dc2626" [matTooltip]="formatCurrencyFull(recon.totalInterestCharges?.amount || 0)">{{formatCurrencyFull(recon.totalInterestCharges?.amount || 0)}}</span>
+              </div>
+              <div class="recon-stat">
+                <span class="recon-stat-label">Closing Balance</span>
+                <span class="recon-stat-value" style="font-weight:800" [matTooltip]="formatCurrencyFull(recon.closingBalance?.amount || 0)">{{formatCurrencyFull(recon.closingBalance?.amount || 0)}}</span>
+              </div>
+            </div>
+
+            <div class="table-wrapper" style="margin-top:16px">
+              <table class="ic-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th style="text-align:right">Debit</th>
+                    <th style="text-align:right">Credit</th>
+                    <th style="text-align:right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (txn of recon.transactions; track txn.reference) {
+                    <tr>
+                      <td>{{formatDate(txn.date)}}</td>
+                      <td><span class="status-badge" [class]="'txn-' + txn.type">{{getTxnTypeLabel(txn.type)}}</span></td>
+                      <td class="ref-cell">{{txn.reference}}</td>
+                      <td>{{txn.description}}</td>
+                      <td class="value-cell" style="text-align:right" [matTooltip]="txn.debit ? formatCurrencyFull(txn.debit) : ''">{{txn.debit ? formatCurrencyFull(txn.debit) : '-'}}</td>
+                      <td class="value-cell" style="text-align:right;color:#10b981" [matTooltip]="txn.credit ? formatCurrencyFull(txn.credit) : ''">{{txn.credit ? formatCurrencyFull(txn.credit) : '-'}}</td>
+                      <td class="value-cell" style="text-align:right;font-weight:700" [matTooltip]="formatCurrencyFull(txn.balance)">{{formatCurrencyFull(txn.balance)}}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="7" class="empty-state">
+                        <mat-icon>compare_arrows</mat-icon>
+                        <span>No transactions found</span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @empty {
+          <div class="detail-card">
+            <div class="empty-state" style="padding:40px;text-align:center">
+              <mat-icon>compare_arrows</mat-icon>
+              <span style="display:block;margin-top:8px;color:#64748b">Select a supplier to view reconciliation</span>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'ageAnalysis') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Interest Charges</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Creditor Reconciliation</button>
+          <button class="tab-btn active">Age Analysis</button>
+          <button class="tab-btn" (click)="navigateTo('outstanding')">Outstanding Payments</button>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Financial Year</mat-label>
+            <mat-select [(ngModel)]="ageFilterYear" (selectionChange)="loadAgeAnalysis()">
+              <mat-option value="">All Years</mat-option>
+              <mat-option value="2024/2025">2024/2025</mat-option>
+              <mat-option value="2023/2024">2023/2024</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Date As At</mat-label>
+            <input matInput [matDatepicker]="ageFilterPicker" [(ngModel)]="ageFilterDate" (dateChange)="loadAgeAnalysis()">
+            <mat-datepicker-toggle matIconSuffix [for]="ageFilterPicker"></mat-datepicker-toggle>
+            <mat-datepicker #ageFilterPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total outstanding: ' + formatCurrencyFull(ageData().total?.amount?.amount || 0)">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <span class="kpi-value">{{formatCurrency(ageData().total?.amount?.amount || 0)}}</span>
+            <span class="kpi-label">Total Outstanding</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Percentage of charges that are overdue (>30 days)'" [style.border-left-color]="getOverduePercent() > 50 ? '#dc2626' : '#f59e0b'">
+            <mat-icon>pie_chart</mat-icon>
+            <span class="kpi-value" [style.color]="getOverduePercent() > 50 ? '#dc2626' : '#f59e0b'">{{getOverduePercent()}}%</span>
+            <span class="kpi-label">% Overdue</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Creditor with highest outstanding amount'">
+            <mat-icon>business</mat-icon>
+            <span class="kpi-value" style="font-size:16px">{{getHighestCreditor()}}</span>
+            <span class="kpi-label">Highest Creditor</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'MFMA Section 65 requires payment within 30 days'" [style.border-left-color]="(ageData().total?.count || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value" [style.color]="(ageData().total?.count || 0) > 0 ? '#dc2626' : '#10b981'">{{ageData().total?.count || 0}}</span>
+            <span class="kpi-label">S65 Flag (&gt;30 days)</span>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>hourglass_empty</mat-icon> Age Analysis as at {{ageData().asAtDate || 'Today'}}</h3>
+          <div class="aging-cards">
+            <div class="aging-card" style="border-left:3px solid #10b981" [matTooltip]="'Current: ' + formatCurrencyFull(ageData().aging?.current?.amount?.amount || 0)">
+              <span class="aging-range" style="color:#10b981">Current</span>
+              <span class="aging-count">{{ageData().aging?.current?.count || 0}}</span>
+              <span class="aging-value">{{formatCurrency(ageData().aging?.current?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="aging-card" style="border-left:3px solid #f59e0b" [matTooltip]="'31-60 Days: ' + formatCurrencyFull(ageData().aging?.['31-60']?.amount?.amount || 0)">
+              <span class="aging-range" style="color:#f59e0b">31-60 Days</span>
+              <span class="aging-count">{{ageData().aging?.['31-60']?.count || 0}}</span>
+              <span class="aging-value">{{formatCurrency(ageData().aging?.['31-60']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="aging-card" style="border-left:3px solid #f97316" [matTooltip]="'61-90 Days: ' + formatCurrencyFull(ageData().aging?.['61-90']?.amount?.amount || 0)">
+              <span class="aging-range" style="color:#f97316">61-90 Days</span>
+              <span class="aging-count">{{ageData().aging?.['61-90']?.count || 0}}</span>
+              <span class="aging-value">{{formatCurrency(ageData().aging?.['61-90']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="aging-card" style="border-left:3px solid #ef4444" [matTooltip]="'91-120 Days: ' + formatCurrencyFull(ageData().aging?.['91-120']?.amount?.amount || 0)">
+              <span class="aging-range" style="color:#ef4444">91-120 Days</span>
+              <span class="aging-count">{{ageData().aging?.['91-120']?.count || 0}}</span>
+              <span class="aging-value">{{formatCurrency(ageData().aging?.['91-120']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="aging-card" style="border-left:3px solid #991b1b" [matTooltip]="'120+ Days: ' + formatCurrencyFull(ageData().aging?.['120+']?.amount?.amount || 0)">
+              <span class="aging-range" style="color:#991b1b">120+ Days</span>
+              <span class="aging-count">{{ageData().aging?.['120+']?.count || 0}}</span>
+              <span class="aging-value">{{formatCurrency(ageData().aging?.['120+']?.amount?.amount || 0)}}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>bar_chart</mat-icon> Age Distribution Chart</h3>
+          <div class="bar-chart">
+            <div class="bar-col" [matTooltip]="'Current: ' + formatCurrencyFull(ageData().aging?.current?.amount?.amount || 0)">
+              <div class="bar-fill" style="background:#10b981" [style.height.%]="getAgeBucketHeight('current')"></div>
+              <span class="bar-label">Current</span>
+              <span class="bar-value">{{formatCurrency(ageData().aging?.current?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="bar-col" [matTooltip]="'31-60: ' + formatCurrencyFull(ageData().aging?.['31-60']?.amount?.amount || 0)">
+              <div class="bar-fill" style="background:#f59e0b" [style.height.%]="getAgeBucketHeight('31-60')"></div>
+              <span class="bar-label">31-60</span>
+              <span class="bar-value">{{formatCurrency(ageData().aging?.['31-60']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="bar-col" [matTooltip]="'61-90: ' + formatCurrencyFull(ageData().aging?.['61-90']?.amount?.amount || 0)">
+              <div class="bar-fill" style="background:#f97316" [style.height.%]="getAgeBucketHeight('61-90')"></div>
+              <span class="bar-label">61-90</span>
+              <span class="bar-value">{{formatCurrency(ageData().aging?.['61-90']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="bar-col" [matTooltip]="'91-120: ' + formatCurrencyFull(ageData().aging?.['91-120']?.amount?.amount || 0)">
+              <div class="bar-fill" style="background:#ef4444" [style.height.%]="getAgeBucketHeight('91-120')"></div>
+              <span class="bar-label">91-120</span>
+              <span class="bar-value">{{formatCurrency(ageData().aging?.['91-120']?.amount?.amount || 0)}}</span>
+            </div>
+            <div class="bar-col" [matTooltip]="'120+: ' + formatCurrencyFull(ageData().aging?.['120+']?.amount?.amount || 0)">
+              <div class="bar-fill" style="background:#991b1b" [style.height.%]="getAgeBucketHeight('120+')"></div>
+              <span class="bar-label">120+</span>
+              <span class="bar-value">{{formatCurrency(ageData().aging?.['120+']?.amount?.amount || 0)}}</span>
+            </div>
+          </div>
+        </div>
+
+        @if ((ageData().details || []).length > 0) {
+          <div class="detail-card">
+            <h3><mat-icon>table_chart</mat-icon> Creditor Age Detail</h3>
+            <div class="table-wrapper">
+              <table class="ic-table">
+                <thead>
+                  <tr>
+                    <th>Creditor</th>
+                    <th>Reference</th>
+                    <th>Days Aging</th>
+                    <th>Interest Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of ageData().details || []; track item.id) {
+                    <tr>
+                      <td>{{item.supplierName}}</td>
+                      <td class="ref-cell">{{item.referenceNumber}}</td>
+                      <td>
+                        <span style="font-weight:600" [style.color]="item.daysAging > 90 ? '#991b1b' : item.daysAging > 60 ? '#ef4444' : item.daysAging > 30 ? '#f59e0b' : '#10b981'">{{item.daysAging}}</span>
+                      </td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(item.interestAmount?.amount || 0)">{{formatCurrencyFull(item.interestAmount?.amount || 0)}}</td>
+                      <td><span class="status-badge" [class]="'status-' + item.status">{{getStatusLabel(item.status)}}</span></td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr style="font-weight:700">
+                    <td colspan="3">Total</td>
+                    <td class="value-cell" [matTooltip]="formatCurrencyFull(ageData().total?.amount?.amount || 0)">{{formatCurrencyFull(ageData().total?.amount?.amount || 0)}}</td>
+                    <td>{{ageData().total?.count || 0}} items</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'outstanding') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Interest Charges</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Creditor Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('ageAnalysis')">Age Analysis</button>
+          <button class="tab-btn active">Outstanding Payments</button>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Financial Year</mat-label>
+            <mat-select [(ngModel)]="outFilterYear" (selectionChange)="loadOutstandingPayments()">
+              <mat-option value="">All Years</mat-option>
+              <mat-option value="2024/2025">2024/2025</mat-option>
+              <mat-option value="2023/2024">2023/2024</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Min Amount (R)</mat-label>
+            <input matInput type="number" [(ngModel)]="outFilterMinAmount" (change)="loadOutstandingPayments()">
+          </mat-form-field>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total creditors with outstanding payments'">
+            <mat-icon>groups</mat-icon>
+            <span class="kpi-value">{{outstandingData().totalCreditors || 0}}</span>
+            <span class="kpi-label">Total Creditors</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Grand total outstanding interest: ' + formatCurrencyFull(outstandingData().grandTotalInterest?.amount || 0)" [style.border-left-color]="'#dc2626'">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value" style="color:#dc2626">{{formatCurrency(outstandingData().grandTotalInterest?.amount || 0)}}</span>
+            <span class="kpi-label">Total Outstanding</span>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="ic-table">
+            <thead>
+              <tr>
+                <th>Creditor</th>
+                <th>Invoice Count</th>
+                <th>Total Invoice Amount</th>
+                <th>Total Interest</th>
+                <th>MFMA Risk Level</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (creditor of paginatedOutstanding(); track creditor.supplierId) {
+                <tr class="order-row">
+                  <td style="font-weight:600">{{creditor.supplierName}}</td>
+                  <td>{{creditor.count}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(creditor.totalInvoiceAmount || 0)">{{formatCurrencyFull(creditor.totalInvoiceAmount || 0)}}</td>
+                  <td class="value-cell" style="color:#dc2626" [matTooltip]="formatCurrencyFull(creditor.totalInterest || 0)">{{formatCurrencyFull(creditor.totalInterest || 0)}}</td>
+                  <td><span class="status-badge" [class]="'risk-' + getMfmaRisk(creditor)">{{getMfmaRiskLabel(creditor)}}</span></td>
+                </tr>
+                @for (ch of creditor.charges; track ch.id) {
+                  <tr style="background:#f8fafc">
+                    <td style="padding-left:40px;color:#64748b;font-size:12px">{{ch.invoiceNumber}}</td>
+                    <td style="font-size:12px;color:#64748b">1</td>
+                    <td class="value-cell" style="font-size:12px" [matTooltip]="formatCurrencyFull(ch.invoiceAmount?.amount || 0)">{{formatCurrencyFull(ch.invoiceAmount?.amount || 0)}}</td>
+                    <td class="value-cell" style="font-size:12px;color:#dc2626" [matTooltip]="formatCurrencyFull(ch.interestAmount?.amount || 0)">{{formatCurrencyFull(ch.interestAmount?.amount || 0)}}</td>
+                    <td style="font-size:12px;color:#64748b">{{ch.daysOverdue}} days overdue</td>
+                  </tr>
+                }
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty-state">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>No outstanding payments</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <div class="page-info-section">
+            <span class="page-info">Showing {{outPageStart()}} - {{outPageEnd()}} of {{(outstandingData().creditors || []).length}} creditors</span>
+            <mat-form-field appearance="outline" class="page-size-select">
+              <mat-select [(ngModel)]="outPageSizeValue" (selectionChange)="outPageSizeValue = outPageSizeValue">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="outCurrentPage() <= 1" (click)="outCurrentPage.set(outCurrentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{outCurrentPage()}} of {{outTotalPages()}}</span>
+            <button mat-icon-button [disabled]="outCurrentPage() >= outTotalPages()" (click)="outCurrentPage.set(outCurrentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (showVoidDialog()) {
+        <div class="dialog-overlay" (click)="showVoidDialog.set(false)">
+          <div class="dialog-box" (click)="$event.stopPropagation()">
+            <h3>Void Interest Charge</h3>
+            <mat-form-field appearance="outline" style="width:100%">
+              <mat-label>Reason for voiding</mat-label>
+              <textarea matInput [(ngModel)]="voidReason" rows="3"></textarea>
+            </mat-form-field>
+            <div class="dialog-actions">
+              <button mat-stroked-button (click)="showVoidDialog.set(false)">Cancel</button>
+              <button mat-flat-button color="warn" (click)="confirmVoid()" [disabled]="!voidReason">Void Charge</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

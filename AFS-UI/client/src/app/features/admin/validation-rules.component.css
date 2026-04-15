@@ -1,0 +1,22 @@
+.severity-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.sev-critical { background: #fef2f2; color: #991b1b; }
+.sev-error { background: #fff7ed; color: #9a3412; }
+.sev-warning { background: #fef3c7; color: #92400e; }
+.sev-info { background: #f0f9ff; color: #075985; }
+
+:host ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+.run-panel {
+  background: white;
+  border-left: 4px solid #3b82f6;
+}

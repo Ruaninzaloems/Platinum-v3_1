@@ -1,0 +1,22 @@
+<div class="ai-card" [class]="'ai-card-' + insight().severity">
+  <div class="ai-card-header">
+    <div class="ai-icon-wrap">
+      <mat-icon>auto_awesome</mat-icon>
+    </div>
+    <span class="ai-label">AI Insight</span>
+    <span class="ai-severity-badge" [class]="'badge-' + insight().severity">
+      {{ severityLabel() }}
+    </span>
+  </div>
+  <div class="ai-card-body">
+    {{ insight().text }}
+  </div>
+  @if (insight().action) {
+    <div class="ai-card-footer">
+      <button mat-stroked-button class="ai-action-btn" (click)="actionClicked.emit(insight())">
+        {{ insight().action }}
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </div>
+  }
+</div>

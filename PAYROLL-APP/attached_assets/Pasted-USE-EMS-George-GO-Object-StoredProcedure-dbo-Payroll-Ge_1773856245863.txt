@@ -1,0 +1,310 @@
+USE [EMS_George]
+GO
+/****** Object:  StoredProcedure [dbo].[Payroll_GetIRP5Income_Trial_sp]    Script Date: 3/18/2026 7:50:25 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+/*
+	AUTHOR		:	FERDI BOTHA
+	CREATE DATE	:	21/06/2017
+	DESCRIPTION	:	EMPLOYEE TOTAL INCOME BASED ON IRP5 CODES
+	UPDATE DATE	:	30/06/2017 - UPDATED THE JOINS AND WHERE CLAUSE TO FILTER IRP5 CODES BASED ON VALID FROM AND VALID UNTIL
+	SAMPLE		:	exec [Payroll_GetTotalIRP5Income_Trial_sp] '06 + 09', 1, 1, 1, 1, 1, 2 <= returns the calculated summary for Employee No. 1; includes the SARS IRP5 deduction(s) + EMS deduction(s) - where the IRP5Code is '0000', the TransactionTypeID is 1 and it is either non-taxable or taxable
+	SAMPLE		:	exec [Payroll_GetTotalIRP5Income_Trial_sp] '01 + 02 + 03 + 04 + 08 - 06 - 09', 1, 1, 1, 1, 1, 2 <= returns the calculated summary for Employee No. 1; includes the SARS IRP5 income(s) + EMS income(s) - where the IRP5Code is '0000', the TransactionTypeID is 1 and it is either non-taxable or taxable
+
+	@TransactionTypeID - where you want to match Transaction Type ID 1 to 4, then pass 0
+	@TransactionTypeID - where you want to match only Transaction Type ID 1, then pass 1
+	@TransactionTypeID - where you want to match only Transaction Type ID 2, then pass 2
+	@TransactionTypeID - where you want to match only Transaction Type ID 3, then pass 4
+	@TransactionTypeID - where you want to match only Transaction Type ID 4, then pass 8
+
+	if you wish to match multiple Transaction Type ID, then you need to combine them using SQL Bitwise OR, by creating a int variable and combining the ID you wish to compare, example:
+
+	declare @XOR int = (1 ^ 3) < this will match where the Transaction Type ID is 1 or 3
+	declare @XOR int = (1 ^ 2 ^ 3) < this will match where the Transaction Type ID is 1, 2 or 3
+	declare @XOR int = (2 ^ 3 ^ 4) < this will match where the Transaction Type ID is 2, 3 or 4
+	declare @XOR int = (1 ^ 4) < this will match where the Transaction Type ID is 1 or 4
+	declare @XOR int = (2 ^ 3) < this will match where the Transaction Type ID is 2 or 3
+	declare @XOR int = (2 ^ 4) < this will match where the Transaction Type ID is 2 or 4
+
+	exec [Payroll_GetTotalIRP5Income_Trial_sp] '01 + 02 + 03 + 04 + 08 - 06 - 09', 1, 1, 1, 1, @XOR, 2
+
+*/
+ALTER procedure [dbo].[Payroll_GetIRP5Income_Trial_sp]
+as
+begin
+
+	set nocount on;
+
+	declare @IRP5Code table (
+
+		[Type] tinyint not null,
+		[IRP5Code] int not null,
+		[IRP5Description] nvarchar(max) not null,
+		[Taxable] decimal(18, 6) not null,
+		[StartDate] datetime2 not null default('1964-03-01 00:00:00.0000000'),
+		[UntilDate] datetime2 not null default('9999-12-31 00:00:00.0000000')
+
+	)
+
+	/* 01 - INCOME RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3601, 'INCOME - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3651, 'FOREIGN INCOME - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3602, 'INCOME - NON TAXABLE', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3652, 'FOREIGN INCOME - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3603, 'PENSION - TAXABLE', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3653, 'FOREIGN PENSION - TAXABLE', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(1, 3604, 'PENSION - NON TAXABLE', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(1, 3654, 'FOREIGN PENSION - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3605, 'ANNUAL PAYMENT - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3655, 'FOREIGN ANNUAL PAYMENT - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3606, 'COMMISSION', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3656, 'FOREIGN COMMISSION', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3607, 'OVERTIME', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(1, 3657, 'FOREIGN OVERTIME', 100, '2002-03-01 00:00:00.0000000', '2010-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3608, 'ARBITRATION AWARDS - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3658, 'FOREIGN ARBITRATION AWARDS - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(1, 3609, 'ARBITRATION AWARDS - NON TAXABLE', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(1, 3659, 'FOREIGN ARBITRATION AWARDS - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3610, 'ANNUITY FROM RETIREMENT FUND', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3660, 'FOREIGN ANNUITY FROM RETIREMENT FUND', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(1, 3611, 'PURCHASED ANNUITIES - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3661, 'FOREIGN PURCHASED ANNUITY - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(1, 3612, 'PURCHASED ANNUITY - NON TAXABLE', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(1, 3662, 'FOREIGN PURCHASED ANNUITY - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3613, 'RESTRAINT OF TRADE', 100, '2000-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3663, 'FOREIGN RESTRAINT OF TRADE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3614, 'OTHER RETIREMENT FUNDING LUMP SUM', 100, '2001-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3664, 'OTHER FOREIGN RETIREMENT FUNDING LUMP SUM', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3615, 'DIRECTOR''S INCOME', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3665, 'FOREIGN DIRECTOR''S INCOME', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3616, 'INDEPENDENT CONTRACTORS', 100, '2003-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3666, 'FOREIGN INDEPENDENT CONTRACTOR', 100, '2003-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3617, 'LABOUR BROKERS', 100, '2003-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3667, 'REMUNERATION PAID/PAYABLE TO A LABOUR BROKER WITHOUT AN EXEMPTION CERTIFICATE (IRP30) IN RESPECT OF FOREIGN SERVICE', 100, '2003-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3619, 'LABOUR BROKERS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3669, 'FOREIGN LABOUR BROKERS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3620, 'DIRECTOR FEES – RSA RESIDENT NED', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3670, 'DIRECTOR FEES – RSA RESIDENT NED FOR FOREIGN SERVICE INCOME', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(1, 3621, 'DIRECTOR RENUMERATION – NON-RESIDENT NED PAYE', 100, '2017-03-01 00:00:00.0000000')
+
+	end
+
+	/* 02 - ALLOWANCE RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3701, 'TRAVELLING ALLOWANCE', 50, '2010-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3751, 'FOREIGN TRAVELLING ALLOWANCE', 50, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3701, 'TRAVELLING ALLOWANCE', 80, '2010-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3751, 'FOREIGN TRAVELLING ALLOWANCE', 80, '2010-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3702, 'RE-IMBURSIVE TRAVEL ALLOW - TAXABLE', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3722, 'RE-IMBURSIVE TRAVEL ALLOW - TAXABLE (ABOVE PRESCRIBED RATE)', 100, '2018-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3752, 'FOREIGN RE-IMBURSIVE TRAVEL ALLOW - TAXABLE', 0, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3703, 'RE-IMBURSIVE TRAVEL ALLOW - NON TAXABLE', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3753, 'FOREIGN RE-IMBURSIVE TRAVEL ALLOW - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000')
+		--insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3704, 'SUBSISTENCE ALLOWANCE (LOCAL TRAVEL) - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3754, 'FOREIGN SUBSISTENCE ALLOWANCE (LOCAL TRAVEL) - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3705, 'SUBSISTENCE ALLOWANCE (LOCAL TRAVEL) - NON TAXABLE', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3755, 'FOREIGN SUBSISTENCE ALLOWANCE (LOCAL TRAVEL) - TAXABLE', 0, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3706, 'ENTERTAINMENT ALLOWANCE', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3756, 'FOREIGN ENTERTAINMENT ALLOWANCE', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3707, 'SHARE OPTION EXERCISED', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3757, 'FOREIGN SHARE OPTION EXERCISED', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3708, 'PUBLIC OFFICE ALLOWANCE', 50)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3758, 'FOREIGN PUBLIC OFFICE ALLOWANCE', 50, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3709, 'UNIFORM ALLOWANCE - NON TAXABLE', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3759, 'FOREIGN UNIFORM ALLOWANCE - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3710, 'TOOL ALLOWANCE', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3760, 'FOREIGN TOOL ALLOWANCE', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3711, 'COMPUTER ALLOWANCE', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3761, 'FOREIGN COMPUTER ALLOWANCE', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(2, 3712, 'TELEPHONE/CELL PHONE ALLOWANCE', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3762, 'FOREIGN TELEPHONE/CELL PHONE ALLOWANCE', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3713, 'OTHER ALLOWANCES - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3763, 'FOREIGN OTHER ALLOWANCES - TAXABLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(2, 3714, 'OTHER ALLOWANCES - NON TAXABLE', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3764, 'FOREIGN OTHER ALLOWANCES - NON TAXABLE', 0, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3715, 'SUBSISTENCE ALLOWANCE (FOREIGN TRAVEL) - TAXABLE', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3765, 'FOREIGN SUBSISTENCE ALLOWANCE (FOREIGN TRAVEL) - TAXABLE', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3716, 'SUBSISTENCE ALLOWANCE (FOREIGN TRAVEL) - NON TAXABLE', 0, '2004-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(2, 3766, 'FOREIGN SUBSISTENCE ALLOWANCE (FOREIGN TRAVELLING) - NON TAXABLE', 0, '2004-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3717, 'BROAD-BASED EMPLOYEE SHARE PLAN - TAXABLE', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3767, 'FOREIGN BROAD-BASED EMPLOYEE SHARE PLAN', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3718, 'VESTING OF EQUITY INSTRUMENTS', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3768, 'FOREIGN VESTING OF EQUITY INSTRUMENTS', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3719, 'DIVIDENDS NOT EXEMPT I.T.O PAR (dd) OF THE PROVISO TO s10(1)(k)(i) PAYE', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3769, 'DIVIDENDS NOT EXEMPT I.T.O PAR (dd) OF THE PROVISO TO s10(1)(k)(i) PAYE FOR FOREIGN SERVICE INCOME', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3720, 'DIVIDENDS NOT EXEMPT I.T.O PAR (ii) OF THE PROVISO TO s10(1)(k)(i) PAYE DIVIDENDS', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3770, 'DIVIDENDS NOT EXEMPT I.T.O PAR (ii) of the proviso to s10(1)(k)(i) PAYE DIVIDENDS FOR FOREIGN SERVICE INCOME', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3721, 'DIVIDENDS NOT EXEMPT I.T.O PAR (jj) OF THE PROVISO TO s10(1)(k)(i) DIVIDENDS', 100, '2017-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(2, 3771, 'DIVIDENDS NOT EXEMPT I.T.O PAR (jj) OF THE PROVISO TO s10(1)(k)(i) DIVIDENDS FOR FOREIGN SERVICE INCOME', 100, '2017-03-01 00:00:00.0000000')
+
+	end
+
+	/* 03 - FRINGE BENEFIT RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(3, 3801, 'GENERAL FRINGE BENEFITS - TAXABLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3851, 'FOREIGN GENERAL FRINGE BENEFITS', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(3, 3802, 'USE OF MOTOR VEHICLE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3852, 'FOREIGN USE OF MOTOR VEHICLE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(3, 3803, 'RIGHT OF USE OF ASSET', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(3, 3853, 'FOREIGN RIGHT OF USE OF ASSET', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(3, 3804, 'MEAL & REFRESHMENTS', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(3, 3854, 'FOREIGN MEAL & REFRESHMENTS', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3805, 'ACCOMMODATION', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3855, 'FOREIGN ACCOMMODATION', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3806, 'FREE OR CHEAP SERVICES', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3856, 'FOREIGN FREE OR CHEAP SERVICES', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(3, 3807, 'LOW OR INTEREST-FREE LOANS & SUBSIDY', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(3, 3857, 'FOREIGN LOW OR INTEREST-FREE LOANS & SUBSIDY', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3808, 'EMPLOYEE''S DEBT', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3858, 'FOREIGN EMPLOYEE''S DEBT', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3809, 'BURSARIES OR SCHOLARSHIPS - TAXABLE', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3859, 'FOREIGN BURSARIES OR SCHOLARSHIPS', 100, '2012-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(3, 3810, 'MEDICAL AID CONTRIBUTIONS PAID ON BEHALF OF AN EMPLOYEE', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3860, 'FOREIGN MEDICAL AID CONTRIBUTIONS PAID ON BEHALF OF AN EMPLOYEE', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3813, 'MEDICAL SERVICES COSTS', 100, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(3, 3863, 'FOREIGN MEDICAL SERVICES COSTS', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3815, 'BURSARIES OR SCHOLARSHIPS - NON TAXABLE', 0, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3865, 'FOREIGN BURSARIES OR SCHOLARSHIPS - NON TAXABLE', 0, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3816, 'THE USE OF MOTOR VEHICLE ACQUIRED BY EMPLOYER UNDER OPERATING LEASE', 100, '2013-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3866, 'FOREIGN USE OF MOTOR VEHICLE ACQUIRED BY EMPLOYER UNDER OPERATING LEASE', 100, '2013-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3817, 'BENEFIT-EMPLOYER PENSION FUND CONTRIBUTIONS (PAYE)', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3867, 'BENEFIT-EMPLOYER PENSION FUND CONTRIBUTIONS (PAYE) FOR FOREIGN SERVICE INCOME', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3820, 'BUSARIES OR SCHOLARSHIPS (FURTHER EDUCATION) - TAXABLE', 100, '2014-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3870, 'FOREIGN BUSARIES OR SCHOLARSHIPS (FURTHER EDUCATION) - TAXABLE', 100, '2014-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3821, 'BUSARIES OR SCHOLARSHIPS (FURTHER EDUCATION) - NON TAXABLE', 0, '2014-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3871, 'FOREIGN BUSARIES OR SCHOLARSHIPS (FURTHER EDUCATION) - NON TAXABLE', 0, '2014-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3822, 'NON-TAXABLE BENEFIT – ACQUISITION OF IMMOVABLE PROPERTY', 0, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3872, 'NON-TAXABLE BENEFIT – ACQUISITION OF IMMOVABLE PROPERTY FOR FOREIGN SERVICE INCOME', 0, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3825, 'BENEFIT-EMPLOYER PROVIDENT FUND CONTRIBUTIONS (PAYE)', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3875, 'BENEFIT-EMPLOYER PROVIDENT FUND CONTRIBUTIONS (PAYE) FOR FOREIGN SERVICE INCOME', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3828, 'EMPLOYER RETIREMENT ANNUITY FUND CONTRIBUTIONS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3878, 'EMPLOYER RETIREMENT ANNUITY FUND CONTRIBUTIONS FOR FOREIGN SERVICE INCOME', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(3, 3833, 'BARGAINING COUNCIL FRINGE BENEFIT', 100, '2016-03-01 00:00:00.0000000')
+
+	end
+
+	/* 04 - LUMP SUM RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3901, 'GRATUITIES', 100, '1995-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3951, 'FOREIGN - GRATUITIES', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3902, 'PENSION FUND/RETIREMENT ANNUITY FUND LUMP SUMS - RESIGNATION', 100, '1995-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3952, 'FOREIGN - PENSION FUND/RETIREMENT ANNUITY FUND LUMP SUM - RESIGNATION', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3903, 'PENSION/RETIREMENT ANNUITY FUND LUMP SUM - RETIRED', 100, '1995-03-01 00:00:00.0000000', '2008-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3953, 'FOREIGN - PENSION FUND/RETIREMENT ANNUITY FUND LUMP SUM - RETIRED', 100, '2002-03-01 00:00:00.0000000', '2008-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3904, 'PROVIDENT FUND LUMP SUMS - RESIGNATION, TRANSFER ETC.', 100, '1995-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3954, 'FOREIGN - PROVIDENT FUND LUMP SUMS - RESIGNATION, TRANSFER ETC.', 100, '2002-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3905, 'PROVIDENT FUND LUMP SUMS - RETIREMENT OR DEATH', 100, '1995-03-01 00:00:00.0000000', '2008-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(4, 3955, 'FOREIGN - PROVIDENT FUND LUMP SUMS - RETIREMENT OR DEATH', 100, '2002-03-01 00:00:00.0000000', '2008-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3906, 'SPECIAL REMUNERATION-PROTO TEAM', 100, '1995-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3956, 'FOREIGN - SPECIAL REMUNERATION-PROTO TEAM', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3907, 'OTHER LUMPS SUMS (E.G. BACKDATED SALARY, WAGES ETC.)', 100, '1995-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3957, 'FOREIGN - OTHER LUMPS SUMS (E.G. BACKDATED SALARY, WAGES ETC.)', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3908, 'NON TAXABLE SURPLUS APPORTIONMENT ON/AFTER 1 JANUARY 2006', 0, '2007-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3909, 'UNCLAIMED BENEFITS', 100, '2007-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3915, 'RETIREMENT FUND LUMP SUM BENEFIT ON/AFTER 1 OCTOBER 2007', 100, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3920, 'RETIREMENT FUND LUMP SUM WITHDRAWAL BENEFIT', 100, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3921, 'LIVING ANNUITY AND SECTION 15C SURPLUS APPORTIONMENT', 100, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3922, 'COMPENSATION IN RESPECT OF DEATH DURING EMPLOYMENT', 100, '2011-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(4, 3923, 'TRANSFER OF UNCLAIMED BENEFITS', 100, '2017-03-01 00:00:00.0000000')
+
+	end
+
+	/* 05 - GROSS RENUMERATION RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(5, 3696, 'GROSS NON TAXABLE INCOME', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(5, 3697, 'GROSS RETIREMENT FUNDING INCOME', 0, '2016-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(5, 3698, 'GROSS NON - RETIREMENT FUNDING INCOME', 0, '2016-02-29 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(5, 3699, 'GROSS TAXABLE INCOME', 0, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(5, 3699, 'GROSS TAXABLE INCOME', 0, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(5, 4583, 'VALUE OF ''FOREIGN RENUMERATION'' FOR CALCULATION OF 11(K) PURPOSES', 0, '2016-03-01 00:00:00')
+
+	end
+
+	/* 06 - DEDUCTION RECORD(S) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(6, 4001, 'CURRENT PENSION FUND CONTRIBUTIONS', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(6, 4002, 'ARREAR PENSION FUND CONTRIBUTIONS', 100, '2015-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(6, 4003, 'CURRENT PROVIDENT FUND CONTRIBUTIONS', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(6, 4004, 'ARREAR PROVIDENT FUND CONTRIBUTIONS (MUST BE INCLUDED IN CODE 4003 FROM 2010 YEAR OF ASSESSMENT)', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(6, 4005, 'MEDICAL AID CONTRIBUTIONS', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(6, 4006, 'CURRENT RETIREMENT ANNUITY FUND CONTRIBUTIONS', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(6, 4007, 'ARREAR (RE-INSTATED) RETIREMENT ANNUITY FUND CONTRIBUTIONS', 100, '2015-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4018, 'PREMIUMS PAID FOR LOSS OF INCOME POLICIES', 100, '2004-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(6, 4024, 'MEDICAL SERVICES COTS DEEMED TO BE PAID BY EMPLOYEE FOR SELF, SPOUSE OR CHILDREN', 100)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [UntilDate]) values(6, 4025, 'MEDICAL CONTRIBUTIONS PAID BY AN EMPLOYEE ALLOWED AS A DEDUCTION FOR EMPLOYEES'' TAX (PAYE) PURPPOSES', 100, '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(6, 4026, 'ARREAR PENSION FUND CONTRIBUTIONS - NON-STATUTORY FORCES (NSF)', 100, '2006-03-01 00:00:00.0000000', '2015-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4030, 'DONATIONS DEDUCTED BY EMPLOYER & PAID TO ORGANISATION', 100, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4472, 'EMPLOYER''S PENSION FUND CONTRIBUTIONS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4473, 'EMPLOYER''S PROVIDENT FUND CONTRIBUTIONS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4474, 'EMPLOYER''S MEDICAL AID CONTRIBUTIONS', 100, '1998-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4475, 'EMPLOYER''S RETIREMENT ANNUITY FUND CONTRIBUTIONS', 100, '2016-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(6, 4485, 'MEDICAL SERVICES COTS DEEMED TO BE PAID BY EMPLOYEE FOR OTHER DEPENDANTS & RELATIVE', 100, '1998-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(6, 4486, 'CAPPED AMOUNT (MEDICAL AID CONTRIBUTIONS)', 100, '2006-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]) values(6, 4487, 'NO VALUE BENEFITS IN RESPECT OF MEDICAL SERVICES PROVIDED OR INCURRED BY EMPLOYER', 100, '2006-03-01 00:00:00.0000000', '2009-02-28 23:59:59.9999999')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4493, 'EMPLOYER''S MEDICAL AID CONTRIBUTIONS IN RESPECT OF RETIRED EMPLOYEES', 100, '2002-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4497, 'TOTAL DEDUCTIONS/CONTRIBUTIONS', 100, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(6, 4582, 'REMUNERATION - VALUE OF RENUMERATION INCLUDED IN CODES 3701/3752, 3802/3852, AND/OR 3816/3866 FOR THE PURPOSE OF THE ALLOWED DEDUCTION I.R.O. PENSION, PROVIDENT AND RETIREMENT FUND CONTRIBUTIONS.', 100, '2016-03-01 00:00:00.0000000')
+
+	end
+
+	/* 07 - EMPLOYEE TAX DEDUCTION CODE */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(7, 4101, 'STANDANDARD INCOME TAX ON EMPLOYEES (SITE)', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(7, 4102, 'PAY-AS-YOU-EARN [PAYE - (EMPLOYEES'' TAX)]', 0)
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4115, 'TAX ON RETIREMENT FUND LUMP SUM BENEFIT (RETIREMENT/DEATH)', 0, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4141, 'EMPLOYEE & EMPLOYER UNEMPLOYMENT INSURANCE FUND (UIF) CONTRIBUTIONS', 0, '2006-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4142, 'EMPLOYER SKILLS DEVELOPMENT LEVY (SDL) CONTRIBUTION', 0, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4149, 'TOTAL TAX, SKILLS DEVELOPMENT LEVY (SDL) & UNEMPLOYMENT INSURNACE FUND (UIF)', 0, '2009-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4116, 'MEDICAL SCHEME FEES TAX CREDIT', 0, '2000-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4118, 'EMPLOYMENT TAX INCENTIVE', 0, '2011-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate]) values(7, 4120, 'ADDITIONAL MEDICAL EXPENSES TAX CREDIT IF EMPLOYEE >= 65 ALLOWED BY EMPLOYER FOR PAYE', 0, '2000-03-01 00:00:00.0000000')
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(7, 4150, 'REASON FOR NON-DEDUCTION OF EMPLOYEES'' TAX (PAYE)', 0)
+
+	end
+
+	/* 08 - EARNINGS (IRP5 CODE => 0000) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(8, 0, 'EARNINGS', 0)
+
+	end
+
+	/* 09 - DEDUCTIONS (IRP5 CODE => 0000) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(9, 0, 'DEDUCTIONS', 0)
+
+	end
+
+	/* 10 - COMPANY CONTRIBUTIONS (IRP5 CODE => 0000) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(10, 0, 'COMPANY CONTRIBUTIONS', 0)
+
+	end
+
+	/* 11 - FRINGE BENEFITS (IRP5 CODE => 0000) */
+	begin
+
+		insert into @IRP5Code([Type], [IRP5Code], [IRP5Description], [Taxable]) values(11, 0, 'FRINGE BENEFITS', 0)
+
+	end
+
+	select [Type], [IRP5Code], [IRP5Description], [Taxable], [StartDate], [UntilDate]
+
+		from @IRP5Code
+
+	set nocount off;
+
+end

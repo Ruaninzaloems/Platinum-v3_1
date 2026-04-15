@@ -1,0 +1,128 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Tax Year Setup</h1>
+    <p class="page-subtitle">Configure tax years and generate payroll periods</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ periods.length }}</span>
+    <span class="summary-label">Periods</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number" style="color: #757575">{{ processedCount }}</span>
+    <span class="summary-label">Processed</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ hasCurrentPeriod ? 1 : 0 }}</span>
+    <span class="summary-label">Current</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number" style="color: #1565c0">{{ pendingCount }}</span>
+    <span class="summary-label">Pending</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number">{{ cycles.length }}</span>
+    <span class="summary-label">Cycles</span>
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading">Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="card-toolbar">
+      <div class="toolbar-left">
+        <div class="form-group-inline">
+          <label>Tax Year</label>
+          <select class="form-control" [(ngModel)]="selectedTaxYear" (ngModelChange)="onTaxYearChange()">
+            <option value="">-- Select --</option>
+            @for (ty of taxYears; track ty) { <option [value]="ty">{{ ty }}</option> }
+          </select>
+        </div>
+        <div class="form-group-inline">
+          <label>Cycle</label>
+          <select class="form-control" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()">
+            <option [ngValue]="null">-- Select --</option>
+            @for (c of cycles; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+          </select>
+        </div>
+        <div class="form-group-inline">
+          <label>Start Date</label>
+          <app-date-input [(ngModel)]="startDate"></app-date-input>
+        </div>
+        <div class="form-group-inline">
+          <label>End Date</label>
+          <app-date-input [(ngModel)]="endDate"></app-date-input>
+        </div>
+        <label class="checkbox-inline">
+          <input type="checkbox" [(ngModel)]="taxYearOpen"> Tax Year Open
+        </label>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-primary" (click)="generate()" [disabled]="generating">
+          @if (generating) { <div class="spinner-sm"></div> Generating... } @else { <app-icon name="plus" [size]="14"></app-icon> Generate Periods }
+        </button>
+        @if (periods.length > 0 && processedCount === 0) {
+          <button class="btn btn-outline-danger" (click)="deletePeriods()">
+            <app-icon name="trash" [size]="14"></app-icon> Delete All
+          </button>
+        }
+        @if (periods.length > 0 && processedCount > 0) {
+          <span class="text-muted" style="font-size: 12px; color: #999; align-self: center;">Periods cannot be deleted once processing has started</span>
+        }
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="form-group-inline">
+        <label>View Tax Year</label>
+        <select class="form-control" [(ngModel)]="viewTaxYear" (ngModelChange)="loadPeriods()">
+          @for (ty of taxYears; track ty) { <option [value]="ty">{{ ty }}</option> }
+        </select>
+      </div>
+      <div class="form-group-inline">
+        <label>View Cycle</label>
+        <select class="form-control" [(ngModel)]="viewCycleId" (ngModelChange)="loadPeriods()">
+          @for (c of cycles; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+        </select>
+      </div>
+      <span class="result-count">{{ periods.length }} periods</span>
+    </div>
+
+    @if (periods.length === 0) {
+      <div class="empty-state">
+        <h3>No Periods</h3>
+        <p>No pay periods found for the selected tax year and cycle. Use the toolbar above to generate them.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tax Period</th>
+              <th>Financial Year</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Payment Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of periods; track p.id) {
+              <tr>
+                <td>{{ p.tax_period }}</td>
+                <td>{{ p.financial_year }}</td>
+                <td>{{ p.start_date | dateSa }}</td>
+                <td>{{ p.end_date | dateSa }}</td>
+                <td>{{ p.payment_date | dateSa }}</td>
+                <td><app-status-badge [status]="getDisplayStatus(p)"></app-status-badge></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}

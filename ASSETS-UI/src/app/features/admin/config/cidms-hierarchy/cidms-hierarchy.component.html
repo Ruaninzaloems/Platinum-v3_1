@@ -1,0 +1,130 @@
+<div class="hier-page">
+  <div class="hier-header">
+    <div>
+      <h1 class="hier-title">CIDMS Hierarchy</h1>
+      <p class="hier-subtitle">Collapsible view of the full 7-level CIDMS classification hierarchy</p>
+    </div>
+    <div class="hier-header-actions">
+      <button mat-flat-button class="btn-primary" (click)="openAddRoot()">
+        <mat-icon>add</mat-icon> Add Accounting Group
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <div class="tree-card">
+
+      @if (visibleNodes().length === 0) {
+        <div class="empty-state">No accounting groups found. Click "Add Accounting Group" to get started.</div>
+      }
+
+      @for (n of visibleNodes(); track n.nodeKey) {
+        <div class="tree-row" [style.padding-left.px]="16 + n.depth * 28">
+
+          <span class="expand-cell">
+            @if (n.hasChildren) {
+              <button mat-icon-button class="expand-btn" (click)="toggleNode(n.nodeKey)">
+                <mat-icon class="expand-icon" [class.rotated]="n.isExpanded">chevron_right</mat-icon>
+              </button>
+            } @else if (n.levelIdx < 6) {
+              <span class="expand-dot"></span>
+            } @else {
+              <span class="leaf-dot"></span>
+            }
+          </span>
+
+          <span class="level-badge" [style.background]="levelConfig[n.levelIdx].bg" [style.color]="levelConfig[n.levelIdx].color">
+            {{levelConfig[n.levelIdx].label}}
+          </span>
+
+          <span class="node-desc">{{n.item[levelConfig[n.levelIdx].descKey]}}</span>
+
+          @if (n.hasChildren && n.isExpanded) {
+            <span class="child-count">{{n.childCount}} {{n.childCount === 1 ? levelConfig[n.levelIdx].childLabel : levelConfig[n.levelIdx].childLabelPlural}}</span>
+          }
+          @if (n.hasChildren && !n.isExpanded) {
+            <span class="child-count muted">{{n.childCount}} {{n.childCount === 1 ? levelConfig[n.levelIdx].childLabel : levelConfig[n.levelIdx].childLabelPlural}}</span>
+          }
+
+          <span class="node-actions">
+            @if (n.levelIdx < 6) {
+              <button mat-icon-button class="action-btn add-btn" (click)="openAddChild(n)" [title]="'Add ' + levelConfig[n.levelIdx].childLabel">
+                <mat-icon>add_circle_outline</mat-icon>
+              </button>
+            }
+            <button mat-icon-button class="action-btn edit-btn" (click)="openEdit(n)" title="Edit">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button class="action-btn del-btn" (click)="confirmDelete(n)" title="Delete">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </span>
+
+        </div>
+      }
+
+    </div>
+  }
+</div>
+
+@if (showModal()) {
+  <div class="modal-overlay" (click)="cancelModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <h3>{{getModalTitle()}}</h3>
+        <button mat-icon-button (click)="cancelModal()"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div class="modal-body">
+
+        @if (modalLevelIdx() > 0) {
+          <div class="form-field">
+            <label>{{levelConfig[modalLevelIdx() - 1].label}}</label>
+            @if (modalMode() === 'add') {
+              <div class="readonly-field">{{modalParentDesc()}}</div>
+            } @else {
+              <select class="form-input" [(ngModel)]="modalForm.parentId">
+                <option [ngValue]="null" disabled>Select {{levelConfig[modalLevelIdx() - 1].label}}</option>
+                @for (p of getParentItems(); track p.id) {
+                  <option [ngValue]="p.id">{{p.desc}}</option>
+                }
+              </select>
+            }
+          </div>
+        }
+
+        <div class="form-field">
+          <label>{{levelConfig[modalLevelIdx()].label}} Description *</label>
+          <input type="text" class="form-input" [(ngModel)]="modalForm.desc" placeholder="Enter description">
+        </div>
+
+        @if (modalLevelIdx() === 6) {
+          <div class="form-row">
+            <div class="form-field">
+              <label>Nature</label>
+              <select class="form-input" [(ngModel)]="modalForm.nature">
+                @for (opt of natureOptions; track opt.value) {
+                  <option [ngValue]="opt.value">{{opt.label}}</option>
+                }
+              </select>
+            </div>
+            <div class="checkbox-field">
+              <input type="checkbox" id="modal-infra" [checked]="modalForm.infrastructure === 1" (change)="onInfrastructureChange($event)">
+              <label for="modal-infra">Infrastructure</label>
+            </div>
+          </div>
+        }
+
+      </div>
+
+      <div class="modal-foot">
+        <button mat-stroked-button (click)="cancelModal()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!modalForm.desc || saving()">
+          {{saving() ? 'Saving...' : (modalMode() === 'edit' ? 'Update' : 'Create')}}
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,6 @@
+﻿AssetHealthGradeID,AssetHealthGradeDesc,DRC,Enabled,DateCaptured,CapturerID,DateModified,ModifierID,Default
+1,Very good,61% or more,1,2020-06-06 15:00:02.707,1,NULL,NULL,1
+2,Good,54 to 60%,1,2020-06-06 15:00:02.817,1,NULL,NULL,1
+3,Fair,47 to 53%,1,2020-06-06 15:00:02.863,1,NULL,NULL,1
+4,Poor,40% to 46%,1,2020-06-06 15:00:02.923,1,NULL,NULL,1
+5,Very poor,Less than 39%,1,2020-06-06 15:00:02.987,1,NULL,NULL,1

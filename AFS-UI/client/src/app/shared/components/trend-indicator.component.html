@@ -1,0 +1,9 @@
+<div class="trend-container" [class]="trendColorClass()">
+  <span class="trend-value-text">{{ formattedValue() }}</span>
+  @if (direction() !== 'neutral') {
+    <mat-icon class="trend-icon">{{ direction() === 'up' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+  }
+  @if (changeText()) {
+    <span class="trend-change">{{ changeText() }}</span>
+  }
+</div>

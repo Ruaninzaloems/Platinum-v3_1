@@ -1,0 +1,627 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">Asset Acquisitions</h1>
+    <p class="page-subtitle">Register new assets into the Asset Register via SCM/GRN, Inventory issue, or Donation</p>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab() === 'scm'" (click)="setTab('scm')">
+      <mat-icon>receipt_long</mat-icon> SCM / GRN
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+      <mat-icon>inventory</mat-icon> Inventory Issue
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'donation'" (click)="setTab('donation')">
+      <mat-icon>volunteer_activism</mat-icon> Donation
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'list'" (click)="setTab('list')">
+      <mat-icon>list_alt</mat-icon> Acquisitions List
+    </button>
+  </div>
+
+  <!-- ===== SCM / GRN TAB ===== -->
+  @if (activeTab() === 'scm') {
+    <div class="content-card">
+      @if (scmLoading()) {
+        <div class="loading-row"><mat-spinner diameter="28"></mat-spinner><span>Loading SCM transfers…</span></div>
+      }
+      @if (!scmLoading()) {
+        <div class="collapse-bar" (click)="scmTableCollapsed.set(!scmTableCollapsed())">
+          <div class="collapse-bar-left">
+            <mat-icon class="collapse-chevron" [class.rotated]="scmTableCollapsed()">expand_more</mat-icon>
+            <span class="collapse-count">{{scmFiltered().length}} of {{scmResults().length}} SCM/GRN transfer(s)</span>
+            @if (scmSelectedRow && scmTableCollapsed()) {
+              <span class="selected-chip">
+                <mat-icon>check_circle</mat-icon>
+                Transfer #{{scmSelectedRow.transferId}} — {{scmSelectedRow.classDescription || scmSelectedRow.categoryDescription || 'Selected'}} — {{formatCurrency(scmSelectedRow.currentAmount)}}
+              </span>
+            }
+            @if (!scmTableCollapsed()) {
+              <span class="collapse-hint">click a row to register as an asset</span>
+            }
+          </div>
+          <span class="collapse-toggle-label">{{scmTableCollapsed() ? 'Show list' : 'Hide list'}}</span>
+        </div>
+        @if (!scmTableCollapsed()) {
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>
+                    Transfer ID
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="scmFilterTransferId" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    GRN ID
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="scmFilterGrnId" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    Asset Category
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="scmFilterCategory" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    Asset Class
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="scmFilterClass" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>Description</th>
+                  <th>Supplier</th>
+                  <th class="amount-col">Amount</th>
+                  <th>Date Captured</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of scmFiltered(); track row.transferId) {
+                  <tr [class.selected-row]="scmSelectedRow?.transferId === row.transferId" (click)="selectScmRow(row)">
+                    <td><strong>{{row.transferId}}</strong></td>
+                    <td>{{row.grnId || '-'}}</td>
+                    <td>{{row.categoryDescription || '-'}}</td>
+                    <td>{{row.classDescription || '-'}}</td>
+                    <td>{{row.description || '-'}}</td>
+                    <td>{{row.supplierName || '-'}}</td>
+                    <td class="amount-col">{{formatCurrency(row.currentAmount)}}</td>
+                    <td>{{formatDate(row.dateCaptured)}}</td>
+                  </tr>
+                }
+                @if (scmFiltered().length === 0) {
+                  <tr><td colspan="8" class="empty-cell">No records found.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- ===== INVENTORY TAB ===== -->
+  @if (activeTab() === 'inventory') {
+    <div class="content-card">
+      @if (invLoading()) {
+        <div class="loading-row"><mat-spinner diameter="28"></mat-spinner><span>Loading inventory transfers…</span></div>
+      }
+      @if (!invLoading()) {
+        <div class="collapse-bar" (click)="invTableCollapsed.set(!invTableCollapsed())">
+          <div class="collapse-bar-left">
+            <mat-icon class="collapse-chevron" [class.rotated]="invTableCollapsed()">expand_more</mat-icon>
+            <span class="collapse-count">{{invFiltered().length}} of {{invResults().length}} inventory item(s)</span>
+            @if (invSelectedRow && invTableCollapsed()) {
+              <span class="selected-chip">
+                <mat-icon>check_circle</mat-icon>
+                Item #{{invSelectedRow.itemId}} — {{invSelectedRow.classDescription || invSelectedRow.categoryDescription || 'Selected'}} — {{formatCurrency(invSelectedRow.purchaseAmount)}}
+              </span>
+            }
+            @if (!invTableCollapsed()) {
+              <span class="collapse-hint">click a row to register as an asset</span>
+            }
+          </div>
+          <span class="collapse-toggle-label">{{invTableCollapsed() ? 'Show list' : 'Hide list'}}</span>
+        </div>
+        @if (!invTableCollapsed()) {
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>
+                    Item ID
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="invFilterItemId" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    Inventory ID
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="invFilterInventoryId" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    Asset Category
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="invFilterCategory" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>
+                    Asset Class
+                    <div class="col-filter">
+                      <mat-icon class="filter-icon">filter_list</mat-icon>
+                      <input type="text" class="col-filter-input" [(ngModel)]="invFilterClass" placeholder="Filter…" />
+                    </div>
+                  </th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th class="amount-col">Purchase Amount</th>
+                  <th>Invoice Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of invFiltered(); track row.itemId) {
+                  <tr [class.selected-row]="invSelectedRow?.itemId === row.itemId" (click)="selectInvRow(row)">
+                    <td><strong>{{row.itemId}}</strong></td>
+                    <td>{{row.inventoryId || '-'}}</td>
+                    <td>{{row.categoryDescription || '-'}}</td>
+                    <td>{{row.classDescription || '-'}}</td>
+                    <td>{{row.description || '-'}}</td>
+                    <td>{{row.quantity || '-'}}</td>
+                    <td class="amount-col">{{formatCurrency(row.purchaseAmount)}}</td>
+                    <td>{{formatDate(row.invoiceDate)}}</td>
+                  </tr>
+                }
+                @if (invFiltered().length === 0) {
+                  <tr><td colspan="8" class="empty-cell">No records found.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- ===== DONATIONS TAB ===== -->
+  @if (activeTab() === 'donation') {
+    <div class="content-card">
+      <div class="section-title">Donation Details</div>
+      <div class="form-grid-2">
+        <div class="field-group">
+          <label class="field-label">Donor Name <span class="required">*</span></label>
+          <input type="text" class="form-input" [(ngModel)]="na.donorName" placeholder="Donor name or organisation" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Donor Registration Number</label>
+          <input type="text" class="form-input" [(ngModel)]="na.donorRegNumber" placeholder="Company reg / ID number" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Date Donated <span class="required">*</span></label>
+          <input type="date" class="form-input" [(ngModel)]="na.dateDonated" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Donation Value (R) <span class="required">*</span></label>
+          <input type="number" class="form-input" [(ngModel)]="na.acquisitionCost" placeholder="0.00" />
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ===== WIZARD PANEL ===== -->
+  @if (wizardVisible()) {
+    <div class="wizard-panel">
+      <div class="wizard-header">
+        <span class="wizard-title">
+          @if (activeTab() === 'scm') { Register Asset from Invoice }
+          @if (activeTab() === 'inventory') { Register Asset from Inventory Issue }
+          @if (activeTab() === 'donation') { Register Donated Asset }
+        </span>
+        <button class="btn-ghost" (click)="cancelWizard()"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div class="wizard-steps">
+        @for (s of wizardSteps; track s.key) {
+          <button class="step-btn" [class.active]="wizardStep() === s.key" [class.done]="isStepDone(s.key)" (click)="goToStep(s.key)">
+            {{s.label}}
+          </button>
+        }
+      </div>
+
+      <!-- STEP 1: Classification -->
+        <div class="step-body" [class.step-hidden]="wizardStep() !== 'classification'">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Description <span class="required">*</span></label>
+              <input type="text" class="form-input" [(ngModel)]="na.description" placeholder="Asset description" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Asset Type</label>
+              <select class="form-input" [(ngModel)]="na.typeId" (ngModelChange)="onTypeChange()">
+                <option [value]="0">— Select Type —</option>
+                @for (t of assetTypes(); track t.assetTypeId) {
+                  <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Category</label>
+              <select class="form-input" [(ngModel)]="na.categoryId" (ngModelChange)="onCategoryChange()">
+                <option [value]="0">— Select Category —</option>
+                @for (c of (filteredCategories().length ? filteredCategories() : allCategories()); track c.assetCategoryId) {
+                  <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Sub-Category</label>
+              <select class="form-input" [(ngModel)]="na.subCategoryId" (ngModelChange)="onSubCategoryChange()">
+                <option [value]="0">— Select Sub-Category —</option>
+                @for (s of filteredSubCategories(); track s.assetSubCategoryId) {
+                  <option [value]="s.assetSubCategoryId">{{s.assetSubCategoryDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Asset Class</label>
+              <select class="form-input" [(ngModel)]="na.assetClassId">
+                <option [value]="0">— Select Class —</option>
+                @for (c of filteredClasses(); track c.assetClass_ID) {
+                  <option [value]="c.assetClass_ID">{{c.assetClassDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Measurement Type</label>
+              <select class="form-input" [(ngModel)]="na.measurementTypeId">
+                <option [value]="0">— Select —</option>
+                @for (m of measurementTypes(); track m.measurementTypeId) {
+                  <option [value]="m.measurementTypeId">{{m.measurementTypeDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Asset Status</label>
+              <select class="form-input" [(ngModel)]="na.assetStatusId">
+                <option [value]="0">— Select —</option>
+                @for (s of assetStatuses(); track s.assetStatusId) {
+                  <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Condition</label>
+              <select class="form-input" [(ngModel)]="na.conditionId">
+                <option [value]="0">— Select —</option>
+                @for (c of assetConditions(); track c.assetCondition_ID) {
+                  <option [value]="c.assetCondition_ID">{{c.assetConditionDesc}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Barcode</label>
+              <input type="text" class="form-input" [(ngModel)]="na.barcode" placeholder="Asset barcode" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Serial Number</label>
+              <input type="text" class="form-input" [(ngModel)]="na.serialNumber" placeholder="Serial number" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Useful Life (months)</label>
+              <input type="number" class="form-input" [(ngModel)]="na.usefulLifeMonths" placeholder="e.g. 120" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Acquisition Cost (R) <span class="required">*</span></label>
+              <input type="number" class="form-input" [(ngModel)]="na.acquisitionCost" placeholder="0.00" />
+            </div>
+          </div>
+          @if (activeTab() === 'scm') {
+            <div class="info-row">
+              <mat-icon style="color:#3b82f6;font-size:16px">info</mat-icon>
+              Pre-filled from SCM Transfer #<strong>{{scmSelectedRow?.transferId}}</strong> — GRN: {{scmSelectedRow?.grnId || '-'}} — {{scmSelectedRow?.supplierName || '-'}} — {{formatCurrency(scmSelectedRow?.currentAmount)}}
+            </div>
+          }
+          @if (activeTab() === 'inventory') {
+            <div class="info-row">
+              <mat-icon style="color:#3b82f6;font-size:16px">info</mat-icon>
+              Pre-filled from Inventory Transfer #<strong>{{invSelectedRow?.itemId}}</strong> — Inventory ID: {{invSelectedRow?.inventoryId || '-'}} — {{formatCurrency(invSelectedRow?.purchaseAmount)}}
+            </div>
+          }
+        </div>
+
+      <!-- STEP 2: Dates -->
+        <div class="step-body" [class.step-hidden]="wizardStep() !== 'dates'">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Acquisition Date</label>
+              <input type="date" class="form-input" [(ngModel)]="na.acquisitionDate" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Ready For Use / Commissioning Date</label>
+              <input type="date" class="form-input" [(ngModel)]="na.commissioningDate" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">In-Service Date</label>
+              <input type="date" class="form-input" [(ngModel)]="na.inServiceDate" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Verification Date</label>
+              <input type="date" class="form-input" [(ngModel)]="na.verificationDate" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Supplier Name</label>
+              <input type="text" class="form-input" [(ngModel)]="na.supplierName" placeholder="Supplier name" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Supplier Code</label>
+              <input type="text" class="form-input" [(ngModel)]="na.supplierCode" placeholder="Supplier code" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Invoice Number</label>
+              <input type="text" class="form-input" [(ngModel)]="na.invoiceNo" placeholder="Invoice number" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Payment Number</label>
+              <input type="text" class="form-input" [(ngModel)]="na.paymentNo" placeholder="Payment reference" />
+            </div>
+          </div>
+        </div>
+
+      <!-- STEP 3: Ownership -->
+        <div class="step-body" [class.step-hidden]="wizardStep() !== 'ownership'">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Department</label>
+              <select class="form-input" [(ngModel)]="na.departmentId" (ngModelChange)="onDepartmentChange()">
+                <option [value]="0">— Select Department —</option>
+                @for (d of departments(); track d.id) {
+                  <option [value]="d.id">{{d.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Division</label>
+              <select class="form-input" [(ngModel)]="na.divisionId">
+                <option [value]="0">— Select Division —</option>
+                @for (d of (filteredDivisions().length ? filteredDivisions() : allDivisions()); track d.id) {
+                  <option [value]="d.id">{{d.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Custodian</label>
+              <select class="form-input" [(ngModel)]="na.custodianId">
+                <option [value]="0">— Select Custodian —</option>
+                @for (e of employees(); track e.employeeId) {
+                  <option [value]="e.employeeId">{{e.firstName}} {{e.surname}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Asset Ownership</label>
+              <input type="text" class="form-input" [(ngModel)]="na.assetOwnership" placeholder="Owner name" />
+            </div>
+          </div>
+        </div>
+
+      <!-- STEP 4: Location -->
+        <div class="step-body" [class.step-hidden]="wizardStep() !== 'location'">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Town</label>
+              <select class="form-input" [(ngModel)]="na.townId" (ngModelChange)="onTownChange()">
+                <option [value]="0">— Select Town —</option>
+                @for (t of towns(); track t.id) {
+                  <option [value]="t.id">{{t.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Ward</label>
+              <select class="form-input" [(ngModel)]="na.wardId">
+                <option [value]="0">— Select Ward —</option>
+                @for (w of wards(); track w.id) {
+                  <option [value]="w.id">{{w.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Suburb</label>
+              <select class="form-input" [(ngModel)]="na.suburbId" (ngModelChange)="onSuburbChange()">
+                <option [value]="0">— Select Suburb —</option>
+                @for (s of suburbs(); track s.id) {
+                  <option [value]="s.id">{{s.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Street</label>
+              <select class="form-input" [(ngModel)]="na.streetId" (ngModelChange)="onStreetChange()">
+                <option [value]="0">— Select Street —</option>
+                @for (s of streets(); track s.id) {
+                  <option [value]="s.id">{{s.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Building</label>
+              <select class="form-input" [(ngModel)]="na.buildingId" (ngModelChange)="onBuildingChange()">
+                <option [value]="0">— Select Building —</option>
+                @for (b of buildings(); track b.id) {
+                  <option [value]="b.id">{{b.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Floor</label>
+              <select class="form-input" [(ngModel)]="na.floorId" (ngModelChange)="onFloorChange()">
+                <option [value]="0">— Select Floor —</option>
+                @for (f of floors(); track f.id) {
+                  <option [value]="f.id">{{f.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Room</label>
+              <select class="form-input" [(ngModel)]="na.roomId">
+                <option [value]="0">— Select Room —</option>
+                @for (r of rooms(); track r.id) {
+                  <option [value]="r.id">{{r.description}}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Location Description</label>
+              <input type="text" class="form-input" [(ngModel)]="na.locationDescription" placeholder="Additional location details" />
+            </div>
+          </div>
+        </div>
+
+      <!-- STEP 5: Review -->
+        <div class="step-body" [class.step-hidden]="wizardStep() !== 'review'">
+          <div class="review-grid">
+            <div class="review-section">
+              <div class="review-section-title">Classification</div>
+              <div class="review-row"><span>Description</span><strong>{{na.description || '—'}}</strong></div>
+              <div class="review-row"><span>Acquisition Cost</span><strong>{{formatCurrency(na.acquisitionCost)}}</strong></div>
+              <div class="review-row"><span>Barcode</span><strong>{{na.barcode || '—'}}</strong></div>
+              <div class="review-row"><span>Serial Number</span><strong>{{na.serialNumber || '—'}}</strong></div>
+              <div class="review-row"><span>Useful Life</span><strong>{{na.usefulLifeMonths ? na.usefulLifeMonths + ' months' : '—'}}</strong></div>
+            </div>
+            <div class="review-section">
+              <div class="review-section-title">Dates &amp; Source</div>
+              <div class="review-row"><span>Acquisition Date</span><strong>{{na.acquisitionDate || '—'}}</strong></div>
+              <div class="review-row"><span>In-Service Date</span><strong>{{na.inServiceDate || '—'}}</strong></div>
+              <div class="review-row"><span>Supplier</span><strong>{{na.supplierName || '—'}}</strong></div>
+              <div class="review-row"><span>Invoice No</span><strong>{{na.invoiceNo || '—'}}</strong></div>
+              @if (activeTab() === 'donation') {
+                <div class="review-row"><span>Donor</span><strong>{{na.donorName || '—'}}</strong></div>
+                <div class="review-row"><span>Donor Reg No</span><strong>{{na.donorRegNumber || '—'}}</strong></div>
+                <div class="review-row"><span>Date Donated</span><strong>{{na.dateDonated || '—'}}</strong></div>
+              }
+              @if (activeTab() === 'scm' && na.grnId) {
+                <div class="review-row"><span>GRN ID</span><strong>{{na.grnId}}</strong></div>
+              }
+              @if (activeTab() === 'inventory' && na.inventoryId) {
+                <div class="review-row"><span>Inventory ID</span><strong>{{na.inventoryId}}</strong></div>
+              }
+            </div>
+          </div>
+          <div class="review-note">
+            <mat-icon style="color:#f59e0b;font-size:18px">warning</mat-icon>
+            Once saved, this asset will be created in the Asset Register. You can edit all fields afterwards from the Asset Records page.
+          </div>
+        </div>
+
+      <div class="wizard-footer">
+        @if (wizardStep() !== 'classification') {
+          <button class="btn-secondary" (click)="prevStep()"><mat-icon>chevron_left</mat-icon> Back</button>
+        }
+        <div style="flex:1"></div>
+        @if (wizardStep() !== 'review') {
+          <button class="btn-primary" (click)="nextStep()">Next <mat-icon>chevron_right</mat-icon></button>
+        } @else {
+          <button class="btn-save" (click)="saveAcquisition()" [disabled]="saving()">
+            @if (saving()) { <mat-spinner diameter="16"></mat-spinner> Saving… } @else { <mat-icon>save</mat-icon> Save Asset }
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ===== ACQUISITIONS LIST TAB ===== -->
+  @if (activeTab() === 'list') {
+    <div class="content-card">
+      @if (listLoading()) {
+        <div class="loading-state"><mat-spinner diameter="32"></mat-spinner><span>Loading acquisitions…</span></div>
+      } @else {
+        @if (listGroupedScm().length > 0) {
+          <div class="list-group-header"><mat-icon>receipt_long</mat-icon> SCM / GRN Acquisitions ({{listGroupedScm().length}})</div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Asset ID</th><th>Description</th><th>Barcode</th><th>Acquisition Date</th><th>Cost</th><th>Supplier</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of listGroupedScm(); track row.assetId) {
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                    <td>{{row.assetId}}</td>
+                    <td>{{row.description}}</td>
+                    <td>{{row.barcode || '—'}}</td>
+                    <td>{{formatDate(row.acquisitionDate)}}</td>
+                    <td>{{formatCurrency(row.purchaseAmount)}}</td>
+                    <td>{{row.supplierName || '—'}}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (listGroupedInventory().length > 0) {
+          <div class="list-group-header" style="margin-top:24px"><mat-icon>inventory</mat-icon> Inventory Acquisitions ({{listGroupedInventory().length}})</div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Asset ID</th><th>Description</th><th>Barcode</th><th>Acquisition Date</th><th>Cost</th><th>Inventory ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of listGroupedInventory(); track row.assetId) {
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                    <td>{{row.assetId}}</td>
+                    <td>{{row.description}}</td>
+                    <td>{{row.barcode || '—'}}</td>
+                    <td>{{formatDate(row.acquisitionDate)}}</td>
+                    <td>{{formatCurrency(row.purchaseAmount)}}</td>
+                    <td>{{row.inventoryId || '—'}}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (listGroupedDonation().length > 0) {
+          <div class="list-group-header" style="margin-top:24px"><mat-icon>volunteer_activism</mat-icon> Donation Acquisitions ({{listGroupedDonation().length}})</div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Asset ID</th><th>Description</th><th>Donor</th><th>Date Donated</th><th>Donation Value</th><th>Donor Reg No</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of listGroupedDonation(); track row.assetId) {
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                    <td>{{row.assetId}}</td>
+                    <td>{{row.description}}</td>
+                    <td>{{row.donorName || '—'}}</td>
+                    <td>{{formatDate(row.dateDonated)}}</td>
+                    <td>{{formatCurrency(row.purchaseAmount)}}</td>
+                    <td>{{row.donorRegNumber || '—'}}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (listGroupedScm().length === 0 && listGroupedInventory().length === 0 && listGroupedDonation().length === 0) {
+          <div class="empty-state">No acquisitions recorded yet. Use the tabs above to register assets.</div>
+        }
+      }
+    </div>
+  }
+</div>

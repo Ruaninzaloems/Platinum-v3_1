@@ -1,0 +1,70 @@
+I want to reorganise the Configuration sidebar/menu structure for better usability and logical grouping.
+
+Important:
+This is a navigation / grouping / ordering refactor only.
+Do NOT break existing routes, pages, permissions, APIs, or functionality.
+Do NOT rename route paths unless absolutely necessary.
+Do NOT refactor unrelated code.
+Preserve all existing pages and existing working links.
+The goal is to improve sidebar structure and labels without breaking anything.
+
+Current problem:
+The Configuration menu feels cluttered and does not flow logically.
+Items are not grouped in the most intuitive way for a municipal HR & Payroll system.
+
+Please reorganise the Configuration sidebar into the following logical groups and order:
+
+Company
+- Municipality Details
+- Countries
+- Provinces
+- Towns / Cities
+- Suburbs
+
+HR Structure
+- Employee Types
+- Employee Sub Types
+- Conditions of Service
+- Task Grades & Notches
+- Upper Limits
+
+Payroll Setup
+- Tax Tables
+- Payroll Cycles
+- Tax Year Setup
+- Payroll Periods
+
+Benefits
+- Medical Aid Schemes
+- Retirement Funds
+- Trade Unions
+
+Pay Structure
+- Pay Points
+- Salary Transactions
+- Salary Transaction Groups
+- Payroll Constants
+
+Other
+- Claims
+
+Requirements:
+1. Reorganise the sidebar/menu to reflect the above grouping and order.
+2. Preserve all existing routes and page functionality.
+3. Preserve existing permissions/security visibility logic.
+4. Preserve the existing Platinum styling and expand/collapse behaviour.
+5. Keep menu labels clean and consistent.
+6. If "Staff Establishment" currently exists as a section label, replace it with "HR Structure".
+7. Do not move pages into new route paths unless there is already a clear shared pattern requiring it.
+8. This should be a UI/navigation restructuring, not a feature rewrite.
+9. If any item currently lives under a different group in code, update only the sidebar/menu grouping, not the underlying feature implementation unless required.
+10. Keep the change targeted and low risk.
+
+Before implementing, first inspect the current sidebar/menu implementation and tell me:
+1. which file(s) control the Configuration sidebar structure
+2. whether the grouping is hardcoded or data-driven
+3. what the safest implementation approach is
+4. whether any existing menu permissions or route guards could be affected
+5. what exact files you plan to change
+
+Do not implement until I approve the plan.

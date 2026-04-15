@@ -1,0 +1,409 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Defined Benefit Obligations</h1>
+      <p class="page-subtitle">DBO calculations, long service awards, current/non-current allocation & actuarial assumptions (HRPB2, HRPB3, HRPB9, HRPB10, HRPB45, HRPB47, HRPB81, HRPB87, HRPB88, HRPB91, HRPB79)</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" (click)="calculateDbo()">
+        <mat-icon>calculate</mat-icon> Calculate DBO
+      </button>
+      <button class="btn-secondary" (click)="allocateCurrentNonCurrent()">
+        <mat-icon>account_tree</mat-icon> Allocate Current/Non-Current
+      </button>
+      <button class="btn-secondary" (click)="calculateLsaPayments()">
+        <mat-icon>payments</mat-icon> Calculate LSA Payments
+      </button>
+      <button class="btn-primary" (click)="showDboDialog = true; resetDboForm()">
+        <mat-icon>add</mat-icon> New DBO Entry
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card-title-bar" (click)="expandedPanel = expandedPanel === 'dbo' ? null : 'dbo'">
+      <div class="svc-header">
+        <span class="svc-type-badge cat-dbo">DBO</span>
+        <h2>Defined Benefit Obligation Movements</h2>
+      </div>
+      <div class="svc-meta">
+        <span class="tariff-count">{{dboEntries.length}} entries</span>
+        <mat-icon>{{expandedPanel === 'dbo' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedPanel === 'dbo'">
+      <div class="tariff-table-wrap" *ngIf="dboEntries.length; else noDbo">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Benefit Type</th>
+              <th>Department</th>
+              <th class="text-right">Opening Balance</th>
+              <th class="text-right">Service Cost</th>
+              <th class="text-right">Interest Cost</th>
+              <th class="text-right">Payments</th>
+              <th class="text-right">Gains/Losses</th>
+              <th class="text-right">Closing Balance</th>
+              <th class="text-right">Current</th>
+              <th class="text-right">Non-Current</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of dboEntries">
+              <td class="fw-600"><span class="type-pill">{{d.benefitType}}</span></td>
+              <td>{{d.department || '—'}}</td>
+              <td class="text-right mono">R {{d.openingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{d.serviceCost | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{d.interestCost | number:'1.2-2'}}</td>
+              <td class="text-right mono neg-val">R {{d.benefitPayments | number:'1.2-2'}}</td>
+              <td class="text-right mono" [ngClass]="d.actuarialGainLoss >= 0 ? 'pos-val' : 'neg-val'">R {{d.actuarialGainLoss | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{d.closingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{d.currentPortion | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{d.nonCurrentPortion | number:'1.2-2'}}</td>
+              <td>
+                <button class="btn-icon" (click)="editDbo(d)" title="Edit"><mat-icon>edit</mat-icon></button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td class="fw-600" colspan="2">Total</td>
+              <td class="text-right mono fw-600">R {{dboTotals.openingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.serviceCost | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.interestCost | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.benefitPayments | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.actuarialGainLoss | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.closingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.currentPortion | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{dboTotals.nonCurrentPortion | number:'1.2-2'}}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <ng-template #noDbo>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No defined benefit obligation entries found</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card-title-bar" (click)="expandedPanel = expandedPanel === 'lsa' ? null : 'lsa'">
+      <div class="svc-header">
+        <span class="svc-type-badge cat-lsa">LSA</span>
+        <h2>Long Service Awards</h2>
+      </div>
+      <div class="svc-meta">
+        <span class="tariff-count">{{longServiceAwards.length}} milestones</span>
+        <mat-icon>{{expandedPanel === 'lsa' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedPanel === 'lsa'">
+      <div class="action-bar">
+        <button class="btn-primary btn-sm" (click)="showLsaDialog = true; resetLsaForm()">
+          <mat-icon>add</mat-icon> New Long Service Award
+        </button>
+      </div>
+      <div class="tariff-table-wrap" *ngIf="longServiceAwards.length; else noLsa">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th class="text-right">Milestone (Years)</th>
+              <th class="text-right">Benefit Amount</th>
+              <th class="text-right">Eligible Employees</th>
+              <th class="text-right">Estimated Payments</th>
+              <th class="text-right">Current Portion</th>
+              <th class="text-right">Non-Current Portion</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let lsa of longServiceAwards">
+              <td class="fw-600">{{lsa.department || '—'}}</td>
+              <td class="text-right"><span class="milestone-badge">{{lsa.milestoneYears}} yrs</span></td>
+              <td class="text-right mono">R {{lsa.benefitAmount | number:'1.2-2'}}</td>
+              <td class="text-right">{{lsa.eligibleEmployees}}</td>
+              <td class="text-right mono fw-600">R {{lsa.estimatedPayments | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{lsa.currentPortion | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{lsa.nonCurrentPortion | number:'1.2-2'}}</td>
+              <td>
+                <button class="btn-icon" (click)="editLsa(lsa)" title="Edit"><mat-icon>edit</mat-icon></button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td class="fw-600" colspan="3">Total</td>
+              <td class="text-right fw-600">{{lsaTotals.eligibleEmployees}}</td>
+              <td class="text-right mono fw-600">R {{lsaTotals.estimatedPayments | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{lsaTotals.currentPortion | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{lsaTotals.nonCurrentPortion | number:'1.2-2'}}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <ng-template #noLsa>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No long service award entries found</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card-title-bar" (click)="expandedPanel = expandedPanel === 'split' ? null : 'split'">
+      <div class="svc-header">
+        <span class="svc-type-badge cat-split">SPLIT</span>
+        <h2>Current / Non-Current Allocation</h2>
+      </div>
+      <div class="svc-meta">
+        <mat-icon>{{expandedPanel === 'split' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedPanel === 'split'">
+      <div class="split-summary" *ngIf="dboSummary">
+        <div class="split-card">
+          <div class="split-label">Total DBO</div>
+          <div class="split-value">R {{dboSummary.totalDbo | number:'1.2-2'}}</div>
+        </div>
+        <div class="split-card split-current">
+          <div class="split-label">Current Portion</div>
+          <div class="split-value">R {{dboSummary.currentPortion | number:'1.2-2'}}</div>
+          <div class="split-pct" *ngIf="dboSummary.totalDbo">{{(dboSummary.currentPortion / dboSummary.totalDbo * 100) | number:'1.1-1'}}%</div>
+        </div>
+        <div class="split-card split-noncurrent">
+          <div class="split-label">Non-Current Portion</div>
+          <div class="split-value">R {{dboSummary.nonCurrentPortion | number:'1.2-2'}}</div>
+          <div class="split-pct" *ngIf="dboSummary.totalDbo">{{(dboSummary.nonCurrentPortion / dboSummary.totalDbo * 100) | number:'1.1-1'}}%</div>
+        </div>
+      </div>
+      <div class="benefit-breakdown" *ngIf="dboSummary?.byBenefitType?.length">
+        <h3 class="section-title">By Benefit Type</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Benefit Type</th>
+              <th class="text-right">Opening</th>
+              <th class="text-right">Service Cost</th>
+              <th class="text-right">Interest Cost</th>
+              <th class="text-right">Payments</th>
+              <th class="text-right">Gains/Losses</th>
+              <th class="text-right">Closing</th>
+              <th class="text-right">Current</th>
+              <th class="text-right">Non-Current</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let bt of dboSummary?.byBenefitType">
+              <td class="fw-600">{{bt.benefitType}}</td>
+              <td class="text-right mono">R {{bt.openingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.serviceCost | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.interestCost | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.benefitPayments | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.actuarialGainLoss | number:'1.2-2'}}</td>
+              <td class="text-right mono fw-600">R {{bt.closingBalance | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.currentPortion | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{bt.nonCurrentPortion | number:'1.2-2'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card-title-bar" (click)="expandedPanel = expandedPanel === 'assumptions' ? null : 'assumptions'">
+      <div class="svc-header">
+        <span class="svc-type-badge cat-assumptions">PARAMS</span>
+        <h2>Actuarial Assumptions</h2>
+      </div>
+      <div class="svc-meta">
+        <mat-icon>{{expandedPanel === 'assumptions' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedPanel === 'assumptions'">
+      <div class="assumptions-grid" *ngIf="dboEntries.length; else noAssumptions">
+        <div class="assumption-card" *ngFor="let d of uniqueDboAssumptions">
+          <h4>{{d.benefitType}}</h4>
+          <div class="assumption-row">
+            <span class="assumption-label">Discount Rate</span>
+            <span class="assumption-value">{{d.discountRate | number:'1.2-2'}}%</span>
+          </div>
+          <div class="assumption-row">
+            <span class="assumption-label">Inflation Rate</span>
+            <span class="assumption-value">{{d.inflationRate | number:'1.2-2'}}%</span>
+          </div>
+          <div class="assumption-row">
+            <span class="assumption-label">Salary Growth Rate</span>
+            <span class="assumption-value">{{d.salaryGrowthRate | number:'1.2-2'}}%</span>
+          </div>
+          <div class="assumption-row" *ngIf="d.mortalityRate != null">
+            <span class="assumption-label">Mortality Rate</span>
+            <span class="assumption-value">{{d.mortalityRate | number:'1.4-4'}}</span>
+          </div>
+          <div class="assumption-row" *ngIf="d.turnoverRate != null">
+            <span class="assumption-label">Turnover Rate</span>
+            <span class="assumption-value">{{d.turnoverRate | number:'1.2-2'}}%</span>
+          </div>
+        </div>
+      </div>
+      <ng-template #noAssumptions>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No DBO entries to display assumptions from</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="card-container">
+    <div class="card-title-bar" (click)="expandedPanel = expandedPanel === 'reports' ? null : 'reports'">
+      <div class="svc-header">
+        <span class="svc-type-badge cat-reports">REPORTS</span>
+        <h2>Actuarial Reports</h2>
+      </div>
+      <div class="svc-meta">
+        <mat-icon>{{expandedPanel === 'reports' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedPanel === 'reports'">
+      <div class="empty-state">
+        <mat-icon>description</mat-icon>
+        <p>Actuarial report uploads and version control will be available in a future release</p>
+        <p class="text-muted">Prior year actuarial reports can be referenced for DBO assumption validation</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showDboDialog" (click)="showDboDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>{{editingDbo ? 'Edit' : 'New'}} DBO Entry</h2>
+        <button class="btn-icon" (click)="showDboDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Benefit Type</label>
+            <select [(ngModel)]="dboForm.benefitType">
+              <option value="PostRetirementMedical">Post-Retirement Medical</option>
+              <option value="LongServiceAward">Long Service Award</option>
+              <option value="PensionTopUp">Pension Top-Up</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="dboForm.department" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label>Opening Balance (R)</label>
+            <input type="number" [(ngModel)]="dboForm.openingBalance" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Service Cost (R)</label>
+            <input type="number" [(ngModel)]="dboForm.serviceCost" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Interest Cost (R)</label>
+            <input type="number" [(ngModel)]="dboForm.interestCost" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Benefit Payments (R)</label>
+            <input type="number" [(ngModel)]="dboForm.benefitPayments" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Actuarial Gain/Loss (R)</label>
+            <input type="number" [(ngModel)]="dboForm.actuarialGainLoss" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Discount Rate (%)</label>
+            <input type="number" [(ngModel)]="dboForm.discountRate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Inflation Rate (%)</label>
+            <input type="number" [(ngModel)]="dboForm.inflationRate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Salary Growth Rate (%)</label>
+            <input type="number" [(ngModel)]="dboForm.salaryGrowthRate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Mortality Rate</label>
+            <input type="number" [(ngModel)]="dboForm.mortalityRate" step="0.0001" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label>Turnover Rate (%)</label>
+            <input type="number" [(ngModel)]="dboForm.turnoverRate" step="0.01" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showDboDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveDbo()" [disabled]="saving">
+          {{saving ? 'Saving...' : (editingDbo ? 'Update' : 'Create')}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showLsaDialog" (click)="showLsaDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>{{editingLsa ? 'Edit' : 'New'}} Long Service Award</h2>
+        <button class="btn-icon" (click)="showLsaDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="lsaForm.department" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label>Milestone Years</label>
+            <select [(ngModel)]="lsaForm.milestoneYears">
+              <option [ngValue]="10">10 Years</option>
+              <option [ngValue]="15">15 Years</option>
+              <option [ngValue]="20">20 Years</option>
+              <option [ngValue]="25">25 Years</option>
+              <option [ngValue]="30">30 Years</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Benefit Amount (R)</label>
+            <input type="number" [(ngModel)]="lsaForm.benefitAmount" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Eligible Employees</label>
+            <input type="number" [(ngModel)]="lsaForm.eligibleEmployees">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showLsaDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveLsa()" [disabled]="saving">
+          {{saving ? 'Saving...' : (editingLsa ? 'Update' : 'Create')}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

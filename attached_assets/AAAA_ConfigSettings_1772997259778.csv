@@ -1,0 +1,360 @@
+﻿ConfigSett_ID,KeyName,KeyValue,KeyDescription,Module,DateCaptured,CapturerID,perMuni_SetupRequirements
+1,NoofPrevPasswords,5,Sets the number of unique passwords required,System,NULL,1,0
+2,DaysPasswordtoExpire,60,Set the time limit in days for a password to expire,System,NULL,1,0
+3,UnsuccessfulLoginTime,5,Set the time limit in minutes for unsuccessful attempts to be regarded as successive,System,NULL,1,0
+4,AccountLockoutTime,30,Set the time limit in minutes for account to be locked out,System,NULL,1,0
+5,DaysAlertPasswordToExpire,5,Set the number of days before password expires that user must be alerted,System,NULL,1,0
+6,NoUnsuccessfulLogins,3,Set the number of successive unsuccessful attempts allowed before account is locked,System,NULL,1,0
+7,MinimumPasswordLength,6,Minimum number of characters a password can be,System,NULL,1,0
+8,FmsVersionNumber,6.1.0.79424,FMs Version Number.,System,NULL,1,0
+9,PublishDate,19-02-2026,Date it was published,System,NULL,1,0
+10,MuniName,Mnquma Municipality,Name of Municipality,System,NULL,1,0
+11,ActiveFinYear,2025/2026,Current financial year,System,NULL,1,0
+12,VATPercentage,15,Pecentage value for VAT,System,NULL,1,0
+13,LogSuccessfulLogin,1,1 = Log successful login in User_AuditTable. 2 = Dont Log,System,NULL,1,0
+14,NoFutureFinYearAccessible,1,The number of future years that can be logged in.  Current Year plus the number stored here,System,2016-01-22 12:39:43.323,1,0
+15,FinYearStartMonth,7,The first month of the financial year,System,NULL,1,0
+16,FMSDatabaseName,EMS_Mnquma,FMS database name,System,NULL,1,0
+17,FMSAuditDatabaseName,EMS_Mnquma_Audit,FMS audit database name,System,NULL,1,0
+18,SmtpFromEmail,NoReply_Mnquma@inzaloems.co.za,Email SMS Scheduler> From email when sending emails to users,System,NULL,1,0
+19,SmtpServer,za-smtp-outbound-1.mimecast.co.za,Email SMS Scheduler> Smtp server to use to send emails,system,NULL,1,0
+22,ProcessingMonth,8,This indicates the current processing month,System,NULL,1,0
+23,ScoaVoteImportFolder,NULL,NULL,System,NULL,1,0
+24,FolderEFT,\EFTFiles\,NULL,System,NULL,1,0
+25,defaultNewUserPassword,Password@1,the default password for a new user. this will be required to be changed on next login.,System,NULL,1,0
+26,RootFolderPath,/uploads/,NULL,NULL,NULL,1,0
+27,ReportPassWord,Imsql321,SSRS> SSRS Password,System,NULL,1,1
+28,ReportDomain,192.168.250.25,SSRS> SSRS Report Domain,System,NULL,1,1
+29,ReportLocation,/EMS_Mnquma_SSRS/,SSRS> SSRS Path of actual Report as subfolder of ReportURL,System,NULL,1,1
+30,ReportUrl,http://192.168.250.25/ReportServer,SSRS> SSRS Report Base URL to directly retrive report files,System,NULL,1,1
+31,DocRootFolderPath,C:\AssetDocuments,Document root folder. E.g. \\10.6.1.40\FMS_Files,System,NULL,1,0
+32,FolderBankStatement,\BankStatement\,Folder to which bank statements will be written,System,NULL,1,0
+33,Overtime @1.5,1.5,Payroll> Overtime Multiplier,Payroll,NULL,1,0
+34,Overtime @2.0,2,Payroll> Overtime Multiplier,Payroll,NULL,1,0
+35,IsCheckListProcess,True,Payroll and Billing> Proccessing Flag,Payroll,NULL,1,0
+36,NoPreviousFinYearAccessible,4,The number of previous years that can be logged in.  Current Year plus the number stored here,System,NULL,1,0
+37,JournalsPDF,\JournalsPDF\,Printed Journal documenation,System,NULL,1,0
+38,FolderAssetDocuments,\AssetDocuments\,Folder for Asset documents and photos,Asset,NULL,1,0
+39,FolderSupportDocs,\SupportDocuments\,Folder for General supporting documents,System,NULL,1,0
+40,DefaultCountryID,1,This is the ID of the Country that Country Dropdowns must default to,NULL,NULL,1,0
+41,DisciplinaryDocument,\Disciplinary\,Folder for Disciplinary,System,NULL,1,0
+42,GrievanceDocument,\Grievance\,Folder for  Grievance,System,NULL,1,0
+43,PerformanceAppraisalDocument,\PerformanceAppraisal\,Folder for PerformanceAppraisal,System,NULL,1,0
+44,KMLDocument,KML\,Folder for KML,System,NULL,1,0
+45,MeterLocationDocument,\MeterLocation\,Folder for MeterLocation,System,NULL,1,0
+46,MunicipalityDocument,\Municipality\,Folder for Municipality,System,NULL,1,0
+47,EmployeeDocument,\Employee\,Folder for Employee,System,NULL,1,0
+48,DocViewerRootFolderPath,https://mnqu.sebataemshosted.co.za/EMS_Mnquma/EMS_Files,NULL,NULL,NULL,1,0
+49,BaseConsumptionWaterMeter,15.00,NULL,System,NULL,1,0
+50,BaseConsumptionElectricMeter,500.00,NULL,System,NULL,1,0
+51,IsCheckListProcess_Billing,True,NULL,System,NULL,1,0
+55,SCOARegionID,947,This non posting ID is from the SCOA Region structure. It is a parent Item which allows us to load region dropdown with info relevent to Muni,System,2017-03-09 13:07:50.130,2,0
+57,SCOANoRegionID,232,"Payroll> This ID is from the SCOA Region structure representing the ""No Regional Identifier"". Allows us load this node of the SCOA Regions tree into the dropdown.  Only this node is node added (ie. no children loaded)",System,2017-01-27 16:15:48.607,2,0
+58,ReportUserId,EmsReports,SSRS> SSRS Username,System,NULL,1,1
+59,JournalTemplate,\Template\Journal\,Journal Template,System,NULL,1,0
+60,ValiationImport,\ValuationImport\,Valiation Import,System,NULL,1,0
+61,StoresInventoryRequistionEstimatedWording,Note: The prices indicated on this requisition are estimated prices.,This is the wording displayed on the Stores Inventory Requisition to warn the user that the price may change,Asset,2013-12-17 13:52:10.340,1,0
+62,ContractDocument,\ContractDocument\,Folder for SCM Contract Documnet,System,NULL,1,0
+63,VendorDocument,\VendorDocument\,Folder for SCM Contract Documnet,System,NULL,1,0
+64,QuotationVendorDocument,\QuotationVendorDocument\,Folder for SCM Contract Documnet,System,NULL,1,0
+65,TaxFinYearEndMonth,2,Tax FinYear End Month,System,NULL,1,0
+66,ProductKey,49ED-1694-43D3-8535-A6CB,Product Key,System,2025-07-30 09:24:19.523,274,0
+67,ValidateKey,MzM5fDIwMjUvMDcvMzAgMDk6MDU6MjMgQU18MjA=,Validate Key,System,2025-07-30 09:24:19.400,274,0
+69,CutOffList,\CutOffList\,CutOffList,System,2014-01-23 11:56:42.000,1,0
+70,DebtArrangementDocument,\DebtArrangementDocument\,DebtArrangementDocument,System,2014-01-23 11:56:42.000,1,0
+71,ValiationExport,\ValiationExport\,Valiation Export,System,2014-02-01 03:51:29.000,1,0
+72,SmtpPort,587,Email SMS Scheduler> Smtp Port,System,2014-02-24 10:36:55.600,1,0
+73,MeterReadingExport,\MeterreadingExport\,MeterReadingExport,System,2014-02-26 10:53:53.000,1,0
+74,MarkupPercentage,1,Selling price markup percentage,System,2014-02-28 10:07:56.350,1,0
+75,SlowMovingRatio,0.125,Inventory Slow Moving Ratio,System,2014-02-28 10:07:56.387,1,0
+83,CouncilorPercentage,25,Councilor Percentage,System,NULL,1,0
+84,EmployeePercentage,25,Employee Percentage,System,NULL,1,0
+85,SmtpAuthenticationPassword,P@%%w0rd,Email SMS Scheduler> Smtp Authentication Password,System,NULL,1,0
+86,EmailBccAddresses,,Email SMS Scheduler> List of addresses that all emails need to be bcc-ed to,System,NULL,1,0
+87,AuthenticationRequired,YES,Email SMS Scheduler> YES/NO - Is Smtp Authentication required,System,NULL,1,0
+88,WeekOffColorCode,#CE5806,Color code for Week off days,System,NULL,1,0
+89,PublicHolidayColorCode,#10588B,Color code for Public Holiday,System,NULL,1,0
+90,TenderDocument,\TenderDocument\,Folder for SCM Tender Document,System,NULL,1,0
+91,GRNDocument,\GRN\,Folder for GRN,System,NULL,1,0
+93,SessionTimeOut,60,Session TimeOut,System,NULL,1,0
+94,InvoiceCreditDebtNotes,\InvoiceNotes\,Folder for SCM Invoice Notes Document,System,NULL,1,0
+95,BlackListedVendorImport,\BlackListedVendorImport\,Black Listed Vendor Import,System,NULL,1,0
+96,ActivePayrollYear,2016/2017,Current Payroll year,System,NULL,1,0
+97,SchedulerPageUrl,http://10.6.2.132/fms/,Email SMS Scheduler> Scheduler page URL,System,NULL,1,0
+98,DaysCalendarAlert,14,This is the number of days an alert will show on dashboard before a corporate governance calendar activity becomes due,System,2014-05-21 17:04:22.030,1,0
+99,NTReportPath,\NT\Reports\,SSRS> Path of excel reports for NT reporting,System,2014-05-29 07:12:52.130,1,0
+100,NTReportExportPath,\NT\ExportedReport\,SSRS> Path of NT report excel file export,System,2014-05-29 07:12:52.130,1,0
+101,MunicipalityCode,DC1,Municipality Code for NT Reporting,System,2014-05-29 07:12:52.133,1,0
+102,OSAStartRow,10,OSA Start Row,System,2014-05-29 07:12:52.133,1,0
+103,OSANumRows,3894,OSA End Row,System,2014-05-29 07:12:52.133,1,0
+104,TenderCommitteeMeetings,\TenderCommitteeMeeting\,Folder For Tender Committee meetings Documents,System,2014-05-29 07:12:52.133,1,0
+105,ExceptionList,\ExceptionList\,ExceptionList,System,2014-05-30 08:21:51.000,1,0
+106,AFS_TemplatePath,T:\EMS6\EMS_Mnquma\Web\Template\AFS\,Afs Document Path,System,2014-06-24 08:28:32.260,1,0
+108,EvalutionMethodMinLimit,200000,Evalution Method Min Limit,System,2014-07-03 13:07:17.000,1,0
+109,EvalutionMethodMaxLimit,1000000,Evalution Method Max Limit,System,2014-07-03 13:07:17.000,1,0
+112,FolderPlanningDocuments,\PlanningDocuments\,Folder for planning documents,System,NULL,1,0
+113,EmployerSIC7Code,84113,SIC 7 Code for Employer,System,2014-07-30 15:32:30.527,1,0
+114,EmployerTradeClassification,2615,Trade Classification Code for Employer,System,2014-07-30 15:32:30.527,1,0
+115,EmployeeSIC7Code,84113,SIC 7 Code for Employee,System,2014-07-31 08:31:16.290,1,0
+116,SimulatedToken,Y,Billing> Simulate STS Token generator: Y: Returns an example token bypassing STS module. N: Attempts to use actual STS Module,,2015-04-15 09:16:40.143,2,0
+117,LimitBtwTenderQuotation,200000.00,Limit Between Quotation and Tender,System,2014-08-18 14:01:38.887,1,0
+118,EndpointAddress,http://licenses.sebata.co.za/ValidateProductKey.svc,End Point Address,System,2014-08-29 12:12:36.257,2,0
+119,LicenseExpireIntimation,10,License Expire Intimation,System,NULL,NULL,0
+120,MaxVendorBusinessArea,5,Maximum Business Areas vendor can be registered for,System,2014-09-01 17:19:43.930,1,0
+121,AccountStatement,\AccountStatement\,Folder for Account Statment documents,System,2014-09-12 08:59:06.307,2,0
+122,ClearanceGuarantee,\ClearanceGuarantee\,Folder For Clearance Guarantee,System,2014-09-12 08:59:06.307,2,0
+123,EmployerSEZCode,ZAR,SEZ Code for Employer,System,2014-09-12 08:59:06.307,2,0
+124,EmployeeSEZCode,ZAR,SEZ Code for Employee,System,2014-09-12 08:59:06.307,2,0
+125,MaxAccountPerEmployee,20,Maximum Number of Account Allo to bind with a employee,System,2014-09-15 16:25:53.837,NULL,0
+126,PersonalACCPayCashbookID,4,Cashbook ID For Personal Account Payment Payroll RUN ro Reconcile Payment Receipts,System,2014-09-17 10:48:11.910,1,0
+127,PrintPayslipPDF,PrintPayslipPDF,Payroll> Print Payslip PDF,System,NULL,NULL,0
+128,ProtectedPrintPayslipPDF,PasswordProtectedPDF\PaySlip,Payroll> Password Protected Print Payslip PDF,System,NULL,NULL,0
+129,MeterManClientID,4,"Billing> MeterManClientID: Client ID to send to Meterman to determine which of theire multiple client/contracts apply to this instance of FMS ",System,2014-10-01 08:50:33.490,0,0
+130,PettyCashPDF,\PettyCashPDF\,Printed Petty Cash documenation,System,NULL,1,0
+131,ResidentualMinAmount,15000,"Residentual Rates minimum ",Billing,2015-01-28 14:01:29.443,1,0
+132,DaysAlertKPISubmissionDue,10,Set number of days before indicator submission deadline that alert must appear for indicator submission,Planning,2015-02-03 16:45:22.690,1,0
+133,DaysAlertKPIReviewDue,10,Set number of days before indicator review deadline that alert must appear for indicator review,Planning,2015-02-03 16:45:22.700,1,0
+134,PayrollDefaultSCOACostingID,20,Payroll> Default SCOA Costing ID for Payroll definitions,Payroll,2015-02-09 00:00:00.000,2,0
+135,PayrollDefaultSCOAProjectID,111,Payroll> Default SCOA Project ID for Payroll definitions,Payroll,2015-02-09 00:00:00.000,2,0
+136,PayrollDefaultSCOAFundID,4875,Payroll> Default SCOA Fund ID for Payroll definitions,Payroll,2015-02-09 00:00:00.000,2,0
+1134,PayrollRunAllowsExportToVIP2CSV,True,Payroll> This allows the user the option in the Payroll Run screen to export the results of a final payroll run to be exported into a CSV file (VIP2 Format),Payroll,2015-02-19 00:00:00.000,1,0
+1135,PayrollDefaultSCOARegionID,299,Payroll> Default SCOA Region ID for Payroll definitions,Payroll,2015-03-02 00:00:00.000,2,1
+1136,ValuationCertificate,\ValuationCertificate\,Folder for Valuation Certificates,Billing,2015-03-10 10:50:20.427,1,0
+2152,IsBiometricsRequired,False,T&A : Biometrics Required for municipality or not,Payroll,NULL,1,0
+2153,CompanyidforBiometrics,4406,T&A : municipality id from ERS for Biometrics API,Payroll,NULL,1,0
+2154,UsernameforBiometrics,4406,T&A : Username for Biometrics API,Payroll,NULL,1,0
+2155,PasswordforBiometrics,sebata,T&A : Password for Biometrics API,Payroll,NULL,1,0
+2156,APIUrl,http://secure.42.ersbio.co.za/api/data_client.php,T&A : url for biometrics API,Payroll,NULL,1,0
+2157,StockTakeVerificationDocument,\StockTake\,Folder for stocktake document,System,2015-12-08 13:27:57.290,1,0
+2158,PayrollDefaultSCOAFunctionID,300,Payroll> Default SCOA Function ID for Payroll deductions in the final payroll run – Not used for new payroll definitions,Payroll,2015-12-17 14:00:39.293,2,0
+2159,PayrollStandardiseSCOACodesOnDeductions,False,Payroll > This value will be used in payroll final run sp to update scoa codes of deduction and company contribution (deduction leg entries only),Payroll,2015-12-17 14:00:39.293,2,0
+2160,ReportManagerUrl,http://192.168.250.25/Report,SSRS> SSRS Report Manager URL to manage Reports,System,2015-12-17 14:14:13.693,2,1
+2161,PayrollRunConnectionTimeout,1000,Payroll Trail & Final Run Connection Timeout,Payroll,2016-01-13 09:54:34.670,1,0
+2162,EmsVersionBuildDate,19-02-2026,EMS Version Build Date,System,2016-02-02 13:59:44.603,2,0
+2163,GeneratAccountStatementEmail,\AccountStatement\GenerateEmail\,Folder for Generate Account Statment documents,System,2016-02-15 13:44:05.083,2,0
+2164,GeneratAccountStatementPrint,\AccountStatement\GeneratePrint\,Folder for Generate Account Statment Print documents,System,2016-02-15 13:44:05.083,2,0
+2165,TemplatePath,https://mnqu.sebataemshosted.co.za/EMS_Mnquma/Web/Template,Get all the files and listed in Grid view,System,2016-03-15 17:30:10.707,1,1
+2166,MTREFDraftDocuments,\MTREFDraftDocuments\,Upload folder for MTREF Draft Documents,Planning,2016-03-30 17:07:53.670,1,1
+2167,GracePeriod,12,This indicates processing month grace period cutoff,System,NULL,1,1
+2168,GeneratTariffTransactionStatementPrint,\TariffTransactionStatement\GeneratePrint\,Folder for Generate Tariff Transaction Statement Print documents,Billing,2016-04-05 15:29:40.940,2,0
+2169,IDPPeriod,IDP Period(2016-2020),IDP period defined,Planning,2016-02-29 13:35:31.473,1,1
+2170,AdjustmentBudgetDocuments,\AdjustmentBudgetDocuments\,Upload folder for Adjustment Budget Documents,Planning,2016-04-19 18:38:11.707,1,1
+2171,RebateDoc,\RebateDoc\,Document For Rebate,Billing,2016-04-22 17:53:05.810,1,0
+2172,GeneratServiceStatusTransactionStatementPrint,\ServiceStatusTransactionStatement\GeneratePrint\,Folder for Generate Service Status Transaction Statement Print documents,Billing,2016-04-22 17:53:27.367,2,0
+2173,ThirdPartyDocuments,\ThirdPartyDocuments\,"Upload file from given Third Party(Post Office,EasyPayee)",Billing,2016-07-11 11:34:10.807,1,0
+2174,PayrollWSPIsYouthDate,35,Payroll> WSP Report IsYouth Cutoff date,Payroll,2016-07-11 11:37:17.040,2685,0
+2175,SchedulerLastDateTriggered,2019-01-04 07:31:39,Email SMS Scheduler> Date of last trigger,System,2019-01-04 07:31:39.097,2,0
+2176,IDPDocuments,\IDPDocuments\,Upload folder for IDP approval Documents,Planning,2016-09-09 17:10:46.490,1,0
+2177,MTREFDocuments,\MTREFDocuments\,Upload folder for MTREF approval Documents,Planning,2016-09-09 17:10:46.493,1,0
+2178,ATTPDocuments,\ATTPDocuments\,Folder for ATTP supporting documents,System,2017-01-27 13:57:49.630,1,1
+2179,ValuationImportFolder,C:\Sebata.data\ValuationImport,Folder where all valuation import files will be stored.,Billing,2017-01-27 13:57:49.630,1,1
+2180,SystemIsLive,1,System is Live if 1 else not live,system,2017-01-27 13:57:50.287,NULL,1
+2181,currentDateForNonLiveMode,,System populated date,system,2017-01-27 13:57:50.287,NULL,1
+2182,FolderEFTConfirmation,\EFTFiles\EFTBankConfirmationFile\,NULL,System,2017-01-27 13:57:56.067,1,1
+2183,TaxYear,2025/2026,Current Payroll year,System,2017-01-27 13:57:56.137,1,1
+2184,InvestmentBankCharges,IE010005004000000000000000000000000000,InvestmentBankCharges,Ledger,2017-01-27 13:59:15.033,1,0
+2185,InvestmentInterestReceived,IR003002001002002000000000000000000000,InvestmentInterestReceived,Ledger,2017-01-27 13:59:15.033,1,0
+2186,VirementDocuments,\VirementDocuments\,Upload folder for VirementDocuments,Planning,2017-01-27 13:59:15.307,1,0
+2190,WebAPIUrl,http://183.0.0.132,User Role Permission Web API URL,General,2017-05-24 16:59:36.147,1,1
+2191,WebAPIFlag,0,Web API Flag,General,2017-05-24 16:59:36.147,1,1
+2192,WebAPIName,CoreWebAPI,User Role Permission Web API Name,General,2017-05-24 16:59:36.180,1,1
+2193,CacheTimeOut,5,Cache Time Out In Minutes,General,2017-05-24 16:59:37.247,1,1
+2194,RequiredDownloadPopup,false,Show download popup before downloading excel and pdf,NULL,NULL,NULL,0
+2195,RequiredSecondPassword,false,Show password screen in the page where the transaction is required,NULL,NULL,NULL,0
+2196,FolderEFTEMSFile,\EFTEMSFile\,Folder to upload file for the use of EMS,Ledger,2017-05-25 10:29:16.273,1,0
+2197,BulkJournalPath,\BulkJournal\,Folder to which bulk journal files will be written,System,NULL,1,1
+2198,DivisionForPositionStatement,Finance,Set text contained for Divison to be used for Position Statment,Ledger,2017-06-15 18:54:13.333,1,1
+2199,FundingDocuments,\FundingDocuments\,Upload folder for FundingDocuments,Planning,2017-07-09 11:31:26.017,1,0
+2200,InvestmentScoaFunding,FD006000000000000000000000000000000000,InvestmentScoaFunding,Ledger,2017-07-09 11:31:26.020,1,0
+2201,InvestmentScoaProject,PD000000000000000000000000000000000000,InvestmentScoaProject,Ledger,2017-07-09 11:31:26.023,1,0
+2202,InvestmentScoaCosting,CO002004000000000000000000000000000000,InvestmentScoaCosting,Ledger,2017-07-09 11:31:26.023,1,0
+2203,LoanTypeScoaLiabilities,15084,LiabilitiesScoaFuntion,Ledger,2017-07-09 11:31:26.027,1,0
+2204,LoanTypeScoaLiabilitiesNonCurrent,15125,LiabilitiesScoaFuntion,Ledger,2017-07-09 11:31:26.030,1,0
+2205,LoanTypeScoaInterestPaid,32528,InterestPaidScoaFuntion,Ledger,2017-07-09 11:31:26.033,1,0
+2206,LoanTypeScoaFund,3979,FundScoaFuntion,Ledger,2017-07-09 11:31:26.033,1,0
+2207,LoanTypeScoaFundNonCurrent,3980,FundScoaFuntion,Ledger,2017-07-09 11:31:26.037,1,0
+2208,NationalTreasuryLoanReport,\NationalTreasuryLoanReport,Folder name to Store National Treasury Loan Report,Ledger,2017-08-02 19:02:06.180,1,1
+2209,RequestedBySupervisorHODFlag,1,Requested By Supervisor HOD Flag,General,2017-08-04 09:19:27.660,1,0
+2210,FolderImportProject,FolderImportProject,Folder to upload File for Importing Projects,Folder to upload File for Importing Projects,2017-08-15 10:41:03.590,1,1
+2211,MunicipalityShortName,EC122,Municipality Short Name,System,2017-09-15 10:54:49.707,1,1
+2212,LoginLimitFlag,0,Login Limit Flag,General,2017-09-19 08:54:45.217,2,1
+2213,InvestmentQuotes,\InvestmentQuotes\,InvestmentQuotes,Ledger,2017-09-19 08:54:45.287,1,1
+2214,MessageToUserForYearEnd,10,Message To User For Year End Before Days,Ledger,2017-09-19 08:54:45.287,1,1
+2215,VatApportionmentType,Function,2025/2026,Ledger,2017-09-19 08:54:45.353,1,1
+2216,SCM_UserID,6790,Identify SCM Processes,CSD_ETL,2017-09-19 08:54:45.547,1,0
+2217,TransactionsApprovalDocs,TransactionsApprovalDocs\,Folder for transactions approval documents,3,NULL,1,1
+2218,TaxDeduction,\TaxDeduction,Authorisation Form Document,Payroll,2017-10-04 13:07:54.000,1,0
+2219,MaximumQueryRows,149,Set the maximum number of rows to be returned for an stored proc,General,2017-12-01 11:20:13.330,1,0
+2220,UseTenderFinalApprover,1,If flag is set then Tender Final approver will be displayed on the Permission screen.,SCM,2017-12-16 08:46:12.990,2,1
+2221,Section71WebServiceURL,https://mnqu.sebataemshosted.co.za/EMS_Mnquma_Section71,Web service URL for section 71 tool,Planning,2017-12-16 08:46:13.423,1,1
+2222,DirectDownload,True,Direct Download,SCM,2017-12-16 08:46:14.130,1,0
+2223,AdjustmentFundingDocuments,\AdjustmentFundingDocuments\,Upload folder for AdjustmentFundingDocuments,Planning,2018-02-11 17:06:16.893,1,0
+2224,SupplementaryBudgetDocuments,\SupplementaryBudgetDocuments\,Upload folder for SupplementaryBudgetDocuments,Planning,2018-02-11 17:06:17.087,2,0
+2225,ApproveAdjustmentBudgetDocuments,\ApproveAdjustmentBudgetDocuments\,Upload folder for ApproveAdjustmentBudgetDocuments,Planning,2018-02-11 17:06:17.193,2,0
+2226,FolderLoanTakeOn,\LedgerLoanTakeOn\,Upload folder for Loan Take on files,Ledger,2018-02-11 17:06:20.077,1,0
+2227,FolderInvestmentTakeOn,\LedgerInvestmentTakeOn\,Upload folder for Investment Take on files,Ledger,2018-02-11 17:06:20.710,1,0
+2228,FolderCashbookTransactionTakeOn,\LedgerCashbookTransactionTakeOn\,Upload folder for Cashbook Transaction Take on files,Ledger,2018-04-24 11:15:19.327,1,0
+2229,FolderBankReconTakeOn,\LedgerBankReconTakeOn\,Upload folder for Bank Recon Take on files,Ledger,2018-04-24 11:15:19.683,1,0
+2230,ManageVotePath,\ManageVoteImport\,Upload folder for Manage Vote Import files,Ledger,2018-05-03 19:02:45.397,1,0
+2231,Cession,\CessionDocuments\,Upload folder for Cession Document files,SCM,2018-06-01 20:25:34.860,1,0
+2232,ActiveProcessingMonth,8,This indicates the current processing month,System,2018-06-29 22:35:52.167,1,1
+2233,UtiliPayAPIBaseURL,https://upservices.azurewebsites.net/,UtiliPay API Base URL,Billing,2021-02-08 11:45:18.670,182,1
+2234,UtiliPayAPIUserName,apiuser@utilipay.co.za,UtiliPay API User Name and Password,Billing,2021-02-08 11:45:18.720,182,1
+2235,UtiliPayAPIUserPassword,Thi$1sThe@PiP@$$w0rd,UtiliPay API User Name and Password,Billing,2021-02-08 11:45:18.767,182,1
+2236,ServiceInvoice,\ServiceInvoice\,Upload folder for ServiceInvoice Documents,SCM,2018-08-07 23:47:19.580,0,0
+2237,BankLogo,\BankLogo\,Folder to which bank Logo will be written,System,2018-09-11 15:32:10.810,1,1
+2238,KeepGracePeriodOpen,1,Keeps processing in previous month open after grace period expires,System,2018-09-20 22:11:54.580,1,1
+2239,CSDPageCountMessage,100,CSD Page Count Message,CSD,2018-10-25 21:46:19.647,1,1
+2240,RequisitionDocument,\RequisitionDocument\,Requisition Document,SCM,2018-11-22 19:35:28.583,1,0
+2241,FolderBankReconTakeOnEMS,\LedgerBankReconTakeOn\UploadedFiles\,Upload folder for Bank Recon Take on files,Ledger,2018-12-07 16:29:57.887,1,0
+2242,FolderCashbookTransactionTakeOnEMS,\LedgerCashbookTransactionTakeOn\UploadedFiles\,Upload folder for Cashbook Transaction Take on files,Ledger,2018-12-07 16:29:57.987,1,0
+2243,FolderInvestmentTakeOnEMS,\LedgerInvestmentTakeOn\UploadedFiles\,Upload folder for Investment Take on files,Ledger,2018-12-07 16:29:58.090,1,0
+2244,FolderLoanTakeOnEMS,\LedgerLoanTakeOn\UploadedFiles\,Upload folder for Loan Take on files,Ledger,2018-12-07 16:29:58.200,1,0
+2245,PayrollEmployeeTerminationDocs,PayrollEmployeeTerminationDocs\,Folder for Payroll Employee Termination documents,3,2019-01-19 00:21:06.623,1,1
+2246,Billing.AllocationPriorityType,Priority,Credit Allocation Prioerity,Billing,2019-05-02 12:33:47.967,1,0
+2247,AlternateFinYearApp,http://localhost:60000,Link to the alternative financial year app,NULL,2019-06-28 15:30:36.023,1,0
+2248,TenderApprovalDocument,\TenderApprovalDocument\,Folder for SCM Tender Approval Document,System,2019-06-28 15:41:30.020,1,1
+2249,PayrollSchedulerDate,01/07/2020,Sets the Payroll Scheduler processing date,Payroll,2022-01-20 13:13:31.173,163,0
+2250,PayrollSchedulerTime,13:05,Sets the Payroll Scheduler processing time,Payroll,2022-01-20 13:13:31.203,163,0
+2251,PosCancellationTimeout,5,Amount of minutes before a cancellation request is sent to UP if response not recieved,Pos,2020-09-17 09:16:44.260,182,1
+2252,SchedulerAPIBase,http://192.168.250.73:5000,Scheduler API Base for web api and signal-r access,Billing,2019-06-28 16:12:34.840,1,1
+2253,GeneratAccountStatementText,\AccountStatement\GenerateText\,Folder for Generate Account Statment documents,System,2020-01-30 18:25:17.047,1,0
+2254,IsMunicipalEntity,0,"1 = This is a municipal entity, 0 = This is not a municipal entity",Planning,2020-01-30 18:25:17.047,1,0
+2255,CreditorMunicipalityGroupingIsMandatory,0,Is municipality grouping is mandatory on creditor management form.,SCM,2020-02-25 17:46:02.297,1,0
+2256,VendorMunicipalityGroupingIsMandatory,0,Is municipality grouping is mandatory on vendor management form.,SCM,2020-02-25 17:46:02.310,1,0
+2257,CostingAPIUrl,http://192.168.250.73:5002/Costing,API for Costing,Costing,2020-05-26 18:05:51.797,1,0
+3257,AssetAPIUrl,http://192.168.250.73:5001/Assets,API for Assets,Assets,2020-06-06 15:00:05.207,1,0
+3275,StockTakeStatusCountCreated,Count Created,Count Created,Inventory,2020-07-16 12:23:24.813,1,0
+3276,StockTakeStatusCountCaptured,Count Captured,Count Captured,Inventory,2020-07-16 12:23:24.813,1,0
+3277,StockTakeStatusCountReconciled,Count Reconciled,Count Reconciled,Inventory,2020-07-16 12:23:24.813,1,0
+3278,StockTakeStatusCountUpdatedandClosed,Count Rejected,Count Rejected,Inventory,2020-07-16 12:23:24.813,1,0
+3279,StockTakeStatusCountApproved,Count Approved,Count Approved,Inventory,2020-07-16 12:23:24.813,1,0
+3280,InventoryDonationDocuments,\InventoryDonation,Document root folder.,Inventory,2020-07-16 12:23:24.813,1,1
+3281,InventoryDisposalDocuments,\InventoryDisposal,Document root folder.,Inventory,2020-07-16 12:23:24.813,1,1
+3282,InventoryValuationDocuments,\InventoryValuation,Document root folder.,Inventory,2020-07-16 12:23:24.813,1,1
+3283,PMUMenu,1,PMU menu,Project,2020-07-17 00:00:00.000,1,1
+3284,VendorBlacklistSchedule,24,Scheduler Time to check Vendor Blacklisting,SCM,2020-07-24 20:05:12.340,1,0
+3285,OverrideBudgetAmount,8888888888,Override Budget Amount,Planning,2020-07-24 20:05:12.620,1,0
+3286,VatApportionmentType,Function,2019/2020,Ledger,2020-10-05 15:54:22.860,1,1
+3287,DebtorsAgingServiceTypes,"1,2,3,4,5,6,7,8,9,10,11,12,13,16,17",Service Type IDs to be included for debtors age analysis,"Billing, Planning",2020-10-20 21:11:06.653,1,0
+3288,SmtpAuthenticationUser,NoReply_Mnquma@inzaloems.co.za,SMTP User for Auth,Assets,2020-12-01 20:29:16.273,1,0
+3289,UseCustomPayrollSchedulerDate,False,Specify if the custom Scheduler date must be used for testing purposes,Payroll,2020-10-19 00:00:00.000,1,0
+3290,TaxYearEndRunSQLDatabaseBackupPath,,Sets the Tax Year End Run SQL Database Backup Path,Payroll,2020-12-04 19:30:14.513,1,1
+3291,TaxYearEndRunTriggerMonth,3,Sets the Tax Year End Run Trigger Month,Payroll,2020-12-04 19:30:14.517,1,1
+3292,TaxYearEndRunTriggerHourly,8,Sets the Tax Year End Run Hourly Trigger,Payroll,2020-12-04 19:30:14.520,1,1
+3293,FolderBulkJournalError,\BulkJournalError\,Folder to which bulk journal validations will be written,System,2020-12-04 19:30:20.510,1,0
+3294,UifDeclarationCsvFileVersion,002,Version of the UIF Declaration CSV File,Payroll,2021-02-09 20:12:23.650,1,0
+3295,PayrollCertificate,\PayrollCertificates\,Folder for Generate Payroll Certificates,System,2021-02-09 20:12:38.587,1,0
+3296,WriteVendingLog,NO,WriteVendingLog,Billing,2021-03-09 13:25:32.893,1,1
+3297,EnableLeave,false,Enable Leave Module,Payroll,NULL,1,0
+3298,BaseWebURL,https://mnqu.sebataemshosted.co.za/EMS_Mnquma/,The Base URL for the site,System,NULL,NULL,0
+3299,VatApportionmentType,Function,2021/2022,NULL,2021-07-14 11:37:09.053,88,0
+3300,BIOrgRef,MNQ,BI Org Ref,BI,2021-07-20 17:15:25.540,2,0
+3301,BIReportUsername,api@mnq.co.za,BI Report Username,BI,2021-07-20 17:15:25.543,2,0
+3302,BIReportPassword,Password1,BI Report Password,BI,2021-07-20 17:15:25.547,2,0
+3303,AccountInArrearsFlag,No,Account In Arrears Flag,General,2021-09-01 17:31:14.467,1,0
+3304,AccountInArrearsText," ",Account In Arrears Text,General,2021-09-01 17:31:14.470,1,0
+3305,HideCashierTotals,0,Hide Cashier Totals,Billing,2021-11-01 13:00:27.250,1,1
+3306,DepreciationServiceFinYear,2025/2026,Depreciation service Financial Year.,Assets,2026-02-05 10:06:36.990,271,0
+3307,AdhocBudgetConsumptionDeletedProjectsInclude,0,"1 = Include deleted projects, 0 = Exclude deleted projects",Planning,2022-02-17 19:16:51.330,1,0
+3308,IsOnlyIssueSCOAConfig,1,1 for Only inventory Issues SCOA item in config,Inventory & Ledger,2022-05-14 08:35:59.110,1,0
+3309,LedgerMicroServiceAPIUrl,https://mnqu.sebataemshosted.co.za/EMS_Mnquma_LedgerAPI/,Ledger Micoservice API URL,Ledger,2022-05-14 08:50:22.373,1,0
+3310,LedgerAPIMaxImport,5000,Ledger Micoservice Journal Import Max Rows,Ledger,2022-05-14 08:50:22.373,1,0
+3311,ContractServiceRequestDocument,\ContractServiceRequestDocument\,Folder for SCM Contract Service Request,System,2022-05-14 08:50:22.377,1,0
+3312,LinkedServer,[192.168.250.25],Linked Server IP ADDRESS from CSD Database Server,SCM,2022-10-26 17:28:22.193,1,1
+3313,BudgetImport,\BudgetImport\,Folder to store imported budgets,Planning,2023-02-09 00:11:31.200,1,0
+3314,BudgetExport,\BudgetExport\,Folder to store exported budgets,Planning,2023-02-09 00:11:31.237,1,0
+3315,DirectDepositNoFileLimit,50,Direct Deposit No File Limit,Billing,2023-02-09 00:11:45.590,1,0
+3316,IsAssetDepreciationBusy,False,Setting to keep track if depreciation is busy,Asset,2026-02-05 10:06:37.130,271,0
+3317,BIAdminUsername,api@mnq.co.za,BI Admin Username,BI,2023-05-10 17:58:45.457,1,0
+3318,BIAdminPassword,Password1,BI Admin Password,BI,2023-05-10 17:58:45.463,1,0
+3319,BIWebServiceURL,https://bi.biinsights.co.za/,BI Web Service URL,BI,2023-05-10 17:58:45.470,1,0
+3320,BIRedirectURL,https://bi.biinsights.co.za/,BI Redirect URL,BI,2023-05-10 17:58:45.477,1,0
+3321,BIEmbeddedURL,https://bi.biinsights.co.za/,BI Embedded URL,BI,2023-05-10 17:58:45.483,1,0
+3322,SundryDocument,\SundryDocument\,Sundry Document,SCM,2023-06-27 17:59:35.010,1,0
+3323,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-06-27 17:59:35.017,1,0
+3324,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-07-13 17:28:08.853,1,0
+3325,AllowAllProcessingMonths,8,This is to allow Display all processing months in Change Processing Month Screen,System,2023-07-13 17:28:09.080,1,0
+3326,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-08-01 21:40:36.123,1,0
+3327,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-08-06 11:40:15.783,1,0
+3328,BlockMultiYearProcessing,8,Block Previous Year Processing,System,NULL,1,0
+3329,GeneratePayrollTrialReports,0,Generate reports during Payroll Trial Run,System,NULL,1,0
+3330,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-09-18 20:20:16.997,1,0
+3331,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-09-27 20:26:20.573,1,0
+3332,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-11-13 17:23:35.540,1,0
+3333,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-11-14 19:30:11.463,1,0
+3334,SSRebuild,0,SS Rebuild Flag,Billing,2023-12-05 17:26:47.163,1,0
+3335,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-12-05 17:26:54.107,1,0
+3336,AdhocReportListLimit,15,Set Limit for Adhoc Reports listed,System,NULL,1,0
+3337,AdhocReportEncryptKey,@dh0c Rep0rt,Key to Encrypt Server Details for AdhocReport,System,NULL,1,0
+3338,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2023-12-13 21:14:52.733,1,0
+3339,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-02-01 19:14:53.667,1,0
+3340,DebtArrangemtLetterTemplate,Standard,Debt Arrangemt Letter Template,Billing,NULL,1,0
+3341,DebtArrangemtLetterEnabled,false,Debt Arrangemt Letter Enabled,Billing,NULL,1,0
+3342,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-02-06 19:16:26.693,1,0
+3343,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-04-11 17:39:24.430,1,0
+3344,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-04-12 16:31:39.997,1,0
+3345,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-04-17 17:47:15.307,1,0
+3346,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-04-30 18:19:06.300,1,0
+3347,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-06-10 17:58:47.000,1,0
+3348,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-06-18 17:52:33.447,1,0
+3349,VatApportionmentType,Function,2024/2025,NULL,2024-06-24 17:44:24.090,58,0
+3350,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-07-01 17:13:57.063,1,0
+3351,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-07-11 18:10:39.200,1,0
+3352,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-07-25 17:14:16.000,1,0
+3353,LeaveOBDate,2024/06/30,Opening Balance Date for Leave Module,Payroll,2024-08-05 10:31:54.927,1,0
+3354,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-08-06 17:38:11.213,1,0
+3355,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-08-21 17:25:36.567,1,0
+3356,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-10-22 22:38:54.550,1,0
+3357,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-10-28 17:23:59.947,1,0
+3358,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-11-06 16:48:54.777,1,0
+3359,AdhocBudgetConsumptionItemFilter,0,"1 = Exclude items as per WHERE clause, 0 = Include all items",Planning,2024-11-21 15:04:16.827,1,0
+3360,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2024-11-27 19:54:12.207,1,0
+3361,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-01-14 18:14:25.777,1,0
+3362,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-02-12 22:53:18.690,1,0
+3363,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-02-27 17:13:54.927,1,0
+3364,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-03-19 21:23:37.447,1,0
+3365,ApproveLeaveRequests,true,Enable Approval of Leave Requests,Payroll,2025-03-19 21:23:37.517,1,0
+3366,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-04-07 18:15:36.100,1,0
+3367,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-04-14 20:33:31.383,1,0
+3368,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-04-25 16:18:58.770,1,0
+3369,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-05-06 12:54:16.093,1,0
+3370,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-05-19 17:57:38.173,1,0
+3371,Cashflow,True,Implement GL changes for Cashflow,Ledger,2025-07-16 09:35:57.080,1,0
+3372,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-05-19 22:02:50.033,1,0
+3373,IsPlatinumCustomer,1,Indicate if the customer is licensed for EMS Platinum,General,2025-05-19 22:02:51.727,2,1
+3374,IsNew_Quotation_TemplateRequired,0,This is flag for new email template for RFQ; specifically designed for Joe Gqabi Municipility,SCM,2025-05-19 22:02:51.730,1,1
+3375,InternalRequisitionApprovalSetup,True,Internal Requisition Approval Setup,SCM,2025-05-20 01:11:52.580,1,0
+3376,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-05-21 18:36:25.683,1,0
+3377,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-05-28 18:13:09.280,1,0
+3378,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-06-04 20:02:02.233,1,0
+3379,SMSReportStatements,https://mu-sms.azurewebsites.net/S/SentStatementSmssByDateTime?,SMS Report For Statements,Billing,2025-06-04 23:43:00.527,1,0
+3380,SMSReportCustom,https://mu-sms.azurewebsites.net/S/SentCustomSmssByDateTime?,SMS Report Custom Messages,Billing,2025-06-04 23:43:00.530,1,0
+3381,SendEMSSMS,1,Send SMSs from EMS,Billing,2025-06-04 23:43:00.530,1,0
+3382,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-06-13 13:24:56.413,1,0
+3383,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-06-18 20:51:29.750,1,0
+3384,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-06-24 17:52:01.417,1,0
+3385,MirrorScoaProject,false,Mirror Scoa Project on GL Postings,Ledger,2025-07-15 17:55:48.153,1,0
+3386,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-07-15 17:55:48.450,1,0
+3387,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-07-31 18:26:25.467,1,0
+3388,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-07-31 19:00:59.483,1,0
+3389,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-08-10 20:21:24.323,1,0
+3390,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-09-03 12:34:23.047,1,0
+3391,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-09-05 13:22:40.043,1,0
+3392,UKey,False,Legacy reference visible,SCM,2025-09-10 08:59:28.783,1,0
+3393,ShowAccountRefresh,1,Show Refresh Transaction Button on Enquiry,Billing,2025-10-02 19:48:48.207,1,0
+3394,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-10-02 19:49:32.233,1,0
+3395,SundryDocument,\InvoiceDocument\,Invoice Document,SCM,2025-10-16 20:09:33.487,1,0
+3396,VatApportionment,false,VAT apportionment to be enabled for SCM use.,SCM,2025-12-08 22:12:10.373,1,0
+3397,ZeroBudgetItemCapture,0,1 = Allow for zero budget item capture,Planning,2025-12-08 22:12:47.070,1,0
+3398,VirementApprovalLevel,1,1 = Allow for Virement Approval Levels,Planning,2025-12-08 22:12:47.077,1,0
+3399,NumberVirementApprovalLevel,7,Number of Virement Approval Levels,Planning,2025-12-08 22:12:47.077,1,0
+3400,VirementStandardPage,0,1 = Use the standard virement page,Planning,2025-12-08 22:12:47.080,1,0
+3401,LegacySystem,EMS,"Legacy systems such as SAMRAS, PROMUN",Planning,2025-12-08 22:12:47.090,1,0
+3402,RebuildSummaryType,1,"1: Stored Procedure, 2: API",Billing,2025-12-08 22:12:47.093,1,1
+3403,BulkCashbookTransactionCount,0,Sets the number of transactions used for Cashbook Bulk Processing,Ledger,2025-12-08 22:12:47.550,1,0
+3404,InvoiceDocument,\InvoiceDocument\,Invoice Document,SCM,2025-12-08 22:12:47.867,1,0
+3405,ExcludeRPPblocking,0,Check if account has an active repayment plan then pass 0% recovery,Billing,2025-12-08 22:34:12.247,1,0
+3406,IncludeTariffCodeInD10,0,"Include TariffCode in D10 entries for Generic Text File statement generation. Set to 1 to include TariffCode, 0 to exclude.",Billing,2025-12-08 22:34:12.250,1,0
+3407,UseNewLeaveProcess,0,Use new leave capture pages,Payroll,2025-12-09 21:00:55.660,1,0
+3408,CalculateTaxByDaysWorked,0,Use DayBased PAYE Calculation,Payroll,2026-01-07 19:59:15.167,1,0

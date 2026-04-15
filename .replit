@@ -1,0 +1,164 @@
+entrypoint = "index.js"
+modules = ["nodejs-22", "dotnet-10.0", "python-3.11", "postgresql-16"]
+hidden = [".config", "package-lock.json"]
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", "package.json", "package-lock.json"]
+
+[nix]
+channel = "stable-24_11"
+
+[deployment]
+run = ["node", "index.js"]
+deploymentTarget = "autoscale"
+ignorePorts = false
+
+[agent]
+expertMode = true
+integrations = ["github:1.0.0"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Backend API"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "POS UI"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "IDP UI"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Payroll UI"
+
+[[workflows.workflow]]
+name = "Backend API"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ASSETS-PSQL-API && dotnet run"
+waitForPort = 3000
+
+[[workflows.workflow]]
+name = "POS UI"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd POS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8080 --proxy-config proxy.conf.json"
+waitForPort = 8080
+
+[[workflows.workflow]]
+name = "IDP UI"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd IDP-UI/platinum-idp-client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 9000 --proxy-config proxy.conf.json --serve-path /idp-app/"
+waitForPort = 9000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Payroll UI"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd PAYROLL-APP/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8099 --proxy-config proxy.conf.json --serve-path /payroll-app/"
+waitForPort = 8099
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
+localPort = 3002
+externalPort = 3002
+
+[[ports]]
+localPort = 3003
+externalPort = 80
+
+[[ports]]
+localPort = 4200
+externalPort = 4200
+
+[[ports]]
+localPort = 4201
+externalPort = 8000
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
+localPort = 5173
+externalPort = 5173
+
+[[ports]]
+localPort = 5174
+externalPort = 8081
+
+[[ports]]
+localPort = 6000
+externalPort = 6000
+
+[[ports]]
+localPort = 6800
+externalPort = 6800
+
+[[ports]]
+localPort = 8008
+externalPort = 8008
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8099
+
+[[ports]]
+localPort = 8099
+externalPort = 8099
+
+[[ports]]
+localPort = 9000
+externalPort = 9000
+
+[[ports]]
+localPort = 18156
+externalPort = 3003
+
+[userenv]
+
+[userenv.shared]
+SKIP_DB_INIT = "true"
+AZURE_POSTGRES_URL = "Host=platinum-postgre-sql.postgres.database.azure.com;Port=5432;Database=Assets;Username=Admin_Dev;Password=NOP@ssword_123;SslMode=Require;CommandTimeout=600;Timeout=30"

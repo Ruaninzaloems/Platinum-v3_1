@@ -1,0 +1,688 @@
+    <div class="gra-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- ===================== LIST VIEW ===================== -->
+      @if (currentView() === 'list') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Returns pending approval'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().pendingReturns || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{summary().pendingReturns || 0}}</span>
+            <span class="kpi-label">Pending Returns</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Approved goods returns'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value">{{summary().approvedReturns || 0}}</span>
+            <span class="kpi-label">Approved Returns</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total value of returned goods'">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summary().totalReturnValue || 0)}}</span>
+            <span class="kpi-label">Total Return Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Active GRA documents'">
+            <mat-icon>description</mat-icon>
+            <span class="kpi-value">{{summary().activeGRAs || 0}}</span>
+            <span class="kpi-label">Active GRAs</span>
+          </div>
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="activeTab() === 'returns'" (click)="switchTab('returns')">
+            <mat-icon>assignment_return</mat-icon> Goods Returns
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'gras'" (click)="switchTab('gras')">
+            <mat-icon>receipt_long</mat-icon> GRA (Advice Documents)
+          </button>
+        </div>
+
+        <!-- ===== RETURNS TAB ===== -->
+        @if (activeTab() === 'returns') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search returns..." [(ngModel)]="searchQuery" (keyup.enter)="loadReturns()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadReturns()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="draft">Draft</mat-option>
+                <mat-option value="pending_approval">Pending Approval</mat-option>
+                <mat-option value="approved">Approved</mat-option>
+                <mat-option value="declined">Declined</mat-option>
+                <mat-option value="gra_created">GRA Created</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="showFilters.set(!showFilters())">
+              <mat-icon>{{showFilters() ? 'expand_less' : 'tune'}}</mat-icon> Filters
+            </button>
+
+            <button mat-stroked-button (click)="clearFilters()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+
+            <button mat-flat-button color="primary" (click)="openCaptureReturn()">
+              <mat-icon>add</mat-icon> New Return
+            </button>
+          </div>
+
+          @if (showFilters()) {
+            <div class="advanced-filters">
+              <mat-form-field appearance="outline">
+                <mat-label>Return Number</mat-label>
+                <input matInput [(ngModel)]="filterReturnNumber" (keyup.enter)="loadReturns()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>GRN Number</mat-label>
+                <input matInput [(ngModel)]="filterGrnNumber" (keyup.enter)="loadReturns()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Order Number</mat-label>
+                <input matInput [(ngModel)]="filterOrderNumber" (keyup.enter)="loadReturns()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor Name</mat-label>
+                <input matInput [(ngModel)]="filterVendorName" (keyup.enter)="loadReturns()">
+              </mat-form-field>
+            </div>
+          }
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Return #</th>
+                  <th>GRN #</th>
+                  <th>Order #</th>
+                  <th>Vendor</th>
+                  <th>Return Date</th>
+                  <th>Status</th>
+                  <th>Budget Impact</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ret of returns(); track ret.id) {
+                  <tr class="data-row" (click)="viewReturn(ret)">
+                    <td class="ref-cell">{{ret.returnNumber}}</td>
+                    <td class="ref-cell">{{ret.grnNumber || '—'}}</td>
+                    <td>{{ret.orderNumber || '—'}}</td>
+                    <td>{{ret.vendorName || '—'}}</td>
+                    <td>{{formatDate(ret.returnDate)}}</td>
+                    <td><span class="status-badge" [class]="'status-' + ret.status">{{getReturnStatusLabel(ret.status)}}</span></td>
+                    <td class="value-cell">{{formatCurrencyFull(ret.budgetImpact?.amount || ret.budgetImpact || 0)}}</td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="returnMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #returnMenu="matMenu">
+                        <button mat-menu-item (click)="viewReturn(ret)"><mat-icon>visibility</mat-icon> View</button>
+                        @if (ret.status === 'draft') {
+                          <button mat-menu-item (click)="submitReturn(ret.id)"><mat-icon>send</mat-icon> Submit</button>
+                        }
+                        @if (ret.status === 'pending_approval') {
+                          <button mat-menu-item (click)="approveReturn(ret.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                          <button mat-menu-item (click)="declineReturn(ret.id)"><mat-icon>cancel</mat-icon> Decline</button>
+                        }
+                        @if (ret.status === 'approved') {
+                          <button mat-menu-item (click)="createGraFromReturn(ret)"><mat-icon>receipt_long</mat-icon> Create GRA</button>
+                        }
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No goods returns found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Page {{currentPage()}} of {{totalPages()}}</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">{{currentPage()}}</span>
+              <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- ===== GRAs TAB ===== -->
+        @if (activeTab() === 'gras') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search GRAs..." [(ngModel)]="graSearchQuery" (keyup.enter)="loadGras()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>GRA Number</mat-label>
+              <input matInput [(ngModel)]="filterGraNumber" (keyup.enter)="loadGras()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Return #</mat-label>
+              <input matInput [(ngModel)]="filterGraReturnNumber" (keyup.enter)="loadGras()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Debit Note #</mat-label>
+              <input matInput [(ngModel)]="filterDebitNoteNumber" (keyup.enter)="loadGras()">
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="clearGraFilters()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+
+            <button mat-flat-button color="primary" (click)="openCreateGra()">
+              <mat-icon>add</mat-icon> New GRA
+            </button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>GRA #</th>
+                  <th>Return #</th>
+                  <th>Vendor</th>
+                  <th>Debit Note #</th>
+                  <th>Status</th>
+                  <th>Budget Released</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (gra of gras(); track gra.id) {
+                  <tr class="data-row" (click)="viewGra(gra)">
+                    <td class="ref-cell">{{gra.graNumber}}</td>
+                    <td class="ref-cell">{{gra.returnNumber || '—'}}</td>
+                    <td>{{gra.vendorName || '—'}}</td>
+                    <td>{{gra.debitNoteNumber || '—'}}</td>
+                    <td><span class="status-badge" [class]="'status-' + gra.status">{{(gra.status || 'active') | titlecase}}</span></td>
+                    <td class="value-cell">{{formatCurrencyFull(gra.budgetReleased?.amount || gra.budgetReleased || 0)}}</td>
+                    <td>{{formatDate(gra.createdDate)}}</td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="graMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #graMenu="matMenu">
+                        <button mat-menu-item (click)="viewGra(gra)"><mat-icon>visibility</mat-icon> View</button>
+                        <button mat-menu-item (click)="printGraPdf(gra.id)"><mat-icon>picture_as_pdf</mat-icon> Print PDF</button>
+                        <button mat-menu-item (click)="printDebitNote(gra.id)"><mat-icon>receipt</mat-icon> Print Debit Note</button>
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No GRA documents found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Page {{graCurrentPage()}} of {{graTotalPages()}}</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="graCurrentPage() <= 1" (click)="changeGraPage(graCurrentPage() - 1)">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">{{graCurrentPage()}}</span>
+              <button mat-icon-button [disabled]="graCurrentPage() >= graTotalPages()" (click)="changeGraPage(graCurrentPage() + 1)">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== RETURN DETAIL VIEW ===================== -->
+      @if (currentView() === 'return-detail' && selectedReturn()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedReturn()!.returnNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedReturn()!.status">{{getReturnStatusLabel(selectedReturn()!.status)}}</span>
+              <span class="dept-tag">GRN: {{selectedReturn()!.grnNumber || '—'}}</span>
+              <span class="dept-tag">Order: {{selectedReturn()!.orderNumber || '—'}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedReturn()!.status === 'draft') {
+              <button mat-flat-button color="primary" (click)="submitReturn(selectedReturn()!.id)"><mat-icon>send</mat-icon> Submit</button>
+            }
+            @if (selectedReturn()!.status === 'pending_approval') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveReturn(selectedReturn()!.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="declineReturn(selectedReturn()!.id)"><mat-icon>cancel</mat-icon> Decline</button>
+            }
+            @if (selectedReturn()!.status === 'approved') {
+              <button mat-flat-button color="primary" (click)="createGraFromReturn(selectedReturn()!)"><mat-icon>receipt_long</mat-icon> Create GRA</button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>info</mat-icon> Return Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Vendor</label>
+                  <span>{{selectedReturn()!.vendorName || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>GRN Reference</label>
+                  <span class="ref-cell">{{selectedReturn()!.grnNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Order Reference</label>
+                  <span class="ref-cell">{{selectedReturn()!.orderNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Return Date</label>
+                  <span>{{formatDate(selectedReturn()!.returnDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Returned By</label>
+                  <span>{{selectedReturn()!.returnBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Financial Year</label>
+                  <span>{{selectedReturn()!.financialYear || '—'}}</span>
+                </div>
+              </div>
+              @if (selectedReturn()!.description) {
+                <div class="detail-field" style="margin-top:16px">
+                  <label>Description</label>
+                  <span class="desc-text">{{selectedReturn()!.description}}</span>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>account_balance_wallet</mat-icon> Budget Impact</h3>
+              <div class="budget-impact-display">
+                <mat-icon>trending_down</mat-icon>
+                <div class="budget-impact-info">
+                  <span class="budget-impact-label">Budget to be released</span>
+                  <span class="budget-impact-value">{{formatCurrencyFull(selectedReturn()!.budgetImpact?.amount || selectedReturn()!.budgetImpact || 0)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>GRN Qty</th>
+                    <th>Return Qty</th>
+                    <th>Return Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of selectedReturn()!.lineItems || []; track line; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{line.description}}</td>
+                      <td class="value-cell">{{line.grnQuantity || 0}}</td>
+                      <td class="value-cell" style="color:#c62828;font-weight:700">{{line.returnQuantity || 0}}</td>
+                      <td>{{line.returnReason || '—'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state">No line items</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (selectedReturn()!.status === 'approved' || selectedReturn()!.status === 'declined') {
+            <div class="detail-card" [class.void-card]="selectedReturn()!.status === 'declined'">
+              <h3>
+                <mat-icon>{{selectedReturn()!.status === 'approved' ? 'check_circle' : 'cancel'}}</mat-icon>
+                {{selectedReturn()!.status === 'approved' ? 'Approval Information' : 'Decline Information'}}
+              </h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>{{selectedReturn()!.status === 'approved' ? 'Approved By' : 'Declined By'}}</label>
+                  <span>{{selectedReturn()!.approvedBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Date</label>
+                  <span>{{formatDate(selectedReturn()!.approvalDate)}}</span>
+                </div>
+                @if (selectedReturn()!.approvalComments) {
+                  <div class="detail-field">
+                    <label>Comments</label>
+                    <span class="desc-text">{{selectedReturn()!.approvalComments}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== CAPTURE RETURN VIEW ===================== -->
+      @if (currentView() === 'capture') {
+        <div class="form-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>Capture Goods Return</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>inventory</mat-icon> GRN Selection</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Search GRN Number</mat-label>
+                <input matInput [(ngModel)]="returnForm.grnSearch" (keyup.enter)="searchGrn()" placeholder="Enter GRN number and press Enter">
+              </mat-form-field>
+              <div class="order-search-action">
+                <button mat-flat-button color="primary" (click)="searchGrn()" [disabled]="!returnForm.grnSearch">
+                  <mat-icon>search</mat-icon> Load GRN
+                </button>
+              </div>
+            </div>
+            @if (returnForm.grnNumber) {
+              <div class="selected-order-info">
+                <mat-icon>check_circle</mat-icon>
+                <span>GRN <strong>{{returnForm.grnNumber}}</strong> loaded — Vendor: <strong>{{returnForm.vendorName}}</strong></span>
+              </div>
+            }
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>assignment_return</mat-icon> Return Details</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor</mat-label>
+                <input matInput [(ngModel)]="returnForm.vendorName" readonly>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Return Date</mat-label>
+                <input matInput [matDatepicker]="returnPicker" [(ngModel)]="returnForm.returnDate">
+                <mat-datepicker-toggle matIconSuffix [for]="returnPicker"></mat-datepicker-toggle>
+                <mat-datepicker #returnPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description / Reason</mat-label>
+                <textarea matInput [(ngModel)]="returnForm.description" rows="3"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            @if (returnFormLines.length === 0) {
+              <div class="empty-text">Load a GRN to populate line items.</div>
+            }
+            @for (line of returnFormLines; track line; let i = $index) {
+              <div class="line-item-row">
+                <div class="line-item-fields">
+                  <mat-form-field appearance="outline" class="line-desc">
+                    <mat-label>Description</mat-label>
+                    <input matInput [(ngModel)]="line.description" readonly>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-xs">
+                    <mat-label>GRN Qty</mat-label>
+                    <input matInput type="number" [(ngModel)]="line.grnQuantity" readonly>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-xs">
+                    <mat-label>Return Qty</mat-label>
+                    <input matInput type="number" [(ngModel)]="line.returnQuantity" min="0">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-sm">
+                    <mat-label>Return Reason</mat-label>
+                    <mat-select [(ngModel)]="line.returnReason">
+                      <mat-option value="damaged">Damaged</mat-option>
+                      <mat-option value="defective">Defective</mat-option>
+                      <mat-option value="wrong_item">Wrong Item</mat-option>
+                      <mat-option value="excess">Excess Quantity</mat-option>
+                      <mat-option value="expired">Expired</mat-option>
+                      <mat-option value="quality">Quality Issue</mat-option>
+                      <mat-option value="other">Other</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveReturn()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save Draft'}}
+            </button>
+            <button mat-flat-button style="background:#2e7d32;color:white" (click)="saveAndSubmitReturn()" [disabled]="saving()">
+              <mat-icon>send</mat-icon> {{saving() ? 'Submitting...' : 'Save & Submit'}}
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== GRA DETAIL VIEW ===================== -->
+      @if (currentView() === 'gra-detail' && selectedGra()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedGra()!.graNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + (selectedGra()!.status || 'active')">{{(selectedGra()!.status || 'active') | titlecase}}</span>
+              <span class="dept-tag">Debit Note: {{selectedGra()!.debitNoteNumber || '—'}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button mat-stroked-button (click)="printGraPdf(selectedGra()!.id)"><mat-icon>picture_as_pdf</mat-icon> Print GRA</button>
+            <button mat-stroked-button (click)="printDebitNote(selectedGra()!.id)"><mat-icon>receipt</mat-icon> Print Debit Note</button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>info</mat-icon> GRA Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>GRA Number</label>
+                  <span class="ref-cell">{{selectedGra()!.graNumber}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Vendor</label>
+                  <span>{{selectedGra()!.vendorName || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Debit Note Number</label>
+                  <span>{{selectedGra()!.debitNoteNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created Date</label>
+                  <span>{{formatDate(selectedGra()!.createdDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created By</label>
+                  <span>{{selectedGra()!.createdBy || '—'}}</span>
+                </div>
+              </div>
+              @if (selectedGra()!.description) {
+                <div class="detail-field" style="margin-top:16px">
+                  <label>Description</label>
+                  <span class="desc-text">{{selectedGra()!.description}}</span>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>link</mat-icon> Linked References</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Return ID</label>
+                  <span class="ref-cell">{{selectedGra()!.returnId || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>GRN ID</label>
+                  <span class="ref-cell">{{selectedGra()!.grnId || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Order ID</label>
+                  <span class="ref-cell">{{selectedGra()!.orderId || '—'}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>account_balance_wallet</mat-icon> Budget Released</h3>
+            <div class="budget-impact-display budget-released">
+              <mat-icon>trending_up</mat-icon>
+              <div class="budget-impact-info">
+                <span class="budget-impact-label">Budget released from return</span>
+                <span class="budget-impact-value">{{formatCurrencyFull(selectedGra()!.budgetReleased?.amount || selectedGra()!.budgetReleased || 0)}}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>GRN Qty</th>
+                    <th>Return Qty</th>
+                    <th>Return Reason</th>
+                    <th>Unit Value</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of selectedGra()!.lineItems || []; track line; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{line.description}}</td>
+                      <td class="value-cell">{{line.grnQuantity || 0}}</td>
+                      <td class="value-cell" style="color:#c62828">{{line.returnQuantity || 0}}</td>
+                      <td>{{line.returnReason || '—'}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(line.unitPrice?.amount || line.unitPrice || 0)}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(line.totalValue?.amount || line.totalValue || 0)}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="7" class="empty-state">No line items</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (selectedGra()!.documents?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>attach_file</mat-icon> Documents</h3>
+              <div class="doc-list">
+                @for (doc of selectedGra()!.documents || []; track doc.name || doc.id) {
+                  <div class="doc-item">
+                    <mat-icon class="doc-icon">description</mat-icon>
+                    <div class="doc-info">
+                      <span class="doc-name">{{doc.name || doc.fileName}}</span>
+                      <span class="doc-meta">{{doc.type || 'Document'}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== CREATE GRA VIEW ===================== -->
+      @if (currentView() === 'create-gra') {
+        <div class="form-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>Create GRA (Goods Return Advice)</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>assignment_return</mat-icon> Select Approved Return</h3>
+            @if (!graForm.returnId) {
+              <div class="form-grid">
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Select Approved Return</mat-label>
+                  <mat-select [(ngModel)]="graForm.returnId" (selectionChange)="onReturnSelected()">
+                    @for (ret of approvedReturns(); track ret.id) {
+                      <mat-option [value]="ret.id">{{ret.returnNumber}} — {{ret.vendorName}} ({{formatDate(ret.returnDate)}})</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            } @else {
+              <div class="selected-order-info">
+                <mat-icon>check_circle</mat-icon>
+                <span>Return <strong>{{graForm.returnNumber}}</strong> selected — Vendor: <strong>{{graForm.vendorName}}</strong></span>
+                <button mat-icon-button (click)="graForm.returnId = ''; graForm.returnNumber = ''; graForm.vendorName = ''">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+
+          @if (graForm.returnId) {
+            <div class="detail-card">
+              <h3><mat-icon>description</mat-icon> GRA Details</h3>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description</mat-label>
+                <textarea matInput [(ngModel)]="graForm.description" rows="3" placeholder="Enter GRA description..."></textarea>
+              </mat-form-field>
+              <div class="info-note">
+                <mat-icon>info</mat-icon>
+                <span>The GRA number and debit note number will be auto-generated upon saving.</span>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button mat-stroked-button (click)="backToList()">
+                <mat-icon>close</mat-icon> Cancel
+              </button>
+              <button mat-flat-button color="primary" (click)="saveGra()" [disabled]="saving()">
+                <mat-icon>save</mat-icon> {{saving() ? 'Creating...' : 'Create GRA'}}
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

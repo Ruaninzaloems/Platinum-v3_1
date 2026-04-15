@@ -1,0 +1,465 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load MFMA report</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>MFMA Reporting Dashboard</h1>
+        <p class="subtitle">Section 71 Monthly &amp; Section 72 Quarterly Reports — {{ financialYearLabel }}</p>
+      </div>
+      <div class="page-actions">
+        <mat-form-field class="fy-select" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Financial Year</mat-label>
+          <mat-select [(value)]="selectedFyId" (selectionChange)="onFyChange()">
+            @for (fy of financialYears; track fy.id) {
+              <mat-option [value]="fy.id">{{ fy.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="report-toggle">
+          <button mat-stroked-button [class.active]="reportType === 'section71'" (click)="setReportType('section71')">
+            <mat-icon>calendar_month</mat-icon> S71 Monthly
+          </button>
+          <button mat-stroked-button [class.active]="reportType === 'section72'" (click)="setReportType('section72')">
+            <mat-icon>view_quilt</mat-icon> S72 Mid-Year
+          </button>
+        </div>
+
+        <mat-form-field class="period-select" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Period</mat-label>
+          <mat-select [(value)]="selectedPeriod" (selectionChange)="onPeriodChange()">
+            @for (p of periodOptions; track p.value) {
+              <mat-option [value]="p.value">{{ p.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh MFMA data">
+          <mat-icon>refresh</mat-icon>
+        </button>
+
+        <button mat-flat-button color="primary" [matMenuTriggerFor]="exportMenu" matTooltip="Export report">
+          <mat-icon>download</mat-icon> Export
+        </button>
+        <mat-menu #exportMenu="matMenu">
+          <button mat-menu-item (click)="exportForSubmission()">
+            <mat-icon>upload_file</mat-icon>
+            <span>Export for Submission (Excel)</span>
+          </button>
+          <button mat-menu-item (click)="exportPdf()">
+            <mat-icon>picture_as_pdf</mat-icon>
+            <span>Generate PDF Report</span>
+          </button>
+        </mat-menu>
+      </div>
+    </div>
+
+    <!-- Submission Status -->
+    <div class="submission-bar">
+      <div class="submission-status">
+        <span class="status-badge" [class]="'badge-' + currentSubmissionStatus">
+          {{ currentSubmissionStatus | titlecase }}
+        </span>
+        @if (currentSubmission?.submittedAt) {
+          <span class="submission-meta">
+            Submitted {{ currentSubmission!.submittedAt | date:'mediumDate' }}
+            @if (currentSubmission!.submittedBy) { by {{ currentSubmission!.submittedBy }} }
+          </span>
+        }
+        @if (validationResults.length > 0) {
+          <span class="validation-badge" matTooltip="Validation summary — view full details in the Rules Engine tab under Governance">
+            <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">rule</mat-icon>
+            @if (validationCounts.fail > 0) {
+              <span class="vb-critical">{{ validationCounts.fail }} critical</span>
+            }
+            @if (validationCounts.warning > 0) {
+              <span class="vb-warnings">{{ validationCounts.warning }} warnings</span>
+            }
+            @if (validationCounts.fail === 0 && validationCounts.warning === 0) {
+              <span class="vb-pass">All passed</span>
+            }
+          </span>
+        }
+      </div>
+      <div class="submission-actions">
+        @if (selectedPeriod === 0) {
+          <span class="period-hint">Select a specific period to validate or submit</span>
+        } @else {
+          @if (currentSubmissionStatus === 'draft') {
+            <button mat-stroked-button color="primary" (click)="runValidation()" [disabled]="validating">
+              <mat-icon>checklist</mat-icon> Run Validation
+            </button>
+          }
+          @if (currentSubmissionStatus === 'validated') {
+            <button mat-flat-button color="primary" (click)="markSubmitted()">
+              <mat-icon>send</mat-icon> Mark as Submitted
+            </button>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Validation Panel -->
+    @if (validationResults.length > 0 || validating) {
+      <mat-card class="validation-panel">
+        <div class="validation-header">
+          <div class="validation-title">
+            <mat-icon>verified</mat-icon>
+            <span>Validation Results — {{ reportType === 'section71' ? 'NT S71' : 'NT S72' }}</span>
+          </div>
+          <div class="validation-summary-chips">
+            @if (validationCounts.pass > 0) {
+              <span class="v-chip v-pass">{{ validationCounts.pass }} Passed</span>
+            }
+            @if (validationCounts.fail > 0) {
+              <span class="v-chip v-fail">{{ validationCounts.fail }} Failed</span>
+            }
+            @if (validationCounts.warning > 0) {
+              <span class="v-chip v-warning">{{ validationCounts.warning }} Warnings</span>
+            }
+          </div>
+          @if (validating) {
+            <mat-spinner diameter="20"></mat-spinner>
+          }
+        </div>
+        @if (!validating) {
+          <div class="validation-list">
+            @for (vr of validationResults; track vr.ruleId) {
+              <div class="validation-row" [class]="'vr-' + vr.status">
+                <mat-icon class="vr-icon">
+                  {{ vr.status === 'pass' ? 'check_circle' : vr.status === 'fail' ? 'cancel' : 'warning' }}
+                </mat-icon>
+                <div class="vr-content">
+                  <span class="vr-name">{{ vr.ruleName }}</span>
+                  <span class="vr-message">{{ vr.message }}</span>
+                </div>
+                <span class="vr-severity" [class]="'sev-' + vr.severity">{{ vr.severity }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+    }
+
+    <!-- KPI Strip -->
+    <div class="kpi-strip">
+      <app-kpi-tile title="Revenue Collection Rate" [value]="collectionRate + '%'" icon="trending_up"
+        [color]="collectionRate >= 90 ? 'success' : collectionRate >= 75 ? 'warning' : 'danger'"></app-kpi-tile>
+      <app-kpi-tile title="Expenditure Spending Rate" [value]="spendingRate + '%'" icon="trending_down"
+        [color]="spendingRate <= 100 ? 'success' : 'danger'"></app-kpi-tile>
+      <app-kpi-tile title="Budget Performance" [value]="budgetPerformance + '%'" icon="assessment"
+        [color]="budgetPerformance >= 80 ? 'success' : budgetPerformance >= 60 ? 'warning' : 'danger'"></app-kpi-tile>
+      <app-kpi-tile title="Net Surplus / Deficit" [value]="formatCurrency(surplus)" icon="account_balance"
+        [color]="surplus >= 0 ? 'success' : 'danger'"></app-kpi-tile>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <mat-card class="summary-card">
+        <div class="summary-label">Total Budget Revenue</div>
+        <div class="summary-value">{{ formatCurrency(totalBudgetRevenue) }}</div>
+      </mat-card>
+      <mat-card class="summary-card">
+        <div class="summary-label">Actual Revenue</div>
+        <div class="summary-value revenue">{{ formatCurrency(totalActualRevenue) }}</div>
+      </mat-card>
+      <mat-card class="summary-card">
+        <div class="summary-label">Total Budget Expenditure</div>
+        <div class="summary-value">{{ formatCurrency(totalBudgetExpenditure) }}</div>
+      </mat-card>
+      <mat-card class="summary-card">
+        <div class="summary-label">Actual Expenditure</div>
+        <div class="summary-value expenditure">{{ formatCurrency(totalActualExpenditure) }}</div>
+      </mat-card>
+    </div>
+
+    <!-- Revenue Categories -->
+    @if (revenueCategories.length > 0) {
+      <div class="section-title">
+        <mat-icon>category</mat-icon> Revenue by NT Category
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Original Budget</th>
+              <th>Adjusted Budget</th>
+              <th>Actual</th>
+              <th>Variance</th>
+              <th>Collection %</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of revenueCategories; track row.category) {
+              <tr>
+                <td class="cat-cell">{{ row.category }}</td>
+                <td class="value-cell">{{ formatCurrency(row.budgetOriginal) }}</td>
+                <td class="value-cell">{{ formatCurrency(row.budgetAdjusted) }}</td>
+                <td class="value-cell">{{ formatCurrency(row.actual) }}</td>
+                <td class="value-cell" [class.positive]="row.variance >= 0" [class.negative]="row.variance < 0">
+                  {{ formatCurrency(row.variance) }}
+                </td>
+                <td class="value-cell">
+                  <span class="rate-chip" [class]="getRateClass(row.collectionRate || 0)">{{ row.collectionRate || 0 }}%</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- Expenditure Categories -->
+    @if (expenditureCategories.length > 0) {
+      <div class="section-title">
+        <mat-icon>category</mat-icon> Expenditure by NT Category
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Original Budget</th>
+              <th>Adjusted Budget</th>
+              <th>Actual</th>
+              <th>Variance</th>
+              <th>Spending %</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of expenditureCategories; track row.category) {
+              <tr>
+                <td class="cat-cell">{{ row.category }}</td>
+                <td class="value-cell">{{ formatCurrency(row.budgetOriginal) }}</td>
+                <td class="value-cell">{{ formatCurrency(row.budgetAdjusted) }}</td>
+                <td class="value-cell">{{ formatCurrency(row.actual) }}</td>
+                <td class="value-cell" [class.positive]="row.variance <= 0" [class.negative]="row.variance > 0">
+                  {{ formatCurrency(row.variance) }}
+                </td>
+                <td class="value-cell">
+                  <span class="rate-chip" [class]="getExpRateClass(row.spendingRate || 0)">{{ row.spendingRate || 0 }}%</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- Section 71 Monthly Table -->
+    <div class="section-title">
+      <mat-icon>calendar_month</mat-icon> Section 71 — Monthly Budget vs Actual
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Budget Revenue</th>
+            <th>Actual Revenue</th>
+            <th>Rev. Variance</th>
+            <th>Budget Expenditure</th>
+            <th>Actual Expenditure</th>
+            <th>Exp. Variance</th>
+            <th>Status</th>
+            <th>Commentary</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of monthlyBreakdown; track row.period) {
+            <tr>
+              <td class="month-cell">{{ row.label }}</td>
+              <td class="value-cell">{{ formatCurrency(row.revenue.budgetAdjusted) }}</td>
+              <td class="value-cell">{{ formatCurrency(row.revenue.actual) }}</td>
+              <td class="value-cell" [class.positive]="row.revenue.variance >= 0" [class.negative]="row.revenue.variance < 0">
+                {{ formatCurrency(row.revenue.variance) }}
+              </td>
+              <td class="value-cell">{{ formatCurrency(row.expenditure.budgetAdjusted) }}</td>
+              <td class="value-cell">{{ formatCurrency(row.expenditure.actual) }}</td>
+              <td class="value-cell" [class.positive]="row.expenditure.variance <= 0" [class.negative]="row.expenditure.variance > 0">
+                {{ formatCurrency(row.expenditure.variance) }}
+              </td>
+              <td>
+                <app-traffic-light [status]="row.status"></app-traffic-light>
+              </td>
+              <td class="commentary-cell">
+                @if (editingCommentary === row.period) {
+                  <div class="commentary-edit">
+                    <input class="commentary-input" [(ngModel)]="commentaryText" placeholder="Variance explanation..." (keyup.enter)="saveCommentary(row.period, row.label)" (keyup.escape)="cancelCommentaryEdit()">
+                    <button mat-icon-button matTooltip="Save" (click)="saveCommentary(row.period, row.label)" class="commentary-btn">
+                      <mat-icon>check</mat-icon>
+                    </button>
+                    <button mat-icon-button matTooltip="Cancel" (click)="cancelCommentaryEdit()" class="commentary-btn">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                } @else {
+                  <div class="commentary-display" (click)="startCommentaryEdit(row.period)">
+                    @if (getCommentary(row.period)) {
+                      <span class="commentary-text">{{ getCommentary(row.period) }}</span>
+                      <mat-icon class="commentary-edit-icon">edit</mat-icon>
+                    } @else {
+                      <span class="commentary-placeholder">Add note...</span>
+                      <mat-icon class="commentary-edit-icon">add_comment</mat-icon>
+                    }
+                  </div>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 72 Quarterly -->
+    @if (reportType === 'section72' && data.financialPosition) {
+      <div class="section-title">
+        <mat-icon>view_quilt</mat-icon> Section 72 — Financial Position
+      </div>
+      <div class="s72-grid">
+        <mat-card class="s72-card">
+          <div class="s72-card-header">Financial Position</div>
+          <div class="s72-row">
+            <span>Total Assets</span>
+            <span class="s72-value">{{ formatCurrency(data.financialPosition.totalAssets) }}</span>
+          </div>
+          <div class="s72-row">
+            <span>Total Liabilities</span>
+            <span class="s72-value">{{ formatCurrency(data.financialPosition.totalLiabilities) }}</span>
+          </div>
+          <div class="s72-divider"></div>
+          <div class="s72-row highlight">
+            <span>Net Assets</span>
+            <span class="s72-value">{{ formatCurrency(data.financialPosition.netAssets) }}</span>
+          </div>
+        </mat-card>
+
+        <mat-card class="s72-card">
+          <div class="s72-card-header">Financial Ratios</div>
+          <div class="s72-row">
+            <span>Current Ratio</span>
+            <span class="s72-value">{{ data.financialPosition.currentRatio }}:1</span>
+          </div>
+          <div class="s72-row">
+            <span>Cash Coverage</span>
+            <span class="s72-value">{{ data.financialPosition.cashCoverageRatio }}:1</span>
+          </div>
+          <div class="s72-row">
+            <span>Debt-to-Revenue</span>
+            <span class="s72-value">{{ data.financialPosition.debtToRevenueRatio }}:1</span>
+          </div>
+        </mat-card>
+
+        @if (data.capitalExpenditure) {
+          <mat-card class="s72-card">
+            <div class="s72-card-header">Capital Expenditure</div>
+            <div class="s72-row">
+              <span>Original Budget</span>
+              <span class="s72-value">{{ formatCurrency(data.capitalExpenditure.budgetOriginal) }}</span>
+            </div>
+            <div class="s72-row">
+              <span>Adjusted Budget</span>
+              <span class="s72-value">{{ formatCurrency(data.capitalExpenditure.budgetAdjusted) }}</span>
+            </div>
+            <div class="s72-row">
+              <span>Actual</span>
+              <span class="s72-value">{{ formatCurrency(data.capitalExpenditure.actual) }}</span>
+            </div>
+            <div class="s72-divider"></div>
+            <div class="s72-row highlight">
+              <span>Spending Rate</span>
+              <span class="s72-value" [class]="getExpRateClass(data.capitalExpenditure.spendingRate)">{{ data.capitalExpenditure.spendingRate }}%</span>
+            </div>
+          </mat-card>
+        }
+
+        @if (data.midYearAssessment) {
+          <mat-card class="s72-card">
+            <div class="s72-card-header">Mid-Year Assessment</div>
+            <div class="s72-row">
+              <span>Revenue Collected</span>
+              <span class="s72-value">{{ formatCurrency(data.midYearAssessment.revenueCollected) }}</span>
+            </div>
+            <div class="s72-row">
+              <span>Revenue Target</span>
+              <span class="s72-value">{{ formatCurrency(data.midYearAssessment.revenueTarget) }}</span>
+            </div>
+            <div class="s72-row">
+              <span>Collection Rate</span>
+              <span class="s72-value" [class]="getRateClass(data.midYearAssessment.revenueCollectionRate)">{{ data.midYearAssessment.revenueCollectionRate }}%</span>
+            </div>
+            <div class="s72-divider"></div>
+            <div class="s72-row">
+              <span>Expenditure Spent</span>
+              <span class="s72-value">{{ formatCurrency(data.midYearAssessment.expenditureSpent) }}</span>
+            </div>
+            <div class="s72-row">
+              <span>Spending Rate</span>
+              <span class="s72-value" [class]="getExpRateClass(data.midYearAssessment.expenditureSpendingRate)">{{ data.midYearAssessment.expenditureSpendingRate }}%</span>
+            </div>
+          </mat-card>
+        }
+      </div>
+
+      <!-- Quarterly Breakdown -->
+      @if (quarterlyBreakdown.length > 0) {
+        <div class="section-title">
+          <mat-icon>grid_view</mat-icon> Quarterly Revenue &amp; Expenditure
+        </div>
+        <div class="quarters-grid">
+          @for (q of quarterlyBreakdown; track q.quarter) {
+            <mat-card class="quarter-card">
+              <div class="quarter-header">{{ q.label }}</div>
+              <div class="quarter-row">
+                <span class="quarter-label">Revenue (Actual)</span>
+                <span class="quarter-value">{{ formatCurrency(q.revenue.actual) }}</span>
+              </div>
+              <div class="quarter-row">
+                <span class="quarter-label">Revenue (Budget)</span>
+                <span class="quarter-value">{{ formatCurrency(q.revenue.budgetAdjusted) }}</span>
+              </div>
+              <div class="quarter-row">
+                <span class="quarter-label">Expenditure (Actual)</span>
+                <span class="quarter-value">{{ formatCurrency(q.expenditure.actual) }}</span>
+              </div>
+              <div class="quarter-row">
+                <span class="quarter-label">Expenditure (Budget)</span>
+                <span class="quarter-value">{{ formatCurrency(q.expenditure.budgetAdjusted) }}</span>
+              </div>
+              <div class="quarter-divider"></div>
+              <div class="quarter-row highlight">
+                <span class="quarter-label">Surplus / Deficit</span>
+                <span class="quarter-value" [class.positive]="q.surplus >= 0" [class.negative]="q.surplus < 0">
+                  {{ formatCurrency(q.surplus) }}
+                </span>
+              </div>
+            </mat-card>
+          }
+        </div>
+      }
+    }
+  </div>
+}

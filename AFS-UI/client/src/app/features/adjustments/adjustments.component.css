@@ -1,0 +1,17 @@
+.type-badge {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  &.pre-audit { background: #e0f2fe; color: #0284c7; }
+  &.audit { background: #fef3c7; color: #d97706; }
+  &.post-audit { background: #ede9fe; color: #7c3aed; }
+}
+.running-totals {
+  display: flex; gap: 24px; align-items: center; padding: 12px 16px; border-radius: 8px; font-size: 13px;
+  &.balanced { background: var(--platinum-success-light); }
+  &.unbalanced { background: var(--platinum-danger-light); }
+}
+.scoa-segment-info {
+  font-size: 10px; color: var(--platinum-text-muted); margin-top: 3px; line-height: 1.4;
+}
+.segment-tag {
+  display: inline-block; background: #f0f4f8; border-radius: 3px; padding: 1px 5px; margin: 1px 2px; font-size: 10px; color: #475569;
+}

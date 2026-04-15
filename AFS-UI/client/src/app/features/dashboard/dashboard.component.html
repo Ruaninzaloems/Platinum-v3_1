@@ -1,0 +1,476 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-subtitle"></div>
+      </div>
+      <div class="page-actions">
+        <div class="skeleton skeleton-button"></div>
+        <div class="skeleton skeleton-button"></div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <div class="skeleton skeleton-icon"></div>
+      <div class="skeleton" style="width:200px;height:16px;border-radius:4px"></div>
+    </div>
+    <div class="financial-strip">
+      @for (i of skeletonCards; track i) {
+        <div class="fin-card">
+          <div class="skeleton skeleton-icon-lg"></div>
+          <div class="fin-details">
+            <div class="skeleton" style="width:80px;height:10px;border-radius:3px;margin-bottom:6px"></div>
+            <div class="skeleton" style="width:120px;height:20px;border-radius:4px;margin-bottom:4px"></div>
+            <div class="skeleton" style="width:100px;height:10px;border-radius:3px"></div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="section-title">
+      <div class="skeleton skeleton-icon"></div>
+      <div class="skeleton" style="width:160px;height:16px;border-radius:4px"></div>
+    </div>
+    <div class="summary-strip">
+      @for (i of skeletonKpis; track i) {
+        <div class="kpi-card">
+          <div class="skeleton skeleton-icon-sm"></div>
+          <div class="kpi-content">
+            <div class="skeleton" style="width:70px;height:10px;border-radius:3px;margin-bottom:6px"></div>
+            <div class="skeleton" style="width:50px;height:22px;border-radius:4px;margin-bottom:4px"></div>
+            <div class="skeleton" style="width:90px;height:10px;border-radius:3px"></div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="detail-card skeleton-card">
+        <div class="skeleton" style="width:200px;height:16px;border-radius:4px;margin-bottom:16px"></div>
+        @for (i of skeletonRows; track i) {
+          <div style="margin-bottom:16px">
+            <div class="skeleton" style="width:100%;height:12px;border-radius:3px;margin-bottom:8px"></div>
+            <div class="skeleton" style="width:100%;height:8px;border-radius:3px"></div>
+          </div>
+        }
+      </div>
+      <div class="detail-card skeleton-card">
+        <div class="skeleton" style="width:180px;height:16px;border-radius:4px;margin-bottom:16px"></div>
+        @for (i of skeletonRows; track i) {
+          <div style="margin-bottom:16px">
+            <div class="skeleton" style="width:100%;height:12px;border-radius:3px;margin-bottom:8px"></div>
+            <div class="skeleton" style="width:100%;height:8px;border-radius:3px"></div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="error-container">
+    <mat-icon class="error-icon">error_outline</mat-icon>
+    <h3>Unable to load dashboard</h3>
+    <p>{{ error }}</p>
+    <button mat-flat-button color="primary" (click)="retryCount = 0; loadDashboard()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="subtitle" matTooltip="Overview showing trial balance data, compilations, audit status, and compliance metrics for the current financial year">
+          Municipal Financial Intelligence Overview
+          @if (data.financialYear) {
+            <span class="fy-badge" matTooltip="Current active financial year period">{{ data.financialYear.label }}</span>
+          }
+        </p>
+      </div>
+      <div class="page-actions">
+        <mat-form-field appearance="outline" class="period-filter-field">
+          <mat-label>Reporting Period</mat-label>
+          <mat-select [(ngModel)]="selectedPeriod" (selectionChange)="onPeriodChange()">
+            @for (p of periodOptions; track p.value) {
+              <mat-option [value]="p.value">{{ p.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button color="primary"
+                (click)="navigate('/compilations')"
+                matTooltip="Create a new AFS compilation from an existing template">
+          <mat-icon>add</mat-icon> New Compilation
+        </button>
+        <button mat-stroked-button
+                (click)="navigate('/rfis')"
+                matTooltip="Create a Request for Information to gather audit evidence">
+          <mat-icon>question_answer</mat-icon> Create RFI
+        </button>
+        <button mat-stroked-button
+                (click)="navigate('/templates')"
+                matTooltip="Upload a Trial Balance or General Ledger file for compilation">
+          <mat-icon>upload_file</mat-icon> Upload TB / GL
+        </button>
+      </div>
+    </div>
+
+    <!-- Financial Summary Strip - TB Data -->
+    @if (data.tbSummary) {
+      <div class="section-title" matTooltip="Key financial figures derived from the imported Trial Balance for the current financial year">
+        <mat-icon>account_balance</mat-icon> Financial Position Summary
+      </div>
+      <div class="financial-strip">
+        <div class="fin-card revenue"
+             matTooltip="Total revenue recognised year-to-date from all exchange and non-exchange sources per the GL. Budget: {{ data.tbSummary.totalBudgetRevenue ? formatCurrency(data.tbSummary.totalBudgetRevenue) : 'N/A — not available from source system' }}">
+          <div class="fin-icon-wrap"><mat-icon>trending_up</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Total Revenue</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.totalRevenue) }}</span>
+            <span class="fin-sub" [class.positive]="revenueCollectionRate() >= 90" [class.negative]="revenueCollectionRate() < 50">
+              @if (data.tbSummary.totalBudgetRevenue) {
+                {{ revenueCollectionRate() | number:'1.1-1' }}% of budget collected
+              } @else {
+                Budget not available from source
+              }
+            </span>
+          </div>
+        </div>
+        <div class="fin-card expenditure"
+             matTooltip="Total expenditure incurred year-to-date across all votes/departments per the GL. Budget: {{ data.tbSummary.totalBudgetExpenditure ? formatCurrency(data.tbSummary.totalBudgetExpenditure) : 'N/A — not available from source system' }}">
+          <div class="fin-icon-wrap exp"><mat-icon>trending_down</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Total Expenditure</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.totalExpenditure) }}</span>
+            <span class="fin-sub">
+              @if (data.tbSummary.totalBudgetExpenditure) {
+                {{ expenditureRate() | number:'1.1-1' }}% of budget spent
+              } @else {
+                Budget not available from source
+              }
+            </span>
+          </div>
+        </div>
+        <div class="fin-card surplus"
+             [class.deficit]="(data.tbSummary.surplus || 0) < 0"
+             matTooltip="Net surplus or deficit = Revenue - Expenditure + Gains/Losses. A positive number indicates a surplus (revenue exceeds expenditure)">
+          <div class="fin-icon-wrap" [class.exp]="(data.tbSummary.surplus || 0) < 0"><mat-icon>balance</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">{{ (data.tbSummary.surplus || 0) >= 0 ? 'Surplus' : 'Deficit' }}</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.surplus) }}</span>
+            <span class="fin-sub">Revenue less expenditure</span>
+          </div>
+        </div>
+        <div class="fin-card assets"
+             matTooltip="Total assets on the Statement of Financial Position, including current and non-current assets as per the Trial Balance">
+          <div class="fin-icon-wrap asset"><mat-icon>domain</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Total Assets</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.totalAssets) }}</span>
+            <span class="fin-sub">{{ data.kpis.tbEntryCount | number }} TB entries</span>
+          </div>
+        </div>
+        <div class="fin-card liabilities"
+             matTooltip="Total liabilities including current and non-current obligations as per the Statement of Financial Position">
+          <div class="fin-icon-wrap liab"><mat-icon>account_balance_wallet</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Total Liabilities</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.totalLiabilities) }}</span>
+            <span class="fin-sub">Current + non-current</span>
+          </div>
+        </div>
+        <div class="fin-card net-assets"
+             matTooltip="Net Assets (Accumulated Surplus/Deficit) = Total Assets + Total Liabilities. Represents the municipality's accumulated equity position">
+          <div class="fin-icon-wrap na"><mat-icon>savings</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Net Assets</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.netAssets) }}</span>
+            <span class="fin-sub">Accumulated surplus/deficit</span>
+          </div>
+        </div>
+        <div class="fin-card gains-losses"
+             matTooltip="Gains and losses from non-exchange transactions, fair value adjustments, and other items per GRAP standards">
+          <div class="fin-icon-wrap gl"><mat-icon>swap_vert</mat-icon></div>
+          <div class="fin-details">
+            <span class="fin-label">Gains & Losses</span>
+            <span class="fin-value">{{ formatCurrency(data.tbSummary.gainsLosses) }}</span>
+            <span class="fin-sub">Non-exchange & fair value</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Operational KPIs -->
+    <div class="section-title" matTooltip="Key performance indicators for AFS compilation workflow, audit collaboration, and evidence management">
+      <mat-icon>speed</mat-icon> Operational KPIs
+    </div>
+    <div class="summary-strip">
+      <div class="kpi-card" matTooltip="Total number of AFS compilations created. Approved compilations have passed review and sign-off workflow.">
+        <div class="kpi-icon-wrap blue"><mat-icon>description</mat-icon></div>
+        <div class="kpi-content">
+          <div class="kpi-label">Compilations</div>
+          <div class="kpi-value">{{ data.kpis.totalCompilations }}</div>
+          <div class="kpi-change positive">{{ data.kpis.approved }} approved</div>
+        </div>
+      </div>
+      <div class="kpi-card" matTooltip="Compilations currently in Draft or In Review status. Average completeness shows how much of the AFS template has been populated with data.">
+        <div class="kpi-icon-wrap amber"><mat-icon>pending_actions</mat-icon></div>
+        <div class="kpi-content">
+          <div class="kpi-label">In Progress</div>
+          <div class="kpi-value">{{ data.kpis.inProgress }}</div>
+          <div class="kpi-change">{{ data.kpis.avgCompleteness }}% avg completion</div>
+        </div>
+      </div>
+      <div class="kpi-card" matTooltip="Open Requests for Information from auditors awaiting response. Overdue RFIs have passed their due date and may trigger escalation per the SLA policy.">
+        <div class="kpi-icon-wrap" [class.red]="data.kpis.overdueRfis > 0" [class.green]="data.kpis.overdueRfis === 0"><mat-icon>question_answer</mat-icon></div>
+        <div class="kpi-content">
+          <div class="kpi-label">Open RFIs</div>
+          <div class="kpi-value">{{ data.kpis.openRfis }}</div>
+          <div class="kpi-change" [class.negative]="data.kpis.overdueRfis > 0">
+            {{ data.kpis.overdueRfis > 0 ? data.kpis.overdueRfis + ' overdue' : 'None overdue' }}
+          </div>
+        </div>
+      </div>
+      <div class="kpi-card" matTooltip="Audit findings that have not been resolved. These include material, significant, minor findings and observations raised by AGSA or internal audit.">
+        <div class="kpi-icon-wrap" [class.red]="data.kpis.unresolvedFindings > 0" [class.green]="data.kpis.unresolvedFindings === 0"><mat-icon>flag</mat-icon></div>
+        <div class="kpi-content">
+          <div class="kpi-label">Unresolved Findings</div>
+          <div class="kpi-value">{{ data.kpis.unresolvedFindings }}</div>
+          <div class="kpi-change">of {{ data.kpis.totalFindings }} total</div>
+        </div>
+      </div>
+      <div class="kpi-card" matTooltip="Overall compliance score based on: unresolved findings (material -15pts, significant -8pts each) and incomplete working papers (-2pts each, max -20pts). Target: 100%.">
+        <div class="kpi-icon-wrap" [class.green]="data.complianceScore >= 80" [class.amber]="data.complianceScore >= 50 && data.complianceScore < 80" [class.red]="data.complianceScore < 50">
+          <mat-icon>verified</mat-icon>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-label">Compliance Score</div>
+          <div class="kpi-value compliance-score">{{ data.complianceScore }}%</div>
+          <mat-progress-bar mode="determinate" [value]="data.complianceScore"
+            [color]="data.complianceScore >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+        </div>
+      </div>
+      <div class="kpi-card" matTooltip="Total audit evidence documents uploaded to the Evidence Vault. Includes supporting documents linked to RFIs, findings, and working papers.">
+        <div class="kpi-icon-wrap purple"><mat-icon>folder_special</mat-icon></div>
+        <div class="kpi-content">
+          <div class="kpi-label">Evidence Docs</div>
+          <div class="kpi-value">{{ data.kpis.evidenceCount }}</div>
+          <div class="kpi-change">documents uploaded</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GL Summary -->
+    @if (data.glSummary && data.glSummary.totalEntries > 0) {
+      <div class="section-title" matTooltip="General Ledger transaction summary by mSCOA category, showing total journal entries and amounts. GL grand total should be R0 (double-entry).">
+        <mat-icon>menu_book</mat-icon> General Ledger Summary
+        <span class="gl-total-badge" [class.balanced]="isGlBalanced()" matTooltip="GL grand total — should be R0.00 for balanced double-entry accounting">
+          <mat-icon>{{ isGlBalanced() ? 'check_circle' : 'warning' }}</mat-icon>
+          Grand Total: {{ formatCurrency(data.glSummary.rawGrandTotal ?? data.glSummary.grandTotal) }}
+        </span>
+        <span class="gl-entries-badge" matTooltip="Total number of General Ledger journal entries">
+          {{ data.glSummary.totalEntries | number }} entries
+        </span>
+      </div>
+      <div class="gl-strip">
+        @for (cat of data.glSummary.categories; track cat.itemType) {
+          <div class="gl-cat-card" [matTooltip]="cat.category + ': ' + (cat.entryCount | number) + ' entries totalling ' + formatCurrency(cat.totalAmount)">
+            <div class="gl-cat-icon" [class]="'gl-icon-' + cat.itemType.toLowerCase()">
+              <mat-icon>{{ getGlCatIcon(cat.itemType) }}</mat-icon>
+            </div>
+            <div class="gl-cat-details">
+              <span class="gl-cat-name">{{ cat.category }}</span>
+              <span class="gl-cat-amount" [class.negative-value]="cat.totalAmount < 0">{{ formatCurrency(cat.totalAmount) }}</span>
+              <span class="gl-cat-count">{{ cat.entryCount | number }} entries</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Budget vs Actual + TB Category Breakdown -->
+    <div class="dashboard-grid">
+      @if (data.tbCategoryBreakdown.length > 0) {
+        <mat-card class="detail-card">
+          <div class="card-title" matTooltip="Trial Balance breakdown by GRAP financial statement category showing closing balances and budget allocations">
+            <mat-icon>pie_chart</mat-icon> Trial Balance by Category
+          </div>
+          <div class="category-list">
+            @for (cat of data.tbCategoryBreakdown; track cat.category) {
+              <div class="category-row"
+                   [matTooltip]="cat.category + ': ' + cat.entryCount + ' TB entries | Actual: ' + formatCurrency(cat.totalClosing) + ' | Budget: ' + formatCurrency(cat.totalBudget) + (cat.budgetOriginal ? ' (Original: ' + formatCurrency(cat.budgetOriginal) + ', Adjusted: ' + formatCurrency(cat.budgetAdjusted) + ')' : '')">
+                <div class="cat-header">
+                  <span class="cat-name">{{ cat.category }}</span>
+                  <span class="cat-count">{{ cat.entryCount | number }} entries</span>
+                </div>
+                <div class="cat-amounts">
+                  <div class="cat-amount">
+                    <span class="cat-amount-label">Actual</span>
+                    <span class="cat-amount-value" [class.negative-value]="cat.totalClosing < 0">{{ formatCurrency(cat.totalClosing) }}</span>
+                  </div>
+                  <div class="cat-amount">
+                    <span class="cat-amount-label">Budget</span>
+                    <span class="cat-amount-value">{{ formatCurrency(cat.totalBudget) }}</span>
+                  </div>
+                </div>
+                <mat-progress-bar mode="determinate"
+                  [value]="getUtilisation(cat.totalClosing, cat.totalBudget)"
+                  [color]="getUtilisation(cat.totalClosing, cat.totalBudget) > 100 ? 'warn' : 'primary'"
+                  [matTooltip]="'Budget utilisation: ' + (getUtilisation(cat.totalClosing, cat.totalBudget) | number:'1.1-1') + '%'">
+                </mat-progress-bar>
+              </div>
+            }
+          </div>
+        </mat-card>
+      }
+
+      @if (data.budgetVsActual.length > 0) {
+        <mat-card class="detail-card">
+          <div class="card-title" matTooltip="Comparison of actual revenue and expenditure against the approved/adjusted budget. Variance shows over/under-collection or spending.">
+            <mat-icon>bar_chart</mat-icon> Budget vs Actual
+          </div>
+          <div class="budget-comparison">
+            @for (bva of data.budgetVsActual; track bva.category) {
+              <div class="bva-item"
+                   [matTooltip]="bva.category + ' - Actual: ' + formatCurrency(bva.actual) + ' | Budget: ' + formatCurrency(bva.budget) + ' | Variance: ' + formatCurrency(bva.variance) + ' (' + (bva.variancePercent | number:'1.1-1') + '%)'">
+                <div class="bva-header">
+                  <span class="bva-category">{{ bva.category }}</span>
+                  <span class="bva-variance" [class.positive]="bva.variancePercent <= 0" [class.negative]="bva.variancePercent > 0">
+                    {{ bva.variancePercent | number:'1.1-1' }}%
+                  </span>
+                </div>
+                <div class="bva-bars">
+                  <div class="bva-bar-row">
+                    <span class="bva-bar-label">Actual</span>
+                    <div class="bva-bar-track">
+                      <div class="bva-bar-fill actual" [style.width.%]="getBarWidth(bva.actual, bva.budget)"></div>
+                    </div>
+                    <span class="bva-bar-value">{{ formatCurrency(bva.actual) }}</span>
+                  </div>
+                  <div class="bva-bar-row">
+                    <span class="bva-bar-label">Budget</span>
+                    <div class="bva-bar-track">
+                      <div class="bva-bar-fill budget" [style.width.%]="100"></div>
+                    </div>
+                    <span class="bva-bar-value">{{ formatCurrency(bva.budget) }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </mat-card>
+      }
+    </div>
+
+    <!-- Top Revenue & Expenditure Items -->
+    <div class="dashboard-grid">
+      @if (data.topRevenueItems.length > 0) {
+        <mat-card class="detail-card">
+          <div class="card-title" matTooltip="Top 10 revenue line items by value from the Trial Balance, showing actual collection against budget">
+            <mat-icon>arrow_upward</mat-icon> Top Revenue Items
+          </div>
+          <div class="top-items-list">
+            @for (item of data.topRevenueItems; track item.item) {
+              <div class="top-item"
+                   [matTooltip]="getItemName(item.item) + ': Actual ' + formatCurrency(item.actual) + ' | Budget ' + formatCurrency(item.budget)">
+                <span class="top-item-name">{{ getItemName(item.item) }}</span>
+                <span class="top-item-value" [class.negative-value]="item.actual < 0">{{ formatCurrency(item.actual) }}</span>
+              </div>
+            }
+          </div>
+        </mat-card>
+      }
+
+      @if (data.topExpenditureItems.length > 0) {
+        <mat-card class="detail-card">
+          <div class="card-title" matTooltip="Top 10 expenditure line items by value from the Trial Balance, showing actual spending against budget">
+            <mat-icon>arrow_downward</mat-icon> Top Expenditure Items
+          </div>
+          <div class="top-items-list">
+            @for (item of data.topExpenditureItems; track item.item) {
+              <div class="top-item"
+                   [matTooltip]="getItemName(item.item) + ': Actual ' + formatCurrency(item.actual) + ' | Budget ' + formatCurrency(item.budget)">
+                <span class="top-item-name">{{ getItemName(item.item) }}</span>
+                <span class="top-item-value">{{ formatCurrency(item.actual) }}</span>
+              </div>
+            }
+          </div>
+        </mat-card>
+      }
+    </div>
+
+    <!-- Activity & Adjustments -->
+    <div class="dashboard-grid">
+      <mat-card class="detail-card">
+        <div class="card-title" matTooltip="Most recent actions across all modules including compilations, RFIs, findings, and adjustments">
+          <mat-icon>history</mat-icon> Recent Activity
+        </div>
+        @if (data.recentActivity.length === 0) {
+          <p class="empty-text">No recent activity — start by creating a compilation or uploading a trial balance</p>
+        } @else {
+          <div class="activity-list">
+            @for (activity of data.recentActivity; track activity.date) {
+              <div class="activity-item"
+                   [matTooltip]="activity.action + ' — ' + (activity.date | date:'medium')">
+                <mat-icon class="activity-icon">{{ getActivityIcon(activity.type) }}</mat-icon>
+                <div class="activity-content">
+                  <span class="activity-action">{{ activity.action }}</span>
+                  <span class="activity-date">{{ activity.date | date:'medium' }}</span>
+                </div>
+                <mat-chip [matTooltip]="'Activity type: ' + activity.type">{{ activity.type }}</mat-chip>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="detail-card">
+        <div class="card-title" matTooltip="Summary of audit adjustments (pre-audit, audit, post-audit). Posted adjustments have been applied to the AFS figures.">
+          <mat-icon>tune</mat-icon> Adjustment Summary
+        </div>
+        <div class="adjustment-stats">
+          <div class="stat-row" matTooltip="Total number of adjustment journals created across all types (pre-audit, audit, post-audit)">
+            <span class="stat-label">Total Adjustments</span>
+            <span class="stat-value">{{ data.adjustmentSummary.total }}</span>
+          </div>
+          <div class="stat-row" matTooltip="Number of adjustments that have been approved and posted to the AFS figures">
+            <span class="stat-label">Posted</span>
+            <span class="stat-value">{{ data.adjustmentSummary.posted }}</span>
+          </div>
+          <div class="stat-row" matTooltip="Total Rand value of all posted adjustments (sum of debit amounts)">
+            <span class="stat-label">Total Amount</span>
+            <span class="stat-value">{{ formatCurrency(data.adjustmentSummary.totalAmount) }}</span>
+          </div>
+          <mat-progress-bar mode="determinate"
+            [value]="data.adjustmentSummary.total > 0 ? (data.adjustmentSummary.posted / data.adjustmentSummary.total) * 100 : 0"
+            matTooltip="Percentage of adjustments that have been posted">
+          </mat-progress-bar>
+          <span class="progress-label">
+            {{ data.adjustmentSummary.total > 0 ? ((data.adjustmentSummary.posted / data.adjustmentSummary.total) * 100 | number:'1.0-0') : 0 }}% posted
+          </span>
+        </div>
+
+        <div class="card-title mt-16" matTooltip="Breakdown of audit findings by severity level per AGSA methodology">
+          <mat-icon>assessment</mat-icon> Findings by Severity
+        </div>
+        <div class="findings-grid">
+          <div class="finding-severity material" matTooltip="Material findings: Matters that are material to the financial statements or represent material non-compliance. These typically result in a qualified, adverse, or disclaimer audit opinion.">
+            <span class="sev-count">{{ data.findingsBySeverity['material'] || 0 }}</span>
+            <span class="sev-label">Material</span>
+          </div>
+          <div class="finding-severity significant" matTooltip="Significant findings: Matters that are significant but not material. These are reported in the management report and may affect the overall audit outcome.">
+            <span class="sev-count">{{ data.findingsBySeverity['significant'] || 0 }}</span>
+            <span class="sev-label">Significant</span>
+          </div>
+          <div class="finding-severity minor" matTooltip="Minor findings: Less significant matters that should be addressed but do not impact the audit opinion or the management report.">
+            <span class="sev-count">{{ data.findingsBySeverity['minor'] || 0 }}</span>
+            <span class="sev-label">Minor</span>
+          </div>
+          <div class="finding-severity observation" matTooltip="Observations: Advisory points for improvement, not classified as formal findings. These are communicated for management attention.">
+            <span class="sev-count">{{ data.findingsBySeverity['observation'] || 0 }}</span>
+            <span class="sev-label">Observation</span>
+          </div>
+        </div>
+      </mat-card>
+    </div>
+  </div>
+}

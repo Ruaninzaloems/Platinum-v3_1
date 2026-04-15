@@ -1,0 +1,338 @@
+@if (view === 'list') {
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ funds.length }}</span>
+      <span class="summary-label">{{ benefitLabel }} Funds</span>
+    </div>
+    <div class="summary-stat">
+      <select class="form-control benefit-type-select" [(ngModel)]="benefitType" (ngModelChange)="onBenefitTypeChange()">
+        @for (bt of benefitTypes; track bt.value) {
+          <option [value]="bt.value">{{ bt.label }}</option>
+        }
+      </select>
+      <span class="summary-label">Benefit Type</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search by fund name, administrator..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterFunds()">
+      <span class="result-count">{{ filteredFunds.length }} results</span>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="16"></app-icon> Add Fund</button>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading retirement funds...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredFunds.length === 0) {
+        <div class="empty-state"><h3>No {{ benefitLabel.toLowerCase() }} funds found</h3><p>{{ funds.length === 0 ? 'Click "Add Fund" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th class="col-id">ID</th>
+                <th>Fund Name</th>
+                <th>Plan Name</th>
+                <th>Administrator</th>
+                <th>Clearance No</th>
+                <th>Fund Type</th>
+                <th style="text-align:right">Category Factor</th>
+                @if (showContributions) {
+                  <th style="text-align:right">Employer %</th>
+                  <th style="text-align:right">Employee %</th>
+                }
+                <th>Dates</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of filteredFunds; track f.id; let i = $index) {
+                <tr (click)="openDetail(f, i)">
+                  <td><span class="id-badge">{{ f.id }}</span></td>
+                  <td><span class="title-text">{{ f.name }}</span></td>
+                  <td>{{ f.plan_name || '-' }}</td>
+                  <td>{{ vendorName(f.vendor_id) }}</td>
+                  <td>{{ f.clearance_no || '-' }}</td>
+                  <td>{{ f.fund_sub_type || '-' }}</td>
+                  <td style="text-align:right">{{ f.fund_category_factor ? f.fund_category_factor + '%' : '-' }}</td>
+                  @if (showContributions) {
+                    <td style="text-align:right">{{ formatPct(f.employer_contribution_value || f.employer_contribution_rate) }}</td>
+                    <td style="text-align:right">{{ formatPct(f.employee_contribution_value || f.employee_contribution_rate) }}</td>
+                  }
+                  <td class="date-cell">{{ f.start_date ? f.start_date.split('T')[0] : '-' }} — {{ formatDate(f.end_date) }}</td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(f, i); $event.stopPropagation()" title="View"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(f, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (fund.id) {
+          <div class="detail-meta">
+            <span class="text-muted">Code: {{ fund.code }}</span>
+            <span class="text-muted">Type: {{ benefitLabel }}</span>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (fund.id) {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ funds.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= funds.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+      }
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="section-title">Benefit Type</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Benefit Type <span class="required">*</span></label>
+        <div class="field-value">{{ benefitLabel }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="section-title">Record Start and End Dates</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Start Date <span class="required">*</span></label>
+        @if (isEditable) {
+          <app-date-input [(ngModel)]="fund.start_date"></app-date-input>
+        } @else {
+          <div class="field-value">{{ fund.start_date ? fund.start_date.split('T')[0] : '-' }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>End Date <span class="required">*</span></label>
+        @if (isEditable) {
+          <app-date-input [(ngModel)]="fund.end_date"></app-date-input>
+        } @else {
+          <div class="field-value">{{ formatDate(fund.end_date) }}</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="section-title">{{ sectionTitle }}</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>{{ adminLabel }} <span class="required">*</span></label>
+        @if (isEditable) {
+          <select class="form-control" [(ngModel)]="fund.vendor_id">
+            <option value="">-- Select --</option>
+            @for (v of vendors; track v.id) {
+              <option [value]="v.id">{{ v.name }}</option>
+            }
+          </select>
+        } @else {
+          <div class="field-value">{{ vendorName(fund.vendor_id) }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>{{ fundNameLabel }} <span class="required">*</span></label>
+        @if (isEditable) {
+          <input class="form-control" [(ngModel)]="fund.plan_name" placeholder="Enter plan/fund name">
+        } @else {
+          <div class="field-value">{{ fund.plan_name || '-' }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Clearance No <span class="required">*</span></label>
+        @if (isEditable) {
+          <input class="form-control" [(ngModel)]="fund.clearance_no" placeholder="Enter clearance number">
+        } @else {
+          <div class="field-value">{{ fund.clearance_no || '-' }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Fund Type <span class="required">*</span></label>
+        @if (isEditable) {
+          <select class="form-control" [(ngModel)]="fund.fund_sub_type">
+            <option value="">-- Select --</option>
+            @for (ft of fundSubTypes; track ft) {
+              <option [value]="ft">{{ ft }}</option>
+            }
+          </select>
+        } @else {
+          <div class="field-value">{{ fund.fund_sub_type || '-' }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Fund Category Factor <span class="required">*</span></label>
+        @if (isEditable) {
+          <div class="input-with-suffix">
+            <input class="form-control" type="number" [(ngModel)]="fund.fund_category_factor" step="0.01" min="0">
+            <span class="input-suffix">%</span>
+          </div>
+        } @else {
+          <div class="field-value">{{ fund.fund_category_factor ? fund.fund_category_factor + '%' : '-' }}</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (showContributions) {
+    <div class="contributions-row">
+      <div class="detail-card contribution-card">
+        <div class="section-title">Employer</div>
+        <div class="contrib-layout">
+          <div class="form-group">
+            <label>Contribution Type</label>
+            @if (isEditable) {
+              <div class="radio-row">
+                <label class="radio-label"><input type="radio" [(ngModel)]="fund.employer_contribution_type" value="PERCENTAGE"> %</label>
+                <label class="radio-label"><input type="radio" [(ngModel)]="fund.employer_contribution_type" value="FIXED"> Fixed</label>
+              </div>
+            } @else {
+              <div class="field-value">{{ fund.employer_contribution_type === 'FIXED' ? 'Fixed' : 'Percentage' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Contribution Value <span class="required">*</span></label>
+            @if (isEditable) {
+              <div class="input-with-suffix">
+                <input class="form-control" type="number" [(ngModel)]="fund.employer_contribution_value" step="0.01" min="0">
+                <span class="input-suffix">{{ fund.employer_contribution_type === 'FIXED' ? 'R' : '%' }}</span>
+              </div>
+            } @else {
+              <div class="field-value">{{ fund.employer_contribution_value || 0 }}{{ fund.employer_contribution_type === 'FIXED' ? '' : '%' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Maximum Value <span class="required">*</span></label>
+            @if (isEditable) {
+              <div class="input-with-suffix">
+                <input class="form-control" type="number" [(ngModel)]="fund.employer_max_value" step="0.01" min="0">
+                <span class="input-suffix">R</span>
+              </div>
+            } @else {
+              <div class="field-value">{{ formatCurrency(fund.employer_max_value) }}</div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-card contribution-card">
+        <div class="section-title">Employee</div>
+        <div class="contrib-layout">
+          <div class="form-group">
+            <label>Pro-rata transaction?</label>
+            @if (isEditable) {
+              <div class="checkbox-row">
+                <label class="checkbox-label"><input type="checkbox" [(ngModel)]="fund.employee_pro_rata"></label>
+              </div>
+            } @else {
+              <div class="field-value">
+                <span class="tag" [class]="fund.employee_pro_rata ? 'tag-yes' : 'tag-no'">{{ fund.employee_pro_rata ? 'Yes' : 'No' }}</span>
+              </div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Contribution Value <span class="required">*</span></label>
+            @if (isEditable) {
+              <div class="input-with-suffix">
+                <input class="form-control" type="number" [(ngModel)]="fund.employee_contribution_value" step="0.01" min="0">
+                <span class="input-suffix">%</span>
+              </div>
+            } @else {
+              <div class="field-value">{{ fund.employee_contribution_value || 0 }}%</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Maximum Value <span class="required">*</span></label>
+            @if (isEditable) {
+              <div class="input-with-suffix">
+                <input class="form-control" type="number" [(ngModel)]="fund.employee_max_value" step="0.01" min="0">
+                <span class="input-suffix">R</span>
+              </div>
+            } @else {
+              <div class="field-value">{{ formatCurrency(fund.employee_max_value) }}</div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (benefitType === 'RETIREMENT_ANNUITY') {
+    <div class="detail-card">
+      <p class="info-message">Employer and Employee Contributions are setup on Employee Details screen as they are defined on an Employee level and not per Plan</p>
+    </div>
+  }
+
+  <div class="detail-card">
+    <div class="section-title">Additional Salary Transactions for Calculation of Pensionable Salary</div>
+    @if (isEditable && fund.id) {
+      <div class="salary-head-add-row">
+        <select class="form-control" [(ngModel)]="selectedSalaryHead" style="max-width: 350px;">
+          <option value="">-- Select --</option>
+          @for (sh of availableSalaryHeads; track sh.id) {
+            <option [value]="sh.id">{{ sh.name }}</option>
+          }
+        </select>
+        <button class="btn btn-sm" (click)="addSalaryHead()" [disabled]="!selectedSalaryHead">Add</button>
+      </div>
+    }
+    @if (!fund.id && mode === 'create') {
+      <p class="text-muted" style="font-size: 13px; padding: 8px 0;">Save the fund first, then you can add salary transactions.</p>
+    }
+    <div class="table-wrap" style="margin-top: 8px;">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th>Salary Transaction</th>
+            @if (isEditable && fund.id) {
+              <th style="width: 80px;">Action</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (fundSalaryHeads.length === 0) {
+            <tr><td [attr.colspan]="isEditable && fund.id ? 2 : 1" class="text-muted" style="text-align: center; padding: 12px;">No records to display.</td></tr>
+          }
+          @for (sh of fundSalaryHeads; track sh.id) {
+            <tr>
+              <td>{{ sh.name }}</td>
+              @if (isEditable && fund.id) {
+                <td><button class="btn btn-sm" (click)="removeSalaryHead(sh)" title="Remove"><app-icon name="trash" [size]="12"></app-icon></button></td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

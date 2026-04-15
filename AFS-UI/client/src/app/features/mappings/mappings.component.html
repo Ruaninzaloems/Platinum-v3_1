@@ -1,0 +1,524 @@
+<div class="page-container studio-page" [class.fullscreen-mode]="isFullscreen">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Mapping Studio</h1>
+      @if (activeCompilation) {
+        <div class="compilation-meta">
+          <span class="meta-item"><strong>{{ activeCompilation.name }}</strong></span>
+          <span class="meta-divider">|</span>
+          <span class="meta-item">{{ activeCompilation.template?.name }}</span>
+          @if (isSystemDefaultTemplate()) {
+            <span class="system-default-badge">System Default</span>
+          }
+          <span class="meta-divider">|</span>
+          <span class="meta-item">{{ activeCompilation.financialYear?.label }}</span>
+          @if (activeCompilation.periodFrom && activeCompilation.periodTo) {
+            <span class="meta-divider">|</span>
+            <span class="meta-item">{{ formatPeriod(activeCompilation.periodFrom) }} – {{ formatPeriod(activeCompilation.periodTo) }}</span>
+          }
+        </div>
+      } @else {
+        <div class="subtitle">Open a compilation to begin mapping</div>
+      }
+    </div>
+    <div class="page-actions">
+      <mat-form-field subscriptSizing="dynamic" class="template-select">
+        <mat-label>Compilation</mat-label>
+        <mat-select [(value)]="selectedCompilationId" (selectionChange)="onCompilationChange()">
+          @for (c of allCompilations; track c.id) {
+            <mat-option [value]="c.id">{{ c.name }} ({{ c.template?.name }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (selectedCompilationId) {
+        <button mat-flat-button class="btn-primary" (click)="saveMapping()" [disabled]="savingMapping" matTooltip="Save mapping state and recalculate compilation">
+          @if (savingMapping) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>save</mat-icon>
+          }
+          Save Mapping
+        </button>
+        <button mat-stroked-button (click)="openCopyPriorDialog()" [disabled]="copyingPrior" matTooltip="Copy mapping rules from a prior compilation">
+          @if (copyingPrior) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>content_paste</mat-icon>
+          }
+          Copy Prior Mapping
+        </button>
+        <button mat-stroked-button (click)="confirmResetToDefault()" [disabled]="resettingDefault" matTooltip="Reset mapping to NT Specimen defaults">
+          @if (resettingDefault) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>restart_alt</mat-icon>
+          }
+          Reset to Default
+        </button>
+        <button mat-stroked-button (click)="showUnmatchedPanel = !showUnmatchedPanel" matTooltip="Show unmatched trial balance rows" [class.active-toggle]="showUnmatchedPanel">
+          <mat-icon>warning_amber</mat-icon>
+          Unmatched TB
+          @if (unmatchedTbRows.length > 0) {
+            <span class="unmatched-count-badge">{{ unmatchedTbRows.length }}</span>
+          }
+        </button>
+        <button mat-stroked-button (click)="toggleShowInactive()" [class.active-toggle]="showInactiveItems" matTooltip="Show or hide sections with no trial balance data">
+          <mat-icon>{{ showInactiveItems ? 'visibility' : 'visibility_off' }}</mat-icon>
+          {{ showInactiveItems ? 'Showing All' : 'Active Only' }}
+        </button>
+        <button mat-flat-button class="btn-primary" (click)="validateAll()" [disabled]="!selectedTemplateId || validating" matTooltip="Run validation">
+          @if (validating) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>verified</mat-icon>
+          }
+          Validate
+        </button>
+        <button mat-stroked-button (click)="autoSuggest()" [disabled]="!selectedTemplateId || suggesting" matTooltip="Auto-suggest mappings">
+          @if (suggesting) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>auto_fix_high</mat-icon>
+          }
+          Auto-Suggest
+        </button>
+        <button mat-stroked-button (click)="showCloneDialog()" [disabled]="!selectedTemplateId || cloning" matTooltip="Clone this template as a custom editable copy">
+          @if (cloning) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          } @else {
+            <mat-icon>content_copy</mat-icon>
+          }
+          Customize Template
+        </button>
+        <button mat-stroked-button [matMenuTriggerFor]="exportMenu" [disabled]="!selectedTemplateId" matTooltip="Export mapping report">
+          <mat-icon>download</mat-icon>
+          Export
+        </button>
+        <mat-menu #exportMenu="matMenu">
+          <button mat-menu-item (click)="exportMappings('csv')">
+            <mat-icon>table_chart</mat-icon> CSV Lead Schedule
+          </button>
+          <button mat-menu-item (click)="exportMappings('pdf')">
+            <mat-icon>picture_as_pdf</mat-icon> PDF Lead Schedule
+          </button>
+        </mat-menu>
+      }
+      @if (!isFullscreen) {
+        <button mat-stroked-button (click)="openFullScreen()" matTooltip="Open Mapping Studio in full screen (new tab)">
+          <mat-icon>open_in_new</mat-icon>
+          Full Screen
+        </button>
+      }
+      @if (isFullscreen) {
+        <button mat-stroked-button (click)="closeFullScreen()" matTooltip="Close full screen and return to main app">
+          <mat-icon>close_fullscreen</mat-icon>
+          Exit Full Screen
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (!selectedCompilationId) {
+    <div class="no-compilation-prompt">
+      <mat-icon class="prompt-icon">assignment</mat-icon>
+      <h2>No Compilation Selected</h2>
+      <p>Select a compilation above to open the Mapping Studio, or navigate to the Compilations page to create one.</p>
+    </div>
+  }
+
+  @if (selectedCompilationId) {
+  <div class="summary-strip">
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Total Mappings</div>
+        <div class="kpi-value">{{ coverage?.totalMappings || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Coverage</div>
+        <div class="kpi-value" [class.text-success]="(coverage?.coveragePercentage || 0) >= 80" [class.text-warning]="(coverage?.coveragePercentage || 0) >= 50 && (coverage?.coveragePercentage || 0) < 80" [class.text-danger]="(coverage?.coveragePercentage || 0) < 50">
+          {{ coverage?.coveragePercentage || 0 }}%
+        </div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Approved</div>
+        <div class="kpi-value text-success">{{ coverage?.byWorkflowStatus?.['approved'] || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Pending Review</div>
+        <div class="kpi-value text-warning">{{ coverage?.byWorkflowStatus?.['pending_review'] || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Draft</div>
+        <div class="kpi-value">{{ coverage?.byWorkflowStatus?.['draft'] || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Unmapped Items</div>
+        <div class="kpi-value text-danger">{{ coverage?.unmappedLineItems || 0 }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-panel-layout" cdkDropListGroup>
+    <div class="panel-left" [style.width.px]="leftPanelWidth">
+      <app-disclosure-tree
+        [templateId]="selectedTemplateId"
+        [compilationId]="selectedCompilationId"
+        [editable]="isTemplateEditable()"
+        (nodeSelected)="onNodeSelected($event)"
+        (treeChanged)="onTreeChanged()">
+      </app-disclosure-tree>
+      <div class="resize-handle left-resize"
+        (mousedown)="startResize($event, 'left')">
+      </div>
+    </div>
+
+    <div class="panel-center-split">
+      <div class="center-top" [style.flex]="centerTopFlex">
+        <app-mapping-workspace
+          [selectedLineItem]="selectedLineItem"
+          [templateId]="selectedTemplateId"
+          [tenantId]="tenantId"
+          [workflowFilter]="workflowFilter"
+          [isTemplateDraft]="isTemplateEditable()"
+          [compilationId]="selectedCompilationId"
+          (mappingChanged)="onMappingChanged()"
+          (defaultsLoaded)="onDefaultsLoaded($event)"
+          (defaultMappingRemoved)="onDefaultMappingRemoved($event)"
+          (requireCloneBeforeEdit)="onRequireCloneBeforeEdit()">
+        </app-mapping-workspace>
+      </div>
+      <div class="center-divider" (mousedown)="startResize($event, 'center')">
+        <mat-icon>drag_handle</mat-icon>
+      </div>
+      <div class="center-bottom" [style.flex]="centerBottomFlex">
+        <app-scoa-explorer
+          [mappedAccountCodes]="mappedAccountCodes"
+          [hideAlreadyMapped]="true"
+          [showOnlyWithBalance]="true"
+          [templateId]="selectedTemplateId"
+          (accountSelected)="onScoaAccountSelected($event)"
+          (batchSelected)="onScoaBatchSelected($event)">
+        </app-scoa-explorer>
+      </div>
+    </div>
+  </div>
+  }
+</div>
+
+@if (showValidationOverlay) {
+  <div class="overlay-backdrop" (click)="showValidationOverlay = false"></div>
+  <div class="overlay-panel validation-panel">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <mat-icon [class.text-success]="validationReport?.validationPassed" [class.text-danger]="!validationReport?.validationPassed">
+          {{ validationReport?.validationPassed ? 'check_circle' : 'warning' }}
+        </mat-icon>
+        <span>Validation Report</span>
+      </div>
+      <div class="overlay-actions">
+        @if (validationReport && validationReport.unmappedLineItems.length > 0) {
+          <button mat-stroked-button class="nav-first-btn" (click)="navigateToFirstUnmapped()">
+            <mat-icon>arrow_forward</mat-icon> Go to First Unmapped
+          </button>
+        }
+        <button mat-icon-button (click)="showValidationOverlay = false"><mat-icon>close</mat-icon></button>
+      </div>
+    </div>
+
+    @if (validationReport) {
+      <div class="overlay-body">
+        <div class="validation-summary">
+          <div class="val-stat clickable" [class.active-filter]="validationFilter === 'coverage'" (click)="toggleValidationFilter('coverage')" matTooltip="Click to view coverage details">
+            <span class="val-stat-value">{{ validationReport.coveragePercentage }}%</span>
+            <span class="val-stat-label">Coverage</span>
+          </div>
+          <div class="val-stat clickable" [class.active-filter]="validationFilter === 'mapped'" (click)="toggleValidationFilter('mapped')" matTooltip="Click to see mapped items">
+            <span class="val-stat-value">{{ validationReport.mappedCount }}</span>
+            <span class="val-stat-label">Mapped</span>
+          </div>
+          <div class="val-stat clickable" [class.active-filter]="validationFilter === 'unmapped'" (click)="toggleValidationFilter('unmapped')" matTooltip="Click to see unmapped items">
+            <span class="val-stat-value text-danger">{{ validationReport.unmappedCount }}</span>
+            <span class="val-stat-label">Unmapped</span>
+          </div>
+          <div class="val-stat clickable" [class.active-filter]="validationFilter === 'rules'" (click)="toggleValidationFilter('rules')" matTooltip="Click to see all mapping rules">
+            <span class="val-stat-value">{{ validationReport.totalMappings }}</span>
+            <span class="val-stat-label">Total Rules</span>
+          </div>
+        </div>
+
+        @if (validationFilter === 'unmapped' || !validationFilter) {
+          <div class="validation-checks">
+            @for (check of validationReport.checks; track check.name) {
+              <div class="check-row" [class.passed]="check.passed" [class.failed]="!check.passed">
+                <mat-icon>{{ check.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+                <div>
+                  <div class="check-name">{{ check.name }}</div>
+                  <div class="check-message">{{ check.message }}</div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (validationFilter === 'unmapped' || !validationFilter) {
+          @if (validationReport.unmappedLineItems.length > 0) {
+            <div class="unmapped-section">
+              <div class="section-label-row">
+                <span class="section-label">Unmapped Line Items ({{ validationReport.unmappedLineItems.length }})</span>
+                <mat-form-field subscriptSizing="dynamic" class="unmapped-search-field">
+                  <mat-icon matPrefix>search</mat-icon>
+                  <input matInput [(ngModel)]="unmappedSearchQuery" placeholder="Filter unmapped..." class="unmapped-search-input">
+                </mat-form-field>
+              </div>
+              <div class="unmapped-list">
+                @for (item of filteredUnmappedItems(); track item.id) {
+                  <div class="unmapped-item clickable-item" (click)="navigateToUnmappedItem(item)" matTooltip="Click to navigate to this line item and start mapping">
+                    <span class="unmapped-code">{{ item.code || '—' }}</span>
+                    <span class="unmapped-label">{{ item.label }}</span>
+                    <span class="unmapped-section-name">{{ item.sectionTitle }}</span>
+                    <mat-icon class="nav-icon">arrow_forward</mat-icon>
+                  </div>
+                }
+                @if (filteredUnmappedItems().length === 0 && unmappedSearchQuery) {
+                  <div class="no-results">No items matching "{{ unmappedSearchQuery }}"</div>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        @if (validationFilter === 'mapped') {
+          <div class="filter-info">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ validationReport.mappedCount }} line items have at least one mapping rule assigned.</span>
+          </div>
+        }
+
+        @if (validationFilter === 'rules') {
+          <div class="filter-info">
+            <mat-icon>rule</mat-icon>
+            <span>{{ validationReport.totalMappings }} total mapping rules across all line items.</span>
+          </div>
+          @if (validationReport.duplicateMappings.length > 0) {
+            <div class="duplicates-section">
+              <div class="section-label">Duplicate Mappings ({{ validationReport.duplicateMappings.length }})</div>
+              <div class="unmapped-list">
+                @for (dup of validationReport.duplicateMappings; track dup.accountCode) {
+                  <div class="unmapped-item">
+                    <span class="unmapped-code">{{ dup.accountCode }}</span>
+                    <span class="unmapped-label">Mapped {{ dup.count }} times</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        @if (validationFilter === 'coverage') {
+          <div class="coverage-detail">
+            <div class="coverage-bar-container">
+              <div class="coverage-bar-fill" [style.width.%]="validationReport.coveragePercentage"></div>
+            </div>
+            <div class="coverage-breakdown">
+              <div class="breakdown-row">
+                <span class="breakdown-label">Total data line items</span>
+                <span class="breakdown-value">{{ validationReport.totalLineItems }}</span>
+              </div>
+              <div class="breakdown-row">
+                <span class="breakdown-label">With mappings</span>
+                <span class="breakdown-value text-success">{{ validationReport.mappedCount }}</span>
+              </div>
+              <div class="breakdown-row">
+                <span class="breakdown-label">Without mappings</span>
+                <span class="breakdown-value text-danger">{{ validationReport.unmappedCount }}</span>
+              </div>
+              @if (validationReport.unapprovedCount > 0) {
+                <div class="breakdown-row">
+                  <span class="breakdown-label">Unapproved mappings</span>
+                  <span class="breakdown-value text-warning">{{ validationReport.unapprovedCount }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
+
+@if (showCloneOverlay) {
+  <div class="overlay-backdrop" (click)="showCloneOverlay = false"></div>
+  <div class="overlay-panel clone-panel">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <mat-icon>content_copy</mat-icon>
+        <span>Customize Template</span>
+      </div>
+      <button mat-icon-button (click)="showCloneOverlay = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="overlay-body">
+      <p class="clone-description">Create a custom copy of this template that you can edit freely. The original template will remain unchanged.</p>
+      <mat-form-field class="clone-name-field" appearance="outline">
+        <mat-label>Custom Template Name</mat-label>
+        <input matInput [(ngModel)]="cloneName" placeholder="Enter a name for your custom template">
+      </mat-form-field>
+      <div class="clone-actions">
+        <button mat-stroked-button (click)="showCloneOverlay = false">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="cloneTemplate()" [disabled]="!cloneName.trim() || cloning">
+          @if (cloning) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          }
+          Clone Template
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showSuggestOverlay) {
+  <div class="overlay-backdrop" (click)="showSuggestOverlay = false"></div>
+  <div class="overlay-panel suggest-panel">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <mat-icon>auto_fix_high</mat-icon>
+        <span>Auto-Suggested Mappings</span>
+        @if (suggestResult) {
+          <span class="suggest-count">({{ suggestResult.suggestions.length }} suggestions)</span>
+        }
+      </div>
+      <div class="overlay-actions">
+        @if (suggestResult && suggestResult.suggestions.length > 0) {
+          <button mat-stroked-button (click)="toggleSelectAll()">
+            {{ allSuggestionsSelected() ? 'Deselect All' : 'Select All' }}
+          </button>
+          <button mat-flat-button class="btn-primary" (click)="acceptSelectedSuggestions()" [disabled]="getSelectedCount() === 0 || acceptingSuggestions">
+            @if (acceptingSuggestions) {
+              <mat-spinner diameter="14" style="display:inline-block;margin-right:4px;"></mat-spinner>
+            }
+            Accept {{ getSelectedCount() }} Selected
+          </button>
+        }
+        <button mat-icon-button (click)="showSuggestOverlay = false"><mat-icon>close</mat-icon></button>
+      </div>
+    </div>
+
+    @if (suggestResult) {
+      <div class="overlay-body">
+        @if (suggestResult.suggestions.length === 0) {
+          <div class="no-suggestions">
+            <mat-icon>info</mat-icon>
+            <p>{{ suggestResult.message }}</p>
+          </div>
+        } @else {
+          <div class="suggest-list">
+            @for (s of suggestResult.suggestions; track s.id) {
+              <div class="suggest-card" [class.selected]="s.selected" (click)="s.selected = !s.selected">
+                <mat-checkbox [checked]="s.selected" (click)="$event.stopPropagation()" (change)="s.selected = $event.checked"></mat-checkbox>
+                <div class="suggest-content">
+                  <div class="suggest-target">
+                    <span class="suggest-code">{{ s.lineItemCode || '—' }}</span>
+                    <span class="suggest-line-item">{{ s.lineItemLabel }}</span>
+                  </div>
+                  <div class="suggest-source">
+                    <mat-icon class="link-icon">link</mat-icon>
+                    <span class="suggest-scoa-code">{{ s.scoaAccountNumber | slice:0:16 }}</span>
+                    <span class="suggest-scoa-desc">{{ s.scoaDescription }}</span>
+                  </div>
+                  <div class="suggest-meta">
+                    <span class="confidence-badge" [class.high]="s.confidence >= 85" [class.medium]="s.confidence >= 70 && s.confidence < 85" [class.low]="s.confidence < 70">
+                      {{ s.confidence }}% confidence
+                    </span>
+                    <span class="suggest-reason">{{ s.reason }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
+
+@if (showCopyPriorOverlay) {
+  <div class="overlay-backdrop" (click)="showCopyPriorOverlay = false"></div>
+  <div class="overlay-panel copy-prior-panel">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <mat-icon>content_paste</mat-icon>
+        <span>Copy Mapping from Prior Compilation</span>
+      </div>
+      <button mat-icon-button (click)="showCopyPriorOverlay = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="overlay-body">
+      <p class="clone-description">Select a prior compilation whose mapping rules will be copied into the current compilation. Existing rules will be replaced.</p>
+      <mat-form-field style="width:100%" appearance="outline">
+        <mat-label>Source Compilation</mat-label>
+        <mat-select [(ngModel)]="copyPriorSourceId">
+          @for (c of priorCompilations; track c.id) {
+            <mat-option [value]="c.id">{{ c.name }} ({{ c.financialYear?.label }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <div class="clone-actions">
+        <button mat-stroked-button (click)="showCopyPriorOverlay = false">Cancel</button>
+        <button mat-flat-button class="btn-primary" [disabled]="!copyPriorSourceId || copyingPrior" (click)="executeCopyPrior()">
+          @if (copyingPrior) {
+            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          }
+          Copy Mapping
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showUnmatchedPanel) {
+  <div class="unmatched-tb-panel">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <mat-icon>warning_amber</mat-icon>
+        <span>Unmatched Trial Balance ({{ unmatchedTbRows.length }} of {{ unmatchedTbSummary.total }})</span>
+      </div>
+      <button mat-icon-button (click)="showUnmatchedPanel = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="overlay-body" style="max-height: 400px; overflow-y: auto;">
+      @if (loadingUnmatched) {
+        <div style="display:flex;justify-content:center;padding:24px">
+          <mat-spinner diameter="28"></mat-spinner>
+        </div>
+      } @else if (unmatchedTbRows.length === 0) {
+        <div class="no-suggestions">
+          <mat-icon>check_circle</mat-icon>
+          <p>All trial balance rows are matched to disclosure line items.</p>
+        </div>
+      } @else {
+        <div class="unmatched-summary-bar">
+          <span>{{ unmatchedTbSummary.matched }} matched</span>
+          <span class="text-danger">{{ unmatchedTbSummary.unmatched }} unmatched</span>
+        </div>
+        <div class="unmatched-list">
+          @for (row of unmatchedTbRows; track row.id) {
+            <div class="unmapped-item">
+              <span class="unmapped-code">{{ row.scoaItemCode }}</span>
+              <span class="unmapped-label" style="flex:1">{{ row.scoaItemDescription || row.sortDesc }}</span>
+              <span class="unmatched-balance" [class.text-danger]="row.closingBalance < 0" [class.text-success]="row.closingBalance > 0">
+                {{ row.closingBalance | number:'1.2-2' }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

@@ -1,0 +1,742 @@
+HR/Payroll
+Employee Termination
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page
+
+Payroll
+
+Employee Termination
+
+Version 1.0
+05 December 2019
+
+SebataEMS
+Copyright © 2014 - Sebata Municipal Solutions (Pty) Ltd.
+All rights reserved. All information contained in this document is confidential and proprietary to
+Sebata Municipal Solutions (Pty) Ltd. No part of this document may be photocopied or reproduced
+in any manner without the prior written consent of Sebata Municipal Solutions (Pty) Ltd.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 2 -of 27
+
+Payroll
+
+Employee Termination
+
+Table of Contents
+1. EMPLOYEE TERMINATION ..................................................................................................... - 4 2. PRE - REQUISITES .................................................................................................................. - 5 3. PROCESS FLOW FOR EMPLOYEE TERMINATION ...................................................................... - 6 4. RULES AND VALIDATIONS FOR EMPLOYEE TERMINATION ...................................................... - 7 5. CAPTURE EMPLOYEE TERMINATION ...................................................................................... - 8 5.1 Role and Permission for Capturing Employee Termination ........................................................ - 8 5.2 Capture Employee Termination ............................................................................................... - 8 6. GENERATE EMPLOYEE TERMINATION REPORT ..................................................................... - 20 6.1 Reports ................................................................................................................................. - 20 6.1.1 Termination Report .................................................................................................................. - 20 6.1.2 Contract Expiry Report ............................................................................................................. - 22 7. CONFIGURATION SETTINGS FOR EMPLOYEE TERMINATION.................................................. - 24 7.1 Reasons for Employment Change Settings .................................................................................. - 24 7.2 XXX Error! Bookmark not defined.
+8. GLOSSARY .......................................................................................................................... - 26 9. NOTES ................................................................................................................................ - 27 -
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 3 -of 27
+
+Payroll
+
+Employee Termination
+
+1. EMPLOYEE TERMINATION
+This manual includes the following processes:
+Employee Termination 6.2.2
+6.2.2.1
+
+6.2.2.2
+
+Capture Employee Termination
+
+Generate Employee Termination Reports
+
+1. Capture Employee Termination.
+2. Generate Employee Termination Report.
+Employee Termination is a step-by-step process on the Sebata EMS System whereby the user will be
+guided by the system to terminate an employee. An employee can be terminated for various reasons for
+example retirement, dismissal or resignation.
+At any stage the creation process can be stopped or cancelled.
+
+Icon identifies the role player (Capturer)
+Icon identifies the role player (Approval)
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 4 -of 27
+
+Payroll
+
+Employee Termination
+
+2. PRE - REQUISITES
+The following must be in place for Employee Termination:
+1.
+
+Reasons for Employment Change need to be setup and completed.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 5 -of 27
+
+Payroll
+
+3.
+
+Employee Termination
+
+PROCESS FLOW FOR EMPLOYEE TERMINATION
+
+Process Summary:
+Capture Employee Termination
+1.
+
+Go To: EMS → Payroll→ Employee→ Employee Termination.
+
+2.
+
+To add new employee termination, click “Add New”
+
+3.
+
+Click “Ok” on confirmation message.
+
+4.
+
+Capture all required information on the screen and click “Next”.
+
+5.
+
+Click Next on all tabs until Document tab.
+
+6.
+
+On Document tab, capture all information and upload document then click on “Next”
+
+7.
+
+Click Finalize.
+END OF PROCESS
+Generate Employee Termination
+
+1.
+
+Go To: Reports→Employee → Termination Report.
+
+2.
+
+Capture the required information.
+
+3.
+
+Click Submit.
+END OF PROCESS
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 6 -of 27
+
+Payroll
+
+Employee Termination
+
+4. RULES AND VALIDATIONS FOR EMPLOYEE TERMINATION
+The following Rules and Validations Apply:
+1.
+
+Permission rights to Employee Termination should be set up on the system.
+
+2.
+
+All compulsory fields * must be completed.
+
+3.
+
+The system will notify the capturer of any outstanding information needed to complete the
+“Employee Termination” process.
+
+4.
+
+Missing fields will be indicated by a rules and validation information pop-up.
+
+“Add New” function button
+
+“Add New” information on System.
+
+“Submit” function button
+
+Save information on system.
+
+“Cancel” function button
+
+To return to the Previous Page.
+
+“Edit” function button
+
+Edit information on System.
+
+“Next” function button
+
+Navigate user to the next tab.
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 7 -of 27
+
+Payroll
+
+Employee Termination
+
+5. CAPTURE EMPLOYEE TERMINATION
+Generate Employee Termination
+Report
+
+Capture Employee Termination
+
+Access
+
+Capturer
+
+Specific Outcomes:
+➢ Successfully capture Employee termination
+
+5.1 Role and Permission for Capturing Employee Termination
+By adding the following permission to the user’s profile, the user will be able to check, capture and edit .
+
+5.2 Capture Employee Termination
+Follow the menu below to capture Employee Termination:
+Payroll
+
+Employee
+
+Employee Terminations
+
+Termination of employment refers to the end of an employee’s contract with a company. In this section
+an employee termination can be captured and/or modified. There are different types of terminations
+such as:
+•
+
+Deceased
+
+•
+
+Dismissal
+
+•
+
+End of fixed contract
+
+•
+
+Incapacity
+
+•
+
+Resignation
+
+•
+
+Retirement
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 8 -of 27
+
+Payroll
+
+Employee Termination
+
+Click “Payroll” in the primary navigation bar.
+Select “Employee” in the secondary navigation bar, then select “Employee Terminations” and the
+employee termination screen will populate.
+
+Click “Add New”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 9 -of 27
+
+Payroll
+
+Employee Termination
+
+Click “Ok”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 10 -of 27
+
+Payroll
+
+Employee Termination
+
+Complete all the required fields marked in red star and click on “Next”
+Step
+
+Field
+
+Description
+
+1.
+
+Termination Type*
+
+Select the termination type from the drop-down list.
+
+2.
+
+Reason*
+
+Select the termination reason from the drop-down list.
+
+3.
+
+Position Status*
+
+Select the position status from the drop-down list.
+
+4.
+
+Employee Number
+
+Capture the employee number.
+
+5.
+
+Last Date of Service*
+
+Capture the last day of service in the field.
+
+6.
+
+Employed for Full month*
+
+Select Yes or No.
+
+7.
+
+Next
+
+Click “Next”.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 11 -of 27
+
+Payroll
+
+Employee Termination
+
+The below screen,user will check if there’s any oustanding salary transactions such as Travel claims,S&T
+claims or overtime that are due to the employee and not approved.The salary transactions can be
+escalated for approval in this section.
+
+Click “Escalate for Approval”
+Click “Next”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 12 -of 27
+
+Payroll
+
+Employee Termination
+
+The below screen,the user will view the medical aid,provident fund,retirement fund,etc that the
+employee belongs to.
+
+View the screen until at the bottom.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 13 -of 27
+
+Payroll
+
+Employee Termination
+
+Click “Next”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 14 -of 27
+
+Payroll
+
+Employee Termination
+
+The below screen shows the payslip view of the employee that is terminating his service.User can view
+employee’s earnings,company contributions,fringe benefits as well as deductions.
+
+Click “Next”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 15 -of 27
+
+Payroll
+
+Employee Termination
+
+The below screen,shows the user if there are any tax directives for the employee.
+
+Click “Next”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 16 -of 27
+
+Payroll
+
+Employee Termination
+
+The below screen,the user will be able to capture assests received and upload all assets documentations
+to the system.
+
+Step
+
+Field
+
+Description
+
+1.
+
+Employee has Assets
+
+Select Yes or No.
+
+2.
+
+Document Type*
+
+Select document type from the drop-down list.
+
+3.
+
+Assets Received
+
+Select Yes or No.
+
+4.
+
+File to Upload*
+
+Click “Select”.
+
+5.
+
+Document Description*
+
+Capture the document description in the field.
+
+6.
+
+Assets Quality*
+
+Select Re-usable or Not Re-usable.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 17 -of 27
+
+Payroll
+
+Employee Termination
+
+7.
+
+Upload
+
+Click “Upload” to upload document.
+
+8.
+
+Next
+
+Click “Next”.
+
+Click “Finalise”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 18 -of 27
+
+Payroll
+
+Employee Termination
+
+Click “Yes”
+
+Click “Ok”
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 19 -of 27
+
+Payroll
+
+Employee Termination
+
+6. GENERATE EMPLOYEE TERMINATION REPORT
+Generate Employee
+Termination Report
+
+Capture Employee Termination
+
+Access
+
+Capturer
+
+6.1 Reports
+Follow the menu below to generate Employee Termination Report:
+Reports
+
+Employee
+
+Termination Report
+
+Specific Outcomes:
+➢ Successfully generate reports.
+6.1.1 Termination Report.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 20 -of 27
+
+Payroll
+
+Employee Termination
+
+Click “Payroll” in the primary navigation bar.
+Select “Reports” in the secondary navigation bar, then select “Employee” and select “Termination
+Report”.
+
+Step
+
+Field
+
+Description
+
+1.
+
+From Date
+
+Capture date from in the From Date field.
+
+2.
+
+To Date
+
+Capture date in the To Date field.
+
+3.
+
+Cycle*
+
+Select Cycle from the drop-down list.
+
+4.
+
+Submit
+
+Click Submit.
+
+,
+
+Info does not populate
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 21 -of 27
+
+Payroll
+
+Employee Termination
+
+6.1.2 Contract Expiry Report.
+
+Click “Payroll” in the primary navigation bar.
+Select “Reports” in the secondary navigation bar, then select “Employee” and then click on “Contract
+Expiry”.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 22 -of 27
+
+Payroll
+
+Employee Termination
+
+Step
+
+Field
+
+Description
+
+1.
+
+From Date
+
+Capture date in the From Date field.
+
+2.
+
+Contract Expiry Date*
+
+Capture date in the Contract expiry date field.
+
+3.
+
+Cycle*
+
+Select Cycle from the drop-down list.
+
+4.
+
+Submit
+
+Click Submit.
+
+Not populating info
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 23 -of 27
+
+Payroll
+
+Employee Termination
+
+7. CONFIGURATION SETTINGS FOR EMPLOYEE TERMINATION
+For more Detailed Information – refer to HR/Payroll Configuration Manual
+Access
+
+System Administrator
+
+7.1 Reasons for Employment Change Settings.
+This section will be used for reporting purposes. There are different types of employment reasons based
+on employment type.
+Various employment change reasons such as promotion, demotion and termination etc., are available
+for selection. There are specific rules for specific employment types.
+
+Click on “Reasons for Employment Change” under Payroll menu.
+
+Click “Add New”.
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 24 -of 27
+
+Payroll
+
+Employee Termination
+
+Select Employment Type from drop-down list.
+Capture a reason in the Employment Reason field.
+Click “Submit”.
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 25 -of 27
+
+Payroll
+
+Employee Termination
+
+8. GLOSSARY
+Authorisation / Approval
+
+The power or right to make decisions.
+
+Refine Search
+
+By using multiple “Search Options”, a more specific search can be
+done on the System.
+
+Validation
+
+To confirm that correct information is entered to continue with the
+Process.
+
+Configuration Settings
+
+Various reasons for use of parameters and initial settings for the
+System to apply these instructions.
+
+Compulsory Fields
+
+Field must be entered to continue with the process.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 26 -of 27
+
+Payroll
+
+Employee Termination
+
+9. NOTES
+
+-END OF PROCESS
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 27 -of 27
+
+

@@ -1,0 +1,2059 @@
+<div style="margin-bottom:20px">
+  <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Reports</h1>
+  <p style="font-size:14px;color:#64748b;margin:0">{{getMunicipalityName()}} · FY {{getActiveFinancialYear()}} Period {{getActivePeriod()}}</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:flex-start">
+  @for (report of reportTypes; track report.title) {
+    <div (click)="generateReport(report.id)"
+      style="cursor:pointer;background:white;border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;width:360px;flex:0 0 360px;box-sizing:border-box;transition:all .15s"
+      onmouseenter="this.style.borderColor='#6366f1';this.style.background='#f5f3ff'"
+      onmouseleave="this.style.borderColor='#e2e8f0';this.style.background='white'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;overflow:hidden">
+        <mat-icon [style.color]="getReportIconColor(report.color)" style="font-size:18px;width:18px;height:18px;flex-shrink:0">{{report.icon}}</mat-icon>
+        <span style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{report.title}}</span>
+      </div>
+      <p style="font-size:11px;color:#64748b;margin:0 0 6px;line-height:1.4">{{report.description}}</p>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        @for (tag of report.tags; track tag) {
+          <span class="mscoa-tag">{{tag}}</span>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+@if (showDisposalFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#ef4444">filter_list</mat-icon> Disposal Report Filters
+      </h2>
+      <button mat-icon-button (click)="showDisposalFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="disposalFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">From Period</label>
+          <select [(ngModel)]="disposalFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">To Period</label>
+          <select [(ngModel)]="disposalFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="disposalFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) {
+              <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="disposalFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) {
+              <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="disposalFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) {
+              <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="disposalFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) {
+              <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="disposalFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
+              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Disposal Method</label>
+          <select [(ngModel)]="disposalFilters.disposalMethodId" class="filter-input">
+            <option value="">All Methods</option>
+            @for (m of disposalMethods(); track m.id) {
+              <option [value]="m.id">{{m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="disposalFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" />
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showDisposalFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button color="warn" (click)="applyDisposalFilters()" style="font-size:13px">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showFarFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#3b82f6">filter_list</mat-icon> FAR Report Filters
+      </h2>
+      <button mat-icon-button (click)="showFarFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="farFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">From Period</label>
+          <select [(ngModel)]="farFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">To Period</label>
+          <select [(ngModel)]="farFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Type</label>
+          <select [(ngModel)]="farFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) {
+              <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="farFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) {
+              <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="farFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (sc of assetSubCategories(); track sc.asset_SubCategory_ID || sc.id) {
+              <option [value]="sc.asset_SubCategory_ID || sc.id">{{sc.asset_SubCategoryDescription || sc.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="farFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) {
+              <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Status</label>
+          <select [(ngModel)]="farFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
+              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Register Item ID</label>
+          <input type="text" [(ngModel)]="farFilters.assetItemId" class="filter-input" placeholder="e.g. 12345">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showFarFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button color="primary" (click)="applyFarFilters()" style="font-size:13px">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Apply Filters
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showDepFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#7c3aed">filter_list</mat-icon> Depreciation Schedule Filters
+      </h2>
+      <button mat-icon-button (click)="showDepFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="depFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">From Period</label>
+          <select [(ngModel)]="depFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">To Period</label>
+          <select [(ngModel)]="depFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Type</label>
+          <select [(ngModel)]="depFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) {
+              <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="depFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) {
+              <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="depFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (sc of assetSubCategories(); track sc.asset_SubCategory_ID || sc.id) {
+              <option [value]="sc.asset_SubCategory_ID || sc.id">{{sc.asset_SubCategoryDescription || sc.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Measurement Model</label>
+          <select [(ngModel)]="depFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Models</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) {
+              <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Status</label>
+          <select [(ngModel)]="depFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
+              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Register Item ID</label>
+          <input type="text" [(ngModel)]="depFilters.assetItemId" class="filter-input" placeholder="e.g. 12345">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showDepFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#7c3aed;color:#fff;font-size:13px" (click)="applyDepFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (depGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Depreciation Schedule...</div>
+  </div>
+}
+
+@if (depReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#7c3aed">event_note</mat-icon> Depreciation Schedule
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{depReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (depReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportDepCsv()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportDepExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openDepFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (depReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No depreciation records found for the selected filters. Try adjusting the financial year or period range.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2400px">
+          <thead>
+            <tr>
+              @for (col of depColumns(); track col) {
+                <th [style.text-align]="isDepValueCol(col) ? 'right' : 'left'">{{col}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of depPagedRows(); track $index) {
+              <tr>
+                @for (col of depColumns(); track col) {
+                  <td [style.text-align]="isDepValueCol(col) ? 'right' : 'left'">{{depRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (depTotalPages() > 1) {
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e8f0;margin-top:8px">
+          <div style="font-size:12px;color:#64748b">
+            Showing {{depPage() * depPageSize + 1}}–{{depPage() * depPageSize + depPagedRows().length}} of {{depReportData().length}} records
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="depGoToPage(0)" [disabled]="depPage() === 0">
+              <mat-icon style="font-size:16px">first_page</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="depPrevPage()" [disabled]="depPage() === 0">
+              <mat-icon style="font-size:16px">chevron_left</mat-icon>
+            </button>
+            <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{depPage() + 1}} of {{depTotalPages()}}</span>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="depNextPage()" [disabled]="depPage() >= depTotalPages() - 1">
+              <mat-icon style="font-size:16px">chevron_right</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="depGoToPage(depTotalPages() - 1)" [disabled]="depPage() >= depTotalPages() - 1">
+              <mat-icon style="font-size:16px">last_page</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+
+@if (disposalGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Disposal Report...</div>
+  </div>
+}
+
+@if (disposalReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#ef4444">delete_sweep</mat-icon> Disposal Report — MFMA S.14
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{disposalReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (disposalReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportDisposalCsv()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportDisposalExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openDisposalFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (disposalReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved disposal records found for the selected filters. Try adjusting the financial year or period range.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:3200px">
+          <thead>
+            <tr>
+              @for (col of disposalColumns(); track col) {
+                <th [style.text-align]="isDisposalValueCol(col) ? 'right' : 'left'">{{col}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of disposalReportData(); track $index) {
+              <tr>
+                @for (col of disposalColumns(); track col) {
+                  <td [style.text-align]="isDisposalValueCol(col) ? 'right' : 'left'">{{disposalRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showRevFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#3b82f6">filter_list</mat-icon> Revaluation Transactions Filters
+      </h2>
+      <button mat-icon-button (click)="showRevFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="revFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="revFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="revFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="revFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="revFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="revFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="revFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="revFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="revFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showRevFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#3b82f6;color:#fff;font-size:13px" (click)="applyRevFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (revGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Revaluation Transactions Report...</div>
+  </div>
+}
+
+@if (revReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#3b82f6">price_change</mat-icon> Revaluation Transactions</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{revReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (revReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRevCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRevExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openRevFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (revReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved revaluation records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2200px">
+          <thead><tr>
+            @for (col of revColumns(); track col) { <th [style.text-align]="isRevValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of revReportData(); track $index) {
+              <tr>
+                @for (col of revColumns(); track col) { <td [style.text-align]="isRevValueCol(col) ? 'right' : 'left'">{{revRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showImpFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#ef4444">filter_list</mat-icon> Impairment Report Filters
+      </h2>
+      <button mat-icon-button (click)="showImpFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="impFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="impFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="impFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="impFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="impFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="impFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="impFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="impFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="impFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showImpFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button color="warn" (click)="applyImpFilters()" style="font-size:13px">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (impGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Impairment Report...</div>
+  </div>
+}
+
+@if (impReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#ef4444">trending_down</mat-icon> Impairment Report</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{impReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (impReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportImpCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportImpExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openImpFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (impReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved impairment records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2000px">
+          <thead><tr>
+            @for (col of impColumns(); track col) { <th [style.text-align]="isImpValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of impReportData(); track $index) {
+              <tr>
+                @for (col of impColumns(); track col) { <td [style.text-align]="isImpValueCol(col) ? 'right' : 'left'">{{impRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showImpRevFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#22c55e">filter_list</mat-icon> Impairment Reversal Report Filters
+      </h2>
+      <button mat-icon-button (click)="showImpRevFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="impRevFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="impRevFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="impRevFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="impRevFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="impRevFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="impRevFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="impRevFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="impRevFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="impRevFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showImpRevFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#22c55e;color:#fff;font-size:13px" (click)="applyImpRevFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (impRevGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Impairment Reversal Report...</div>
+  </div>
+}
+
+@if (impRevReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#22c55e">trending_up</mat-icon> Impairment Reversal Report</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{impRevReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (impRevReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportImpRevCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportImpRevExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openImpRevFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (impRevReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No impairment reversal records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2000px">
+          <thead><tr>
+            @for (col of impRevColumns(); track col) { <th [style.text-align]="isImpRevValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of impRevReportData(); track $index) {
+              <tr>
+                @for (col of impRevColumns(); track col) { <td [style.text-align]="isImpRevValueCol(col) ? 'right' : 'left'">{{impRevRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showRefurbFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#d97706">filter_list</mat-icon> Refurbishment Report Filters
+      </h2>
+      <button mat-icon-button (click)="showRefurbFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="refurbFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="refurbFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="refurbFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="refurbFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="refurbFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="refurbFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="refurbFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="refurbFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="refurbFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showRefurbFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#d97706;color:#fff;font-size:13px" (click)="applyRefurbFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (refurbGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Refurbishment Report...</div>
+  </div>
+}
+
+@if (refurbReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#d97706">build</mat-icon> Refurbishment Report</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{refurbReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (refurbReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRefurbCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRefurbExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openRefurbFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (refurbReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved refurbishment records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2000px">
+          <thead><tr>
+            @for (col of refurbColumns(); track col) { <th [style.text-align]="isRefurbValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of refurbReportData(); track $index) {
+              <tr>
+                @for (col of refurbColumns(); track col) { <td [style.text-align]="isRefurbValueCol(col) ? 'right' : 'left'">{{refurbRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showPyaFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#7c3aed">filter_list</mat-icon> Prior Year Adjustments Filters
+      </h2>
+      <button mat-icon-button (click)="showPyaFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="pyaFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="pyaFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="pyaFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="pyaFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="pyaFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="pyaFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="pyaFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="pyaFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="pyaFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showPyaFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#7c3aed;color:#fff;font-size:13px" (click)="applyPyaFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (pyaGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Prior Year Adjustments Report...</div>
+  </div>
+}
+
+@if (pyaReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#7c3aed">history</mat-icon> Prior Year Adjustments</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{pyaReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (pyaReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportPyaCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportPyaExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openPyaFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (pyaReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved prior year adjustment records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2600px">
+          <thead><tr>
+            @for (col of pyaColumns(); track col) { <th [style.text-align]="isPyaValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of pyaReportData(); track $index) {
+              <tr>
+                @for (col of pyaColumns(); track col) { <td [style.text-align]="isPyaValueCol(col) ? 'right' : 'left'">{{pyaRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showPpaFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#16a34a">filter_list</mat-icon> Prior Period Adjustments Filters
+      </h2>
+      <button mat-icon-button (click)="showPpaFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field"><label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="ppaFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">From Period</label>
+          <select [(ngModel)]="ppaFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">To Period</label>
+          <select [(ngModel)]="ppaFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) { <option [ngValue]="p.value">{{p.label}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="ppaFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) { <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Category</label>
+          <select [(ngModel)]="ppaFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) { <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="ppaFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of assetSubCategories(); track s.asset_SubCategory_ID || s.id) { <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Measurement Type</label>
+          <select [(ngModel)]="ppaFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Types</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) { <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Status</label>
+          <select [(ngModel)]="ppaFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+          </select></div>
+        <div class="filter-field"><label class="filter-label">Asset Register ID</label>
+          <input type="number" [(ngModel)]="ppaFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showPpaFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#16a34a;color:#fff;font-size:13px" (click)="applyPpaFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (ppaGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Prior Period Adjustments Report...</div>
+  </div>
+}
+
+@if (ppaReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px"><mat-icon style="color:#16a34a">update</mat-icon> Prior Period Adjustments</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{ppaReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (ppaReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportPpaCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportPpaExcel()"><mat-icon>table_chart</mat-icon> Export Excel</button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openPpaFilters()"><mat-icon>filter_list</mat-icon> Filters</button>
+      </div>
+    </div>
+    @if (ppaReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No approved prior period adjustment records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2600px">
+          <thead><tr>
+            @for (col of ppaColumns(); track col) { <th [style.text-align]="isPpaValueCol(col) ? 'right' : 'left'">{{col}}</th> }
+          </tr></thead>
+          <tbody>
+            @for (row of ppaReportData(); track $index) {
+              <tr>
+                @for (col of ppaColumns(); track col) { <td [style.text-align]="isPpaValueCol(col) ? 'right' : 'left'">{{ppaRowValue(row, col)}}</td> }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showLocFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#d97706">filter_list</mat-icon> Location Content Report Filters
+      </h2>
+      <button mat-icon-button (click)="showLocFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">From Room</label>
+          <select [(ngModel)]="locFilters.fromRoom" class="filter-input">
+            <option value="">— All Rooms (start) —</option>
+            @for (r of locAllRooms; track r.id) {
+              <option [value]="r.roomDesc">{{r.roomDesc}}@if (r.buildingDesc) { — {{r.buildingDesc}}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">To Room</label>
+          <select [(ngModel)]="locFilters.toRoom" class="filter-input">
+            <option value="">— All Rooms (end) —</option>
+            @for (r of locAllRooms; track r.id) {
+              <option [value]="r.roomDesc">{{r.roomDesc}}@if (r.buildingDesc) { — {{r.buildingDesc}}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Custodian / Person</label>
+          <select [(ngModel)]="locFilters.custodianId" class="filter-input">
+            <option value="">All Custodians</option>
+            @for (c of locCustodians; track c.id) {
+              <option [value]="c.id">{{c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Department</label>
+          <select [(ngModel)]="locFilters.departmentId" (change)="onLocDepartmentChange()" class="filter-input">
+            <option value="">All Departments</option>
+            @for (d of locDepartments; track d.id) {
+              <option [value]="d.id">{{d.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Division</label>
+          <select [(ngModel)]="locFilters.divisionId" class="filter-input">
+            <option value="">All Divisions</option>
+            @for (d of locFilteredDivisions; track d.id) {
+              <option [value]="d.id">{{d.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field" style="display:flex;flex-direction:column;justify-content:flex-end">
+          <label class="filter-label">Report by Room</label>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151">
+              <input type="checkbox" [(ngModel)]="locFilters.reportByRoom" style="width:16px;height:16px;cursor:pointer">
+              Group by room (page-break per room when printing)
+            </label>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showLocFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#d97706;color:#fff;font-size:13px" (click)="applyLocFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Run Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (locGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Location Content Report...</div>
+  </div>
+}
+
+@if (locReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#d97706">location_on</mat-icon> Location Content Report
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{locReportData().length}} asset(s) across {{locGroupByRoom(locReportData()).length}} room(s)</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (locReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="printLocReport()">
+            <mat-icon>print</mat-icon> Print PDF
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openLocFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (locReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No assets found for the selected filters. Try adjusting or clearing filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:1600px">
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Floor</th>
+              <th>Room</th>
+              <th>Asset ID</th>
+              <th>Description</th>
+              <th>Asset Type</th>
+              <th>Category</th>
+              <th>Barcode</th>
+              <th>Serial No.</th>
+              <th>Make / Model</th>
+              <th>Custodian</th>
+              <th>Department</th>
+              <th>Division</th>
+              <th style="text-align:right">Qty</th>
+              <th style="text-align:right">Carrying Value (R)</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of locReportData(); track row.assetId) {
+              <tr>
+                <td>{{row.buildingDesc}}</td>
+                <td>{{row.floorDesc}}</td>
+                <td>{{row.roomDesc}}</td>
+                <td>{{row.assetId}}</td>
+                <td>{{row.description}}</td>
+                <td>{{row.assetType}}</td>
+                <td>{{row.assetCategory}}</td>
+                <td>{{row.barcode}}</td>
+                <td>{{row.serialNumber}}</td>
+                <td>{{row.make}}{{row.model ? (row.make ? ' / ' : '') + row.model : ''}}</td>
+                <td>{{row.custodianName}}</td>
+                <td>{{row.departmentDesc}}</td>
+                <td>{{row.divisionDesc}}</td>
+                <td style="text-align:right">{{row.quantity}}</td>
+                <td style="text-align:right">{{locFmtRand(row.carryingValue)}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (generating()) {
+  <div class="card-container" style="padding:40px;text-align:center">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating report...</div>
+  </div>
+}
+
+@if (reportData()) {
+  <div class="card-container">
+    <div class="card-title-bar">
+      <h2><mat-icon style="color:#3b82f6">description</mat-icon> {{reportData().title}}</h2>
+      <div style="display:flex;gap:8px">
+        @if (reportData().rows.length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportFarCsv()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openFarFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    <div style="padding:20px">
+      <div style="display:flex;gap:16px;margin-bottom:16px">
+        <div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:4px">
+          <mat-icon style="font-size:14px">calendar_today</mat-icon> Generated: {{reportDate}}
+        </div>
+        <div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:4px">
+          <mat-icon style="font-size:14px">table_rows</mat-icon> {{reportData().rows.length}} records
+        </div>
+        @if (reportData().subtitle) {
+          <div style="font-size:12px;color:#3b82f6;display:flex;align-items:center;gap:4px">
+            <mat-icon style="font-size:14px">info</mat-icon> {{reportData().subtitle}}
+          </div>
+        }
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table far-table">
+          <thead>
+            <tr>
+              @for (col of reportData().columns; track col) { <th>{{col}}</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @if (isFarReport()) {
+              @for (row of farPagedRows(); track $index) {
+                <tr [class.font-bold]="isSubtotalRow(row)" (click)="onFarRowClick(row)" style="cursor:pointer">
+                  @for (col of reportData().columns; track col) {
+                    <td [class.ref-cell]="col === 'AssetRegisterItem_ID' || col === 'Asset ID'" [class.value-cell]="isValueCol(col)" [style.font-weight]="isSubtotalRow(row) ? '700' : 'normal'">{{row[col]}}</td>
+                  }
+                </tr>
+              }
+            } @else {
+              @for (row of reportData().rows; track $index) {
+                <tr [class.font-bold]="isSubtotalRow(row)">
+                  @for (col of reportData().columns; track col) {
+                    <td [class.ref-cell]="col === 'Asset ID'" [class.value-cell]="isValueCol(col)" [style.font-weight]="isSubtotalRow(row) ? '700' : 'normal'">{{row[col]}}</td>
+                  }
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (isFarReport() && farTotalPages() > 1) {
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e8f0;margin-top:8px">
+          <div style="font-size:12px;color:#64748b">
+            Showing {{farPage() * farPageSize + 1}}–{{farPage() * farPageSize + farPagedRows().length}} of {{reportData().rows.length}} records
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="farGoToPage(0)" [disabled]="farPage() === 0">
+              <mat-icon style="font-size:16px">first_page</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="farPrevPage()" [disabled]="farPage() === 0">
+              <mat-icon style="font-size:16px">chevron_left</mat-icon>
+            </button>
+            <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{farPage() + 1}} of {{farTotalPages()}}</span>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="farNextPage()" [disabled]="farPage() >= farTotalPages() - 1">
+              <mat-icon style="font-size:16px">chevron_right</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="farGoToPage(farTotalPages() - 1)" [disabled]="farPage() >= farTotalPages() - 1">
+              <mat-icon style="font-size:16px">last_page</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (drilldownVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center" (click)="closeDrilldown()">
+    <div style="background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.25);max-width:95vw;width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden" (click)="$event.stopPropagation()">
+      <div style="padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#3b82f6">analytics</mat-icon> ATS Period Drilldown
+          </div>
+          @if (drilldownAsset()) {
+            <div style="font-size:13px;color:#64748b;margin-top:2px">
+              Asset #{{drilldownAsset()['AssetRegisterItem_ID']}} — {{drilldownAsset()['Description'] || 'N/A'}}
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:1px">
+              {{drilldownAsset()['AssetTypeDesc'] || ''}} · {{drilldownAsset()['AssetCategoryDesc'] || ''}} · FY {{farFilters.finYear || getActiveFinancialYear()}} P{{farFilters.fromPeriod || 1}}–P{{farFilters.toPeriod || 12}}
+            </div>
+          }
+        </div>
+        <button mat-icon-button (click)="closeDrilldown()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+      </div>
+      <div style="overflow:auto;flex:1;padding:16px 20px">
+        @if (drilldownLoading()) {
+          <div style="text-align:center;padding:40px">
+            <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+            <div style="font-size:13px;color:#64748b">Loading period detail...</div>
+          </div>
+        } @else if (drilldownData() && drilldownData().length > 0) {
+          <div style="overflow-x:auto">
+            <table class="data-table far-table">
+              <thead>
+                <tr>
+                  @for (col of getDrilldownColumns(); track col) {
+                    <th [class.value-cell]="isValueCol(col)">{{col}}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of drilldownData(); track row.FinancialPeriod) {
+                  <tr style="cursor:pointer" (click)="onDrilldownPeriodClick(row)" title="Click to view transactions for this period">
+                    @for (col of getDrilldownColumns(); track col) {
+                      <td [class.value-cell]="isValueCol(col)">{{formatDrilldownVal(row, col)}}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div style="text-align:center;padding:40px;color:#94a3b8">
+            <mat-icon style="font-size:48px;margin-bottom:8px">info</mat-icon>
+            <div style="font-size:14px">No transaction summary data found for this asset in the selected period range</div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showAfsFilters()) {
+  <div class="card-container" style="margin-bottom:24px;position:relative;z-index:20">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#22c55e">filter_list</mat-icon> AFS Reconciliation Filters
+      </h2>
+      <button mat-icon-button (click)="closeAfsReport()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="afsFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showAfsFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#22c55e;color:#fff;font-size:13px" (click)="applyAfsFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (afsGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating AFS Reconciliation...</div>
+  </div>
+}
+
+@if (afsReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#22c55e">balance</mat-icon> AFS Reconciliation — Appendix B
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{afsReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportAfsExcel()">
+          <mat-icon>table_chart</mat-icon> Export Excel
+        </button>
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openAfsFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+        <button mat-icon-button (click)="closeAfsReport()" style="color:#64748b" title="Close report"><mat-icon>close</mat-icon></button>
+      </div>
+    </div>
+    @if (afsDisplayRows().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No data found for the selected financial year.
+      </div>
+    } @else {
+      <div style="max-height:660px;overflow:auto">
+        <table style="border-collapse:collapse;font-size:11px;min-width:4000px;width:100%">
+          <thead style="position:sticky;top:0;z-index:10">
+            <tr style="background:#1e293b;color:#fff">
+              <th style="min-width:260px;position:sticky;left:0;z-index:11;background:#1e293b;text-align:left;padding:6px 10px;border-right:2px solid #475569"></th>
+              <th colspan="14" style="text-align:center;padding:6px 10px;border-right:2px solid #475569;letter-spacing:.5px;font-size:10px;text-transform:uppercase">COST</th>
+              <th colspan="8" style="text-align:center;padding:6px 10px;border-right:2px solid #475569;letter-spacing:.5px;font-size:10px;text-transform:uppercase">ACCUMULATED DEPRECIATION</th>
+              <th colspan="8" style="text-align:center;padding:6px 10px;border-right:2px solid #475569;letter-spacing:.5px;font-size:10px;text-transform:uppercase">ACCUMULATED IMPAIRMENT</th>
+              <th style="text-align:center;padding:6px 10px;letter-spacing:.5px;font-size:10px;text-transform:uppercase">CARRYING AMOUNT</th>
+            </tr>
+            <tr style="background:#334155;color:#e2e8f0;font-size:10px">
+              <th style="min-width:260px;position:sticky;left:0;z-index:11;background:#334155;text-align:left;padding:5px 10px;border-right:2px solid #475569;white-space:nowrap">Category</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Opening Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Correction of Error</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;background:#2d3f52">Restated OB</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Acquisitions</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Decommissioning</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Work In Progress</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Refurbishment</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Change in Estimate</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Fair Value Adj</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Revaluation</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Transfer Received</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Transfer Made</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Disposal</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;border-right:2px solid #475569;background:#2d3f52">Closing Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Opening Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Other Changes</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;background:#2d3f52">Restated OB</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Depreciation</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Dep Adjustments</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Disposal</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Transfer</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;border-right:2px solid #475569;background:#2d3f52">Closing Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Opening Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Other Changes</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;background:#2d3f52">Restated OB</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Impairment</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Imp Reversal</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Disposal</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px">Transfers</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:110px;border-right:2px solid #475569;background:#2d3f52">Closing Balance</th>
+              <th style="text-align:right;padding:5px 8px;white-space:nowrap;min-width:130px;background:#0f4c2c;color:#bbf7d0">Carrying Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of afsDisplayRows(); track $index) {
+              @if (row._rowType === 'type-header') {
+                <tr style="background:#e2e8f0">
+                  <td colspan="32" style="padding:6px 10px;font-size:12px;font-weight:700;color:#1e293b;position:sticky;left:0;background:#e2e8f0">{{row.label}}</td>
+                </tr>
+              } @else if (row._rowType === 'subtotal') {
+                <tr style="background:#f0fdf4;font-weight:700">
+                  <td style="padding:5px 10px;font-size:11px;color:#15803d;position:sticky;left:0;background:#f0fdf4;border-right:2px solid #bbf7d0">{{row.label}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.costOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.correctionOfError)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;background:#e7fce7">{{afsR(row.costRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.acquisitions)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.decommissioning)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.workInProgress)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.refurbishment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.changeInEstimate)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.fairValueAdjustment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.revaluation)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.transferReceived)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.transferMade)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.costDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;border-right:2px solid #bbf7d0;background:#e7fce7">{{afsR(row.costClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depOtherChanges)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;background:#e7fce7">{{afsR(row.depRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depreciation)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depAdjustments)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.depTransfer)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;border-right:2px solid #bbf7d0;background:#e7fce7">{{afsR(row.depClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impOtherChanges)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;background:#e7fce7">{{afsR(row.impRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impairment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impairmentReversal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d">{{afsR(row.impTransfers)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;border-right:2px solid #bbf7d0;background:#e7fce7">{{afsR(row.impClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#15803d;background:#dcfce7;font-weight:800">{{afsR(row.carryingAmount)}}</td>
+                </tr>
+              } @else if (row._rowType === 'grand-total') {
+                <tr style="background:#14532d;color:#bbf7d0;font-weight:800;font-size:11.5px">
+                  <td style="padding:6px 10px;position:sticky;left:0;background:#14532d;color:#bbf7d0;border-right:2px solid #166534">GRAND TOTAL</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.costOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.correctionOfError)}}</td>
+                  <td style="text-align:right;padding:6px 8px;background:#166534">{{afsR(row.costRestatedOb)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.acquisitions)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.decommissioning)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.workInProgress)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.refurbishment)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.changeInEstimate)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.fairValueAdjustment)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.revaluation)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.transferReceived)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.transferMade)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.costDisposal)}}</td>
+                  <td style="text-align:right;padding:6px 8px;border-right:2px solid #166534;background:#166534">{{afsR(row.costClosingBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depOtherChanges)}}</td>
+                  <td style="text-align:right;padding:6px 8px;background:#166534">{{afsR(row.depRestatedOb)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depreciation)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depAdjustments)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depDisposal)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.depTransfer)}}</td>
+                  <td style="text-align:right;padding:6px 8px;border-right:2px solid #166534;background:#166534">{{afsR(row.depClosingBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impOtherChanges)}}</td>
+                  <td style="text-align:right;padding:6px 8px;background:#166534">{{afsR(row.impRestatedOb)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impairment)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impairmentReversal)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impDisposal)}}</td>
+                  <td style="text-align:right;padding:6px 8px">{{afsR(row.impTransfers)}}</td>
+                  <td style="text-align:right;padding:6px 8px;border-right:2px solid #166534;background:#166534">{{afsR(row.impClosingBalance)}}</td>
+                  <td style="text-align:right;padding:6px 8px;background:#0f4c2c;color:#bbf7d0">{{afsR(row.carryingAmount)}}</td>
+                </tr>
+              } @else {
+                <tr (click)="openAfsDrilldown(row)" class="afs-cat-row">
+                  <td style="padding:5px 10px;font-size:11px;color:#1e293b;position:sticky;left:0;background:inherit;border-right:2px solid #e2e8f0;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis">
+                    <span style="display:inline-flex;align-items:center;gap:4px">
+                      <mat-icon style="font-size:11px;width:11px;height:11px;color:#22c55e">open_in_new</mat-icon>
+                      {{row.assetCategoryDesc}}
+                    </span>
+                  </td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.costOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.correctionOfError)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;background:#f9fafb">{{afsR(row.costRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.acquisitions)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.decommissioning)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.workInProgress)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.refurbishment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.changeInEstimate)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.fairValueAdjustment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.revaluation)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.transferReceived)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.transferMade)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.costDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(row.costClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depOtherChanges)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;background:#f9fafb">{{afsR(row.depRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depreciation)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depAdjustments)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.depTransfer)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(row.depClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impOpeningBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impOtherChanges)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;background:#f9fafb">{{afsR(row.impRestatedOb)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impairment)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impairmentReversal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impDisposal)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151">{{afsR(row.impTransfers)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(row.impClosingBalance)}}</td>
+                  <td style="text-align:right;padding:5px 8px;color:#14532d;font-weight:700;background:#f0fdf4">{{afsR(row.carryingAmount)}}</td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (afsDrilldownVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1100;display:flex;align-items:center;justify-content:center" (click)="closeAfsDrilldown()">
+    <div style="background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.3);max-width:98vw;width:98vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden" (click)="$event.stopPropagation()">
+      <div style="padding:16px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#22c55e">balance</mat-icon> {{afsDrilldownCategoryDesc()}} — Asset Detail
+          </div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">FY {{afsFilters.finYear || getActiveFinancialYear()}} · Click outside to close</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          @if (afsDrilldownData().length > 0) {
+            <button mat-stroked-button style="border-color:#bbf7d0;font-size:13px;color:#14532d" (click)="exportAfsDrilldownExcel()">
+              <mat-icon>table_chart</mat-icon> Export Excel
+            </button>
+          }
+          <button mat-icon-button (click)="closeAfsDrilldown()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+        </div>
+      </div>
+      <div style="overflow:auto;flex:1;padding:0">
+        @if (afsDrilldownLoading()) {
+          <div style="text-align:center;padding:40px">
+            <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+            <div style="font-size:13px;color:#64748b">Loading assets...</div>
+          </div>
+        } @else if (afsDrilldownData().length > 0) {
+          <div style="font-size:12px;color:#64748b;padding:12px 16px 4px">{{afsDrilldownData().length}} asset(s)</div>
+          <div style="overflow-x:auto">
+            <table style="border-collapse:collapse;font-size:10.5px;min-width:5000px;width:100%">
+              <thead>
+                <tr style="background:#1e293b;color:#fff;position:sticky;top:0;z-index:5">
+                  <th style="text-align:left;padding:5px 8px;min-width:60px;white-space:nowrap">Asset ID</th>
+                  <th style="text-align:left;padding:5px 8px;min-width:220px;white-space:nowrap">Description</th>
+                  <th style="text-align:left;padding:5px 8px;min-width:120px;white-space:nowrap">Sub-Category</th>
+                  <th style="text-align:left;padding:5px 8px;min-width:100px;white-space:nowrap">Meas. Type</th>
+                  <th style="text-align:left;padding:5px 8px;min-width:100px;white-space:nowrap;border-right:2px solid #475569">Status</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Cost OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Correction of Error</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;background:#2d3f52">Restated OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Acquisitions</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Decommissioning</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">WIP</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Refurb</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Chg Estimate</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Fair Value</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Revaluation</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Xfer Received</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Xfer Made</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Disposal</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;border-right:2px solid #475569;background:#2d3f52">Cost CB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Dep OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Other Changes</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;background:#2d3f52">Dep Restated OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Depreciation</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Dep Adj</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Dep Disposal</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Dep Transfer</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;border-right:2px solid #475569;background:#2d3f52">Dep CB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Imp OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Imp Other</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;background:#2d3f52">Imp Restated OB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Impairment</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Imp Reversal</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Imp Disposal</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap">Imp Transfers</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:110px;white-space:nowrap;border-right:2px solid #475569;background:#2d3f52">Imp CB</th>
+                  <th style="text-align:right;padding:5px 8px;min-width:120px;white-space:nowrap;background:#0f4c2c;color:#bbf7d0">Carrying Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (dr of afsDrilldownData(); track dr.assetId) {
+                  <tr class="afs-dd-row">
+                    <td style="padding:4px 8px;color:#374151">{{dr.assetId}}</td>
+                    <td style="padding:4px 8px;color:#374151;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{dr.description}}</td>
+                    <td style="padding:4px 8px;color:#374151;white-space:nowrap">{{dr.subCategory}}</td>
+                    <td style="padding:4px 8px;color:#374151;white-space:nowrap">{{dr.measurementType}}</td>
+                    <td style="padding:4px 8px;color:#374151;white-space:nowrap;border-right:2px solid #e2e8f0">{{dr.assetStatus}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.costOpeningBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.correctionOfError)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;background:#f9fafb">{{afsR(dr.costRestatedOb)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.acquisitions)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.decommissioning)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.workInProgress)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.refurbishment)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.changeInEstimate)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.fairValueAdjustment)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.revaluation)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.transferReceived)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.transferMade)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.costDisposal)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(dr.costClosingBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depOpeningBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depOtherChanges)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;background:#f9fafb">{{afsR(dr.depRestatedOb)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depreciation)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depAdjustments)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depDisposal)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.depTransfer)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(dr.depClosingBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impOpeningBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impOtherChanges)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;background:#f9fafb">{{afsR(dr.impRestatedOb)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impairment)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impairmentReversal)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impDisposal)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151">{{afsR(dr.impTransfers)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#374151;border-right:2px solid #e2e8f0;background:#f9fafb">{{afsR(dr.impClosingBalance)}}</td>
+                    <td style="text-align:right;padding:4px 8px;color:#14532d;font-weight:700;background:#f0fdf4">{{afsR(dr.carryingAmount)}}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div style="text-align:center;padding:40px;color:#94a3b8">
+            <mat-icon style="font-size:48px;margin-bottom:8px">info</mat-icon>
+            <div style="font-size:14px">No assets found for this category in the selected financial year</div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (txnDrilldownVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1100;display:flex;align-items:center;justify-content:center" (click)="closeTxnDrilldown()">
+    <div style="background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.3);max-width:96vw;width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden" (click)="$event.stopPropagation()">
+      <div style="padding:16px 20px;background:#eff6ff;border-bottom:1px solid #bfdbfe;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#2563eb">receipt_long</mat-icon> Transaction Detail — {{txnDrilldownPeriodLabel()}}
+          </div>
+          @if (drilldownAsset()) {
+            <div style="font-size:13px;color:#64748b;margin-top:2px">
+              Asset #{{drilldownAsset()['AssetRegisterItem_ID']}} — {{drilldownAsset()['Description'] || 'N/A'}} · FY {{farFilters.finYear || getActiveFinancialYear()}}
+            </div>
+          }
+        </div>
+        <button mat-icon-button (click)="closeTxnDrilldown()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+      </div>
+      <div style="overflow:auto;flex:1;padding:16px 20px">
+        @if (txnDrilldownLoading()) {
+          <div style="text-align:center;padding:40px">
+            <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+            <div style="font-size:13px;color:#64748b">Loading transactions...</div>
+          </div>
+        } @else if (txnDrilldownData().length > 0) {
+          <div style="font-size:13px;color:#64748b;margin-bottom:12px">{{txnDrilldownData().length}} transaction(s) found</div>
+          <div style="overflow-x:auto">
+            <table class="data-table far-table">
+              <thead>
+                <tr>
+                  @for (col of getTxnDrilldownColumns(); track col) {
+                    <th [class.value-cell]="isValueCol(col)" style="white-space:nowrap">{{col}}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of txnDrilldownData(); track row.AssetRegisterTransaction_ID) {
+                  <tr>
+                    @for (col of getTxnDrilldownColumns(); track col) {
+                      <td [class.value-cell]="isValueCol(col)" style="white-space:nowrap">{{formatTxnDrilldownVal(row, col)}}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div style="text-align:center;padding:40px;color:#94a3b8">
+            <mat-icon style="font-size:48px;margin-bottom:8px">info</mat-icon>
+            <div style="font-size:14px">No transactions found for this asset in the selected period</div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showCustomFarFilters()) {
+  <div class="card-container" style="margin-bottom:24px;position:relative;z-index:20">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#0d9488">tune</mat-icon> Custom FAR &mdash; Filters &amp; Columns
+      </h2>
+      <button mat-icon-button (click)="showCustomFarFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="customFarFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">From Period</label>
+          <select [(ngModel)]="customFarFilters.fromPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">To Period</label>
+          <select [(ngModel)]="customFarFilters.toPeriod" class="filter-input">
+            @for (p of periodOptions; track p.value) {
+              <option [ngValue]="p.value">{{p.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Type</label>
+          <select [(ngModel)]="customFarFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) {
+              <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="customFarFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryID || c.id) {
+              <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="customFarFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (sc of assetSubCategories(); track sc.asset_SubCategory_ID || sc.id) {
+              <option [value]="sc.asset_SubCategory_ID || sc.id">{{sc.asset_SubCategoryDescription || sc.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Measurement Model</label>
+          <select [(ngModel)]="customFarFilters.measurementTypeId" class="filter-input">
+            <option value="">All Measurement Models</option>
+            @for (m of measurementTypes(); track m.measurementType_ID || m.id) {
+              <option [value]="m.measurementType_ID || m.id">{{m.measurementTypeDesc || m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Status</label>
+          <select [(ngModel)]="customFarFilters.statusId" class="filter-input">
+            <option value="">All Statuses</option>
+            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
+              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Register Item ID</label>
+          <input type="text" [(ngModel)]="customFarFilters.assetItemId" class="filter-input" placeholder="e.g. 12345">
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #e2e8f0;padding-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <mat-icon style="font-size:20px;color:#0d9488">view_column</mat-icon>
+            <span style="font-size:15px;font-weight:600;color:#334155">Column Selection</span>
+            <span style="font-size:12px;background:#f0fdfa;color:#0d9488;border:1px solid #99f6e4;border-radius:12px;padding:2px 10px;font-weight:600">{{customFarSelectedKeys().length}} selected</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button mat-stroked-button style="font-size:12px;height:32px;line-height:32px" (click)="customFarResetDefaults()">Reset Defaults</button>
+            <button mat-stroked-button style="font-size:12px;height:32px;line-height:32px" (click)="customFarSelectAll()">Select All</button>
+            <button mat-stroked-button style="font-size:12px;height:32px;line-height:32px;color:#ef4444;border-color:#ef4444" (click)="customFarClearAll()">Clear All</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px">
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <div style="padding:10px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc">
+              <input type="text" [(ngModel)]="customFarColumnSearch" class="filter-input" placeholder="Search columns..." style="margin:0;width:100%;box-sizing:border-box">
+            </div>
+            <div style="max-height:320px;overflow-y:auto;padding:6px 0">
+              @for (grp of customFarGroupNames(); track grp) {
+                <div>
+                  <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;padding:8px 12px 3px">{{grp}}</div>
+                  @for (col of customFarColumnsForGroup(grp); track col.key) {
+                    <label [style.background]="customFarIsSelected(col.key) ? '#f0fdfa' : 'transparent'"
+                           style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;transition:background .12s">
+                      <input type="checkbox" [checked]="customFarIsSelected(col.key)" (change)="customFarToggleColumn(col.key)" style="cursor:pointer;accent-color:#0d9488;flex-shrink:0">
+                      <span style="font-size:13px;color:#334155;line-height:1.3">{{col.label}}</span>
+                    </label>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="padding:10px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0">Column Order</div>
+            <div style="flex:1;overflow-y:auto;max-height:368px">
+              @if (customFarSelectedKeys().length === 0) {
+                <div style="text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px">
+                  <mat-icon style="font-size:32px;display:block;margin-bottom:8px">view_column</mat-icon>
+                  Select columns from the left panel
+                </div>
+              }
+              @for (key of customFarSelectedKeys(); track key; let idx = $index) {
+                <div style="display:flex;align-items:center;gap:4px;padding:3px 8px;border-bottom:1px solid #f1f5f9">
+                  <span style="font-size:11px;color:#94a3b8;width:18px;text-align:right;flex-shrink:0">{{idx + 1}}</span>
+                  <div style="display:flex;flex-direction:column">
+                    <button mat-icon-button [disabled]="idx === 0" (click)="customFarMoveUp(idx)"
+                            style="width:20px;height:20px;line-height:20px;display:flex;align-items:center;justify-content:center">
+                      <mat-icon style="font-size:15px;width:15px;height:15px">keyboard_arrow_up</mat-icon>
+                    </button>
+                    <button mat-icon-button [disabled]="idx === customFarSelectedKeys().length - 1" (click)="customFarMoveDown(idx)"
+                            style="width:20px;height:20px;line-height:20px;display:flex;align-items:center;justify-content:center">
+                      <mat-icon style="font-size:15px;width:15px;height:15px">keyboard_arrow_down</mat-icon>
+                    </button>
+                  </div>
+                  <span style="flex:1;font-size:12px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" [title]="customFarLabelForKey(key)">{{customFarLabelForKey(key)}}</span>
+                  <button mat-icon-button (click)="customFarRemoveColumn(key)"
+                          style="width:24px;height:24px;line-height:24px;color:#ef4444;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">close</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+        <button mat-stroked-button (click)="showCustomFarFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#0d9488;color:#fff;font-size:13px"
+                [disabled]="customFarSelectedKeys().length === 0" (click)="applyCustomFarFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon>
+          Generate ({{customFarSelectedKeys().length}} cols)
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (customFarGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="40" style="margin:0 auto 16px"></mat-spinner>
+    <div style="color:#64748b;font-size:15px">Generating Custom FAR report&hellip;</div>
+  </div>
+}
+
+@if (customFarReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar" style="flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="margin:0;font-size:18px;font-weight:700;color:#0f172a">Custom FAR Report</h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{customFarReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button mat-stroked-button style="font-size:12px" (click)="printCustomFar()">
+          <mat-icon style="font-size:16px;margin-right:4px">print</mat-icon> Print
+        </button>
+        <button mat-stroked-button style="font-size:12px" (click)="exportCustomFarExcel()">
+          <mat-icon style="font-size:16px;margin-right:4px">file_download</mat-icon> Export Excel
+        </button>
+        <button mat-stroked-button style="font-size:12px" (click)="openCustomFarFilters()">
+          <mat-icon style="font-size:16px;margin-right:4px">tune</mat-icon> Filters &amp; Columns
+        </button>
+        <button mat-icon-button (click)="closeCustomFarReport()" style="color:#64748b"><mat-icon>close</mat-icon></button>
+      </div>
+    </div>
+
+    @if (customFarReportRows().length === 0) {
+      <div style="text-align:center;padding:60px;color:#94a3b8">
+        <mat-icon style="font-size:56px;margin-bottom:12px">find_in_page</mat-icon>
+        <div style="font-size:15px">No records found for the selected filters</div>
+      </div>
+    } @else {
+      <div style="overflow-x:auto">
+        <table class="report-table" style="font-size:12px">
+          <thead>
+            <tr>
+              @for (col of customFarActiveColumns(); track col) {
+                <th style="white-space:nowrap;padding:8px 12px">{{customFarLabelForKey(col)}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of customFarPagedRows(); track $index) {
+              <tr>
+                @for (col of customFarActiveColumns(); track col) {
+                  <td style="white-space:nowrap;padding:6px 12px">{{row[col]}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid #e2e8f0;background:#f8fafc">
+        <div style="font-size:13px;color:#64748b">
+          Page {{customFarPage() + 1}} of {{customFarTotalPages()}} &mdash; {{customFarReportRows().length}} total records
+        </div>
+        <div style="display:flex;gap:4px">
+          <button mat-stroked-button style="min-width:36px;padding:0 8px" [disabled]="customFarPage() === 0" (click)="customFarPage.set(0)">
+            <mat-icon style="font-size:16px">first_page</mat-icon>
+          </button>
+          <button mat-stroked-button style="min-width:36px;padding:0 8px" [disabled]="customFarPage() === 0" (click)="customFarPage.set(customFarPage() - 1)">
+            <mat-icon style="font-size:16px">chevron_left</mat-icon>
+          </button>
+          <button mat-stroked-button style="min-width:36px;padding:0 8px" [disabled]="customFarPage() >= customFarTotalPages() - 1" (click)="customFarPage.set(customFarPage() + 1)">
+            <mat-icon style="font-size:16px">chevron_right</mat-icon>
+          </button>
+          <button mat-stroked-button style="min-width:36px;padding:0 8px" [disabled]="customFarPage() >= customFarTotalPages() - 1" (click)="customFarPage.set(customFarTotalPages() - 1)">
+            <mat-icon style="font-size:16px">last_page</mat-icon>
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+}

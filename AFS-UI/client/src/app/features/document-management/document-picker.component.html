@@ -1,0 +1,77 @@
+<h2 mat-dialog-title>
+  <mat-icon style="vertical-align: middle; margin-right: 8px; color: #3b82f6;">attach_file</mat-icon>
+  Select Document{{ data.multiple ? 's' : '' }}
+</h2>
+<mat-dialog-content style="min-width: 560px; max-height: 480px;">
+  <div class="filters-bar" style="margin-bottom: 12px;">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex: 1;">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput placeholder="Search documents..." [(ngModel)]="searchQuery" (ngModelChange)="doSearch()">
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 150px;">
+      <mat-label>Type</mat-label>
+      <mat-select [(ngModel)]="typeFilter" (ngModelChange)="doSearch()">
+        <mat-option value="">All Types</mat-option>
+        <mat-option value="evidence">Evidence</mat-option>
+        <mat-option value="working_paper">Working Paper</mat-option>
+        <mat-option value="rfi_attachment">RFI Attachment</mat-option>
+        <mat-option value="finding_attachment">Finding Attachment</mat-option>
+        <mat-option value="adjustment_support">Adjustment Support</mat-option>
+        <mat-option value="afs_draft">AFS Draft</mat-option>
+        <mat-option value="afs_final">AFS Final</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <div style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">Loading...</div>
+  }
+
+  @if (!loading() && documents().length === 0) {
+    <div class="empty-state" style="padding: 32px;">
+      <mat-icon>search_off</mat-icon>
+      <h3>No documents found</h3>
+      <p>Try adjusting your search criteria.</p>
+    </div>
+  }
+
+  @if (documents().length > 0) {
+    <table class="data-table" style="width: 100%;">
+      <thead>
+        <tr>
+          @if (data.multiple) {
+            <th style="width: 40px;"></th>
+          }
+          <th>File Name</th>
+          <th>Type</th>
+          <th>Size</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (doc of documents(); track doc.id) {
+          <tr (click)="toggleSelection(doc)" [style.background]="isSelected(doc) ? '#eef6ff' : ''">
+            @if (data.multiple) {
+              <td><mat-checkbox [checked]="isSelected(doc)" (click)="$event.stopPropagation()" (change)="toggleSelection(doc)"></mat-checkbox></td>
+            }
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="font-size: 18px; width: 18px; height: 18px; color: var(--platinum-text-muted);">insert_drive_file</mat-icon>
+                {{ doc.originalName || doc.fileName }}
+              </div>
+            </td>
+            <td><span class="status-badge active" style="font-size: 10px;">{{ doc.documentType || 'evidence' }}</span></td>
+            <td class="amount-col">{{ formatSize(doc.fileSize) }}</td>
+            <td class="date-cell">{{ doc.createdAt | date:'shortDate' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-stroked-button (click)="dialogRef.close()">Cancel</button>
+  <button mat-flat-button class="btn-primary" (click)="confirm()" [disabled]="selectedDocs().length === 0">
+    <mat-icon>check</mat-icon> Select ({{ selectedDocs().length }})
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,104 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Bulk Upload Jobs</h1>
+      <p class="page-subtitle">Upload, validate and manage asset bulk uploads</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="downloadTemplate()" style="margin-right:8px">
+        <mat-icon>download</mat-icon> Download Template
+      </button>
+      <select class="upload-type-select"
+              [disabled]="uploading() || loadingTypes()"
+              (change)="onUploadTypeChange($any($event.target).value)">
+        <option value="">{{loadingTypes() ? 'Loading types...' : '-- Select Upload Type --'}}</option>
+        @for (ut of uploadTypes(); track ut.id) {
+          <option [value]="ut.id">{{ut.description}}</option>
+        }
+      </select>
+      <button mat-flat-button class="btn-primary"
+              (click)="fileInput.click()"
+              [disabled]="uploading() || loadingTypes() || selectedUploadType() === null">
+        <mat-icon>cloud_upload</mat-icon>
+        {{uploading() ? 'Processing...' : 'Upload File'}}
+      </button>
+      <input #fileInput type="file" accept=".xlsx,.xls" style="display:none" (change)="onFileSelected($event)">
+    </div>
+  </div>
+
+  @if (uploading() && uploadProgress()) {
+    <div class="upload-progress">
+      <div class="progress-header">
+        <mat-icon class="progress-icon">hourglass_top</mat-icon>
+        <span class="progress-message">{{uploadProgress().message}}</span>
+        <span class="progress-percent">{{uploadProgress().percent}}%</span>
+      </div>
+      <mat-progress-bar mode="determinate" [value]="uploadProgress().percent"></mat-progress-bar>
+    </div>
+  } @else if (uploading()) {
+    <div class="upload-progress">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Uploading file...</span>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Upload Type</th>
+            <th>File Name</th>
+            <th>Status</th>
+            <th>Records</th>
+            <th>Errors</th>
+            <th>Uploaded Date</th>
+            <th>Run ID</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+          <tr class="filter-row">
+            <td></td>
+            <td><input type="text" class="filter-input" [(ngModel)]="filters.filename" (ngModelChange)="applyFilters()" placeholder="Filter..."></td>
+            <td><input type="text" class="filter-input" [(ngModel)]="filters.job_Status" (ngModelChange)="applyFilters()" placeholder="Filter..."></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </thead>
+        <tbody>
+          @for (job of filteredJobs(); track job.id) {
+            <tr>
+              <td>{{getUploadTypeLabel(job.uploadType)}}</td>
+              <td class="desc-cell">{{job.filename}}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(job.job_Status)">{{job.job_Status}}</span></td>
+              <td class="num-cell">{{job.total_Records}}</td>
+              <td class="num-cell">{{job.no_RecodsNotValidating || 0}}</td>
+              <td class="date-cell">{{job.date_Created | date:'medium'}}</td>
+              <td class="id-cell">{{job.runID}}</td>
+              <td class="actions-cell">
+                @if (hasValidationErrors(job)) {
+                  <button mat-icon-button (click)="viewErrors(job)" matTooltip="View Errors">
+                    <mat-icon class="action-icon" style="color:#ef4444">error_outline</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="exportErrors(job)" matTooltip="Download Error Report">
+                    <mat-icon class="action-icon" style="color:#f59e0b">file_download</mat-icon>
+                  </button>
+                }
+                <button mat-icon-button (click)="downloadFile(job)" matTooltip="Download Original File">
+                  <mat-icon class="action-icon" style="color:#3b82f6">download</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (filteredJobs().length === 0) {
+        <div class="empty-state">No upload jobs found</div>
+      }
+    </div>
+  }
+</div>

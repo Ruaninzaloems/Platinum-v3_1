@@ -1,0 +1,11 @@
+<router-outlet />
+<app-toast />
+@if (loading()) {
+  <div class="auth-loading-overlay">
+    <div class="auth-loading-card">
+      <div class="auth-loading-icon"><span class="material-icons">account_balance</span></div>
+      <div class="auth-loading-bar"></div>
+      <div class="auth-loading-text">Connecting to Platinum...</div>
+    </div>
+  </div>
+}

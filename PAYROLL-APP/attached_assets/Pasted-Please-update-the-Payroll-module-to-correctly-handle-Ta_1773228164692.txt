@@ -1,0 +1,302 @@
+Please update the Payroll module to correctly handle Task Grade vs Upper Limit salary logic on Employee setup, and add the related configuration and Hours & Rates functionality.
+
+IMPORTANT BUSINESS RULES
+1. A Job Profile can be linked to either:
+   - a Task Grade, or
+   - an Upper Limit
+   depending on the Employee Type rules.
+2. A Position is linked to a Job Profile.
+3. An Employee is linked to a Position.
+4. The employee’s salary source must come from the Job Profile / Position chain, using the correct Task Grade or Upper Limit linked to that Job Profile.
+5. This is critical:
+   - Do NOT let the system mix Task Grade and Upper Limit incorrectly.
+   - The correct salary source must always be determined from the employee’s linked position -> job profile.
+   - The Employee Type determines whether Task Grade or Upper Limit is applicable.
+6. Shift and Rotation must remain visible if already on screen, but do not implement or change any new logic for them now.
+
+GOAL
+Fix the employee salary determination so that:
+- if the employee’s Job Profile uses Task Grade, pull salary and related values from Task Grade
+- if the employee’s Job Profile uses Upper Limit, pull salary and related values from Upper Limit
+- show the correct Hours and Rates values on Employee master
+- ensure the working hours / working days defaults come from Employee Type setup
+- add missing config options on Employee Type and Employee Sub Type pages
+
+==================================================
+1. EMPLOYEE TYPE PAGE
+==================================================
+
+Create a separate page to view Employee Types on its own, instead of only using it as a dropdown/config dependency.
+
+Rules:
+- Users must be able to view all Employee Types
+- Users must NOT be able to add new Employee Types
+- Users must NOT be able to delete Employee Types
+- Users must only be able to edit these fields:
+  - Working Hours Per Month
+  - Working Days Per Month
+
+Purpose:
+These fields will act as defaults for employees linked to that Employee Type.
+
+Suggested fields on Employee Type page:
+- Employee Type Name / Description
+- Working Hours Per Month
+- Working Days Per Month
+- Enabled / active display only if already exists in schema
+
+Behaviour:
+- Save edits to Working Hours Per Month and Working Days Per Month
+- Validate values are numeric and greater than zero
+- These defaults must flow through to Employee Hours and Rates
+
+==================================================
+2. EMPLOYEE SUB TYPE PAGE
+==================================================
+
+Add configuration fields to Employee Sub Type setup page:
+
+New fields:
+- Exclude UIF (checkbox)
+- Exclude SDL (checkbox)
+- Enable Bonus (checkbox)
+
+Behaviour:
+- Save and persist these fields on Employee Sub Type
+- These are configuration flags only for now
+- If there is already a details or edit page, add them there
+- If there is a grid/list, show these values as Yes/No where appropriate
+
+==================================================
+3. EMPLOYEE MASTER – HOURS AND RATES TAB
+==================================================
+
+Add / complete a separate “Hours and Rates” tab on Employee master similar to the attached screenshot.
+
+Fields to show on the Hours and Rates tab:
+Left side:
+- Payroll Cycle
+- Upper Limits OR Task Grade display, depending on applicable salary structure
+- Working Hours Per Month
+- Working Days Per Month
+- Monthly Fixed Salary
+- Method Of Tax Calculation
+
+Right side:
+- Annual Salary
+- Working Hours Per Day
+- Rate Per Day
+- Rate Per Hour
+- Shift (display only / leave as-is)
+- Rotation (display only / leave as-is)
+- Allow Overtime
+- Exclude SDL
+
+Notes:
+- Leave Shift and Rotation logic untouched for now
+- If those controls already exist, keep them, but do not build new dependency logic
+- Exclude SDL can display based on subtype/config or employee-level field if already available
+- Allow Overtime can remain as existing employee flag if already present
+
+==================================================
+4. SALARY SOURCE LOGIC – VERY IMPORTANT
+==================================================
+
+Implement correct logic to determine where the employee’s basic salary comes from.
+
+Required logic:
+1. Employee links to Position
+2. Position links to Job Profile
+3. Job Profile determines whether this role uses:
+   - Task Grade
+   - Upper Limit
+4. Based on that, pull the correct salary details
+
+Expected result:
+- If Job Profile uses Task Grade:
+  - show Task Grade on employee
+  - derive salary from Task Grade setup
+- If Job Profile uses Upper Limit:
+  - show Upper Limit on employee
+  - derive salary from Upper Limit setup
+
+Important:
+- Do not allow an employee to incorrectly show an Upper Limit when their Job Profile uses Task Grade
+- Do not allow an employee to incorrectly show a Task Grade when their Job Profile uses Upper Limit
+- The displayed salary and calculated rates must always match the correct source
+
+If needed, add a clean service/helper method like:
+- getEmployeeSalaryStructure(employeeId)
+- getPositionSalaryStructure(positionId)
+- resolveJobProfileRemuneration(jobProfileId)
+
+This method should return:
+- salary source type (Task Grade or Upper Limit)
+- salary source id
+- salary description
+- monthly/basic salary
+- any related grade/notch information if available
+
+==================================================
+5. HOURS AND RATES CALCULATIONS
+==================================================
+
+Populate the Hours and Rates tab using:
+- salary from Task Grade or Upper Limit
+- working hours per month from Employee Type defaults
+- working days per month from Employee Type defaults
+
+Calculations:
+1. Monthly Fixed Salary
+   - from the correct salary source (Task Grade or Upper Limit)
+
+2. Annual Salary
+   - Monthly Fixed Salary * 12
+
+3. Working Hours Per Day
+   - Working Hours Per Month / Working Days Per Month
+   - round sensibly to 2 decimals unless existing payroll standard differs
+
+4. Rate Per Day
+   - Monthly Fixed Salary / Working Days Per Month
+
+5. Rate Per Hour
+   - Monthly Fixed Salary / Working Hours Per Month
+
+Validation:
+- prevent divide by zero
+- if working hours or working days are missing or zero, show validation/warning and do not crash
+- read-only calculated fields should not be manually editable unless current design specifically requires overrides
+
+==================================================
+6. DEFAULTING RULES
+==================================================
+
+When opening or creating an employee:
+- determine Employee Type
+- pull default Working Hours Per Month from Employee Type
+- pull default Working Days Per Month from Employee Type
+- display these on Hours and Rates tab
+
+When employee position/job profile changes:
+- refresh the salary source and rates
+- re-evaluate whether Task Grade or Upper Limit applies
+
+If an employee already exists:
+- on load, recalculate/display values using current linked setup
+- do not hardcode salary values
+- use derived/configured values
+
+==================================================
+7. UI / UX REQUIREMENTS
+==================================================
+
+On Employee Hours and Rates tab:
+- If salary source is Task Grade, label field clearly as Task Grade
+- If salary source is Upper Limit, label field clearly as Upper Limit
+- Do not show the wrong field populated
+- If needed, use one dynamic label and one read-only value control
+- Keep layout close to the screenshot provided
+
+Suggested display behaviour:
+- Payroll Cycle: read-only or dropdown if already part of employee maintenance
+- Salary structure field: read-only display of Task Grade or Upper Limit
+- Monthly Fixed Salary: read-only calculated / derived
+- Annual Salary: read-only calculated
+- Working Hours Per Day / Rate Per Day / Rate Per Hour: read-only calculated
+
+==================================================
+8. DATA / BACKEND CHANGES
+==================================================
+
+Please inspect the existing schema and wire this into the correct entities/tables already used by:
+- Employee
+- Position
+- Job Profile
+- Employee Type
+- Employee Sub Type
+- Task Grade
+- Upper Limit
+
+Do not introduce duplicate salary storage if it can be derived reliably.
+
+If schema changes are needed:
+- keep them minimal
+- only add fields for:
+  - Employee Type: WorkingHoursPerMonth, WorkingDaysPerMonth
+  - Employee Sub Type: ExcludeUIF, ExcludeSDL, EnableBonus
+- create migration scripts if applicable
+
+==================================================
+9. SAVE / LOAD BEHAVIOUR
+==================================================
+
+Ensure:
+- Employee Type page saves working hours/days
+- Employee Sub Type page saves exclude UIF / exclude SDL / enable bonus
+- Employee master Hours and Rates loads correctly every time
+- Existing employees still open without errors
+- Derived salary values update correctly when related config changes
+
+==================================================
+10. TEST SCENARIOS TO COVER
+==================================================
+
+Please test at least these scenarios:
+
+Scenario 1:
+- Employee Type A has 166 hours/month and 20.75 days/month
+- Job Profile uses Upper Limit
+- Position linked correctly
+- Employee linked to Position
+Expected:
+- Employee Hours and Rates shows Upper Limit
+- Monthly salary comes from Upper Limit
+- Annual salary/rates calculate correctly
+- Working hours/days come from Employee Type
+
+Scenario 2:
+- Employee Type B has different hours/days
+- Job Profile uses Task Grade
+Expected:
+- Employee Hours and Rates shows Task Grade
+- Monthly salary comes from Task Grade
+- Rates calculate correctly
+- No Upper Limit salary is used
+
+Scenario 3:
+- Employee Sub Type has Exclude UIF = true, Exclude SDL = true, Enable Bonus = true
+Expected:
+- Config saves and reloads correctly
+
+Scenario 4:
+- Working days or hours are zero/null
+Expected:
+- user-friendly validation
+- no divide-by-zero errors
+
+==================================================
+11. CLEANUP / IMPLEMENTATION NOTES
+==================================================
+
+Please refactor carefully and do not break existing employee creation/edit flows.
+
+Priorities:
+1. Fix Task Grade vs Upper Limit logic properly
+2. Add Employee Type defaults for working hours/days
+3. Add Employee Sub Type config flags
+4. Add/complete Employee Hours and Rates tab
+5. Keep Shift and Rotation untouched for now
+
+Before coding, first inspect the current relationships and confirm where:
+- salary is currently being sourced incorrectly
+- employee type is stored
+- subtype is stored
+- job profile / position relation is stored
+
+Then implement the fix cleanly.
+
+Also provide a short summary of:
+- what files changed
+- what logic was fixed
+- any assumptions made where the current schema was unclear

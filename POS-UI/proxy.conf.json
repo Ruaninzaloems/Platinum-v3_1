@@ -1,0 +1,13 @@
+{
+  "/pos-app/api": {
+    "target": "http://localhost:3003",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/pos-app/api": "/api" }
+  },
+  "/api": {
+    "target": "http://localhost:3003",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

@@ -1,0 +1,1882 @@
+    <div class="requisitions-page">
+      <!-- ===================== DASHBOARD VIEW ===================== -->
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Requisition List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('report')">Reports</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total: ' + (summary().totalRequisitions || 0) + ' requisitions worth ' + formatCurrencyFull(summary().totalValue || 0)">
+            <mat-icon>description</mat-icon>
+            <span class="kpi-value">{{summary().totalRequisitions || 0}}</span>
+            <span class="kpi-label">Total Requisitions</span>
+            <span class="kpi-detail">{{formatCurrency(summary().totalValue || 0)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'You have ' + (myApprovals().length || 0) + ' requisitions worth ' + formatCurrencyFull(myApprovalsValue()) + ' awaiting your action'" [style.border-left-color]="(myApprovals().length || 0) > 0 ? '#ef6c00' : '#2e7d32'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(myApprovals().length || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{myApprovals().length || 0}}</span>
+            <span class="kpi-label">Awaiting My Approval</span>
+            <span class="kpi-detail">{{formatCurrency(myApprovalsValue())}} pending</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average ' + (summary().avgProcessingDays || 0) + ' days from submission to final approval. Target: 5 days'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{summary().avgProcessingDays || 0}}</span>
+            <span class="kpi-label">Avg Processing Days</span>
+            <span class="kpi-detail">
+              @if ((summary().avgProcessingDays || 0) <= 5) {
+                <mat-icon class="trend-icon trend-good">trending_down</mat-icon> Within SLA
+              } @else {
+                <mat-icon class="trend-icon trend-warn">trending_up</mat-icon> Above target
+              }
+            </span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().approvalRate || 0) + '% of decided requisitions were approved'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value">{{summary().approvalRate || 0}}%</span>
+            <span class="kpi-label">Approval Rate</span>
+            <div class="progress-bar-wrapper" style="margin-top: 4px;">
+              <div class="progress-bar" [style.width.%]="summary().approvalRate || 0" [style.background]="(summary().approvalRate || 0) >= 80 ? '#2e7d32' : '#ef6c00'"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatus('draft')" [matTooltip]="(pipeline().pipeline?.draft?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.draft?.value || 0)">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.draft?.count || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'saved'" (click)="filterByStatus('saved')" [matTooltip]="(pipeline().pipeline?.saved?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.saved?.value || 0)">
+            <mat-icon>save</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.saved?.count || 0}}</span>
+            <span class="pipe-label">Saved</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'submitted'" (click)="filterByStatus('submitted')" [matTooltip]="(pipeline().pipeline?.submitted?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.submitted?.value || 0)">
+            <mat-icon>send</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.submitted?.count || 0}}</span>
+            <span class="pipe-label">Submitted</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'supervisor_review'" (click)="filterByStatus('supervisor_review')" [matTooltip]="(pipeline().pipeline?.supervisor_review?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.supervisor_review?.value || 0)">
+            <mat-icon>supervisor_account</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.supervisor_review?.count || 0}}</span>
+            <span class="pipe-label">Supervisor</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'hod_review'" (click)="filterByStatus('hod_review')" [matTooltip]="(pipeline().pipeline?.hod_review?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.hod_review?.value || 0)">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.hod_review?.count || 0}}</span>
+            <span class="pipe-label">HOD Review</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'final_approved'" (click)="filterByStatus('final_approved')" [matTooltip]="(pipeline().pipeline?.final_approved?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.final_approved?.value || 0)">
+            <mat-icon>check_circle</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.final_approved?.count || 0}}</span>
+            <span class="pipe-label">Approved</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'routed'" (click)="filterByStatus('routed')" [matTooltip]="(pipeline().pipeline?.routed?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.routed?.value || 0)">
+            <mat-icon>alt_route</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.routed?.count || 0}}</span>
+            <span class="pipe-label">Routed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'completed'" (click)="filterByStatus('completed')" [matTooltip]="(pipeline().pipeline?.completed?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.completed?.value || 0)">
+            <mat-icon>task_alt</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.completed?.count || 0}}</span>
+            <span class="pipe-label">Completed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'supervisor_rejected' || filterStatus === 'hod_rejected'" (click)="filterByStatus('supervisor_rejected')" [matTooltip]="((pipeline().pipeline?.supervisor_rejected?.count || 0) + (pipeline().pipeline?.hod_rejected?.count || 0)) + ' rejected requisitions'">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{(pipeline().pipeline?.supervisor_rejected?.count || 0) + (pipeline().pipeline?.hod_rejected?.count || 0)}}</span>
+            <span class="pipe-label">Rejected</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'voided'" (click)="filterByStatus('voided')" [matTooltip]="(pipeline().pipeline?.voided?.count || 0) + ' requisitions worth ' + formatCurrency(pipeline().pipeline?.voided?.value || 0)">
+            <mat-icon>delete_forever</mat-icon>
+            <span class="pipe-count">{{pipeline().pipeline?.voided?.count || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <!-- DEPARTMENT GROUPING -->
+        <div class="dept-grouping">
+          <div class="dept-toggle">
+            <button mat-stroked-button (click)="toggleDeptGrouping()">
+              <mat-icon>{{showDeptGrouping() ? 'expand_less' : 'expand_more'}}</mat-icon>
+              {{showDeptGrouping() ? 'Hide' : 'Show'}} Department Grouping
+            </button>
+          </div>
+          @if (showDeptGrouping()) {
+            <div class="dept-cards">
+              @for (dept of getDeptPipelineKeys(); track dept) {
+                <div class="dept-card">
+                  <div class="dept-card-header">
+                    <span class="dept-name">{{dept}}</span>
+                    <span class="dept-total">{{formatCurrency(deptPipeline()[dept]?.totalValue || 0)}}</span>
+                  </div>
+                  <div class="dept-stats">
+                    <span class="dept-stat" style="background:#f1f5f9;color:#64748b">{{deptPipeline()[dept]?.draft || 0}} Draft</span>
+                    <span class="dept-stat" style="background:#e3f2fd;color:#1565c0">{{deptPipeline()[dept]?.submitted || 0}} Submitted</span>
+                    <span class="dept-stat" style="background:#fff3e0;color:#ef6c00">{{deptPipeline()[dept]?.inReview || 0}} In Review</span>
+                    <span class="dept-stat" style="background:#e8f5e9;color:#2e7d32">{{deptPipeline()[dept]?.approved || 0}} Approved</span>
+                  </div>
+                </div>
+              }
+              @if (getDeptPipelineKeys().length === 0) {
+                <div class="dept-card"><span class="empty-text">No department data available</span></div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- AI INSIGHTS PANEL -->
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; cursor: pointer;" (click)="showAiPanel.set(!showAiPanel())">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <mat-icon style="color: #7c3aed;">psychology</mat-icon>
+              <span style="font-size: 14px; font-weight: 600; color: #1e293b;">AI Requisition Insights</span>
+              <span style="font-size: 11px; color: #94a3b8; padding: 2px 8px; background: #f8fafc; border-radius: 4px;">
+                {{reqAiInsights().length > 0 && reqAiInsights()[0].aiGenerated ? 'Powered by AI' : 'Rule-based'}}
+              </span>
+            </div>
+            <mat-icon style="color: #94a3b8;">{{showAiPanel() ? 'expand_less' : 'expand_more'}}</mat-icon>
+          </div>
+          @if (showAiPanel() && reqAiInsights().length > 0) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+              @for (insight of reqAiInsights(); track insight.id) {
+                <div style="display: flex; gap: 10px; padding: 14px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; border-left: 3px solid {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}}; box-shadow: 0 1px 3px rgba(0,0,0,0.04);" [matTooltip]="insight.recommendation || ''">
+                  <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: {{insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'}}; color: {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}};">
+                    <mat-icon style="font-size: 18px; width: 18px; height: 18px;">{{insight.icon || 'description'}}</mat-icon>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 3px;">{{insight.title}}</div>
+                    <div style="font-size: 11px; color: #64748b; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{insight.message}}</div>
+                    @if (insight.legislationRef) {
+                      <div style="display: inline-flex; align-items: center; gap: 3px; background: #f3e8ff; color: #7c3aed; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; margin-top: 4px;">
+                        <mat-icon style="font-size: 10px; width: 10px; height: 10px;">menu_book</mat-icon>
+                        {{insight.legislationRef}}
+                      </div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size: 10px; color: #0d9488; background: #f0fdfa; padding: 3px 6px; border-radius: 3px; margin-top: 4px; line-height: 1.3;">{{insight.recommendation}}</div>
+                    }
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                      @if (insight.financialImpact) {
+                        <span style="font-size: 10px; color: #059669; font-weight: 500;">{{insight.financialImpact}}</span>
+                      } @else { <span></span> }
+                      @if (insight.confidence) {
+                        <span style="font-size: 9px; color: #94a3b8;">{{(insight.confidence * 100).toFixed(0)}}%</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- SLA STRIP -->
+        @if (slaData().stages?.length) {
+          <div class="sla-strip">
+            @for (stage of slaData().stages; track stage.name) {
+              <div class="sla-indicator">
+                <span class="sla-label">{{stage.name}}</span>
+                <div class="sla-values">
+                  <span class="sla-actual" [class]="getSlaClass(stage.actualDays, stage.targetDays)">{{stage.actualDays || 0}}d</span>
+                  <span class="sla-target">/ {{stage.targetDays}}d target</span>
+                </div>
+                <div class="sla-bar" [style.background]="getSlaBarColor(stage.actualDays, stage.targetDays)" [style.width.%]="getSlaBarWidth(stage.actualDays, stage.targetDays)"></div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- PROCUREMENT ROUTE SUMMARY -->
+        <div class="route-summary-strip">
+          <div class="route-tile route-bg-green" matTooltip="Requisitions routed as Direct Purchase (R0 - R2,000)">
+            <mat-icon>shopping_bag</mat-icon>
+            <div class="route-info">
+              <span class="route-count">{{summary().byRoute?.direct_purchase?.count || 0}}</span>
+              <span class="route-label">Direct Purchase</span>
+              <span class="route-value">{{formatCurrency(summary().byRoute?.direct_purchase?.value || 0)}}</span>
+            </div>
+          </div>
+          <div class="route-tile route-bg-amber" matTooltip="Requisitions routed as Informal Quotations (R2,001 - R30,000)">
+            <mat-icon>request_quote</mat-icon>
+            <div class="route-info">
+              <span class="route-count">{{summary().byRoute?.informal_quotation?.count || 0}}</span>
+              <span class="route-label">Informal Quotations</span>
+              <span class="route-value">{{formatCurrency(summary().byRoute?.informal_quotation?.value || 0)}}</span>
+            </div>
+          </div>
+          <div class="route-tile route-bg-blue" matTooltip="Requisitions routed as Formal Quotations (R30,001 - R200,000)">
+            <mat-icon>assignment</mat-icon>
+            <div class="route-info">
+              <span class="route-count">{{summary().byRoute?.formal_quotation?.count || 0}}</span>
+              <span class="route-label">Formal Quotations</span>
+              <span class="route-value">{{formatCurrency(summary().byRoute?.formal_quotation?.value || 0)}}</span>
+            </div>
+          </div>
+          <div class="route-tile route-bg-purple" matTooltip="Requisitions routed as Competitive Bidding (R200,001+)">
+            <mat-icon>gavel</mat-icon>
+            <div class="route-info">
+              <span class="route-count">{{summary().byRoute?.competitive_bid?.count || 0}}</span>
+              <span class="route-label">Competitive Bidding</span>
+              <span class="route-value">{{formatCurrency(summary().byRoute?.competitive_bid?.value || 0)}}</span>
+            </div>
+          </div>
+          <div class="route-tile route-bg-red" matTooltip="Requisitions processed under deviation from normal procurement">
+            <mat-icon>warning</mat-icon>
+            <div class="route-info">
+              <span class="route-count">{{summary().byRoute?.deviation?.count || 0}}</span>
+              <span class="route-label">Deviation</span>
+              <span class="route-value">{{formatCurrency(summary().byRoute?.deviation?.value || 0)}}</span>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== AI ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Requisition List</button>
+          <button class="tab-btn active">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('report')">Reports</button>
+        </div>
+
+        @if (reqAnalytics()) {
+          <!-- DEMAND VS BUDGET CHART -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">trending_up</mat-icon>
+                  Demand vs Budget Coverage
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112, SCM Reg 12(5)</span>
+              </div>
+              <div style="height: 250px; position: relative;">
+                <canvas id="demandBudgetChart"></canvas>
+              </div>
+              <div style="display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                <div style="flex: 1; text-align: center;">
+                  <div style="font-size: 11px; color: #94a3b8;">Total Demand</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #3b82f6;">R {{sumDatasetMillions(0)}}M</div>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                  <div style="font-size: 11px; color: #94a3b8;">Budget Available</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #10b981;">R {{sumDatasetMillions(1)}}M</div>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                  <div style="font-size: 11px; color: #94a3b8;">Committed</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #f59e0b;">R {{sumDatasetMillions(2)}}M</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SPLITTING DETECTION TREND -->
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #ef4444; font-size: 20px; width: 20px; height: 20px;">warning</mat-icon>
+                  Order Splitting Detection
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fef2f2; padding: 2px 8px; border-radius: 4px;">SCM Reg 12(3), NT Practice Note 8</span>
+              </div>
+              <div style="height: 250px; position: relative;">
+                <canvas id="splittingChart"></canvas>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                @for (dept of reqAnalytics().splittingDetection.byDepartment; track dept.department) {
+                  <div style="flex: 1; background: #fef2f2; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div style="font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{dept.department}}</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #dc2626;">{{dept.cases}}</div>
+                    <div style="font-size: 10px; color: #64748b;">cases</div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- AGING FUNNEL + IRREGULAR RISK -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <!-- AGING FUNNEL -->
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #8b5cf6; font-size: 20px; width: 20px; height: 20px;">filter_alt</mat-icon>
+                  Requisition Aging Funnel
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112, s115</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                @for (stage of reqAnalytics().agingFunnel.stages; track stage.stage) {
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 120px; font-size: 12px; color: #64748b; text-align: right;">{{stage.stage}}</div>
+                    <div style="flex: 1; background: #f1f5f9; border-radius: 6px; height: 32px; position: relative; overflow: hidden;">
+                      <div [style.width.%]="(stage.count / reqAnalytics().agingFunnel.stages[0].count) * 100" [style.background]="stage.color" style="height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; transition: width 0.8s ease;">
+                        <span style="font-size: 12px; font-weight: 600; color: white;">{{stage.count}}</span>
+                      </div>
+                    </div>
+                    <div style="width: 70px; font-size: 11px; color: #94a3b8;" [matTooltip]="'Median ' + stage.medianDays + ' days at this stage'">~{{stage.medianDays}}d median</div>
+                  </div>
+                }
+              </div>
+              @if (reqAnalytics().agingFunnel.outliers?.length) {
+                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                  <div style="font-size: 11px; font-weight: 600; color: #dc2626; margin-bottom: 8px;">Outliers (Exceeding Target)</div>
+                  @for (outlier of reqAnalytics().agingFunnel.outliers; track outlier.ref) {
+                    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fef2f2; border-radius: 6px; margin-bottom: 4px;">
+                      <mat-icon style="font-size: 14px; width: 14px; height: 14px; color: #dc2626;">schedule</mat-icon>
+                      <span style="font-size: 11px; font-weight: 600; color: #1e293b;">{{outlier.ref}}</span>
+                      <span style="font-size: 11px; color: #dc2626; font-weight: 600;">{{outlier.days}}d</span>
+                      <span style="font-size: 10px; color: #64748b; flex: 1;">{{outlier.reason}}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- TOP IRREGULAR RISK -->
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #dc2626; font-size: 20px; width: 20px; height: 20px;">security</mat-icon>
+                  Top Irregular Risk Requisitions
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fef2f2; padding: 2px 8px; border-radius: 4px;">MFMA s171</span>
+              </div>
+              @for (risk of reqAnalytics().irregularRisk; track risk.ref) {
+                <div style="padding: 12px; border: 1px solid {{risk.severity === 'critical' ? '#fecaca' : risk.severity === 'warning' ? '#fde68a' : '#e2e8f0'}}; border-radius: 10px; margin-bottom: 8px; background: {{risk.severity === 'critical' ? '#fef2f2' : risk.severity === 'warning' ? '#fffbeb' : '#f8fafc'}};">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-size: 12px; font-weight: 700; color: #1e293b;">{{risk.ref}}</span>
+                      <span style="font-size: 10px; color: #64748b; background: white; padding: 1px 6px; border-radius: 3px;">{{risk.department}}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <div style="width: 40px; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                        <div [style.width.%]="risk.riskScore" style="height: 100%; border-radius: 3px; background: {{risk.riskScore > 80 ? '#dc2626' : risk.riskScore > 60 ? '#f59e0b' : '#3b82f6'}};"></div>
+                      </div>
+                      <span style="font-size: 11px; font-weight: 700; color: {{risk.riskScore > 80 ? '#dc2626' : risk.riskScore > 60 ? '#f59e0b' : '#3b82f6'}};">{{risk.riskScore}}%</span>
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; color: #334155; margin-bottom: 4px;">{{risk.title}}</div>
+                  @for (reason of risk.riskReasons; track reason) {
+                    <div style="font-size: 10px; color: #dc2626; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                      <mat-icon style="font-size: 12px; width: 12px; height: 12px;">error_outline</mat-icon>
+                      {{reason}}
+                    </div>
+                  }
+                  <div style="display: inline-flex; align-items: center; gap: 3px; background: #f3e8ff; color: #7c3aed; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; margin-top: 4px;">
+                    <mat-icon style="font-size: 10px; width: 10px; height: 10px;">menu_book</mat-icon>
+                    {{risk.legislationRef}}
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- DEPARTMENT BUDGET UTILISATION -->
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #10b981; font-size: 20px; width: 20px; height: 20px;">account_balance</mat-icon>
+                Department Budget Utilisation
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s15, SCM Reg 12(5)</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+              @for (dept of reqAnalytics().demandVsBudget.byDepartment; track dept.department) {
+                <div style="background: #f8fafc; border-radius: 10px; padding: 14px; border: 1px solid #e2e8f0;" [matTooltip]="'Demand: R' + (dept.demand/1000000).toFixed(1) + 'M / Budget: R' + (dept.budget/1000000).toFixed(1) + 'M'">
+                  <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{dept.department}}</div>
+                  <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px;">
+                    <span style="font-size: 20px; font-weight: 700; color: {{dept.utilisation > 70 ? '#dc2626' : dept.utilisation > 50 ? '#f59e0b' : '#10b981'}};">{{dept.utilisation}}%</span>
+                    <span style="font-size: 10px; color: #94a3b8;">utilised</span>
+                  </div>
+                  <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                    <div [style.width.%]="dept.utilisation" style="height: 100%; border-radius: 3px; background: {{dept.utilisation > 70 ? '#dc2626' : dept.utilisation > 50 ? '#f59e0b' : '#10b981'}}; transition: width 0.8s ease;"></div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                    <span style="font-size: 10px; color: #3b82f6;">R{{(dept.demand/1000000).toFixed(1)}}M</span>
+                    <span style="font-size: 10px; color: #10b981;">R{{(dept.budget/1000000).toFixed(1)}}M</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div style="text-align: center; padding: 60px; color: #94a3b8;">
+            <mat-icon style="font-size: 48px; width: 48px; height: 48px; margin-bottom: 16px;">analytics</mat-icon>
+            <p>Loading analytics data...</p>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn active">Requisition List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('report')">Reports</button>
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search requisitions..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="saved">Saved</mat-option>
+              <mat-option value="submitted">Submitted</mat-option>
+              <mat-option value="supervisor_review">Supervisor Review</mat-option>
+              <mat-option value="hod_review">HOD Review</mat-option>
+              <mat-option value="final_approved">Approved</mat-option>
+              <mat-option value="routed">Routed</mat-option>
+              <mat-option value="completed">Completed</mat-option>
+              <mat-option value="supervisor_rejected">Supervisor Rejected</mat-option>
+              <mat-option value="hod_rejected">HOD Rejected</mat-option>
+              <mat-option value="returned">Returned</mat-option>
+              <mat-option value="voided">Voided</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Type" [(ngModel)]="filterRequisitionType" (selectionChange)="applyFilters()">
+              <mat-option value="">All Types</mat-option>
+              <mat-option value="operational">Operational</mat-option>
+              <mat-option value="capital">Capital</mat-option>
+              <mat-option value="maintenance">Maintenance</mat-option>
+              <mat-option value="emergency">Emergency</mat-option>
+              <mat-option value="deviation">Deviation</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Category" [(ngModel)]="filterCategory" (selectionChange)="applyFilters()">
+              <mat-option value="">All Categories</mat-option>
+              <mat-option value="goods">Goods</mat-option>
+              <mat-option value="services">Services</mat-option>
+              <mat-option value="works">Works</mat-option>
+              <mat-option value="professional_services">Professional Services</mat-option>
+              <mat-option value="consulting">Consulting</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="applyFilters()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments; track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Priority" [(ngModel)]="filterPriority" (selectionChange)="applyFilters()">
+              <mat-option value="">All Priorities</mat-option>
+              <mat-option value="low">Low</mat-option>
+              <mat-option value="medium">Medium</mat-option>
+              <mat-option value="high">High</mat-option>
+              <mat-option value="urgent">Urgent</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Route" [(ngModel)]="filterRoute" (selectionChange)="applyFilters()">
+              <mat-option value="">All Routes</mat-option>
+              <mat-option value="direct_purchase">Direct Purchase</mat-option>
+              <mat-option value="informal_quotation">Informal Quotation</mat-option>
+              <mat-option value="formal_quotation">Formal Quotation</mat-option>
+              <mat-option value="competitive_bid">Competitive Bid</mat-option>
+              <mat-option value="deviation">Deviation</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterFromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterToPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" matTooltip="Filter by minimum estimated value">
+            <mat-label>Min Value (R)</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMin" (change)="applyFilters()" placeholder="0" min="0">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" matTooltip="Filter by maximum estimated value">
+            <mat-label>Max Value (R)</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMax" (change)="applyFilters()" placeholder="No limit" min="0">
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()" matTooltip="Clear all active filters">
+            <mat-icon>filter_alt_off</mat-icon> Clear All Filters
+          </button>
+          <button mat-flat-button color="primary" (click)="openCreateForm()">
+            <mat-icon>add</mat-icon> New Requisition
+          </button>
+        </div>
+
+        <!-- REQUISITIONS TABLE -->
+        <div class="table-wrapper">
+          <table class="requisitions-table">
+            <thead>
+              <tr>
+                <th (click)="sort('referenceNumber')">Ref # <mat-icon>unfold_more</mat-icon></th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th (click)="sort('department')">Department <mat-icon>unfold_more</mat-icon></th>
+                <th (click)="sort('totalEstimatedValue')">Est. Value <mat-icon>unfold_more</mat-icon></th>
+                <th>Route</th>
+                <th>Status</th>
+                <th (click)="sort('captureDate')">Requested <mat-icon>unfold_more</mat-icon></th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (req of requisitions(); track req.id) {
+                <tr class="req-row" (click)="viewRequisition(req)">
+                  <td class="ref-cell">{{req.referenceNumber}}</td>
+                  <td class="title-cell">
+                    <span class="req-title" [matTooltip]="req.title">{{req.title}}</span>
+                  </td>
+                  <td><span class="type-badge" [class]="getTypeBadgeClass(req.requisitionType)">{{getTypeLabel(req.requisitionType)}}</span></td>
+                  <td>
+                    <mat-icon class="cat-icon" [matTooltip]="req.category | titlecase">{{getCategoryIcon(req.category)}}</mat-icon>
+                    <span class="cat-label">{{req.category | titlecase}}</span>
+                  </td>
+                  <td>{{req.department}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(req.totalEstimatedValue?.amount || req.estimatedCost?.amount || getReqLineItemsTotal(req))">{{formatCurrency(req.totalEstimatedValue?.amount || req.estimatedCost?.amount || getReqLineItemsTotal(req))}}</td>
+                  <td>
+                    @if (req.procurementRoute) {
+                      <span class="route-badge" [class]="getRouteBadgeClass(req.procurementRoute)">{{getRouteLabel(req.procurementRoute)}}</span>
+                    } @else {
+                      <span class="route-badge route-unrouted">Pending</span>
+                    }
+                  </td>
+                  <td><span class="status-badge" [class]="'status-' + req.status">{{getStatusLabel(req.status)}}</span></td>
+                  <td>{{formatDate(req.captureDate)}}</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button (click)="viewRequisition(req)" matTooltip="View details">
+                      <mat-icon>visibility</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="10" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No requisitions found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAGINATION -->
+        <div class="pagination">
+          <span class="page-info">Showing {{pageStart()}} – {{pageEnd()}} of {{totalRequisitions()}} requisitions</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== DETAIL VIEW ===================== -->
+      @if (currentView() === 'detail' && selectedRequisition()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedRequisition()!.referenceNumber || selectedRequisition()!.requisitionNumber}} — {{selectedRequisition()!.title || selectedRequisition()!.serviceDescription || ''}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedRequisition()!.status">{{getStatusLabel(selectedRequisition()!.status)}}</span>
+              @if (selectedRequisition()!.procurementRoute) {
+                <span class="route-badge" [class]="getRouteBadgeClass(selectedRequisition()!.procurementRoute)">{{getRouteLabel(selectedRequisition()!.procurementRoute)}}</span>
+              }
+              <span class="type-badge" [class]="getTypeBadgeClass(selectedRequisition()!.requisitionType)">{{getTypeLabel(selectedRequisition()!.requisitionType)}}</span>
+              @if (selectedRequisition()!.priority) {
+                <span class="priority-badge" [class]="'priority-' + selectedRequisition()!.priority">
+                  <mat-icon>{{getPriorityIcon(selectedRequisition()!.priority)}}</mat-icon>
+                  {{selectedRequisition()!.priority | titlecase}}
+                </span>
+              }
+              <span class="dept-tag">{{selectedRequisition()!.department}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Estimated Value</span>
+            <span class="value-amount">{{formatCurrencyFull(selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!))}}</span>
+          </div>
+        </div>
+
+        <!-- DETAIL ACTION BUTTONS -->
+        <div class="detail-actions-bar">
+          @if (['draft', 'saved', 'returned', 'submitted', 'supervisor_review', 'supervisor_approved', 'hod_review'].includes(selectedRequisition()!.status)) {
+            <button mat-flat-button color="primary" (click)="openEditForm()"><mat-icon>edit</mat-icon> Edit</button>
+          }
+          @if (['draft', 'saved', 'returned'].includes(selectedRequisition()!.status)) {
+            <button mat-flat-button style="background:#2e7d32;color:white" (click)="submitRequisition()"><mat-icon>send</mat-icon> Submit</button>
+          }
+          @if (['draft', 'saved'].includes(selectedRequisition()!.status)) {
+            <button mat-stroked-button color="warn" (click)="deleteRequisition()"><mat-icon>delete</mat-icon> Delete</button>
+          }
+          @if (selectedRequisition()!.status === 'submitted') {
+            <button mat-stroked-button color="warn" (click)="recallRequisition()"><mat-icon>undo</mat-icon> Recall</button>
+          }
+          @if (['approved', 'final_approved'].includes(selectedRequisition()!.status)) {
+            <button mat-stroked-button style="color:#7c3aed;border-color:#7c3aed" (click)="amendRequisition()" matTooltip="Create an amendment to this approved requisition"><mat-icon>edit_document</mat-icon> Amend</button>
+          }
+          @if (!['voided', 'completed', 'draft', 'saved'].includes(selectedRequisition()!.status)) {
+            <button mat-stroked-button style="color:#c62828;border-color:#c62828" (click)="voidRequisition()"><mat-icon>block</mat-icon> Void</button>
+          }
+          <button mat-stroked-button (click)="exportRequisition()" matTooltip="Export requisition data for printing"><mat-icon>download</mat-icon> Export</button>
+          <button mat-stroked-button (click)="printRequisition()" matTooltip="Print current view"><mat-icon>print</mat-icon> Print</button>
+        </div>
+
+        @if (notificationMessage()) {
+          <div class="notification-bar">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{notificationMessage()}}</span>
+            <button mat-icon-button (click)="notificationMessage.set('')"><mat-icon>close</mat-icon></button>
+          </div>
+        }
+
+        <!-- APPROVAL ACTIONS PANEL -->
+        @if (selectedRequisition()!.status === 'supervisor_review' || selectedRequisition()!.status === 'hod_review') {
+          <div class="action-panel">
+            <div class="action-panel-header">
+              <mat-icon>pending_actions</mat-icon>
+              <span>
+                @if (selectedRequisition()!.status === 'supervisor_review') {
+                  This requisition is awaiting Supervisor approval
+                } @else {
+                  This requisition is awaiting HOD / Final approval
+                }
+              </span>
+            </div>
+            <div class="action-panel-body">
+              <mat-form-field appearance="outline" class="action-comments">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="actionComments" rows="2" placeholder="Add your comments..."></textarea>
+              </mat-form-field>
+              <div class="action-buttons">
+                @if (selectedRequisition()!.status === 'supervisor_review') {
+                  <button mat-flat-button color="primary" (click)="supervisorApprove()"><mat-icon>check</mat-icon> Approve</button>
+                  <button mat-stroked-button color="warn" (click)="supervisorReject()"><mat-icon>close</mat-icon> Reject</button>
+                  <button mat-stroked-button (click)="supervisorReturn()"><mat-icon>undo</mat-icon> Return for Revision</button>
+                } @else {
+                  <button mat-flat-button color="primary" (click)="hodApprove()"><mat-icon>check</mat-icon> Approve</button>
+                  <button mat-stroked-button color="warn" (click)="hodReject()"><mat-icon>close</mat-icon> Reject</button>
+                  <button mat-stroked-button (click)="hodReturn()"><mat-icon>undo</mat-icon> Return</button>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (selectedRequisition()!.status === 'final_approved') {
+          <div class="action-panel" style="border-color:#7c3aed">
+            <div class="action-panel-header" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe)">
+              <mat-icon style="color:#7c3aed">alt_route</mat-icon>
+              <span style="color:#5b21b6">This requisition is fully approved and ready to be routed to procurement</span>
+            </div>
+            <div class="action-panel-body">
+              <div class="detail-grid" style="margin-bottom:12px">
+                <div class="detail-field">
+                  <label>Procurement Method</label>
+                  <span class="route-badge route-badge-lg" [class]="getRouteBadgeClass(selectedRequisition()!.procurementRoute)">
+                    {{getRouteLabel(selectedRequisition()!.procurementRoute)}}
+                  </span>
+                </div>
+                <div class="detail-field">
+                  <label>Estimated Value</label>
+                  <span>{{formatCurrencyFull(selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!))}}</span>
+                </div>
+                @if (selectedRequisition()!.procurementRoute === 'competitive_bid') {
+                  <div class="detail-field">
+                    <label>Scoring</label>
+                    <span>80/20 PPPFA</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Advert Days</label>
+                    <span>21 days</span>
+                  </div>
+                }
+              </div>
+              <p style="font-size:13px;color:#64748b;margin:0 0 12px">
+                @if (selectedRequisition()!.procurementRoute === 'competitive_bid') {
+                  Routing will create a new Competitive Bid (Tender) linked to this requisition. The tender will appear in the Tenders module for further processing.
+                } @else if (selectedRequisition()!.procurementRoute === 'formal_quotation') {
+                  Routing will create a new Formal Quotation process linked to this requisition.
+                } @else if (selectedRequisition()!.procurementRoute === 'informal_quotation') {
+                  Routing will create an Informal Quotation process linked to this requisition.
+                } @else {
+                  Routing will proceed with the appropriate procurement process for this requisition.
+                }
+              </p>
+              <div class="action-buttons">
+                <button mat-flat-button style="background:#7c3aed;color:white" (click)="routeToProcurement()">
+                  <mat-icon>alt_route</mat-icon> Route to Procurement
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (selectedRequisition()!.status === 'routed' || selectedRequisition()!.status === 'completed') {
+          <div class="action-panel" style="border-color:#2e7d32">
+            <div class="action-panel-header" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7)">
+              <mat-icon style="color:#2e7d32">check_circle</mat-icon>
+              <span style="color:#166534">This requisition has been routed to procurement</span>
+            </div>
+            <div class="action-panel-body">
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Procurement Method</label>
+                  <span class="route-badge route-badge-lg" [class]="getRouteBadgeClass(selectedRequisition()!.procurementRoute)">
+                    {{getRouteLabel(selectedRequisition()!.procurementRoute)}}
+                  </span>
+                </div>
+                @if (selectedRequisition()!.linkedTender) {
+                  <div class="detail-field">
+                    <label>Linked Tender</label>
+                    <span style="color:#3b82f6;font-weight:600;cursor:pointer" (click)="navigateToTender(selectedRequisition()!.linkedTender)">{{selectedRequisition()!.linkedTender}}</span>
+                  </div>
+                }
+                @if (selectedRequisition()!.linkedQuotation) {
+                  <div class="detail-field">
+                    <label>Linked Quotation</label>
+                    <span style="color:#3b82f6;font-weight:600;cursor:pointer" (click)="navigateToQuotation(selectedRequisition()!.linkedQuotation)">{{selectedRequisition()!.linkedQuotation}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (selectedRequisition()!.status === 'voided' && selectedRequisition()!.voidInfo) {
+          <div class="void-panel">
+            <div class="void-header"><mat-icon>block</mat-icon> Requisition Voided</div>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Voided By</label><span>{{selectedRequisition()!.voidInfo.voidedBy?.name}}</span></div>
+              <div class="detail-field"><label>Date</label><span>{{formatDateTime(selectedRequisition()!.voidInfo.voidedDate)}}</span></div>
+              <div class="detail-field"><label>Reason</label><span>{{selectedRequisition()!.voidInfo.reason}}</span></div>
+              <div class="detail-field"><label>Budget Released</label><span>{{formatCurrencyFull(selectedRequisition()!.voidInfo.budgetReleased)}}</span></div>
+            </div>
+          </div>
+        }
+
+        @if (selectedRequisition()!.status === 'amendment_pending') {
+          <div class="action-panel" style="border-color:#7c3aed">
+            <div class="action-panel-header" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe)">
+              <mat-icon style="color:#7c3aed">edit_document</mat-icon>
+              <span style="color:#5b21b6">An amendment is pending for this requisition</span>
+            </div>
+            <div class="action-panel-body">
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Amendment Reference</label>
+                  <span style="color:#7c3aed;font-weight:600;cursor:pointer" (click)="viewRequisition({id: selectedRequisition()!.amendmentId})" matTooltip="Click to view amendment">{{selectedRequisition()!.amendmentId}}</span>
+                </div>
+              </div>
+              <p style="font-size:13px;color:#64748b;margin:8px 0 0">This requisition is locked while an amendment is being processed. The original will be superseded if the amendment is approved.</p>
+            </div>
+          </div>
+        }
+
+        @if (selectedRequisition()!.status === 'amendment_draft') {
+          <div class="action-panel" style="border-color:#7c3aed">
+            <div class="action-panel-header" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe)">
+              <mat-icon style="color:#7c3aed">edit_document</mat-icon>
+              <span style="color:#5b21b6">This is an amendment awaiting approval</span>
+            </div>
+            <div class="action-panel-body">
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Original Requisition</label>
+                  <span style="color:#3b82f6;font-weight:600;cursor:pointer" (click)="viewRequisition({id: selectedRequisition()!.amendedFrom})" matTooltip="Click to view original requisition">{{selectedRequisition()!.amendedFrom}}</span>
+                </div>
+                @if (selectedRequisition()!.amendmentReason) {
+                  <div class="detail-field">
+                    <label>Amendment Reason</label>
+                    <span>{{selectedRequisition()!.amendmentReason}}</span>
+                  </div>
+                }
+              </div>
+              <div style="margin-top:12px">
+                <mat-form-field appearance="outline" class="action-comments">
+                  <mat-label>Comments</mat-label>
+                  <textarea matInput [(ngModel)]="actionComments" rows="2" placeholder="Add your comments..."></textarea>
+                </mat-form-field>
+                <div class="action-buttons">
+                  <button mat-flat-button style="background:#7c3aed;color:white" (click)="approveAmendment()" matTooltip="Approve this amendment and supersede the original"><mat-icon>check</mat-icon> Approve Amendment</button>
+                  <button mat-stroked-button color="warn" (click)="rejectAmendment()" matTooltip="Reject this amendment and restore the original"><mat-icon>close</mat-icon> Reject Amendment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- WORKFLOW STEPPER -->
+        <div class="workflow-stepper">
+          @for (step of workflowSteps; track step.key; let last = $last) {
+            <div class="step" [class.completed]="isStepCompleted(step.key)" [class.current]="isStepCurrent(step.key)">
+              <div class="step-indicator">
+                @if (isStepCompleted(step.key)) {
+                  <mat-icon>check_circle</mat-icon>
+                } @else if (isStepCurrent(step.key)) {
+                  <mat-icon>radio_button_checked</mat-icon>
+                } @else {
+                  <mat-icon>radio_button_unchecked</mat-icon>
+                }
+              </div>
+              <span class="step-label">{{step.label}}</span>
+            </div>
+            @if (!last) {
+              <div class="step-connector" [class.completed]="isStepCompleted(step.key)"></div>
+            }
+          }
+        </div>
+
+        <!-- TAB NAV -->
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'details'" (click)="detailTab.set('details')">Details</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'lineitems'" (click)="detailTab.set('lineitems')">Line Items ({{selectedRequisition()!.lineItems?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'budget'" (click)="detailTab.set('budget')">Budget & Project</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'approvals'" (click)="detailTab.set('approvals')">Approvals</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents')">Documents ({{selectedRequisition()!.documents?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'audit'" (click)="detailTab.set('audit')">Audit Trail</button>
+        </div>
+
+        <!-- ========== TAB: DETAILS ========== -->
+        @if (detailTab() === 'details') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>info</mat-icon> Requisition Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Reference</label><span>{{selectedRequisition()!.referenceNumber || selectedRequisition()!.requisitionNumber}}</span></div>
+                  <div class="detail-field"><label>Type</label><span class="type-badge" [class]="getTypeBadgeClass(selectedRequisition()!.requisitionType)">{{getTypeLabel(selectedRequisition()!.requisitionType)}}</span></div>
+                  <div class="detail-field"><label>Category</label><span>{{(selectedRequisition()!.category || '—') | titlecase}}</span></div>
+                  <div class="detail-field"><label>Department</label><span>{{selectedRequisition()!.department || '—'}}</span></div>
+                  <div class="detail-field"><label>Cost Centre</label><span>{{selectedRequisition()!.costCollector || selectedRequisition()!.costCentre || '—'}}</span></div>
+                  <div class="detail-field"><label>Requested By</label><span>{{selectedRequisition()!.requestedBy?.name || selectedRequisition()!.requestedBy || '—'}}</span></div>
+                  <div class="detail-field"><label>Supervisor</label><span>{{selectedRequisition()!.supervisor?.name || selectedRequisition()!.supervisor || '—'}}</span></div>
+                  <div class="detail-field"><label>HOD</label><span>{{selectedRequisition()!.hod?.name || selectedRequisition()!.hod || '—'}}</span></div>
+                  <div class="detail-field"><label>Priority</label><span>{{selectedRequisition()!.priority || 'Normal' | titlecase}}</span></div>
+                  @if (selectedRequisition()!.demandPlanRef) {
+                    <div class="detail-field"><label>Demand Plan</label><span style="color:#1e40af;font-weight:500">{{selectedRequisition()!.demandPlanRef}}</span></div>
+                  }
+                  <div class="detail-field"><label>Capture Date</label><span>{{formatDate(selectedRequisition()!.captureDate)}}</span></div>
+                  @if (selectedRequisition()!.submittedDate) {
+                    <div class="detail-field"><label>Submitted Date</label><span>{{formatDate(selectedRequisition()!.submittedDate)}}</span></div>
+                  }
+                  @if (selectedRequisition()!.daysInProcess != null) {
+                    <div class="detail-field"><label>Days in Process</label><span>{{selectedRequisition()!.daysInProcess}} days</span></div>
+                  }
+                </div>
+                <div class="detail-grid" style="margin-top: 16px;">
+                  <div class="detail-field" style="grid-column: 1 / -1;">
+                    <label>Description</label>
+                    <span class="desc-text">{{selectedRequisition()!.description}}</span>
+                  </div>
+                </div>
+                @if (selectedRequisition()!.isTenderRequisition) {
+                  <div class="flag-badge flag-tender" style="margin-top: 12px;">
+                    <mat-icon>campaign</mat-icon> Tender Requisition
+                  </div>
+                }
+                @if (selectedRequisition()!.isMultiYear) {
+                  <div class="flag-badge flag-multiyear" style="margin-top: 8px;">
+                    <mat-icon>date_range</mat-icon> Multi-Year Contract
+                  </div>
+                }
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>alt_route</mat-icon> Procurement Route</h3>
+                @if (selectedRequisition()!.procurementRoute) {
+                  <div class="route-determination">
+                    <span class="route-badge route-badge-lg" [class]="getRouteBadgeClass(selectedRequisition()!.procurementRoute)">{{getRouteLabel(selectedRequisition()!.procurementRoute)}}</span>
+                    <p class="route-reason">{{selectedRequisition()!.procurementRouteReason}}</p>
+                    <div class="route-details">
+                      @if (getRouteScoring(selectedRequisition()!.procurementRoute)) {
+                        <div class="route-detail-item"><label>Scoring</label><span>{{getRouteScoring(selectedRequisition()!.procurementRoute)}}</span></div>
+                      }
+                      @if (getRouteMinQuotes(selectedRequisition()!.procurementRoute) > 0) {
+                        <div class="route-detail-item"><label>Min Quotes</label><span>{{getRouteMinQuotes(selectedRequisition()!.procurementRoute)}}</span></div>
+                      }
+                      @if (getRouteAdvertDays(selectedRequisition()!.procurementRoute) > 0) {
+                        <div class="route-detail-item"><label>Advert Days</label><span>{{getRouteAdvertDays(selectedRequisition()!.procurementRoute)}}</span></div>
+                      }
+                    </div>
+                  </div>
+                } @else {
+                  <p class="empty-text">Route not yet determined</p>
+                }
+              </div>
+            </div>
+
+            <!-- Deviation Panel -->
+            @if (selectedRequisition()!.requisitionType === 'deviation' && selectedRequisition()!.deviation) {
+              <div class="detail-card deviation-card">
+                <h3><mat-icon>warning</mat-icon> Deviation from Normal Process</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Motivation</label>
+                    <span>{{selectedRequisition()!.deviation.motivation | titlecase}}</span>
+                  </div>
+                  @if (selectedRequisition()!.deviation.motivationDescription) {
+                    <div class="detail-field" style="grid-column: 1 / -1;">
+                      <label>Motivation Description</label>
+                      <span class="desc-text">{{selectedRequisition()!.deviation.motivationDescription}}</span>
+                    </div>
+                  }
+                </div>
+                @if (selectedRequisition()!.deviation.approvalChain?.length) {
+                  <h4 class="sub-heading">Deviation Approval Chain</h4>
+                  <div class="deviation-chain">
+                    @for (step of selectedRequisition()!.deviation.approvalChain; track step.level) {
+                      <div class="deviation-step">
+                        <div class="deviation-step-indicator">
+                          @if (step.status === 'approved') {
+                            <mat-icon class="dev-approved">check_circle</mat-icon>
+                          } @else if (step.status === 'rejected') {
+                            <mat-icon class="dev-rejected">cancel</mat-icon>
+                          } @else {
+                            <mat-icon class="dev-pending">schedule</mat-icon>
+                          }
+                        </div>
+                        <div class="deviation-step-content">
+                          <span class="dev-role">Level {{step.level}} — {{getDeviationRoleLabel(step.role)}}</span>
+                          <span class="dev-assignee">{{step.assignedTo?.name || 'Not assigned'}}</span>
+                          <span class="status-badge" [class]="'status-' + step.status">{{step.status | titlecase}}</span>
+                          @if (step.actionDate) {
+                            <span class="dev-date">{{formatDateTime(step.actionDate)}}</span>
+                          }
+                          @if (step.comments) {
+                            <span class="dev-comments">{{step.comments}}</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Inventory External -->
+            @if (selectedRequisition()!.requisitionType === 'inventory_external' && selectedRequisition()!.inventoryDetails) {
+              <div class="detail-card">
+                <h3><mat-icon>warehouse</mat-icon> Inventory / Store Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Store</label><span>{{selectedRequisition()!.inventoryDetails.store || '—'}}</span></div>
+                  <div class="detail-field"><label>Commodity</label><span>{{selectedRequisition()!.inventoryDetails.commodity || '—'}}</span></div>
+                </div>
+                @if (selectedRequisition()!.inventoryDetails.commodities?.length) {
+                  <h4 style="margin-top:12px;font-size:13px;color:#475569">Commodities</h4>
+                  @for (com of selectedRequisition()!.inventoryDetails.commodities; track $index) {
+                    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9">
+                      <span style="font-weight:500">{{com.commodityId}}</span> — {{com.name}} ({{com.quantity}} {{com.unitOfMeasure}})
+                      @if (isEditable()) {
+                        <button mat-icon-button (click)="removeCommodity($index)" style="margin-left:4px" matTooltip="Remove commodity"><mat-icon style="font-size:16px">delete</mat-icon></button>
+                      }
+                    </div>
+                  }
+                }
+                @if (isEditable() && selectedRequisition()!.requisitionType === 'inventory_external') {
+                  <div class="commodity-actions" style="margin-top:8px">
+                    <button mat-stroked-button (click)="showAddCommodity = !showAddCommodity">
+                      <mat-icon>{{showAddCommodity ? 'close' : 'add'}}</mat-icon> {{showAddCommodity ? 'Cancel' : 'Add Commodity'}}
+                    </button>
+                  </div>
+                  @if (showAddCommodity) {
+                    <div class="form-grid" style="margin-top:8px;padding:12px;background:#f8fafc;border-radius:8px">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Commodity ID</mat-label>
+                        <input matInput [(ngModel)]="newCommodityId" placeholder="e.g., COM-001">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Commodity Name</mat-label>
+                        <input matInput [(ngModel)]="newCommodityName" placeholder="Name">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Quantity</mat-label>
+                        <input matInput type="number" [(ngModel)]="newCommodityQty" placeholder="0">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Unit of Measure</mat-label>
+                        <mat-select [(ngModel)]="newCommodityUom">
+                          <mat-option value="Each">Each</mat-option>
+                          <mat-option value="Kg">Kg</mat-option>
+                          <mat-option value="Litre">Litre</mat-option>
+                          <mat-option value="Metre">Metre</mat-option>
+                          <mat-option value="Box">Box</mat-option>
+                          <mat-option value="Pack">Pack</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <div style="display:flex;align-items:center">
+                        <button mat-flat-button color="primary" (click)="addCommodity()">
+                          <mat-icon>add</mat-icon> Add
+                        </button>
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: LINE ITEMS ========== -->
+        @if (detailTab() === 'lineitems') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+              <div class="table-wrapper">
+                <table class="requisitions-table line-items-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Purchase Item</th>
+                      <th>Description</th>
+                      <th>UNSPSC</th>
+                      <th>Qty</th>
+                      <th>UOM</th>
+                      <th>Est. Unit Price</th>
+                      <th>Est. Total</th>
+                      <th>Delivery Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of selectedRequisition()!.lineItems; track item.id; let i = $index) {
+                      <tr class="req-row" (click)="toggleLineItemExpand(item.id)">
+                        <td>{{i + 1}}</td>
+                        <td class="title-cell"><span class="req-title">{{item.purchaseItem}}</span></td>
+                        <td class="desc-cell" [matTooltip]="(item.purchaseItemDescription2 || item.description || '') + ' ' + (item.purchaseItemDescription3 || '')">
+                          {{item.purchaseItemDescription2 || item.description || item.name || '—'}}
+                        </td>
+                        <td><span class="badge badge-info">{{item.unspscCode || '—'}}</span></td>
+                        <td class="value-cell">{{item.quantity}}</td>
+                        <td>{{item.unitOfMeasure}}</td>
+                        <td class="value-cell">{{formatCurrencyFull(item.estimatedUnitPrice?.amount || item.estimatedUnitCost?.amount || 0)}}</td>
+                        <td class="value-cell" [matTooltip]="'Unit: ' + formatCurrencyFull(item.estimatedUnitPrice?.amount || item.estimatedUnitCost?.amount || 0) + ' × ' + (item.quantity || 0) + ' = ' + formatCurrencyFull((item.estimatedUnitPrice?.amount || item.estimatedUnitCost?.amount || 0) * (item.quantity || 0))">{{formatCurrencyFull(item.estimatedTotal?.amount || (item.estimatedUnitPrice?.amount || item.estimatedUnitCost?.amount || 0) * (item.quantity || 1))}}</td>
+                        <td>{{formatDate(item.deliveryDate)}}</td>
+                      </tr>
+                      @if (expandedLineItem() === item.id && item.mscoa) {
+                        <tr class="mscoa-row">
+                          <td colspan="9">
+                            <div class="mscoa-strip">
+                              <span class="mscoa-title">mSCOA Segments:</span>
+                              <span class="mscoa-tag" matTooltip="Fund">Fund: {{item.mscoa.fund}}</span>
+                              <span class="mscoa-tag" matTooltip="Function">Function: {{item.mscoa.function}}</span>
+                              <span class="mscoa-tag" matTooltip="Project">Project: {{item.mscoa.project}}</span>
+                              <span class="mscoa-tag" matTooltip="Costing">Costing: {{item.mscoa.costing}}</span>
+                              <span class="mscoa-tag" matTooltip="Region">Region: {{item.mscoa.region}}</span>
+                              <span class="mscoa-tag" matTooltip="Municipal Vote">Vote: {{item.mscoa.municipalVote}}</span>
+                              <span class="mscoa-tag" matTooltip="Item">Item: {{item.mscoa.item}}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    }
+                    <tr class="total-row">
+                      <td colspan="7" style="text-align: right; font-weight: 700;">Total Estimated Value</td>
+                      <td class="value-cell" style="font-weight: 700; font-size: 14px;">{{formatCurrencyFull(selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!))}}</td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- PREVIOUS REQUISITION HISTORY -->
+            @if (projectHistory().length > 0) {
+              <div class="detail-card" style="margin-top: 16px;">
+                <h3><mat-icon>history</mat-icon> Previous Requisitions (Same Project)</h3>
+                <table class="history-table">
+                  <thead>
+                    <tr>
+                      <th>Reference</th>
+                      <th>Title</th>
+                      <th>Status</th>
+                      <th>Value</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (hist of projectHistory(); track hist.id) {
+                      <tr>
+                        <td class="ref-cell">{{hist.referenceNumber}}</td>
+                        <td>{{hist.title}}</td>
+                        <td><span class="status-badge" [class]="'status-' + hist.status">{{getStatusLabel(hist.status)}}</span></td>
+                        <td class="value-cell">{{formatCurrency(hist.totalEstimatedValue?.amount)}}</td>
+                        <td>{{formatDate(hist.captureDate)}}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <div class="detail-card" style="margin-top:16px">
+              <h3><mat-icon>history</mat-icon> Previous Requisitions (Same Department)</h3>
+              @if (previousReqs().length) {
+                <div class="table-wrapper">
+                  <table class="req-table">
+                    <thead>
+                      <tr>
+                        <th>Ref #</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (prev of previousReqs(); track prev.id) {
+                        <tr (click)="viewRequisition(prev)" style="cursor:pointer">
+                          <td>{{prev.referenceNumber}}</td>
+                          <td>{{prev.title}}</td>
+                          <td>{{prev.requisitionType | titlecase}}</td>
+                          <td class="value-cell">{{formatCurrencyFull(prev.totalEstimatedValue?.amount || 0)}}</td>
+                          <td><span class="badge" [class]="'status-' + prev.status">{{getStatusLabel(prev.status)}}</span></td>
+                          <td>{{formatDate(prev.captureDate)}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No previous requisitions found in this department</p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ========== TAB: BUDGET & PROJECT ========== -->
+        @if (detailTab() === 'budget') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-1">
+                <h3><mat-icon>account_tree</mat-icon> Project Information</h3>
+                @if (selectedRequisition()!.project) {
+                  <div class="detail-grid">
+                    <div class="detail-field"><label>Project Name</label><span>{{selectedRequisition()!.project.name}}</span></div>
+                    <div class="detail-field"><label>Project Code</label><span>{{selectedRequisition()!.project.code}}</span></div>
+                    <div class="detail-field"><label>Type</label><span>{{selectedRequisition()!.project.type || '—' | titlecase}}</span></div>
+                    <div class="detail-field"><label>Department</label><span>{{selectedRequisition()!.department}}</span></div>
+                    <div class="detail-field"><label>Vote</label><span>{{selectedRequisition()!.project.vote || '—'}}</span></div>
+                  </div>
+                } @else {
+                  <p class="empty-text">No project linked</p>
+                }
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>account_balance_wallet</mat-icon> Budget Breakdown</h3>
+                @if (selectedRequisition()!.budget) {
+                  <div class="budget-breakdown">
+                    <div class="budget-row">
+                      <span class="budget-label">Total Annual Budget</span>
+                      <span class="budget-value" [matTooltip]="'Total budget for project: ' + formatCurrencyFull(selectedRequisition()!.budget?.totalAnnual || 0) + '. After this requisition: ' + formatCurrencyFull((selectedRequisition()!.budget?.remainingAnnual || 0)) + ' remaining'">{{formatCurrencyFull(selectedRequisition()!.budget.totalAnnual)}}</span>
+                    </div>
+                    <div class="budget-bar-wrapper">
+                      <div class="budget-bar budget-committed" [style.width.%]="getBudgetPct('committed')" matTooltip="Committed: funds reserved for approved requisitions">
+                      </div>
+                      <div class="budget-bar budget-spent" [style.width.%]="getBudgetPct('spent')" matTooltip="Spent: funds already paid out">
+                      </div>
+                      <div class="budget-bar budget-this" [style.width.%]="getBudgetPct('thisReq')" matTooltip="This requisition's estimated value">
+                      </div>
+                    </div>
+                    <div class="budget-legend">
+                      <span class="legend-item"><span class="legend-dot committed"></span> Committed</span>
+                      <span class="legend-item"><span class="legend-dot spent"></span> Spent</span>
+                      <span class="legend-item"><span class="legend-dot this-req"></span> This Requisition</span>
+                      <span class="legend-item"><span class="legend-dot available"></span> Available</span>
+                    </div>
+                    <div class="budget-row">
+                      <span class="budget-label">Available for Requisition</span>
+                      <span class="budget-value" [style.color]="selectedRequisition()!.budget.sufficient ? '#2e7d32' : '#c62828'">
+                        {{formatCurrencyFull(selectedRequisition()!.budget.availableForRequisition)}}
+                        <mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">
+                          {{selectedRequisition()!.budget.sufficient ? 'check_circle' : 'error'}}
+                        </mat-icon>
+                      </span>
+                    </div>
+                    <div class="budget-row">
+                      <span class="budget-label">This Requisition</span>
+                      <span class="budget-value budget-highlight">{{formatCurrencyFull(selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!))}}</span>
+                    </div>
+                    <div class="budget-row">
+                      <span class="budget-label">Remaining After</span>
+                      <span class="budget-value" [style.color]="(selectedRequisition()!.budget.availableForRequisition - (selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!) || 0)) >= 0 ? '#2e7d32' : '#c62828'">
+                        {{formatCurrencyFull((selectedRequisition()!.budget.availableForRequisition || 0) - (selectedRequisition()!.totalEstimatedValue?.amount || selectedRequisition()!.estimatedCost?.amount || getReqLineItemsTotal(selectedRequisition()!) || 0))}}
+                      </span>
+                    </div>
+                  </div>
+                  @if (selectedRequisition()!.budget.totalThreeYear) {
+                    <div class="three-year-view" style="margin-top: 16px;">
+                      <label style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Three-Year Budget</label>
+                      <span class="budget-value" matTooltip="Total MTREF budget allocation over 3 years">{{formatCurrencyFull(selectedRequisition()!.budget.totalThreeYear)}}</span>
+                    </div>
+                  }
+                } @else {
+                  <p class="empty-text">No budget information available</p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- ========== TAB: APPROVALS ========== -->
+        @if (detailTab() === 'approvals') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>how_to_reg</mat-icon> Approval Chain</h3>
+              @if (selectedRequisition()!.approvalChain?.length) {
+                <div class="approval-timeline">
+                  @for (approval of selectedRequisition()!.approvalChain; track approval.level) {
+                    <div class="approval-step">
+                      <div class="approval-indicator">
+                        @if (approval.status === 'approved') {
+                          <mat-icon class="approval-approved">check_circle</mat-icon>
+                        } @else if (approval.status === 'rejected') {
+                          <mat-icon class="approval-rejected">cancel</mat-icon>
+                        } @else if (approval.status === 'returned') {
+                          <mat-icon class="approval-returned">undo</mat-icon>
+                        } @else {
+                          <mat-icon class="approval-pending">schedule</mat-icon>
+                        }
+                        <div class="approval-line"></div>
+                      </div>
+                      <div class="approval-content">
+                        <div class="approval-header">
+                          <span class="approval-role">Level {{approval.level}} — {{approval.role | titlecase}}</span>
+                          <span class="status-badge" [class]="'status-' + approval.status">{{approval.status | titlecase}}</span>
+                        </div>
+                        <span class="approval-assignee">{{approval.assignedTo?.name || 'Not assigned'}}</span>
+                        @if (approval.actionDate) {
+                          <span class="approval-date">{{formatDateTime(approval.actionDate)}}</span>
+                        }
+                        @if (approval.comments) {
+                          <div class="approval-comments">
+                            <mat-icon>comment</mat-icon>
+                            <span>{{approval.comments}}</span>
+                          </div>
+                        }
+                        @if (approval.documents?.length) {
+                          <div class="approval-docs">
+                            @for (doc of approval.documents; track doc.id) {
+                              <span class="approval-doc-chip"><mat-icon>attach_file</mat-icon> {{doc.name}}</span>
+                            }
+                          </div>
+                        }
+                        @if (approval.status === 'pending') {
+                          <span class="approval-pending-text">Awaiting action</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">No approval chain — requisition has not been submitted</p>
+              }
+            </div>
+
+            @if (selectedRequisition()!.requisitionType === 'deviation' && selectedRequisition()!.deviation?.approvalChain?.length) {
+              <div class="detail-card deviation-card">
+                <h3><mat-icon>warning</mat-icon> Deviation Approval Chain</h3>
+                <div class="approval-timeline">
+                  @for (step of selectedRequisition()!.deviation.approvalChain; track step.level) {
+                    <div class="approval-step">
+                      <div class="approval-indicator">
+                        @if (step.status === 'approved') {
+                          <mat-icon class="approval-approved">check_circle</mat-icon>
+                        } @else if (step.status === 'rejected') {
+                          <mat-icon class="approval-rejected">cancel</mat-icon>
+                        } @else {
+                          <mat-icon class="approval-pending">schedule</mat-icon>
+                        }
+                        <div class="approval-line"></div>
+                      </div>
+                      <div class="approval-content">
+                        <div class="approval-header">
+                          <span class="approval-role">Level {{step.level}} — {{getDeviationRoleLabel(step.role)}}</span>
+                          <span class="status-badge" [class]="'status-' + step.status">{{step.status | titlecase}}</span>
+                        </div>
+                        <span class="approval-assignee">{{step.assignedTo?.name || 'Not assigned'}}</span>
+                        @if (step.actionDate) {
+                          <span class="approval-date">{{formatDateTime(step.actionDate)}}</span>
+                        }
+                        @if (step.comments) {
+                          <div class="approval-comments"><mat-icon>comment</mat-icon><span>{{step.comments}}</span></div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: DOCUMENTS ========== -->
+        @if (detailTab() === 'documents') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <h3 style="margin:0"><mat-icon>folder</mat-icon> Documents ({{selectedRequisition()!.documents?.length || 0}})</h3>
+                <mat-form-field appearance="outline" style="width:180px;margin:0" matTooltip="Filter documents by type">
+                  <mat-label>Filter by Type</mat-label>
+                  <mat-select [(ngModel)]="docTypeFilter" (selectionChange)="applyDocTypeFilter()">
+                    <mat-option value="">All Types</mat-option>
+                    <mat-option value="motivation">Motivation</mat-option>
+                    <mat-option value="quotation">Quotation</mat-option>
+                    <mat-option value="specification">Specification</mat-option>
+                    <mat-option value="supporting_document">Supporting Document</mat-option>
+                    <mat-option value="approval">Approval</mat-option>
+                    <mat-option value="deviation_approval">Deviation Approval</mat-option>
+                    <mat-option value="procurement_plan">Procurement Plan</mat-option>
+                    <mat-option value="budget_confirmation">Budget Confirmation</mat-option>
+                    <mat-option value="evidence">Evidence</mat-option>
+                    <mat-option value="other">Other</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              @if (getFilteredDocuments().length) {
+                <div class="table-wrapper">
+                  <table class="requisitions-table line-items-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Uploaded By</th>
+                        <th>Date</th>
+                        <th>Size</th>
+                        <th>Version</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (doc of getFilteredDocuments(); track doc.id) {
+                        <tr class="req-row">
+                          <td><span class="badge badge-info" [matTooltip]="doc.type">{{doc.type | titlecase}}</span></td>
+                          <td>
+                            <div style="display:flex;align-items:center;gap:6px">
+                              <mat-icon class="doc-icon" style="font-size:16px;width:16px;height:16px">{{getDocIcon(doc.type)}}</mat-icon>
+                              <span class="req-title" [matTooltip]="doc.name">{{doc.name}}</span>
+                            </div>
+                          </td>
+                          <td [matTooltip]="doc.description || ''">{{doc.description || '—'}}</td>
+                          <td [matTooltip]="doc.uploadedByName || doc.uploadedBy || ''">{{doc.uploadedByName || doc.uploadedBy || '—'}}</td>
+                          <td [matTooltip]="formatDateTime(doc.uploadedAt)">{{formatDate(doc.uploadedAt)}}</td>
+                          <td [matTooltip]="formatFileSize(doc.size)">{{formatFileSize(doc.size)}}</td>
+                          <td [matTooltip]="'Version ' + (doc.version || '1.0')">{{doc.version || '1.0'}}</td>
+                          <td class="actions-cell">
+                            @if (isEditable()) {
+                              <button mat-icon-button color="warn" (click)="confirmDeleteDocument(doc.id)" matTooltip="Remove document">
+                                <mat-icon>delete_outline</mat-icon>
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No documents {{docTypeFilter ? 'of type ' + (docTypeFilter | titlecase) : 'uploaded yet'}}</p>
+              }
+            </div>
+
+            @if (isEditable()) {
+              <div class="detail-card">
+                <h3><mat-icon>upload_file</mat-icon> Upload Document</h3>
+                <div class="upload-form">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Name</mat-label>
+                    <input matInput [(ngModel)]="newDocName" placeholder="e.g., budget_report.pdf">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Type</mat-label>
+                    <mat-select [(ngModel)]="newDocType">
+                      <mat-option value="supporting_document">Supporting Document</mat-option>
+                      <mat-option value="quotation">Quotation</mat-option>
+                      <mat-option value="specification">Specification</mat-option>
+                      <mat-option value="motivation">Motivation</mat-option>
+                      <mat-option value="deviation_approval">Deviation Approval</mat-option>
+                      <mat-option value="procurement_plan">Procurement Plan</mat-option>
+                      <mat-option value="budget_confirmation">Budget Confirmation</mat-option>
+                      <mat-option value="other">Other</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Description</mat-label>
+                    <input matInput [(ngModel)]="newDocDescription" placeholder="Brief description of the document">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="newDocCategory">
+                      <mat-option value="supporting">Supporting</mat-option>
+                      <mat-option value="technical">Technical</mat-option>
+                      <mat-option value="governance">Governance</mat-option>
+                      <mat-option value="pricing">Pricing</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <button mat-flat-button color="primary" (click)="uploadDocument()" [disabled]="!newDocName || !newDocType" matTooltip="Upload document to this requisition">
+                    <mat-icon>cloud_upload</mat-icon> Upload
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ========== TAB: AUDIT TRAIL ========== -->
+        @if (detailTab() === 'audit') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>history</mat-icon> Audit Trail</h3>
+              @if (selectedRequisition()!.auditTrail?.length) {
+                <ul class="audit-list">
+                  @for (entry of selectedRequisition()!.auditTrail; track $index) {
+                    <li class="audit-item">
+                      <div class="audit-dot" [class]="getAuditDotClass(entry.action)"></div>
+                      <div class="audit-content">
+                        <span class="audit-action">{{entry.action}}</span>
+                        <span class="audit-detail">{{entry.details}}</span>
+                        <span class="audit-date">{{formatDateTime(entry.timestamp)}} · {{entry.userName}}</span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty-text">No audit entries</p>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== REPORT VIEW ===================== -->
+      @if (currentView() === 'report') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Requisition List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn active">Reports</button>
+        </div>
+        <div class="report-view">
+          <div class="detail-header">
+            <div class="detail-title-section">
+              <h2>Requisition Reports</h2>
+              <span class="subtitle">Generate filtered reports</span>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>filter_list</mat-icon> Report Filters</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Date From</mat-label>
+                <input matInput [matDatepicker]="reportFromPicker" [(ngModel)]="reportDateFrom">
+                <mat-datepicker-toggle matIconSuffix [for]="reportFromPicker"></mat-datepicker-toggle>
+                <mat-datepicker #reportFromPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date To</mat-label>
+                <input matInput [matDatepicker]="reportToPicker" [(ngModel)]="reportDateTo">
+                <mat-datepicker-toggle matIconSuffix [for]="reportToPicker"></mat-datepicker-toggle>
+                <mat-datepicker #reportToPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Status</mat-label>
+                <mat-select [(ngModel)]="reportStatus">
+                  <mat-option value="">All Statuses</mat-option>
+                  @for (s of statusOptions; track s.key) {
+                    <mat-option [value]="s.key">{{s.label}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Type</mat-label>
+                <mat-select [(ngModel)]="reportType">
+                  <mat-option value="">All Types</mat-option>
+                  <mat-option value="operational">Operational</mat-option>
+                  <mat-option value="capital">Capital</mat-option>
+                  <mat-option value="financial_position">Financial Position</mat-option>
+                  <mat-option value="inventory_external">Inventory External</mat-option>
+                  <mat-option value="deviation">Deviation</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="reportDepartment">
+                  <mat-option value="">All Departments</mat-option>
+                  @for (d of departments; track d) {
+                    <mat-option [value]="d">{{d}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Requested By</mat-label>
+                <input matInput [(ngModel)]="reportRequestedBy" placeholder="Name or ID">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Procurement Route</mat-label>
+                <mat-select [(ngModel)]="reportRoute">
+                  <mat-option value="">All Routes</mat-option>
+                  <mat-option value="direct_purchase">Direct Purchase</mat-option>
+                  <mat-option value="informal_quotation">Informal Quotation</mat-option>
+                  <mat-option value="formal_quotation">Formal Quotation</mat-option>
+                  <mat-option value="competitive_bid">Competitive Bidding</mat-option>
+                  <mat-option value="deviation">Deviation</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Offline Reference</mat-label>
+                <input matInput [(ngModel)]="reportOfflineRef" placeholder="Offline ref number">
+              </mat-form-field>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button mat-flat-button color="primary" (click)="generateReqReport()"><mat-icon>search</mat-icon> Generate Report</button>
+              <button mat-stroked-button (click)="clearReportFilters()"><mat-icon>clear</mat-icon> Clear Filters</button>
+            </div>
+          </div>
+
+          @if (reportResults()) {
+            <div class="detail-card">
+              <h3><mat-icon>table_chart</mat-icon> Report Results</h3>
+              <div class="report-summary-bar">
+                <div class="report-stat-card"><span class="rs-label">Total Records</span><span class="rs-value">{{reportResults()!.totalRecords}}</span></div>
+                <div class="report-stat-card"><span class="rs-label">Total Value</span><span class="rs-value">{{formatCurrencyFull(reportResults()!.totalValue)}}</span></div>
+                <div class="report-stat-card"><span class="rs-label">Average Value</span><span class="rs-value">{{formatCurrencyFull(reportResults()!.totalRecords > 0 ? reportResults()!.totalValue / reportResults()!.totalRecords : 0)}}</span></div>
+              </div>
+              @if (reportResults()!.data?.length) {
+                <div class="table-wrapper" style="margin-top:12px">
+                  <table class="requisitions-table">
+                    <thead>
+                      <tr>
+                        <th>Ref #</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Value (ZAR)</th>
+                        <th>Date</th>
+                        <th>Requested By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of reportResults()!.data; track row.id) {
+                        <tr (click)="viewRequisition(row)" style="cursor:pointer" class="req-row">
+                          <td class="ref-cell">{{row.referenceNumber}}</td>
+                          <td>{{row.title}}</td>
+                          <td><span class="type-badge" [class]="getTypeBadgeClass(row.requisitionType)">{{getTypeLabel(row.requisitionType)}}</span></td>
+                          <td>{{row.department}}</td>
+                          <td><span class="status-badge" [class]="'status-' + row.status">{{getStatusLabel(row.status)}}</span></td>
+                          <td class="value-cell">{{formatCurrencyFull(row.totalEstimatedValue?.amount || 0)}}</td>
+                          <td>{{formatDate(row.captureDate)}}</td>
+                          <td>{{row.requestedBy?.name || '—'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No requisitions match the selected filters</p>
+              }
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <button mat-stroked-button (click)="printRequisition()"><mat-icon>print</mat-icon> Print Report</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== CREATE / EDIT FORM ===================== -->
+      @if (currentView() === 'create' || currentView() === 'edit') {
+        <div class="create-form">
+          <div class="form-header">
+            <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+            <h2>{{currentView() === 'create' ? 'New Requisition' : 'Edit Requisition'}}</h2>
+          </div>
+
+          @if (notificationMessage()) {
+            <div class="notification-bar">
+              <mat-icon>check_circle</mat-icon>
+              <span>{{notificationMessage()}}</span>
+              <button mat-icon-button (click)="notificationMessage.set('')"><mat-icon>close</mat-icon></button>
+            </div>
+          }
+
+          <div class="form-card">
+            <h3><mat-icon>info</mat-icon> Basic Information</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="formData.title" required placeholder="Enter requisition title">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description</mat-label>
+                <textarea matInput [(ngModel)]="formData.description" required rows="3" placeholder="Describe what is being requisitioned and why"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Requisition Type</mat-label>
+                <mat-select [(ngModel)]="formData.requisitionType" required>
+                  <mat-option value="operational">Operational</mat-option>
+                  <mat-option value="capital">Capital</mat-option>
+                  <mat-option value="financial_position">Financial Position</mat-option>
+                  <mat-option value="inventory_external">Inventory External</mat-option>
+                  <mat-option value="deviation">Deviation</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Category</mat-label>
+                <mat-select [(ngModel)]="formData.category" required>
+                  <mat-option value="goods">Goods</mat-option>
+                  <mat-option value="services">Services</mat-option>
+                  <mat-option value="works">Works</mat-option>
+                  <mat-option value="professional_services">Professional Services</mat-option>
+                  <mat-option value="consulting">Consulting</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="formData.department" required>
+                  @for (dept of departments; track dept) {
+                    <mat-option [value]="dept">{{dept}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Priority</mat-label>
+                <mat-select [(ngModel)]="formData.priority">
+                  <mat-option value="low">Low</mat-option>
+                  <mat-option value="medium">Medium</mat-option>
+                  <mat-option value="high">High</mat-option>
+                  <mat-option value="urgent">Urgent</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Preferred Supplier</mat-label>
+                <input matInput [(ngModel)]="formData.preferredSupplier" placeholder="Optional">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Cost Centre / Cost Collector</mat-label>
+                <input matInput [(ngModel)]="formData.costCollector" placeholder="e.g. CC-001">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Offline Reference Number</mat-label>
+                <input matInput [(ngModel)]="formData.offlineReferenceNumber" placeholder="Optional offline ref">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Supervisor</mat-label>
+                <mat-select [(ngModel)]="formData.supervisor">
+                  <mat-option value="">— Select Supervisor —</mat-option>
+                  @for (sup of supervisorOptions; track sup.id) {
+                    <mat-option [value]="sup.id">{{sup.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>HOD</mat-label>
+                <mat-select [(ngModel)]="formData.hod">
+                  <mat-option value="">— Select HOD —</mat-option>
+                  @for (h of hodOptions; track h.id) {
+                    <mat-option [value]="h.id">{{h.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <!-- TOGGLES SECTION -->
+          <div class="form-card">
+            <h3><mat-icon>toggle_on</mat-icon> Options & Flags</h3>
+            <div class="toggle-row">
+              <div class="toggle-item" [class.active]="formData.isTenderRequisition" (click)="formData.isTenderRequisition = !formData.isTenderRequisition">
+                <mat-icon>{{formData.isTenderRequisition ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <span>Tender Requisition</span>
+              </div>
+              <div class="toggle-item" [class.active]="formData.isMultiYear" (click)="formData.isMultiYear = !formData.isMultiYear">
+                <mat-icon>{{formData.isMultiYear ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <span>Multi-Year Contract</span>
+              </div>
+              <div class="toggle-item" [class.active]="formData.isInventoryDirectDelivery" (click)="formData.isInventoryDirectDelivery = !formData.isInventoryDirectDelivery">
+                <mat-icon>{{formData.isInventoryDirectDelivery ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+                <span>Direct Delivery to Department</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PROCUREMENT PLAN LINKAGE (Capital & Tender Requisitions) -->
+          @if (formData.requisitionType === 'capital' || formData.isTenderRequisition) {
+            <div class="form-card">
+              <h3><mat-icon>assignment</mat-icon> Procurement Plan Linkage</h3>
+              <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">Capital expenditure and tender requisitions must be linked to an approved procurement plan item.</p>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Procurement Plan</mat-label>
+                  <mat-select [(ngModel)]="formData.procurementPlanId" (selectionChange)="onProcurementPlanChange()">
+                    <mat-option value="">— Select Plan —</mat-option>
+                    @for (plan of procurementPlans(); track plan.id) {
+                      <mat-option [value]="plan.id">{{plan.name}} ({{plan.financialYear}})</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Plan Item</mat-label>
+                  <mat-select [(ngModel)]="formData.procurementPlanItemId" [disabled]="!formData.procurementPlanId">
+                    <mat-option value="">— Select Item —</mat-option>
+                    @for (item of procurementPlanItems(); track item.id) {
+                      <mat-option [value]="item.id">{{item.description}} ({{formatCurrency(item.estimatedValue)}})</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              @if (formData.procurementPlanId && !formData.procurementPlanItemId) {
+                <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff3e0; border-radius: 8px; margin-top: 8px;">
+                  <mat-icon style="color: #ef6c00; font-size: 18px; width: 18px; height: 18px;">warning</mat-icon>
+                  <span style="font-size: 12px; color: #ef6c00;">A plan item must be selected to ensure compliance with the procurement plan.</span>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- DEVIATION SECTION -->
+          @if (formData.requisitionType === 'deviation') {
+            <div class="form-card deviation-form-section">
+              <h3><mat-icon>warning</mat-icon> Deviation Details</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Deviation Motivation</mat-label>
+                  <mat-select [(ngModel)]="formData.deviationMotivation">
+                    @for (mot of deviationMotivationOptions; track mot.value) {
+                      <mat-option [value]="mot.value">{{mot.label}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Motivation Description</mat-label>
+                  <textarea matInput [(ngModel)]="formData.deviationReason" rows="3" placeholder="Provide detailed motivation for deviation..."></textarea>
+                </mat-form-field>
+              </div>
+            </div>
+          }
+
+          <div class="form-card line-items-section">
+            <div class="line-items-header">
+              <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+              <button mat-stroked-button (click)="addLineItem()"><mat-icon>add</mat-icon> Add Item</button>
+            </div>
+
+            @for (item of formLineItems; track $index; let i = $index) {
+              <div class="line-item-row">
+                <div class="line-item-number">{{i + 1}}</div>
+                <div class="line-item-fields">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Purchase Item</mat-label>
+                    <input matInput [(ngModel)]="item.purchaseItem" required placeholder="Item name">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Description</mat-label>
+                    <input matInput [(ngModel)]="item.description" placeholder="Item description">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-sm">
+                    <mat-label>Qty</mat-label>
+                    <input matInput type="number" [(ngModel)]="item.quantity" min="1" required>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-sm">
+                    <mat-label>UoM</mat-label>
+                    <mat-select [(ngModel)]="item.unitOfMeasure">
+                      <mat-option value="each">Each</mat-option>
+                      <mat-option value="box">Box</mat-option>
+                      <mat-option value="kg">Kg</mat-option>
+                      <mat-option value="litre">Litre</mat-option>
+                      <mat-option value="metre">Metre</mat-option>
+                      <mat-option value="pack">Pack</mat-option>
+                      <mat-option value="set">Set</mat-option>
+                      <mat-option value="hour">Hour</mat-option>
+                      <mat-option value="day">Day</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-sm">
+                    <mat-label>Est. Unit Price (R)</mat-label>
+                    <input matInput type="number" [(ngModel)]="item.estimatedUnitPrice" min="0" required>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-sm">
+                    <mat-label>Delivery Date</mat-label>
+                    <input matInput [matDatepicker]="deliveryPicker" [(ngModel)]="item.deliveryDate" (click)="deliveryPicker.open()">
+                    <mat-datepicker-toggle matIconSuffix [for]="deliveryPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #deliveryPicker></mat-datepicker>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Delivery Address</mat-label>
+                    <input matInput [(ngModel)]="item.deliveryAddress" placeholder="Delivery address">
+                  </mat-form-field>
+
+                  <span class="line-total">R {{((item.quantity || 0) * (item.estimatedUnitPrice || 0)).toLocaleString('en-ZA', {minimumFractionDigits: 2})}}</span>
+                </div>
+                <button mat-icon-button color="warn" (click)="removeLineItem(i)" [disabled]="formLineItems.length <= 1" matTooltip="Remove item">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            }
+
+            <div class="line-items-total">
+              <span>Total Estimated Value:</span>
+              <span class="total-amount">R {{getFormTotal().toLocaleString('en-ZA', {minimumFractionDigits: 2})}}</span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()">Cancel</button>
+            <button mat-flat-button style="background:#64748b;color:white" (click)="saveRequisition()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> Save as Draft
+            </button>
+            <button mat-flat-button color="primary" (click)="submitRequisition()" [disabled]="saving()">
+              <mat-icon>send</mat-icon> Submit
+            </button>
+          </div>
+        </div>
+      }
+    </div>

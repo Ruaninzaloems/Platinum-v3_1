@@ -1,0 +1,125 @@
+﻿Asset_SubCategory_ID,Asset_SubCategoryDescription,Enabled,DateCaptured,Capturer_ID,DateModified,Modifier_ID,AssetCategoryID,TypeID,Default
+1,Mature,0,2019-06-28 15:41:39.567,1,NULL,NULL,1,1,1
+2,Dairy Cattle,1,2019-06-28 15:41:39.570,1,NULL,NULL,1,1,1
+3,Feathered Animals (Eggs and Feathers),1,2019-06-28 15:41:39.577,1,NULL,NULL,1,1,1
+4,Forests and Plantations,1,2019-06-28 15:41:39.580,1,NULL,NULL,1,1,1
+5,Fruit Trees,1,2019-06-28 15:41:39.583,1,NULL,NULL,1,1,1
+6,Game Animals,1,2019-06-28 15:41:39.590,1,NULL,NULL,1,1,1
+7,"Animals for Reproduction (Cattle, Goats, Sheep and Pigs)",1,2019-06-28 15:41:39.593,1,NULL,NULL,1,1,1
+8,Animals for Wool or Milk (Goats and Sheep),1,2019-06-28 15:41:39.597,1,NULL,NULL,1,1,1
+9,Dogs (Law Enforcement and Working),1,2019-06-28 15:41:39.600,1,NULL,NULL,1,1,1
+10,Horses (Law Enforcement and Working),1,2019-06-28 15:41:39.607,1,NULL,NULL,1,1,1
+11,Vines,1,2019-06-28 15:41:39.610,1,NULL,NULL,1,1,1
+12,Plants (for Production of Seeds),1,2019-06-28 15:41:39.613,1,NULL,NULL,1,1,1
+13,Immature,0,2019-06-28 15:41:39.617,1,NULL,NULL,2,1,1
+14,Dairy Cattle,1,2019-06-28 15:41:39.620,1,NULL,NULL,2,1,1
+15,Feathered Animals (Eggs and Feathers),1,2019-06-28 15:41:39.627,1,NULL,NULL,2,1,1
+16,Forests and Plantations,1,2019-06-28 15:41:39.630,1,NULL,NULL,2,1,1
+17,Fruit Trees,1,2019-06-28 15:41:39.633,1,NULL,NULL,2,1,1
+18,Game Animals,1,2019-06-28 15:41:39.637,1,NULL,NULL,2,1,1
+19,"Animals for Reproduction (Cattle, Goats, Sheep and Pigs)",1,2019-06-28 15:41:39.640,1,NULL,NULL,2,1,1
+20,Animals for Wool or Milk (Goats and Sheep),1,2019-06-28 15:41:39.647,1,NULL,NULL,2,1,1
+21,Dogs (Law Enforcement and Working),1,2019-06-28 15:41:39.650,1,NULL,NULL,2,1,1
+22,Horses (Law Enforcement and Working),1,2019-06-28 15:41:39.657,1,NULL,NULL,2,1,1
+23,Vines,1,2019-06-28 15:41:39.660,1,NULL,NULL,2,1,1
+24,Plants (for Production of Seeds),1,2019-06-28 15:41:39.663,1,NULL,NULL,2,1,1
+25,Mature,0,2019-06-28 15:41:39.670,1,NULL,NULL,3,1,1
+26,Dairy Cattle,1,2019-06-28 15:41:39.673,1,NULL,NULL,3,1,1
+27,Feathered Animals (Eggs and Feathers),1,2019-06-28 15:41:39.677,1,NULL,NULL,3,1,1
+28,Forests and Plantations,1,2019-06-28 15:41:39.680,1,NULL,NULL,3,1,1
+29,Fruit Trees,1,2019-06-28 15:41:39.687,1,NULL,NULL,3,1,1
+30,Game Animals,1,2019-06-28 15:41:39.690,1,NULL,NULL,3,1,1
+31,"Animals for Reproduction (Cattle, Goats, Sheep and Pigs)",1,2019-06-28 15:41:39.693,1,NULL,NULL,3,1,1
+32,Animals for Wool or Milk (Goats and Sheep),1,2019-06-28 15:41:39.700,1,NULL,NULL,3,1,1
+33,Dogs (Law Enforcement and Working),1,2019-06-28 15:41:39.703,1,NULL,NULL,3,1,1
+34,Horses (Law Enforcement and Working),1,2019-06-28 15:41:39.707,1,NULL,NULL,3,1,1
+35,Vines,1,2019-06-28 15:41:39.713,1,NULL,NULL,3,1,1
+36,Plants (for Production of Seeds),1,2019-06-28 15:41:39.717,1,NULL,NULL,3,1,1
+37,Immature,0,2019-06-28 15:41:39.720,1,NULL,NULL,4,1,1
+38,Dairy Cattle,1,2019-06-28 15:41:39.723,1,NULL,NULL,4,1,1
+39,Feathered Animals (Eggs and Feathers),1,2019-06-28 15:41:39.730,1,NULL,NULL,4,1,1
+40,Forests and Plantations,1,2019-06-28 15:41:39.733,1,NULL,NULL,4,1,1
+41,Fruit Trees,1,2019-06-28 15:41:39.740,1,NULL,NULL,4,1,1
+42,Game Animals,1,2019-06-28 15:41:39.743,1,NULL,NULL,4,1,1
+43,"Animals for Reproduction (Cattle, Goats, Sheep and Pigs)",1,2019-06-28 15:41:39.747,1,NULL,NULL,4,1,1
+44,Animals for Wool or Milk (Goats and Sheep),1,2019-06-28 15:41:39.750,1,NULL,NULL,4,1,1
+45,Dogs (Law Enforcement and Working),1,2019-06-28 15:41:39.757,1,NULL,NULL,4,1,1
+46,Horses (Law Enforcement and Working),1,2019-06-28 15:41:39.760,1,NULL,NULL,4,1,1
+47,Vines,1,2019-06-28 15:41:39.763,1,NULL,NULL,4,1,1
+48,Plants (for Production of Seeds),1,2019-06-28 15:41:39.770,1,NULL,NULL,4,1,1
+49,Archives Cost,1,2019-06-28 15:41:39.773,0,NULL,NULL,5,2,1
+50,Municipal Jewellery Cost,1,2019-06-28 15:41:39.777,0,NULL,NULL,5,2,1
+51,Areas of Land of Historic Specific Significance Cost,1,2019-06-28 15:41:39.780,0,NULL,NULL,6,2,1
+52,Antiques and Collections Cost,1,2019-06-28 15:41:39.787,0,NULL,NULL,7,2,1
+53,Paintings Cost,1,2019-06-28 15:41:39.790,0,NULL,NULL,7,2,1
+54,Sculptures Cost,1,2019-06-28 15:41:39.793,0,NULL,NULL,7,2,1
+55,Works of Art and Collections Cost,1,2019-06-28 15:41:39.800,0,NULL,NULL,7,2,1
+56,Culturally Significant Buildings Cost,1,2019-06-28 15:41:39.803,0,NULL,NULL,8,2,1
+57,National Monuments Cost,1,2019-06-28 15:41:39.810,0,NULL,NULL,8,2,1
+58,National Parks Cost,1,2019-06-28 15:41:39.813,0,NULL,NULL,9,2,1
+61,Distribution Plant,1,2019-06-28 15:41:39.830,0,NULL,NULL,12,4,1
+62,General Plant,1,2019-06-28 15:41:39.833,0,NULL,NULL,12,4,1
+71,Boreholes,1,2019-06-28 15:41:39.870,0,NULL,NULL,15,4,1
+72,Bulk Mains,1,2019-06-28 15:41:39.877,0,NULL,NULL,15,4,1
+73,Dams and Weirs,1,2019-06-28 15:41:39.880,0,NULL,NULL,15,4,1
+74,Distribution,1,2019-06-28 15:41:39.887,0,NULL,NULL,15,4,1
+75,Pump Stations,1,2019-06-28 15:41:39.890,0,NULL,NULL,15,4,1
+76,Reservoirs,1,2019-06-28 15:41:39.893,0,NULL,NULL,15,4,1
+77,PRV stations,1,2019-06-28 15:41:39.900,0,NULL,NULL,15,4,1
+78,Water Treatment Works (WTW),1,2019-06-28 15:41:39.903,0,NULL,NULL,15,4,1
+79,Capital Spares,1,2019-06-28 15:41:39.907,0,NULL,NULL,15,4,1
+80,Material and Supplies,1,2019-06-28 15:41:39.913,0,NULL,NULL,31,6,1
+81,Compensation of Employees,1,2019-06-28 15:41:39.917,0,NULL,NULL,31,6,1
+82,Cost of Site Preparation,1,2019-06-28 15:41:39.920,0,NULL,NULL,31,6,1
+83,Initial Delivery and Assembly Cost,1,2019-06-28 15:41:39.927,0,NULL,NULL,31,6,1
+84,Installation and Assembly Cost,1,2019-06-28 15:41:39.930,0,NULL,NULL,31,6,1
+85,Cost of testing Sites,1,2019-06-28 15:41:39.933,0,NULL,NULL,31,6,1
+86,Professional Fees,1,2019-06-28 15:41:39.940,0,NULL,NULL,31,6,1
+87,HV Switching Station,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.680,0,14,4,1
+90,MV Substations,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.693,0,14,4,1
+93,LV Networks,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.707,0,14,4,1
+94,Power Plants,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.710,0,14,4,1
+95,Capital Spares,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.717,0,14,4,1
+101,MV Networks,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.737,0,14,4,1
+106,HV Substations,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.757,0,14,4,1
+107,HV Transmission Conductors,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.763,0,14,4,1
+109,MV Switching Station,1,2019-06-28 15:42:56.677,1,2019-06-28 15:42:56.770,0,14,4,1
+114,Intangible Assets under Development,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.583,0,10,3,1
+115,Capital Development,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.590,0,10,3,1
+116,Computer Software,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.600,0,10,3,1
+117,Franchises and Consents,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.607,0,10,3,1
+118,Incorporation and Organisational Start-up,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.613,0,10,3,1
+119,"Patents, Licences, Copyrights, Brand Names and Trademarks",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.623,0,10,3,1
+120,"Recipes, Formulae, Prototypes, Designs and Models",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.630,0,10,3,1
+121,"Service, Operating and Land Rights",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.637,0,10,3,1
+122,Intangible Assets under Development,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.647,0,11,3,1
+123,Capital Development,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.653,0,11,3,1
+124,Computer Software,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.660,0,11,3,1
+125,Franchises and Consents,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.670,0,11,3,1
+126,Incorporation and Organisational Start-up,1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.677,0,11,3,1
+127,"Patents, Licences, Copyrights, Brand Names and Trademarks",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.683,0,11,3,1
+128,"Recipes, Formulae, Prototypes, Designs and Models",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.693,0,11,3,1
+129,"Service, Operating and Land Rights",1,2019-06-03 00:00:00.000,1,2019-06-28 15:42:59.700,0,11,3,1
+130,Infrastructure,1,2019-07-08 15:56:32.473,88,2019-07-08 15:56:41.953,88,24,4,NULL
+131,Other assets,1,2019-07-15 11:24:35.007,79,2019-07-15 11:24:35.007,0,28,4,NULL
+132,"Roads, Sidewalks & Stormwater Drains",1,2019-07-15 17:37:37.193,86,2019-07-15 17:37:37.193,0,29,4,NULL
+138,"Computer Equipment ",1,2019-07-16 14:43:17.230,178,2019-07-16 14:43:17.230,0,21,4,NULL
+139,Vehicles,1,2019-08-19 19:58:18.743,86,2019-08-19 19:58:18.743,0,13,4,NULL
+141,Roads,1,2021-06-10 10:04:57.330,199,2021-06-10 10:04:57.330,0,29,4,NULL
+151,Audio Visual Equipment,1,2021-06-17 10:53:20.930,199,2021-06-17 10:53:20.930,0,24,4,NULL
+152,Security Item,1,2021-06-17 11:22:56.497,199,2021-06-17 11:22:56.497,0,24,4,NULL
+153,Zoom License,1,2022-04-13 15:03:07.133,209,2022-04-13 15:03:07.133,0,35,3,NULL
+156,Land,1,2022-05-20 14:40:35.337,199,2022-05-20 14:40:35.337,0,28,4,NULL
+157,Operational Buildings,1,2022-05-20 14:40:53.590,199,2022-05-20 14:40:53.590,0,28,4,NULL
+158,Security Measures,1,2022-06-01 11:08:06.210,252,2022-06-01 11:08:06.210,0,28,4,NULL
+159,Printer Licenses,1,2022-09-21 09:15:34.243,199,2022-09-21 09:15:34.243,0,35,3,NULL
+160,LV Networks,1,2022-10-06 11:40:27.283,252,2022-10-06 11:40:27.283,0,30,6,NULL
+164,Culturally Significant Building Revaluation,1,2022-10-10 09:40:53.983,252,2022-10-10 09:40:53.983,0,8,2,NULL
+166,"Server Software ",1,2022-11-17 20:55:52.167,251,2022-11-17 20:55:52.167,0,11,3,NULL
+167,"Other Software ",1,2022-11-17 20:57:05.467,251,2022-11-17 20:57:05.467,0,11,3,NULL
+170,Community Assets,1,2023-01-16 16:46:57.680,199,2023-01-16 16:46:57.680,0,30,6,NULL
+171,Roads Infrastructure,1,2023-01-16 16:47:17.060,199,2023-01-16 16:47:17.060,0,30,6,NULL
+175,Furniture and Office Equipment,1,2023-08-09 15:59:04.110,271,2023-08-10 19:46:15.390,271,20,4,NULL
+176,Operational Buildings,1,2024-04-22 22:27:40.677,199,2024-04-22 22:27:40.677,0,30,6,NULL
+177,Electrical Infrastructure,1,2024-10-07 19:33:10.973,199,2024-10-07 19:33:10.973,0,30,6,NULL
+179,Big screen,1,2024-11-14 13:04:22.130,169,2024-11-14 13:04:22.130,0,21,4,NULL

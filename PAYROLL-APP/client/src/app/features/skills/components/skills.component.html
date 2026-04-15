@@ -1,0 +1,365 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Skills & Training</h1>
+    <p class="page-subtitle">Manage training courses, qualifications and competency frameworks</p>
+  </div>
+</div>
+
+<div class="module-tabs">
+  <div class="detail-tab" [class.active]="activeTab === 'courses'" (click)="switchTab('courses')"><app-icon name="award" [size]="14"></app-icon> Training Courses</div>
+  <div class="detail-tab" [class.active]="activeTab === 'qualifications'" (click)="switchTab('qualifications')"><app-icon name="file" [size]="14"></app-icon> Qualifications</div>
+  <div class="detail-tab" [class.active]="activeTab === 'records'" (click)="switchTab('records')"><app-icon name="clipboard" [size]="14"></app-icon> Training Records</div>
+  <div class="detail-tab" [class.active]="activeTab === 'wsp'" (click)="switchTab('wsp')"><app-icon name="barChart" [size]="14"></app-icon> WSP / ATR</div>
+  <div class="detail-tab" [class.active]="activeTab === 'competencies'" (click)="switchTab('competencies')"><app-icon name="layers" [size]="14"></app-icon> Competency Framework</div>
+  <div class="detail-tab" [class.active]="activeTab === 'gapAnalysis'" (click)="switchTab('gapAnalysis')"><app-icon name="alertTriangle" [size]="14"></app-icon> Gap Analysis</div>
+  <div class="detail-tab" [class.active]="activeTab === 'trainingCalendar'" (click)="switchTab('trainingCalendar')"><app-icon name="calendar" [size]="14"></app-icon> Training Calendar</div>
+</div>
+
+@if (activeTab === 'courses') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="award" [size]="16"></app-icon> Training Course Catalogue ({{ courses.length }})</div>
+    <button class="btn btn-primary" (click)="openAddCourse()"><app-icon name="plus" [size]="14"></app-icon> Add Course</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Code</th><th>Course Name</th><th>Category</th><th>Provider</th><th>Duration</th><th>Cost</th><th>NQF</th><th>Status</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (c of courses; track c.id) {
+          <tr>
+            <td><strong>{{ c.course_code || '-' }}</strong></td>
+            <td>{{ c.course_name }}</td>
+            <td>{{ c.category || '-' }}</td>
+            <td>{{ c.provider || '-' }}</td>
+            <td style="text-align:right">{{ c.duration_hours ? c.duration_hours + 'h' : '-' }}</td>
+            <td style="text-align:right">{{ c.cost ? 'R ' + (+c.cost).toLocaleString() : '-' }}</td>
+            <td>{{ c.nqf_level ? 'NQF ' + c.nqf_level : '-' }}</td>
+            <td><span class="status-badge" [ngClass]="c.is_active ? 'status-approved' : 'status-failed'">{{ c.is_active ? 'Active' : 'Inactive' }}</span></td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editCourse(c); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteCourse(c); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (courses.length === 0) {
+          <tr><td colspan="9" style="text-align:center;color:var(--text-muted)">No courses registered</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'qualifications') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="file" [size]="16"></app-icon> Employee Qualifications</div>
+    <button class="btn btn-primary" (click)="openAddQualification()"><app-icon name="plus" [size]="14"></app-icon> Add Qualification</button>
+  </div>
+  <div class="form-group" style="max-width:300px;margin-bottom:12px">
+    <label>Select Employee</label>
+    <select class="form-control" [(ngModel)]="qualEmployeeId" (ngModelChange)="loadQualifications()">
+      <option [ngValue]="null">-- Select Employee --</option>
+      @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+    </select>
+  </div>
+  @if (qualifications.length > 0) {
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Qualification</th><th>Type</th><th>Institution</th><th>NQF</th><th>Year</th><th>Status</th><th style="width: 100px;">Actions</th></tr></thead>
+        <tbody>
+          @for (q of qualifications; track q.id) {
+            <tr>
+              <td><strong>{{ q.qualification_name }}</strong></td>
+              <td>{{ q.qualification_type || '-' }}</td>
+              <td>{{ q.institution || '-' }}</td>
+              <td>{{ q.nqf_level ? 'NQF ' + q.nqf_level : '-' }}</td>
+              <td>{{ q.year_obtained || '-' }}</td>
+              <td><span class="status-badge" [ngClass]="q.verified ? 'status-approved' : 'status-pending'">{{ q.verified ? 'Verified' : 'Unverified' }}</span></td>
+              <td>
+                <div style="display: flex; gap: 4px;">
+                  <button class="btn btn-sm" (click)="editQualification(q); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                  <button class="btn btn-sm" (click)="deleteQualification(q); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab === 'records') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="clipboard" [size]="16"></app-icon> Training Records ({{ records.length }})</div>
+    <button class="btn btn-primary" (click)="openAddRecord()"><app-icon name="plus" [size]="14"></app-icon> Log Training</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee</th><th>Course</th><th>Date</th><th>Status</th><th>Score</th><th>NQF</th><th>CPD Points</th><th>Cost</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (r of records; track r.id) {
+          <tr>
+            <td>{{ r.first_name ? r.first_name + ' ' + r.surname : 'ID:' + r.employee_id }}</td>
+            <td>{{ r.course_name || 'Course ID:' + r.course_id }}</td>
+            <td>{{ formatDate(r.training_date) }}</td>
+            <td><app-status-badge [status]="r.status"></app-status-badge></td>
+            <td>{{ r.score != null ? r.score + '%' : '-' }}</td>
+            <td>{{ r.nqf_level ? 'NQF ' + r.nqf_level : '-' }}</td>
+            <td style="text-align:right">{{ r.cpd_points != null ? r.cpd_points : '-' }}</td>
+            <td style="text-align:right">{{ r.cost_actual ? 'R ' + (+r.cost_actual).toLocaleString() : '-' }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editRecord(r); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteRecord(r); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (records.length === 0) {
+          <tr><td colspan="9" style="text-align:center;color:var(--text-muted)">No training records</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'wsp') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="barChart" [size]="16"></app-icon> Workplace Skills Plan (WSP) / Annual Training Report (ATR)</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="form-control" style="width:120px" [(ngModel)]="wspYear" (ngModelChange)="loadWSP()">
+        @for (y of [0,1,2,3,4]; track y) {
+          @let yr = 2026 - y;
+          <option [ngValue]="yr">{{ yr }}</option>
+        }
+      </select>
+      <button class="btn btn-primary" (click)="loadWSP()"><app-icon name="refreshCw" [size]="14"></app-icon> Refresh</button>
+    </div>
+  </div>
+  @if (wspData) {
+    <div class="summary-row" style="margin-bottom:20px">
+      <div class="summary-card sc-blue"><div class="summary-icon" style="background:var(--info-bg)"><app-icon name="clipboard" [size]="18"></app-icon></div><div><div class="summary-label">Total Planned</div><div class="summary-value">{{ wspData.totals?.total_records || 0 }}</div></div></div>
+      <div class="summary-card sc-green"><div class="summary-icon" style="background:var(--success-bg)"><app-icon name="check" [size]="18"></app-icon></div><div><div class="summary-label">Completed</div><div class="summary-value">{{ wspData.totals?.completed_count || 0 }}</div></div></div>
+      <div class="summary-card sc-orange"><div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="clock" [size]="18"></app-icon></div><div><div class="summary-label">In Progress</div><div class="summary-value">{{ wspData.totals?.in_progress_count || 0 }}</div></div></div>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-top:16px">Submit WSP annually to LGSETA by 30 April.</p>
+  } @else {
+    <div style="color:var(--text-muted);text-align:center;padding:20px">No WSP data available for {{ wspYear }}</div>
+  }
+}
+
+@if (activeTab === 'competencies') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="layers" [size]="16"></app-icon> Competency Framework ({{ competencies.length }})</div>
+    <button class="btn btn-primary" (click)="openAddCompetency()"><app-icon name="plus" [size]="14"></app-icon> Add Competency</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Name</th><th>Category</th><th>Description</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (c of competencies; track c.id) {
+          <tr>
+            <td><strong>{{ c.name || '-' }}</strong></td>
+            <td>{{ c.category || '-' }}</td>
+            <td>{{ c.description || '-' }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editCompetency(c); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteCompetency(c); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (competencies.length === 0) {
+          <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No competencies defined</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'gapAnalysis') {
+  <div class="section-header"><app-icon name="alertTriangle" [size]="16"></app-icon> Skills Gap Analysis</div>
+  <div class="form-group" style="max-width:300px;margin-bottom:12px">
+    <label>Select Employee</label>
+    <select class="form-control" [(ngModel)]="gapEmployeeId" (ngModelChange)="loadGapAnalysis()">
+      <option [ngValue]="null">-- Select Employee --</option>
+      @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+    </select>
+  </div>
+  @if (gapItems.length > 0) {
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Competency</th><th style="text-align:center">Required Level</th><th style="text-align:center">Assessed Level</th><th style="text-align:center">Gap</th></tr></thead>
+        <tbody>
+          @for (g of gapItems; track g) {
+            @let gap = (+(g.required_level || 0)) - (+(g.assessed_level || 0));
+            <tr>
+              <td><strong>{{ g.competency_name || g.name || '-' }}</strong></td>
+              <td style="text-align:center">{{ g.required_level != null ? g.required_level : '-' }}</td>
+              <td style="text-align:center">{{ g.assessed_level != null ? g.assessed_level : '-' }}</td>
+              <td style="text-align:center"><span [ngClass]="getGapBadgeClass(gap)" style="padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600">{{ gap }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab === 'trainingCalendar') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="calendar" [size]="16"></app-icon> Training Calendar</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="form-control" style="width:140px" [(ngModel)]="calendarMonth" (ngModelChange)="loadCalendar()">
+        @for (m of monthNames; track m; let i = $index) { <option [ngValue]="i + 1">{{ m }}</option> }
+      </select>
+      <select class="form-control" style="width:100px" [(ngModel)]="calendarYear" (ngModelChange)="loadCalendar()">
+        @for (y of [0,1,2,3,4]; track y) { @let yr = 2027 - y; <option [ngValue]="yr">{{ yr }}</option> }
+      </select>
+      <button class="btn btn-primary" (click)="loadCalendar()"><app-icon name="refreshCw" [size]="14"></app-icon> Refresh</button>
+    </div>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Date</th><th>Course</th><th>Employee</th><th>Provider</th><th>Status</th><th>Venue</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (e of calendarItems; track e) {
+          <tr>
+            <td>{{ formatDate(e.training_date) }}</td>
+            <td><strong>{{ e.course_name || '-' }}</strong></td>
+            <td>{{ e.employee_name || (e.first_name ? e.first_name + ' ' + e.surname : '-') }}</td>
+            <td>{{ e.provider || '-' }}</td>
+            <td><app-status-badge [status]="e.status"></app-status-badge></td>
+            <td>{{ e.venue || '-' }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editRecord(e); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteRecord(e); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (calendarItems.length === 0) {
+          <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No training events for this period</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (showCourseModal) {
+  <div class="modal-overlay" (click)="showCourseModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ courseForm.id ? 'Edit' : 'Add' }} Training Course</h3><button class="modal-close" (click)="showCourseModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Course Code</label><input class="form-control" [(ngModel)]="courseForm.course_code"></div>
+          <div class="form-group"><label>Course Name</label><input class="form-control" [(ngModel)]="courseForm.course_name"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Category</label>
+            <select class="form-control" [(ngModel)]="courseForm.category">
+              <option>TECHNICAL</option><option>MANAGEMENT</option><option>COMPLIANCE</option><option>SAFETY</option><option>SOFT_SKILLS</option><option>IT</option><option>FINANCE</option><option>LEGAL</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Provider</label><input class="form-control" [(ngModel)]="courseForm.provider"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Duration (hours)</label><input type="number" class="form-control" [(ngModel)]="courseForm.duration_hours"></div>
+          <div class="form-group"><label>Cost (R)</label><input type="number" class="form-control" [(ngModel)]="courseForm.cost"></div>
+          <div class="form-group"><label>NQF Level</label>
+            <select class="form-control" [(ngModel)]="courseForm.nqf_level">
+              <option value="">-</option>
+              @for (n of [1,2,3,4,5,6,7,8,9,10]; track n) { <option [value]="n">{{ n }}</option> }
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Description</label><textarea class="form-control" [(ngModel)]="courseForm.description"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showCourseModal = false">Cancel</button><button class="btn btn-primary" (click)="saveCourse()">Save Course</button></div>
+    </div>
+  </div>
+}
+
+@if (showRecordModal) {
+  <div class="modal-overlay" (click)="showRecordModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ recordForm.id ? 'Edit' : 'Log' }} Training Record</h3><button class="modal-close" (click)="showRecordModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="recordForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Course</label>
+          <select class="form-control" [(ngModel)]="recordForm.course_id">
+            @for (c of courses; track c.id) { <option [ngValue]="c.id">{{ c.course_name }}</option> }
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Training Date</label><app-date-input [(ngModel)]="recordForm.training_date"></app-date-input></div>
+          <div class="form-group"><label>Status</label>
+            <select class="form-control" [(ngModel)]="recordForm.status">
+              <option>ENROLLED</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>CANCELLED</option><option>FAILED</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showRecordModal = false">Cancel</button><button class="btn btn-primary" (click)="saveRecord()">Save</button></div>
+    </div>
+  </div>
+}
+
+@if (showQualModal) {
+  <div class="modal-overlay" (click)="showQualModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ qualForm.id ? 'Edit' : 'Add' }} Qualification</h3><button class="modal-close" (click)="showQualModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="qualForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Qualification Name</label><input class="form-control" [(ngModel)]="qualForm.qualification_name"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Type</label>
+            <select class="form-control" [(ngModel)]="qualForm.qualification_type">
+              <option>CERTIFICATE</option><option>DIPLOMA</option><option>DEGREE</option><option>HONOURS</option><option>MASTERS</option><option>DOCTORATE</option><option>MATRIC</option><option>TRADE_TEST</option><option>OTHER</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Institution</label><input class="form-control" [(ngModel)]="qualForm.institution"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>NQF Level</label>
+            <select class="form-control" [(ngModel)]="qualForm.nqf_level">
+              <option value="">-</option>
+              @for (n of [1,2,3,4,5,6,7,8,9,10]; track n) { <option [value]="n">{{ n }}</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Year Obtained</label><input type="number" class="form-control" [(ngModel)]="qualForm.year_obtained"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showQualModal = false">Cancel</button><button class="btn btn-primary" (click)="saveQualification()">Save</button></div>
+    </div>
+  </div>
+}
+
+@if (showCompModal) {
+  <div class="modal-overlay" (click)="showCompModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ compForm.id ? 'Edit' : 'Add' }} Competency</h3><button class="modal-close" (click)="showCompModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Name</label><input class="form-control" [(ngModel)]="compForm.name"></div>
+        <div class="form-group"><label>Category</label>
+          <select class="form-control" [(ngModel)]="compForm.category">
+            <option>CORE</option><option>FUNCTIONAL</option><option>LEADERSHIP</option><option>TECHNICAL</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Description</label><textarea class="form-control" [(ngModel)]="compForm.description"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showCompModal = false">Cancel</button><button class="btn btn-primary" (click)="saveCompetency()">Save Competency</button></div>
+    </div>
+  </div>
+}

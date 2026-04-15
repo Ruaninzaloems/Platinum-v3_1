@@ -1,0 +1,94 @@
+:host {
+  display: block;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cycles-section {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  margin-bottom: 24px;
+}
+
+.section-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.section-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f2b46;
+  margin: 0 0 8px 0;
+}
+
+.system-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.system-tag {
+  font-size: 12.5px;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.cycles-table-wrap {
+  overflow-x: auto;
+}
+
+.cycles-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.cycles-table thead th {
+  background: #f8fafc;
+  padding: 10px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.cycles-table tbody td {
+  padding: 10px 20px;
+  font-size: 13.5px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cycles-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cycles-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.cycle-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cs-open { background: #dcfce7; color: #16a34a; }
+.cs-closed { background: #f1f5f9; color: #94a3b8; }
+.cs-trial-in-progress { background: #fef9c3; color: #ca8a04; }
+.cs-trial-locked { background: #fef3c7; color: #d97706; }
+.cs-finalised { background: #dbeafe; color: #2563eb; }
+.cs-no-period { background: #f1f5f9; color: #cbd5e1; }

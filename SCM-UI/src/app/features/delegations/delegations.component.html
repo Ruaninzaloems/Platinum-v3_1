@@ -1,0 +1,442 @@
+    <div class="delegations-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="activeTab() === 'delegations'" (click)="activeTab.set('delegations')">Delegations</button>
+          <button class="tab-btn" [class.active]="activeTab() === 'thresholds'" (click)="switchToThresholds()">Thresholds</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="activeDelegations() + ' delegations currently active'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value">{{activeDelegations()}}</span>
+            <span class="kpi-label">Active Delegations</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="expiredDelegations() > 0 ? '#ef6c00' : '#2e7d32'" [matTooltip]="expiredDelegations() + ' delegations have expired'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value" [style.color]="expiredDelegations() > 0 ? '#ef6c00' : '#2e7d32'">{{expiredDelegations()}}</span>
+            <span class="kpi-label">Expired</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="revokedDelegations() > 0 ? '#c62828' : '#2e7d32'" [matTooltip]="revokedDelegations() + ' delegations revoked'">
+            <mat-icon>block</mat-icon>
+            <span class="kpi-value" [style.color]="revokedDelegations() > 0 ? '#c62828' : '#2e7d32'">{{revokedDelegations()}}</span>
+            <span class="kpi-label">Revoked</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="thresholds().length + ' threshold rules configured'">
+            <mat-icon>tune</mat-icon>
+            <span class="kpi-value">{{thresholds().length}}</span>
+            <span class="kpi-label">Threshold Rules</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Highest delegation amount'">
+            <mat-icon>trending_up</mat-icon>
+            <span class="kpi-value">{{formatCurrency(highestDelegation())}}</span>
+            <span class="kpi-label">Highest Delegation</span>
+          </div>
+        </div>
+
+        <div class="legislation-bar">
+          <span class="legislation-badge"><mat-icon>gavel</mat-icon> MFMA Section 56</span>
+          <span class="legislation-badge"><mat-icon>gavel</mat-icon> SCM Regulation 4</span>
+        </div>
+
+        @if (activeTab() === 'delegations') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search delegations..." [(ngModel)]="searchQuery" (keyup.enter)="loadDelegations()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadDelegations()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="expired">Expired</mat-option>
+                <mat-option value="revoked">Revoked</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="clearFilters()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+
+            <button mat-flat-button color="primary" (click)="openCreateForm()">
+              <mat-icon>add</mat-icon> New Delegation
+            </button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Delegated By</th>
+                  <th>Delegated To</th>
+                  <th>Role</th>
+                  <th>Transaction Types</th>
+                  <th>Max Amount</th>
+                  <th>Period</th>
+                  <th>Status</th>
+                  <th>Council Resolution</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (del of delegations(); track del.id) {
+                  <tr class="data-row" (click)="viewDelegation(del)">
+                    <td class="ref-cell">{{del.id}}</td>
+                    <td>{{getUserName(del.delegatedBy)}}</td>
+                    <td>{{getUserName(del.delegatedTo)}}</td>
+                    <td><span class="role-badge">{{getRoleLabel(del.role)}}</span></td>
+                    <td>
+                      <div class="chip-list">
+                        @for (tt of del.transactionTypes; track tt) {
+                          <span class="type-chip">{{tt | titlecase}}</span>
+                        }
+                      </div>
+                    </td>
+                    <td class="value-cell">{{formatCurrency(del.maxAmount?.amount || 0)}}</td>
+                    <td class="date-cell">{{formatDate(del.startDate)}} — {{formatDate(del.endDate)}}</td>
+                    <td><span class="status-badge" [class]="'status-' + del.status">{{del.status | titlecase}}</span></td>
+                    <td>{{del.councilResolution || '—'}}</td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #actionMenu="matMenu">
+                        <button mat-menu-item (click)="viewDelegation(del)"><mat-icon>visibility</mat-icon> View</button>
+                        @if (del.status === 'active') {
+                          <button mat-menu-item (click)="editDelegation(del)"><mat-icon>edit</mat-icon> Edit</button>
+                          <button mat-menu-item (click)="openRevokeDialog(del)"><mat-icon>block</mat-icon> Revoke</button>
+                        }
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="10" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No delegations found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Page {{currentPage()}} of {{totalPages()}}</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">{{currentPage()}}</span>
+              <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'thresholds') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Role" [(ngModel)]="thresholdFilterRole" (selectionChange)="loadThresholds()">
+                <mat-option value="">All Roles</mat-option>
+                @for (role of roleOptions; track role.value) {
+                  <mat-option [value]="role.value">{{role.label}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Transaction Type" [(ngModel)]="thresholdFilterType" (selectionChange)="loadThresholds()">
+                <mat-option value="">All Types</mat-option>
+                @for (tt of transactionTypeOptions; track tt) {
+                  <mat-option [value]="tt">{{tt | titlecase}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="clearThresholdFilters()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Transaction Type</th>
+                  <th>Max Amount</th>
+                  <th>Description</th>
+                  <th>Requires Approval</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (thr of filteredThresholds(); track thr.id) {
+                  <tr class="data-row">
+                    <td><span class="role-badge">{{getRoleLabel(thr.role)}}</span></td>
+                    <td>{{thr.transactionType | titlecase}}</td>
+                    <td class="value-cell">{{formatCurrency(thr.maxAmount?.amount || 0)}}</td>
+                    <td>{{thr.description}}</td>
+                    <td>
+                      @if (thr.requiresApproval) {
+                        <span class="status-badge status-submitted">Yes</span>
+                      } @else {
+                        <span class="status-badge status-approved">No</span>
+                      }
+                    </td>
+                    <td class="actions-cell">
+                      <button mat-icon-button (click)="openEditThreshold(thr)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No threshold rules found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'detail' && selectedDelegation()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>Delegation {{selectedDelegation()!.id}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedDelegation()!.status">{{selectedDelegation()!.status | titlecase}}</span>
+              <span class="legislation-badge-sm"><mat-icon>gavel</mat-icon> MFMA Section 56</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedDelegation()!.status === 'active') {
+              <button mat-stroked-button (click)="editDelegation(selectedDelegation()!)"><mat-icon>edit</mat-icon> Edit</button>
+              <button mat-stroked-button color="warn" (click)="openRevokeDialog(selectedDelegation()!)"><mat-icon>block</mat-icon> Revoke</button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-2">
+              <h3><mat-icon>account_tree</mat-icon> Delegation Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Delegation ID</label>
+                  <span>{{selectedDelegation()!.id}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Delegated By</label>
+                  <span>{{getUserName(selectedDelegation()!.delegatedBy)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Delegated To</label>
+                  <span>{{getUserName(selectedDelegation()!.delegatedTo)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Role</label>
+                  <span class="role-badge">{{getRoleLabel(selectedDelegation()!.role)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Maximum Amount</label>
+                  <span class="value-cell">{{formatCurrencyFull(selectedDelegation()!.maxAmount?.amount || 0)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Council Resolution</label>
+                  <span>{{selectedDelegation()!.councilResolution || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Start Date</label>
+                  <span>{{formatDate(selectedDelegation()!.startDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>End Date</label>
+                  <span>{{formatDate(selectedDelegation()!.endDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created</label>
+                  <span>{{formatDate(selectedDelegation()!.createdDate)}}</span>
+                </div>
+              </div>
+              <div class="detail-field" style="margin-top: 16px;">
+                <label>Reason</label>
+                <span class="desc-text">{{selectedDelegation()!.reason}}</span>
+              </div>
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>category</mat-icon> Transaction Types</h3>
+              <div class="chip-list-detail">
+                @for (tt of selectedDelegation()!.transactionTypes; track tt) {
+                  <span class="type-chip-lg">{{tt | titlecase}}</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (selectedDelegation()!.status === 'revoked') {
+            <div class="detail-card void-card">
+              <h3><mat-icon>block</mat-icon> Revocation Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Revoked Date</label>
+                  <span>{{formatDate(selectedDelegation()!.revokedDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Revocation Reason</label>
+                  <span class="desc-text">{{selectedDelegation()!.revokedReason || '—'}}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (currentView() === 'create') {
+        <div class="form-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>{{editMode() ? 'Edit Delegation' : 'Create New Delegation'}}</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>account_tree</mat-icon> Delegation Information</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Delegated By (User ID)</mat-label>
+                <input matInput [(ngModel)]="delegationForm.delegatedBy" placeholder="e.g. USR001">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Delegated To (User ID)</mat-label>
+                <input matInput [(ngModel)]="delegationForm.delegatedTo" placeholder="e.g. USR002">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Role</mat-label>
+                <mat-select [(ngModel)]="delegationForm.role">
+                  @for (role of roleOptions; track role.value) {
+                    <mat-option [value]="role.value">{{role.label}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Maximum Amount (R)</mat-label>
+                <input matInput type="number" [(ngModel)]="delegationForm.maxAmount" min="0">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Start Date</mat-label>
+                <input matInput [matDatepicker]="startPicker" [(ngModel)]="delegationForm.startDate">
+                <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+                <mat-datepicker #startPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>End Date</mat-label>
+                <input matInput [matDatepicker]="endPicker" [(ngModel)]="delegationForm.endDate">
+                <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+                <mat-datepicker #endPicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>category</mat-icon> Transaction Types</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Transaction Types</mat-label>
+                <mat-select [(ngModel)]="delegationForm.transactionTypes" multiple>
+                  @for (tt of transactionTypeOptions; track tt) {
+                    <mat-option [value]="tt">{{tt | titlecase}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>description</mat-icon> Additional Details</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Reason / Justification</mat-label>
+                <textarea matInput [(ngModel)]="delegationForm.reason" rows="3"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Council Resolution Reference</mat-label>
+                <input matInput [(ngModel)]="delegationForm.councilResolution" placeholder="e.g. C12/2024">
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveDelegation()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : (editMode() ? 'Update Delegation' : 'Create Delegation')}}
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (showRevokeDialog()) {
+        <div class="dialog-overlay" (click)="showRevokeDialog.set(false)">
+          <div class="dialog-card" (click)="$event.stopPropagation()">
+            <h3><mat-icon>block</mat-icon> Revoke Delegation</h3>
+            <p class="dialog-text">Are you sure you want to revoke delegation <strong>{{revokeTarget()?.id}}</strong>?</p>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Reason for Revocation</mat-label>
+              <textarea matInput [(ngModel)]="revokeReason" rows="3" placeholder="Enter the reason for revoking this delegation..."></textarea>
+            </mat-form-field>
+            <div class="dialog-actions">
+              <button mat-stroked-button (click)="showRevokeDialog.set(false)">Cancel</button>
+              <button mat-flat-button color="warn" (click)="confirmRevoke()" [disabled]="!revokeReason">
+                <mat-icon>block</mat-icon> Revoke
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showEditThresholdDialog()) {
+        <div class="dialog-overlay" (click)="showEditThresholdDialog.set(false)">
+          <div class="dialog-card" (click)="$event.stopPropagation()">
+            <h3><mat-icon>edit</mat-icon> Edit Threshold</h3>
+            <p class="dialog-text">Editing threshold for <strong>{{getRoleLabel(editingThreshold()?.role || '')}}</strong> — {{editingThreshold()?.transactionType | titlecase}}</p>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Maximum Amount (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="thresholdEditAmount" min="0">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Description</mat-label>
+              <textarea matInput [(ngModel)]="thresholdEditDescription" rows="2"></textarea>
+            </mat-form-field>
+            <div class="dialog-actions">
+              <button mat-stroked-button (click)="showEditThresholdDialog.set(false)">Cancel</button>
+              <button mat-flat-button color="primary" (click)="saveThreshold()">
+                <mat-icon>save</mat-icon> Save
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

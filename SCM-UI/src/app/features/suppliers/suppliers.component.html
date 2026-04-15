@@ -1,0 +1,1411 @@
+    <div class="suppliers-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'main') {
+        <div class="top-tabs">
+          <button class="top-tab" [class.active]="activeTab() === 'dashboard'" (click)="activeTab.set('dashboard')">
+            <mat-icon>dashboard</mat-icon> Dashboard
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'registrations'" (click)="activeTab.set('registrations'); loadRegistrations()">
+            <mat-icon>list_alt</mat-icon> Registration List
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'csd'" (click)="activeTab.set('csd')">
+            <mat-icon>cloud_download</mat-icon> CSD Import
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'documents'" (click)="activeTab.set('documents'); loadExpiringDocuments(); loadAllDocuments()">
+            <mat-icon>folder</mat-icon> Documents
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'reports'" (click)="activeTab.set('reports')">
+            <mat-icon>assessment</mat-icon> Reports
+          </button>
+          <button class="top-tab" (click)="navigateToAnalytics()">
+            <mat-icon>analytics</mat-icon> AI Analytics
+          </button>
+        </div>
+
+        @if (activeTab() === 'dashboard') {
+          <div class="kpi-strip">
+            <div class="kpi-tile" matTooltip="Total registered vendors">
+              <mat-icon>business</mat-icon>
+              <span class="kpi-value">{{dashboardData().activeVendors || 0}}</span>
+              <span class="kpi-label">Active Vendors</span>
+              <span class="kpi-sub">of {{dashboardData().totalVendors || 0}} total</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Registrations awaiting supervisor approval">
+              <mat-icon>pending_actions</mat-icon>
+              <span class="kpi-value" [style.color]="(dashboardData().pendingApprovals || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{dashboardData().pendingApprovals || 0}}</span>
+              <span class="kpi-label">Pending Approvals</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Documents expiring within 30 days">
+              <mat-icon>schedule</mat-icon>
+              <span class="kpi-value" [style.color]="(dashboardData().expiringDocs || 0) > 0 ? '#c62828' : '#2e7d32'">{{dashboardData().expiringDocs || 0}}</span>
+              <span class="kpi-label">Expiring Documents</span>
+            </div>
+            <div class="kpi-tile" matTooltip="B-BBEE level distribution of active vendors">
+              <mat-icon>pie_chart</mat-icon>
+              <span class="kpi-value">{{dashboardData().bbbeeDistribution || '—'}}</span>
+              <span class="kpi-label">B-BBEE Distribution</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Percentage of HDI-owned vendors">
+              <mat-icon>diversity_3</mat-icon>
+              <span class="kpi-value">{{dashboardData().hdiPercent || 0}}%</span>
+              <span class="kpi-label">HDI Owned</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Active registrations in progress">
+              <mat-icon>app_registration</mat-icon>
+              <span class="kpi-value">{{dashboardData().activeRegistrations || 0}}</span>
+              <span class="kpi-label">Active Registrations</span>
+            </div>
+          </div>
+
+          <div class="pipeline-strip">
+            <div class="pipe-tile">
+              <mat-icon>edit_note</mat-icon>
+              <span class="pipe-count" matTooltip="Draft registrations">{{dashboardData().pipeline?.draft || 0}}</span>
+              <span class="pipe-label">Draft</span>
+            </div>
+            <div class="pipe-connector"><mat-icon>arrow_forward</mat-icon></div>
+            <div class="pipe-tile">
+              <mat-icon>send</mat-icon>
+              <span class="pipe-count" matTooltip="Submitted for approval">{{dashboardData().pipeline?.submitted || 0}}</span>
+              <span class="pipe-label">Submitted</span>
+            </div>
+            <div class="pipe-connector"><mat-icon>arrow_forward</mat-icon></div>
+            <div class="pipe-tile">
+              <mat-icon>check_circle</mat-icon>
+              <span class="pipe-count" matTooltip="Approved registrations">{{dashboardData().pipeline?.approved || 0}}</span>
+              <span class="pipe-label">Approved</span>
+            </div>
+            <div class="pipe-connector"><mat-icon>arrow_forward</mat-icon></div>
+            <div class="pipe-tile">
+              <mat-icon>verified</mat-icon>
+              <span class="pipe-count" matTooltip="Active vendors">{{dashboardData().pipeline?.active || 0}}</span>
+              <span class="pipe-label">Active</span>
+            </div>
+          </div>
+
+          @if (expiringAlerts().expiring?.length || expiringAlerts().expired?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>warning</mat-icon> Document Alerts</h3>
+              @if (expiringAlerts().expired?.length) {
+                <h4 style="color:#c62828;margin:8px 0 4px">Expired Documents</h4>
+                <div class="alert-list">
+                  @for (doc of expiringAlerts().expired?.slice(0, 5); track doc.id) {
+                    <div class="alert-item alert-expired">
+                      <mat-icon>error</mat-icon>
+                      <span><strong>{{doc.supplierName}}</strong> — {{doc.documentTypeName}} expired {{doc.expiryDate}}</span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (expiringAlerts().expiring?.length) {
+                <h4 style="color:#ef6c00;margin:8px 0 4px">Expiring Within 30 Days</h4>
+                <div class="alert-list">
+                  @for (doc of expiringAlerts().expiring?.slice(0, 5); track doc.id) {
+                    <div class="alert-item alert-warning">
+                      <mat-icon>schedule</mat-icon>
+                      <span><strong>{{doc.supplierName}}</strong> — {{doc.documentTypeName}} expires in {{doc.daysRemaining}} days</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (recentRegistrations().length) {
+            <div class="detail-card">
+              <h3><mat-icon>history</mat-icon> Recent Registrations</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead>
+                    <tr>
+                      <th>Registration ID</th>
+                      <th>Vendor</th>
+                      <th>Source</th>
+                      <th>Status</th>
+                      <th>Captured By</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (reg of recentRegistrations(); track reg.id) {
+                      <tr class="tender-row" (click)="viewRegistration(reg)">
+                        <td class="ref-cell">{{reg.id}}</td>
+                        <td>{{getRegSupplierName(reg)}}</td>
+                        <td><span class="source-badge" [class]="'source-' + reg.registrationSource">{{reg.registrationSource === 'csd_import' ? 'CSD Import' : 'Manual'}}</span></td>
+                        <td><span class="status-badge" [class]="'status-' + reg.status">{{getStatusLabel(reg.status)}}</span></td>
+                        <td>{{reg.capturedByName}}</td>
+                        <td>{{formatDate(reg.capturedDate)}}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'registrations') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search registrations..." [(ngModel)]="regSearch" (keyup.enter)="loadRegistrations()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="regFilterStatus" (selectionChange)="loadRegistrations()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="draft">Draft</mat-option>
+                <mat-option value="pending_supervisor_approval">Pending Approval</mat-option>
+                <mat-option value="approved">Approved</mat-option>
+                <mat-option value="rejected">Rejected</mat-option>
+                <mat-option value="returned">Returned</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Source" [(ngModel)]="regFilterSource" (selectionChange)="loadRegistrations()">
+                <mat-option value="">All Sources</mat-option>
+                <mat-option value="csd_import">CSD Import</mat-option>
+                <mat-option value="manual">Manual</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="regFromPicker" [(ngModel)]="regDateFrom" (dateChange)="loadRegistrations()">
+              <mat-datepicker-toggle matIconSuffix [for]="regFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #regFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="regToPicker" [(ngModel)]="regDateTo" (dateChange)="loadRegistrations()">
+              <mat-datepicker-toggle matIconSuffix [for]="regToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #regToPicker></mat-datepicker>
+            </mat-form-field>
+            <button mat-stroked-button (click)="clearRegFilters()" matTooltip="Clear all filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear All
+            </button>
+            <button mat-flat-button color="primary" (click)="openManualRegistration()">
+              <mat-icon>add</mat-icon> New Registration
+            </button>
+          </div>
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr>
+                  <th>Registration ID</th>
+                  <th>Vendor Name</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Captured By</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (reg of registrations(); track reg.id) {
+                  <tr class="tender-row" (click)="viewRegistration(reg)">
+                    <td class="ref-cell">{{reg.id}}</td>
+                    <td>{{getRegSupplierName(reg)}}</td>
+                    <td><span class="source-badge" [class]="'source-' + reg.registrationSource">{{reg.registrationSource === 'csd_import' ? 'CSD Import' : 'Manual'}}</span></td>
+                    <td><span class="status-badge" [class]="'status-' + reg.status">{{getStatusLabel(reg.status)}}</span></td>
+                    <td>{{reg.capturedByName}}</td>
+                    <td>{{formatDate(reg.capturedDate)}}</td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="regMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #regMenu="matMenu">
+                        <button mat-menu-item (click)="viewRegistration(reg)"><mat-icon>visibility</mat-icon> View</button>
+                        @if (reg.status === 'draft' || reg.status === 'returned') {
+                          <button mat-menu-item (click)="viewRegistration(reg); detailTab.set('wizard')"><mat-icon>edit</mat-icon> Edit (Wizard)</button>
+                        }
+                        @if (reg.status === 'draft') {
+                          <button mat-menu-item (click)="submitRegistration(reg.id)"><mat-icon>send</mat-icon> Submit</button>
+                        }
+                        @if (reg.status === 'pending_supervisor_approval') {
+                          <button mat-menu-item (click)="approveRegistration(reg.id, 'approve')"><mat-icon>check</mat-icon> Approve</button>
+                          <button mat-menu-item (click)="approveRegistration(reg.id, 'reject')"><mat-icon>close</mat-icon> Reject</button>
+                          <button mat-menu-item (click)="approveRegistration(reg.id, 'return')"><mat-icon>undo</mat-icon> Return</button>
+                        }
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No registrations found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Showing {{regPageStart()}} - {{regPageEnd()}} of {{regTotal()}} registrations</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="regPage() <= 1" (click)="regPage.set(regPage() - 1); loadRegistrations()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{regPage()}} of {{regTotalPages()}}</span>
+              <button mat-icon-button [disabled]="regPage() >= regTotalPages()" (click)="regPage.set(regPage() + 1); loadRegistrations()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'csd') {
+          <div class="detail-card">
+            <h3><mat-icon>cloud_download</mat-icon> CSD Vendor Search</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>CSD Number</mat-label>
+                <input matInput [(ngModel)]="csdSearchForm.csdNumber" placeholder="e.g., MAAA0001234">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Company Name</mat-label>
+                <input matInput [(ngModel)]="csdSearchForm.companyName" placeholder="Search by name">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Registration Number</mat-label>
+                <input matInput [(ngModel)]="csdSearchForm.registrationNumber" placeholder="e.g., 2015/123456/07">
+              </mat-form-field>
+            </div>
+            <div style="margin-top:8px">
+              <button mat-flat-button color="primary" (click)="searchCsd()" [disabled]="saving() || (!csdSearchForm.csdNumber && !csdSearchForm.companyName && !csdSearchForm.registrationNumber)">
+                <mat-icon>search</mat-icon> Search CSD
+              </button>
+            </div>
+          </div>
+
+          @if (csdResults().length) {
+            <div class="detail-card">
+              <h3><mat-icon>list</mat-icon> Search Results ({{csdResults().length}})</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead>
+                    <tr>
+                      <th>Registered Name</th>
+                      <th>CSD Number</th>
+                      <th>Registration #</th>
+                      <th>Status</th>
+                      <th>B-BBEE Level</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (result of csdResults(); track result.csdNumber) {
+                      <tr>
+                        <td><strong>{{result.registeredName}}</strong></td>
+                        <td class="ref-cell">{{result.csdNumber}}</td>
+                        <td>{{result.registrationNumber}}</td>
+                        <td><span class="status-badge status-active">{{result.status}}</span></td>
+                        <td><span class="bbbee-badge">Level {{result.bbbeeLevel}}</span></td>
+                        <td>
+                          <button mat-flat-button color="primary" (click)="importFromCsd(result.csdNumber)" [disabled]="saving()" matTooltip="Import this vendor">
+                            <mat-icon>cloud_download</mat-icon> Import
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          @if (csdImportResult()) {
+            <div class="detail-card" style="border-left:4px solid #2e7d32">
+              <h3><mat-icon>check_circle</mat-icon> Import Successful</h3>
+              <p>Vendor imported with <strong>{{csdImportResult().importedFields}}</strong> fields populated.</p>
+              <p>Registration ID: <strong>{{csdImportResult().registration?.id}}</strong></p>
+              <button mat-flat-button color="primary" (click)="viewRegistration(csdImportResult().registration)" style="margin-top:8px">
+                <mat-icon>edit</mat-icon> Open in Wizard
+              </button>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'documents') {
+          <div class="kpi-strip" style="margin-bottom:16px">
+            <div class="kpi-tile" style="border-left:4px solid #c62828" matTooltip="Documents already expired">
+              <mat-icon style="color:#c62828">error</mat-icon>
+              <span class="kpi-value" style="color:#c62828">{{expiringAlerts().expired?.length || 0}}</span>
+              <span class="kpi-label">Expired</span>
+            </div>
+            <div class="kpi-tile" style="border-left:4px solid #ef6c00" matTooltip="Expiring within 30 days">
+              <mat-icon style="color:#ef6c00">warning</mat-icon>
+              <span class="kpi-value" style="color:#ef6c00">{{expiringAlerts().expiring?.length || 0}}</span>
+              <span class="kpi-label">Expiring (30 days)</span>
+            </div>
+            <div class="kpi-tile" style="border-left:4px solid #2e7d32" matTooltip="Total documents on file">
+              <mat-icon style="color:#2e7d32">folder</mat-icon>
+              <span class="kpi-value">{{allDocuments().length || 0}}</span>
+              <span class="kpi-label">Total Documents</span>
+            </div>
+          </div>
+
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-label>Document Type</mat-label>
+              <mat-select [(ngModel)]="docFilterType" (selectionChange)="loadAllDocuments()">
+                <mat-option value="">All Types</mat-option>
+                @for (dt of config().documentTypes; track dt.code) {
+                  <mat-option [value]="dt.code">{{dt.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Status</mat-label>
+              <mat-select [(ngModel)]="docFilterStatus" (selectionChange)="loadAllDocuments()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="pending_verification">Pending Verification</mat-option>
+                <mat-option value="verified">Verified</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <button mat-stroked-button (click)="docFilterType=''; docFilterStatus=''; loadAllDocuments()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+          </div>
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr>
+                  <th>Document ID</th>
+                  <th>Type</th>
+                  <th>Supplier</th>
+                  <th>File Name</th>
+                  <th>Status</th>
+                  <th>Expiry Date</th>
+                  <th>Uploaded By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (doc of allDocuments(); track doc.id) {
+                  <tr>
+                    <td class="ref-cell">{{doc.id}}</td>
+                    <td>{{getDocTypeName(doc.documentType)}}</td>
+                    <td>{{doc.supplierId}}</td>
+                    <td>{{doc.fileName}}</td>
+                    <td><span class="status-badge" [class]="'status-' + doc.status">{{doc.status === 'pending_verification' ? 'Pending' : doc.status}}</span></td>
+                    <td [style.color]="isDocExpired(doc) ? '#c62828' : '#1e293b'">{{doc.expiryDate || '—'}}</td>
+                    <td>{{doc.uploadedBy}}</td>
+                    <td class="actions-cell">
+                      @if (doc.status === 'pending_verification') {
+                        <button mat-icon-button color="primary" (click)="verifyDocument(doc.id)" matTooltip="Verify document">
+                          <mat-icon>verified</mat-icon>
+                        </button>
+                      }
+                      <button mat-icon-button color="warn" (click)="deleteDocument(doc.id)" matTooltip="Delete document">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      <mat-icon>folder_off</mat-icon>
+                      <span>No documents found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Showing {{docPageStart()}} - {{docPageEnd()}} of {{docTotal()}} documents</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="docPage() <= 1" (click)="docPage.set(docPage() - 1); loadAllDocuments()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{docPage()}} of {{docTotalPages()}}</span>
+              <button mat-icon-button [disabled]="docPage() >= docTotalPages()" (click)="docPage.set(docPage() + 1); loadAllDocuments()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'reports') {
+          <div class="report-tabs">
+            <button class="tab-btn" [class.active]="reportTab() === 'details'" (click)="reportTab.set('details'); loadVendorDetailsReport()">Vendor Details</button>
+            <button class="tab-btn" [class.active]="reportTab() === 'status'" (click)="reportTab.set('status'); loadStatusReport()">Status Report</button>
+            <button class="tab-btn" [class.active]="reportTab() === 'exceptions'" (click)="reportTab.set('exceptions'); loadExceptionsReport()">Exceptions</button>
+            <button class="tab-btn" [class.active]="reportTab() === 'diversity'" (click)="reportTab.set('diversity'); loadDiversityReport()">Diversity</button>
+          </div>
+
+          @if (reportTab() === 'details') {
+            <div class="filters-bar">
+              <mat-form-field appearance="outline">
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput placeholder="Search vendors..." [(ngModel)]="rptSearch" (keyup.enter)="loadVendorDetailsReport()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-select placeholder="Status" [(ngModel)]="rptStatus" (selectionChange)="loadVendorDetailsReport()">
+                  <mat-option value="">All</mat-option>
+                  <mat-option value="active">Active</mat-option>
+                  <mat-option value="pending_verification">Pending</mat-option>
+                  <mat-option value="suspended">Suspended</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-select placeholder="B-BBEE Level" [(ngModel)]="rptBbbee" (selectionChange)="loadVendorDetailsReport()">
+                  <mat-option value="">All Levels</mat-option>
+                  @for (lvl of [1,2,3,4,5,6,7,8]; track lvl) {
+                    <mat-option [value]="lvl">Level {{lvl}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button mat-stroked-button (click)="rptSearch=''; rptStatus=''; rptBbbee=''; loadVendorDetailsReport()">
+                <mat-icon>filter_alt_off</mat-icon> Clear
+              </button>
+            </div>
+            <div class="tender-table-wrapper">
+              <table class="tender-table">
+                <thead>
+                  <tr>
+                    <th>Vendor Name</th>
+                    <th>CSD Number</th>
+                    <th>Status</th>
+                    <th>B-BBEE Level</th>
+                    <th>Documents</th>
+                    <th>Directors</th>
+                    <th>HDI %</th>
+                    <th>Women %</th>
+                    <th>Accreditations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (vendor of reportDetails(); track vendor.id) {
+                    <tr>
+                      <td><strong>{{vendor.name}}</strong></td>
+                      <td class="ref-cell">{{vendor.csdNumber || '—'}}</td>
+                      <td><span class="status-badge" [class]="'status-' + vendor.status">{{vendor.status}}</span></td>
+                      <td><span class="bbbee-badge">Level {{vendor.bbbeeLevel}}</span></td>
+                      <td matTooltip="Total documents on file">{{vendor.totalDocuments || 0}}</td>
+                      <td matTooltip="Number of directors">{{vendor.directorsCount || 0}}</td>
+                      <td matTooltip="HDI ownership percentage">{{vendor.hdiOwnership || 0}}%</td>
+                      <td matTooltip="Women ownership percentage">{{vendor.womenOwnership || 0}}%</td>
+                      <td>{{vendor.accreditations || '—'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="9" class="empty-state"><mat-icon>search_off</mat-icon><span>No vendors found</span></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination">
+              <span class="page-info">{{reportDetails().length}} vendors displayed</span>
+            </div>
+          }
+
+          @if (reportTab() === 'status') {
+            @if (statusReport()) {
+              <div class="kpi-strip">
+                <div class="kpi-tile" matTooltip="Total registered vendors">
+                  <span class="kpi-value">{{statusReport().total || 0}}</span>
+                  <span class="kpi-label">Total Vendors</span>
+                </div>
+                @for (entry of getObjectEntries(statusReport().statusBreakdown || {}); track entry[0]) {
+                  <div class="kpi-tile">
+                    <span class="kpi-value">{{entry[1]}}</span>
+                    <span class="kpi-label">{{entry[0]}}</span>
+                  </div>
+                }
+              </div>
+              @if (statusReport().bbbeeBreakdown) {
+                <div class="detail-card">
+                  <h3><mat-icon>pie_chart</mat-icon> B-BBEE Breakdown</h3>
+                  <div class="kpi-strip">
+                    @for (entry of getObjectEntries(statusReport().bbbeeBreakdown || {}); track entry[0]) {
+                      <div class="kpi-tile">
+                        <span class="kpi-value">{{entry[1]}}</span>
+                        <span class="kpi-label">{{entry[0]}}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+              @if (statusReport().recentChanges?.length) {
+                <div class="detail-card">
+                  <h3><mat-icon>history</mat-icon> Recent Status Changes</h3>
+                  <div class="tender-table-wrapper">
+                    <table class="tender-table">
+                      <thead>
+                        <tr><th>Vendor</th><th>From</th><th>To</th><th>Changed By</th><th>Date</th></tr>
+                      </thead>
+                      <tbody>
+                        @for (ch of statusReport().recentChanges; track ch.id) {
+                          <tr>
+                            <td>{{ch.supplierName}}</td>
+                            <td><span class="status-badge" [class]="'status-' + ch.fromStatus">{{ch.fromStatus}}</span></td>
+                            <td><span class="status-badge" [class]="'status-' + ch.toStatus">{{ch.toStatus}}</span></td>
+                            <td>{{ch.changedByName}}</td>
+                            <td>{{formatDate(ch.changedDate)}}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            }
+          }
+
+          @if (reportTab() === 'exceptions') {
+            @if (exceptionsReport()) {
+              <div class="kpi-strip">
+                <div class="kpi-tile" style="border-left:4px solid #c62828" matTooltip="Critical severity exceptions">
+                  <span class="kpi-value" style="color:#c62828">{{exceptionsReport().summary?.critical || 0}}</span>
+                  <span class="kpi-label">Critical</span>
+                </div>
+                <div class="kpi-tile" style="border-left:4px solid #ef6c00" matTooltip="High severity exceptions">
+                  <span class="kpi-value" style="color:#ef6c00">{{exceptionsReport().summary?.high || 0}}</span>
+                  <span class="kpi-label">High</span>
+                </div>
+                <div class="kpi-tile" style="border-left:4px solid #1565c0" matTooltip="Medium severity exceptions">
+                  <span class="kpi-value" style="color:#1565c0">{{exceptionsReport().summary?.medium || 0}}</span>
+                  <span class="kpi-label">Medium</span>
+                </div>
+                <div class="kpi-tile" matTooltip="Total exception count">
+                  <span class="kpi-value">{{exceptionsReport().summary?.total || 0}}</span>
+                  <span class="kpi-label">Total</span>
+                </div>
+              </div>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead>
+                    <tr><th>Vendor</th><th>Exception Type</th><th>Detail</th><th>Severity</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (exc of exceptionsReport().exceptions?.slice(0, 50); track $index) {
+                      <tr>
+                        <td><strong>{{exc.supplierName}}</strong></td>
+                        <td>{{exc.exceptionType}}</td>
+                        <td>{{exc.detail}}</td>
+                        <td><span class="severity-badge" [class]="'severity-' + exc.severity">{{exc.severity}}</span></td>
+                        <td><span class="status-badge" [class]="'status-' + exc.status">{{exc.status}}</span></td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><mat-icon>check_circle</mat-icon><span>No exceptions found</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+          @if (reportTab() === 'diversity') {
+            @if (diversityReport()) {
+              <div class="kpi-strip">
+                <div class="kpi-tile" matTooltip="Total active suppliers analyzed">
+                  <span class="kpi-value">{{diversityReport().totalActiveSuppliers || 0}}</span>
+                  <span class="kpi-label">Active Suppliers</span>
+                </div>
+                <div class="kpi-tile" matTooltip="HDI-owned suppliers (>50% HDI ownership)">
+                  <span class="kpi-value">{{diversityReport().hdiOwned?.count || 0}}</span>
+                  <span class="kpi-label">HDI Owned</span>
+                  <span class="kpi-sub">{{diversityReport().hdiOwned?.percentage || 0}}% of spend</span>
+                </div>
+                <div class="kpi-tile" matTooltip="Women-owned suppliers (>50% women ownership)">
+                  <span class="kpi-value">{{diversityReport().womenOwned?.count || 0}}</span>
+                  <span class="kpi-label">Women Owned</span>
+                  <span class="kpi-sub">{{diversityReport().womenOwned?.percentage || 0}}% of spend</span>
+                </div>
+                <div class="kpi-tile" matTooltip="Youth-owned suppliers (>50% youth ownership)">
+                  <span class="kpi-value">{{diversityReport().youthOwned?.count || 0}}</span>
+                  <span class="kpi-label">Youth Owned</span>
+                  <span class="kpi-sub">{{diversityReport().youthOwned?.percentage || 0}}% of spend</span>
+                </div>
+                <div class="kpi-tile" matTooltip="Disability-owned suppliers (>50% disability ownership)">
+                  <span class="kpi-value">{{diversityReport().disabilityOwned?.count || 0}}</span>
+                  <span class="kpi-label">Disability Owned</span>
+                  <span class="kpi-sub">{{diversityReport().disabilityOwned?.percentage || 0}}% of spend</span>
+                </div>
+              </div>
+              @if (diversityReport().supplierDetails?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="tender-table">
+                    <thead>
+                      <tr>
+                        <th>Vendor</th>
+                        <th>B-BBEE</th>
+                        <th>Contract Value</th>
+                        <th>HDI %</th>
+                        <th>Women %</th>
+                        <th>Youth %</th>
+                        <th>Disability %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (s of diversityReport().supplierDetails; track s.supplierId) {
+                        <tr>
+                          <td><strong>{{s.supplierName}}</strong></td>
+                          <td><span class="bbbee-badge">Level {{s.bbbeeLevel}}</span></td>
+                          <td class="value-cell" matTooltip="Total contract value">{{formatCurrency(s.contractValue)}}</td>
+                          <td [style.color]="s.isHdiOwned ? '#2e7d32' : '#1e293b'" [style.fontWeight]="s.isHdiOwned ? '700' : '400'">{{s.hdiOwnership}}%</td>
+                          <td [style.color]="s.isWomenOwned ? '#2e7d32' : '#1e293b'" [style.fontWeight]="s.isWomenOwned ? '700' : '400'">{{s.womenOwnership}}%</td>
+                          <td [style.color]="s.isYouthOwned ? '#2e7d32' : '#1e293b'" [style.fontWeight]="s.isYouthOwned ? '700' : '400'">{{s.youthOwnership}}%</td>
+                          <td [style.color]="s.isDisabilityOwned ? '#2e7d32' : '#1e293b'" [style.fontWeight]="s.isDisabilityOwned ? '700' : '400'">{{s.disabilityOwnership}}%</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            }
+          }
+        }
+      }
+
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="currentView.set('main')">Dashboard</button>
+          <button class="tab-btn active">AI Analytics</button>
+        </div>
+        @if (vendorAnalytics()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">pie_chart</mat-icon>
+                  Supplier Concentration Index
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112(1)(l)-(m)</span>
+              </div>
+              <div style="height: 240px; position: relative;">
+                <canvas id="vendorConcentrationChart"></canvas>
+              </div>
+            </div>
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #10b981; font-size: 20px; width: 20px; height: 20px;">verified</mat-icon>
+                  Supplier Compliance Status
+                </h3>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;">
+                <div style="background: #dcfce7; border-radius: 10px; padding: 12px; text-align: center;">
+                  <div style="font-size: 24px; font-weight: 700; color: #166534;">{{vendorAnalytics().complianceStatus.active}}</div>
+                  <div style="font-size: 10px; color: #166534;">Active</div>
+                </div>
+                <div style="background: #fef3c7; border-radius: 10px; padding: 12px; text-align: center;">
+                  <div style="font-size: 24px; font-weight: 700; color: #92400e;">{{vendorAnalytics().complianceStatus.expired}}</div>
+                  <div style="font-size: 10px; color: #92400e;">Expired</div>
+                </div>
+                <div style="background: #fecaca; border-radius: 10px; padding: 12px; text-align: center;">
+                  <div style="font-size: 24px; font-weight: 700; color: #991b1b;">{{vendorAnalytics().complianceStatus.blocked}}</div>
+                  <div style="font-size: 10px; color: #991b1b;">Blocked</div>
+                </div>
+              </div>
+              <div style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Expiring Documents (Next 60 Days)</div>
+              @for (doc of vendorAnalytics().complianceStatus.expiringDocuments; track doc.type) {
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f8fafc;">
+                  <span style="font-size: 11px; color: #334155;">{{doc.type}}</span>
+                  <div style="display: flex; gap: 12px;">
+                    <span style="font-size: 10px; color: #dc2626; font-weight: 600;" matTooltip="Within 30 days">{{doc.within30Days}} urgent</span>
+                    <span style="font-size: 10px; color: #f59e0b;">{{doc.within60Days}} total</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="detail-card" style="text-align: center; padding: 40px;">
+            <mat-icon style="font-size: 48px; width: 48px; height: 48px; color: #94a3b8;">analytics</mat-icon>
+            <p style="color: #64748b; margin-top: 12px;">Loading vendor analytics data...</p>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'manual-register') {
+        <div class="create-form">
+          <div class="form-header">
+            <button mat-icon-button (click)="currentView.set('main')"><mat-icon>arrow_back</mat-icon></button>
+            <h2>New Manual Vendor Registration</h2>
+          </div>
+          <div class="detail-card">
+            <h3><mat-icon>business</mat-icon> Company Details</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Registered Name</mat-label>
+                <input matInput [(ngModel)]="manualForm.name" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Trading Name</mat-label>
+                <input matInput [(ngModel)]="manualForm.tradingName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Registration Number</mat-label>
+                <input matInput [(ngModel)]="manualForm.registrationNumber" placeholder="e.g., 2015/123456/07">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Registration Type</mat-label>
+                <mat-select [(ngModel)]="manualForm.registrationType">
+                  @for (rt of config().registrationTypes; track rt.code) {
+                    <mat-option [value]="rt.code">{{rt.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Person</mat-label>
+                <input matInput [(ngModel)]="manualForm.contactPerson">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Email</mat-label>
+                <input matInput type="email" [(ngModel)]="manualForm.email">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Phone</mat-label>
+                <input matInput [(ngModel)]="manualForm.phone">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>VAT Number</mat-label>
+                <input matInput [(ngModel)]="manualForm.vatNumber">
+              </mat-form-field>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button mat-stroked-button (click)="currentView.set('main')" [disabled]="saving()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveManualRegistration()" [disabled]="saving() || !manualForm.name">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Create Registration'}}
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'detail') {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedSupplier()?.name || 'Vendor'}} — {{selectedRegistration()?.id}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedRegistration()?.status">{{getStatusLabel(selectedRegistration()?.status || '')}}</span>
+              <span class="source-badge" [class]="'source-' + selectedRegistration()?.registrationSource">{{selectedRegistration()?.registrationSource === 'csd_import' ? 'CSD Import' : 'Manual'}}</span>
+              <span class="dept-tag">Captured: {{selectedRegistration()?.capturedByName}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedRegistration()?.status === 'draft') {
+              <button mat-flat-button color="primary" (click)="submitRegistration(selectedRegistration()!.id)"><mat-icon>send</mat-icon> Submit</button>
+            }
+            @if (selectedRegistration()?.status === 'pending_supervisor_approval') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveRegistration(selectedRegistration()!.id, 'approve')"><mat-icon>check</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="approveRegistration(selectedRegistration()!.id, 'reject')"><mat-icon>close</mat-icon> Reject</button>
+              <button mat-stroked-button (click)="approveRegistration(selectedRegistration()!.id, 'return')"><mat-icon>undo</mat-icon> Return</button>
+            }
+          </div>
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'info'" (click)="detailTab.set('info')">Information</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'wizard'" (click)="detailTab.set('wizard')">Wizard</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents'); loadSupplierDocuments()">Documents</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'directors'" (click)="detailTab.set('directors'); loadDirectors()">Directors</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'accreditations'" (click)="detailTab.set('accreditations'); loadAccreditations()">Accreditations</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'history'" (click)="detailTab.set('history'); loadStatusHistory()">Status History</button>
+        </div>
+
+        @if (detailTab() === 'info') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>business</mat-icon> General Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Registered Name</label><span>{{selectedSupplier()?.name || '—'}}</span></div>
+                  <div class="detail-field"><label>Trading Name</label><span>{{selectedSupplier()?.tradingName || '—'}}</span></div>
+                  <div class="detail-field"><label>Registration Number</label><span>{{selectedSupplier()?.registrationNumber || '—'}}</span></div>
+                  <div class="detail-field"><label>CSD Number</label><span>{{selectedSupplier()?.csdNumber || '—'}}</span></div>
+                  <div class="detail-field"><label>VAT Number</label><span>{{selectedSupplier()?.vatNumber || '—'}}</span></div>
+                  <div class="detail-field"><label>Registration Type</label><span>{{selectedRegistration()?.registrationType || '—'}}</span></div>
+                  <div class="detail-field"><label>Status</label><span class="status-badge" [class]="'status-' + selectedSupplier()?.status">{{selectedSupplier()?.status || '—'}}</span></div>
+                  <div class="detail-field"><label>Registered Date</label><span>{{selectedSupplier()?.registeredDate || '—'}}</span></div>
+                </div>
+              </div>
+              <div class="detail-card flex-1">
+                <h3><mat-icon>contact_phone</mat-icon> Contact</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Contact Person</label><span>{{selectedSupplier()?.contactPerson || '—'}}</span></div>
+                  <div class="detail-field"><label>Email</label><span>{{selectedSupplier()?.email || '—'}}</span></div>
+                  <div class="detail-field"><label>Phone</label><span>{{selectedSupplier()?.phone || '—'}}</span></div>
+                  <div class="detail-field"><label>Mobile</label><span>{{selectedSupplier()?.mobile || '—'}}</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="detail-cards-row">
+              <div class="detail-card flex-1">
+                <h3><mat-icon>account_balance</mat-icon> Banking Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Bank</label><span>{{selectedSupplier()?.bankingDetails?.bankName || '—'}}</span></div>
+                  <div class="detail-field"><label>Branch Code</label><span>{{selectedSupplier()?.bankingDetails?.branchCode || '—'}}</span></div>
+                  <div class="detail-field"><label>Account Number</label><span>{{selectedSupplier()?.bankingDetails?.accountNumber || '—'}}</span></div>
+                  <div class="detail-field"><label>Account Type</label><span>{{selectedSupplier()?.bankingDetails?.accountType || '—'}}</span></div>
+                </div>
+              </div>
+              <div class="detail-card flex-1">
+                <h3><mat-icon>location_on</mat-icon> Physical Address</h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Street</label><span>{{selectedSupplier()?.physicalAddress?.street || '—'}}</span></div>
+                  <div class="detail-field"><label>City</label><span>{{selectedSupplier()?.physicalAddress?.city || '—'}}</span></div>
+                  <div class="detail-field"><label>Province</label><span>{{selectedSupplier()?.physicalAddress?.province || '—'}}</span></div>
+                  <div class="detail-field"><label>Postal Code</label><span>{{selectedSupplier()?.physicalAddress?.postalCode || '—'}}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'wizard') {
+          <div class="detail-content">
+            <div class="workflow-stepper">
+              @for (step of wizardSteps; track step.key; let i = $index; let last = $last) {
+                <div class="step" [class.completed]="isWizardStepCompleted(step.key)" [class.current]="wizardCurrentStep() === i + 1" (click)="wizardCurrentStep.set(i + 1)">
+                  <div class="step-indicator">
+                    @if (isWizardStepCompleted(step.key)) {
+                      <mat-icon>check_circle</mat-icon>
+                    } @else if (wizardCurrentStep() === i + 1) {
+                      <mat-icon>radio_button_checked</mat-icon>
+                    } @else {
+                      <mat-icon>radio_button_unchecked</mat-icon>
+                    }
+                  </div>
+                  <span class="step-label">{{step.label}}</span>
+                </div>
+                @if (!last) {
+                  <div class="step-connector" [class.completed]="isWizardStepCompleted(step.key)"></div>
+                }
+              }
+            </div>
+
+            @if (wizardCurrentStep() === 1) {
+              <div class="detail-card">
+                <h3><mat-icon>business</mat-icon> Step 1: General</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>Company Name</mat-label><input matInput [(ngModel)]="wizardData.name"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Trading Name</mat-label><input matInput [(ngModel)]="wizardData.tradingName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Registration Number</mat-label><input matInput [(ngModel)]="wizardData.registrationNumber"></mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Registration Type</mat-label>
+                    <mat-select [(ngModel)]="wizardData.registrationType">
+                      @for (rt of config().registrationTypes; track rt.code) {
+                        <mat-option [value]="rt.code">{{rt.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 2) {
+              <div class="detail-card">
+                <h3><mat-icon>payments</mat-icon> Step 2: Discount Details</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>Payment Term (Days)</mat-label><input matInput type="number" [(ngModel)]="wizardData.paymentTermDays"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Discount Percentage</mat-label><input matInput type="number" [(ngModel)]="wizardData.discountPercentage"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Early Payment Incentive</mat-label><input matInput [(ngModel)]="wizardData.earlyPaymentIncentive"></mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 3) {
+              <div class="detail-card">
+                <h3><mat-icon>receipt_long</mat-icon> Step 3: Tax Information</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>VAT Number</mat-label><input matInput [(ngModel)]="wizardData.vatNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Income Tax Number</mat-label><input matInput [(ngModel)]="wizardData.incomeTaxNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>PAYE Number</mat-label><input matInput [(ngModel)]="wizardData.payeNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Tax Clearance PIN</mat-label><input matInput [(ngModel)]="wizardData.taxClearancePin"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Tax Clearance Expiry</mat-label><input matInput [matDatepicker]="taxClearanceExpiryPicker" [(ngModel)]="wizardData.taxClearanceExpiry"><mat-datepicker-toggle matIconSuffix [for]="taxClearanceExpiryPicker"></mat-datepicker-toggle><mat-datepicker #taxClearanceExpiryPicker></mat-datepicker></mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 4) {
+              <div class="detail-card">
+                <h3><mat-icon>category</mat-icon> Step 4: Business Areas</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>NT Category</mat-label>
+                    <mat-select [(ngModel)]="wizardData.ntCategory">
+                      @for (cat of config().ntCategories; track cat.code) {
+                        <mat-option [value]="cat.code">{{cat.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Municipal Grouping</mat-label>
+                    <mat-select [(ngModel)]="wizardData.municipalGrouping">
+                      @for (mg of config().municipalGroupings; track mg.code) {
+                        <mat-option [value]="mg.code">{{mg.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="form-field-full">
+                    <mat-label>UNSPSC Codes (comma separated)</mat-label>
+                    <input matInput [(ngModel)]="wizardData.unspscCodes" placeholder="e.g., 43211500, 72101500">
+                  </mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 5) {
+              <div class="detail-card">
+                <h3><mat-icon>upload_file</mat-icon> Step 5: Documents</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Type</mat-label>
+                    <mat-select [(ngModel)]="wizDocForm.documentType">
+                      @for (dt of config().documentTypes; track dt.code) {
+                        <mat-option [value]="dt.code">{{dt.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Document Number</mat-label><input matInput [(ngModel)]="wizDocForm.documentNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>File Name</mat-label><input matInput [(ngModel)]="wizDocForm.fileName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="expiryPicker" [(ngModel)]="wizDocForm.expiryDate"><mat-datepicker-toggle matIconSuffix [for]="expiryPicker"></mat-datepicker-toggle><mat-datepicker #expiryPicker></mat-datepicker></mat-form-field>
+                </div>
+                <button mat-flat-button color="primary" (click)="uploadWizardDocument()" [disabled]="saving() || !wizDocForm.documentType" style="margin-top:8px">
+                  <mat-icon>upload</mat-icon> Upload Document
+                </button>
+                @if (wizardDocuments().length) {
+                  <div class="tender-table-wrapper" style="margin-top:12px">
+                    <table class="tender-table">
+                      <thead><tr><th>Type</th><th>Number</th><th>File</th><th>Expiry</th><th>Status</th></tr></thead>
+                      <tbody>
+                        @for (d of wizardDocuments(); track d.id) {
+                          <tr>
+                            <td>{{getDocTypeName(d.documentType)}}</td>
+                            <td>{{d.documentNumber}}</td>
+                            <td>{{d.fileName}}</td>
+                            <td>{{d.expiryDate || '—'}}</td>
+                            <td><span class="status-badge" [class]="'status-' + d.status">{{d.status}}</span></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 6) {
+              <div class="detail-card">
+                <h3><mat-icon>people</mat-icon> Step 6: Directorate</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>First Name</mat-label><input matInput [(ngModel)]="wizDirForm.firstName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Last Name</mat-label><input matInput [(ngModel)]="wizDirForm.lastName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>ID Number</mat-label><input matInput [(ngModel)]="wizDirForm.idNumber"></mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Gender</mat-label>
+                    <mat-select [(ngModel)]="wizDirForm.gender">
+                      <mat-option value="Male">Male</mat-option>
+                      <mat-option value="Female">Female</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>HDI</mat-label>
+                    <mat-select [(ngModel)]="wizDirForm.hdi">
+                      <mat-option [value]="true">Yes</mat-option>
+                      <mat-option [value]="false">No</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Disability</mat-label>
+                    <mat-select [(ngModel)]="wizDirForm.disability">
+                      <mat-option [value]="true">Yes</mat-option>
+                      <mat-option [value]="false">No</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>% Ownership</mat-label><input matInput type="number" [(ngModel)]="wizDirForm.percentageOwned"></mat-form-field>
+                </div>
+                <button mat-flat-button color="primary" (click)="addDirectorFromWizard()" [disabled]="saving() || !wizDirForm.firstName || !wizDirForm.lastName" style="margin-top:8px">
+                  <mat-icon>person_add</mat-icon> Add Director
+                </button>
+                @if (directorsData()?.directors?.length) {
+                  <div class="tender-table-wrapper" style="margin-top:12px">
+                    <table class="tender-table">
+                      <thead><tr><th>Name</th><th>ID Number</th><th>Gender</th><th>HDI</th><th>Disability</th><th>% Owned</th></tr></thead>
+                      <tbody>
+                        @for (d of directorsData().directors; track d.id) {
+                          <tr>
+                            <td><strong>{{d.fullName || (d.firstName + ' ' + d.lastName)}}</strong></td>
+                            <td>{{d.idNumber}}</td>
+                            <td>{{d.gender}}</td>
+                            <td>{{d.hdi ? 'Yes' : 'No'}}</td>
+                            <td>{{d.disability ? 'Yes' : 'No'}}</td>
+                            <td>{{d.percentageOwned}}%</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                  @if (directorsData()?.ownershipAnalysis) {
+                    <div class="ownership-analysis" style="margin-top:12px">
+                      <h4>Ownership Analysis</h4>
+                      <div class="kpi-strip">
+                        <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isHdiOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                          <span class="kpi-value" matTooltip="HDI ownership percentage">{{directorsData().ownershipAnalysis.hdiOwnership}}%</span>
+                          <span class="kpi-label">HDI</span>
+                          @if (directorsData().ownershipAnalysis.isHdiOwned) { <span class="threshold-met">Above 50%</span> }
+                        </div>
+                        <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isWomenOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                          <span class="kpi-value" matTooltip="Women ownership percentage">{{directorsData().ownershipAnalysis.womenOwnership}}%</span>
+                          <span class="kpi-label">Women</span>
+                          @if (directorsData().ownershipAnalysis.isWomenOwned) { <span class="threshold-met">Above 50%</span> }
+                        </div>
+                        <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isYouthOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                          <span class="kpi-value" matTooltip="Youth ownership percentage">{{directorsData().ownershipAnalysis.youthOwnership}}%</span>
+                          <span class="kpi-label">Youth</span>
+                          @if (directorsData().ownershipAnalysis.isYouthOwned) { <span class="threshold-met">Above 50%</span> }
+                        </div>
+                        <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isDisabilityOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                          <span class="kpi-value" matTooltip="Disability ownership percentage">{{directorsData().ownershipAnalysis.disabilityOwnership}}%</span>
+                          <span class="kpi-label">Disability</span>
+                          @if (directorsData().ownershipAnalysis.isDisabilityOwned) { <span class="threshold-met">Above 50%</span> }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 7) {
+              <div class="detail-card">
+                <h3><mat-icon>contact_phone</mat-icon> Step 7: Contact Details</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>Primary Contact</mat-label><input matInput [(ngModel)]="wizardData.contactPerson"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Email</mat-label><input matInput [(ngModel)]="wizardData.email"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Phone</mat-label><input matInput [(ngModel)]="wizardData.phone"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Mobile</mat-label><input matInput [(ngModel)]="wizardData.mobile"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Secondary Contact</mat-label><input matInput [(ngModel)]="wizardData.secondaryContact"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Emergency Contact</mat-label><input matInput [(ngModel)]="wizardData.emergencyContact"></mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 8) {
+              <div class="detail-card">
+                <h3><mat-icon>account_balance</mat-icon> Step 8: Banking Details</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline"><mat-label>Bank Name</mat-label><input matInput [(ngModel)]="wizardData.bankName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Branch Code</mat-label><input matInput [(ngModel)]="wizardData.branchCode"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Account Number</mat-label><input matInput [(ngModel)]="wizardData.accountNumber"></mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Account Type</mat-label>
+                    <mat-select [(ngModel)]="wizardData.accountType">
+                      <mat-option value="Current">Current</mat-option>
+                      <mat-option value="Savings">Savings</mat-option>
+                      <mat-option value="Transmission">Transmission</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 9) {
+              <div class="detail-card">
+                <h3><mat-icon>verified</mat-icon> Step 9: B-BBEE</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>B-BBEE Level</mat-label>
+                    <mat-select [(ngModel)]="wizardData.bbbeeLevel">
+                      @for (lvl of [1,2,3,4,5,6,7,8]; track lvl) {
+                        <mat-option [value]="lvl">Level {{lvl}}</mat-option>
+                      }
+                      <mat-option value="exempt">Exempt</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Certificate Number</mat-label><input matInput [(ngModel)]="wizardData.bbbeeCertificateNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="bbbeeExpiryPicker" [(ngModel)]="wizardData.bbbeeExpiry"><mat-datepicker-toggle matIconSuffix [for]="bbbeeExpiryPicker"></mat-datepicker-toggle><mat-datepicker #bbbeeExpiryPicker></mat-datepicker></mat-form-field>
+                </div>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 10) {
+              <div class="detail-card">
+                <h3><mat-icon>workspace_premium</mat-icon> Step 10: Accreditation & Professional Registrations</h3>
+                <h4>Add Accreditation</h4>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Type</mat-label>
+                    <mat-select [(ngModel)]="wizAccForm.type">
+                      @for (at of config().accreditationTypes; track at.code) {
+                        <mat-option [value]="at.code">{{at.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Registration Number</mat-label><input matInput [(ngModel)]="wizAccForm.number"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Grade</mat-label><input matInput [(ngModel)]="wizAccForm.grade"><mat-form-field appearance="outline"><mat-label>Issue Date</mat-label><input matInput [matDatepicker]="issuePicker" [(ngModel)]="wizAccForm.issueDate"><mat-datepicker-toggle matIconSuffix [for]="issuePicker"></mat-datepicker-toggle><mat-datepicker #issuePicker></mat-datepicker></mat-form-field><mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="expiryPicker2" [(ngModel)]="wizAccForm.expiryDate"><mat-datepicker-toggle matIconSuffix [for]="expiryPicker2"></mat-datepicker-toggle><mat-datepicker #expiryPicker2></mat-datepicker></mat-form-field></mat-form-field>
+                </div>
+                <button mat-flat-button color="primary" (click)="addAccreditationFromWizard()" [disabled]="saving() || !wizAccForm.type" style="margin-top:8px">
+                  <mat-icon>add</mat-icon> Add Accreditation
+                </button>
+
+                <h4 style="margin-top:16px">Add Professional Registration</h4>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Body</mat-label>
+                    <mat-select [(ngModel)]="wizProfForm.body">
+                      @for (pb of config().professionalRegistrationBodies; track pb.code) {
+                        <mat-option [value]="pb.code">{{pb.name}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Registration Number</mat-label><input matInput [(ngModel)]="wizProfForm.registrationNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="expiryPicker3" [(ngModel)]="wizProfForm.expiryDate"><mat-datepicker-toggle matIconSuffix [for]="expiryPicker3"></mat-datepicker-toggle><mat-datepicker #expiryPicker3></mat-datepicker></mat-form-field>
+                </div>
+                <button mat-flat-button color="primary" (click)="addProfRegistrationFromWizard()" [disabled]="saving() || !wizProfForm.body" style="margin-top:8px">
+                  <mat-icon>add</mat-icon> Add Registration
+                </button>
+              </div>
+            }
+
+            @if (wizardCurrentStep() === 11) {
+              <div class="detail-card">
+                <h3><mat-icon>notes</mat-icon> Step 11: Notes</h3>
+                <mat-form-field appearance="outline" class="form-field-full" style="width:100%">
+                  <mat-label>Notes</mat-label>
+                  <textarea matInput [(ngModel)]="wizardData.notes" rows="6" placeholder="Additional notes about this vendor registration"></textarea>
+                </mat-form-field>
+              </div>
+            }
+
+            <div class="wizard-nav">
+              <button mat-stroked-button [disabled]="wizardCurrentStep() <= 1" (click)="wizardCurrentStep.set(wizardCurrentStep() - 1)">
+                <mat-icon>chevron_left</mat-icon> Previous
+              </button>
+              <button mat-flat-button color="primary" (click)="saveWizardStep()" [disabled]="saving()">
+                <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save Step'}}
+              </button>
+              <button mat-stroked-button [disabled]="wizardCurrentStep() >= 11" (click)="wizardCurrentStep.set(wizardCurrentStep() + 1)">
+                Next <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'documents') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>checklist</mat-icon> Mandatory Document Checklist</h3>
+              @if (supplierChecklist()?.mandatoryChecklist?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="tender-table">
+                    <thead><tr><th>Document</th><th>Status</th><th>Expiry</th><th>Days Until Expiry</th></tr></thead>
+                    <tbody>
+                      @for (item of supplierChecklist().mandatoryChecklist; track item.documentType) {
+                        <tr>
+                          <td><strong>{{item.name}}</strong></td>
+                          <td>
+                            @if (item.received) {
+                              @if (item.isExpired) {
+                                <span class="status-badge status-rejected">Expired</span>
+                              } @else {
+                                <span class="status-badge status-approved">Received</span>
+                              }
+                            } @else {
+                              <span class="status-badge status-draft">Missing</span>
+                            }
+                          </td>
+                          <td>{{item.document?.expiryDate || '—'}}</td>
+                          <td [style.color]="(item.daysUntilExpiry !== null && item.daysUntilExpiry <= 30) ? '#c62828' : '#1e293b'">
+                            {{item.daysUntilExpiry !== null ? item.daysUntilExpiry + ' days' : '—'}}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>upload_file</mat-icon> Upload Document</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Document Type</mat-label>
+                  <mat-select [(ngModel)]="supDocForm.documentType">
+                    @for (dt of config().documentTypes; track dt.code) {
+                      <mat-option [value]="dt.code">{{dt.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>Document Number</mat-label><input matInput [(ngModel)]="supDocForm.documentNumber"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>File Name</mat-label><input matInput [(ngModel)]="supDocForm.fileName"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="expiryPicker4" [(ngModel)]="supDocForm.expiryDate"><mat-datepicker-toggle matIconSuffix [for]="expiryPicker4"></mat-datepicker-toggle><mat-datepicker #expiryPicker4></mat-datepicker></mat-form-field>
+              </div>
+              <button mat-flat-button color="primary" (click)="uploadSupplierDocument()" [disabled]="saving() || !supDocForm.documentType" style="margin-top:8px">
+                <mat-icon>upload</mat-icon> Upload
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'directors') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>people</mat-icon> Directors</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline"><mat-label>First Name</mat-label><input matInput [(ngModel)]="dirForm.firstName"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>Last Name</mat-label><input matInput [(ngModel)]="dirForm.lastName"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>ID Number</mat-label><input matInput [(ngModel)]="dirForm.idNumber"></mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Gender</mat-label>
+                  <mat-select [(ngModel)]="dirForm.gender"><mat-option value="Male">Male</mat-option><mat-option value="Female">Female</mat-option></mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>HDI</mat-label>
+                  <mat-select [(ngModel)]="dirForm.hdi"><mat-option [value]="true">Yes</mat-option><mat-option [value]="false">No</mat-option></mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Disability</mat-label>
+                  <mat-select [(ngModel)]="dirForm.disability"><mat-option [value]="true">Yes</mat-option><mat-option [value]="false">No</mat-option></mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>% Ownership</mat-label><input matInput type="number" [(ngModel)]="dirForm.percentageOwned"></mat-form-field>
+              </div>
+              <button mat-flat-button color="primary" (click)="addDirector()" [disabled]="saving() || !dirForm.firstName || !dirForm.lastName" style="margin-top:8px">
+                <mat-icon>person_add</mat-icon> Add Director
+              </button>
+
+              @if (directorsData()?.directors?.length) {
+                <div class="tender-table-wrapper" style="margin-top:16px">
+                  <table class="tender-table">
+                    <thead><tr><th>Name</th><th>ID Number</th><th>Gender</th><th>HDI</th><th>Disability</th><th>% Owned</th></tr></thead>
+                    <tbody>
+                      @for (d of directorsData().directors; track d.id) {
+                        <tr>
+                          <td><strong>{{d.fullName || (d.firstName + ' ' + d.lastName)}}</strong></td>
+                          <td>{{d.idNumber}}</td>
+                          <td>{{d.gender}}</td>
+                          <td>{{d.hdi ? 'Yes' : 'No'}}</td>
+                          <td>{{d.disability ? 'Yes' : 'No'}}</td>
+                          <td matTooltip="Ownership percentage">{{d.percentageOwned}}%</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              @if (directorsData()?.ownershipAnalysis) {
+                <div style="margin-top:16px">
+                  <h4>Ownership Analysis</h4>
+                  <div class="kpi-strip">
+                    <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isHdiOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                      <span class="kpi-value" matTooltip="HDI ownership">{{directorsData().ownershipAnalysis.hdiOwnership}}%</span>
+                      <span class="kpi-label">HDI</span>
+                      @if (directorsData().ownershipAnalysis.isHdiOwned) { <span class="threshold-met">Above 50%</span> }
+                    </div>
+                    <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isWomenOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                      <span class="kpi-value" matTooltip="Women ownership">{{directorsData().ownershipAnalysis.womenOwnership}}%</span>
+                      <span class="kpi-label">Women</span>
+                      @if (directorsData().ownershipAnalysis.isWomenOwned) { <span class="threshold-met">Above 50%</span> }
+                    </div>
+                    <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isYouthOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                      <span class="kpi-value" matTooltip="Youth ownership">{{directorsData().ownershipAnalysis.youthOwnership}}%</span>
+                      <span class="kpi-label">Youth</span>
+                      @if (directorsData().ownershipAnalysis.isYouthOwned) { <span class="threshold-met">Above 50%</span> }
+                    </div>
+                    <div class="kpi-tile" [style.borderLeft]="directorsData().ownershipAnalysis.isDisabilityOwned ? '4px solid #2e7d32' : '4px solid #e2e8f0'">
+                      <span class="kpi-value" matTooltip="Disability ownership">{{directorsData().ownershipAnalysis.disabilityOwnership}}%</span>
+                      <span class="kpi-label">Disability</span>
+                      @if (directorsData().ownershipAnalysis.isDisabilityOwned) { <span class="threshold-met">Above 50%</span> }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'accreditations') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>workspace_premium</mat-icon> Accreditations</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Type</mat-label>
+                  <mat-select [(ngModel)]="accForm.type">
+                    @for (at of config().accreditationTypes; track at.code) {
+                      <mat-option [value]="at.code">{{at.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>Number</mat-label><input matInput [(ngModel)]="accForm.number"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>Grade</mat-label><input matInput [(ngModel)]="accForm.grade"><mat-form-field appearance="outline"><mat-label>Issue Date</mat-label><input matInput [matDatepicker]="issuePicker2" [(ngModel)]="accForm.issueDate"><mat-datepicker-toggle matIconSuffix [for]="issuePicker2"></mat-datepicker-toggle><mat-datepicker #issuePicker2></mat-datepicker></mat-form-field><mat-form-field appearance="outline"><mat-label>Expiry Date</mat-label><input matInput [matDatepicker]="expiryPicker5" [(ngModel)]="accForm.expiryDate"><mat-datepicker-toggle matIconSuffix [for]="expiryPicker5"></mat-datepicker-toggle><mat-datepicker #expiryPicker5></mat-datepicker></mat-form-field></mat-form-field>
+              </div>
+              <button mat-flat-button color="primary" (click)="addAccreditation()" [disabled]="saving() || !accForm.type" style="margin-top:8px">
+                <mat-icon>add</mat-icon> Add Accreditation
+              </button>
+
+              @if (accreditations().length) {
+                <div class="tender-table-wrapper" style="margin-top:16px">
+                  <table class="tender-table">
+                    <thead><tr><th>Type</th><th>Number</th><th>Grade</th><th>Issue Date</th><th>Expiry Date</th><th>Verified</th></tr></thead>
+                    <tbody>
+                      @for (a of accreditations(); track a.id) {
+                        <tr>
+                          <td><strong>{{a.type}}</strong></td>
+                          <td>{{a.registrationNumber || a.number}}</td>
+                          <td>{{a.grade}}</td>
+                          <td>{{a.issueDate}}</td>
+                          <td [style.color]="isDateExpired(a.expiryDate) ? '#c62828' : '#1e293b'">{{a.expiryDate}}</td>
+                          <td>
+                            @if (a.verified) {
+                              <span class="status-badge status-approved">Verified</span>
+                            } @else {
+                              <span class="status-badge status-draft">Pending</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'history') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>timeline</mat-icon> Status History</h3>
+              @if (statusHistory().length) {
+                <div class="timeline">
+                  @for (change of statusHistory(); track change.id) {
+                    <div class="timeline-item">
+                      <div class="timeline-dot" [style.background]="getTimelineColor(change.toStatus)"></div>
+                      <div class="timeline-content">
+                        <div class="timeline-header">
+                          <span class="status-badge" [class]="'status-' + change.fromStatus">{{change.fromStatus}}</span>
+                          <mat-icon style="font-size:16px;width:16px;height:16px;color:#94a3b8">arrow_forward</mat-icon>
+                          <span class="status-badge" [class]="'status-' + change.toStatus">{{change.toStatus}}</span>
+                        </div>
+                        <p class="timeline-reason">{{change.reason}}</p>
+                        <span class="timeline-meta">{{change.changedByName}} — {{formatDate(change.changedDate)}}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">No status changes recorded.</p>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>

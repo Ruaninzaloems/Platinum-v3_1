@@ -1,0 +1,403 @@
+<div class="config-page">
+
+  @if (view() === 'list') {
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">mSCOA Settings</h1>
+        <p class="page-subtitle">Configure mSCOA journal mapping per asset classification</p>
+      </div>
+      <div class="header-actions">
+        <button mat-flat-button class="btn-primary" (click)="openAdd()">
+          <mat-icon>add</mat-icon> Add New
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-card">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>Financial Year</label>
+          <select class="form-input" [(ngModel)]="filterFinYear">
+            <option value="">All Years</option>
+            @for (fy of finYears(); track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Asset Type</label>
+          <select class="form-input" [(ngModel)]="filterTypeId" (change)="onFilterTypeChange()">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetTypeId) {
+              <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Category</label>
+          <select class="form-input" [(ngModel)]="filterCategoryId" (change)="onFilterCategoryChange()" [disabled]="filterCategories().length === 0">
+            <option value="">All Categories</option>
+            @for (c of filterCategories(); track c.assetCategoryId) {
+              <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Sub Category</label>
+          <select class="form-input" [(ngModel)]="filterSubCategoryId" [disabled]="filterSubCategories().length === 0">
+            <option value="">All Sub Categories</option>
+            @for (s of filterSubCategories(); track s.assetSubCategoryId) {
+              <option [value]="s.assetSubCategoryId">{{s.assetSubCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Department</label>
+          <select class="form-input" [(ngModel)]="filterDepartmentId" (change)="onFilterDepartmentChange()">
+            <option value="">All Departments</option>
+            @for (d of departments(); track d.id) {
+              <option [value]="d.id">{{d.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Division</label>
+          <select class="form-input" [(ngModel)]="filterDivisionId" [disabled]="filterDivisions().length === 0">
+            <option value="">All Divisions</option>
+            @for (dv of filterDivisions(); track dv.id) {
+              <option [value]="dv.id">{{dv.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button mat-flat-button class="btn-primary" (click)="search()"><mat-icon>search</mat-icon> Search</button>
+          <button mat-stroked-button (click)="clearFilter()">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+    } @else {
+      <div class="table-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Financial Year</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Sub Category</th>
+              <th>Measurement Type</th>
+              <th>Status</th>
+              <th>Department</th>
+              <th>Division</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of items(); track item.assetConfigMscoaId) {
+              <tr>
+                <td><span class="fin-year-badge">{{item.finYear}}</span></td>
+                <td class="desc-cell">{{item.typeDesc || '—'}}</td>
+                <td>{{item.categoryDesc || '—'}}</td>
+                <td>{{item.subCategoryDesc || '—'}}</td>
+                <td>
+                  <span [class]="getMtypeClass(item)">{{getMeasurementTypeDisplayName(item)}}</span>
+                </td>
+                <td><span class="status-badge status-active">{{item.statusDesc || '—'}}</span></td>
+                <td>{{getDeptName(item.departmentId)}}</td>
+                <td>{{getDivName(item.divisionId)}}</td>
+                <td class="actions-cell">
+                  <button mat-icon-button matTooltip="Edit mSCOA settings" (click)="openEdit(item)">
+                    <mat-icon class="action-icon edit">edit</mat-icon>
+                  </button>
+                  <button mat-icon-button matTooltip="Copy mSCOA settings" (click)="openCopy(item)">
+                    <mat-icon class="action-icon">content_copy</mat-icon>
+                  </button>
+                  <button mat-icon-button matTooltip="Delete" (click)="confirmDelete(item)">
+                    <mat-icon class="action-icon delete">delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (items().length === 0) {
+          <div class="empty-state">No mSCOA settings found. Use the filters above or click "Add New".</div>
+        }
+      </div>
+    }
+  }
+
+  @if (view() === 'step1') {
+    <div class="breadcrumb">
+      <button mat-button class="back-btn" (click)="backToList()"><mat-icon>arrow_back</mat-icon> Back to List</button>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current">{{copyingFromId() ? 'Copy' : (editingId() ? 'Edit' : 'Add')}} mSCOA Settings — Step 1: Asset Details</span>
+    </div>
+
+    <div class="wizard-card">
+      <div class="wizard-steps-indicator">
+        <div class="step-indicator active">
+          <div class="step-circle">1</div>
+          <span>Asset Details</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-indicator">
+          <div class="step-circle inactive">2</div>
+          <span>Transaction Types</span>
+        </div>
+      </div>
+
+      <h3 class="section-title">Asset Classification</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Financial Year <span class="required">*</span></label>
+          <select class="form-input" [(ngModel)]="step1Form.finYear">
+            <option value="">— Select —</option>
+            @for (fy of finYears(); track fy) {
+              <option [value]="fy">{{fy}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Asset Type <span class="required">*</span></label>
+          <select class="form-input" [(ngModel)]="step1Form.typeId" (change)="onStep1TypeChange()">
+            <option value="">— Select —</option>
+            @for (t of assetTypes(); track t.assetTypeId) {
+              <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Asset Category</label>
+          <select class="form-input" [(ngModel)]="step1Form.categoryId" (change)="onStep1CategoryChange()" [disabled]="step1Categories().length === 0">
+            <option value="">— Select —</option>
+            @for (c of step1Categories(); track c.assetCategoryId) {
+              <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Asset Sub Category</label>
+          <select class="form-input" [(ngModel)]="step1Form.subCategoryId" [disabled]="step1SubCategories().length === 0">
+            <option value="">— Select —</option>
+            @for (s of step1SubCategories(); track s.assetSubCategoryId) {
+              <option [value]="s.assetSubCategoryId">{{s.assetSubCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Measurement Type <span class="required">*</span></label>
+          <select class="form-input" [(ngModel)]="step1Form.measurementTypeId">
+            <option value="">— Select —</option>
+            @for (m of measurementTypes(); track m.measurementTypeId) {
+              <option [value]="m.measurementTypeId">{{m.measurementTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Asset Status</label>
+          <select class="form-input" [(ngModel)]="step1Form.statusId">
+            <option value="">— Select —</option>
+            @for (s of statuses(); track s.assetStatus_ID) {
+              <option [value]="s.assetStatus_ID">{{s.assetStatusDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Department <span class="required">*</span></label>
+          <select class="form-input" [(ngModel)]="step1Form.departmentId" (change)="onStep1DepartmentChange()">
+            <option value="">— Select —</option>
+            @for (d of departments(); track d.id) {
+              <option [value]="d.id">{{d.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Division <span class="required">*</span></label>
+          <select class="form-input" [(ngModel)]="step1Form.divisionId" [disabled]="step1Divisions().length === 0">
+            <option value="">— Select —</option>
+            @for (dv of step1Divisions(); track dv.id) {
+              <option [value]="dv.id">{{dv.description}}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button mat-stroked-button (click)="backToList()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="saveStep1()" [disabled]="saving() || !isStep1Valid()">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+          Save & Continue <mat-icon style="margin-left:4px">arrow_forward</mat-icon>
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (view() === 'step2') {
+    <div class="breadcrumb">
+      <button mat-button class="back-btn" (click)="backToList()"><mat-icon>arrow_back</mat-icon> Back to List</button>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current">mSCOA Settings — Step 2: Transaction Type Mapping</span>
+    </div>
+
+    <div class="wizard-card">
+      <div class="wizard-steps-indicator">
+        <div class="step-indicator done" (click)="view.set('step1')">
+          <div class="step-circle done-circle"><mat-icon style="font-size:14px;line-height:14px">check</mat-icon></div>
+          <span>Asset Details</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-indicator active">
+          <div class="step-circle">2</div>
+          <span>Transaction Types</span>
+        </div>
+      </div>
+
+      <div class="record-info-bar">
+        @if (currentRecord()) {
+          <div class="info-chips">
+            <div class="info-chip">
+              <span class="chip-label">Financial Year</span>
+              <span class="chip-value">{{currentRecord().finYear}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Type</span>
+              <span class="chip-value">{{currentRecord().typeDesc || '—'}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Category</span>
+              <span class="chip-value">{{currentRecord().categoryDesc || '—'}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Sub Category</span>
+              <span class="chip-value">{{currentRecord().subCategoryDesc || '—'}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Measurement</span>
+              <span class="chip-value mtype-inline" [class]="getMtypeClass(currentRecord())">{{getMeasurementTypeDisplayName(currentRecord())}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Status</span>
+              <span class="chip-value">{{currentRecord().statusDesc || '—'}}</span>
+            </div>
+            <div class="info-chip">
+              <span class="chip-label">Department</span>
+              <span class="chip-value">{{getDeptName(currentRecord().departmentId)}}</span>
+            </div>
+            @if (currentRecord().divisionId) {
+              <div class="info-chip">
+                <span class="chip-label">Division</span>
+                <span class="chip-value">{{getDivName(currentRecord().divisionId)}}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <mat-tab-group animationDuration="0ms" (selectedIndexChange)="onTabChange($event)" [selectedIndex]="activeTabIndex()">
+        @for (tab of tabs(); track tab.transactionTypeId; let i = $index) {
+          <mat-tab [disabled]="!enabledTabs()[i]">
+            <ng-template mat-tab-label>
+              <span [class]="enabledTabs()[i] ? 'tab-label-enabled' : 'tab-label-disabled'">
+                @if (isTabSaved(tab.transactionTypeId)) {
+                  <mat-icon style="font-size:14px;vertical-align:middle;margin-right:3px;color:#22c55e">check_circle</mat-icon>
+                }
+                {{tab.name}}
+              </span>
+            </ng-template>
+
+            @if (!enabledTabs()[i]) {
+              <div class="tab-disabled-msg">
+                <mat-icon style="color:#94a3b8">block</mat-icon>
+                <span>This transaction type is not applicable for <strong>{{getMeasurementTypeDisplayName(currentRecord())}}</strong></span>
+              </div>
+            } @else {
+              <div class="tab-content">
+                <div class="mapping-columns">
+                  <div class="mapping-col">
+                    @if (tab.subType1) {
+                      <div class="col-header">{{tab.subType1}}</div>
+                    }
+                    @for (field of tab.leftFields; track field.voteKey) {
+                      <div class="mapping-row">
+                        <div class="mapping-label">{{field.label}}</div>
+                        <div class="mapping-inputs">
+                          <div class="mapping-input-group">
+                            <label class="input-sublabel">Project</label>
+                            <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event)">
+                              <option value="">— Select Project —</option>
+                              @for (p of getProjectOptions(i, field.projectKey); track p.projectId) {
+                                <option [value]="p.projectId">{{p.projectCode}}{{p.projectName ? ' | ' + p.projectName : ''}}</option>
+                              }
+                            </select>
+                          </div>
+                          <div class="mapping-input-group">
+                            <label class="input-sublabel">SCOA Item</label>
+                            <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey])" (ngModelChange)="setTabField(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
+                              <option value="">{{getTabData(i)[field.projectKey] ? '— Select SCOA Item —' : '— Select Project First —'}}</option>
+                              @for (s of getScoaOptions(i, field.projectKey, field.voteKey); track s.planProjectItemId) {
+                                <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                              }
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  @if (tab.rightFields.length > 0) {
+                    <div class="col-divider"></div>
+                    <div class="mapping-col">
+                      @if (tab.subType2) {
+                        <div class="col-header">{{tab.subType2}}</div>
+                      }
+                      @for (field of tab.rightFields; track field.voteKey) {
+                        <div class="mapping-row">
+                          <div class="mapping-label">{{field.label}}</div>
+                          <div class="mapping-inputs">
+                            <div class="mapping-input-group">
+                              <label class="input-sublabel">Project</label>
+                              <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.projectKey]" (focus)="ensureProjectsLoaded()" (ngModelChange)="onMscoaProjectChange(i, field.projectKey, field.voteKey, $event)">
+                                <option value="">— Select Project —</option>
+                                @for (p of getProjectOptions(i, field.projectKey); track p.projectId) {
+                                  <option [value]="p.projectId">{{p.projectCode}}{{p.projectName ? ' | ' + p.projectName : ''}}</option>
+                                }
+                              </select>
+                            </div>
+                            <div class="mapping-input-group">
+                              <label class="input-sublabel">SCOA Item</label>
+                              <select class="form-input mapping-select" [ngModel]="getTabData(i)[field.voteKey]" (focus)="ensureScoaItemsLoaded(i, field.projectKey, getTabData(i)[field.projectKey])" (ngModelChange)="setTabField(i, field.voteKey, $event)" [disabled]="!getTabData(i)[field.projectKey]">
+                                <option value="">{{getTabData(i)[field.projectKey] ? '— Select SCOA Item —' : '— Select Project First —'}}</option>
+                                @for (s of getScoaOptions(i, field.projectKey, field.voteKey); track s.planProjectItemId) {
+                                  <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                                }
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+
+                <div class="tab-actions">
+                  <button mat-flat-button class="btn-primary" (click)="saveCurrentTab()" [disabled]="saving()">
+                    @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+                    <mat-icon>save</mat-icon> Save {{tab.name}} Mapping
+                  </button>
+                </div>
+              </div>
+            }
+          </mat-tab>
+        }
+      </mat-tab-group>
+
+      <div class="wizard-actions" style="margin-top:16px">
+        <button mat-stroked-button (click)="backToList()"><mat-icon>check</mat-icon> Done — Back to List</button>
+      </div>
+    </div>
+  }
+
+</div>

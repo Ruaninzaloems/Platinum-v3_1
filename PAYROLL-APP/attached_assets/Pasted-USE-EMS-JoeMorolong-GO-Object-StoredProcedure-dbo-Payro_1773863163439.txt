@@ -1,0 +1,65 @@
+USE [EMS_JoeMorolong]
+GO
+/****** Object:  StoredProcedure [dbo].[Payroll_EmployeeWageCalculation_Trial_sp]    Script Date: 3/18/2026 9:45:36 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		Ilya Skavronskiy
+-- Create date: 2020-09-16
+-- Description:	Calculates Employee Wages
+-- =============================================
+
+ALTER PROCEDURE [dbo].[Payroll_EmployeeWageCalculation_Trial_sp]
+    @EmployeeID INT, 
+    @PeriodID INT, 
+    @CycleID INT, 
+    @CycleModeID INT, 
+    @StartDate DATETIME, 
+    @EndDate DATETIME, 
+    @Month INT, 
+    @SCOAYear NVARCHAR(10), 
+    @TaxYear NVARCHAR(10), 
+    @Simulation BIT
+AS
+BEGIN
+SET NOCOUNT ON;
+
+BEGIN TRY
+	INSERT INTO Payroll_EmployeeTrialPayslip 
+		(EmployeeID, PayrollDefinationID, Amount, [Month], FinancialYear, PeriodID, SalaryHeadTitleAddendum, TaxYear, ReferenceNo, Simulation)
+	SELECT
+		E.Employee_ID,
+		EPD.EmployeePayrollDefinition_ID,
+		SUM(WT.Amount),
+		@Month, 
+		@SCOAYear, 
+		@PeriodID, 
+		SH.SalaryHeadName, 
+		@TaxYear,
+		'',
+		@Simulation
+	FROM Payroll_WageTransaction AS WT WITH(NOLOCK)
+	JOIN Payroll_Employee AS E WITH(NOLOCK) ON WT.EmployeeId = E.Employee_ID AND E.CycleID = @CycleID
+	JOIN Payroll_EmployeePayrollDefinition AS EPD WITH(NOLOCK) ON WT.EmployeeId = EPD.EmployeeID AND EPD.Enabled = 1
+	JOIN Payroll_SalaryHead AS SH WITH(NOLOCK) ON EPD.PayrollSalaryHeadID = SH.SalaryHead_ID AND WT.SalaryHeadId = SH.SalaryHead_ID AND SH.Enabled = 1
+	JOIN Payroll_IRP5Code AS IRPC WITH(NOLOCK) ON SH.IRP5CodeId = IRPC.IRP5Code_ID AND IRPC.Enabled = 1
+	JOIN Payroll_CyclePeriodDetails AS CPD WITH(NOLOCK) ON WT.CapturedDuringPeriodId = CPD.Period_ID AND CPD.CycleID = @CycleID
+	JOIN Payroll_TrialRun_History_Employees AS TRHE WITH(NOLOCK) ON WT.EmployeeId = TRHE.Employee_ID AND CPD.Period_ID = TRHE.Period_ID
+	WHERE
+		(@EmployeeID = 0 OR WT.EmployeeId = @EmployeeID)
+		AND WT.Enabled = 1
+		AND WT.IsApproved = 1
+		AND WT.Processed = 0
+		AND WT.CapturedDuringPeriodId = @PeriodID
+	GROUP BY E.Employee_ID, EPD.EmployeePayrollDefinition_ID, SH.SalaryHeadName, WT.SalaryHeadId
+END TRY
+BEGIN CATCH
+	INSERT INTO Payroll_TrialErrors 
+		(ValidationType, PeriodID, ErrorMessage, StoredProcedure, CapturedBy, CapturedDate, Simulation)
+	VALUES('System', @PeriodID, '#' + CAST(ERROR_LINE() AS NVARCHAR) + ' - ' + ERROR_MESSAGE(), ERROR_PROCEDURE(), 1, GETDATE(), @Simulation)
+END CATCH
+
+SET NOCOUNT OFF;
+END

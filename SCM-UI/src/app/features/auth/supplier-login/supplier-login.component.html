@@ -1,0 +1,350 @@
+<div class="login-container">
+  <div class="login-left">
+    <div class="brand-content">
+      <div class="logo-icon">
+        <mat-icon class="shield-icon">storefront</mat-icon>
+      </div>
+      <h1>Supplier Portal</h1>
+      <p class="tagline">Platinum SCM — Self-Service</p>
+      <div class="divider"></div>
+      <p class="description">
+        Access your orders, contracts, invoices, and payments.
+        Submit invoices, track approvals, and manage your documents — all in one place.
+      </p>
+      <div class="features">
+        <div class="feature-item">
+          <mat-icon>cloud_upload</mat-icon>
+          <span>Submit Invoices & Supporting Documents</span>
+        </div>
+        <div class="feature-item">
+          <mat-icon>track_changes</mat-icon>
+          <span>Track Approval Progress in Real-Time</span>
+        </div>
+        <div class="feature-item">
+          <mat-icon>payments</mat-icon>
+          <span>View Payments & EFT References</span>
+        </div>
+        <div class="feature-item">
+          <mat-icon>description</mat-icon>
+          <span>Access Orders, Contracts & SLA Documents</span>
+        </div>
+        <div class="feature-item">
+          <mat-icon>notifications_active</mat-icon>
+          <span>Document Expiry & Deficiency Alerts</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-text">&copy; 2026 Platinum ERP Solutions. All rights reserved.</div>
+  </div>
+
+  <div class="login-right">
+    <div class="login-form-wrapper">
+
+      <!-- ===== LOGIN VIEW ===== -->
+      @if (view() === 'login') {
+        <h2>Supplier Sign In</h2>
+        <p class="subtitle">Authenticate using your Company Registration Number and ID Number</p>
+
+        @if (errorMessage()) {
+          <div class="error-banner">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{errorMessage()}}</span>
+          </div>
+        }
+
+        <form (ngSubmit)="onLogin()" class="login-form">
+          @if (!loginForm.noRegistration) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Company Registration Number</mat-label>
+              <mat-icon matPrefix>business</mat-icon>
+              <input matInput [(ngModel)]="loginForm.registrationNumber" name="regNumber"
+                     placeholder="e.g. 2018/123456/07" [disabled]="loading()">
+              <mat-hint>CIPC registration number (e.g. 2018/123456/07)</mat-hint>
+            </mat-form-field>
+          }
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>ID Number</mat-label>
+            <mat-icon matPrefix>badge</mat-icon>
+            <input matInput [(ngModel)]="loginForm.idNumber" name="idNumber"
+                   [type]="hideId() ? 'password' : 'text'"
+                   placeholder="13-digit SA ID Number" maxlength="13" [disabled]="loading()">
+            <button mat-icon-button matSuffix type="button" (click)="hideId.set(!hideId())">
+              <mat-icon>{{hideId() ? 'visibility_off' : 'visibility'}}</mat-icon>
+            </button>
+            <mat-hint>South African ID Number (13 digits)</mat-hint>
+          </mat-form-field>
+
+          <mat-checkbox [(ngModel)]="loginForm.noRegistration" name="noReg" class="no-reg-check">
+            I don't have a company registration (sole proprietor / individual)
+          </mat-checkbox>
+
+          <button mat-flat-button class="login-button" type="submit"
+                  [disabled]="loading() || !loginForm.idNumber || (!loginForm.noRegistration && !loginForm.registrationNumber)">
+            @if (loading()) {
+              <mat-icon class="spin">hourglass_empty</mat-icon>
+              <span>Authenticating...</span>
+            } @else {
+              <mat-icon>login</mat-icon>
+              <span>Sign In</span>
+            }
+          </button>
+        </form>
+
+        <div class="register-link">
+          <p>Not registered yet? <a (click)="switchView('register')">Create an account</a></p>
+        </div>
+
+        <mat-divider class="section-divider"></mat-divider>
+
+        <div class="demo-credentials">
+          <p class="demo-title"><mat-icon>info</mat-icon> Demo Supplier Credentials</p>
+          <div class="credentials-grid">
+            @for (cred of demoCredentials; track cred.reg) {
+              <div class="credential" (click)="fillDemo(cred)">
+                <strong>{{cred.name}}</strong>
+                <span>Reg: {{cred.reg}}</span>
+              </div>
+            }
+          </div>
+          <p class="demo-password">Click a supplier above to auto-fill credentials</p>
+        </div>
+
+        <div class="admin-link">
+          <a routerLink="/login"><mat-icon>admin_panel_settings</mat-icon> Municipality Staff Login</a>
+        </div>
+      }
+
+      <!-- ===== REGISTER VIEW ===== -->
+      @if (view() === 'register') {
+        <h2>Supplier Registration</h2>
+        <p class="subtitle">Register as a supplier to access the municipality procurement portal</p>
+
+        @if (errorMessage()) {
+          <div class="error-banner">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{errorMessage()}}</span>
+          </div>
+        }
+
+        <div class="step-indicator">
+          <div class="step" [class.active]="registerStep() >= 0" [class.done]="registerStep() > 0">
+            <span class="step-num">1</span><span class="step-text">Company Details</span>
+          </div>
+          <div class="step-line" [class.active]="registerStep() > 0"></div>
+          <div class="step" [class.active]="registerStep() >= 1" [class.done]="registerStep() > 1">
+            <span class="step-num">2</span><span class="step-text">Banking & B-BBEE</span>
+          </div>
+          <div class="step-line" [class.active]="registerStep() > 1"></div>
+          <div class="step" [class.active]="registerStep() >= 2">
+            <span class="step-num">3</span><span class="step-text">Confirm</span>
+          </div>
+        </div>
+
+        <!-- Step 1: Company Details -->
+        @if (registerStep() === 0) {
+          <div class="form-step">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Company / Trading Name *</mat-label>
+              <mat-icon matPrefix>business</mat-icon>
+              <input matInput [(ngModel)]="registerForm.companyName" name="companyName" required>
+            </mat-form-field>
+
+            <mat-checkbox [(ngModel)]="registerForm.noRegistration" name="noRegReg" class="no-reg-check">
+              No company registration (sole proprietor / individual)
+            </mat-checkbox>
+
+            @if (!registerForm.noRegistration) {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>CIPC Registration Number *</mat-label>
+                <mat-icon matPrefix>assignment</mat-icon>
+                <input matInput [(ngModel)]="registerForm.registrationNumber" name="regNumber" placeholder="e.g. 2018/123456/07">
+              </mat-form-field>
+            }
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Director / Owner ID Number *</mat-label>
+              <mat-icon matPrefix>badge</mat-icon>
+              <input matInput [(ngModel)]="registerForm.idNumber" name="idNumber" maxlength="13" placeholder="13-digit SA ID Number" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Contact Person *</mat-label>
+              <mat-icon matPrefix>person</mat-icon>
+              <input matInput [(ngModel)]="registerForm.contactPerson" name="contactPerson" required>
+            </mat-form-field>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="half-width">
+                <mat-label>Email Address *</mat-label>
+                <mat-icon matPrefix>email</mat-icon>
+                <input matInput [(ngModel)]="registerForm.email" name="email" type="email" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="half-width">
+                <mat-label>Phone Number</mat-label>
+                <mat-icon matPrefix>phone</mat-icon>
+                <input matInput [(ngModel)]="registerForm.phone" name="phone">
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>CSD Number *</mat-label>
+              <mat-icon matPrefix>verified</mat-icon>
+              <input matInput [(ngModel)]="registerForm.csdNumber" name="csdNumber" placeholder="Central Supplier Database number" required>
+              <mat-hint>Register at <a href="https://secure.csd.gov.za" target="_blank">csd.gov.za</a> if you don't have one</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>VAT Number</mat-label>
+              <mat-icon matPrefix>receipt</mat-icon>
+              <input matInput [(ngModel)]="registerForm.vatNumber" name="vatNumber" placeholder="If VAT registered">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Physical Address</mat-label>
+              <mat-icon matPrefix>location_on</mat-icon>
+              <input matInput [(ngModel)]="registerForm.physicalAddress" name="physicalAddress">
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Step 2: Banking & B-BBEE -->
+        @if (registerStep() === 1) {
+          <div class="form-step">
+            <h3 class="step-title"><mat-icon>account_balance</mat-icon> Banking Details</h3>
+            <p class="step-subtitle">Required for EFT payment processing</p>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Bank Name</mat-label>
+              <mat-select [(ngModel)]="registerForm.bankName" name="bankName">
+                @for (bank of bankOptions; track bank) {
+                  <mat-option [value]="bank">{{bank}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="half-width">
+                <mat-label>Account Number</mat-label>
+                <input matInput [(ngModel)]="registerForm.bankAccountNumber" name="bankAccount">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="half-width">
+                <mat-label>Branch Code</mat-label>
+                <input matInput [(ngModel)]="registerForm.bankBranchCode" name="branchCode">
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Account Type</mat-label>
+              <mat-select [(ngModel)]="registerForm.accountType" name="accountType">
+                @for (type of accountTypes; track type.value) {
+                  <mat-option [value]="type.value">{{type.label}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-divider class="section-divider"></mat-divider>
+
+            <h3 class="step-title"><mat-icon>stars</mat-icon> B-BBEE Information</h3>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>B-BBEE Level</mat-label>
+              <mat-select [(ngModel)]="registerForm.beeLevel" name="beeLevel">
+                @for (level of [1,2,3,4,5,6,7,8]; track level) {
+                  <mat-option [value]="level">Level {{level}}</mat-option>
+                }
+                <mat-option [value]="0">Non-compliant</mat-option>
+              </mat-select>
+              <mat-hint>Upload your B-BBEE certificate after registration</mat-hint>
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Step 3: Confirm -->
+        @if (registerStep() === 2) {
+          <div class="form-step">
+            <h3 class="step-title"><mat-icon>checklist</mat-icon> Review & Confirm</h3>
+
+            <div class="review-card">
+              <div class="review-section">
+                <h4>Company Details</h4>
+                <div class="review-row"><span>Company Name:</span><strong>{{registerForm.companyName}}</strong></div>
+                @if (!registerForm.noRegistration) {
+                  <div class="review-row"><span>Registration:</span><strong>{{registerForm.registrationNumber}}</strong></div>
+                }
+                <div class="review-row"><span>Contact Person:</span><strong>{{registerForm.contactPerson}}</strong></div>
+                <div class="review-row"><span>Email:</span><strong>{{registerForm.email}}</strong></div>
+                <div class="review-row"><span>CSD Number:</span><strong>{{registerForm.csdNumber}}</strong></div>
+              </div>
+              @if (registerForm.bankName) {
+                <div class="review-section">
+                  <h4>Banking</h4>
+                  <div class="review-row"><span>Bank:</span><strong>{{registerForm.bankName}}</strong></div>
+                  <div class="review-row"><span>Account:</span><strong>****{{registerForm.bankAccountNumber?.slice(-4) || ''}}</strong></div>
+                </div>
+              }
+            </div>
+
+            <mat-checkbox [(ngModel)]="registerForm.acceptTerms" name="acceptTerms" class="terms-check">
+              I confirm all information is accurate and accept the municipality's supplier code of conduct and procurement terms
+            </mat-checkbox>
+          </div>
+        }
+
+        <div class="step-actions">
+          @if (registerStep() > 0) {
+            <button mat-stroked-button type="button" (click)="prevStep()">
+              <mat-icon>arrow_back</mat-icon> Back
+            </button>
+          }
+          @if (registerStep() < 2) {
+            <button mat-flat-button color="primary" type="button" (click)="nextStep()" [disabled]="!canProceedStep()">
+              Next <mat-icon>arrow_forward</mat-icon>
+            </button>
+          }
+          @if (registerStep() === 2) {
+            <button mat-flat-button class="login-button" type="button" (click)="onRegister()"
+                    [disabled]="loading() || !registerForm.acceptTerms">
+              @if (loading()) {
+                <mat-icon class="spin">hourglass_empty</mat-icon> Submitting...
+              } @else {
+                <mat-icon>how_to_reg</mat-icon> Submit Registration
+              }
+            </button>
+          }
+        </div>
+
+        <div class="register-link">
+          <p>Already registered? <a (click)="switchView('login')">Sign in</a></p>
+        </div>
+      }
+
+      <!-- ===== PENDING/SUCCESS VIEW ===== -->
+      @if (view() === 'pending') {
+        <div class="success-view">
+          <div class="success-icon">
+            <mat-icon>check_circle</mat-icon>
+          </div>
+          <h2>Registration Submitted</h2>
+          <p class="subtitle">Your supplier registration has been received and is pending verification.</p>
+
+          @if (registrationResult()) {
+            <div class="next-steps-card">
+              <h3><mat-icon>list_alt</mat-icon> Next Steps</h3>
+              @for (step of registrationResult().nextSteps || []; track $index) {
+                <div class="next-step-item">
+                  <span class="step-number">{{$index + 1}}</span>
+                  <span>{{step}}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <button mat-flat-button class="login-button" (click)="goToLogin()">
+            <mat-icon>login</mat-icon> Go to Sign In
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</div>

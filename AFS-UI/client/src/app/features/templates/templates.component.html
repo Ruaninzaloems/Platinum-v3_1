@@ -1,0 +1,103 @@
+<h2 mat-dialog-title>
+  <mat-icon style="vertical-align: middle; margin-right: 8px;">playlist_add_check</mat-icon>
+  Apply Template to Municipality
+</h2>
+<mat-dialog-content>
+  <div class="apply-info">
+    <div class="info-row">
+      <span class="info-label">Template</span>
+      <span class="info-value">{{ data.template.name }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Type</span>
+      <span class="info-value">{{ data.template.type }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Total Sections</span>
+      <span class="info-value">{{ data.template.sections?.length || 0 }}</span>
+    </div>
+  </div>
+
+  @if (preview) {
+    <div class="preview-summary">
+      <div class="preview-header">
+        <mat-icon>assessment</mat-icon>
+        <span>Impact Preview for {{ preview.municipalityName }} ({{ preview.municipalCategory }})</span>
+      </div>
+      <div class="preview-counts">
+        <div class="count-card included">
+          <span class="count-number">{{ preview.includedCount }}</span>
+          <span class="count-label">Sections included</span>
+        </div>
+        <div class="count-card excluded">
+          <span class="count-number">{{ preview.excludedCount }}</span>
+          <span class="count-label">Sections excluded</span>
+        </div>
+        <div class="count-card items">
+          <span class="count-number">{{ preview.totalLineItems }}</span>
+          <span class="count-label">Line items</span>
+        </div>
+      </div>
+      @if (preview.excludedSections.length > 0) {
+        <div class="excluded-list">
+          <span class="excluded-heading">Excluded sections:</span>
+          @for (s of preview.excludedSections; track s.title) {
+            <div class="excluded-item">
+              <mat-icon class="excluded-icon">visibility_off</mat-icon>
+              <span>{{ s.title }}</span>
+              <span class="excluded-reason">{{ s.reason }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  } @else if (loadingPreview) {
+    <div class="preview-loading">
+      <mat-spinner diameter="20"></mat-spinner>
+      <span>Loading impact preview...</span>
+    </div>
+  } @else if (previewError) {
+    <div class="apply-error" style="margin-bottom: 12px;">
+      <mat-icon>warning</mat-icon>
+      <span>{{ previewError }}</span>
+    </div>
+  }
+
+  <p class="apply-description">
+    This will create a municipality-specific copy of the template, filtered by your municipality category.
+    Sections and line items will be automatically activated or deactivated based on your trial balance data.
+  </p>
+  @if (isAdmin) {
+    <mat-form-field style="width: 100%;" matTooltip="Select the target municipality to apply this template to">
+      <mat-label>Target Municipality</mat-label>
+      <mat-select [(ngModel)]="selectedTenantId" (selectionChange)="onTenantChange()">
+        @for (t of tenants; track t.id) {
+          <mat-option [value]="t.id">{{ t.name }} ({{ t.municipalityType || 'Unknown' }})</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+  <mat-form-field style="width: 100%;" matTooltip="Select the financial year for TB-based activation">
+    <mat-label>Financial Year</mat-label>
+    <mat-select [(ngModel)]="selectedFyId" (selectionChange)="onFyChange()">
+      @for (fy of financialYears; track fy.id) {
+        <mat-option [value]="fy.id">{{ fy.label }} {{ fy.isCurrent ? '(Current)' : '' }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  @if (errorMessage) {
+    <div class="apply-error">
+      <mat-icon>error</mat-icon>
+      <span>{{ errorMessage }}</span>
+    </div>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancel</button>
+  <button mat-flat-button class="btn-primary" [disabled]="!selectedFyId || applying" (click)="apply()">
+    @if (applying) {
+      <mat-spinner diameter="16" style="display:inline-block;margin-right:6px;"></mat-spinner>
+    }
+    {{ applying ? 'Applying...' : 'Apply Template' }}
+  </button>
+</mat-dialog-actions>

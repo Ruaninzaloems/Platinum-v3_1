@@ -1,0 +1,1434 @@
+    <div class="payments-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error-bar]="notification().startsWith('Error') || notification().startsWith('Failed')">
+          <mat-icon>{{notification().startsWith('Error') || notification().startsWith('Failed') ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- ===================== DASHBOARD VIEW ===================== -->
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active" (click)="currentView.set('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" (click)="navigateTo('list')" [matTooltip]="'Total: ' + (summary().totalBatches || 0) + ' payment batches'" style="cursor:pointer">
+            <mat-icon>payments</mat-icon>
+            <span class="kpi-value">{{summary().totalBatches || 0}}</span>
+            <span class="kpi-label">Total Batches</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().processedBatches?.count || 0) + ' batches processed totalling ' + formatCurrencyFull(summary().processedBatches?.amount?.amount || 0)" [style.border-left-color]="'#10b981'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value" style="color:#10b981">{{formatCurrency(summary().processedBatches?.amount?.amount || 0)}}</span>
+            <span class="kpi-label">Processed Amount</span>
+            <span class="kpi-detail">{{summary().processedBatches?.count || 0}} batches</span>
+          </div>
+          <div class="kpi-tile" (click)="filterByStatus('pending_approval')" [matTooltip]="(summary().pendingBatches?.count || 0) + ' pending batches worth ' + formatCurrencyFull(summary().pendingBatches?.amount?.amount || 0)" [style.border-left-color]="(summary().pendingBatches?.count || 0) > 0 ? '#f59e0b' : '#10b981'" style="cursor:pointer">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().pendingBatches?.count || 0) > 0 ? '#f59e0b' : '#10b981'">{{summary().pendingBatches?.count || 0}}</span>
+            <span class="kpi-label">Pending Batches</span>
+            <span class="kpi-detail">{{formatCurrency(summary().pendingBatches?.amount?.amount || 0)}}</span>
+          </div>
+          <div class="kpi-tile" (click)="navigateTo('create')" [matTooltip]="(summary().readyForPayment?.count || 0) + ' approved invoices ready for payment worth ' + formatCurrencyFull(summary().readyForPayment?.amount?.amount || 0)" [style.border-left-color]="'#3b82f6'" style="cursor:pointer">
+            <mat-icon>receipt_long</mat-icon>
+            <span class="kpi-value" style="color:#3b82f6">{{summary().readyForPayment?.count || 0}}</span>
+            <span class="kpi-label">Ready for Payment</span>
+            <span class="kpi-detail">{{formatCurrency(summary().readyForPayment?.amount?.amount || 0)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().overduePayments?.count || 0) + ' overdue payments — potential MFMA breach'" [style.border-left-color]="(summary().overduePayments?.count || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>warning</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().overduePayments?.count || 0) > 0 ? '#dc2626' : '#10b981'">{{summary().overduePayments?.count || 0}}</span>
+            <span class="kpi-label">Overdue Payments</span>
+            <span class="kpi-detail">{{formatCurrency(summary().overduePayments?.amount?.amount || 0)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().eftFilesGenerated || 0) + ' EFT files generated for bank processing'">
+            <mat-icon>description</mat-icon>
+            <span class="kpi-value">{{summary().eftFilesGenerated || 0}}</span>
+            <span class="kpi-label">EFT Files Generated</span>
+          </div>
+          <div class="kpi-tile" (click)="navigateTo('exceptions')" [matTooltip]="'Payment exceptions requiring attention'" [style.border-left-color]="(exceptionsData().totalExceptions || 0) > 0 ? '#dc2626' : '#10b981'" style="cursor:pointer">
+            <mat-icon>report_problem</mat-icon>
+            <span class="kpi-value" [style.color]="(exceptionsData().totalExceptions || 0) > 0 ? '#dc2626' : '#10b981'">{{exceptionsData().totalExceptions || 0}}</span>
+            <span class="kpi-label">Exceptions</span>
+          </div>
+          <div class="kpi-tile" (click)="navigateTo('bankConfig')" [matTooltip]="'Bank file configuration and generated files'" style="cursor:pointer">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{bankFiles().length}}</span>
+            <span class="kpi-label">Bank Files</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-col-left">
+            <div class="detail-card">
+              <h3><mat-icon>trending_up</mat-icon> Payment Forecast (4 Weeks)</h3>
+              @if (forecast().length) {
+                <div class="forecast-grid">
+                  @for (week of forecast(); track week.label) {
+                    <div class="forecast-card" [matTooltip]="week.label + ': ' + week.count + ' invoices due, ' + formatCurrencyFull(week.amount?.amount || 0)">
+                      <span class="forecast-label">{{week.label}}</span>
+                      <span class="forecast-count">{{week.count}} invoices</span>
+                      <span class="forecast-amount">{{formatCurrency(week.amount?.amount || 0)}}</span>
+                      <div class="forecast-bar-track">
+                        <div class="forecast-bar-fill" [style.width.%]="getForecastBarWidth(week)"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+                <div class="forecast-total">
+                  <span class="forecast-total-label">Total 4-Week Forecast</span>
+                  <span class="forecast-total-value">{{formatCurrencyFull(getForecastTotal())}}</span>
+                </div>
+              } @else {
+                <div class="empty-text">No forecast data available</div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>hourglass_empty</mat-icon> Creditor Age Analysis</h3>
+              @if (ageAnalysis().suppliers?.length) {
+                <div class="aging-cards">
+                  <div class="aging-card" [matTooltip]="'Current: ' + formatCurrencyFull(ageAnalysis().totals?.current?.amount || 0)">
+                    <span class="aging-range">Current</span>
+                    <span class="aging-count">{{ageAnalysis().totals?.totalInvoices || 0}}</span>
+                    <span class="aging-value">{{formatCurrency(ageAnalysis().totals?.current?.amount || 0)}}</span>
+                  </div>
+                  <div class="aging-card" [matTooltip]="'30 Days: ' + formatCurrencyFull(ageAnalysis().totals?.days30?.amount || 0)">
+                    <span class="aging-range">30 Days</span>
+                    <span class="aging-value">{{formatCurrency(ageAnalysis().totals?.days30?.amount || 0)}}</span>
+                  </div>
+                  <div class="aging-card aging-warn" [matTooltip]="'60 Days: ' + formatCurrencyFull(ageAnalysis().totals?.days60?.amount || 0)">
+                    <span class="aging-range">60 Days</span>
+                    <span class="aging-value">{{formatCurrency(ageAnalysis().totals?.days60?.amount || 0)}}</span>
+                  </div>
+                  <div class="aging-card aging-warn" [matTooltip]="'90 Days: ' + formatCurrencyFull(ageAnalysis().totals?.days90?.amount || 0)">
+                    <span class="aging-range">90 Days</span>
+                    <span class="aging-value">{{formatCurrency(ageAnalysis().totals?.days90?.amount || 0)}}</span>
+                  </div>
+                  <div class="aging-card aging-danger" [matTooltip]="'120+ Days: ' + formatCurrencyFull(ageAnalysis().totals?.days120Plus?.amount || 0) + ' — MFMA breach'">
+                    <span class="aging-range">120+ Days</span>
+                    <span class="aging-value">{{formatCurrency(ageAnalysis().totals?.days120Plus?.amount || 0)}}</span>
+                  </div>
+                </div>
+                <div class="age-grand-total">
+                  <span>Grand Total Outstanding</span>
+                  <span class="age-grand-value">{{formatCurrencyFull(ageAnalysis().totals?.grandTotal?.amount || 0)}}</span>
+                </div>
+              } @else {
+                <div class="empty-text">Loading age analysis...</div>
+              }
+            </div>
+          </div>
+
+          <div class="dashboard-col-right">
+            <div class="detail-card">
+              <h3><mat-icon>bar_chart</mat-icon> Batch Status Overview</h3>
+              <div class="status-overview-grid">
+                <div class="status-overview-item" (click)="filterByStatus('draft')" style="cursor:pointer" [matTooltip]="'Click to view draft batches'">
+                  <div class="status-dot" style="background:#94a3b8"></div>
+                  <span class="so-label">Draft</span>
+                  <span class="so-count">{{getStatusCount('draft')}}</span>
+                </div>
+                <div class="status-overview-item" (click)="filterByStatus('pending_approval')" style="cursor:pointer" [matTooltip]="'Click to view pending batches'">
+                  <div class="status-dot" style="background:#f59e0b"></div>
+                  <span class="so-label">Pending Approval</span>
+                  <span class="so-count">{{getStatusCount('pending_approval')}}</span>
+                </div>
+                <div class="status-overview-item" (click)="filterByStatus('approved')" style="cursor:pointer" [matTooltip]="'Click to view approved batches'">
+                  <div class="status-dot" style="background:#10b981"></div>
+                  <span class="so-label">Approved</span>
+                  <span class="so-count">{{getStatusCount('approved')}}</span>
+                </div>
+                <div class="status-overview-item" (click)="filterByStatus('eft_generated')" style="cursor:pointer" [matTooltip]="'Click to view EFT generated batches'">
+                  <div class="status-dot" style="background:#6366f1"></div>
+                  <span class="so-label">EFT Generated</span>
+                  <span class="so-count">{{getStatusCount('eft_generated')}}</span>
+                </div>
+                <div class="status-overview-item" (click)="filterByStatus('processed')" style="cursor:pointer" [matTooltip]="'Click to view processed batches'">
+                  <div class="status-dot" style="background:#3b82f6"></div>
+                  <span class="so-label">Processed</span>
+                  <span class="so-count">{{getStatusCount('processed')}}</span>
+                </div>
+                <div class="status-overview-item" (click)="filterByStatus('voided')" style="cursor:pointer" [matTooltip]="'Click to view voided batches'">
+                  <div class="status-dot" style="background:#6b7280"></div>
+                  <span class="so-label">Voided</span>
+                  <span class="so-count">{{getStatusCount('voided')}}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>speed</mat-icon> Quick Actions</h3>
+              <div class="quick-actions-grid">
+                <button class="quick-action-btn" (click)="navigateTo('create')" matTooltip="Create a new payment batch from approved invoices">
+                  <mat-icon>add_circle</mat-icon>
+                  <span>Create Batch</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('cr01')" matTooltip="Generate CR01 creditor age analysis report">
+                  <mat-icon>assessment</mat-icon>
+                  <span>CR01 Report</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('remittance')" matTooltip="View and manage remittance advices">
+                  <mat-icon>mail</mat-icon>
+                  <span>Remittances</span>
+                </button>
+                <button class="quick-action-btn" (click)="navigateTo('list')" matTooltip="View all payment batches">
+                  <mat-icon>list_alt</mat-icon>
+                  <span>All Batches</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>info</mat-icon> Payment Summary</h3>
+              <div class="summary-stats">
+                <div class="summary-stat">
+                  <span class="ss-label">Avg Batch Size</span>
+                  <span class="ss-value">{{summary().avgBatchSize || 0}} invoices</span>
+                </div>
+                <div class="summary-stat">
+                  <span class="ss-label">Remittances Sent</span>
+                  <span class="ss-value">{{summary().remittancesSent || 0}}</span>
+                </div>
+                <div class="summary-stat">
+                  <span class="ss-label">Total Suppliers</span>
+                  <span class="ss-value">{{ageAnalysis().totals?.totalSuppliers || 0}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== AI ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn active">AI Analytics</button>
+        </div>
+
+        @if (payAnalytics()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">schedule</mat-icon>
+                  Payment Cycle Time
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s65(2)(e) — 30 days</span>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="paymentCycleChart"></canvas>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #dc2626; font-size: 20px; width: 20px; height: 20px;">account_balance</mat-icon>
+                  Bank Detail Change Risk
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fef2f2; padding: 2px 8px; border-radius: 4px;">Fraud Prevention</span>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="bankChangeChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #ef4444; font-size: 20px; width: 20px; height: 20px;">block</mat-icon>
+                Top Blocked Payments
+              </h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; font-weight: 700; color: #dc2626;">{{payAnalytics().blockedPayments.total}} blocked</span>
+                <span style="font-size: 10px; color: #94a3b8;">R{{(payAnalytics().blockedPayments.totalValue/1000000).toFixed(1)}}M value</span>
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+              @for (reason of payAnalytics()?.blockedPayments?.reasons || []; track reason.reason) {
+                <div style="background: #fef2f2; border-radius: 10px; padding: 14px; display: flex; align-items: center; gap: 10px;">
+                  <mat-icon style="color: #dc2626; font-size: 20px; width: 20px; height: 20px;">{{reason.icon}}</mat-icon>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 600; color: #1e293b;">{{reason.reason}}</div>
+                    <div style="font-size: 10px; color: #64748b;">{{reason.count}} payments · R{{(reason.value/1000000).toFixed(2)}}M</div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="detail-card" style="text-align: center; padding: 40px;">
+            <mat-icon style="font-size: 48px; width: 48px; height: 48px; color: #94a3b8;">analytics</mat-icon>
+            <p style="color: #64748b; margin-top: 12px;">Loading payment analytics...</p>
+          </div>
+        }
+      }
+
+      <!-- ===================== LIST VIEW (Payment Batches) ===================== -->
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn active" (click)="currentView.set('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === ''" (click)="filterByStatus('')" matTooltip="All batches">
+            <mat-icon>all_inclusive</mat-icon>
+            <span class="pipe-count">{{summary().totalBatches || 0}}</span>
+            <span class="pipe-label">All</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatus('draft')" matTooltip="Draft batches">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{getStatusCount('draft')}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'pending_approval'" (click)="filterByStatus('pending_approval')" matTooltip="Awaiting approval">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="pipe-count">{{getStatusCount('pending_approval')}}</span>
+            <span class="pipe-label">Pending</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'approved'" (click)="filterByStatus('approved')" matTooltip="Approved batches">
+            <mat-icon>check_circle</mat-icon>
+            <span class="pipe-count">{{getStatusCount('approved')}}</span>
+            <span class="pipe-label">Approved</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'eft_generated'" (click)="filterByStatus('eft_generated')" matTooltip="EFT generated batches">
+            <mat-icon>description</mat-icon>
+            <span class="pipe-count">{{getStatusCount('eft_generated')}}</span>
+            <span class="pipe-label">EFT Gen</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'processed'" (click)="filterByStatus('processed')" matTooltip="Processed batches">
+            <mat-icon>task_alt</mat-icon>
+            <span class="pipe-count">{{getStatusCount('processed')}}</span>
+            <span class="pipe-label">Processed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'voided'" (click)="filterByStatus('voided')" matTooltip="Voided batches">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{getStatusCount('voided')}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search batches..." [(ngModel)]="searchQuery" (keyup.enter)="loadBatches()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadBatches()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="pending_approval">Pending Approval</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+              <mat-option value="eft_generated">EFT Generated</mat-option>
+              <mat-option value="processed">Processed</mat-option>
+              <mat-option value="voided">Voided</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Payment Method" [(ngModel)]="filterPaymentMethod" (selectionChange)="loadBatches()">
+              <mat-option value="">All Methods</mat-option>
+              <mat-option value="EFT">EFT</mat-option>
+              <mat-option value="cheque">Cheque</mat-option>
+              <mat-option value="direct_deposit">Direct Deposit</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="loadBatches()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterFromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="loadBatches()">
+            <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterToPicker></mat-datepicker>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="navigateTo('create')">
+            <mat-icon>add</mat-icon> New Batch
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="payments-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Items</th>
+                <th>Total Amount</th>
+                <th>Payment Method</th>
+                <th>EFT Ref</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (batch of batches(); track batch.id) {
+                <tr class="order-row" (click)="viewBatch(batch)">
+                  <td class="ref-cell">{{batch.referenceNumber}}</td>
+                  <td>{{formatDate(batch.batchDate)}}</td>
+                  <td><span class="status-badge" [class]="'status-' + batch.status">{{getStatusLabel(batch.status)}}</span></td>
+                  <td>{{batch.itemCount || 0}}</td>
+                  <td class="value-cell">{{formatCurrencyFull(batch.totalAmount?.amount || 0)}}</td>
+                  <td>{{batch.paymentMethod || 'EFT'}}</td>
+                  <td>{{batch.eftFileReference || '—'}}</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button (click)="viewBatch(batch)" matTooltip="View">
+                      <mat-icon>visibility</mat-icon>
+                    </button>
+                    @if (batch.status === 'draft' || batch.status === 'pending_approval') {
+                      <button mat-icon-button (click)="approveBatch(batch.id)" matTooltip="Approve">
+                        <mat-icon>thumb_up</mat-icon>
+                      </button>
+                    }
+                    @if (batch.status === 'approved') {
+                      <button mat-icon-button (click)="generateEft(batch.id)" matTooltip="Generate EFT">
+                        <mat-icon>description</mat-icon>
+                      </button>
+                    }
+                    @if (batch.status === 'approved' || batch.status === 'eft_generated') {
+                      <button mat-icon-button (click)="processBatch(batch.id)" matTooltip="Process">
+                        <mat-icon>play_circle</mat-icon>
+                      </button>
+                    }
+                    @if (!['processed', 'voided'].includes(batch.status)) {
+                      <button mat-icon-button color="warn" (click)="voidBatch(batch.id)" matTooltip="Void">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No payment batches found</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <div class="page-info-section">
+            <span class="page-info">Showing {{pageStart()}} – {{pageEnd()}} of {{totalBatches()}}</span>
+            <mat-form-field appearance="outline" class="page-size-select">
+              <mat-select [(ngModel)]="pageSizeValue" (selectionChange)="onPageSizeChange()">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== DETAIL VIEW (Batch Detail) ===================== -->
+      @if (currentView() === 'detail' && selectedBatch()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('list')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>Payment Batch: {{selectedBatch()!.referenceNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedBatch()!.status">{{getStatusLabel(selectedBatch()!.status)}}</span>
+              <span class="dept-tag">{{selectedBatch()!.paymentMethod || 'EFT'}}</span>
+              <span class="dept-tag">{{selectedBatch()!.itemCount || 0}} invoices</span>
+              @if (selectedBatch()!.eftFileReference) {
+                <span class="dept-tag">EFT: {{selectedBatch()!.eftFileReference}}</span>
+              }
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Total Amount</span>
+            <span class="value-amount">{{formatCurrencyFull(selectedBatch()!.totalAmount?.amount || 0)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedBatch()!.status === 'draft') {
+              <button mat-stroked-button (click)="submitBatch(selectedBatch()!.id)">
+                <mat-icon>send</mat-icon> Submit
+              </button>
+            }
+            @if (selectedBatch()!.status === 'draft' || selectedBatch()!.status === 'pending_approval') {
+              <button mat-stroked-button style="color:#10b981;border-color:#10b981" (click)="approveBatch(selectedBatch()!.id)">
+                <mat-icon>thumb_up</mat-icon> Approve
+              </button>
+            }
+            @if (selectedBatch()!.status === 'approved') {
+              <button mat-stroked-button style="color:#6366f1;border-color:#6366f1" (click)="generateEft(selectedBatch()!.id)">
+                <mat-icon>description</mat-icon> Generate EFT
+              </button>
+            }
+            @if (selectedBatch()!.status === 'approved' || selectedBatch()!.status === 'eft_generated') {
+              <button mat-flat-button style="background:#3b82f6;color:white" (click)="processBatch(selectedBatch()!.id)">
+                <mat-icon>play_circle</mat-icon> Process Payment
+              </button>
+            }
+            @if (selectedBatch()!.status === 'processed') {
+              <button mat-stroked-button style="color:#dc2626;border-color:#dc2626" (click)="reverseBatch(selectedBatch()!.id)">
+                <mat-icon>undo</mat-icon> Reverse
+              </button>
+            }
+            @if (['draft', 'pending_approval', 'submitted'].includes(selectedBatch()!.status)) {
+              <button mat-stroked-button style="color:#f59e0b;border-color:#f59e0b" (click)="cancelBatch(selectedBatch()!.id)">
+                <mat-icon>block</mat-icon> Cancel
+              </button>
+            }
+            @if (!['processed', 'voided', 'reversed'].includes(selectedBatch()!.status)) {
+              <button mat-stroked-button color="warn" (click)="voidBatch(selectedBatch()!.id)">
+                <mat-icon>cancel</mat-icon> Void
+              </button>
+            }
+            <button mat-stroked-button (click)="generateRemittance(selectedBatch()!.id)" matTooltip="Generate remittance advices for this batch">
+              <mat-icon>receipt</mat-icon> Remittance
+            </button>
+            <button mat-stroked-button (click)="sendRemittance(selectedBatch()!.id)" matTooltip="Send remittance advices to suppliers">
+              <mat-icon>send</mat-icon> Send
+            </button>
+            <button mat-stroked-button (click)="viewDocuments(selectedBatch()!.id)" matTooltip="View attached documents">
+              <mat-icon>folder</mat-icon> Documents
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>info</mat-icon> Batch Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Reference</label>
+                  <span>{{selectedBatch()!.referenceNumber}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Batch Date</label>
+                  <span>{{formatDate(selectedBatch()!.batchDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created By</label>
+                  <span>{{selectedBatch()!.createdByName || selectedBatch()!.createdBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Payment Method</label>
+                  <span>{{selectedBatch()!.paymentMethod || 'EFT'}}</span>
+                </div>
+                @if (selectedBatch()!.eftFileReference) {
+                  <div class="detail-field">
+                    <label>EFT File Reference</label>
+                    <span>{{selectedBatch()!.eftFileReference}}</span>
+                  </div>
+                }
+                @if (selectedBatch()!.eftFileName) {
+                  <div class="detail-field">
+                    <label>EFT File Name</label>
+                    <span>{{selectedBatch()!.eftFileName}}</span>
+                  </div>
+                }
+                @if (selectedBatch()!.eftGeneratedDate) {
+                  <div class="detail-field">
+                    <label>EFT Generated</label>
+                    <span>{{formatDate(selectedBatch()!.eftGeneratedDate)}}</span>
+                  </div>
+                }
+                @if (selectedBatch()!.processedDate) {
+                  <div class="detail-field">
+                    <label>Processed Date</label>
+                    <span>{{formatDate(selectedBatch()!.processedDate)}}</span>
+                  </div>
+                }
+                @if (selectedBatch()!.notes) {
+                  <div class="detail-field" style="grid-column:1/-1">
+                    <label>Notes</label>
+                    <span class="desc-text">{{selectedBatch()!.notes}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (selectedBatch()!.approvalChain?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>verified</mat-icon> Approval Chain</h3>
+              <div class="approval-chain">
+                @for (approval of selectedBatch()!.approvalChain || []; track approval.level) {
+                  <div class="approval-step">
+                    <div class="approval-level">Level {{approval.level}}</div>
+                    <div class="approval-info">
+                      <span class="approval-user">{{approval.userName || approval.userId}}</span>
+                      <span class="approval-role">{{approval.role}}</span>
+                      <span class="approval-date">{{formatDate(approval.date)}}</span>
+                    </div>
+                    <span class="status-badge status-approved">{{approval.status}}</span>
+                    @if (approval.comments) {
+                      <span class="approval-comments">{{approval.comments}}</span>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="detail-card">
+            <h3><mat-icon>receipt</mat-icon> Invoices in Batch ({{selectedBatch()!.items?.length || 0}})</h3>
+            <div class="table-wrapper">
+              <table class="payments-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Invoice #</th>
+                    <th>Supplier</th>
+                    <th>Amount</th>
+                    <th>Bank</th>
+                    <th>Branch Code</th>
+                    <th>Remittance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of selectedBatch()!.items || []; track item.invoiceId; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td class="ref-cell">{{item.invoiceNumber || item.invoiceId}}</td>
+                      <td>{{item.supplierName || '—'}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(item.amount?.amount || 0)}}</td>
+                      <td>{{item.bankName || '—'}}</td>
+                      <td>{{item.branchCode || '—'}}</td>
+                      <td>
+                        @if (item.remittanceSent) {
+                          <span class="status-badge status-approved">Sent</span>
+                        } @else {
+                          <span class="status-badge status-draft">Pending</span>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="7" class="empty-text" style="text-align:center;padding:20px">No invoices in this batch</td></tr>
+                  }
+                </tbody>
+                @if (selectedBatch()!.items?.length) {
+                  <tfoot>
+                    <tr class="grand-total">
+                      <td colspan="3" style="text-align:right;font-weight:700">Total</td>
+                      <td class="value-cell" style="font-weight:700">{{formatCurrencyFull(selectedBatch()!.totalAmount?.amount || 0)}}</td>
+                      <td colspan="3"></td>
+                    </tr>
+                  </tfoot>
+                }
+              </table>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>history</mat-icon> Audit Trail</h3>
+            @if (selectedBatch()!.auditTrail?.length) {
+              <ul class="audit-list">
+                @for (entry of selectedBatch()!.auditTrail || []; track entry.timestamp) {
+                  <li class="audit-item">
+                    <div class="audit-dot" [class.dot-approval]="entry.action?.includes('Approved')" [class.dot-rejection]="entry.action?.includes('Voided')" [class.dot-system]="entry.action?.includes('EFT') || entry.action?.includes('Processed')"></div>
+                    <div class="audit-content">
+                      <span class="audit-action">{{entry.action}}</span>
+                      <span class="audit-detail">{{entry.details}}</span>
+                      <span class="audit-date">{{formatDate(entry.timestamp)}} — {{entry.userId}}</span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <div class="empty-text">No audit trail entries</div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ===================== CREATE BATCH VIEW ===================== -->
+      @if (currentView() === 'create') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn active" (click)="currentView.set('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="form-header">
+          <mat-icon>add_circle</mat-icon>
+          <h2>Create Payment Batch</h2>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>settings</mat-icon> Batch Settings</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Payment Method</mat-label>
+              <mat-select [(ngModel)]="newBatchMethod">
+                <mat-option value="EFT">EFT (Electronic Funds Transfer)</mat-option>
+                <mat-option value="cheque">Cheque</mat-option>
+                <mat-option value="direct_deposit">Direct Deposit</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Notes (Optional)</mat-label>
+              <input matInput [(ngModel)]="newBatchNotes" placeholder="Enter batch notes...">
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (selectedInvoiceIds().length > 0) {
+          <div class="selected-summary">
+            <mat-icon>shopping_cart</mat-icon>
+            <span class="selected-count">{{selectedInvoiceIds().length}} invoices selected</span>
+            <span class="selected-total">Total: {{formatCurrencyFull(getSelectedTotal())}}</span>
+            <button mat-flat-button color="primary" (click)="createBatch()" [disabled]="saving()">
+              <mat-icon>add</mat-icon> {{saving() ? 'Creating...' : 'Create Batch'}}
+            </button>
+            <button mat-stroked-button (click)="selectedInvoiceIds.set([])">
+              <mat-icon>deselect</mat-icon> Clear Selection
+            </button>
+          </div>
+        }
+
+        <div class="detail-card">
+          <h3><mat-icon>receipt_long</mat-icon> Approved Invoices Available for Payment ({{approvedInvoices().length}})</h3>
+          @if (approvedInvoices().length > 0) {
+            <div class="table-wrapper">
+              <table class="payments-table">
+                <thead>
+                  <tr>
+                    <th class="check-col">
+                      <mat-checkbox [checked]="allInvoicesSelected()" (change)="toggleSelectAllInvoices()"></mat-checkbox>
+                    </th>
+                    <th>Invoice #</th>
+                    <th>Supplier</th>
+                    <th>Amount</th>
+                    <th>Age (Days)</th>
+                    <th>Due Date</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (inv of approvedInvoices(); track inv.id) {
+                    <tr class="order-row" (click)="toggleInvoiceSelection(inv.id)">
+                      <td class="check-col" (click)="$event.stopPropagation()">
+                        <mat-checkbox [checked]="isInvoiceSelected(inv.id)" (change)="toggleInvoiceSelection(inv.id)"></mat-checkbox>
+                      </td>
+                      <td class="ref-cell">{{inv.supplierInvoiceNumber || inv.id}}</td>
+                      <td>{{inv.supplierName || '—'}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(inv.netPayable?.amount || inv.totalAmount?.amount || 0)}}</td>
+                      <td>
+                        <span [style.color]="(inv.ageDays || 0) > 30 ? '#dc2626' : (inv.ageDays || 0) > 20 ? '#f59e0b' : '#10b981'" [style.font-weight]="'600'">
+                          {{inv.ageDays || 0}}
+                        </span>
+                      </td>
+                      <td>{{formatDate(inv.dueDate)}}</td>
+                      <td>{{inv.invoiceType || 'Regular'}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="empty-state" style="padding:40px;text-align:center">
+              <mat-icon>check_circle</mat-icon>
+              <span style="display:block;margin-top:8px;color:#64748b">No approved invoices available for payment batching</span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== CR01 REPORT VIEW ===================== -->
+      @if (currentView() === 'cr01') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn active" (click)="currentView.set('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>assessment</mat-icon> CR01 — Creditor Age Analysis Report</h3>
+          <div class="cr01-filters">
+            <mat-form-field appearance="outline">
+              <mat-label>Report Period (Month)</mat-label>
+              <input matInput type="month" [(ngModel)]="cr01Month" (change)="loadCr01()">
+            </mat-form-field>
+            <button mat-flat-button color="primary" (click)="loadCr01()" [disabled]="loading()">
+              <mat-icon>refresh</mat-icon> Generate
+            </button>
+            <button mat-stroked-button (click)="exportCr01()">
+              <mat-icon>download</mat-icon> Export
+            </button>
+          </div>
+        </div>
+
+        @if (cr01Data()) {
+          <div class="detail-card" style="margin-bottom:16px">
+            <div class="cr01-header">
+              <div class="cr01-title">
+                <span class="cr01-name">{{cr01Data()!.reportName || 'CR01 Report'}}</span>
+                <span class="cr01-period">Period: {{cr01Data()!.reportPeriod}}</span>
+                <span class="cr01-municipality">{{cr01Data()!.municipalityName}}</span>
+              </div>
+              @if (cr01Data()!.summary) {
+                <div class="cr01-summary-strip">
+                  <div class="cr01-stat">
+                    <span class="cr01-stat-label">Total Creditors</span>
+                    <span class="cr01-stat-value">{{cr01Data()!.summary.totalCreditors || 0}}</span>
+                  </div>
+                  <div class="cr01-stat">
+                    <span class="cr01-stat-label">Total Outstanding</span>
+                    <span class="cr01-stat-value">{{formatCurrencyFull(cr01Data()!.summary.totalOutstanding?.amount || 0)}}</span>
+                  </div>
+                  <div class="cr01-stat" [style.color]="(cr01Data()!.summary.overdue || 0) > 0 ? '#dc2626' : '#10b981'">
+                    <span class="cr01-stat-label">Overdue</span>
+                    <span class="cr01-stat-value">{{cr01Data()!.summary.overdue || 0}}</span>
+                  </div>
+                  <div class="cr01-stat">
+                    <span class="cr01-stat-label">MFMA Compliant</span>
+                    <span class="cr01-stat-value" style="color:#10b981">{{cr01Data()!.summary.mfmaCompliant || 0}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <div class="table-wrapper">
+              <table class="payments-table cr01-table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Invoice #</th>
+                    <th>Invoice Date</th>
+                    <th class="value-col">Current</th>
+                    <th class="value-col">30 Days</th>
+                    <th class="value-col">60 Days</th>
+                    <th class="value-col">90 Days</th>
+                    <th class="value-col">120+ Days</th>
+                    <th class="value-col">Total</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of cr01Data()!.data || []; track row.invoiceNumber) {
+                    <tr>
+                      <td>{{row.supplierName}}</td>
+                      <td class="ref-cell">{{row.invoiceNumber}}</td>
+                      <td>{{row.invoiceDate}}</td>
+                      <td class="value-cell">{{row.current > 0 ? formatCurrency(row.current) : '—'}}</td>
+                      <td class="value-cell" [style.color]="row.days30 > 0 ? '#f59e0b' : ''">{{row.days30 > 0 ? formatCurrency(row.days30) : '—'}}</td>
+                      <td class="value-cell" [style.color]="row.days60 > 0 ? '#f97316' : ''">{{row.days60 > 0 ? formatCurrency(row.days60) : '—'}}</td>
+                      <td class="value-cell" [style.color]="row.days90 > 0 ? '#ef4444' : ''">{{row.days90 > 0 ? formatCurrency(row.days90) : '—'}}</td>
+                      <td class="value-cell" [style.color]="row.days120Plus > 0 ? '#dc2626' : ''">{{row.days120Plus > 0 ? formatCurrency(row.days120Plus) : '—'}}</td>
+                      <td class="value-cell" style="font-weight:700">{{formatCurrency(row.total)}}</td>
+                      <td style="font-size:11px;color:#64748b">{{row.reason || '—'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="10" class="empty-text" style="text-align:center;padding:20px">No data available for this period</td></tr>
+                  }
+                </tbody>
+                @if (cr01Data()!.data?.length) {
+                  <tfoot>
+                    <tr class="grand-total">
+                      <td colspan="3" style="text-align:right;font-weight:700">TOTALS</td>
+                      <td class="value-cell">{{formatCurrency(getCr01ColumnTotal('current'))}}</td>
+                      <td class="value-cell">{{formatCurrency(getCr01ColumnTotal('days30'))}}</td>
+                      <td class="value-cell">{{formatCurrency(getCr01ColumnTotal('days60'))}}</td>
+                      <td class="value-cell">{{formatCurrency(getCr01ColumnTotal('days90'))}}</td>
+                      <td class="value-cell">{{formatCurrency(getCr01ColumnTotal('days120Plus'))}}</td>
+                      <td class="value-cell" style="font-weight:700">{{formatCurrency(getCr01ColumnTotal('total'))}}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                }
+              </table>
+            </div>
+          </div>
+        } @else {
+          <div class="detail-card">
+            <div class="empty-state" style="padding:40px;text-align:center">
+              <mat-icon>assessment</mat-icon>
+              <span style="display:block;margin-top:8px;color:#64748b">Click "Generate" to create the CR01 report</span>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== REMITTANCE VIEW ===================== -->
+      @if (currentView() === 'remittance') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn active" (click)="currentView.set('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>mail</mat-icon> Remittance Advices</h3>
+          <div class="table-wrapper">
+            <table class="payments-table">
+              <thead>
+                <tr>
+                  <th>Remittance ID</th>
+                  <th>Supplier</th>
+                  <th>Batch Ref</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Sent Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (rem of remittances(); track rem.id) {
+                  <tr>
+                    <td class="ref-cell">{{rem.id}}</td>
+                    <td>{{rem.supplierName || '—'}}</td>
+                    <td>{{rem.batchReference || rem.paymentBatchId || '—'}}</td>
+                    <td class="value-cell">{{formatCurrencyFull(rem.amount?.amount || 0)}}</td>
+                    <td><span class="status-badge" [class]="'status-' + (rem.status === 'sent' ? 'approved' : 'draft')">{{rem.status || 'Pending'}}</span></td>
+                    <td>{{rem.sentDate ? formatDate(rem.sentDate) : '—'}}</td>
+                    <td class="actions-cell">
+                      <button mat-icon-button (click)="resendRemittance(rem.id)" matTooltip="Resend remittance advice">
+                        <mat-icon>send</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="empty-state">
+                      <mat-icon>mail_outline</mat-icon>
+                      <span>No remittance advices found</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== RECONCILIATION VIEW ===================== -->
+      @if (currentView() === 'reconciliation') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn active" (click)="currentView.set('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total reconciliation items: ' + (reconciliationData().summary?.total || 0)">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{reconciliationData().summary?.total || 0}}</span>
+            <span class="kpi-label">Total Payments</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Matched: ' + (reconciliationData().summary?.matched || 0)" [style.border-left-color]="'#10b981'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value" style="color:#10b981">{{reconciliationData().summary?.matched || 0}}</span>
+            <span class="kpi-label">Matched</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Unmatched: ' + (reconciliationData().summary?.unmatched || 0)" [style.border-left-color]="(reconciliationData().summary?.unmatched || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>error_outline</mat-icon>
+            <span class="kpi-value" [style.color]="(reconciliationData().summary?.unmatched || 0) > 0 ? '#dc2626' : '#10b981'">{{reconciliationData().summary?.unmatched || 0}}</span>
+            <span class="kpi-label">Unmatched</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Match rate: ' + (reconciliationData().summary?.matchRate || 0) + '%'">
+            <mat-icon>trending_up</mat-icon>
+            <span class="kpi-value">{{reconciliationData().summary?.matchRate || 0}}%</span>
+            <span class="kpi-label">Match Rate</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total value: ' + formatCurrencyFull(reconciliationData().summary?.totalValue?.amount || 0)">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <span class="kpi-value">{{formatCurrency(reconciliationData().summary?.totalValue?.amount || 0)}}</span>
+            <span class="kpi-label">Total Value</span>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-label>Status</mat-label>
+              <mat-select [(ngModel)]="reconFilterStatus" (selectionChange)="loadReconciliation()">
+                <mat-option value="">All</mat-option>
+                <mat-option value="matched">Matched</mat-option>
+                <mat-option value="unmatched">Unmatched</mat-option>
+                <mat-option value="partial">Partial</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="reconFromPicker" [(ngModel)]="reconDateFrom" (dateChange)="loadReconciliation()">
+              <mat-datepicker-toggle matIconSuffix [for]="reconFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #reconFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="reconToPicker" [(ngModel)]="reconDateTo" (dateChange)="loadReconciliation()">
+              <mat-datepicker-toggle matIconSuffix [for]="reconToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #reconToPicker></mat-datepicker>
+            </mat-form-field>
+            <button mat-stroked-button (click)="clearReconFilters()"><mat-icon>clear</mat-icon> Clear All</button>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>compare_arrows</mat-icon> Bank Statement Reconciliation</h3>
+          <div class="table-wrapper">
+            <table class="payments-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>EFT Ref</th>
+                  <th>Payment Date</th>
+                  <th>Suppliers</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Bank Ref</th>
+                  <th>Variance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of reconciliationData().items || []; track item.paymentId) {
+                  <tr>
+                    <td class="ref-cell">{{item.referenceNumber}}</td>
+                    <td>{{item.eftFileReference || '—'}}</td>
+                    <td>{{formatDate(item.paymentDate)}}</td>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" [matTooltip]="item.supplierNames">{{item.supplierNames || '—'}}</td>
+                    <td class="value-cell" [matTooltip]="formatCurrencyFull(item.totalAmount?.amount || 0)">{{formatCurrencyFull(item.totalAmount?.amount || 0)}}</td>
+                    <td>
+                      <span class="status-badge" [class]="'status-' + (item.reconciliationStatus === 'matched' ? 'approved' : item.reconciliationStatus === 'partial' ? 'pending_approval' : 'draft')">
+                        {{item.reconciliationStatus}}
+                      </span>
+                    </td>
+                    <td>{{item.bankStatementRef || '—'}}</td>
+                    <td class="value-cell" [style.color]="(item.variance?.amount || 0) > 0 ? '#dc2626' : '#10b981'">
+                      @if (item.variance) { {{formatCurrencyFull(item.variance.amount || 0)}} } @else { — }
+                    </td>
+                    <td class="actions-cell">
+                      @if (item.reconciliationStatus !== 'matched') {
+                        <button mat-icon-button matTooltip="Match to bank statement" (click)="matchPayment(item.paymentId)">
+                          <mat-icon>link</mat-icon>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty-state" style="text-align:center;padding:30px">
+                    <mat-icon>compare_arrows</mat-icon>
+                    <span style="display:block;margin-top:8px;color:#64748b">No reconciliation items found</span>
+                  </td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== SCHEDULE VIEW ===================== -->
+      @if (currentView() === 'schedule') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('create')">Create Batch</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn active" (click)="currentView.set('schedule')">Schedule</button>
+          <button class="tab-btn" (click)="navigateTo('cr01')">CR01 Report</button>
+          <button class="tab-btn" (click)="navigateTo('remittance')">Remittance</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total scheduled payments: ' + (scheduleData().summary?.totalPayments || 0)">
+            <mat-icon>calendar_today</mat-icon>
+            <span class="kpi-value">{{scheduleData().summary?.totalPayments || 0}}</span>
+            <span class="kpi-label">Scheduled Payments</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total scheduled amount: ' + formatCurrencyFull(scheduleData().summary?.totalAmount?.amount || 0)">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <span class="kpi-value">{{formatCurrency(scheduleData().summary?.totalAmount?.amount || 0)}}</span>
+            <span class="kpi-label">Total Amount</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Overdue payments requiring immediate attention'" [style.border-left-color]="(scheduleData().summary?.overdueCount || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>warning</mat-icon>
+            <span class="kpi-value" [style.color]="(scheduleData().summary?.overdueCount || 0) > 0 ? '#dc2626' : '#10b981'">{{scheduleData().summary?.overdueCount || 0}}</span>
+            <span class="kpi-label">Overdue</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'MFMA Section 65 risk — approaching 30-day deadline'" [style.border-left-color]="(scheduleData().summary?.mfmaRiskCount || 0) > 0 ? '#f59e0b' : '#10b981'">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value" [style.color]="(scheduleData().summary?.mfmaRiskCount || 0) > 0 ? '#f59e0b' : '#10b981'">{{scheduleData().summary?.mfmaRiskCount || 0}}</span>
+            <span class="kpi-label">MFMA Risk</span>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-label>Month</mat-label>
+              <mat-select [(ngModel)]="scheduleMonth" (selectionChange)="loadSchedule()">
+                @for (m of months; track m.value) {
+                  <mat-option [value]="m.value">{{m.label}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Year</mat-label>
+              <mat-select [(ngModel)]="scheduleYear" (selectionChange)="loadSchedule()">
+                <mat-option value="2024">2024</mat-option>
+                <mat-option value="2025">2025</mat-option>
+                <mat-option value="2026">2026</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if ((scheduleData().calendarDays || []).length > 0) {
+          <div class="detail-card" style="margin-bottom:16px">
+            <h3><mat-icon>date_range</mat-icon> Payment Calendar</h3>
+            <div class="calendar-grid">
+              @for (day of scheduleData().calendarDays || []; track day.date) {
+                <div class="calendar-day" [class.calendar-day-overdue]="hasOverduePayment(day)" [matTooltip]="day.count + ' payment(s) — ' + formatCurrencyFull(day.totalAmount || 0)">
+                  <span class="calendar-date">{{day.date}}</span>
+                  <span class="calendar-count">{{day.count}} payment{{day.count !== 1 ? 's' : ''}}</span>
+                  <span class="calendar-amount">{{formatCurrency(day.totalAmount || 0)}}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="detail-card">
+          <h3><mat-icon>upcoming</mat-icon> Upcoming Payments</h3>
+          <div class="table-wrapper">
+            <table class="payments-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Supplier</th>
+                  <th>Department</th>
+                  <th>Amount</th>
+                  <th>Due Date</th>
+                  <th>Scheduled</th>
+                  <th>Age</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of scheduleData().upcoming || []; track item.invoiceId) {
+                  <tr>
+                    <td class="ref-cell">{{item.invoiceNumber}}</td>
+                    <td>{{item.supplierName || '—'}}</td>
+                    <td>{{item.department || '—'}}</td>
+                    <td class="value-cell" [matTooltip]="formatCurrencyFull(item.amount?.amount || 0)">{{formatCurrencyFull(item.amount?.amount || 0)}}</td>
+                    <td>{{formatDate(item.dueDate)}}</td>
+                    <td>{{formatDate(item.scheduledDate)}}</td>
+                    <td>
+                      <span [style.color]="item.isOverdue ? '#dc2626' : item.mfmaRisk ? '#f59e0b' : '#10b981'" style="font-weight:600">
+                        {{item.ageDays || 0}}d
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-badge" [class]="'status-' + item.status">{{getStatusLabel(item.status)}}</span>
+                      @if (item.isOverdue) {
+                        <span class="status-badge" style="background:#fef2f2;color:#dc2626;border-color:#fecaca;margin-left:4px" matTooltip="MFMA Section 65 breach — exceeds 30-day payment deadline">S65</span>
+                      }
+                    </td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="Reschedule payment" (click)="reschedulePayment(item.invoiceId)">
+                        <mat-icon>edit_calendar</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty-state" style="text-align:center;padding:30px">
+                    <mat-icon>calendar_today</mat-icon>
+                    <span style="display:block;margin-top:8px;color:#64748b">No scheduled payments for this period</span>
+                  </td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== EXCEPTIONS VIEW ===================== -->
+      @if (currentView() === 'exceptions') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Payment Batches</button>
+          <button class="tab-btn" (click)="navigateTo('reconciliation')">Reconciliation</button>
+          <button class="tab-btn" (click)="navigateTo('schedule')">Schedule</button>
+          <button class="tab-btn active" (click)="currentView.set('exceptions')">Exceptions</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total exceptions requiring attention'" [style.border-left-color]="(exceptionsData().totalExceptions || 0) > 0 ? '#dc2626' : '#10b981'">
+            <mat-icon>report_problem</mat-icon>
+            <span class="kpi-value" [style.color]="(exceptionsData().totalExceptions || 0) > 0 ? '#dc2626' : '#10b981'">{{exceptionsData().totalExceptions || 0}}</span>
+            <span class="kpi-label">Total Exceptions</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Overdue payments exceeding 30-day deadline'" [style.border-left-color]="'#f59e0b'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value" style="color:#f59e0b">{{exceptionsData().overdue_payments?.count || 0}}</span>
+            <span class="kpi-label">Overdue Payments</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Failed EFT transactions'" [style.border-left-color]="'#ef4444'">
+            <mat-icon>error</mat-icon>
+            <span class="kpi-value" style="color:#ef4444">{{exceptionsData().failed_eft?.count || 0}}</span>
+            <span class="kpi-label">Failed EFT</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'MFMA Section 65 violations'" [style.border-left-color]="'#dc2626'">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value" style="color:#dc2626">{{exceptionsData().mfma_violations?.count || 0}}</span>
+            <span class="kpi-label">MFMA Violations</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Duplicate payment detections'">
+            <mat-icon>content_copy</mat-icon>
+            <span class="kpi-value">{{exceptionsData().duplicate_payments?.count || 0}}</span>
+            <span class="kpi-label">Duplicates</span>
+          </div>
+        </div>
+
+        @if ((exceptionsData().overdue_payments?.items || []).length > 0) {
+          <div class="detail-card" style="margin-bottom:16px">
+            <h3><mat-icon>schedule</mat-icon> Overdue Payments ({{exceptionsData().overdue_payments?.count || 0}})</h3>
+            <div class="table-wrapper">
+              <table class="payments-table">
+                <thead>
+                  <tr><th>Invoice #</th><th>Supplier</th><th>Amount</th><th>Age (Days)</th><th>Due Date</th></tr>
+                </thead>
+                <tbody>
+                  @for (item of exceptionsData().overdue_payments?.items || []; track item.invoiceId) {
+                    <tr>
+                      <td class="ref-cell">{{item.invoiceNumber}}</td>
+                      <td>{{item.supplierName || '—'}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(item.amount?.amount || 0)">{{formatCurrencyFull(item.amount?.amount || 0)}}</td>
+                      <td><span style="color:#dc2626;font-weight:600">{{item.ageDays || 0}}</span></td>
+                      <td>{{formatDate(item.dueDate)}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if ((exceptionsData().mfma_violations?.items || []).length > 0) {
+          <div class="detail-card">
+            <h3 style="color:#dc2626"><mat-icon>gavel</mat-icon> MFMA Section 65 Violations ({{exceptionsData().mfma_violations?.count || 0}})</h3>
+            <div class="table-wrapper">
+              <table class="payments-table">
+                <thead>
+                  <tr><th>Invoice #</th><th>Supplier</th><th>Amount</th><th>Age (Days)</th><th>Interest Due</th></tr>
+                </thead>
+                <tbody>
+                  @for (item of exceptionsData().mfma_violations?.items || []; track item.invoiceId) {
+                    <tr>
+                      <td class="ref-cell">{{item.invoiceNumber}}</td>
+                      <td>{{item.supplierName || '—'}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(item.amount?.amount || 0)">{{formatCurrencyFull(item.amount?.amount || 0)}}</td>
+                      <td><span style="color:#dc2626;font-weight:600">{{item.ageDays || 0}}</span></td>
+                      <td class="value-cell" style="color:#dc2626" [matTooltip]="formatCurrencyFull(item.interest?.amount || 0)">{{formatCurrencyFull(item.interest?.amount || 0)}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== DOCUMENTS VIEW ===================== -->
+      @if (currentView() === 'documents') {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('detail')"><mat-icon>arrow_back</mat-icon></button>
+          <h2>Documents — {{docPaymentId()}}</h2>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>upload_file</mat-icon> Upload Document</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Document Type</mat-label>
+              <mat-select [(ngModel)]="newDocType">
+                <mat-option value="remittance_advice">Remittance Advice</mat-option>
+                <mat-option value="bank_statement">Bank Statement</mat-option>
+                <mat-option value="proof_of_payment">Proof of Payment</mat-option>
+                <mat-option value="authorization">Authorization</mat-option>
+                <mat-option value="correspondence">Correspondence</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>File Name</mat-label>
+              <input matInput [(ngModel)]="newDocFilename" placeholder="document.pdf">
+            </mat-form-field>
+          </div>
+          <button mat-flat-button color="primary" (click)="uploadDocument()" [disabled]="!newDocType || !newDocFilename" style="margin-top:12px">
+            <mat-icon>cloud_upload</mat-icon> Upload
+          </button>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>folder_open</mat-icon> Attached Documents ({{paymentDocuments().length}})</h3>
+          <div class="table-wrapper">
+            <table class="payments-table">
+              <thead>
+                <tr><th>Document ID</th><th>Type</th><th>Filename</th><th>Uploaded</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                @for (doc of paymentDocuments(); track doc.id) {
+                  <tr>
+                    <td class="ref-cell">{{doc.id}}</td>
+                    <td>
+                      <span class="status-badge" [class]="'status-' + (doc.type === 'proof_of_payment' ? 'approved' : doc.type === 'authorization' ? 'eft_generated' : 'draft')">
+                        {{doc.type?.replace('_', ' ') || 'Unknown'}}
+                      </span>
+                    </td>
+                    <td>{{doc.filename}}</td>
+                    <td>{{formatDate(doc.uploadedDate)}}</td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="Delete document" color="warn" (click)="deleteDocument(doc.id)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="5" class="empty-state" style="text-align:center;padding:30px">
+                    <mat-icon>folder_open</mat-icon>
+                    <span style="display:block;margin-top:8px;color:#64748b">No documents attached</span>
+                  </td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== BANK CONFIG VIEW ===================== -->
+      @if (currentView() === 'bankConfig') {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('dashboard')"><mat-icon>arrow_back</mat-icon></button>
+          <h2>Bank File Configuration</h2>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:16px">
+          <h3><mat-icon>settings</mat-icon> Bank Account Settings</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Default Bank</mat-label>
+              <mat-select [(ngModel)]="bankConfigData.defaultBank">
+                <mat-option value="absa">ABSA</mat-option>
+                <mat-option value="nedbank">Nedbank</mat-option>
+                <mat-option value="standard_bank">Standard Bank</mat-option>
+                <mat-option value="fnb">FNB</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Branch Code</mat-label>
+              <input matInput [(ngModel)]="bankConfigData.branchCode">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Account Number</mat-label>
+              <input matInput [(ngModel)]="bankConfigData.accountNumber">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Account Name</mat-label>
+              <input matInput [(ngModel)]="bankConfigData.accountName">
+            </mat-form-field>
+          </div>
+          <button mat-flat-button color="primary" (click)="saveBankConfig()" style="margin-top:12px">
+            <mat-icon>save</mat-icon> Save Configuration
+          </button>
+        </div>
+
+        @if (bankFiles().length > 0) {
+          <div class="detail-card">
+            <h3><mat-icon>description</mat-icon> Generated Bank Files ({{bankFiles().length}})</h3>
+            <div class="table-wrapper">
+              <table class="payments-table">
+                <thead>
+                  <tr><th>File ID</th><th>File Name</th><th>Format</th><th>Batch</th><th>Records</th><th>Amount</th><th>Generated</th></tr>
+                </thead>
+                <tbody>
+                  @for (f of bankFiles(); track f.fileId) {
+                    <tr>
+                      <td class="ref-cell">{{f.fileId}}</td>
+                      <td>{{f.fileName}}</td>
+                      <td><span class="status-badge status-eft_generated">{{f.formatName || f.format}}</span></td>
+                      <td>{{f.batchReference}}</td>
+                      <td>{{f.recordCount}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(f.totalAmount?.amount || 0)">{{formatCurrencyFull(f.totalAmount?.amount || 0)}}</td>
+                      <td>{{formatDate(f.generatedDate)}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

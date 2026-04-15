@@ -1,0 +1,1108 @@
+<div class="portal-page">
+  @if (notification()) {
+    <div class="notification-bar">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{notification()}}</span>
+    </div>
+  }
+
+  <div class="mode-switcher">
+    <button class="mode-btn" [class.active]="portalMode() === 'supplier'" (click)="switchMode('supplier')">
+      <mat-icon>storefront</mat-icon> Supplier Portal
+    </button>
+    <button class="mode-btn" [class.active]="portalMode() === 'admin'" (click)="switchMode('admin')">
+      <mat-icon>admin_panel_settings</mat-icon> Admin Management
+    </button>
+    @if (portalMode() === 'supplier') {
+      <div class="demo-supplier-picker">
+        <mat-icon>person</mat-icon>
+        <mat-form-field appearance="outline" class="supplier-select">
+          <mat-select [value]="demoSupplierId()" (selectionChange)="changeDemoSupplier($event.value)">
+            @for (opt of demoSupplierOptions; track opt.id) {
+              <mat-option [value]="opt.id">{{opt.name}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+    }
+  </div>
+
+  <!-- ================= SUPPLIER-FACING PORTAL ================= -->
+  @if (portalMode() === 'supplier') {
+    <div class="supplier-portal">
+      <div class="supplier-tab-nav">
+        <button class="stab" [class.active]="supplierTab() === 'dashboard'" (click)="switchSupplierTab('dashboard')">
+          <mat-icon>dashboard</mat-icon><span>My Dashboard</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'orders'" (click)="switchSupplierTab('orders')">
+          <mat-icon>shopping_cart</mat-icon><span>My Orders</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'contracts'" (click)="switchSupplierTab('contracts')">
+          <mat-icon>description</mat-icon><span>My Contracts</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'invoices'" (click)="switchSupplierTab('invoices')">
+          <mat-icon>receipt_long</mat-icon><span>My Invoices</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'payments'" (click)="switchSupplierTab('payments')">
+          <mat-icon>payments</mat-icon><span>My Payments</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'documents'" (click)="switchSupplierTab('documents')">
+          <mat-icon>folder_open</mat-icon><span>Documents</span>
+        </button>
+        <button class="stab" [class.active]="supplierTab() === 'notifications'" (click)="switchSupplierTab('notifications')"
+                [matBadge]="supplierNotifications().unreadCount || null" matBadgeColor="warn" matBadgeSize="small">
+          <mat-icon>notifications</mat-icon><span>Notifications</span>
+        </button>
+      </div>
+
+      @if (loading()) {
+        <div class="loading-state"><mat-icon class="spin">hourglass_empty</mat-icon> Loading...</div>
+      }
+
+      <!-- ===== SUPPLIER DASHBOARD ===== -->
+      @if (supplierTab() === 'dashboard') {
+        <div class="sp-section">
+          <div class="dash-hero">
+            <div class="hero-left">
+              <div class="hero-avatar">
+                <mat-icon>business</mat-icon>
+              </div>
+              <div class="hero-info">
+                <h2>{{supplierDashboard().supplier?.companyName || 'Supplier Portal'}}</h2>
+                <div class="hero-meta">
+                  <span class="meta-chip bee-chip" [matTooltip]="'Broad-Based Black Economic Empowerment level'"><mat-icon>stars</mat-icon> B-BBEE Level {{supplierDashboard().supplier?.beeLevel || '—'}}</span>
+                  <span class="meta-chip"><mat-icon>badge</mat-icon> {{supplierDashboard().supplier?.registrationNumber || '—'}}</span>
+                  <span class="meta-chip" [class.status-active]="supplierDashboard().supplier?.status === 'active'" [class.status-pending]="supplierDashboard().supplier?.status !== 'active'">
+                    <mat-icon>{{supplierDashboard().supplier?.status === 'active' ? 'verified' : 'pending'}}</mat-icon> {{(supplierDashboard().supplier?.status || 'pending') | titlecase}}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="hero-actions">
+              <button mat-flat-button color="primary" class="upload-btn" (click)="openInvoiceUpload()">
+                <mat-icon>cloud_upload</mat-icon> Submit Invoice
+              </button>
+              <button mat-stroked-button (click)="switchSupplierTab('documents')">
+                <mat-icon>folder_open</mat-icon> Documents
+              </button>
+            </div>
+          </div>
+
+          <div class="kpi-grid-modern">
+            <div class="kpi-card kpi-gradient-blue" (click)="switchSupplierTab('orders')" [matTooltip]="'Total value of all purchase orders — click to view orders'">
+              <div class="kpi-icon-wrap"><mat-icon>shopping_cart</mat-icon></div>
+              <div class="kpi-data">
+                <span class="kpi-amount">{{formatCurrency(supplierDashboard().financial?.totalOrderValue)}}</span>
+                <span class="kpi-title">Order Value</span>
+              </div>
+              <span class="kpi-badge">{{supplierDashboard().orderSummary?.total || 0}}</span>
+            </div>
+            <div class="kpi-card kpi-gradient-purple" (click)="switchSupplierTab('contracts')" [matTooltip]="'Total active contract value — click to view contracts'">
+              <div class="kpi-icon-wrap"><mat-icon>description</mat-icon></div>
+              <div class="kpi-data">
+                <span class="kpi-amount">{{formatCurrency(supplierDashboard().financial?.totalContractValue)}}</span>
+                <span class="kpi-title">Contract Value</span>
+              </div>
+              <span class="kpi-badge">{{supplierDashboard().contractSummary?.total || 0}}</span>
+            </div>
+            <div class="kpi-card kpi-gradient-amber" (click)="switchSupplierTab('invoices')" [matTooltip]="'Total pending invoice amount awaiting payment — click to view invoices'">
+              <div class="kpi-icon-wrap"><mat-icon>hourglass_top</mat-icon></div>
+              <div class="kpi-data">
+                <span class="kpi-amount">{{formatCurrency(supplierDashboard().financial?.totalPending)}}</span>
+                <span class="kpi-title">Pending Payment</span>
+              </div>
+              <span class="kpi-badge">{{supplierDashboard().invoiceSummary?.pending || 0}}</span>
+            </div>
+            <div class="kpi-card kpi-gradient-green" (click)="switchSupplierTab('payments')" [matTooltip]="'Total payments received from municipality — click to view payments'">
+              <div class="kpi-icon-wrap"><mat-icon>paid</mat-icon></div>
+              <div class="kpi-data">
+                <span class="kpi-amount">{{formatCurrency(supplierDashboard().financial?.totalPaid)}}</span>
+                <span class="kpi-title">Total Paid</span>
+              </div>
+              <span class="kpi-badge">{{supplierDashboard().invoiceSummary?.paid || 0}}</span>
+            </div>
+            <div class="kpi-card kpi-gradient-teal" [matTooltip]="'Remaining budget available for invoicing across your orders and contracts'">
+              <div class="kpi-icon-wrap"><mat-icon>account_balance_wallet</mat-icon></div>
+              <div class="kpi-data">
+                <span class="kpi-amount">{{formatCurrency(supplierDashboard().financial?.availableBudget)}}</span>
+                <span class="kpi-title">Available Budget</span>
+              </div>
+              <span class="kpi-badge-text">{{supplierDashboard().invoiceSummary?.averageDaysToPayment || 0}}d avg</span>
+            </div>
+          </div>
+
+          <div class="dash-row-2col">
+            <div class="dash-card pipeline-card">
+              <div class="card-header">
+                <h3><mat-icon>timeline</mat-icon> Invoice Lifecycle Pipeline</h3>
+              </div>
+              <div class="pipeline-modern">
+                @for (phase of supplierDashboard().invoicePipeline || []; track phase.phase) {
+                  <div class="pipe-node" [class.pipe-active]="phase.count > 0" [matTooltip]="phase.phase + ': ' + phase.count + ' invoice(s) — ' + formatCurrency(phase.value)">
+                    <div class="pipe-dot"><mat-icon>{{phase.icon || 'circle'}}</mat-icon></div>
+                    <span class="pipe-count">{{phase.count}}</span>
+                    <span class="pipe-label">{{phase.phase}}</span>
+                  </div>
+                  @if (!$last) { <div class="pipe-connector"></div> }
+                }
+              </div>
+            </div>
+
+            <div class="dash-card alerts-card">
+              <div class="card-header">
+                <h3><mat-icon>notifications_active</mat-icon> Action Required</h3>
+                <span class="alert-count-badge" [class.has-alerts]="(supplierDashboard().documentAlerts?.expired || 0) + (supplierDashboard().documentAlerts?.expiring || 0) + (supplierDashboard().invoiceSummary?.withMissingDocs || 0) > 0">
+                  {{(supplierDashboard().documentAlerts?.expired || 0) + (supplierDashboard().documentAlerts?.expiring || 0) + (supplierDashboard().invoiceSummary?.withMissingDocs || 0)}}
+                </span>
+              </div>
+              @if ((supplierDashboard().documentAlerts?.expired || 0) > 0) {
+                <div class="alert-item alert-critical">
+                  <div class="alert-icon"><mat-icon>error_outline</mat-icon></div>
+                  <div class="alert-content">
+                    <strong>{{supplierDashboard().documentAlerts?.expired}} Expired Document(s)</strong>
+                    <p>Upload renewed documents to remain compliant</p>
+                  </div>
+                  <button mat-flat-button color="warn" (click)="switchSupplierTab('documents')">Fix Now</button>
+                </div>
+              }
+              @if ((supplierDashboard().documentAlerts?.expiring || 0) > 0) {
+                <div class="alert-item alert-warn">
+                  <div class="alert-icon"><mat-icon>schedule</mat-icon></div>
+                  <div class="alert-content">
+                    <strong>{{supplierDashboard().documentAlerts?.expiring}} Expiring Soon</strong>
+                    <p>Documents expiring within 90 days</p>
+                  </div>
+                  <button mat-stroked-button (click)="switchSupplierTab('documents')">Review</button>
+                </div>
+              }
+              @if ((supplierDashboard().invoiceSummary?.withMissingDocs || 0) > 0) {
+                <div class="alert-item alert-warn">
+                  <div class="alert-icon"><mat-icon>upload_file</mat-icon></div>
+                  <div class="alert-content">
+                    <strong>{{supplierDashboard().invoiceSummary?.withMissingDocs}} Invoice(s) Need Documents</strong>
+                    <p>Resubmit missing documents to resume processing</p>
+                  </div>
+                  <button mat-stroked-button color="primary" (click)="switchSupplierTab('invoices')">View</button>
+                </div>
+              }
+              @if ((supplierDashboard().documentAlerts?.expired || 0) === 0 && (supplierDashboard().documentAlerts?.expiring || 0) === 0 && (supplierDashboard().invoiceSummary?.withMissingDocs || 0) === 0) {
+                <div class="alert-item alert-ok">
+                  <div class="alert-icon"><mat-icon>check_circle</mat-icon></div>
+                  <div class="alert-content"><strong>All Clear</strong><p>No actions required — documents compliant</p></div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="dash-row-2col">
+            <div class="dash-card">
+              <div class="card-header">
+                <h3><mat-icon>trending_up</mat-icon> Financial Overview</h3>
+              </div>
+              <div class="financial-bars">
+                <div class="fin-row" [matTooltip]="'Orders: ' + formatCurrency(supplierDashboard().financial?.totalOrderValue) + ' total value'">
+                  <span class="fin-label">Orders</span>
+                  <div class="fin-bar-track">
+                    <div class="fin-bar fin-bar-blue" [style.width.%]="getFinBarWidth('orders')"></div>
+                  </div>
+                  <span class="fin-val">{{formatCurrency(supplierDashboard().financial?.totalOrderValue)}}</span>
+                </div>
+                <div class="fin-row" [matTooltip]="'Contracts: ' + formatCurrency(supplierDashboard().financial?.totalContractValue) + ' total value'">
+                  <span class="fin-label">Contracts</span>
+                  <div class="fin-bar-track">
+                    <div class="fin-bar fin-bar-purple" [style.width.%]="getFinBarWidth('contracts')"></div>
+                  </div>
+                  <span class="fin-val">{{formatCurrency(supplierDashboard().financial?.totalContractValue)}}</span>
+                </div>
+                <div class="fin-row" [matTooltip]="'Invoiced: ' + formatCurrency(supplierDashboard().financial?.totalInvoiced) + ' invoiced so far'">
+                  <span class="fin-label">Invoiced</span>
+                  <div class="fin-bar-track">
+                    <div class="fin-bar fin-bar-amber" [style.width.%]="getFinBarWidth('invoiced')"></div>
+                  </div>
+                  <span class="fin-val">{{formatCurrency(supplierDashboard().financial?.totalInvoiced)}}</span>
+                </div>
+                <div class="fin-row" [matTooltip]="'Paid: ' + formatCurrency(supplierDashboard().financial?.totalPaid) + ' received from municipality'">
+                  <span class="fin-label">Paid</span>
+                  <div class="fin-bar-track">
+                    <div class="fin-bar fin-bar-green" [style.width.%]="getFinBarWidth('paid')"></div>
+                  </div>
+                  <span class="fin-val">{{formatCurrency(supplierDashboard().financial?.totalPaid)}}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <div class="card-header">
+                <h3><mat-icon>verified</mat-icon> Compliance Status</h3>
+              </div>
+              <div class="compliance-grid">
+                @for (check of [{key:'csd',label:'CSD Verification',icon:'fact_check'},{key:'cipc',label:'CIPC Registration',icon:'business'},{key:'sars',label:'SARS Tax Compliance',icon:'receipt'},{key:'municipal_rates',label:'Municipal Rates',icon:'location_city'},{key:'bank_verification',label:'Bank Verification',icon:'account_balance'}]; track check.key) {
+                  <div class="compliance-item" [class.verified]="supplierDashboard().verificationStatus?.[check.key]?.verified">
+                    <div class="comp-icon-wrap">
+                      <mat-icon>{{supplierDashboard().verificationStatus?.[check.key]?.verified ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
+                    </div>
+                    <div class="comp-info">
+                      <span class="comp-label">{{check.label}}</span>
+                      <span class="comp-status">{{supplierDashboard().verificationStatus?.[check.key]?.verified ? 'Verified' : 'Pending'}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-card full-width">
+            <div class="card-header">
+              <h3><mat-icon>history</mat-icon> Recent Invoice Activity</h3>
+              <button mat-stroked-button (click)="switchSupplierTab('invoices')">View All <mat-icon>arrow_forward</mat-icon></button>
+            </div>
+            <table class="modern-table">
+              <thead>
+                <tr><th>Reference</th><th>Your Invoice #</th><th>Type</th><th>Status</th><th>Amount</th><th>Date</th><th>Payment ETA</th></tr>
+              </thead>
+              <tbody>
+                @for (inv of supplierDashboard().recentActivity || []; track inv.id) {
+                  <tr class="clickable-row" (click)="switchSupplierTab('invoices'); viewInvoiceDetail(inv)">
+                    <td class="ref-cell">{{inv.referenceNumber}}</td>
+                    <td>{{inv.supplierInvoiceNumber || '—'}}</td>
+                    <td><span class="type-badge">{{inv.invoiceType || 'regular'}}</span></td>
+                    <td><span class="status-pill" [style.background]="getInvoiceStatusColor(inv.status)">{{getInvoiceStatusLabel(inv.status)}}</span></td>
+                    <td class="amount-cell">{{formatCurrency(inv.totalAmount)}}</td>
+                    <td>{{formatDate(inv.invoiceDate)}}</td>
+                    <td>{{inv.estimatedPaymentDate ? formatDate(inv.estimatedPaymentDate) : (inv.status === 'paid' ? 'Paid' : 'Processing')}}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="7" class="empty-cell">No recent invoices — submit your first invoice above</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===== SUPPLIER ORDERS ===== -->
+      @if (supplierTab() === 'orders') {
+        @if (selectedOrderDetail()) {
+          <div class="sp-section">
+            <button mat-stroked-button (click)="backToList()" class="back-btn"><mat-icon>arrow_back</mat-icon> Back to Orders</button>
+            <div class="detail-header">
+              <h2>{{selectedOrderDetail().id}} — {{selectedOrderDetail().description}}</h2>
+              <span class="inv-status" [style.background]="selectedOrderDetail().status === 'approved' ? '#10b981' : '#3b82f6'">{{selectedOrderDetail().status}}</span>
+            </div>
+
+            <div class="kpi-strip">
+              <div class="kpi-tile kpi-blue"><mat-icon>shopping_cart</mat-icon><span class="kpi-value">{{formatCurrency(selectedOrderDetail().budget?.orderValue)}}</span><span class="kpi-label">Order Value</span></div>
+              <div class="kpi-tile kpi-amber"><mat-icon>receipt</mat-icon><span class="kpi-value">{{formatCurrency(selectedOrderDetail().budget?.totalInvoiced)}}</span><span class="kpi-label">Invoiced</span></div>
+              <div class="kpi-tile kpi-green"><mat-icon>paid</mat-icon><span class="kpi-value">{{formatCurrency(selectedOrderDetail().budget?.totalPaid)}}</span><span class="kpi-label">Paid</span></div>
+              <div class="kpi-tile kpi-teal"><mat-icon>account_balance_wallet</mat-icon><span class="kpi-value">{{formatCurrency(selectedOrderDetail().budget?.remaining)}}</span><span class="kpi-label">Remaining</span></div>
+            </div>
+
+            <div class="budget-bar-container">
+              <div class="budget-bar-label">Budget Utilization: {{selectedOrderDetail().budget?.percentageUsed || 0}}%</div>
+              <div class="budget-bar-track"><div class="budget-bar-fill" [style.width.%]="selectedOrderDetail().budget?.percentageUsed || 0" [style.background]="(selectedOrderDetail().budget?.percentageUsed || 0) > 90 ? '#ef4444' : '#3b82f6'"></div></div>
+            </div>
+
+            @if ((selectedOrderDetail().lineItems || []).length > 0) {
+              <div class="detail-card">
+                <h3><mat-icon>list</mat-icon> Line Items</h3>
+                <table class="data-table">
+                  <thead><tr><th>Description</th><th>Qty</th><th>UOM</th><th>Unit Price</th><th>Total</th></tr></thead>
+                  <tbody>
+                    @for (li of selectedOrderDetail().lineItems; track $index) {
+                      <tr><td>{{li.description}}</td><td>{{li.quantity}}</td><td>{{li.uom}}</td><td>{{formatCurrency(li.unitPrice)}}</td><td>{{formatCurrency(li.total)}}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            @if ((selectedOrderDetail().invoices || []).length > 0) {
+              <div class="detail-card">
+                <h3><mat-icon>receipt_long</mat-icon> Related Invoices</h3>
+                <table class="data-table">
+                  <thead><tr><th>Reference</th><th>Invoice #</th><th>Status</th><th>Amount</th><th>Date</th></tr></thead>
+                  <tbody>
+                    @for (inv of selectedOrderDetail().invoices; track inv.id) {
+                      <tr><td>{{inv.referenceNumber}}</td><td>{{inv.supplierInvoiceNumber || '—'}}</td>
+                        <td><span class="inv-status" [style.background]="getInvoiceStatusColor(inv.status)">{{getInvoiceStatusLabel(inv.status)}}</span></td>
+                        <td>{{formatCurrency(inv.totalAmount)}}</td><td>{{formatDate(inv.invoiceDate)}}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            @if (selectedOrderDetail().canSubmitInvoice) {
+              <button mat-flat-button color="primary" (click)="openInvoiceUpload(selectedOrderDetail().id)" class="submit-btn">
+                <mat-icon>upload_file</mat-icon> Submit Invoice for this Order
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="sp-section">
+            <div class="section-header">
+              <h2><mat-icon>shopping_cart</mat-icon> My Orders & Budget</h2>
+              <div class="summary-chips">
+                <span class="chip chip-blue">{{supplierOrders().summary?.totalOrders || 0}} Total</span>
+                <span class="chip chip-green">{{supplierOrders().summary?.activeOrders || 0}} Active</span>
+                <span class="chip chip-teal">Remaining: {{formatCurrency(supplierOrders().summary?.totalRemaining)}}</span>
+              </div>
+            </div>
+            @for (order of supplierOrders().orders || []; track order.id) {
+              <div class="order-card" (click)="viewOrderDetail(order)">
+                <div class="order-header">
+                  <div class="order-title"><strong>{{order.id}}</strong> — {{order.description}}</div>
+                  <span class="inv-status" [style.background]="order.status === 'approved' ? '#10b981' : '#3b82f6'">{{order.status}}</span>
+                </div>
+                <div class="order-meta">
+                  <span><mat-icon>calendar_today</mat-icon> {{formatDate(order.orderDate)}}</span>
+                  <span><mat-icon>local_shipping</mat-icon> Delivery: {{formatDate(order.deliveryDate)}}</span>
+                  <span><mat-icon>receipt</mat-icon> {{order.invoiceCount}} invoice(s)</span>
+                </div>
+                <div class="budget-bar-container compact">
+                  <div class="budget-info-row">
+                    <span>Order: {{formatCurrency(order.budget?.orderValue)}}</span>
+                    <span>Invoiced: {{formatCurrency(order.budget?.totalInvoiced)}}</span>
+                    <span>Remaining: {{formatCurrency(order.budget?.remaining)}}</span>
+                  </div>
+                  <div class="budget-bar-track"><div class="budget-bar-fill" [style.width.%]="order.budget?.percentageUsed || 0"></div></div>
+                </div>
+                @if (order.canSubmitInvoice) {
+                  <button mat-stroked-button color="primary" class="order-action" (click)="$event.stopPropagation(); openInvoiceUpload(order.id)">
+                    <mat-icon>upload_file</mat-icon> Submit Invoice
+                  </button>
+                }
+              </div>
+            }
+            @if ((supplierOrders().orders || []).length === 0) {
+              <div class="empty-state"><mat-icon>inbox</mat-icon><p>No purchase orders found</p></div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===== SUPPLIER CONTRACTS ===== -->
+      @if (supplierTab() === 'contracts') {
+        @if (selectedContractDetail()) {
+          <div class="sp-section">
+            <button mat-stroked-button (click)="backToList()" class="back-btn"><mat-icon>arrow_back</mat-icon> Back to Contracts</button>
+            <div class="detail-header">
+              <h2>{{selectedContractDetail().id}} — {{selectedContractDetail().title}}</h2>
+              <span class="inv-status" [style.background]="selectedContractDetail().status === 'active' ? '#10b981' : '#64748b'">{{selectedContractDetail().status}}</span>
+            </div>
+
+            <div class="kpi-strip">
+              <div class="kpi-tile kpi-purple"><mat-icon>description</mat-icon><span class="kpi-value">{{formatCurrency(selectedContractDetail().financial?.contractValue)}}</span><span class="kpi-label">Contract Value</span></div>
+              <div class="kpi-tile kpi-amber"><mat-icon>receipt</mat-icon><span class="kpi-value">{{formatCurrency(selectedContractDetail().financial?.totalInvoiced)}}</span><span class="kpi-label">Invoiced</span></div>
+              <div class="kpi-tile kpi-green"><mat-icon>paid</mat-icon><span class="kpi-value">{{formatCurrency(selectedContractDetail().financial?.totalPaid)}}</span><span class="kpi-label">Paid</span></div>
+              <div class="kpi-tile kpi-teal"><mat-icon>account_balance_wallet</mat-icon><span class="kpi-value">{{formatCurrency(selectedContractDetail().financial?.remaining)}}</span><span class="kpi-label">Remaining</span></div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>schedule</mat-icon> Contract Timeline</h3>
+              <div class="contract-timeline-info">
+                <span>Start: {{formatDate(selectedContractDetail().startDate)}}</span>
+                <span>End: {{formatDate(selectedContractDetail().endDate)}}</span>
+                <span>{{selectedContractDetail().timeline?.daysRemaining}} days remaining</span>
+              </div>
+              <div class="budget-bar-track"><div class="budget-bar-fill" [style.width.%]="selectedContractDetail().timeline?.percentageComplete || 0" style="background:#8b5cf6"></div></div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>gavel</mat-icon> SLA Terms</h3>
+              <div class="sla-grid">
+                <div class="sla-item"><strong>Response Time:</strong> {{selectedContractDetail().sla?.responseTime}}</div>
+                <div class="sla-item"><strong>Delivery:</strong> {{selectedContractDetail().sla?.deliveryTimeline}}</div>
+                <div class="sla-item"><strong>Penalty Rate:</strong> {{selectedContractDetail().sla?.penaltyRate}}</div>
+                <div class="sla-item"><strong>Warranty:</strong> {{selectedContractDetail().sla?.warrantyPeriod}}</div>
+              </div>
+            </div>
+
+            @if ((selectedContractDetail().milestones || []).length > 0) {
+              <div class="detail-card">
+                <h3><mat-icon>flag</mat-icon> Milestones</h3>
+                <table class="data-table">
+                  <thead><tr><th>Milestone</th><th>Due Date</th><th>Status</th><th>Amount</th></tr></thead>
+                  <tbody>
+                    @for (m of selectedContractDetail().milestones; track $index) {
+                      <tr><td>{{m.name || m.description}}</td><td>{{formatDate(m.dueDate)}}</td>
+                        <td><span class="inv-status" [style.background]="m.status === 'completed' ? '#10b981' : m.status === 'in_progress' ? '#3b82f6' : '#94a3b8'">{{m.status}}</span></td>
+                        <td>{{formatCurrency(m.amount)}}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            @if (selectedContractDetail().canSubmitInvoice) {
+              <button mat-flat-button color="primary" (click)="openInvoiceUpload('', selectedContractDetail().id)" class="submit-btn">
+                <mat-icon>upload_file</mat-icon> Submit Contract Invoice
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="sp-section">
+            <div class="section-header">
+              <h2><mat-icon>description</mat-icon> My Contracts & SLAs</h2>
+              <div class="summary-chips">
+                <span class="chip chip-purple">{{supplierContracts().summary?.totalContracts || 0}} Total</span>
+                <span class="chip chip-green">{{supplierContracts().summary?.activeContracts || 0}} Active</span>
+              </div>
+            </div>
+            @for (c of supplierContracts().contracts || []; track c.id) {
+              <div class="order-card" (click)="viewContractDetail(c)">
+                <div class="order-header">
+                  <div class="order-title"><strong>{{c.id}}</strong> — {{c.title}}</div>
+                  <span class="inv-status" [style.background]="c.status === 'active' ? '#10b981' : '#64748b'">{{c.status}}</span>
+                </div>
+                <div class="order-meta">
+                  <span><mat-icon>calendar_today</mat-icon> {{formatDate(c.startDate)}} - {{formatDate(c.endDate)}}</span>
+                  <span><mat-icon>schedule</mat-icon> {{c.timeline?.daysRemaining}} days left ({{c.timeline?.percentageComplete}}%)</span>
+                </div>
+                <div class="budget-bar-container compact">
+                  <div class="budget-info-row">
+                    <span>Value: {{formatCurrency(c.financial?.contractValue)}}</span>
+                    <span>Spent: {{formatCurrency(c.financial?.totalPaid)}}</span>
+                    <span>Remaining: {{formatCurrency(c.financial?.remaining)}}</span>
+                  </div>
+                  <div class="budget-bar-track"><div class="budget-bar-fill" [style.width.%]="c.financial?.percentageSpent || 0" style="background:#8b5cf6"></div></div>
+                </div>
+              </div>
+            }
+            @if ((supplierContracts().contracts || []).length === 0) {
+              <div class="empty-state"><mat-icon>inbox</mat-icon><p>No contracts found</p></div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===== SUPPLIER INVOICES ===== -->
+      @if (supplierTab() === 'invoices') {
+        @if (selectedInvoiceDetail()) {
+          <div class="sp-section">
+            <button mat-stroked-button (click)="backToList()" class="back-btn"><mat-icon>arrow_back</mat-icon> Back to Invoices</button>
+            <div class="detail-header">
+              <h2>Invoice {{selectedInvoiceDetail().referenceNumber}}</h2>
+              <span class="inv-status" [style.background]="getInvoiceStatusColor(selectedInvoiceDetail().status)">{{selectedInvoiceDetail().statusLabel || getInvoiceStatusLabel(selectedInvoiceDetail().status)}}</span>
+            </div>
+
+            <div class="invoice-info-grid">
+              <div class="info-item"><span class="info-label">Your Invoice #</span><span class="info-value">{{selectedInvoiceDetail().supplierInvoiceNumber || '—'}}</span></div>
+              <div class="info-item"><span class="info-label">Invoice Date</span><span class="info-value">{{formatDate(selectedInvoiceDetail().invoiceDate)}}</span></div>
+              <div class="info-item"><span class="info-label">Received Date</span><span class="info-value">{{formatDate(selectedInvoiceDetail().receivedDate)}}</span></div>
+              <div class="info-item"><span class="info-label">Due Date (MFMA 30-day)</span><span class="info-value" [style.color]="selectedInvoiceDetail().isOverdue ? '#dc2626' : '#334155'">{{formatDate(selectedInvoiceDetail().dueDate)}}</span></div>
+              <div class="info-item"><span class="info-label">Total Amount</span><span class="info-value amount">{{formatCurrency(selectedInvoiceDetail().totalAmount)}}</span></div>
+              <div class="info-item"><span class="info-label">VAT</span><span class="info-value">{{formatCurrency(selectedInvoiceDetail().vatAmount)}}</span></div>
+              <div class="info-item"><span class="info-label">Net Payable</span><span class="info-value amount">{{formatCurrency(selectedInvoiceDetail().netPayable)}}</span></div>
+              <div class="info-item"><span class="info-label">Type</span><span class="info-value">{{selectedInvoiceDetail().invoiceType}}</span></div>
+            </div>
+
+            @if (selectedInvoiceDetail().nextAction) {
+              <div class="next-action-banner">
+                <mat-icon>info</mat-icon>
+                <span><strong>Current Status:</strong> {{selectedInvoiceDetail().nextAction}}</span>
+              </div>
+            }
+
+            @if (selectedInvoiceDetail().isOverdue) {
+              <div class="next-action-banner overdue"><mat-icon>warning</mat-icon><span>This invoice is overdue. MFMA 30-day payment deadline has passed.</span></div>
+            }
+
+            <!-- Approval Timeline -->
+            <div class="detail-card timeline-card">
+              <h3><mat-icon>timeline</mat-icon> Approval Progress
+                @if (invoiceTimeline()) {
+                  <span class="progress-badge">{{invoiceTimeline()?.progressPercentage || 0}}%</span>
+                }
+              </h3>
+              @if (invoiceTimeline()) {
+                <div class="approval-timeline">
+                  @for (step of invoiceTimeline()?.timeline || []; track step.key) {
+                    <div class="timeline-step" [class.completed]="step.status === 'completed'" [class.current]="step.status === 'current'" [class.rejected]="step.status === 'rejected'" [class.pending]="step.status === 'pending'">
+                      <div class="step-indicator">
+                        <div class="step-dot">
+                          @if (step.status === 'completed') { <mat-icon>check</mat-icon> }
+                          @else if (step.status === 'current') { <mat-icon>{{step.icon}}</mat-icon> }
+                          @else if (step.status === 'rejected') { <mat-icon>close</mat-icon> }
+                          @else { <mat-icon>circle</mat-icon> }
+                        </div>
+                        @if (!$last) { <div class="step-line"></div> }
+                      </div>
+                      <div class="step-content">
+                        <div class="step-label">{{step.label}}</div>
+                        <div class="step-description">{{step.description}}</div>
+                        @if (step.timestamp) { <div class="step-date">{{formatDateTime(step.timestamp)}}</div> }
+                        @if (step.completedBy) { <div class="step-by">by {{step.completedBy}}</div> }
+                      </div>
+                    </div>
+                  }
+                </div>
+                @if (invoiceTimeline()?.estimatedPaymentDate) {
+                  <div class="estimated-payment">
+                    <mat-icon>event</mat-icon> Estimated payment date: <strong>{{formatDate(invoiceTimeline()?.estimatedPaymentDate)}}</strong>
+                  </div>
+                }
+              }
+            </div>
+
+            @if (selectedInvoiceDetail().payment) {
+              <div class="detail-card payment-detail">
+                <h3><mat-icon>payments</mat-icon> Payment Information</h3>
+                <div class="payment-grid">
+                  <div class="info-item"><span class="info-label">Batch Reference</span><span class="info-value">{{selectedInvoiceDetail().payment.batchReference}}</span></div>
+                  <div class="info-item"><span class="info-label">Payment Method</span><span class="info-value">{{selectedInvoiceDetail().payment.paymentMethod}}</span></div>
+                  <div class="info-item"><span class="info-label">EFT Reference</span><span class="info-value">{{selectedInvoiceDetail().payment.eftFileReference || '—'}}</span></div>
+                  <div class="info-item"><span class="info-label">Processed Date</span><span class="info-value">{{formatDate(selectedInvoiceDetail().payment.processedDate)}}</span></div>
+                </div>
+              </div>
+            }
+
+            @if (selectedInvoiceDetail().hasMissingDocs) {
+              <div class="detail-card missing-docs-card">
+                <h3><mat-icon>warning</mat-icon> Missing Documents — Action Required</h3>
+                <p>The municipality has flagged the following documents as missing or incomplete. Please resubmit to continue processing.</p>
+                @for (def of selectedInvoiceDetail().missingDocuments || []; track $index) {
+                  <div class="deficiency-item">
+                    @for (doc of def.missingDocuments || [def]; track $index) {
+                      <div class="missing-doc-row">
+                        <mat-icon [style.color]="doc.resubmitted ? '#10b981' : '#ef4444'">{{doc.resubmitted ? 'check_circle' : 'cancel'}}</mat-icon>
+                        <span>{{doc.label || doc.type}}</span>
+                        <span class="doc-reason">{{doc.reason}}</span>
+                      </div>
+                    }
+                  </div>
+                }
+                <button mat-flat-button color="warn" (click)="openResubmitDialog(selectedInvoiceDetail())">
+                  <mat-icon>upload_file</mat-icon> Resubmit Documents
+                </button>
+              </div>
+            }
+
+            @if (selectedInvoiceDetail().rejectionReason) {
+              <div class="detail-card rejection-card">
+                <h3><mat-icon>block</mat-icon> Rejection Reason</h3>
+                <p>{{selectedInvoiceDetail().rejectionReason}}</p>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="sp-section">
+            <div class="section-header">
+              <h2><mat-icon>receipt_long</mat-icon> My Invoices</h2>
+              <div class="section-actions">
+                <button mat-flat-button color="primary" (click)="openInvoiceUpload()"><mat-icon>upload_file</mat-icon> Upload Invoice</button>
+              </div>
+            </div>
+
+            <div class="kpi-strip compact">
+              <div class="kpi-mini" (click)="filterInvoicesByStatus('')" [class.active]="!invoiceStatusFilter">
+                <span class="kpi-value">{{supplierInvoices().summary?.total || 0}}</span><span class="kpi-label">All</span>
+              </div>
+              <div class="kpi-mini" (click)="filterInvoicesByStatus('submitted')" [class.active]="invoiceStatusFilter === 'submitted'">
+                <span class="kpi-value" style="color:#3b82f6">{{supplierInvoices().summary?.byStatus?.submitted || 0}}</span><span class="kpi-label">Submitted</span>
+              </div>
+              <div class="kpi-mini" (click)="filterInvoicesByStatus('approved')" [class.active]="invoiceStatusFilter === 'approved'">
+                <span class="kpi-value" style="color:#10b981">{{supplierInvoices().summary?.byStatus?.approved || 0}}</span><span class="kpi-label">Approved</span>
+              </div>
+              <div class="kpi-mini" (click)="filterInvoicesByStatus('paid')" [class.active]="invoiceStatusFilter === 'paid'">
+                <span class="kpi-value" style="color:#059669">{{supplierInvoices().summary?.byStatus?.paid || 0}}</span><span class="kpi-label">Paid</span>
+              </div>
+              <div class="kpi-mini" (click)="filterInvoicesByStatus('rejected')" [class.active]="invoiceStatusFilter === 'rejected'">
+                <span class="kpi-value" style="color:#dc2626">{{supplierInvoices().summary?.byStatus?.rejected || 0}}</span><span class="kpi-label">Rejected</span>
+              </div>
+            </div>
+
+            <div class="summary-strip">
+              <span>Total: {{formatCurrency(supplierInvoices().summary?.totalValue)}}</span>
+              <span>Paid: {{formatCurrency(supplierInvoices().summary?.paidValue)}}</span>
+              <span>Pending: {{formatCurrency(supplierInvoices().summary?.pendingValue)}}</span>
+              @if ((supplierInvoices().summary?.overdueCount || 0) > 0) {
+                <span class="overdue-badge">{{supplierInvoices().summary?.overdueCount}} Overdue</span>
+              }
+            </div>
+
+            @for (inv of supplierInvoices().invoices || []; track inv.id) {
+              <div class="invoice-row" (click)="viewInvoiceDetail(inv)" [class.has-alert]="inv.hasMissingDocs || inv.isOverdue">
+                <div class="invoice-row-main">
+                  <div class="invoice-row-left">
+                    <strong>{{inv.referenceNumber}}</strong>
+                    <span class="inv-sub">{{inv.supplierInvoiceNumber || '—'}}</span>
+                  </div>
+                  <div class="invoice-row-center">
+                    <div class="mini-timeline">
+                      @for (phase of inv.approvalTimeline || []; track phase.key) {
+                        <div class="mini-dot" [class.completed]="phase.status === 'completed'" [class.current]="phase.status === 'current'" [class.rejected]="phase.status === 'rejected'"
+                             [matTooltip]="phase.label + ': ' + phase.status"></div>
+                      }
+                    </div>
+                  </div>
+                  <div class="invoice-row-right">
+                    <span class="inv-status" [style.background]="getInvoiceStatusColor(inv.status)">{{inv.statusLabel || getInvoiceStatusLabel(inv.status)}}</span>
+                    <span class="inv-amount">{{formatCurrency(inv.totalAmount)}}</span>
+                    <span class="inv-date">{{formatDate(inv.invoiceDate)}}</span>
+                  </div>
+                </div>
+                @if (inv.hasMissingDocs) {
+                  <div class="invoice-alert"><mat-icon>warning</mat-icon> Missing documents — resubmission required</div>
+                }
+                @if (inv.isOverdue) {
+                  <div class="invoice-alert overdue"><mat-icon>error</mat-icon> Overdue — past MFMA 30-day deadline</div>
+                }
+              </div>
+            }
+            @if ((supplierInvoices().invoices || []).length === 0) {
+              <div class="empty-state"><mat-icon>inbox</mat-icon><p>No invoices found</p></div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===== SUPPLIER PAYMENTS ===== -->
+      @if (supplierTab() === 'payments') {
+        <div class="sp-section">
+          <div class="section-header">
+            <h2><mat-icon>payments</mat-icon> My Payments & Remittances</h2>
+          </div>
+
+          <div class="kpi-strip">
+            <div class="kpi-tile kpi-green"><mat-icon>paid</mat-icon><span class="kpi-value">{{formatCurrency(supplierPayments().summary?.totalPaid)}}</span><span class="kpi-label">Total Received</span><span class="kpi-count">{{supplierPayments().summary?.totalPayments || 0}} payments</span></div>
+            <div class="kpi-tile kpi-blue"><mat-icon>schedule</mat-icon><span class="kpi-value">{{supplierPayments().summary?.averageDaysToPayment || 0}} days</span><span class="kpi-label">Avg Payment Time</span></div>
+            <div class="kpi-tile kpi-teal"><mat-icon>verified</mat-icon><span class="kpi-value">{{supplierPayments().summary?.mfmaCompliantRate || 100}}%</span><span class="kpi-label">MFMA Compliance</span></div>
+            <div class="kpi-tile kpi-purple"><mat-icon>account_balance</mat-icon><span class="kpi-value">{{supplierPayments().supplier?.bankName || '—'}}</span><span class="kpi-label">Account {{supplierPayments().supplier?.accountRef || '—'}}</span></div>
+          </div>
+
+          @if ((supplierPayments().summary?.byMonth || []).length > 0) {
+            <div class="detail-card">
+              <h3><mat-icon>bar_chart</mat-icon> Payment History by Month</h3>
+              <div class="month-chart">
+                @for (m of supplierPayments().summary?.byMonth || []; track m.month) {
+                  <div class="month-bar-item">
+                    <span class="month-label">{{m.month}}</span>
+                    <div class="month-bar-track"><div class="month-bar-fill" [style.width.%]="(m.amount / (supplierPayments().summary?.totalPaid?.amount || 1)) * 100"></div></div>
+                    <span class="month-amount">{{formatCurrency({amount: m.amount, currency: 'ZAR'})}} ({{m.count}})</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="detail-card">
+            <h3><mat-icon>list</mat-icon> Payment Details</h3>
+            <table class="data-table">
+              <thead><tr><th>Reference</th><th>Your Invoice</th><th>Invoice Date</th><th>Paid Date</th><th>Amount</th><th>Days</th><th>EFT Ref</th><th>MFMA</th></tr></thead>
+              <tbody>
+                @for (p of supplierPayments().payments || []; track p.invoiceId) {
+                  <tr>
+                    <td>{{p.referenceNumber}}</td>
+                    <td>{{p.supplierInvoiceNumber || '—'}}</td>
+                    <td>{{formatDate(p.invoiceDate)}}</td>
+                    <td>{{formatDate(p.paidDate)}}</td>
+                    <td class="amount-cell">{{formatCurrency(p.netPaid)}}</td>
+                    <td>{{p.daysToPayment || '—'}}</td>
+                    <td>{{p.paymentBatch?.eftFileReference || '—'}}</td>
+                    <td><mat-icon [style.color]="p.mfmaCompliant ? '#10b981' : '#dc2626'">{{p.mfmaCompliant ? 'check_circle' : 'cancel'}}</mat-icon></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if ((supplierPayments().payments || []).length === 0) {
+            <div class="empty-state"><mat-icon>inbox</mat-icon><p>No payments received yet</p></div>
+          }
+        </div>
+      }
+
+      <!-- ===== DOCUMENTS & STATEMENT ===== -->
+      @if (supplierTab() === 'documents') {
+        <div class="sp-section">
+          <div class="section-header">
+            <h2><mat-icon>folder_open</mat-icon> Document Centre & Statement</h2>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>receipt</mat-icon> Account Statement</h3>
+            <table class="data-table">
+              <thead><tr><th>Date</th><th>Reference</th><th>Your Ref</th><th>Type</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (line of supplierStatement().lines || []; track $index) {
+                  <tr>
+                    <td>{{formatDate(line.date)}}</td>
+                    <td>{{line.reference}}</td>
+                    <td>{{line.supplierRef || '—'}}</td>
+                    <td>{{line.type}}</td>
+                    <td class="amount-cell">{{formatCurrency(line.debit)}}</td>
+                    <td class="amount-cell credit">{{line.credit ? formatCurrency(line.credit) : '—'}}</td>
+                    <td class="amount-cell">{{formatCurrency(line.balance)}}</td>
+                    <td><span class="inv-status" [style.background]="getInvoiceStatusColor(line.status)" style="font-size:11px">{{getInvoiceStatusLabel(line.status)}}</span></td>
+                  </tr>
+                }
+              </tbody>
+              @if ((supplierStatement().lines || []).length > 0) {
+                <tfoot>
+                  <tr class="total-row">
+                    <td colspan="4"><strong>Totals</strong></td>
+                    <td class="amount-cell"><strong>{{formatCurrency(supplierStatement().totals?.totalInvoiced)}}</strong></td>
+                    <td class="amount-cell credit"><strong>{{formatCurrency(supplierStatement().totals?.totalPaid)}}</strong></td>
+                    <td class="amount-cell"><strong>{{formatCurrency(supplierStatement().totals?.balance)}}</strong></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              }
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===== NOTIFICATIONS ===== -->
+      @if (supplierTab() === 'notifications') {
+        <div class="sp-section">
+          <div class="section-header">
+            <h2><mat-icon>notifications</mat-icon> Notifications & Messages</h2>
+            <div class="summary-chips">
+              <span class="chip chip-amber">{{supplierNotifications().unreadCount || 0}} Unread</span>
+              @if ((supplierNotifications().urgentCount || 0) > 0) {
+                <span class="chip chip-red">{{supplierNotifications().urgentCount}} Urgent</span>
+              }
+            </div>
+          </div>
+
+          @for (n of supplierNotifications().notifications || []; track $index) {
+            <div class="notification-item" [class.urgent]="n.urgent" [class.unread]="!n.read">
+              <div class="notif-icon">
+                @if (n.type === 'payment_processed') { <mat-icon style="color:#059669">paid</mat-icon> }
+                @else if (n.type === 'invoice_approved') { <mat-icon style="color:#10b981">check_circle</mat-icon> }
+                @else if (n.type === 'invoice_rejected') { <mat-icon style="color:#dc2626">cancel</mat-icon> }
+                @else if (n.type === 'missing_documents') { <mat-icon style="color:#f59e0b">warning</mat-icon> }
+                @else if (n.type === 'document_expiring') { <mat-icon style="color:#f59e0b">schedule</mat-icon> }
+                @else if (n.type === 'document_expired') { <mat-icon style="color:#dc2626">error</mat-icon> }
+                @else { <mat-icon>info</mat-icon> }
+              </div>
+              <div class="notif-content">
+                <p>{{n.message}}</p>
+                <span class="notif-date">{{formatDateTime(n.date)}}</span>
+                @if (n.invoiceRef) { <span class="notif-ref">Ref: {{n.invoiceRef}}</span> }
+              </div>
+              @if (n.type === 'missing_documents' && n.invoiceId) {
+                <button mat-stroked-button (click)="switchSupplierTab('invoices')">View Invoice</button>
+              }
+            </div>
+          }
+          @if ((supplierNotifications().notifications || []).length === 0) {
+            <div class="empty-state"><mat-icon>notifications_none</mat-icon><p>No notifications</p></div>
+          }
+        </div>
+      }
+
+      <!-- ===== INVOICE UPLOAD DIALOG ===== -->
+      @if (showInvoiceUpload()) {
+        <div class="dialog-overlay" (click)="showInvoiceUpload.set(false)">
+          <div class="dialog-content" (click)="$event.stopPropagation()">
+            <div class="dialog-header">
+              <h2><mat-icon>upload_file</mat-icon> Upload Invoice</h2>
+              <button mat-icon-button (click)="showInvoiceUpload.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="dialog-body">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Invoice Type</mat-label>
+                <mat-select [(ngModel)]="uploadForm.invoiceType">
+                  <mat-option value="regular">Regular Invoice (PO-linked)</mat-option>
+                  <mat-option value="contract_service">Contract Service Invoice</mat-option>
+                  <mat-option value="retention">Retention Release</mat-option>
+                  <mat-option value="guarantee">Guarantee Release</mat-option>
+                  <mat-option value="sundry">Sundry Invoice</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Your Invoice Number</mat-label>
+                <input matInput [(ngModel)]="uploadForm.supplierInvoiceNumber" placeholder="e.g. INV-2025-001">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Estimated Amount (excl. VAT)</mat-label>
+                <input matInput type="number" [(ngModel)]="uploadForm.estimatedAmount" placeholder="0.00">
+                <span matPrefix>R&nbsp;</span>
+              </mat-form-field>
+
+              @if (uploadForm.orderId) {
+                <div class="linked-entity"><mat-icon>link</mat-icon> Linked to Order: <strong>{{uploadForm.orderId}}</strong></div>
+              }
+              @if (uploadForm.contractId) {
+                <div class="linked-entity"><mat-icon>link</mat-icon> Linked to Contract: <strong>{{uploadForm.contractId}}</strong></div>
+              }
+
+              <div class="upload-area">
+                <mat-icon>cloud_upload</mat-icon>
+                <p>Invoice PDF/image will be OCR-processed automatically</p>
+                <span class="upload-hint">Supported: PDF, JPEG, PNG, TIFF</span>
+              </div>
+
+              <h4>Supporting Documents</h4>
+              <div class="doc-chips">
+                <button mat-stroked-button (click)="addSupportingDoc('tax_invoice')">Tax Invoice</button>
+                <button mat-stroked-button (click)="addSupportingDoc('delivery_note')">Delivery Note</button>
+                <button mat-stroked-button (click)="addSupportingDoc('payment_certificate')">Payment Certificate</button>
+                <button mat-stroked-button (click)="addSupportingDoc('milestone_report')">Milestone Report</button>
+                <button mat-stroked-button (click)="addSupportingDoc('completion_certificate')">Completion Certificate</button>
+                <button mat-stroked-button (click)="addSupportingDoc('supporting')">Other Supporting</button>
+              </div>
+
+              @for (doc of uploadForm.supportingDocuments; track $index) {
+                <div class="attached-doc">
+                  <mat-icon>attach_file</mat-icon>
+                  <span>{{doc.type.replace('_', ' ') | titlecase}} — {{doc.filename}}</span>
+                  <button mat-icon-button (click)="removeSupportingDoc($index)"><mat-icon>close</mat-icon></button>
+                </div>
+              }
+            </div>
+            <div class="dialog-footer">
+              <button mat-stroked-button (click)="showInvoiceUpload.set(false)">Cancel</button>
+              <button mat-flat-button color="primary" (click)="submitInvoiceUpload()" [disabled]="loading()">
+                <mat-icon>send</mat-icon> Submit Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ===== DOCUMENT RESUBMISSION DIALOG ===== -->
+      @if (showResubmitDialog()) {
+        <div class="dialog-overlay" (click)="showResubmitDialog.set(false)">
+          <div class="dialog-content" (click)="$event.stopPropagation()">
+            <div class="dialog-header">
+              <h2><mat-icon>file_upload</mat-icon> Resubmit Missing Documents</h2>
+              <button mat-icon-button (click)="showResubmitDialog.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="dialog-body">
+              <p>Select the documents you want to resubmit for invoice <strong>{{resubmitInvoice()?.referenceNumber}}</strong>:</p>
+              @for (doc of resubmitDocs; track $index) {
+                <div class="resubmit-row">
+                  <mat-checkbox [(ngModel)]="doc.selected">{{doc.label || doc.type}}</mat-checkbox>
+                  @if (doc.selected) {
+                    <div class="upload-area compact">
+                      <mat-icon>cloud_upload</mat-icon>
+                      <span>Drop file or click to upload</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            <div class="dialog-footer">
+              <button mat-stroked-button (click)="showResubmitDialog.set(false)">Cancel</button>
+              <button mat-flat-button color="warn" (click)="submitResubmission()">
+                <mat-icon>send</mat-icon> Resubmit Documents
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ================= ADMIN MANAGEMENT ================= -->
+  @if (portalMode() === 'admin') {
+    @if (currentView() === 'dashboard') {
+      <div class="tab-nav">
+        <button class="tab-btn active" (click)="currentView.set('dashboard')">Dashboard</button>
+        <button class="tab-btn" (click)="navigateTo('list')">Registered Suppliers</button>
+        <button class="tab-btn" (click)="navigateTo('submissions')">Invoice Submissions</button>
+      </div>
+
+      <div class="kpi-strip">
+        <div class="kpi-tile" [matTooltip]="'Total registered suppliers'">
+          <mat-icon>business</mat-icon>
+          <span class="kpi-value">{{summary().totalRegistered || 0}}</span>
+          <span class="kpi-label">Total Registered</span>
+        </div>
+        <div class="kpi-tile" [style.border-left-color]="'#2e7d32'" [matTooltip]="(summary().activeSuppliers || 0) + ' active suppliers'">
+          <mat-icon>verified</mat-icon>
+          <span class="kpi-value" style="color:#2e7d32">{{summary().activeSuppliers || 0}}</span>
+          <span class="kpi-label">Active Suppliers</span>
+        </div>
+        <div class="kpi-tile" [style.border-left-color]="(summary().pendingVerification || 0) > 0 ? '#ef6c00' : '#2e7d32'">
+          <mat-icon>hourglass_empty</mat-icon>
+          <span class="kpi-value" [style.color]="(summary().pendingVerification || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{summary().pendingVerification || 0}}</span>
+          <span class="kpi-label">Pending Verification</span>
+        </div>
+        <div class="kpi-tile">
+          <mat-icon>receipt_long</mat-icon>
+          <span class="kpi-value">{{summary().invoiceSubmissions || 0}}</span>
+          <span class="kpi-label">Invoice Submissions</span>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="detail-card">
+          <h3><mat-icon>pie_chart</mat-icon> Status Breakdown</h3>
+          @for (item of [{label:'Active', key:'activeSuppliers', color:'#2e7d32'}, {label:'Pending Verification', key:'pendingVerification', color:'#1565c0'}, {label:'Verified', key:'verified', color:'#00897b'}, {label:'Suspended', key:'suspended', color:'#ef6c00'}, {label:'Blacklisted', key:'blacklisted', color:'#c62828'}]; track item.key) {
+            <div class="breakdown-row" (click)="filterByStatus(item.key)">
+              <span class="status-badge">{{item.label}}</span>
+              <span class="breakdown-count">{{summary()[item.key] || 0}}</span>
+              <div class="breakdown-bar-track"><div class="breakdown-bar-fill" [style.background]="item.color" [style.width.%]="getBreakdownWidth(summary()[item.key])"></div></div>
+            </div>
+          }
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>person_add</mat-icon> Recent Registrations</h3>
+          @for (s of recentSuppliers(); track s.id) {
+            <div class="recent-item clickable-row" (click)="viewSupplier(s)">
+              <div><strong>{{s.companyName}}</strong></div>
+              <div class="recent-meta"><span>{{s.contactPerson}}</span> &bull; <span>{{formatDate(s.registeredDate)}}</span></div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (currentView() === 'list') {
+      <div class="tab-nav">
+        <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+        <button class="tab-btn active">Registered Suppliers</button>
+        <button class="tab-btn" (click)="navigateTo('submissions')">Invoice Submissions</button>
+      </div>
+
+      <div class="filter-bar">
+        <mat-form-field appearance="outline">
+          <mat-label>Search</mat-label>
+          <input matInput [(ngModel)]="searchQuery" (keyup.enter)="loadSuppliers()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Status</mat-label>
+          <mat-select [(ngModel)]="filterStatusValue" (selectionChange)="loadSuppliers()">
+            <mat-option value="">All</mat-option>
+            <mat-option value="active">Active</mat-option>
+            <mat-option value="pending_verification">Pending Verification</mat-option>
+            <mat-option value="suspended">Suspended</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-stroked-button (click)="clearFilters()">Clear</button>
+      </div>
+
+      <table class="data-table">
+        <thead><tr><th>Company</th><th>Contact</th><th>CSD #</th><th>B-BBEE</th><th>Status</th><th>Registered</th><th></th></tr></thead>
+        <tbody>
+          @for (s of suppliers(); track s.id) {
+            <tr class="clickable-row" (click)="viewSupplier(s)">
+              <td><strong>{{s.companyName}}</strong></td>
+              <td>{{s.contactPerson}}</td>
+              <td>{{s.csdNumber}}</td>
+              <td>Level {{s.beeLevel}}</td>
+              <td><span class="status-badge status-{{s.status}}">{{getStatusLabel(s.status)}}</span></td>
+              <td>{{formatDate(s.registeredDate)}}</td>
+              <td><button mat-icon-button (click)="$event.stopPropagation(); viewSupplier(s)"><mat-icon>visibility</mat-icon></button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="pagination">
+        <span>Page {{currentPage()}} of {{totalPages()}} ({{totalSuppliers()}} suppliers)</span>
+        <div>
+          <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)"><mat-icon>chevron_left</mat-icon></button>
+          <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)"><mat-icon>chevron_right</mat-icon></button>
+        </div>
+      </div>
+    }
+
+    @if (currentView() === 'detail' && selectedSupplier()) {
+      <div class="sp-section">
+        <button mat-stroked-button (click)="navigateTo('list')" class="back-btn"><mat-icon>arrow_back</mat-icon> Back</button>
+        <div class="detail-header">
+          <h2>{{selectedSupplier().companyName}}</h2>
+          <span class="status-badge status-{{selectedSupplier().status}}">{{getStatusLabel(selectedSupplier().status)}}</span>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h3><mat-icon>business</mat-icon> Company Details</h3>
+            <div class="info-item"><span class="info-label">Registration</span><span class="info-value">{{selectedSupplier().registrationNumber}}</span></div>
+            <div class="info-item"><span class="info-label">CSD Number</span><span class="info-value">{{selectedSupplier().csdNumber}}</span></div>
+            <div class="info-item"><span class="info-label">VAT Number</span><span class="info-value">{{selectedSupplier().vatNumber || '—'}}</span></div>
+            <div class="info-item"><span class="info-label">Contact</span><span class="info-value">{{selectedSupplier().contactPerson}}</span></div>
+            <div class="info-item"><span class="info-label">Email</span><span class="info-value">{{selectedSupplier().email}}</span></div>
+            <div class="info-item"><span class="info-label">Phone</span><span class="info-value">{{selectedSupplier().phone}}</span></div>
+            <div class="info-item"><span class="info-label">B-BBEE Level</span><span class="info-value">Level {{selectedSupplier().beeLevel}}</span></div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>verified</mat-icon> Verification Checks</h3>
+            @for (check of getVerificationChecks(); track check.key) {
+              <div class="verification-row">
+                <mat-icon [style.color]="check.verified ? '#2e7d32' : '#c62828'">{{check.verified ? 'check_circle' : 'cancel'}}</mat-icon>
+                <span>{{check.label}}</span>
+                @if (check.verifiedDate) { <span class="check-date">{{formatDate(check.verifiedDate)}}</span> }
+              </div>
+            }
+            <div class="action-buttons">
+              <button mat-stroked-button (click)="verifySupplier(selectedSupplier().id)"><mat-icon>fact_check</mat-icon> Run Checks</button>
+              <button mat-stroked-button (click)="verifyAllChecks(selectedSupplier().id)"><mat-icon>done_all</mat-icon> Verify All</button>
+              <button mat-flat-button color="primary" (click)="approveSupplier(selectedSupplier().id)"><mat-icon>check</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="suspendSupplier(selectedSupplier().id)"><mat-icon>block</mat-icon> Suspend</button>
+            </div>
+          </div>
+        </div>
+
+        @if ((documentChecklist() || []).length > 0) {
+          <div class="detail-card">
+            <h3><mat-icon>folder</mat-icon> Document Checklist ({{documentChecklistSummary().uploaded}}/{{documentChecklistSummary().total}})</h3>
+            @for (doc of documentChecklist(); track doc.type) {
+              <div class="doc-check-row">
+                <mat-icon [style.color]="doc.uploaded ? '#2e7d32' : '#c62828'">{{doc.uploaded ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
+                <span>{{doc.label}}</span>
+                @if (doc.mandatory) { <span class="mandatory-badge">Required</span> }
+                @if (doc.expiryDate) { <span class="expiry-date">Expires: {{formatDate(doc.expiryDate)}}</span> }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (currentView() === 'submissions') {
+      <div class="tab-nav">
+        <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+        <button class="tab-btn" (click)="navigateTo('list')">Registered Suppliers</button>
+        <button class="tab-btn active">Invoice Submissions</button>
+      </div>
+
+      <div class="filter-bar">
+        <mat-form-field appearance="outline">
+          <mat-label>Search</mat-label>
+          <input matInput [(ngModel)]="submissionSearch" (keyup.enter)="clearSubmissionFilters()">
+        </mat-form-field>
+        <div class="status-chips">
+          @for (status of ['uploaded','ocr_processing','ocr_complete','ocr_low_confidence','accepted','rejected']; track status) {
+            <button mat-stroked-button [class.active]="submissionFilterStatus === status" (click)="filterSubmissionsByStatus(status)">
+              {{getSubmissionStatusLabel(status)}} ({{getSubmissionCount(status)}})
+            </button>
+          }
+        </div>
+        <button mat-stroked-button (click)="clearSubmissionFilters()">Clear</button>
+      </div>
+
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Supplier</th><th>File</th><th>Date</th><th>OCR</th><th>Status</th></tr></thead>
+        <tbody>
+          @for (sub of submissions(); track sub.id) {
+            @if (!submissionFilterStatus || sub.status === submissionFilterStatus) {
+              <tr>
+                <td>{{sub.id}}</td>
+                <td>{{sub.supplierName}}</td>
+                <td>{{sub.fileName || 'Manual'}}</td>
+                <td>{{formatDateTime(sub.submissionDate)}}</td>
+                <td>
+                  @if (sub.ocrConfidence !== null && sub.ocrConfidence !== undefined) {
+                    <span [style.color]="getOcrConfidenceColor(sub)">{{getOcrConfidence(sub)}}%</span>
+                  } @else { <span>—</span> }
+                </td>
+                <td><span class="status-badge status-{{sub.status}}">{{getSubmissionStatusLabel(sub.status)}}</span></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    }
+  }
+</div>

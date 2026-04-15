@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mSCOA HR & Payroll Management System</title>
+  <link rel="stylesheet" href="/css/dashboard.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar" id="app-sidebar">
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse sidebar">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="sidebar-brand">
+      <div class="brand-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="brand-text">
+        <span class="brand-title">PLATINUM</span>
+        <span class="brand-subtitle">HR & Payroll</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <a class="nav-item active" data-module="dashboard">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+          <span>Dashboard</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-item" data-toggle="hr">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span>HR Management</span>
+          <span class="nav-chevron">&#9654;</span>
+        </div>
+        <div class="nav-children">
+          <a class="nav-child" data-module="employees">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            Employees
+          </a>
+          <a class="nav-child" data-module="organogram">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="14"/><line x1="12" y1="12" x2="19" y2="14"/></svg></span>
+            Organogram
+          </a>
+          <a class="nav-child" data-module="jobprofiles">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+            Job Profiles
+          </a>
+          <a class="nav-child" data-module="positions">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span>
+            Staff Establishment
+          </a>
+          <a class="nav-child" data-module="departments">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+            Departments
+          </a>
+        </div>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="payroll">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+          <span>Payroll</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="leave">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+          <span>Leave Management</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="benefits">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+          <span>Benefits</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="time">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>Time & Attendance</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="performance">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+          <span>Staff Performance</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="reports">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+          <span>Reports & Exports</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="disciplinary">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+          <span>Disciplinary</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="skills">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></span>
+          <span>Skills & Training</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="recruitment">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+          <span>Recruitment</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <a class="nav-item" data-module="ess">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+          <span>Employee Self-Service</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-item" data-toggle="settings">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span>Configuration</span>
+          <span class="nav-chevron">&#9654;</span>
+        </div>
+        <div class="nav-children">
+          <a class="nav-child" data-module="settings-municipality">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+            Municipality Details
+          </a>
+          <a class="nav-child" data-module="settings-employeetypes">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            Employee Sub Types
+          </a>
+          <a class="nav-child" data-module="settings-taskgrades">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+            Task Grades & Notches
+          </a>
+          <a class="nav-child" data-module="settings-conditions">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            Conditions of Service
+          </a>
+          <a class="nav-child" data-module="settings-tax">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            Tax Tables
+          </a>
+          <a class="nav-child" data-module="settings-leave">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            Leave Types
+          </a>
+          <a class="nav-child" data-module="settings-salaryheads">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+            Salary Heads
+          </a>
+          <a class="nav-child" data-module="settings-bank">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+            Bank & Payments
+          </a>
+          <a class="nav-child" data-module="settings-security">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            Security & RBAC
+          </a>
+          <a class="nav-child" data-module="settings-leavepolicies">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            Leave Policies
+          </a>
+          <a class="nav-child" data-module="settings-claimrates">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+            Claim Rates
+          </a>
+          <a class="nav-child" data-module="settings-saltransgroups">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
+            Salary Trans Groups
+          </a>
+          <a class="nav-child" data-module="settings-upperlimits">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+            Upper Limits
+          </a>
+          <a class="nav-child" data-module="settings-workflows">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+            Workflows
+          </a>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div>v4.0</div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <span class="municipality-name" style="font-size:14px;font-weight:600;color:#1e293b">Platinum Municipality</span>
+      <div class="breadcrumb" style="margin-left:16px">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="#64748b" stroke-width="1.75" fill="none"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="separator">/</span>
+        <span>HR & Payroll</span>
+        <span class="separator">/</span>
+        <span class="current" id="breadcrumb-module">Executive Dashboard</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-badge" id="topbar-period-badge">Loading...</span>
+        <span class="audit-badge"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> AG Ready</span>
+        <div class="notification-bell" id="notification-bell" onclick="toggleNotifications()" style="position:relative;cursor:pointer;padding:6px">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notification-count" id="notification-count" style="display:none;position:absolute;top:0;right:0;background:#ef5350;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center">0</span>
+        </div>
+        <div class="notification-dropdown" id="notification-dropdown" style="display:none;position:absolute;top:54px;right:80px;width:360px;max-height:400px;overflow-y:auto;background:#fff;border:1px solid #e8ecf1;border-radius:12px;box-shadow:0 4px 12px rgba(15,43,70,0.1);z-index:1000">
+          <div style="padding:12px 16px;border-bottom:1px solid #e8ecf1;display:flex;justify-content:space-between;align-items:center">
+            <strong style="font-size:14px;color:#1e293b">Notifications</strong>
+            <button class="btn btn-sm" onclick="markAllNotificationsRead()">Mark all read</button>
+          </div>
+          <div id="notification-list" style="padding:8px"></div>
+        </div>
+        <div class="notification-bell" id="settings-gear" onclick="openWorkflowConfig()" style="position:relative;cursor:pointer;padding:6px" title="Approval Workflow Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.75" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <button class="btn btn-sm btn-refresh" onclick="location.reload()"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</button>
+        <a class="btn btn-primary btn-sm" href="/api-docs" target="_blank" style="background:#0f2b46;border-color:#0f2b46"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> API Docs</a>
+        <div class="user-avatar">DS</div>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="page-view" id="executive-dashboard" style="display:block">
+        <div class="page-header">
+          <div>
+            <div class="page-title">HR & Payroll Dashboard</div>
+            <div class="page-subtitle">
+              Platinum mSCOA Module &mdash; <span id="dashboard-date"></span>
+              <span class="period-badge" style="font-size:11px" id="dashboard-period-badge">Loading...</span>
+            </div>
+          </div>
+          <div>
+            <a class="btn btn-sm btn-refresh" href="/api-docs" target="_blank"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Swagger API</a>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" data-tab="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Executive Overview</div>
+          <div class="tab" data-tab="list"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Employee List</div>
+          <div class="tab" data-tab="analytics"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6H14c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><line x1="10" y1="16" x2="14" y2="16"/><line x1="10" y1="19" x2="14" y2="19"/><path d="M10 22h4"/></svg> AI Analytics</div>
+          <div class="tab" data-tab="reports"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Reports</div>
+        </div>
+
+        <div class="tab-content active" id="tab-dashboard">
+          <div id="dashboard-content">
+            <div class="loading"><div class="spinner"></div>Loading dashboard...</div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-list">
+          <div class="loading"><div class="spinner"></div>Click to load employee list...</div>
+        </div>
+
+        <div class="tab-content" id="tab-analytics">
+          <div id="analytics-content">
+            <div class="loading"><div class="spinner"></div>Loading AI Analytics...</div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-reports">
+          <div class="summary-row">
+            <div class="summary-card sc-blue">
+              <div class="summary-icon" style="background:var(--info-bg)"><svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--info-dark)" stroke-width="1.75" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+              <div>
+                <div class="summary-label">IRP5/IT3(a) Certificates</div>
+                <div class="summary-value">Generated</div>
+                <div class="summary-sub">SARS Annual Reconciliation</div>
+              </div>
+            </div>
+            <div class="summary-card sc-green">
+              <div class="summary-icon" style="background:var(--success-bg)"><svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--success-dark)" stroke-width="1.75" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+              <div>
+                <div class="summary-label">EMP201 Monthly</div>
+                <div class="summary-value">Submitted</div>
+                <div class="summary-sub">PAYE, UIF, SDL Returns</div>
+              </div>
+            </div>
+            <div class="summary-card sc-orange">
+              <div class="summary-icon" style="background:var(--warning-bg)"><svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--warning-dark)" stroke-width="1.75" fill="none"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></div>
+              <div>
+                <div class="summary-label">EEA2 / EEA4</div>
+                <div class="summary-value">Pending</div>
+                <div class="summary-sub">Employment Equity Reports</div>
+              </div>
+            </div>
+            <div class="summary-card sc-purple">
+              <div class="summary-icon" style="background:var(--purple-bg)"><svg viewBox="0 0 24 24" width="18" height="18" stroke="var(--purple-dark)" stroke-width="1.75" fill="none"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+              <div>
+                <div class="summary-label">WSP / ATR</div>
+                <div class="summary-value">Due Apr</div>
+                <div class="summary-sub">Skills Development Reports</div>
+              </div>
+            </div>
+          </div>
+          <div class="data-grid">
+            <table>
+              <thead>
+                <tr><th>Report</th><th>Category</th><th>Frequency</th><th>Status</th><th>Due Date</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>EMP201 - Monthly Declaration</td><td>SARS</td><td>Monthly</td><td><span class="status-badge status-completed">Submitted</span></td><td>2026-02-07</td></tr>
+                <tr><td>EMP501 - Bi-Annual Reconciliation</td><td>SARS</td><td>Bi-Annual</td><td><span class="status-badge status-pending">Pending</span></td><td>2026-03-31</td></tr>
+                <tr><td>IRP5/IT3(a) Tax Certificates</td><td>SARS</td><td>Annual</td><td><span class="status-badge status-processing">In Progress</span></td><td>2026-05-31</td></tr>
+                <tr><td>EEA2 - Employment Equity Report</td><td>DoEL</td><td>Annual</td><td><span class="status-badge status-pending">Pending</span></td><td>2026-01-15</td></tr>
+                <tr><td>WSP/ATR - Skills Development</td><td>LGSETA</td><td>Annual</td><td><span class="status-badge status-pending">Pending</span></td><td>2026-04-30</td></tr>
+                <tr><td>mSCOA CoE Analysis (A1)</td><td>National Treasury</td><td>Quarterly</td><td><span class="status-badge status-completed">Submitted</span></td><td>2026-01-31</td></tr>
+                <tr><td>MFMA Section 71 Report</td><td>National Treasury</td><td>Quarterly</td><td><span class="status-badge status-completed">Submitted</span></td><td>2026-01-31</td></tr>
+                <tr><td>AG Audit Working Papers</td><td>AGSA</td><td>Annual</td><td><span class="status-badge status-processing">In Progress</span></td><td>2026-08-31</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-view" id="module-page" style="display:none">
+        <div class="page-header">
+          <div>
+            <div class="page-title" id="module-title">Module</div>
+            <div class="page-subtitle" id="module-subtitle"></div>
+          </div>
+          <div>
+            <button class="btn btn-sm" data-module="dashboard"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back to Dashboard</button>
+          </div>
+        </div>
+        <div id="module-body">
+          <div class="loading"><div class="spinner"></div>Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/components.js"></script>
+  <script src="/js/modules/employees.js"></script>
+  <script src="/js/modules/payroll.js"></script>
+  <script src="/js/modules/jobprofiles.js"></script>
+  <script src="/js/modules/positions.js"></script>
+  <script src="/js/modules/leave.js"></script>
+  <script src="/js/modules/benefits.js"></script>
+  <script src="/js/modules/time.js"></script>
+  <script src="/js/modules/performance.js"></script>
+  <script src="/js/modules/reports.js"></script>
+  <script src="/js/modules/disciplinary.js"></script>
+  <script src="/js/modules/skills.js"></script>
+  <script src="/js/modules/recruitment.js"></script>
+  <script src="/js/modules/ess.js"></script>
+  <script src="/js/modules/organogram.js"></script>
+  <script src="/js/modules/settings.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

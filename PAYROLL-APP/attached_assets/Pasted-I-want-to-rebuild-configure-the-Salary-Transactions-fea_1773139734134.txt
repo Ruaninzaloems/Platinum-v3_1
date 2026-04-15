@@ -1,0 +1,175 @@
+I want to rebuild/configure the Salary Transactions feature, but only for Phase 1.
+
+Use the attached Platinum screenshots as business and field reference only.
+Do not copy the legacy UI exactly.
+Use the existing Angular Platinum page pattern already used by Positions, Job Profiles, Medical Aid Schemes, Trade Unions, and other modern configuration pages.
+
+Important:
+This is only Phase 1 of Salary Transactions.
+Do NOT build full ledger integration yet.
+Do NOT build the advanced formula / method-of-calculation engine yet.
+Do NOT overengineer the calculation logic yet.
+The goal is to create a clean, modern Salary Transactions configuration feature that supports the core master data needed now.
+
+Purpose:
+Salary Transactions define the earning, deduction, company contribution, and fringe benefit items that will later be used in payroll calculations and payslips.
+
+Phase 1 scope:
+Build the Salary Transactions master feature only, with the core fields, lookups, history tracking, and basic configuration required now.
+
+Main design decision:
+- Keep the Salary Transaction tab/details section
+- Drop the General Ledger tab for now
+- Drop the old Tax & IRP5 tab as a separate tab
+- Move IRP5 Code onto the main Salary Transaction details tab
+- Add a History tab
+- Keep Method of Calculation as a future placeholder only if needed, but do NOT build the advanced formula engine yet
+
+Required fixed lookup: Transaction Type
+Transaction Type must come from a constant/reference table, not hardcoded in the UI.
+
+Seed the following Transaction Type values:
+- Earnings (TransactionTypeId = 1)
+- Deductions (TransactionTypeId = 2)
+- Company Contributions (TransactionTypeId = 3)
+- Fringe Benefits (TransactionTypeId = 4)
+
+Required fixed lookup: Calculation Method
+Calculation Method must come from a constant/reference table, not hardcoded in the UI.
+
+Seed the following Calculation Method values:
+- User Input Value Required
+- System Calculate
+
+Recommended lookup tables:
+- salary_transaction_types
+- salary_transaction_calculation_methods
+
+Phase 1 Salary Transaction fields:
+- Start Date
+- End Date
+- Transaction Type
+- Title
+- Description
+- IRP5 Code
+- Calculation Method
+- Group On Payslip According To IRP5 Code
+- Retirement Funding Income
+- Pro-rated Transaction
+- Enabled
+
+Business rules:
+- Title is required
+- Transaction Type is required
+- Calculation Method is required
+- IRP5 Code may be nullable for now if not always required, but structure the field properly for future compliance use
+- Start Date and End Date must support effective dating
+- End Date can default to 31/12/9999 if that matches existing system conventions
+- Transaction Type values must come from a constant table
+- Calculation Method values must come from a constant table
+- Do not hardcode lookup values in the Angular UI
+- Do not implement ledger account mapping yet
+- Do not implement advanced formula configuration yet
+- Do not invent unnecessary extra fields unless clearly required by existing project conventions
+- Preserve audit/history conventions used elsewhere in the system
+
+History requirements:
+- Add a dedicated History tab on the detail page
+- Track changes to Salary Transactions
+- History must show at least:
+  - changed field
+  - old value
+  - new value
+  - changed by
+  - changed at
+- Reuse the project’s existing history/audit approach if one already exists
+- If the project already uses snapshot history instead of field-by-field history, follow the existing project pattern
+- Salary Transaction history is important and must be included in Phase 1
+
+UI/UX requirements:
+Use the existing modern Angular Platinum feature pattern, not the old legacy wizard/tab UI.
+
+List page:
+- Summary cards
+  - Total Salary Transactions
+  - Active
+  - Inactive
+  - optionally counts by Transaction Type if this fits existing pattern
+- Search/filter
+- Paginated table
+- Status column
+- Actions column using the exact same working action button/icon pattern as the existing reference pages
+- Add button
+
+Detail page:
+- Create / View / Edit modes
+- Tabs:
+  1. Salary Transaction Details
+  2. History
+- If needed, include a placeholder Method of Calculation section/tab for future enhancement, but do NOT implement the advanced engine now
+- White background cards
+- Uppercase labels
+- Existing Platinum styles/tokens
+- Reuse shared components and patterns already in the project
+
+Salary Transaction Details should include:
+- Start Date
+- End Date
+- Transaction Type
+- Title
+- Description
+- IRP5 Code
+- Calculation Method
+- Group On Payslip According To IRP5 Code
+- Retirement Funding Income
+- Pro-rated Transaction
+- Enabled
+
+Future design note:
+The Method of Calculation / Formula capability will be redesigned later and must be treated as Phase 2.
+For now, only store the selected Calculation Method and structure the feature so it can be enhanced later without redesigning the whole page.
+
+Reference UI pattern:
+Use the same modern Angular feature pattern as:
+- Employees
+- Positions
+- Job Profiles
+- Medical Aid Schemes
+- Trade Unions
+
+Development rules:
+- Reuse the closest existing feature/module as template
+- Reuse existing services, shared components, styling, and action button patterns
+- Keep changes targeted
+- Do not refactor unrelated modules
+- Verify existing naming conventions before creating new files/tables/routes
+- Preserve auditability, traceability, and compliance
+- Do not redesign the UI
+- Do not hardcode Transaction Type or Calculation Method values in the frontend
+
+Expected backend/API:
+Please create the required backend routes, service logic, and lookup endpoints for:
+- list salary transactions
+- create salary transaction
+- update salary transaction
+- view salary transaction/history
+- get Transaction Type lookup values
+- get Calculation Method lookup values
+
+Expected data model:
+Please verify the existing salary transaction table first.
+If the existing structure can be reused safely, do so.
+Only add new constant/reference tables if they do not already exist in a suitable form.
+
+Important:
+Before implementing, first inspect the existing codebase and existing configuration patterns.
+Then tell me:
+1. which existing feature is the best template
+2. which frontend files need to be created or changed
+3. which backend files/routes/services need to be created or changed
+4. whether existing salary transaction structures can be reused
+5. what constant/reference tables are required
+6. how history will be implemented
+7. any assumptions or questions before implementation
+
+Do not implement until I approve the plan.

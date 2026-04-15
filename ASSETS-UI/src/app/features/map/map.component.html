@@ -1,0 +1,73 @@
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Asset Map</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Geographic view of all assets with GPS coordinates</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button mat-stroked-button style="border-color:#e2e8f0" (click)="resetView()">
+      <mat-icon>center_focus_strong</mat-icon> Reset View
+    </button>
+    <button mat-stroked-button style="border-color:#e2e8f0" (click)="toggleClustering()">
+      <mat-icon>{{clusteringEnabled ? 'blur_on' : 'blur_off'}}</mat-icon> {{clusteringEnabled ? 'Clustering On' : 'Clustering Off'}}
+    </button>
+  </div>
+</div>
+
+<div class="filters-bar">
+  <mat-form-field appearance="outline" style="width:180px;margin:0" subscriptSizing="dynamic">
+    <mat-label>Category</mat-label>
+    <mat-select [(ngModel)]="categoryFilter" (selectionChange)="filterAssets()">
+      <mat-option value="">All Categories</mat-option>
+      @for (c of categories(); track c.id) { <mat-option [value]="c.name">{{c.name}}</mat-option> }
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" style="width:140px;margin:0" subscriptSizing="dynamic">
+    <mat-label>Condition</mat-label>
+    <mat-select [(ngModel)]="conditionFilter" (selectionChange)="filterAssets()">
+      <mat-option value="">All</mat-option>
+      <mat-option value="Good">Good</mat-option>
+      <mat-option value="Fair">Fair</mat-option>
+      <mat-option value="Poor">Poor</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" style="width:140px;margin:0" subscriptSizing="dynamic">
+    <mat-label>Status</mat-label>
+    <mat-select [(ngModel)]="statusFilter" (selectionChange)="filterAssets()">
+      <mat-option value="">All</mat-option>
+      <mat-option value="Active">Active</mat-option>
+      <mat-option value="Under Maintenance">Under Maintenance</mat-option>
+      <mat-option value="In Storage">In Storage</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <span style="font-size:13px;color:#64748b;display:flex;align-items:center;gap:4px">
+    <mat-icon style="font-size:16px">place</mat-icon> {{filteredAssets().length}} assets shown
+  </span>
+  <div style="flex:1"></div>
+  <div style="display:flex;gap:12px;align-items:center;font-size:12px;color:#64748b">
+    <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:50%;background:#10b981"></div>Good</div>
+    <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:50%;background:#f59e0b"></div>Fair</div>
+    <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>Poor</div>
+  </div>
+</div>
+
+<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:white;position:relative">
+  @if (mapLoading()) {
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:white;padding:16px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:12px">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span style="font-size:13px;color:#64748b">Loading map...</span>
+    </div>
+  }
+  <div id="asset-map" style="height:560px;width:100%;background:#e2e8f0"></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px">
+  @for (loc of locations(); track loc.id) {
+    <div class="kpi-card" style="cursor:pointer;transition:all 0.15s" (click)="centerOnLocation(loc)">
+      <div class="kpi-icon-wrap icon-blue"><mat-icon>place</mat-icon></div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#1e293b">{{loc.name}}</div>
+        <div style="font-size:11px;color:#64748b">{{loc.type}} · {{loc.assetCount || 0}} assets</div>
+      </div>
+    </div>
+  }
+</div>

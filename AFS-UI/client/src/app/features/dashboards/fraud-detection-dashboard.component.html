@@ -1,0 +1,361 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load fraud detection data</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Fraud Detection Dashboard</h1>
+        <p class="subtitle">Anomaly Detection &amp; Risk Analysis for Journal Entries</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh analysis">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Anomalies" [value]="data.totalAnomalies" icon="warning"
+        [color]="data.totalAnomalies > 0 ? 'warning' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="High Risk Items" [value]="data.highRiskItems" icon="error"
+        [color]="data.highRiskItems > 0 ? 'danger' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="Under Review" [value]="data.itemsUnderReview" icon="pending" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Large Adjustments" [value]="data.largeAdjustments" icon="attach_money" color="warning"></app-kpi-tile>
+      <app-kpi-tile title="Duplicate Entries" [value]="data.duplicateEntries" icon="content_copy"
+        [color]="data.duplicateEntries > 0 ? 'danger' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="Round-Number Txns" [value]="data.roundNumberTransactions" icon="radio_button_unchecked" color="info"></app-kpi-tile>
+    </div>
+
+    <div class="anomaly-cards">
+      <mat-card class="anomaly-card">
+        <div class="card-title">
+          <mat-icon>attach_money</mat-icon> Unusual Journal Entries
+          <span class="card-count">{{ data.largeAdjustments }} flagged</span>
+        </div>
+        <p class="card-desc">Adjustments exceeding materiality thresholds or with unusual characteristics.</p>
+        <div class="indicator-bar">
+          <div class="indicator-fill" [class.high]="data.largeAdjustments > 5"
+            [class.medium]="data.largeAdjustments > 0 && data.largeAdjustments <= 5"
+            [class.low]="data.largeAdjustments === 0"
+            [style.width.%]="getIndicatorWidth(data.largeAdjustments, data.totalAnomalies)">
+          </div>
+        </div>
+      </mat-card>
+
+      <mat-card class="anomaly-card">
+        <div class="card-title">
+          <mat-icon>content_copy</mat-icon> Duplicate Entries
+          <span class="card-count">{{ data.duplicateEntries }} detected</span>
+        </div>
+        <p class="card-desc">Entries with matching amounts, dates, and account codes flagged for review.</p>
+        <div class="indicator-bar">
+          <div class="indicator-fill" [class.high]="data.duplicateEntries > 5"
+            [class.medium]="data.duplicateEntries > 0 && data.duplicateEntries <= 5"
+            [class.low]="data.duplicateEntries === 0"
+            [style.width.%]="getIndicatorWidth(data.duplicateEntries, data.totalAnomalies)">
+          </div>
+        </div>
+      </mat-card>
+
+      <mat-card class="anomaly-card">
+        <div class="card-title">
+          <mat-icon>radio_button_unchecked</mat-icon> Round-Number Transactions
+          <span class="card-count">{{ data.roundNumberTransactions }} identified</span>
+        </div>
+        <p class="card-desc">Transactions with suspiciously round amounts that may indicate estimation.</p>
+        <div class="indicator-bar">
+          <div class="indicator-fill" [class.high]="data.roundNumberTransactions > 10"
+            [class.medium]="data.roundNumberTransactions > 0 && data.roundNumberTransactions <= 10"
+            [class.low]="data.roundNumberTransactions === 0"
+            [style.width.%]="getIndicatorWidth(data.roundNumberTransactions, data.totalAnomalies)">
+          </div>
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="section-title">
+      <mat-icon>grid_on</mat-icon> Risk Matrix
+    </div>
+    <mat-card class="matrix-card">
+      <div class="risk-matrix">
+        <div class="matrix-y-label">Severity →</div>
+        <div class="matrix-grid">
+          <div class="matrix-corner"></div>
+          @for (sev of data.severityLabels; track sev) {
+            <div class="matrix-col-header">{{ sev }}</div>
+          }
+          @for (lik of data.likelihoodLabels; track lik) {
+            <div class="matrix-row-header">{{ lik }}</div>
+            @for (sev of data.severityLabels; track sev) {
+              <div class="matrix-cell" [style.background]="getCellColor(sev, lik)"
+                [matTooltip]="sev + ' × ' + lik + ': ' + getCellCount(sev, lik) + ' items'">
+                <span class="cell-count">{{ getCellCount(sev, lik) }}</span>
+              </div>
+            }
+          }
+        </div>
+        <div class="matrix-x-label">← Likelihood</div>
+      </div>
+    </mat-card>
+
+    @if (data.emsDataAvailable) {
+      <div class="ems-panels">
+        <div class="section-title">
+          <mat-icon>integration_instructions</mat-icon> EMS Fraud Detection
+          <span class="ems-badge">EMS Connected</span>
+        </div>
+
+        <div class="ems-grid">
+          <mat-card class="anomaly-card">
+            <div class="card-title">
+              <mat-icon>payments</mat-icon> Duplicate Payments (SCM)
+              <span class="card-count">{{ data.duplicatePayments.length }} flagged</span>
+            </div>
+            <p class="card-desc">Invoices with multiple payments that may indicate duplicate processing.</p>
+            @if (data.duplicatePayments.length > 0) {
+              <div class="ems-table-mini">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Document No</th>
+                      <th>Payments</th>
+                      <th>Invoice Amt</th>
+                      <th>Total Paid</th>
+                      <th>Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (dp of data.duplicatePayments.slice(0, 5); track dp.InvoiceID) {
+                      <tr class="clickable-row" (click)="drillDuplicatePayment(dp)" matTooltip="Click to view payment details">
+                        <td class="ref-cell">{{ dp.DocumentNo || 'INV-' + dp.InvoiceID }}</td>
+                        <td>{{ dp.PaymentCount }}</td>
+                        <td class="value-cell">{{ formatCurrency(dp.InvoiceAmount) }}</td>
+                        <td class="value-cell">{{ formatCurrency(dp.TotalPaid) }}</td>
+                        <td>
+                          <app-traffic-light [status]="dp.TotalPaid > dp.InvoiceAmount ? 'red' : 'amber'" [label]="dp.TotalPaid > dp.InvoiceAmount ? 'high' : 'medium'"></app-traffic-light>
+                        </td>
+                      </tr>
+                      @if (expandedInvoiceId === dp.InvoiceID) {
+                        <tr class="detail-row">
+                          <td colspan="5">
+                            @if (drillLoading) {
+                              <div class="drill-loading"><mat-spinner diameter="20"></mat-spinner> Loading payment details...</div>
+                            } @else if (drillPaymentDetails.length > 0) {
+                              <div class="drill-detail">
+                                <div class="drill-title">Payment Allocations for {{ dp.DocumentNo || 'INV-' + dp.InvoiceID }}</div>
+                                <table class="data-table drill-table">
+                                  <thead><tr><th>Vendor</th><th>Payment No</th><th>Date</th><th>Amount</th><th>Method</th></tr></thead>
+                                  <tbody>
+                                    @for (det of drillPaymentDetails; track det.PaymentAllocation_ID || $index) {
+                                      <tr>
+                                        <td>{{ det.VendorName || det.VendorCode || '—' }}</td>
+                                        <td>{{ det.PaymentNumber || det.PaymentID || '—' }}</td>
+                                        <td>{{ det.PaymentDate || '—' }}</td>
+                                        <td class="value-cell">{{ formatCurrency(det.AllocationAmount) }}</td>
+                                        <td>{{ det.PaymentMethod || '—' }}</td>
+                                      </tr>
+                                    }
+                                  </tbody>
+                                </table>
+                              </div>
+                            } @else {
+                              <div class="drill-detail drill-summary-fallback">
+                                <div class="drill-title">Duplicate Payment Summary — {{ dp.DocumentNo || 'INV-' + dp.InvoiceID }}</div>
+                                <div class="drill-summary-info">
+                                  <div class="drill-summary-row">
+                                    <span class="drill-label">Payment Count:</span>
+                                    <span class="drill-value highlight-warn">{{ dp.PaymentCount }} payments recorded against this invoice</span>
+                                  </div>
+                                  <div class="drill-summary-row">
+                                    <span class="drill-label">Total Paid:</span>
+                                    <span class="drill-value">{{ formatCurrency(dp.TotalPaid) }}</span>
+                                  </div>
+                                  @if (dp.InvoiceAmount && dp.InvoiceAmount > 0) {
+                                    <div class="drill-summary-row">
+                                      <span class="drill-label">Invoice Amount:</span>
+                                      <span class="drill-value">{{ formatCurrency(dp.InvoiceAmount) }}</span>
+                                    </div>
+                                    <div class="drill-summary-row">
+                                      <span class="drill-label">Overpayment:</span>
+                                      <span class="drill-value" [class.highlight-danger]="dp.TotalPaid > dp.InvoiceAmount">{{ formatCurrency(dp.TotalPaid - dp.InvoiceAmount) }}</span>
+                                    </div>
+                                  }
+                                  <div class="drill-summary-row">
+                                    <span class="drill-label">Risk Assessment:</span>
+                                    <span class="drill-value highlight-danger">{{ dp.TotalPaid > (dp.InvoiceAmount || 0) ? 'Total paid exceeds invoice — possible duplicate/overpayment' : 'Multiple payment allocations detected — requires verification' }}</span>
+                                  </div>
+                                </div>
+                                <div class="drill-note">Detailed payment allocation records unavailable from source system. Summary based on detection data.</div>
+                              </div>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="ems-empty"><mat-icon>check_circle</mat-icon> No duplicate payments detected</div>
+            }
+          </mat-card>
+
+          <mat-card class="anomaly-card">
+            <div class="card-title">
+              <mat-icon>account_balance</mat-icon> Vendor Banking Anomalies
+              <span class="card-count">{{ data.vendorBankingAnomalies.length }} flagged</span>
+            </div>
+            <p class="card-desc">Bank accounts shared across multiple vendors — potential shell company indicator.</p>
+            @if (data.vendorBankingAnomalies.length > 0) {
+              <div class="ems-table-mini">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Bank Account</th>
+                      <th>Vendors Sharing</th>
+                      <th>Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (ba of data.vendorBankingAnomalies.slice(0, 5); track ba.BankAccountNo) {
+                      <tr class="clickable-row" (click)="drillVendorBanking(ba)" matTooltip="Click to view vendors sharing this account">
+                        <td class="ref-cell">{{ maskBankAccount(ba.BankAccountNo) }}</td>
+                        <td>{{ ba.VendorCount }} vendors</td>
+                        <td>
+                          <app-traffic-light [status]="ba.VendorCount > 3 ? 'red' : 'amber'" [label]="ba.VendorCount > 3 ? 'high' : 'medium'"></app-traffic-light>
+                        </td>
+                      </tr>
+                      @if (expandedBankAccount === ba.BankAccountNo) {
+                        <tr class="detail-row">
+                          <td colspan="3">
+                            @if (drillLoading) {
+                              <div class="drill-loading"><mat-spinner diameter="20"></mat-spinner> Loading vendor details...</div>
+                            } @else if (drillVendorDetails.length > 0) {
+                              <div class="drill-detail">
+                                <div class="drill-title">Vendors sharing account ****{{ ba.BankAccountNo.slice(-4) }}</div>
+                                <table class="data-table drill-table">
+                                  <thead><tr><th>Vendor Name</th><th>Vendor ID</th><th>Email</th></tr></thead>
+                                  <tbody>
+                                    @for (v of drillVendorDetails; track v.Vendor_ID || v.VendorID || $index) {
+                                      <tr>
+                                        <td>{{ v.VendorName || '—' }}</td>
+                                        <td>{{ v.Vendor_ID || v.VendorID || '—' }}</td>
+                                        <td>{{ v.EmailAddress || '—' }}</td>
+                                      </tr>
+                                    }
+                                  </tbody>
+                                </table>
+                              </div>
+                            } @else {
+                              <div class="drill-empty">No vendor details found</div>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="ems-empty"><mat-icon>check_circle</mat-icon> No banking anomalies detected</div>
+            }
+          </mat-card>
+
+          <mat-card class="anomaly-card">
+            <div class="card-title">
+              <mat-icon>undo</mat-icon> Cashbook Reversals
+              <span class="card-count">{{ data.cashbookReversals.length }} found</span>
+            </div>
+            <p class="card-desc">Cashbook reversals that may indicate unauthorised transaction manipulation.</p>
+            @if (data.cashbookReversals.length > 0) {
+              <div class="ems-table-mini">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Document No</th>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Authorised</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (cr of data.cashbookReversals.slice(0, 5); track cr.Cashbook_ID) {
+                      <tr>
+                        <td class="ref-cell">{{ cr.DocumentNo || 'CB-' + cr.Cashbook_ID }}</td>
+                        <td>{{ cr.ReversalDate || cr.TransactionDate || '—' }}</td>
+                        <td class="value-cell">{{ formatCurrency(cr.Amount || 0) }}</td>
+                        <td>
+                          <app-traffic-light [status]="cr.ReversalAuthorised ? 'green' : 'red'" [label]="cr.ReversalAuthorised ? 'Yes' : 'No'"></app-traffic-light>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="ems-empty"><mat-icon>check_circle</mat-icon> No cashbook reversals found</div>
+            }
+          </mat-card>
+        </div>
+      </div>
+    }
+
+    @if (data.suspiciousItems.length > 0) {
+      <div class="section-title">
+        <mat-icon>visibility</mat-icon> Top Suspicious Items
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Risk</th>
+              <th>Flag Reason</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of data.suspiciousItems; track item.id) {
+              <tr>
+                <td class="ref-cell">{{ item.reference }}</td>
+                <td class="desc-cell" [matTooltip]="item.description">{{ item.description }}</td>
+                <td><span class="type-chip">{{ item.type }}</span></td>
+                <td class="value-cell">{{ formatCurrency(item.amount) }}</td>
+                <td>
+                  <app-traffic-light [status]="getRiskStatus(item.riskLevel)"
+                    [label]="item.riskLevel"></app-traffic-light>
+                </td>
+                <td class="flag-cell">{{ item.flagReason }}</td>
+                <td><span class="status-badge" [class]="item.status">{{ formatStatus(item.status) }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}

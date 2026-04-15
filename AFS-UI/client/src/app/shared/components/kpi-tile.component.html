@@ -1,0 +1,24 @@
+<mat-card class="kpi-tile-card" [class]="'kpi-tile-' + color()">
+  <div class="kpi-tile-content">
+    @if (icon()) {
+      <div class="kpi-tile-icon-wrap" [class]="'icon-' + color()">
+        <mat-icon>{{ icon() }}</mat-icon>
+      </div>
+    }
+    <div class="kpi-tile-info">
+      <span class="kpi-tile-label">{{ title() }}</span>
+      <span class="kpi-tile-value">{{ value() }}</span>
+      @if (subtitle()) {
+        <span class="kpi-tile-subtitle">{{ subtitle() }}</span>
+      }
+      @if (trend() !== 'neutral') {
+        <div class="kpi-tile-trend" [class]="trendClass()">
+          <mat-icon class="trend-arrow">{{ trend() === 'up' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+          @if (trendValue()) {
+            <span>{{ trendValue() }}</span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</mat-card>

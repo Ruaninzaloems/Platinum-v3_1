@@ -1,0 +1,6 @@
+<div class="traffic-light-container">
+  <span class="traffic-dot" [style.background]="dotColor()"></span>
+  @if (label()) {
+    <span class="traffic-label">{{ label() }}</span>
+  }
+</div>

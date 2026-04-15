@@ -1,0 +1,318 @@
+<div class="resolve-disclosure-container">
+  <div class="resolve-header">
+    <div class="header-left">
+      <button mat-icon-button (click)="close()" matTooltip="Back to workbench">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h2>Resolve Disclosure</h2>
+      <span class="disc-id" *ngIf="preview">{{ preview.disclosureId }}</span>
+    </div>
+    <div class="header-right" *ngIf="preview">
+      <mat-chip-set>
+        <mat-chip [style.background-color]="getProgressColor(preview.resolutionPercent) === 'primary' ? '#e3f2fd' : getProgressColor(preview.resolutionPercent) === 'accent' ? '#fff3e0' : '#ffebee'">
+          {{ preview.resolutionPercent }}% resolved
+        </mat-chip>
+        <mat-chip>{{ preview.totalRows }} rows</mat-chip>
+        <mat-chip>{{ formatRand(preview.totalAmount) }}</mat-chip>
+      </mat-chip-set>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    <p>Loading disclosure resolution data...</p>
+  </div>
+
+  <div *ngIf="preview && !loading" class="resolve-content">
+    <div class="disclosure-summary">
+      <h3>{{ preview.disclosureLabel }}</h3>
+      <div class="progress-row">
+        <mat-progress-bar
+          [mode]="'determinate'"
+          [value]="preview.resolutionPercent"
+          [color]="getProgressColor(preview.resolutionPercent)">
+        </mat-progress-bar>
+        <span class="progress-label">
+          {{ preview.resolvedRows }}/{{ preview.totalRows }} rows resolved
+          ({{ formatRand(preview.resolvedAmount) }} of {{ formatRand(preview.totalAmount) }})
+        </span>
+      </div>
+      <div class="stat-chips">
+        <mat-chip class="unresolved-chip" *ngIf="preview.unresolvedRows > 0">
+          <mat-icon>warning</mat-icon>
+          {{ preview.unresolvedRows }} unresolved ({{ formatRand(preview.unresolvedAmount) }})
+        </mat-chip>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div *ngIf="lastBulkResult && isDraft" class="undo-banner">
+      <mat-icon>check_circle</mat-icon>
+      <span>Applied {{ lastBulkResult.applied }} rows. Batch: {{ lastBulkResult.batchCorrelationId }}</span>
+      <button mat-stroked-button color="warn" (click)="undoLastBulk()" [disabled]="undoing">
+        <mat-icon>undo</mat-icon> Undo
+      </button>
+    </div>
+
+    <div class="two-column-layout">
+      <div class="left-column">
+        <h3>Suggested Child Disclosures</h3>
+        <div *ngIf="preview.suggestedChildren.length === 0" class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p>No suggestions available. Use mSCOA groups below to manually assign rows.</p>
+        </div>
+        <div *ngFor="let suggestion of preview.suggestedChildren" class="suggestion-card"
+             [class.high]="suggestion.confidenceScore === 'HIGH'"
+             [class.medium]="suggestion.confidenceScore === 'MEDIUM'"
+             [class.low]="suggestion.confidenceScore === 'LOW'"
+             [class.none]="suggestion.confidenceScore === 'NONE'"
+             [class.highlighted]="selectedTargetId === suggestion.disclosureId">
+          <div class="suggestion-header">
+            <div class="confidence-badge" [style.color]="getConfidenceColor(suggestion.confidenceScore)">
+              <mat-icon>{{ getConfidenceIcon(suggestion.confidenceScore) }}</mat-icon>
+              {{ suggestion.confidenceScore }}
+            </div>
+            <strong>{{ suggestion.label }}</strong>
+            <span class="disc-code">{{ suggestion.disclosureId }}</span>
+          </div>
+          <div class="suggestion-meta">
+            <span>{{ suggestion.matchedTbCount }} rows</span>
+            <span>{{ formatRand(suggestion.totalAmount) }}</span>
+          </div>
+          <p class="rationale">{{ suggestion.rationale }}</p>
+          <div class="suggestion-actions" *ngIf="isDraft">
+            <ng-container *ngIf="suggestion.confidenceScore === 'HIGH'">
+              <button mat-flat-button color="primary"
+                      (click)="selectSuggestion(suggestion)"
+                      [disabled]="bulkApplyLoading">
+                <mat-icon>check</mat-icon> Apply (Pre-selected)
+              </button>
+            </ng-container>
+            <ng-container *ngIf="suggestion.confidenceScore === 'MEDIUM'">
+              <button mat-flat-button color="accent"
+                      (click)="selectSuggestion(suggestion)"
+                      [disabled]="bulkApplyLoading">
+                <mat-icon>preview</mat-icon> Preview & Apply
+              </button>
+              <span class="interaction-hint">Shortlisted — review before applying</span>
+            </ng-container>
+            <ng-container *ngIf="suggestion.confidenceScore === 'LOW'">
+              <button mat-stroked-button color="warn"
+                      (click)="selectSuggestion(suggestion)"
+                      [disabled]="bulkApplyLoading">
+                <mat-icon>edit</mat-icon> Review & Pick Rows
+              </button>
+              <span class="interaction-hint">Low confidence — manual row selection required</span>
+            </ng-container>
+          </div>
+        </div>
+
+        <div *ngIf="preview.unresolvedRows > 0 && preview.suggestedChildren.length === 0" class="no-suggestion-picker">
+          <p>No automatic suggestions available. Use the manual picker to assign rows to a child disclosure.</p>
+          <button mat-stroked-button color="primary" *ngIf="isDraft"
+                  (click)="openFullPicker(preview.mscoaGroups.length > 0 ? preview.mscoaGroups[0].rows : [])">
+            <mat-icon>playlist_add</mat-icon> Open Manual Picker
+          </button>
+        </div>
+
+        <mat-divider *ngIf="preview.alreadyMappedChildren.length > 0"></mat-divider>
+
+        <div *ngIf="preview.alreadyMappedChildren.length > 0">
+          <h3>Already Mapped Children</h3>
+          <div *ngFor="let child of preview.alreadyMappedChildren" class="mapped-child-card">
+            <div class="mapped-child-info">
+              <mat-icon style="color: #4caf50">check_circle</mat-icon>
+              <strong>{{ child.label }}</strong>
+              <span class="disc-code">{{ child.disclosureId }}</span>
+            </div>
+            <div class="mapped-child-stats">
+              <span>{{ child.rowCount }} rows</span>
+              <span>{{ formatRand(child.totalAmount) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="right-column">
+        <h3>Unresolved Rows by mSCOA Context</h3>
+        <div *ngIf="preview.mscoaGroups.length === 0" class="empty-state">
+          <mat-icon>check_circle</mat-icon>
+          <p>All rows have been resolved to child disclosures.</p>
+        </div>
+        <mat-accordion *ngIf="preview.mscoaGroups.length > 0">
+          <mat-expansion-panel *ngFor="let group of preview.mscoaGroups">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <span class="mscoa-label">{{ group.mscoaText }}</span>
+              </mat-panel-title>
+              <mat-panel-description>
+                {{ group.rowCount }} rows &middot; {{ formatRand(group.totalAmount) }}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            <div class="group-rows">
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>SCOA Code</th>
+                    <th>Description</th>
+                    <th class="amount-col">Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of group.rows">
+                    <td class="code-cell">{{ row.scoaItemCode }}</td>
+                    <td>{{ row.sortDesc }}</td>
+                    <td class="amount-col">{{ formatRand(row.currentYearAmount) }}</td>
+                    <td>
+                      <mat-chip class="status-chip" [class]="row.reviewStatus">
+                        {{ row.reviewStatus }}
+                      </mat-chip>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="group-actions" *ngIf="isDraft && preview.suggestedChildren.length > 0">
+                <span class="action-label">Map group to:</span>
+                <button *ngFor="let child of preview.suggestedChildren"
+                        mat-stroked-button
+                        (click)="selectMscoaGroup(group, child.disclosureId, child.label)"
+                        [disabled]="bulkApplyLoading">
+                  {{ child.label }}
+                </button>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+      </div>
+    </div>
+
+    <div *ngIf="showManualPicker && preview" class="manual-picker-overlay">
+      <mat-card class="manual-picker-card">
+        <mat-card-header>
+          <mat-card-title>
+            {{ selectedConfidence === 'LOW' ? 'Review Rows (LOW Confidence)' : 'Manual Row & Target Picker' }}
+          </mat-card-title>
+          <mat-card-subtitle *ngIf="selectedConfidence === 'LOW' && selectedTargetLabel">
+            Highlighted suggestion: <strong>{{ selectedTargetLabel }}</strong> — verify rows below before applying
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="picker-rows">
+            <div *ngFor="let group of preview.mscoaGroups">
+              <h4>{{ group.mscoaText }} ({{ group.rowCount }} rows)</h4>
+              <div *ngFor="let row of group.rows" class="picker-row"
+                   [class.selected]="isRowSelected(row.id)"
+                   (click)="toggleManualRow(row.id)">
+                <mat-checkbox [checked]="isRowSelected(row.id)" (click)="$event.stopPropagation();"
+                              (change)="toggleManualRow(row.id)">
+                </mat-checkbox>
+                <span class="picker-scoa">{{ row.scoaItemCode }}</span>
+                <span class="picker-desc">{{ row.sortDesc }}</span>
+                <span class="picker-amount">{{ formatRand(row.currentYearAmount) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="picker-target-select" *ngIf="selectedConfidence !== 'LOW' || !selectedTargetId">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Select target child disclosure</mat-label>
+              <mat-select [(value)]="selectedTargetId">
+                <mat-option *ngFor="let child of preview.suggestedChildren" [value]="child.disclosureId">
+                  {{ child.label }} ({{ child.disclosureId }})
+                </mat-option>
+                <mat-option *ngFor="let child of preview.alreadyMappedChildren" [value]="child.disclosureId">
+                  {{ child.label }} ({{ child.disclosureId }}) — existing
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Reason</mat-label>
+            <textarea matInput [(ngModel)]="bulkApplyReason" rows="2"
+                      placeholder="Explain why these rows should be mapped to this child disclosure"></textarea>
+          </mat-form-field>
+          <div class="picker-summary">
+            <span>{{ manualPickerRowIds.length }} row(s) selected</span>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-button (click)="showManualPicker = false">Cancel</button>
+          <button mat-flat-button color="primary"
+                  [disabled]="manualPickerRowIds.length === 0 || !selectedTargetId || !bulkApplyReason.trim()"
+                  (click)="confirmManualPick(selectedTargetId, selectedTargetLabel || selectedTargetId)">
+            <mat-icon>check</mat-icon> Confirm & Preview Impact
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+
+    <div *ngIf="showBulkConfirm && bulkApplyPreview" class="bulk-confirm-overlay">
+      <mat-card class="bulk-confirm-card">
+        <mat-card-header>
+          <mat-card-title>Confirm Bulk Apply</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="confirm-summary">
+            <div class="confirm-row">
+              <span class="confirm-label">Source:</span>
+              <span>{{ bulkApplyPreview.sourceDisclosureId }}</span>
+            </div>
+            <div class="confirm-row">
+              <span class="confirm-label">Target:</span>
+              <span>{{ bulkApplyPreview.targetLabel }} ({{ bulkApplyPreview.targetDisclosureId }})</span>
+            </div>
+            <div class="confirm-row">
+              <span class="confirm-label">Rows:</span>
+              <span>{{ bulkApplyPreview.rowCount }}</span>
+            </div>
+            <div class="confirm-row">
+              <span class="confirm-label">Total Amount:</span>
+              <span>{{ formatRand(bulkApplyPreview.totalAmount) }}</span>
+            </div>
+            <div class="confirm-row">
+              <span class="confirm-label">Confidence:</span>
+              <span [style.color]="getConfidenceColor(selectedConfidence)">
+                <mat-icon style="font-size:16px;height:16px;width:16px">{{ getConfidenceIcon(selectedConfidence) }}</mat-icon>
+                {{ selectedConfidence }}
+              </span>
+            </div>
+          </div>
+
+          <div *ngIf="bulkApplyPreview.warnings?.length > 0" class="confirm-warnings">
+            <div *ngFor="let warning of bulkApplyPreview.warnings" class="warning-item">
+              <mat-icon>warning</mat-icon> {{ warning }}
+            </div>
+          </div>
+
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Reason for mapping decision</mat-label>
+            <textarea matInput [(ngModel)]="bulkApplyReason" rows="2"></textarea>
+          </mat-form-field>
+
+          <div *ngIf="bulkApplyPreview.rowCount > 200" class="large-batch-ack">
+            <mat-checkbox [(ngModel)]="bulkApplyConfirmLarge">
+              I confirm this large batch ({{ bulkApplyPreview.rowCount }} rows)
+            </mat-checkbox>
+          </div>
+
+          <div *ngIf="selectedConfidence === 'LOW'" class="low-conf-ack">
+            <mat-checkbox [(ngModel)]="bulkApplyAckLow">
+              I acknowledge this is a LOW confidence suggestion and have reviewed the rows
+            </mat-checkbox>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-button (click)="cancelBulkApply()">Cancel</button>
+          <button mat-flat-button color="primary"
+                  (click)="executeBulkApply()"
+                  [disabled]="bulkApplyLoading || !bulkApplyReason.trim()
+                    || (bulkApplyPreview.rowCount > 200 && !bulkApplyConfirmLarge)
+                    || (selectedConfidence === 'LOW' && !bulkApplyAckLow)">
+            <mat-icon>check</mat-icon> Apply {{ bulkApplyPreview.rowCount }} rows
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  </div>
+</div>

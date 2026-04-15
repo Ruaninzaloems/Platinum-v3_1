@@ -1,0 +1,214 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Reports & Analytics</h1>
+      <div class="subtitle">Comprehensive reporting and financial analysis</div>
+    </div>
+  </div>
+
+  <mat-tab-group animationDuration="200ms">
+    <mat-tab label="Executive Summary">
+      <div style="padding-top: 24px;">
+        @if (dashboard()) {
+          <div class="summary-strip">
+            <div class="kpi-card" matTooltip="Total number of AFS compilations across all statuses">
+              <div class="kpi-label">Total Compilations</div>
+              <div class="kpi-value">{{ dashboard()!.kpis.totalCompilations }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Compilations currently being worked on">
+              <div class="kpi-label">In Progress</div>
+              <div class="kpi-value">{{ dashboard()!.kpis.inProgress }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Compilations that have been approved for publication">
+              <div class="kpi-label">Approved</div>
+              <div class="kpi-value">{{ dashboard()!.kpis.approved }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Compilations published and finalized">
+              <div class="kpi-label">Published</div>
+              <div class="kpi-value">{{ dashboard()!.kpis.published }}</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+            <mat-card>
+              <mat-card-content>
+                <div class="card-title" matTooltip="Summary of Request for Information items"><mat-icon>request_quote</mat-icon> RFI Overview</div>
+                <div class="stat-row"><span>Open RFIs</span><strong>{{ dashboard()!.kpis.openRfis }}</strong></div>
+                <div class="stat-row"><span>Overdue RFIs</span><strong class="danger">{{ dashboard()!.kpis.overdueRfis }}</strong></div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card>
+              <mat-card-content>
+                <div class="card-title" matTooltip="Summary of audit findings and resolutions"><mat-icon>bug_report</mat-icon> Findings Overview</div>
+                <div class="stat-row"><span>Unresolved</span><strong class="danger">{{ dashboard()!.kpis.unresolvedFindings }}</strong></div>
+                <div class="stat-row"><span>Total</span><strong>{{ dashboard()!.kpis.totalFindings }}</strong></div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card>
+              <mat-card-content>
+                <div class="card-title" matTooltip="Overview of pending adjustments and evidence documents"><mat-icon>tune</mat-icon> Adjustments & Evidence</div>
+                <div class="stat-row"><span>Pending Adjustments</span><strong>{{ dashboard()!.kpis.pendingAdjustments }}</strong></div>
+                <div class="stat-row"><span>Evidence Documents</span><strong>{{ dashboard()!.kpis.evidenceCount }}</strong></div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card>
+              <mat-card-content>
+                <div class="card-title" matTooltip="Working paper completion and sign-off progress"><mat-icon>task</mat-icon> Working Papers</div>
+                <div class="stat-row"><span>Completion</span><strong>{{ dashboard()!.kpis.wpCompletion }}%</strong></div>
+                <mat-progress-bar mode="determinate" [value]="dashboard()!.kpis.wpCompletion"></mat-progress-bar>
+                <div class="stat-row" style="margin-top: 8px;"><span>Avg. Completeness</span><strong>{{ dashboard()!.kpis.avgCompleteness }}%</strong></div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+
+          @if (dashboard()?.recentActivity?.length) {
+            <div class="detail-card" style="margin-top: 16px;">
+              <div class="card-title" matTooltip="Latest actions and events across the platform"><mat-icon>history</mat-icon> Recent Activity</div>
+              <table class="data-table">
+                <thead><tr><th matTooltip="Activity type">Type</th><th matTooltip="Description of the action performed">Action</th><th matTooltip="When the activity occurred">Date</th></tr></thead>
+                <tbody>
+                  @for (activity of dashboard()?.recentActivity || []; track $index) {
+                    <tr>
+                      <td><span class="status-badge">{{ activity.type }}</span></td>
+                      <td>{{ activity.action }}</td>
+                      <td>{{ activity.date | date:'medium' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        } @else {
+          <div class="empty-state">
+            <mat-icon>analytics</mat-icon>
+            <h3>Loading executive data...</h3>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Compliance">
+      <div style="padding-top: 24px;">
+        @if (dashboard()) {
+          <div class="summary-strip">
+            <div class="kpi-card" matTooltip="Overall compliance score based on findings, working papers, and evidence">
+              <div class="kpi-label">Compliance Score</div>
+              <div class="kpi-value">{{ dashboard()!.complianceScore }}%</div>
+              <mat-progress-bar mode="determinate" [value]="dashboard()!.complianceScore"
+                [color]="dashboard()!.complianceScore >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+            </div>
+            <div class="kpi-card" matTooltip="Percentage of working papers completed and signed off">
+              <div class="kpi-label">WP Completion</div>
+              <div class="kpi-value">{{ dashboard()!.kpis.wpCompletion }}%</div>
+              <mat-progress-bar mode="determinate" [value]="dashboard()!.kpis.wpCompletion"></mat-progress-bar>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <div class="card-title" matTooltip="Distribution of audit findings by severity level"><mat-icon>assessment</mat-icon> Findings by Severity</div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              @for (entry of severityEntries(); track entry[0]) {
+                <div class="kpi-card" style="min-width: 120px;">
+                  <div class="kpi-label">{{ entry[0] }}</div>
+                  <div class="kpi-value">{{ entry[1] }}</div>
+                  <span class="severity-badge" [class]="entry[0].toLowerCase()" matTooltip="Severity: {{ entry[0] }}">{{ entry[0] }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="detail-card" style="margin-top: 16px;">
+            <div class="card-title" matTooltip="Breakdown of compilations across workflow statuses"><mat-icon>pie_chart</mat-icon> Compilations by Status</div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              @for (entry of statusEntries(); track entry[0]) {
+                <div class="kpi-card" style="min-width: 120px;">
+                  <div class="kpi-label">{{ entry[0] }}</div>
+                  <div class="kpi-value">{{ entry[1] }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Financial Analysis">
+      <div style="padding-top: 24px;">
+        <div style="margin-bottom: 16px;">
+          <mat-form-field appearance="outline" style="max-width: 400px;">
+            <mat-label>Select Compilation</mat-label>
+            <mat-select [(ngModel)]="selectedCompilationId" (selectionChange)="loadAnalytics()">
+              @for (comp of compilations(); track comp.id) {
+                <mat-option [value]="comp.id">{{ comp.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        @if (analytics()) {
+          <div class="summary-strip">
+            <div class="kpi-card" matTooltip="Total assets from the Statement of Financial Position">
+              <div class="kpi-label">Total Assets</div>
+              <div class="kpi-value amount">{{ analytics()!.totalAssets | number:'1.0-0' }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Total liabilities from the Statement of Financial Position">
+              <div class="kpi-label">Total Liabilities</div>
+              <div class="kpi-value amount">{{ analytics()!.totalLiabilities | number:'1.0-0' }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Total revenue from the Statement of Financial Performance">
+              <div class="kpi-label">Total Revenue</div>
+              <div class="kpi-value amount">{{ analytics()!.totalRevenue | number:'1.0-0' }}</div>
+            </div>
+            <div class="kpi-card" matTooltip="Total expenditure from the Statement of Financial Performance">
+              <div class="kpi-label">Total Expenditure</div>
+              <div class="kpi-value amount">{{ analytics()!.totalExpenditure | number:'1.0-0' }}</div>
+            </div>
+          </div>
+
+          @if (analytics()!.materialVariances?.length) {
+            <div class="detail-card">
+              <div class="card-title" matTooltip="Line items with variances exceeding materiality thresholds"><mat-icon>warning</mat-icon> Material Variances</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th matTooltip="AFS line item description">Line Item</th>
+                    <th class="amount-col" matTooltip="Current financial year amount in ZAR">Current Year</th>
+                    <th class="amount-col" matTooltip="Prior financial year amount in ZAR">Prior Year</th>
+                    <th class="amount-col" matTooltip="Absolute variance between current and prior year">Variance</th>
+                    <th class="amount-col" matTooltip="Percentage change from prior year">Variance %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of analytics()!.materialVariances; track $index) {
+                    <tr>
+                      <td>{{ v.label }}</td>
+                      <td class="amount-col">{{ v.currentYear | number:'1.2-2' }}</td>
+                      <td class="amount-col">{{ v.priorYear | number:'1.2-2' }}</td>
+                      <td class="amount-col" [class.negative]="v.variance < 0" [class.positive]="v.variance > 0">
+                        {{ v.variance | number:'1.2-2' }}
+                      </td>
+                      <td class="amount-col" [class.negative]="v.variancePercentage < 0" [class.positive]="v.variancePercentage > 0">
+                        {{ v.variancePercentage | number:'1.1-1' }}%
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        } @else if (selectedCompilationId) {
+          <div class="empty-state">
+            <mat-icon>hourglass_empty</mat-icon>
+            <h3>Loading financial analysis...</h3>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <mat-icon>analytics</mat-icon>
+            <h3>Select a compilation</h3>
+            <p>Choose a compilation to view financial analysis.</p>
+          </div>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

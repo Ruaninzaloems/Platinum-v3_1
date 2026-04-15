@@ -1,0 +1,256 @@
+@if (compilationContextLoading()) {
+  <div style="display:flex;justify-content:center;padding:64px">
+    <mat-progress-bar mode="indeterminate" style="max-width:400px"></mat-progress-bar>
+  </div>
+} @else if (!hasCompilationContext()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#9e9e9e;margin-bottom:16px">playlist_add_check</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">No Active Compilation</h2>
+    <p style="color:#757575;margin:0 0 24px;max-width:400px">Select or create a compilation before accessing Opening Balance Control.</p>
+    <button mat-flat-button color="primary" (click)="goToCompilations()">
+      <mat-icon>arrow_forward</mat-icon> Go to Compilations
+    </button>
+  </div>
+} @else if (periodsLoading()) {
+  <div style="display:flex;justify-content:center;padding:64px">
+    <mat-progress-bar mode="indeterminate" style="max-width:400px"></mat-progress-bar>
+  </div>
+} @else if (!allPeriodsReady()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#ff9800;margin-bottom:16px">hourglass_empty</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">Required Periods Not Committed</h2>
+    <p style="color:#757575;margin:0 0 24px;max-width:460px">Both current-year and prior-year TB must be committed before opening balance control can begin.</p>
+    <button mat-flat-button color="primary" (click)="goToDataSources()">
+      <mat-icon>arrow_forward</mat-icon> Go to Data Sources
+    </button>
+  </div>
+} @else {
+  <div class="ob-container">
+    <!-- HEADER -->
+    <div class="ob-header">
+      <div>
+        <h1 class="ob-title">Opening Balance Control</h1>
+        <div class="ob-subtitle">Trial Balance continuity verification and baseline confirmation</div>
+      </div>
+      <div class="ob-actions">
+        @if (!baseline() || isSuperseded) {
+          <button mat-flat-button class="btn-primary" (click)="generateComparison()"
+            [disabled]="generateLoading()"
+            matTooltip="Generate or re-generate the rollforward comparison from committed TB data">
+            <mat-icon>compare_arrows</mat-icon>
+            {{ baseline() ? 'Re-generate Comparison' : 'Generate Comparison' }}
+          </button>
+        }
+        @if (baseline() && canConfirm) {
+          <button mat-flat-button class="btn-confirm" (click)="confirmBaseline()"
+            [disabled]="confirmLoading()"
+            matTooltip="Confirm the opening balance baseline — required before export">
+            <mat-icon>verified</mat-icon>
+            Confirm Baseline
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (generateLoading()) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+
+    <!-- BASELINE SUMMARY CARD -->
+    @if (baseline()) {
+      <div class="ob-summary-card" [style.border-left-color]="getStatusColor(baseline().status)">
+        <div class="ob-summary-header">
+          <div class="ob-status-badge" [style.background]="getStatusColor(baseline().status)">
+            {{ getStatusLabel(baseline().status) }}
+          </div>
+          @if (isConfirmed) {
+            <div class="ob-confirmed-stamp">
+              <mat-icon style="font-size:16px;width:16px;height:16px">verified_user</mat-icon>
+              Confirmed {{ baseline().confirmedAt | date:'medium' }}
+            </div>
+          }
+        </div>
+
+        @if (isSuperseded) {
+          <div class="ob-superseded-banner">
+            <mat-icon>warning</mat-icon>
+            <div>
+              <strong>Baseline Superseded</strong> — The underlying TB data has been replaced since this baseline was established. Re-generate the comparison and re-confirm to proceed with exports.
+            </div>
+          </div>
+        }
+
+        @if (baseline().status === 'continuity_matched_unconfirmed') {
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin:16px 0 0;background:#e3f2fd;border:1px solid #90caf9;border-radius:8px">
+            <mat-icon style="color:#1565c0">info</mat-icon>
+            <div style="flex:1">
+              <strong style="color:#1565c0">All mSCOA items matched</strong>
+              <span style="color:#1565c0;margin-left:8px">— prior-year closing balances equal current-year opening balances. Click "Confirm Baseline" to lock and proceed.</span>
+            </div>
+          </div>
+        }
+
+        <div class="ob-stats-grid">
+          <div class="ob-stat-item">
+            <div class="ob-stat-value">{{ baseline().totalAccounts }}</div>
+            <div class="ob-stat-label">Total mSCOA Items</div>
+          </div>
+          <div class="ob-stat-item">
+            <div class="ob-stat-value" style="color:#4caf50">{{ baseline().matchedAccounts }}</div>
+            <div class="ob-stat-label">Matched</div>
+          </div>
+          <div class="ob-stat-item">
+            <div class="ob-stat-value" [style.color]="baseline().exceptionAccounts > 0 ? '#f44336' : '#4caf50'">
+              {{ baseline().exceptionAccounts }}
+            </div>
+            <div class="ob-stat-label">Exceptions</div>
+          </div>
+          <div class="ob-stat-item">
+            <div class="ob-stat-value" [style.color]="baseline().totalDifference > 0 ? '#ff9800' : '#4caf50'">
+              {{ formatRand(baseline().totalDifference) }}
+            </div>
+            <div class="ob-stat-label">Total Difference</div>
+          </div>
+        </div>
+
+        @if (baseline().exceptionAccounts > 0 && !isConfirmed && !isSuperseded) {
+          <div class="ob-progress-bar">
+            <div class="ob-progress-label">
+              Exception Acknowledgement: {{ baseline().exceptionAccounts - unacknowledgedCount }} of {{ baseline().exceptionAccounts }} acknowledged
+            </div>
+            <mat-progress-bar mode="determinate"
+              [value]="((baseline().exceptionAccounts - unacknowledgedCount) / baseline().exceptionAccounts) * 100">
+            </mat-progress-bar>
+          </div>
+        }
+      </div>
+
+      <!-- EXCEPTIONS TABLE -->
+      @if (exceptions().length > 0) {
+        <div class="ob-section-card">
+          <div class="ob-section-header">
+            <h2 class="ob-section-title">
+              <mat-icon>compare</mat-icon>
+              Opening Balance Exceptions
+            </h2>
+            <div class="ob-filter-row">
+              <button mat-stroked-button [class.active]="exceptionsFilter === ''"
+                (click)="exceptionsFilter = ''; loadBaseline()">All</button>
+              <button mat-stroked-button [class.active]="exceptionsFilter === 'exceptions_only'"
+                (click)="exceptionsFilter = 'exceptions_only'; loadBaseline()">Unacknowledged</button>
+              <button mat-stroked-button [class.active]="exceptionsFilter === 'acknowledged'"
+                (click)="exceptionsFilter = 'acknowledged'; loadBaseline()">Acknowledged</button>
+            </div>
+          </div>
+
+          <div class="ob-table-wrap">
+            <table class="ob-table">
+              <thead>
+                <tr>
+                  <th>mSCOA Code</th>
+                  <th>Description</th>
+                  <th class="amount-col">Prior-Year Closing</th>
+                  <th class="amount-col">Current-Year Opening</th>
+                  <th class="amount-col">Difference</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ex of exceptions(); track ex.id) {
+                  <tr [class.acknowledged]="ex.acknowledged" [class.selected]="selectedExceptionId() === ex.id">
+                    <td class="mono">{{ ex.scoaItemCode }}</td>
+                    <td class="desc-col">{{ ex.scoaItemDescription || '—' }}</td>
+                    <td class="amount-col">{{ formatRand(ex.priorYearClosing) }}</td>
+                    <td class="amount-col">{{ formatRand(ex.currentYearOpening) }}</td>
+                    <td class="amount-col" [style.color]="ex.difference !== 0 ? '#f44336' : '#4caf50'">
+                      {{ formatRand(ex.difference) }}
+                    </td>
+                    <td>
+                      <span class="ob-type-badge" [class]="ex.exceptionType">
+                        {{ getExceptionTypeLabel(ex.exceptionType) }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (ex.acknowledged) {
+                        <span class="ob-ack-badge acknowledged">
+                          <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon>
+                          Acknowledged
+                        </span>
+                      } @else {
+                        <span class="ob-ack-badge pending">Pending</span>
+                      }
+                    </td>
+                    <td>
+                      @if (!ex.acknowledged && !isConfirmed && !isSuperseded) {
+                        <button mat-icon-button color="primary" (click)="selectException(ex.id)"
+                          matTooltip="Acknowledge this opening balance exception">
+                          <mat-icon>rate_review</mat-icon>
+                        </button>
+                      } @else if (ex.acknowledged) {
+                        <span class="ob-reason-hint" [matTooltip]="ex.reason || ''">
+                          {{ ex.reasonCategory || '' }}
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                  @if (selectedExceptionId() === ex.id) {
+                    <tr class="ack-form-row">
+                      <td colspan="8">
+                        <div class="ack-form">
+                          <div class="ack-form-header">
+                            <mat-icon>rate_review</mat-icon>
+                            Acknowledge Exception: {{ ex.scoaItemCode }}
+                          </div>
+                          <div class="ack-form-body">
+                            <mat-form-field appearance="outline" class="ack-field">
+                              <mat-label>Reason Category</mat-label>
+                              <mat-select [(ngModel)]="acknowledgeCategory">
+                                @for (cat of reasonCategories; track cat.value) {
+                                  <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+                                }
+                              </mat-select>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="ack-field ack-field-wide">
+                              <mat-label>Reason / Explanation</mat-label>
+                              <input matInput [(ngModel)]="acknowledgeReason" placeholder="Explain this difference">
+                            </mat-form-field>
+                            <div class="ack-actions">
+                              <button mat-stroked-button (click)="selectException(ex.id)">Cancel</button>
+                              <button mat-flat-button color="primary"
+                                [disabled]="!acknowledgeReason || !acknowledgeCategory || acknowledgeLoading()"
+                                (click)="acknowledgeException(ex.id)">
+                                <mat-icon>check</mat-icon> Acknowledge
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    } @else if (!baselineLoading() && !generateLoading()) {
+      <!-- NO BASELINE YET -->
+      <div class="ob-empty-state">
+        <mat-icon style="font-size:56px;width:56px;height:56px;color:#90caf9">compare_arrows</mat-icon>
+        <h2>Opening Balance Comparison Not Yet Generated</h2>
+        <p>Both required TB periods are committed. Generate the rollforward comparison to review prior-year closing balances against current-year opening balances.</p>
+        <button mat-flat-button class="btn-primary" (click)="generateComparison()" [disabled]="generateLoading()">
+          <mat-icon>compare_arrows</mat-icon> Generate Comparison
+        </button>
+      </div>
+    }
+
+    @if (baselineLoading()) {
+      <div style="display:flex;justify-content:center;padding:48px">
+        <mat-progress-bar mode="indeterminate" style="max-width:400px"></mat-progress-bar>
+      </div>
+    }
+  </div>
+}

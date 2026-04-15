@@ -1,0 +1,154 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Security</h1>
+    <p class="page-subtitle">Manage user permissions and role assignments</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ permissions.length }}</span>
+    <span class="summary-label">Total Permissions</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ userRoles.length }}</span>
+    <span class="summary-label">User Roles</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ uniqueRoleCount }}</span>
+    <span class="summary-label">Unique Roles</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search security..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredPermissions.length + filteredUserRoles.length }} results</span>
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="shield" [size]="14"></app-icon> Permissions by Role</h4>
+        <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" (click)="openPermModal()"><app-icon name="plus" [size]="12"></app-icon> Add Permission</button>
+      </div>
+      <div class="list-card">
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead><tr><th>Role</th><th>Module</th><th>Action</th><th style="width: 100px;">Actions</th></tr></thead>
+            <tbody>
+              @if (filteredPermissions.length === 0) {
+                <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No permissions found</td></tr>
+              } @else {
+                @for (p of filteredPermissions; track p.id) {
+                  <tr>
+                    <td><span class="badge badge-info">{{ p.role_name || p.role_id }}</span></td>
+                    <td>{{ p.module }}</td>
+                    <td><span class="badge badge-{{ getActionBadge(p.action) }}">{{ p.action }}</span></td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="editPerm(p)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deletePerm(p)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="users" [size]="14"></app-icon> User Role Assignments</h4>
+        <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" (click)="openRoleModal()"><app-icon name="plus" [size]="12"></app-icon> Add User Role</button>
+      </div>
+      <div class="list-card">
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead><tr><th>Employee #</th><th>Name</th><th>Role</th><th>Assigned</th><th style="width: 100px;">Actions</th></tr></thead>
+            <tbody>
+              @if (filteredUserRoles.length === 0) {
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No user roles found</td></tr>
+              } @else {
+                @for (ur of filteredUserRoles; track ur.id || $index) {
+                  <tr>
+                    <td>{{ ur.employee_number || ur.user_id }}</td>
+                    <td style="font-weight:500">{{ ur.employee_name || ur.username || '-' }}</td>
+                    <td><span class="badge badge-info">{{ ur.role_name || ur.role_id }}</span></td>
+                    <td>{{ formatDate(ur.assigned_at) }}</td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="editRole(ur)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteRole(ur)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showPermModal) {
+  <div class="modal-overlay visible" (click)="showPermModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Permission</h3>
+        <button class="modal-close" (click)="showPermModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="shield" [size]="16"></app-icon> Permission Details</div>
+          <div class="form-group"><label>Role *</label><input class="form-control" [(ngModel)]="newPerm.role_id" placeholder="Role ID or name"></div>
+          <div class="form-group"><label>Module *</label><input class="form-control" [(ngModel)]="newPerm.module" placeholder="e.g. employees, payroll, leave"></div>
+          <div class="form-group">
+            <label>Action *</label>
+            <select class="form-control" [(ngModel)]="newPerm.action">
+              <option value="READ">READ</option>
+              <option value="WRITE">WRITE</option>
+              <option value="APPROVE">APPROVE</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showPermModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="savePerm()">Add Permission</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRoleModal) {
+  <div class="modal-overlay visible" (click)="showRoleModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Assign User Role</h3>
+        <button class="modal-close" (click)="showRoleModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="users" [size]="16"></app-icon> User Role Assignment</div>
+          <div class="form-group"><label>User / Employee ID *</label><input class="form-control" [(ngModel)]="newRole.user_id" placeholder="Employee ID"></div>
+          <div class="form-group"><label>Role *</label><input class="form-control" [(ngModel)]="newRole.role_id" placeholder="Role ID or name"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showRoleModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveRole()">Assign Role</button>
+      </div>
+    </div>
+  </div>
+}

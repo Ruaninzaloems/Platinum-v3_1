@@ -1,0 +1,160 @@
+<div class="shell-container" [class.embedded-mode]="isEmbedded()">
+  <aside class="sidebar">
+    <div class="sidenav-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <mat-icon>account_balance</mat-icon>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">PLATINUM</span>
+          <span class="brand-sub">AFS</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav-section">
+      @for (item of topNavItems; track item.route) {
+        <a class="nav-link"
+           [routerLink]="item.route"
+           routerLinkActive="active-link"
+           [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
+           [matTooltip]="getNavTooltip(item.route)"
+           matTooltipPosition="right">
+          <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      }
+
+      @for (group of navGroups; track group.label) {
+        <button class="group-header" (click)="group.expanded = !group.expanded"
+                [matTooltip]="getGroupTooltip(group.label)" matTooltipPosition="right">
+          <mat-icon class="group-icon">{{ group.icon }}</mat-icon>
+          <span class="group-label">{{ group.label }}</span>
+          <span class="group-spacer"></span>
+          <mat-icon class="group-chevron">{{ group.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        @if (group.expanded) {
+          @for (child of group.children; track child.route) {
+            <a class="nav-link sub-item"
+               [routerLink]="child.route"
+               routerLinkActive="active-link"
+               [matTooltip]="getNavTooltip(child.route)"
+               matTooltipPosition="right">
+              <mat-icon class="nav-icon">{{ child.icon }}</mat-icon>
+              <span class="nav-label">{{ child.label }}</span>
+            </a>
+          }
+        }
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info-sidebar">
+        <div class="user-avatar-sidebar">
+          {{ userInitials() }}
+        </div>
+        <div class="user-details-sidebar">
+          <span class="user-name-sidebar">{{ userName() }}</span>
+          <span class="user-role-sidebar">{{ userRole() }}</span>
+        </div>
+      </div>
+      <div class="sidebar-version">v4.0.0</div>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <mat-toolbar class="app-toolbar">
+      <div class="toolbar-left">
+        <span class="municipality-name" matTooltip="Current municipality tenant">{{ auth.user()?.tenantName || 'Municipality' }}</span>
+        <button class="period-badge" [matMenuTriggerFor]="periodMenu"
+                matTooltip="Click to change financial year. Current: {{ currentFinancialYear() || 'Not set' }}">
+          <mat-icon class="period-icon">calendar_today</mat-icon>
+          {{ currentFinancialYear() || 'Select Year' }}
+          <mat-icon class="period-chevron">arrow_drop_down</mat-icon>
+        </button>
+        <mat-menu #periodMenu="matMenu" class="period-menu">
+          <div class="period-menu-header" (click)="$event.stopPropagation()">
+            <span class="period-menu-title">Financial Year</span>
+          </div>
+          @for (fy of financialYears(); track fy.id) {
+            <button mat-menu-item
+                    [class.active-fy]="fy.isCurrent"
+                    (click)="selectFinancialYear(fy)">
+              <mat-icon>{{ fy.isCurrent ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+              <span>{{ fy.label }} <span class="fy-status">({{ fy.status }})</span></span>
+            </button>
+          }
+        </mat-menu>
+      </div>
+
+      <span class="toolbar-spacer"></span>
+
+      <div class="toolbar-right">
+        <button mat-icon-button class="toolbar-btn" aria-label="Search"
+                matTooltip="Search across compilations, mappings, findings, and evidence">
+          <mat-icon>search</mat-icon>
+        </button>
+
+        <button mat-icon-button class="toolbar-btn" aria-label="Notifications"
+                [matBadge]="unreadCount()" matBadgeColor="warn"
+                [matBadgeHidden]="unreadCount() === 0" matBadgeSize="small"
+                matTooltip="Notifications — {{ unreadCount() }} unread">
+          <mat-icon>notifications_none</mat-icon>
+        </button>
+
+        <span class="user-name-toolbar" matTooltip="Signed in as {{ auth.user()?.email }}">{{ userName() }}</span>
+
+        <button mat-icon-button [matMenuTriggerFor]="userMenu" class="toolbar-avatar-btn"
+                matTooltip="User menu — profile, settings, sign out">
+          <div class="user-avatar-toolbar">
+            {{ userInitials() }}
+          </div>
+        </button>
+
+        <mat-menu #userMenu="matMenu" xPosition="before">
+          <div class="user-menu-header">
+            <div class="user-avatar-menu">{{ userInitials() }}</div>
+            <div class="user-menu-info">
+              <span class="user-menu-name">{{ userName() }}</span>
+              <span class="user-menu-email">{{ auth.user()?.email }}</span>
+            </div>
+          </div>
+          <hr class="menu-divider">
+          <button mat-menu-item>
+            <mat-icon>person</mat-icon>
+            <span>Profile</span>
+          </button>
+          <button mat-menu-item>
+            <mat-icon>settings</mat-icon>
+            <span>Settings</span>
+          </button>
+          <hr class="menu-divider">
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Sign Out</span>
+          </button>
+        </mat-menu>
+      </div>
+    </mat-toolbar>
+
+    <div class="breadcrumb-bar">
+      <div class="breadcrumb-trail">
+        <a class="breadcrumb-home" routerLink="/dashboard">
+          <mat-icon class="breadcrumb-home-icon">home</mat-icon>
+        </a>
+        <mat-icon class="breadcrumb-separator">chevron_right</mat-icon>
+        <span class="breadcrumb-current">
+          <mat-icon class="breadcrumb-current-icon">{{ currentPageIcon() }}</mat-icon>
+          {{ currentPageTitle() }}
+        </span>
+      </div>
+    </div>
+
+    <main class="content-area">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
+@if (!isEmbedded()) {
+  <app-copilot-panel></app-copilot-panel>
+}

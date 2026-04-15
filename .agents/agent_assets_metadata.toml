@@ -1,0 +1,26 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "qyVl8le9or5VRlVeINtok"
+uri = "file://ASSETS-API/Manuals/PriorYearAdjustments_UserManual.docx"
+type = "word_document"
+title = "PYA User Manual (Updated)"
+
+[[outputs]]
+id = "GJ1A2P3uHeV99b010qA1t"
+uri = "file://STANDARDS.md"
+type = "text"
+title = "Mnquma Asset Management — Standards & Architecture Document"
+
+[[outputs]]
+id = "m9tBFVHBw2pU0aXlBJUOH"
+uri = "file://migration_audit_confirmation_required.txt"
+type = "text"
+title = "Migration Audit — Confirmation Required"
+
+[[outputs]]
+id = "kXq1OBZAeaeV8R1q9HIjK"
+uri = "file://Platinum_Issues_Tracker.xlsx"
+type = "table"
+title = "Platinum ERP - Issues Tracker"

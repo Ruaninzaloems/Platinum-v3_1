@@ -1,0 +1,633 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Employee Self-Service</h1>
+    <p class="page-subtitle">View employee profile, payslips, leave balances, and benefits</p>
+  </div>
+</div>
+
+<div class="ess-selector-bar">
+  <div class="selector-group">
+    <label class="selector-label">Select Employee</label>
+    <select class="selector-input" [(ngModel)]="selectedEmployeeId" (ngModelChange)="selectEmployee()">
+      <option [ngValue]="null">-- Choose an employee --</option>
+      @for (emp of filteredEmployees; track emp.id) {
+        <option [ngValue]="emp.id">{{ emp.id }} — {{ emp.employee_code }} — {{ emp.title ? emp.title + ' ' : '' }}{{ emp.first_name }} {{ emp.surname }}</option>
+      }
+    </select>
+  </div>
+  <div class="selector-group selector-search">
+    <label class="selector-label">Search</label>
+    <input class="selector-input" type="text" [(ngModel)]="employeeSearch" placeholder="Filter by ID, code, name or surname..." />
+  </div>
+</div>
+
+@if (loading) {
+  <div class="ess-loading">
+    <div class="ess-spinner"></div>
+    <p>Loading employee data...</p>
+  </div>
+}
+
+@if (!loading && !profile && selectedEmployeeId) {
+  <div class="ess-empty">
+    <div class="ess-empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <p>Employee data not found</p>
+  </div>
+}
+
+@if (!loading && !selectedEmployeeId) {
+  <div class="ess-empty">
+    <div class="ess-empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <h3>Employee Self-Service Portal</h3>
+    <p>Select an employee above to view their profile, payslips, leave balances, and benefits.</p>
+  </div>
+}
+
+@if (!loading && profile) {
+  <div class="ess-tabs">
+    <button class="ess-tab" [class.active]="activeTab === 'overview'" (click)="switchTab('overview')">Overview</button>
+    <button class="ess-tab" [class.active]="activeTab === 'payslips'" (click)="switchTab('payslips')">Payslips</button>
+    <button class="ess-tab" [class.active]="activeTab === 'leave'" (click)="switchTab('leave')">Leave</button>
+    <button class="ess-tab" [class.active]="activeTab === 'benefits'" (click)="switchTab('benefits')">Benefits</button>
+    <button class="ess-tab" [class.active]="activeTab === 'personal'" (click)="switchTab('personal')">Personal Details</button>
+  </div>
+
+  @if (activeTab === 'overview') {
+    <div class="ess-grid">
+      <!-- Profile Card -->
+      <div class="ess-card ess-card-profile">
+        <div class="profile-header">
+          <div class="profile-avatar">{{ getInitials() }}</div>
+          <div class="profile-info">
+            <h2 class="profile-name">{{ profile.title ? profile.title + ' ' : '' }}{{ profile.first_name }} {{ profile.surname }}</h2>
+            <p class="profile-position">{{ profile.position_title || 'No position assigned' }}</p>
+            <div class="profile-meta">
+              <span class="profile-code">{{ profile.employee_code }}</span>
+              <span class="profile-badge" [class]="getStatusClass(profile.status)">{{ profile.status || 'Unknown' }}</span>
+            </div>
+          </div>
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <button class="quick-action-btn qa-leave" (click)="goToLeave()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Apply for Leave
+            </button>
+            @if (latestPayslip) {
+              <button class="quick-action-btn qa-download" (click)="downloadLatestPayslip()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Payslip
+              </button>
+            }
+            <button class="quick-action-btn qa-payslip" (click)="goToPayslipHistory()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              View Payslip History
+            </button>
+          </div>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Department</span>
+            <span class="detail-value">{{ profile.department_name || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Division</span>
+            <span class="detail-value">{{ profile.division_name || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Employee Type</span>
+            <span class="detail-value">{{ profile.employee_type_name || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Task Grade</span>
+            <span class="detail-value">{{ profile.grade_code ? profile.grade_code + ' - ' + profile.grade_name : '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Joining Date</span>
+            <span class="detail-value">{{ formatDate(profile.joining_date) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Payslip Card with itemised transactions -->
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Current Payslip</h3>
+          @if (latestPayslip) {
+            <span class="card-period">{{ getPeriodLabel(latestPayslip) }}</span>
+          }
+        </div>
+        @if (latestPayslip) {
+          <div class="payslip-summary">
+            <div class="payslip-kpi">
+              <span class="kpi-label">Gross Earnings</span>
+              <span class="kpi-value kpi-green">{{ formatCurrency(latestPayslip.gross_pay) }}</span>
+            </div>
+            <div class="payslip-kpi">
+              <span class="kpi-label">Total Deductions</span>
+              <span class="kpi-value kpi-red">{{ formatCurrency(latestPayslip.total_deductions) }}</span>
+            </div>
+            <div class="payslip-divider"></div>
+            <div class="payslip-kpi payslip-nett">
+              <span class="kpi-label">Nett Pay</span>
+              <span class="kpi-value kpi-primary">{{ formatCurrency(latestPayslip.nett_pay) }}</span>
+            </div>
+          </div>
+
+          @if (latestPayslipEarnings.length > 0) {
+            <div class="payslip-itemised">
+              <h4 class="itemised-heading">Earnings</h4>
+              @for (tx of latestPayslipEarnings; track tx.id) {
+                <div class="itemised-row">
+                  <span class="itemised-name">{{ tx.head_name }}</span>
+                  <span class="itemised-amount">{{ formatCurrency(tx.amount) }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (latestPayslipDeductions.length > 0) {
+            <div class="payslip-itemised">
+              <h4 class="itemised-heading">Deductions</h4>
+              @for (tx of latestPayslipDeductions; track tx.id) {
+                <div class="itemised-row">
+                  <span class="itemised-name">{{ tx.head_name }}</span>
+                  <span class="itemised-amount itemised-deduction">{{ formatCurrency(tx.amount) }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="payslip-meta">
+            <span>{{ latestPayslip.cycle_name }}</span>
+            <span class="profile-badge" [class]="getStatusClass(latestPayslip.status)">{{ latestPayslip.status }}</span>
+          </div>
+        } @else {
+          <div class="card-empty">No payslip data available</div>
+        }
+      </div>
+
+      <!-- Leave Balances Card -->
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Leave Balances</h3>
+          <span class="card-count">{{ leaveBalances.length }} types</span>
+        </div>
+        @if (leaveBalances.length > 0) {
+          <div class="leave-list">
+            @for (lb of leaveBalances; track lb.id) {
+              <div class="leave-item">
+                <div class="leave-item-top">
+                  <span class="leave-type">{{ lb.leave_type }}</span>
+                  <span class="leave-balance">{{ (lb.balance || 0) | number:'1.1-1' }} days</span>
+                </div>
+                <div class="leave-bar-track">
+                  <div class="leave-bar-fill" [style.width.%]="getLeavePercentage(lb)" [style.background]="getLeaveBarColor(lb)"></div>
+                </div>
+                <div class="leave-item-bottom">
+                  <span>Accrued: {{ (lb.accrued || 0) | number:'1.1-1' }}</span>
+                  <span>Taken: {{ (lb.taken || 0) | number:'1.1-1' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="card-empty">No leave balances recorded</div>
+        }
+      </div>
+
+      <!-- Benefits Card -->
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Benefits</h3>
+        </div>
+        <div class="benefits-section">
+          <h4 class="benefits-sub-heading">Medical Aid</h4>
+          @if (benefits.medical_aid && benefits.medical_aid.length > 0) {
+            @for (ma of benefits.medical_aid; track ma.id) {
+              <div class="benefit-item">
+                <div class="benefit-icon benefit-icon-medical">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <div class="benefit-info">
+                  <span class="benefit-name">{{ ma.scheme_name }}</span>
+                  <span class="benefit-detail">Member #{{ ma.membership_number || '-' }}</span>
+                </div>
+              </div>
+            }
+          } @else {
+            <p class="benefit-none">No medical aid enrolled</p>
+          }
+        </div>
+        <div class="benefits-section">
+          <h4 class="benefits-sub-heading">Retirement Funds</h4>
+          @if (benefits.retirement_funds && benefits.retirement_funds.length > 0) {
+            @for (rf of benefits.retirement_funds; track rf.id) {
+              <div class="benefit-item">
+                <div class="benefit-icon benefit-icon-retirement">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="benefit-info">
+                  <span class="benefit-name">{{ rf.fund_name }}</span>
+                  <span class="benefit-detail">Employee: {{ formatCurrency(rf.employee_amount) }} | Employer: {{ formatCurrency(rf.employer_amount) }}</span>
+                </div>
+              </div>
+            }
+          } @else {
+            <p class="benefit-none">No retirement funds enrolled</p>
+          }
+        </div>
+        @if (dependants.length > 0) {
+          <div class="benefits-section">
+            <h4 class="benefits-sub-heading">Dependants ({{ dependants.length }})</h4>
+            @for (dep of dependants; track dep.id) {
+              <div class="benefit-item">
+                <div class="benefit-icon benefit-icon-dependant">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                <div class="benefit-info">
+                  <span class="benefit-name">{{ dep.first_name }} {{ dep.surname }}</span>
+                  <span class="benefit-detail">{{ dep.relationship || '-' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Personal Details Quick Card -->
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Personal Details</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Email</span>
+            <span class="detail-value">{{ profile.email_address || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Cell Number</span>
+            <span class="detail-value">{{ profile.cell_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Work Number</span>
+            <span class="detail-value">{{ profile.work_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">ID Number</span>
+            <span class="detail-value">{{ profile.id_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Tax Number</span>
+            <span class="detail-value">{{ profile.income_tax_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Bank</span>
+            <span class="detail-value">{{ profile.bank_name || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Number</span>
+            <span class="detail-value">{{ maskAccountNumber(profile.bank_account_number) }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Type</span>
+            <span class="detail-value">{{ profile.bank_account_type || '-' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'payslips') {
+    <div class="ess-card ess-card-full">
+      <div class="card-title-bar">
+        <h3 class="card-heading">Payslip History</h3>
+        <span class="card-count">{{ payslips.length }} records</span>
+      </div>
+      @if (payslips.length > 0) {
+        <div class="table-wrapper">
+          <table class="ess-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Cycle</th>
+                <th>Gross Pay</th>
+                <th>Deductions</th>
+                <th>Nett Pay</th>
+                <th>Status</th>
+                <th>Payment Date</th>
+                <th style="text-align:center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ps of payslips; track ps.run_id) {
+                <tr>
+                  <td class="td-bold">{{ getPeriodLabel(ps) }}</td>
+                  <td>{{ ps.cycle_name }}</td>
+                  <td class="td-currency">{{ formatCurrency(ps.gross_pay) }}</td>
+                  <td class="td-currency td-red">{{ formatCurrency(ps.total_deductions) }}</td>
+                  <td class="td-currency td-bold">{{ formatCurrency(ps.nett_pay) }}</td>
+                  <td><span class="profile-badge" [class]="getStatusClass(ps.status)">{{ ps.status }}</span></td>
+                  <td>{{ formatDate(ps.payment_date) }}</td>
+                  <td style="text-align:center"><button class="btn btn-sm" style="padding:4px 10px;font-size:12px" (click)="viewPayslip(ps.run_id)"><app-icon name="fileText" [size]="13"></app-icon> View</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="card-empty">No payslip history available</div>
+      }
+    </div>
+  }
+
+  @if (activeTab === 'leave') {
+    <div class="ess-grid ess-grid-leave">
+      @for (lb of leaveBalances; track lb.id) {
+        <div class="ess-card leave-card">
+          <div class="leave-card-header">
+            <h4 class="leave-card-type">{{ lb.leave_type }}</h4>
+            <span class="leave-card-code">{{ lb.code }}</span>
+          </div>
+          <div class="leave-card-balance">
+            <span class="leave-big-number">{{ (lb.balance || 0) | number:'1.1-1' }}</span>
+            <span class="leave-big-label">days remaining</span>
+          </div>
+          <div class="leave-bar-track leave-bar-lg">
+            <div class="leave-bar-fill" [style.width.%]="getLeavePercentage(lb)" [style.background]="getLeaveBarColor(lb)"></div>
+          </div>
+          <div class="leave-card-stats">
+            <div class="leave-stat">
+              <span class="leave-stat-label">Accrued</span>
+              <span class="leave-stat-value">{{ (lb.accrued || 0) | number:'1.1-1' }}</span>
+            </div>
+            <div class="leave-stat">
+              <span class="leave-stat-label">Taken</span>
+              <span class="leave-stat-value">{{ (lb.taken || 0) | number:'1.1-1' }}</span>
+            </div>
+            <div class="leave-stat">
+              <span class="leave-stat-label">Forfeited</span>
+              <span class="leave-stat-value">{{ (lb.forfeited || 0) | number:'1.1-1' }}</span>
+            </div>
+          </div>
+          @if (lb.as_at_date) {
+            <div class="leave-card-footer">As at {{ formatDate(lb.as_at_date) }}</div>
+          }
+        </div>
+      }
+      @if (leaveBalances.length === 0) {
+        <div class="ess-card ess-card-full">
+          <div class="card-empty">No leave balance records found</div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab === 'benefits') {
+    <div class="ess-grid ess-grid-benefits">
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Medical Aid</h3>
+        </div>
+        @if (benefits.medical_aid && benefits.medical_aid.length > 0) {
+          @for (ma of benefits.medical_aid; track ma.id) {
+            <div class="benefit-detail-card">
+              <div class="benefit-detail-row">
+                <span class="detail-label">Scheme</span>
+                <span class="detail-value">{{ ma.scheme_name }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Type</span>
+                <span class="detail-value">{{ ma.scheme_type || '-' }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Membership #</span>
+                <span class="detail-value">{{ ma.membership_number || '-' }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Join Date</span>
+                <span class="detail-value">{{ formatDate(ma.join_date) }}</span>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="card-empty">No active medical aid membership</div>
+        }
+      </div>
+
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Retirement Funds</h3>
+        </div>
+        @if (benefits.retirement_funds && benefits.retirement_funds.length > 0) {
+          @for (rf of benefits.retirement_funds; track rf.id) {
+            <div class="benefit-detail-card">
+              <div class="benefit-detail-row">
+                <span class="detail-label">Fund</span>
+                <span class="detail-value">{{ rf.fund_name }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Type</span>
+                <span class="detail-value">{{ rf.fund_type || '-' }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Administrator</span>
+                <span class="detail-value">{{ rf.administrator || '-' }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Fund Number</span>
+                <span class="detail-value">{{ rf.fund_number || '-' }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Employee Contribution</span>
+                <span class="detail-value">{{ formatCurrency(rf.employee_amount) }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Employer Contribution</span>
+                <span class="detail-value">{{ formatCurrency(rf.employer_amount) }}</span>
+              </div>
+              <div class="benefit-detail-row">
+                <span class="detail-label">Join Date</span>
+                <span class="detail-value">{{ formatDate(rf.join_date) }}</span>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="card-empty">No active retirement fund membership</div>
+        }
+      </div>
+
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Dependants</h3>
+          <span class="card-count">{{ dependants.length }} registered</span>
+        </div>
+        @if (dependants.length > 0) {
+          <div class="table-wrapper">
+            <table class="ess-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Relationship</th>
+                  <th>ID Number</th>
+                  <th>Date of Birth</th>
+                  <th>Gender</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (dep of dependants; track dep.id) {
+                  <tr>
+                    <td class="td-bold">{{ dep.first_name }} {{ dep.surname }}</td>
+                    <td>{{ dep.relationship || '-' }}</td>
+                    <td>{{ dep.id_number || '-' }}</td>
+                    <td>{{ formatDate(dep.date_of_birth) }}</td>
+                    <td>{{ dep.gender || '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="card-empty">No dependants registered</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'personal') {
+    <div class="ess-grid ess-grid-personal">
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Personal Information</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Full Name</span>
+            <span class="detail-value">{{ profile.title ? profile.title + ' ' : '' }}{{ profile.first_name }} {{ profile.surname }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Known As</span>
+            <span class="detail-value">{{ profile.known_as || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">ID Number</span>
+            <span class="detail-value">{{ profile.id_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Date of Birth</span>
+            <span class="detail-value">{{ formatDate(profile.date_of_birth) }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Gender</span>
+            <span class="detail-value">{{ profile.gender || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Race</span>
+            <span class="detail-value">{{ profile.race || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Nationality</span>
+            <span class="detail-value">{{ profile.nationality || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Marital Status</span>
+            <span class="detail-value">{{ profile.marital_status || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Language</span>
+            <span class="detail-value">{{ profile.language || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Disability</span>
+            <span class="detail-value">{{ profile.disability_status || 'None' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Contact Details</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Email</span>
+            <span class="detail-value">{{ profile.email_address || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Cell Number</span>
+            <span class="detail-value">{{ profile.cell_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Home Number</span>
+            <span class="detail-value">{{ profile.home_number || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Work Number</span>
+            <span class="detail-value">{{ profile.work_number || '-' }}</span>
+          </div>
+        </div>
+        <div class="card-title-bar card-title-bar-sub">
+          <h3 class="card-heading">Physical Address</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Address Line 1</span>
+            <span class="detail-value">{{ profile.physical_address_1 || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Address Line 2</span>
+            <span class="detail-value">{{ profile.physical_address_2 || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">City</span>
+            <span class="detail-value">{{ profile.physical_city || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Province</span>
+            <span class="detail-value">{{ profile.physical_province || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Postal Code</span>
+            <span class="detail-value">{{ profile.physical_postal_code || '-' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ess-card">
+        <div class="card-title-bar">
+          <h3 class="card-heading">Banking Details</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Bank</span>
+            <span class="detail-value">{{ profile.bank_name || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Branch Code</span>
+            <span class="detail-value">{{ profile.bank_branch_code || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Number</span>
+            <span class="detail-value">{{ maskAccountNumber(profile.bank_account_number) }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Type</span>
+            <span class="detail-value">{{ profile.bank_account_type || '-' }}</span>
+          </div>
+        </div>
+        <div class="card-title-bar card-title-bar-sub">
+          <h3 class="card-heading">Tax Information</h3>
+        </div>
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="detail-label">Income Tax Number</span>
+            <span class="detail-value">{{ profile.income_tax_number || '-' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}

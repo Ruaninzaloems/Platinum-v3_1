@@ -1,0 +1,526 @@
+<div class="page-container">
+  <div class="page-header">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button mat-icon-button (click)="goBack()" matTooltip="Back to Template Library">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <h1>{{ template()?.name || 'Loading...' }}</h1>
+        <div class="subtitle" *ngIf="template()?.description">{{ template()?.description }}</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      @if (template()) {
+        <button mat-flat-button class="btn-gold" (click)="createNewVersion()" [disabled]="creatingVersion()" matTooltip="Create a new version of this template (deep copy)">
+          <mat-icon>add_circle</mat-icon>
+          {{ creatingVersion() ? 'Creating...' : 'Create New Version' }}
+        </button>
+        <button mat-flat-button class="btn-gold" (click)="editStyle()" matTooltip="Customize the visual design of the AFS output for this template">
+          <mat-icon>palette</mat-icon>
+          Edit Style
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (template(); as tmpl) {
+    <div class="info-bar">
+      <div class="info-item" matTooltip="AFS template type classification">
+        <span class="info-label">Type</span>
+        <span class="type-badge" [class]="tmpl.type.toLowerCase()">{{ tmpl.type }}</span>
+      </div>
+      <div class="info-item" matTooltip="Current template version number">
+        <span class="info-label">Version</span>
+        <span class="info-value">v{{ tmpl.version }}</span>
+        @if (tmpl.versionLabel) {
+          <span class="version-label-badge">{{ tmpl.versionLabel }}</span>
+        }
+      </div>
+      <div class="info-item" matTooltip="Whether this version is the active current version">
+        <span class="info-label">Current</span>
+        @if (tmpl.isCurrentVersion) {
+          <span class="current-badge active"><mat-icon style="font-size:14px;width:14px;height:14px;">check_circle</mat-icon> Current</span>
+        } @else {
+          <span class="current-badge inactive">Superseded</span>
+        }
+      </div>
+      <div class="info-item" matTooltip="Current template lifecycle status">
+        <span class="info-label">Status</span>
+        <span class="status-badge" [class]="tmpl.status.toLowerCase().replace(' ', '_')">{{ tmpl.status }}</span>
+      </div>
+      <div class="info-item" matTooltip="GRAP standard year this template aligns with">
+        <span class="info-label">GRAP Standard</span>
+        <span class="info-value">GRAP {{ tmpl.specimenYear || 'N/A' }}</span>
+      </div>
+      <div class="info-item" matTooltip="mSCOA chart version used for mapping rules">
+        <span class="info-label">mSCOA Target</span>
+        <span class="info-value">{{ mscoaVersionLabel() || 'Loading...' }}</span>
+      </div>
+    </div>
+
+    <mat-tab-group [selectedIndex]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)" class="template-tabs" animationDuration="200ms">
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">table_chart</mat-icon>
+          Statements
+        </ng-template>
+
+        @if (statementSections().length > 0) {
+          <div class="tab-content">
+            <mat-accordion multi>
+              @for (section of statementSections(); track section.id) {
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header matTooltip="Expand to view line items in this section">
+                    <mat-panel-title>
+                      @if (section.noteNumber) {
+                        <span class="note-number" matTooltip="AFS disclosure note number">{{ section.noteNumber }}</span>
+                      }
+                      {{ section.title }}
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ section.lineItems?.length || 0 }} line items
+                      @if (section.grapReference) {
+                        <mat-chip matTooltip="GRAP standard reference for this section">{{ section.grapReference }}</mat-chip>
+                      }
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  @if (section.lineItems && section.lineItems.length > 0) {
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th matTooltip="Unique line item code identifier">Code</th>
+                          <th matTooltip="Display label for the line item">Label</th>
+                          <th matTooltip="Line item type: Header, Detail, Total, etc.">Type</th>
+                          <th matTooltip="Data type: Currency, Percentage, Text, etc.">Data Type</th>
+                          <th matTooltip="GRAP standard reference for this line item">GRAP Ref</th>
+                          <th matTooltip="Calculation formula applied to this line item">Formula</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of section.lineItems; track item.id) {
+                          <tr [class.bold-row]="item.isBold"
+                              [class.italic-row]="item.isItalic"
+                              [class.total-row]="item.isTotal"
+                              [class.subtotal-row]="item.isSubTotal"
+                              [style.padding-left.px]="item.indentLevel * 16">
+                            <td class="code-col">{{ item.code || '\u2014' }}</td>
+                            <td [style.padding-left.px]="item.indentLevel * 16">{{ item.label }}</td>
+                            <td>{{ item.lineType }}</td>
+                            <td>{{ item.dataType }}</td>
+                            <td>
+                              @if (item.grapReference) {
+                                <span class="mscoa-tag" matTooltip="GRAP reference: {{ item.grapReference }}">{{ item.grapReference }}</span>
+                              } @else {
+                                \u2014
+                              }
+                            </td>
+                            <td class="formula-col" [matTooltip]="item.formula ? 'Formula: ' + item.formula : 'No formula defined'">{{ item.formula || '\u2014' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <div class="empty-state" style="padding: 24px;">
+                      <p>No line items in this section.</p>
+                    </div>
+                  }
+                </mat-expansion-panel>
+              }
+            </mat-accordion>
+          </div>
+        } @else {
+          <div class="empty-state tab-content" matTooltip="No sections have been defined for this template yet">
+            <mat-icon>table_chart</mat-icon>
+            <h3>No sections</h3>
+            <p>This template has no sections defined yet.</p>
+          </div>
+        }
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">policy</mat-icon>
+          Policies
+        </ng-template>
+        <div class="tab-content embedded-tab">
+          <app-accounting-policies></app-accounting-policies>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">description</mat-icon>
+          Notes
+        </ng-template>
+        <div class="tab-content">
+          @if (noteSections().length > 0) {
+            <div class="notes-summary">
+              <span class="note-count">{{ noteSections().length }} disclosure note sections</span>
+            </div>
+            <mat-accordion multi>
+              @for (section of noteSections(); track section.id) {
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      @if (section.noteNumber) {
+                        <span class="note-number">{{ section.noteNumber }}</span>
+                      }
+                      {{ section.title }}
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ section.lineItems?.length || 0 }} line items
+                      @if (section.grapReference) {
+                        <mat-chip>{{ section.grapReference }}</mat-chip>
+                      }
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  @if (section.lineItems && section.lineItems.length > 0) {
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Code</th>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Data Type</th>
+                          <th>GRAP Ref</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of section.lineItems; track item.id) {
+                          <tr [class.bold-row]="item.isBold"
+                              [class.italic-row]="item.isItalic"
+                              [class.total-row]="item.isTotal">
+                            <td class="code-col">{{ item.code || '\u2014' }}</td>
+                            <td [style.padding-left.px]="(item.indentLevel || 0) * 16">{{ item.label }}</td>
+                            <td>{{ item.lineType }}</td>
+                            <td>{{ item.dataType }}</td>
+                            <td>
+                              @if (item.grapReference) {
+                                <span class="mscoa-tag">{{ item.grapReference }}</span>
+                              } @else {
+                                \u2014
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <div class="empty-state" style="padding: 24px;">
+                      <p>No line items in this note.</p>
+                    </div>
+                  }
+                </mat-expansion-panel>
+              }
+            </mat-accordion>
+          } @else {
+            <div class="empty-state">
+              <mat-icon>description</mat-icon>
+              <h3>No Disclosure Notes</h3>
+              <p>This template has no disclosure note sections defined.</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">short_text</mat-icon>
+          Abbreviations
+        </ng-template>
+        <div class="tab-content embedded-tab">
+          <app-abbreviations></app-abbreviations>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">assessment</mat-icon>
+          Mapping Summary
+        </ng-template>
+        <div class="tab-content">
+          @if (mappingLoading()) {
+            <div class="loading-state">
+              <mat-spinner diameter="36"></mat-spinner>
+              <p>Loading mapping coverage...</p>
+            </div>
+          } @else if (mappingData(); as mapping) {
+            <div class="mapping-validity" [class.valid]="mapping.isValid" [class.invalid]="!mapping.isValid">
+              <mat-icon>{{ mapping.isValid ? 'check_circle' : 'warning' }}</mat-icon>
+              <span>{{ mapping.isValid ? 'All mappings are valid' : 'Mapping coverage incomplete' }}</span>
+              <span class="rule-count">{{ mapping.totalRules }} mapping rules</span>
+            </div>
+
+            <div class="mapping-grid">
+              <div class="mapping-card">
+                <h4>Statement Line Coverage</h4>
+                <div class="coverage-stat">
+                  <span class="coverage-pct"
+                        [class.full]="mapping.statementLineCoverage.unmapped === 0"
+                        [class.partial]="mapping.statementLineCoverage.unmapped > 0 && mapping.statementLineCoverage.mapped > 0"
+                        [class.low]="mapping.statementLineCoverage.mapped === 0 && mapping.statementLineCoverage.totalDataLines > 0">
+                    {{ mapping.statementLineCoverage.totalDataLines > 0 ? Math.round((mapping.statementLineCoverage.mapped / mapping.statementLineCoverage.totalDataLines) * 100) : 0 }}%
+                  </span>
+                </div>
+                <div class="coverage-counts">
+                  <div class="count-item mapped"><mat-icon>check_circle</mat-icon><span>{{ mapping.statementLineCoverage.mapped }} Mapped</span></div>
+                  <div class="count-item unmapped"><mat-icon>radio_button_unchecked</mat-icon><span>{{ mapping.statementLineCoverage.unmapped }} Unmapped</span></div>
+                  <div class="count-item total"><mat-icon>view_list</mat-icon><span>{{ mapping.statementLineCoverage.totalDataLines }} Total</span></div>
+                </div>
+                <mat-progress-bar mode="determinate"
+                  [value]="mapping.statementLineCoverage.totalDataLines > 0 ? (mapping.statementLineCoverage.mapped / mapping.statementLineCoverage.totalDataLines) * 100 : 0"
+                  [class.bar-full]="mapping.statementLineCoverage.unmapped === 0"
+                  [class.bar-partial]="mapping.statementLineCoverage.unmapped > 0 && mapping.statementLineCoverage.mapped > 0"
+                  [class.bar-low]="mapping.statementLineCoverage.mapped === 0">
+                </mat-progress-bar>
+              </div>
+
+              <div class="mapping-card">
+                <h4>Note Section Coverage</h4>
+                <div class="coverage-stat">
+                  <span class="coverage-pct"
+                        [class.full]="mapping.noteCoverage.unmapped === 0"
+                        [class.partial]="mapping.noteCoverage.unmapped > 0 && mapping.noteCoverage.mapped > 0"
+                        [class.low]="mapping.noteCoverage.mapped === 0 && mapping.noteCoverage.totalNoteSections > 0">
+                    {{ mapping.noteCoverage.totalNoteSections > 0 ? Math.round((mapping.noteCoverage.mapped / mapping.noteCoverage.totalNoteSections) * 100) : 0 }}%
+                  </span>
+                </div>
+                <div class="coverage-counts">
+                  <div class="count-item mapped"><mat-icon>check_circle</mat-icon><span>{{ mapping.noteCoverage.mapped }} Mapped</span></div>
+                  <div class="count-item unmapped"><mat-icon>radio_button_unchecked</mat-icon><span>{{ mapping.noteCoverage.unmapped }} Unmapped</span></div>
+                  <div class="count-item total"><mat-icon>view_list</mat-icon><span>{{ mapping.noteCoverage.totalNoteSections }} Total</span></div>
+                </div>
+                <mat-progress-bar mode="determinate"
+                  [value]="mapping.noteCoverage.totalNoteSections > 0 ? (mapping.noteCoverage.mapped / mapping.noteCoverage.totalNoteSections) * 100 : 0"
+                  [class.bar-full]="mapping.noteCoverage.unmapped === 0"
+                  [class.bar-partial]="mapping.noteCoverage.unmapped > 0 && mapping.noteCoverage.mapped > 0"
+                  [class.bar-low]="mapping.noteCoverage.mapped === 0">
+                </mat-progress-bar>
+              </div>
+
+              <div class="mapping-card">
+                <h4>mSCOA Sub-Class Coverage</h4>
+                <div class="coverage-stat">
+                  <span class="coverage-pct"
+                        [class.full]="mapping.subClassCoverage.coveragePercent === 100"
+                        [class.partial]="mapping.subClassCoverage.coveragePercent >= 50 && mapping.subClassCoverage.coveragePercent < 100"
+                        [class.low]="mapping.subClassCoverage.coveragePercent < 50">
+                    {{ mapping.subClassCoverage.coveragePercent }}%
+                  </span>
+                </div>
+                <div class="coverage-counts">
+                  <div class="count-item mapped"><mat-icon>check_circle</mat-icon><span>{{ mapping.subClassCoverage.matched }} Matched</span></div>
+                  <div class="count-item unmapped"><mat-icon>radio_button_unchecked</mat-icon><span>{{ mapping.subClassCoverage.unmatched }} Unmatched</span></div>
+                  <div class="count-item total"><mat-icon>view_list</mat-icon><span>{{ mapping.subClassCoverage.total }} Total</span></div>
+                </div>
+                <mat-progress-bar mode="determinate" [value]="mapping.subClassCoverage.coveragePercent"
+                  [class.bar-full]="mapping.subClassCoverage.coveragePercent === 100"
+                  [class.bar-partial]="mapping.subClassCoverage.coveragePercent >= 50 && mapping.subClassCoverage.coveragePercent < 100"
+                  [class.bar-low]="mapping.subClassCoverage.coveragePercent < 50">
+                </mat-progress-bar>
+              </div>
+            </div>
+
+            @if (mapping.noteCoverage.mappedDetails.length > 0) {
+              <h4 class="section-list-title">Mapped Note Sections</h4>
+              <div class="section-coverage-list">
+                @for (note of mapping.noteCoverage.mappedDetails; track note.sectionId) {
+                  <div class="section-coverage-row">
+                    <div class="sec-info">
+                      <span class="sec-title">{{ note.title }}</span>
+                      <span class="sec-badge mapped-badge">{{ note.ruleCount }} rules</span>
+                    </div>
+                    <div class="sec-stats">
+                      <span class="sec-count">{{ note.lineItemCoverage.mapped }}/{{ note.lineItemCoverage.total }}</span>
+                      <div class="sec-bar-wrap">
+                        <div class="sec-bar" [style.width.%]="note.lineItemCoverage.total > 0 ? (note.lineItemCoverage.mapped / note.lineItemCoverage.total) * 100 : 0"
+                             [class.bar-full]="note.lineItemCoverage.mapped === note.lineItemCoverage.total"
+                             [class.bar-partial]="note.lineItemCoverage.mapped > 0 && note.lineItemCoverage.mapped < note.lineItemCoverage.total"
+                             [class.bar-low]="note.lineItemCoverage.mapped === 0">
+                        </div>
+                      </div>
+                      <span class="sec-pct">{{ note.lineItemCoverage.total > 0 ? Math.round((note.lineItemCoverage.mapped / note.lineItemCoverage.total) * 100) : 0 }}%</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (mapping.statementLineCoverage.unmappedDetails.length > 0) {
+              <h4 class="section-list-title unmapped-title">Unmapped Statement Lines</h4>
+              <div class="section-coverage-list">
+                @for (line of mapping.statementLineCoverage.unmappedDetails; track line.lineItemId) {
+                  <div class="section-coverage-row unmapped-row">
+                    <div class="sec-info">
+                      <span class="sec-title">{{ line.label }}</span>
+                    </div>
+                    <span class="sec-badge unmapped-badge">{{ line.section }}</span>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="empty-state">
+              <mat-icon>assessment</mat-icon>
+              <h3>No Mapping Data</h3>
+              <p>Mapping coverage statistics are not available for this template. Seed disclosure mappings first.</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">history</mat-icon>
+          Version History
+        </ng-template>
+        <div class="tab-content">
+          @if (versionLoading()) {
+            <div class="loading-state">
+              <mat-spinner diameter="36"></mat-spinner>
+              <p>Loading version history...</p>
+            </div>
+          } @else if (versionHistory(); as history) {
+            <div class="version-history-container">
+              <div class="version-family-header">
+                <h3>{{ history.familyName }}</h3>
+                <span class="version-count">{{ history.versions.length }} version(s)</span>
+              </div>
+              <div class="version-timeline">
+                @for (ver of history.versions; track ver.id) {
+                  <div class="version-card" [class.active-version]="ver.isCurrentVersion" [class.selected-version]="ver.id === template()?.id">
+                    <div class="version-card-header">
+                      <div class="version-card-left">
+                        <span class="version-number-badge">v{{ ver.version }}</span>
+                        @if (ver.versionLabel) {
+                          <span class="version-label">{{ ver.versionLabel }}</span>
+                        }
+                      </div>
+                      <div class="version-card-right">
+                        @if (ver.isCurrentVersion) {
+                          <span class="current-version-tag"><mat-icon style="font-size:12px;width:12px;height:12px;">check_circle</mat-icon> Current</span>
+                        }
+                        <span class="status-badge small" [class]="ver.status.toLowerCase()">{{ ver.status }}</span>
+                      </div>
+                    </div>
+                    <div class="version-meta-row">
+                      <span class="version-date">Created {{ ver.createdAt | date:'medium' }}</span>
+                      @if (ver.publishedAt) {
+                        <span class="version-date">Published {{ ver.publishedAt | date:'medium' }}</span>
+                      }
+                      <span class="version-stat">{{ ver.sectionCount }} sections</span>
+                      <span class="version-stat">{{ ver.compilationCount }} compilation(s)</span>
+                    </div>
+                    <div class="version-actions">
+                      @if (ver.id !== template()?.id) {
+                        <button mat-stroked-button (click)="openVersion(ver.id)" matTooltip="View this version">
+                          <mat-icon>open_in_new</mat-icon> View
+                        </button>
+                        <button mat-stroked-button (click)="compareWithVersion(ver.id)" matTooltip="Compare this version with the current one">
+                          <mat-icon>compare_arrows</mat-icon> Compare
+                        </button>
+                      } @else {
+                        <span class="viewing-label">Currently viewing</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <mat-icon>history</mat-icon>
+              <h3>No Version History</h3>
+              <p>This template is the only version. Create a new version to start tracking changes.</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+
+    @if (comparisonData(); as comparison) {
+      <div class="comparison-overlay">
+        <div class="comparison-panel">
+          <div class="comparison-header">
+            <h2>Version Comparison</h2>
+            <button mat-icon-button (click)="closeComparison()" matTooltip="Close comparison">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="comparison-versions-row">
+            <div class="comp-version">
+              <span class="comp-label">Base</span>
+              <span class="comp-name">{{ comparison.template1.name }} v{{ comparison.template1.version }}</span>
+            </div>
+            <mat-icon class="comp-arrow">arrow_forward</mat-icon>
+            <div class="comp-version">
+              <span class="comp-label">Compare</span>
+              <span class="comp-name">{{ comparison.template2.name }} v{{ comparison.template2.version }}</span>
+            </div>
+          </div>
+          <div class="comparison-summary">
+            <div class="comp-stat">
+              <span class="comp-num added">{{ comparison.summary.added }}</span>
+              <span class="comp-stat-label">Added</span>
+            </div>
+            <div class="comp-stat">
+              <span class="comp-num removed">{{ comparison.summary.removed }}</span>
+              <span class="comp-stat-label">Removed</span>
+            </div>
+            <div class="comp-stat">
+              <span class="comp-num modified">{{ comparison.summary.modified }}</span>
+              <span class="comp-stat-label">Modified</span>
+            </div>
+            <div class="comp-stat">
+              <span class="comp-num">{{ comparison.summary.unchanged }}</span>
+              <span class="comp-stat-label">Unchanged</span>
+            </div>
+          </div>
+          <div class="comparison-sections">
+            @for (section of comparison.sections; track section.title) {
+              <div class="comp-section" [class]="'comp-' + section.change">
+                <div class="comp-section-header">
+                  <mat-icon>{{ section.change === 'added' ? 'add_circle' : section.change === 'removed' ? 'remove_circle' : 'edit' }}</mat-icon>
+                  <span class="comp-section-title">{{ section.title }}</span>
+                  <span class="comp-section-type">{{ section.sectionType }}</span>
+                  <span class="comp-change-badge" [class]="section.change">{{ section.change }}</span>
+                </div>
+                @if (section.lineItems && section.lineItems.length > 0) {
+                  <div class="comp-line-items">
+                    @for (li of section.lineItems; track li.label) {
+                      @if (li.change !== 'unchanged') {
+                        <div class="comp-li" [class]="'comp-li-' + li.change">
+                          <mat-icon style="font-size:14px;width:14px;height:14px;">
+                            {{ li.change === 'added' ? 'add' : li.change === 'removed' ? 'remove' : 'edit' }}
+                          </mat-icon>
+                          <span>{{ li.label }}</span>
+                          <span class="li-type">{{ li.lineType }}</span>
+                          @if (li.details) {
+                            <div class="li-details">
+                              @for (detail of objectEntries(li.details); track detail[0]) {
+                                <span class="detail-change">{{ detail[0] }}: {{ detail[1].old }} → {{ detail[1].new }}</span>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            }
+            @if (comparison.sections.length === 0) {
+              <div class="empty-state" style="padding:24px;">
+                <mat-icon>check_circle</mat-icon>
+                <h3>No Differences</h3>
+                <p>These two versions are identical.</p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

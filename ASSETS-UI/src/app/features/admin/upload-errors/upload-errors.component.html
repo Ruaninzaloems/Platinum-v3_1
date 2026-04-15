@@ -1,0 +1,49 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Validation Errors</h1>
+      <p class="page-subtitle">
+        @if (job()) {
+          File: {{job().filename}} | Total Rows: {{job().total_Records}} | Error Rows: {{job().no_RecodsNotValidating}}
+        }
+      </p>
+    </div>
+    <div class="header-actions">
+      <button mat-flat-button class="btn-primary" (click)="exportErrors()" [disabled]="exporting()">
+        <mat-icon>file_download</mat-icon>
+        {{exporting() ? 'Exporting...' : 'Download Error Report'}}
+      </button>
+      <button mat-stroked-button (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon> Back to Jobs
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Field</th>
+            <th>Error Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (err of parsedErrors(); track $index) {
+            <tr>
+              <td class="id-cell">{{err.rowNumber}}</td>
+              <td class="field-cell">{{err.field}}</td>
+              <td class="error-cell">{{err.message}}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (parsedErrors().length === 0) {
+        <div class="empty-state">No validation errors found</div>
+      }
+    </div>
+  }
+</div>

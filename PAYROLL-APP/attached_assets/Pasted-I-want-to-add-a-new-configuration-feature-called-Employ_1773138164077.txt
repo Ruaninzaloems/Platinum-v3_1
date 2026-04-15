@@ -1,0 +1,167 @@
+I want to add a new configuration feature called Employment Change Reasons.
+
+Use the attached Platinum screenshots as functional and field reference only.
+Do not copy the legacy UI exactly.
+Use the existing Angular Platinum page pattern already used by Positions, Job Profiles, Medical Aid Schemes, Trade Unions, and other modern configuration pages.
+
+Purpose:
+This feature must maintain the reasons used for employee employment-related changes such as:
+- termination
+- demotion
+- promotion
+- transfer
+- retirement
+- resignation
+- dismissal
+- take-on / appointment
+- recruitment-related employee status changes
+
+Important terminology:
+Do NOT confuse this with existing Employee Type / Employee Subtype in the HR system.
+
+This feature must use:
+- Employment Change Type
+- Employment Change Reason
+
+The Employment Change Type values are FIXED system lookup values and must not be user-editable.
+
+Fixed Employment Change Type values:
+- Take-on
+- Employment Changes
+- Termination
+- Recruitment
+
+Architecture requirement:
+Do NOT hardcode these values in the Angular UI.
+Do NOT make them a normal editable configuration screen.
+They must come from a reference/constant lookup table in the database and be exposed via API.
+
+Recommended data design:
+1. A lookup/reference table for Employment Change Types
+2. A master table for Employment Change Reasons linked to Employment Change Type
+
+Expected tables:
+- employment_change_types
+- employment_change_reasons
+
+Suggested structure:
+employment_change_types
+- employment_change_type_id
+- code
+- description
+- enabled
+- captured_at
+- captured_by
+- modified_at
+- modified_by
+
+employment_change_reasons
+- employment_change_reason_id
+- employment_change_type_id
+- reason_description
+- enabled
+- captured_at
+- captured_by
+- modified_at
+- modified_by
+
+Seed the fixed Employment Change Type values:
+- TAKE_ON / Take-on
+- EMP_CHANGE / Employment Changes
+- TERMINATION / Termination
+- RECRUITMENT / Recruitment
+
+Feature requirements:
+Create a full modern Angular feature for Employment Change Reasons.
+
+List page requirements:
+- Summary cards
+  - Total Reasons
+  - Active
+  - Inactive
+- Search/filter
+- Paginated table
+- Status column
+- Actions column using the exact same working action button/icon pattern as the existing reference pages
+- Add button
+
+Detail page requirements:
+- Create / View / Edit modes
+- Tabs:
+  1. Reason Details
+  2. History
+- White background cards
+- Uppercase labels
+- Existing Platinum styles/tokens
+- Reuse shared components and patterns already in the project
+
+Reason Details fields:
+- Employment Change Type (dropdown from lookup table)
+- Employment Change Reason
+- Enabled
+
+Business rules:
+- Employment Change Type is required
+- Employment Change Reason is required
+- Employment Change Reason must be unique per Employment Change Type
+- Enabled is a boolean flag
+- Only enabled reasons should normally appear in operational dropdowns/lookups
+- History/audit conventions must match the rest of the system
+- Do not invent unnecessary extra fields
+- Reuse existing shared action button/icon patterns from working feature pages
+- Do not introduce a new icon library or generic CRUD styling
+- Do not use generic Angular CRUD assumptions if a similar project page already exists
+
+Functional usage requirements:
+This feature must be usable later in workflows such as:
+- employee termination
+- demotion
+- promotion
+- transfer
+- retirement
+- resignation
+- dismissal
+- other employment status changes
+
+Integration requirement:
+Make this feature available as a lookup source for future employment change workflows.
+Do not implement full workflow integration everywhere unless already appropriate, but structure it properly for downstream use.
+
+Reference UI pattern:
+Use the same modern Angular feature pattern as:
+- Employees
+- Positions
+- Job Profiles
+- Medical Aid Schemes
+- Trade Unions
+
+Development rules:
+- Reuse the closest existing feature/module as template
+- Reuse existing services, shared components, styling, and action button patterns
+- Keep changes targeted
+- Do not refactor unrelated modules
+- Verify existing naming conventions before creating new files/tables/routes
+- Preserve auditability, traceability, and compliance
+- Do not redesign the UI
+- Do not hardcode Employment Change Type values in the frontend
+
+Expected backend/API:
+Please create the required backend routes, service logic, and lookup endpoint(s) for:
+- list reasons
+- create reason
+- update reason
+- view reason/history
+- get Employment Change Type lookup values
+
+Suggested route style:
+Use the project’s existing route conventions under settings/configuration-style endpoints where most appropriate.
+
+Important:
+Before implementing, first inspect the existing codebase and existing configuration patterns.
+Then implement this feature using the closest working reference page.
+
+Please implement the full feature and when done provide:
+1. a summary of which frontend files were created/changed
+2. a summary of which backend files/routes/services were created/changed
+3. a summary of which database tables/scripts/seeds were added
+4. any assumptions made

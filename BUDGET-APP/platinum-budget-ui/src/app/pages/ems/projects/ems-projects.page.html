@@ -1,0 +1,277 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-title-group">
+      <mat-icon class="page-icon">business_center</mat-icon>
+      <div>
+        <h1 class="page-title">EMS Project Register</h1>
+        <p class="page-sub">Capital & Operating project budget lines | SCOA-linked financial planning</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="openCreate()">
+        <mat-icon>add</mat-icon> New Project
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-bar">
+    <div class="kpi-card">
+      <div class="kpi-value">{{ kpis.total }}</div>
+      <div class="kpi-label">Total Projects</div>
+    </div>
+    <div class="kpi-card kpi-capital">
+      <div class="kpi-value">{{ kpis.capital }}</div>
+      <div class="kpi-label">Capital</div>
+    </div>
+    <div class="kpi-card kpi-operating">
+      <div class="kpi-value">{{ kpis.operating }}</div>
+      <div class="kpi-label">Operating</div>
+    </div>
+    <div class="kpi-card kpi-budget">
+      <div class="kpi-value">{{ formatZAR(kpis.totalY1) }}</div>
+      <div class="kpi-label">Y1 Budget</div>
+    </div>
+    <div class="kpi-card kpi-y2">
+      <div class="kpi-value">{{ formatZAR(kpis.totalY2) }}</div>
+      <div class="kpi-label">Y2 Budget</div>
+    </div>
+    <div class="kpi-card kpi-y3">
+      <div class="kpi-value">{{ formatZAR(kpis.totalY3) }}</div>
+      <div class="kpi-label">Y3 Budget</div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <select [(ngModel)]="selectedFinYear" (change)="load()" class="filter-select">
+      <option *ngFor="let y of finYears" [value]="y">{{ y }}</option>
+    </select>
+    <select [(ngModel)]="statusFilter" (change)="applyFilter()" class="filter-select">
+      <option *ngFor="let s of statusOptions" [value]="s.value">{{ s.label }}</option>
+    </select>
+    <select [(ngModel)]="capOpFilter" (change)="applyFilter()" class="filter-select">
+      <option *ngFor="let c of capOpOptions" [value]="c.value">{{ c.label }}</option>
+    </select>
+    <div class="search-box">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" placeholder="Search by name or code..." class="search-input" />
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state"><mat-spinner diameter="40"></mat-spinner><span>Loading EMS projects...</span></div>
+  } @else if (error) {
+    <div class="error-state"><mat-icon>error_outline</mat-icon>{{ error }}</div>
+  } @else {
+    <div class="content-layout" [class.split-view]="showDetailPanel">
+      <div class="table-container">
+        @if (filtered.length === 0) {
+          <div class="empty-state">
+            <mat-icon>folder_open</mat-icon>
+            <p>No projects found for {{ selectedFinYear }}. Create the first one.</p>
+          </div>
+        } @else {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Project Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Lines</th>
+                <th class="num-col">Y1 Budget</th>
+                <th class="num-col">Y2 Budget</th>
+                <th class="num-col">Y3 Budget</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of filtered; track p.projectId) {
+                <tr (click)="selectProject(p)" [class.selected-row]="selectedProject?.projectId === p.projectId" class="clickable-row">
+                  <td class="mono-cell">{{ p.projectCode ?? '-' }}</td>
+                  <td class="name-cell">
+                    <div class="project-name">{{ p.projectName }}</div>
+                    @if (p.projectDesc) { <div class="project-desc">{{ p.projectDesc }}</div> }
+                  </td>
+                  <td><span class="badge" [class]="getCapOpClass(p.capitalOperation)">{{ p.capitalOperationLabel }}</span></td>
+                  <td><span class="badge" [class]="getStatusClass(p.projectStatus)">{{ p.projectStatusLabel }}</span></td>
+                  <td class="center-cell">{{ p.itemCount }}</td>
+                  <td class="num-cell">{{ formatZAR(p.totalY1) }}</td>
+                  <td class="num-cell">{{ formatZAR(p.totalY2) }}</td>
+                  <td class="num-cell">{{ formatZAR(p.totalY3) }}</td>
+                  <td>
+                    <button mat-icon-button color="warn" (click)="deleteProject(p.projectId, $event)" matTooltip="Delete project">
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+
+      @if (showDetailPanel) {
+        <div class="detail-panel">
+          <div class="detail-header">
+            <h3>{{ selectedProject?.projectName ?? 'Loading...' }}</h3>
+            <button mat-icon-button (click)="closeDetail()"><mat-icon>close</mat-icon></button>
+          </div>
+          @if (loadingDetail) {
+            <div class="loading-state"><mat-spinner diameter="30"></mat-spinner></div>
+          } @else if (selectedProject) {
+            <div class="detail-meta">
+              <div class="meta-row">
+                <span class="meta-label">Code</span><span class="meta-value">{{ selectedProject.projectCode ?? '–' }}</span>
+                <span class="meta-label">Fin Year</span><span class="meta-value">{{ selectedProject.finYear }}</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Status</span>
+                <span class="meta-value"><span class="badge" [class]="getStatusClass(selectedProject.projectStatus)">{{ selectedProject.projectStatusLabel }}</span></span>
+                <span class="meta-label">Type</span>
+                <span class="meta-value"><span class="badge" [class]="getCapOpClass(selectedProject.capitalOperation)">{{ selectedProject.capitalOperationLabel }}</span></span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Cost Estimate</span><span class="meta-value">{{ formatZAR(selectedProject.costEstimate) }}</span>
+              </div>
+              @if (selectedProject.projectDesc) {
+                <div class="detail-desc">{{ selectedProject.projectDesc }}</div>
+              }
+            </div>
+
+            <div class="section-title">Budget Lines ({{ selectedProject.items.length }})</div>
+            @if (selectedProject.items.length === 0) {
+              <p class="empty-items">No budget lines added yet.</p>
+            } @else {
+              <div class="items-table-wrap">
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>SCOA Item</th>
+                      <th>Fund</th>
+                      <th>Function</th>
+                      <th class="num-col">Y1</th>
+                      <th class="num-col">Y2</th>
+                      <th class="num-col">Y3</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of selectedProject.items; track item.planProjectItemId) {
+                      <tr [class.active-item]="showHistoryFor?.planProjectItemId === item.planProjectItemId">
+                        <td>
+                          <div class="scoa-code">{{ item.scoaItemCode ?? '?' }}</div>
+                          <div class="scoa-desc">{{ item.scoaItemDesc }}</div>
+                        </td>
+                        <td class="mono-cell">{{ item.scoaFundCode ?? '–' }}</td>
+                        <td class="mono-cell">{{ item.scoaFunctionCode ?? '–' }}</td>
+                        <td class="num-cell">{{ formatZAR(item.budgetAmount ?? 0) }}</td>
+                        <td class="num-cell">{{ formatZAR(item.budgetAmountCurP1 ?? 0) }}</td>
+                        <td class="num-cell">{{ formatZAR(item.budgetAmountCurP2 ?? 0) }}</td>
+                        <td>
+                          <button mat-icon-button (click)="loadItemBudget(item)" matTooltip="View budget balance">
+                            <mat-icon>account_balance_wallet</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            @if (selectedItemBudget) {
+              <div class="budget-summary-card">
+                <div class="summary-title">
+                  <mat-icon>analytics</mat-icon>
+                  Budget Balance — {{ showHistoryFor?.scoaItemCode }}
+                </div>
+                <div class="summary-grid">
+                  <div class="summary-row">
+                    <span>Original Budget</span><span class="summary-val">{{ formatZAR(selectedItemBudget.originalBudget) }}</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Adjustments</span><span class="summary-val">{{ formatZAR(selectedItemBudget.adjustments) }}</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Virements</span><span class="summary-val">{{ formatZAR(selectedItemBudget.totalVirementAmount) }}</span>
+                  </div>
+                  <div class="summary-row summary-current">
+                    <span>Current Budget</span><span class="summary-val">{{ formatZAR(selectedItemBudget.currentBudget) }}</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Reserved</span><span class="summary-val warn-val">{{ formatZAR(selectedItemBudget.reserved) }}</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Committed</span><span class="summary-val warn-val">{{ formatZAR(selectedItemBudget.commitment) }}</span>
+                  </div>
+                  <div class="summary-row">
+                    <span>Actual Spent</span><span class="summary-val danger-val">{{ formatZAR(selectedItemBudget.actual) }}</span>
+                  </div>
+                  <div class="summary-row summary-available" [class.avail-danger]="selectedItemBudget.availableBudget < 0" [class.avail-warn]="selectedItemBudget.availableBudget >= 0 && getAvailPct(selectedItemBudget) < 10">
+                    <span><strong>Available Budget</strong></span>
+                    <span class="summary-val"><strong>{{ formatZAR(selectedItemBudget.availableBudget) }}</strong></span>
+                  </div>
+                  <div class="avail-bar-wrap">
+                    <div class="avail-bar" [style.width.%]="getAvailPct(selectedItemBudget)"
+                      [class.bar-green]="getAvailPct(selectedItemBudget) >= 10"
+                      [class.bar-amber]="getAvailPct(selectedItemBudget) > 0 && getAvailPct(selectedItemBudget) < 10"
+                      [class.bar-red]="selectedItemBudget.availableBudget < 0"></div>
+                    <span class="avail-pct">{{ getAvailPct(selectedItemBudget) }}%</span>
+                  </div>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showCreateDialog) {
+  <div class="dialog-overlay" (click)="showCreateDialog = false">
+    <div class="dialog-box" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <mat-icon>add_business</mat-icon>
+        <h3>New EMS Project</h3>
+        <button mat-icon-button (click)="showCreateDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-row">
+          <label>Project Name *</label>
+          <input [(ngModel)]="newProject.projectName" placeholder="e.g. Roads Infrastructure Upgrade" class="form-input" />
+        </div>
+        <div class="form-row">
+          <label>Description</label>
+          <textarea [(ngModel)]="newProject.projectDesc" placeholder="Brief project description..." class="form-input" rows="2"></textarea>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label>Financial Year</label>
+            <select [(ngModel)]="newProject.finYear" class="form-select">
+              <option *ngFor="let y of finYears" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Capital / Operating</label>
+            <select [(ngModel)]="newProject.capitalOperation" class="form-select">
+              <option [value]="1">Capital</option>
+              <option [value]="2">Operating</option>
+              <option [value]="3">Revenue</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Cost Estimate (ZAR)</label>
+          <input type="number" [(ngModel)]="newProject.costEstimate" class="form-input" />
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showCreateDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="createProject()" [disabled]="!newProject.projectName">
+          <mat-icon>save</mat-icon> Create Project
+        </button>
+      </div>
+    </div>
+  </div>
+}

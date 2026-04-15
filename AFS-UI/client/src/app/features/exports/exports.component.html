@@ -1,0 +1,239 @@
+@if (!compilationContextLoading() && !hasCompilationContext()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#9e9e9e;margin-bottom:16px">playlist_add_check</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">No Active Compilation</h2>
+    <p style="color:#757575;margin:0 0 24px;max-width:400px">Select or create a compilation before generating exports.</p>
+    <button mat-flat-button color="primary" (click)="goToCompilations()">
+      <mat-icon>arrow_forward</mat-icon> Go to Compilations
+    </button>
+  </div>
+} @else {
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Export Center</h1>
+      <div class="subtitle">Generate and download AFS exports</div>
+    </div>
+    <div class="page-actions">
+      <span [matTooltip]="exportBlocked ? 'Resolve gate issues before creating exports' : 'Create a new AFS export in PDF, Excel, or iXBRL format'">
+        <button mat-flat-button class="btn-primary" (click)="showCreateForm.set(!showCreateForm())"
+          [disabled]="exportBlocked">
+          <mat-icon>add</mat-icon>
+          New Export
+        </button>
+      </span>
+    </div>
+  </div>
+
+  @if (gateErrors().length > 0) {
+    <div style="margin-bottom:16px;padding:12px 16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <mat-icon style="color:#e65100">warning</mat-icon>
+        <strong style="color:#e65100">Export Prerequisites Not Met</strong>
+      </div>
+      @for (err of gateErrors(); track err) {
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;color:#bf360c">
+          <mat-icon style="font-size:16px;width:16px;height:16px">close</mat-icon>
+          <span>{{ err }}</span>
+        </div>
+      }
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        @if (!allPeriodsReady()) {
+          <button mat-stroked-button routerLink="/tb-import-workbench">
+            <mat-icon>table_chart</mat-icon> TB Import
+          </button>
+        }
+        @if (!integrityPassed() && !integrityOverridden()) {
+          <button mat-stroked-button (click)="goToIntegrityChecks()">
+            <mat-icon>fact_check</mat-icon> Integrity Checks
+          </button>
+        }
+        @if (!policiesApproved()) {
+          <button mat-stroked-button (click)="goToAccountingPolicies()">
+            <mat-icon>policy</mat-icon> Accounting Policies
+          </button>
+        }
+        @if (openingBalanceStatus() !== 'continuity_matched_confirmed' && openingBalanceStatus() !== 'confirmed_with_exception') {
+          <button mat-stroked-button (click)="goToOpeningBalanceControl()">
+            <mat-icon>balance</mat-icon> Opening Balance Control
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (showCreateForm()) {
+    <div class="detail-card" style="margin-bottom: 24px;">
+      <div class="card-title">
+        <mat-icon>file_download</mat-icon>
+        Create New Export
+      </div>
+
+      <div style="margin-bottom:16px;padding:12px 16px;background:#e3f2fd;border:1px solid #90caf9;border-radius:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <mat-icon style="color:#1565c0">info</mat-icon>
+          <strong style="color:#1565c0">Export Mode</strong>
+        </div>
+        <mat-radio-group [value]="selectedExportMode()" (change)="onExportModeChange($event.value)">
+          <mat-radio-button value="official" style="margin-right:24px">
+            <strong>Official Export</strong> — from locked version snapshot (immutable)
+          </mat-radio-button>
+          <mat-radio-button value="preview">
+            <strong>Draft Preview</strong> — from live compilation data (NON-OFFICIAL)
+          </mat-radio-button>
+        </mat-radio-group>
+      </div>
+
+      @if (selectedExportMode() === 'official') {
+        @if (!selectedCompilationId()) {
+          <div style="margin-bottom:16px;padding:12px 16px;background:#e3f2fd;border:1px solid #90caf9;border-radius:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#1565c0">info</mat-icon>
+              <span style="color:#1565c0">Select a compilation first to see available locked versions.</span>
+            </div>
+          </div>
+        }
+        @if (selectedCompilationId() && lockedVersionsForComp().length === 0 && !versionsLoading()) {
+          <div style="margin-bottom:16px;padding:12px 16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#e65100">warning</mat-icon>
+              <span style="color:#e65100">No locked versions available for this compilation. Go to <a routerLink="/afs-versions" style="color:#1565c0;text-decoration:underline">Versioning & Locking</a> to create and lock a version first.</span>
+            </div>
+          </div>
+        }
+        @if (lockedVersionsForComp().length > 0) {
+          <mat-form-field appearance="outline" style="width:100%;margin-bottom:8px">
+            <mat-label>Locked Version</mat-label>
+            <mat-select [value]="selectedVersionId()" (selectionChange)="selectedVersionId.set($event.value)">
+              @for (v of lockedVersionsForComp(); track v.id) {
+                <mat-option [value]="v.id">
+                  v{{ v.versionNumber }} — {{ v.status === 'locked' ? 'Current (Locked)' : 'Historical (Superseded)' }}
+                  — locked {{ v.lockedAt | date:'medium' }}
+                  @if (v.exportCount > 0) { — exported {{ v.exportCount }}x }
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+      }
+
+      @if (selectedExportMode() === 'preview') {
+        <div style="margin-bottom:16px;padding:8px 16px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#92400e;font-size:18px;width:18px;height:18px">visibility</mat-icon>
+            <span style="color:#92400e;font-size:13px">Draft Preview exports read live compilation data and are clearly watermarked as NON-OFFICIAL. They are for internal review only.</span>
+          </div>
+        </div>
+      }
+
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Compilation</mat-label>
+          <mat-select [value]="newExport.compilationId" (selectionChange)="onCompilationChange($event.value)">
+            @for (comp of compilations(); track comp.id) {
+              <mat-option [value]="comp.id">{{ comp.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Format</mat-label>
+          <mat-select [(ngModel)]="newExport.format">
+            <mat-option value="pdf">PDF</mat-option>
+            <mat-option value="xlsx">Excel</mat-option>
+            <mat-option value="ixbrl">iXBRL</mat-option>
+            @if (selectedExportMode() === 'preview') {
+              <mat-option value="evidence-zip">Evidence ZIP</mat-option>
+              <mat-option value="governance-pack">Governance Pack</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <button mat-stroked-button (click)="showCreateForm.set(false)" matTooltip="Cancel and close the export form">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="createExport()"
+          [disabled]="!newExport.compilationId || !newExport.format || exportBlocked || (selectedExportMode() === 'official' && !selectedVersionId())"
+          [matTooltip]="selectedExportMode() === 'official' && !selectedVersionId() ? 'Select a locked version to export' : (exportBlocked ? 'Resolve export prerequisites before generating' : 'Generate the export')">
+          @if (selectedExportMode() === 'official') {
+            <mat-icon>lock</mat-icon> Generate Official Export
+          } @else {
+            <mat-icon>visibility</mat-icon> Generate Draft Preview
+          }
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="detail-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th matTooltip="Export output format: PDF, Excel, or iXBRL">Format</th>
+          <th matTooltip="Official (from locked snapshot) or Preview (from live data)">Mode</th>
+          <th matTooltip="Current export job status">Status</th>
+          <th matTooltip="Export generation progress percentage">Progress</th>
+          <th matTooltip="Generated file name">File Name</th>
+          <th class="amount-col" matTooltip="Size of the generated export file">File Size</th>
+          <th matTooltip="Date and time the export was created">Created</th>
+          <th matTooltip="Available actions for this export">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (job of jobs(); track job.id) {
+          <tr>
+            <td>
+              <span class="format-badge" [class]="job.format" matTooltip="Export format: {{ job.format | uppercase }}">{{ job.format | uppercase }}</span>
+            </td>
+            <td>
+              @if (job.exportMode === 'official') {
+                <span class="mode-badge official" [matTooltip]="'Official export from locked version v' + (job.versionNumber ?? '?')">
+                  <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">lock</mat-icon>
+                  v{{ job.versionNumber ?? '?' }}
+                </span>
+              } @else {
+                <span class="mode-badge preview" matTooltip="Draft preview from live compilation data — NON-OFFICIAL">PREVIEW</span>
+              }
+            </td>
+            <td>
+              <span class="status-badge" [class]="job.status" matTooltip="Export status: {{ job.status }}">{{ job.status }}</span>
+            </td>
+            <td style="min-width: 160px;">
+              @if (job.status === 'processing') {
+                <mat-progress-bar mode="determinate" [value]="job.progress"></mat-progress-bar>
+                <span style="font-size: 11px; color: var(--platinum-text-secondary);">{{ job.progress }}%</span>
+              } @else if (job.status === 'completed') {
+                <mat-progress-bar mode="determinate" [value]="100"></mat-progress-bar>
+                <span style="font-size: 11px; color: var(--platinum-success);">100%</span>
+              } @else if (job.status === 'queued') {
+                <mat-progress-bar mode="buffer"></mat-progress-bar>
+                <span style="font-size: 11px; color: var(--platinum-text-muted);">Queued</span>
+              } @else {
+                <span style="font-size: 11px; color: var(--platinum-danger);">Failed</span>
+              }
+            </td>
+            <td>{{ job.fileName || '—' }}</td>
+            <td class="amount-col">{{ job.fileSize ? formatFileSize(job.fileSize) : '—' }}</td>
+            <td>{{ job.createdAt | date:'short' }}</td>
+            <td>
+              @if (job.status === 'completed') {
+                <button mat-icon-button color="primary" (click)="downloadExport(job)" matTooltip="Download the completed export file">
+                  <mat-icon>download</mat-icon>
+                </button>
+                <button mat-icon-button (click)="viewInDms(job)" matTooltip="View in Document Management System">
+                  <mat-icon>folder_open</mat-icon>
+                </button>
+              }
+            </td>
+          </tr>
+        }
+        @if (jobs().length === 0) {
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+              No export jobs found. Click "New Export" to generate one.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+}

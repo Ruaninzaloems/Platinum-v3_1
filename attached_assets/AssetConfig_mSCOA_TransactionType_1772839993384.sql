@@ -1,0 +1,50 @@
+CREATE TABLE [dbo].[AssetConfig_mSCOA_TransactionType](
+	[AssetConfig_mSCOA_TransactionType_ID] [int] IDENTITY(1,1) NOT NULL,
+	[AssetConfig_mSCOA_ID] [int] NOT NULL,
+	[TransactionTypeID] [int] NULL,
+	[Project11] [int] NULL,
+	[DebitItem11_1] [int] NULL,
+	[DebitItem11_1DisplayName] [nvarchar](200) NULL,
+	[DebitItem11_2] [int] NULL,
+	[DebitItem11_2DisplayName] [nvarchar](200) NULL,
+	[CreditItem11_1] [nchar](10) NULL,
+	[CreditItem11_1DisplayName] [varchar](200) NULL,
+	[Project21] [int] NULL,
+	[DebitItem21_1] [int] NULL,
+	[DebitItem21_1DisplayName] [varchar](200) NULL,
+	[DebitItem21_2] [int] NULL,
+	[DebitItem21_2DisplayName] [varchar](200) NULL,
+	[CreditItem21_1] [nchar](10) NULL,
+	[CreditItem21_1DisplayName] [varchar](200) NULL,
+	[Project12] [int] NULL,
+	[DebitItem12_1] [int] NULL,
+	[DebitItem12_1DisplayName] [varchar](200) NULL,
+	[CreditItem12_1] [int] NULL,
+	[CreditItem12_1DisplayName] [varchar](200) NULL,
+	[Project22] [int] NULL,
+	[DebitItem22_1] [int] NULL,
+	[DebitItem22_1DisplayName] [varchar](200) NULL,
+	[Project13] [int] NULL,
+	[CreditItem13_1] [int] NULL,
+	[CreditItem13_1DisplayName] [varchar](200) NULL,
+	[Project23] [int] NULL,
+	[CreditItem23_1] [int] NULL,
+	[CreditItem23_1DisplayName] [varchar](200) NULL,
+	[Default] [bit] NULL,
+	[Enabled] [bit] NULL,
+	[CreatedByID] [int] NULL,
+	[CreatedDate] [datetime] NULL,
+	[ModifiedByID] [int] NULL,
+	[ModiefiedDate] [datetime] NULL,
+	[Project14] [int] NULL,
+	[Project24] [int] NULL,
+	[Project15] [int] NULL,
+	[Project25] [int] NULL,
+ CONSTRAINT [PK_AssetConfig_mSCOA_TransactionType] PRIMARY KEY CLUSTERED 
+(
+	[AssetConfig_mSCOA_TransactionType_ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 93, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+

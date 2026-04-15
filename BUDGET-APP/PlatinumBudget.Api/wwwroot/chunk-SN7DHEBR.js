@@ -1,0 +1,1 @@
+import{Ja as e,U as a,zc as r}from"./chunk-BL33A35W.js";var f=(()=>{class t{static \u0275fac=function(d){return new(d||t)};static \u0275mod=e({type:t});static \u0275inj=a({imports:[r]})}return t})();export{f as a};

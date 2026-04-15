@@ -1,0 +1,41 @@
+CREATE TABLE [dbo].[Plan_ProjectItem](
+	[PlanProjectItem_ID] [int] IDENTITY(1,1) NOT NULL,
+	[ProjectID] [int] NOT NULL,
+	[ProjectItemID] [int] NULL,
+	[ProjectItemCode] [int] NULL,
+	[SCOAItemID] [int] NOT NULL,
+	[FinYear] [nvarchar](9) NOT NULL,
+	[CapturerID] [int] NOT NULL,
+	[DateCaptured] [datetime] NOT NULL,
+	[ModifierID] [int] NULL,
+	[DateModified] [datetime] NULL,
+	[ProjectFundYearID] [int] NULL,
+	[SCOAFundId] [int] NULL,
+	[BudgetAmount] [decimal](16, 2) NULL,
+	[BudgetAmountCurP1] [decimal](16, 2) NULL,
+	[BudgetAmountCurP2] [decimal](16, 2) NULL,
+	[SCOAFunctionId] [int] NULL,
+	[SCOARegionId] [int] NULL,
+	[DivisionId] [int] NULL,
+	[BudgetSplitID] [int] NULL,
+	[VirementId] [int] NULL,
+	[HistoricalProjectCode] [nvarchar](100) NULL,
+	[AdjustmentId] [int] NULL,
+	[ModificationNumber] [int] NULL,
+	[SCOACostingID] [int] NULL,
+	[IsItemLocked] [bit] NULL,
+	[CreditDebit] [varchar](6) NULL,
+	[PreviousReferenceId] [int] NULL,
+	[GRAPClassification] [nvarchar](4000) NULL,
+	[GRAPClassificationNote] [nvarchar](4000) NULL,
+	[MainSegmentReporting] [nvarchar](4000) NULL,
+	[SubSegmentReporting] [nvarchar](4000) NULL,
+	[IsActiveForSCM] [bit] NULL,
+	[ZeroBudgetItem] [bit] NULL,
+	[ZeroBudgetItemReason] [nvarchar](max) NULL,
+ CONSTRAINT [PK_Plan_ProjectItem] PRIMARY KEY CLUSTERED 
+(
+	[PlanProjectItem_ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 93, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO

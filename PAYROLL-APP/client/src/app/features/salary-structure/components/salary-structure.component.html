@@ -1,0 +1,345 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1>Salary Structure</h1>
+      <p class="subtitle">Manage remuneration packages for Upper Limit employees</p>
+    </div>
+  </div>
+
+  @if (error) { <div class="alert alert-error">{{ error }}</div> }
+
+  <div class="filters-bar">
+    <input class="form-control search-input" placeholder="Search by name, code, or ID..." [(ngModel)]="searchTerm" (ngModelChange)="applyFilters()">
+    <select class="form-control filter-select" [(ngModel)]="filterDepartment" (ngModelChange)="applyFilters()">
+      <option value="">All Departments</option>
+      @for (dept of departments; track dept.id) {
+        <option [value]="dept.id">{{ dept.name }}</option>
+      }
+    </select>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">Loading...</div>
+  } @else if (filteredEmployees.length === 0) {
+    <div class="empty-state">
+      <p>No Upper Limit employees found.</p>
+      <p class="hint">Employees linked to positions with Upper Limit job profiles will appear here.</p>
+    </div>
+  } @else {
+    <div class="card">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Employee Code</th>
+              <th>Name</th>
+              <th>Position</th>
+              <th>Department</th>
+              <th>Upper Limit</th>
+              <th>Value Type</th>
+              <th class="text-right">Target Package</th>
+              <th class="text-right">Current Package</th>
+              <th class="text-right">Variance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (emp of filteredEmployees; track emp.id) {
+              <tr class="clickable-row" (click)="openDetail(emp)">
+                <td class="font-mono">{{ emp.id }}</td>
+                <td class="font-mono">{{ emp.employee_code }}</td>
+                <td>{{ emp.first_name }} {{ emp.surname }}</td>
+                <td>{{ emp.position_title }}</td>
+                <td>{{ emp.department_name }}</td>
+                <td><span class="badge badge-info">UL #{{ emp.upper_limit_id }}</span></td>
+                <td>{{ valueTypeLabel(emp.upper_limit_value_type) }}</td>
+                <td class="text-right font-mono">{{ formatCurrency(emp.target_package) }}</td>
+                <td class="text-right font-mono">{{ formatCurrency(emp.current_package_total) }}</td>
+                <td class="text-right font-mono" [class]="emp.variance >= 0 ? 'text-muted' : 'text-danger'">{{ formatCurrency(emp.variance) }}</td>
+                <td><span class="status-badge" [class]="getStatusClass(emp.status)">{{ getStatusLabel(emp.status) }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+}
+
+@if (view === 'detail' && selectedEmployee) {
+  <div class="page-header">
+    <div>
+      <h1>{{ selectedEmployee.first_name }} {{ selectedEmployee.surname }}</h1>
+      <p class="subtitle">{{ selectedEmployee.employee_code }} | {{ selectedEmployee.position_title }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn" (click)="backToList()">
+        <app-icon name="arrow-left" [size]="14"></app-icon> Back
+      </button>
+    </div>
+  </div>
+
+  @if (error) { <div class="alert alert-error">{{ error }}</div> }
+  @if (success) { <div class="alert alert-success">{{ success }}</div> }
+  @if (varianceWarning) { <div class="alert alert-warning">{{ varianceWarning }}</div> }
+
+  @if (loading) {
+    <div class="loading-state">Loading salary structure...</div>
+  } @else if (structureData) {
+    <div class="summary-panel">
+      <div class="summary-row">
+        <div class="summary-card">
+          <div class="summary-label">Target Package</div>
+          <div class="summary-value summary-target">{{ formatCurrency(targetPackage) }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Current Package</div>
+          <div class="summary-value" [class]="getStatusClass(packageStatus)">{{ formatCurrency(packageTotal) }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Variance</div>
+          <div class="summary-value" [class]="variance >= 0 ? '' : 'text-danger'">{{ formatCurrency(variance) }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">% of Target</div>
+          <div class="summary-value" [class]="getStatusClass(packageStatus)">{{ percentOfTarget }}%</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Status</div>
+          <div class="summary-value"><span class="status-badge" [class]="getStatusClass(packageStatus)">{{ getStatusLabel(packageStatus) }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="structure-actions">
+      <button class="btn btn-sm btn-primary" (click)="openAddModal()">
+        <app-icon name="plus" [size]="12"></app-icon> Add Component
+      </button>
+    </div>
+
+    <div class="card section-card">
+      <h3 class="section-title">Earnings</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Method</th>
+              <th class="text-right">Amount</th>
+              <th class="text-right">%</th>
+              <th class="text-center">In Package</th>
+              <th>Taxable</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (txn of earnings; track txn.salary_head_id) {
+              <tr>
+                <td class="font-mono">{{ txn.salary_head_id }}</td>
+                <td>{{ txn.name }}</td>
+                <td><span class="badge badge-muted">{{ txn.calculation_method }}</span></td>
+                <td class="text-right font-mono">
+                  @if (editingHeadId === txn.salary_head_id) {
+                    <span class="inline-edit-group">
+                      <input class="form-control inline-edit" type="number" [(ngModel)]="editAmount" step="0.01">
+                      <button class="btn-inline-save" (click)="saveEdit(txn)" title="Save"><app-icon name="check" [size]="14"></app-icon></button>
+                      <button class="btn-inline-cancel" (click)="cancelEdit()" title="Cancel"><app-icon name="x" [size]="14"></app-icon></button>
+                      @if (txn.source === 'EMPLOYEE') {
+                        <button class="btn-inline-reset" (click)="resetRow(txn)" title="Reset to zero and remove override"><app-icon name="trash" [size]="13"></app-icon></button>
+                      }
+                    </span>
+                  } @else {
+                    <span class="editable-amount" (click)="startEdit(txn)" title="Click to edit amount">
+                      {{ formatCurrency(txn.amount) }} <app-icon name="edit" [size]="11"></app-icon>
+                    </span>
+                  }
+                </td>
+                <td class="text-right font-mono">{{ txn.percentage ? txn.percentage + '%' : '-' }}</td>
+                <td class="text-center">
+                  <input type="checkbox" [checked]="txn.included_in_package" (change)="toggleIncludedInPackage(txn)">
+                </td>
+                <td>{{ txn.taxable ? 'Yes' : 'No' }}</td>
+                <td>
+                  <span class="source-badge" [class]="txn.source === 'INHERITED' ? 'source-inherited' : 'source-employee'">{{ txn.source === 'INHERITED' ? 'Inherited' : 'Employee' }}</span>
+                  @if (txn.source === 'EMPLOYEE') {
+                    <button class="btn-inline-delete" (click)="deleteTransaction(txn)" title="Remove override"><app-icon name="trash" [size]="11"></app-icon></button>
+                  }
+                </td>
+              </tr>
+            }
+            @if (earnings.length === 0) {
+              <tr><td colspan="8" class="empty-row">No earnings configured</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="3"><strong>Included Earnings Total</strong></td>
+              <td class="text-right font-mono"><strong>{{ formatCurrency(earningsTotal) }}</strong></td>
+              <td colspan="4"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card section-card">
+      <h3 class="section-title">Deductions</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Method</th>
+              <th class="text-right">Amount</th>
+              <th class="text-right">%</th>
+              <th>Taxable</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (txn of deductions; track txn.salary_head_id) {
+              <tr class="readonly-row">
+                <td class="font-mono">{{ txn.code }}</td>
+                <td>{{ txn.name }}</td>
+                <td><span class="badge badge-muted">{{ txn.calculation_method }}</span></td>
+                <td class="text-right font-mono">{{ formatCurrency(txn.amount) }}</td>
+                <td class="text-right font-mono">{{ txn.percentage ? txn.percentage + '%' : '-' }}</td>
+                <td>{{ txn.taxable ? 'Yes' : 'No' }}</td>
+                <td><span class="source-badge" [class]="txn.source === 'INHERITED' ? 'source-inherited' : 'source-employee'">{{ txn.source === 'INHERITED' ? 'Inherited' : 'Employee' }}</span></td>
+              </tr>
+            }
+            @if (deductions.length === 0) {
+              <tr><td colspan="7" class="empty-row">No deductions configured</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card section-card">
+      <h3 class="section-title">Company Contributions</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Method</th>
+              <th class="text-right">Amount</th>
+              <th class="text-right">%</th>
+              <th class="text-center">In Package</th>
+              <th>Taxable</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (txn of companyContributions; track txn.salary_head_id) {
+              <tr>
+                <td class="font-mono">{{ txn.salary_head_id }}</td>
+                <td>{{ txn.name }}</td>
+                <td><span class="badge badge-muted">{{ txn.calculation_method }}</span></td>
+                <td class="text-right font-mono">
+                  @if (editingHeadId === txn.salary_head_id) {
+                    <span class="inline-edit-group">
+                      <input class="form-control inline-edit" type="number" [(ngModel)]="editAmount" step="0.01">
+                      <button class="btn-inline-save" (click)="saveEdit(txn)" title="Save"><app-icon name="check" [size]="14"></app-icon></button>
+                      <button class="btn-inline-cancel" (click)="cancelEdit()" title="Cancel"><app-icon name="x" [size]="14"></app-icon></button>
+                      @if (txn.source === 'EMPLOYEE') {
+                        <button class="btn-inline-reset" (click)="resetRow(txn)" title="Reset to zero and remove override"><app-icon name="trash" [size]="13"></app-icon></button>
+                      }
+                    </span>
+                  } @else {
+                    <span class="editable-amount" (click)="startEdit(txn)" title="Click to edit amount">
+                      {{ formatCurrency(txn.amount) }} <app-icon name="edit" [size]="11"></app-icon>
+                    </span>
+                  }
+                </td>
+                <td class="text-right font-mono">{{ txn.percentage ? txn.percentage + '%' : '-' }}</td>
+                <td class="text-center">
+                  <input type="checkbox" [checked]="txn.included_in_package" (change)="toggleIncludedInPackage(txn)">
+                </td>
+                <td>{{ txn.taxable ? 'Yes' : 'No' }}</td>
+                <td>
+                  <span class="source-badge" [class]="txn.source === 'INHERITED' ? 'source-inherited' : 'source-employee'">{{ txn.source === 'INHERITED' ? 'Inherited' : 'Employee' }}</span>
+                  @if (txn.source === 'EMPLOYEE') {
+                    <button class="btn-inline-delete" (click)="deleteTransaction(txn)" title="Remove override"><app-icon name="trash" [size]="11"></app-icon></button>
+                  }
+                </td>
+              </tr>
+            }
+            @if (companyContributions.length === 0) {
+              <tr><td colspan="8" class="empty-row">No company contributions configured</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="3"><strong>Included Contributions Total</strong></td>
+              <td class="text-right font-mono"><strong>{{ formatCurrency(companyContributionsTotal) }}</strong></td>
+              <td colspan="4"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card package-total-card" [class]="getStatusClass(packageStatus)">
+      <div class="package-total-row">
+        <span class="package-total-label">Total Package (Earnings + Company Contributions)</span>
+        <span class="package-total-value">{{ formatCurrency(packageTotal) }}</span>
+      </div>
+      <div class="package-total-row">
+        <span class="package-total-label">Target Package (Upper Limit {{ valueTypeLabel(structureData?.employee?.upper_limit_value_type) }})</span>
+        <span class="package-total-value">{{ formatCurrency(targetPackage) }}</span>
+      </div>
+      <div class="package-total-row variance-row">
+        <span class="package-total-label">Variance</span>
+        <span class="package-total-value" [class]="variance >= 0 ? '' : 'text-danger'">{{ formatCurrency(variance) }}</span>
+      </div>
+    </div>
+  }
+}
+
+@if (showAddModal) {
+  <div class="modal-overlay visible" (click)="showAddModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Salary Component</h3>
+        <button class="modal-close" (click)="showAddModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Salary Head</label>
+          <select class="form-control" [(ngModel)]="newTxn.salary_head_id">
+            <option [ngValue]="null">-- Select --</option>
+            @for (head of availableHeads; track head.id) {
+              <option [ngValue]="head.id">{{ head.code }} - {{ head.name }} ({{ head.transaction_type }})</option>
+            }
+          </select>
+        </div>
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group">
+            <label>Amount</label>
+            <input class="form-control" type="number" [(ngModel)]="newTxn.amount" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label>Percentage</label>
+            <input class="form-control" type="number" [(ngModel)]="newTxn.percentage" step="0.01" min="0" max="100">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label class="checkbox-label">
+            <input type="checkbox" [(ngModel)]="newTxn.included_in_package">
+            Include in Package Total
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showAddModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="addTransaction()" [disabled]="!newTxn.salary_head_id">Add</button>
+      </div>
+    </div>
+  </div>
+}

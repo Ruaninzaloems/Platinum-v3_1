@@ -1,0 +1,80 @@
+I want to add a new Payroll Pay Points page.
+
+Use the attached Platinum screenshots as workflow, field, and tab reference only.
+Do not copy the legacy UI exactly.
+Use the existing Angular Platinum page pattern already used by Positions, Job Profiles, Medical Aid Schemes, and Trade Unions.
+
+Build this as a proper modern Angular feature using the existing list/detail page architecture, shared styling, and existing route/menu/component conventions.
+
+Entity name:
+Pay Points
+
+Purpose:
+Maintain payroll pay points and link departments to each pay point.
+
+Functional structure:
+The feature must support:
+1. Pay Point master details
+2. Link Departments to a Pay Point
+3. History/audit tracking consistent with the rest of the system
+
+Use the screenshots as reference for the functional flow:
+- Tab 1: Pay Point
+- Tab 2: Link Departments
+
+Core Pay Point fields:
+- Pay Point Code
+- Description
+- Pay Point Address
+- Pay Point Location
+
+Linked Department section:
+- Department (lookup/select)
+- Department Code
+- Grid of linked departments for the selected pay point
+
+Business rules:
+- Pay Point Code is required and should be unique
+- Description is required
+- A pay point can be linked to multiple departments
+- A department should not be linked to the same pay point more than once
+- Department Code should be derived from the selected department where applicable, not manually invented
+- The linked departments grid must show current linked records for the selected pay point
+- Updates must preserve audit/history according to the project patterns
+- Do not invent extra fields unless clearly required by existing project conventions
+- Do not redesign the page using generic Angular CRUD patterns; follow existing Platinum Angular feature patterns
+
+UI/UX requirements:
+- Use the same list/detail pattern used in Positions, Job Profiles, Medical Aid Schemes, and Trade Unions
+- Create / View / Edit modes
+- Detail page with tabs
+- White background cards
+- Uppercase labels
+- Existing Platinum tokens/styles
+- Shared dd/MM/yyyy date conventions only if dates are needed by project standards
+- No emoji, use existing icon approach if icons are needed
+
+Expected modernised page structure:
+List page:
+- Summary cards
+- Search/filter
+- Paginated table
+- Actions column
+
+Detail page:
+- Header
+- Tabs:
+  - Pay Point Details
+  - Linked Departments
+  - History
+- Card sections within tabs
+- Prev / Next navigation if that is how the existing feature pages work
+
+Please do not implement yet.
+
+First inspect the existing codebase and tell me:
+1. which existing feature is the best template to copy
+2. which frontend files need to be created or changed
+3. which backend routes/services need to be created or changed
+4. what database tables or link tables are required
+5. any assumptions or questions before implementation

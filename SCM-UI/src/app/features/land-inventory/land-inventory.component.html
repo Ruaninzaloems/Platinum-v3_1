@@ -1,0 +1,1361 @@
+    <div class="land-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          {{notification()}}
+          <button mat-icon-button (click)="notification.set('')"><mat-icon>close</mat-icon></button>
+        </div>
+      }
+
+      <div class="main-tabs">
+        <button class="main-tab" [class.active]="activeTab() === 'dashboard'" (click)="switchTab('dashboard')">Dashboard</button>
+        <button class="main-tab" [class.active]="activeTab() === 'register'" (click)="switchTab('register')">Property Register</button>
+        <button class="main-tab" [class.active]="activeTab() === 'transactions'" (click)="switchTab('transactions')">Transactions</button>
+        <button class="main-tab" [class.active]="activeTab() === 'financial'" (click)="switchTab('financial')">Financial</button>
+        <button class="main-tab" [class.active]="activeTab() === 'compliance'" (click)="switchTab('compliance')">Compliance</button>
+        <button class="main-tab" [class.active]="activeTab() === 'analytics'" (click)="switchTab('analytics')">AI Analytics</button>
+        <button class="main-tab" [class.active]="activeTab() === 'reports'" (click)="switchTab('reports')">Reports</button>
+      </div>
+
+      <!-- ==================== DASHBOARD TAB ==================== -->
+      @if (activeTab() === 'dashboard') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" matTooltip="Total land parcels in the register">
+            <mat-icon style="color:#8b5cf6;">landscape</mat-icon>
+            <span class="kpi-value">{{dash().totalParcels || 0}}</span>
+            <span class="kpi-label">Total Parcels</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total land extent in hectares">
+            <mat-icon style="color:#10b981;">straighten</mat-icon>
+            <span class="kpi-value">{{formatNum(dash().totalHectares)}}</span>
+            <span class="kpi-label">Total Hectares</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total carrying value of all land inventory">
+            <mat-icon style="color:#0284c7;">payments</mat-icon>
+            <span class="kpi-value">{{formatRand(dash().totalCarryingValue)}}</span>
+            <span class="kpi-label">Carrying Value</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total market / municipal valuation value">
+            <mat-icon style="color:#ea580c;">trending_up</mat-icon>
+            <span class="kpi-value">{{formatRand(dash().totalMarketValue)}}</span>
+            <span class="kpi-label">Market Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(dash().parcelsRequiringWriteDown || 0) + ' parcels require NRV write-down'" [class.alert]="(dash().parcelsRequiringWriteDown || 0) > 0">
+            <mat-icon [style.color]="(dash().parcelsRequiringWriteDown || 0) > 0 ? '#ef4444' : '#10b981'">trending_down</mat-icon>
+            <span class="kpi-value" [style.color]="(dash().parcelsRequiringWriteDown || 0) > 0 ? '#ef4444' : '#10b981'">{{dash().parcelsRequiringWriteDown || 0}}</span>
+            <span class="kpi-label">NRV Write-Downs</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Pending acquisition approvals">
+            <mat-icon style="color:#f59e0b;">add_shopping_cart</mat-icon>
+            <span class="kpi-value">{{dash().pendingAcquisitions || 0}}</span>
+            <span class="kpi-label">Pending Acquisitions</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Pending disposal/sale approvals">
+            <mat-icon style="color:#dc2626;">sell</mat-icon>
+            <span class="kpi-value">{{dash().pendingDisposals || 0}}</span>
+            <span class="kpi-label">Pending Disposals</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Pending transfer approvals">
+            <mat-icon style="color:#6366f1;">swap_horiz</mat-icon>
+            <span class="kpi-value">{{dash().pendingTransfers || 0}}</span>
+            <span class="kpi-label">Pending Transfers</span>
+          </div>
+        </div>
+
+        <div class="module-grid">
+          <div class="module-card" (click)="switchTab('register')" matTooltip="View and manage the land parcel register with all title deed details">
+            <div class="module-icon" style="background:#f5f3ff;color:#8b5cf6;"><mat-icon>landscape</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Property Register</span>
+              <span class="module-count">{{dash().totalParcels || 0}} parcels</span>
+              <span class="module-ref">LNIM001-008</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('transactions'); txSection.set('acquisitions')" matTooltip="Record land acquisitions — purchase, donation, expropriation">
+            <div class="module-icon" style="background:#fef3c7;color:#d97706;"><mat-icon>add_shopping_cart</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Acquisitions</span>
+              <span class="module-count">{{dash().pendingAcquisitions || 0}} pending</span>
+              <span class="module-ref">LNIM009-025, Sub-process 6.7</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('transactions'); txSection.set('transfers')" matTooltip="Transfer land to/from inventory — reclassification, rezoning">
+            <div class="module-icon" style="background:#ede9fe;color:#7c3aed;"><mat-icon>swap_horiz</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Transfers</span>
+              <span class="module-count">{{dash().pendingTransfers || 0}} pending</span>
+              <span class="module-ref">LNIM026-040, Sub-process 6.8</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('transactions'); txSection.set('distributions')" matTooltip="Distribute land — sale, donation, disposal with Council approval">
+            <div class="module-icon" style="background:#fef2f2;color:#dc2626;"><mat-icon>sell</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Distributions (Disposals)</span>
+              <span class="module-count">{{dash().pendingDisposals || 0}} pending</span>
+              <span class="module-ref">LNIM041-060, Sub-process 6.9</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('financial'); finSection.set('valuations')" matTooltip="NRV valuation per GRAP 12 — lower of cost and NRV">
+            <div class="module-icon" style="background:#fff7ed;color:#ea580c;"><mat-icon>assessment</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Valuations (GRAP 12)</span>
+              <span class="module-count">NRV assessment</span>
+              <span class="module-ref">LNIM061-080, Sub-process 6.13</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('financial'); finSection.set('impairments')" matTooltip="Impairment assessments per GRAP 21/26">
+            <div class="module-icon" style="background:#fef2f2;color:#b91c1c;"><mat-icon>warning_amber</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Impairments (GRAP 21)</span>
+              <span class="module-count">Risk assessment</span>
+              <span class="module-ref">LNIM081-095</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('financial'); finSection.set('reconciliations')" matTooltip="Monthly reconciliation of land inventory">
+            <div class="module-icon" style="background:#f0f9ff;color:#0369a1;"><mat-icon>balance</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Reconciliation</span>
+              <span class="module-count">Monthly schedule</span>
+              <span class="module-ref">LNIM096-110, Sub-process 6.11</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('compliance'); compSection.set('environmental')" matTooltip="Environmental impact assessments and compliance">
+            <div class="module-icon" style="background:#ecfdf5;color:#059669;"><mat-icon>eco</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Environmental</span>
+              <span class="module-count">EIA tracking</span>
+              <span class="module-ref">LNIM111-125</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('compliance'); compSection.set('servitudes')" matTooltip="Servitudes, rights of way, and encumbrances on land">
+            <div class="module-icon" style="background:#faf5ff;color:#9333ea;"><mat-icon>share_location</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Servitudes</span>
+              <span class="module-count">Encumbrances</span>
+              <span class="module-ref">LNIM126-135</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card"><h4><mat-icon>pie_chart</mat-icon> By Zoning Classification</h4><div style="height:220px;position:relative;"><canvas id="zoningChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>bar_chart</mat-icon> By Municipal Ward</h4><div style="height:220px;position:relative;"><canvas id="wardChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>donut_small</mat-icon> By Ownership Status</h4><div style="height:220px;position:relative;"><canvas id="ownershipChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>stacked_bar_chart</mat-icon> Value by Classification</h4><div style="height:220px;position:relative;"><canvas id="classificationChart"></canvas></div></div>
+        </div>
+
+        <div class="ai-insights-panel">
+          <div class="ai-insights-header" (click)="showAiPanel.set(!showAiPanel())">
+            <div class="ai-insights-title">
+              <mat-icon style="color:#7c3aed;">psychology</mat-icon>
+              <span>AI Land Inventory Insights</span>
+              <span class="ai-badge">Rule-based Analysis</span>
+            </div>
+            <mat-icon style="color:#94a3b8;">{{showAiPanel() ? 'expand_less' : 'expand_more'}}</mat-icon>
+          </div>
+          @if (showAiPanel()) {
+            <div class="insights-grid">
+              @for (insight of landInsights(); track insight.id) {
+                <div class="insight-card" [style.border-left-color]="insight.severity === 'critical' ? '#dc2626' : insight.severity === 'high' ? '#f59e0b' : insight.severity === 'medium' ? '#3b82f6' : '#10b981'" [matTooltip]="insight.recommendation || ''">
+                  <div class="insight-icon" [style.background]="insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'high' ? '#fffbeb' : insight.severity === 'medium' ? '#eff6ff' : '#f0fdf4'" [style.color]="insight.severity === 'critical' ? '#dc2626' : insight.severity === 'high' ? '#f59e0b' : insight.severity === 'medium' ? '#3b82f6' : '#10b981'">
+                    <mat-icon style="font-size:18px;width:18px;height:18px;">{{insight.icon}}</mat-icon>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:600;color:#1e293b;margin-bottom:3px;">{{insight.title}}</div>
+                    <div style="font-size:11px;color:#64748b;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{insight.description}}</div>
+                    @if (insight.legislationRef) {
+                      <div class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> {{insight.legislationRef}}</div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size:10px;color:#0d9488;background:#f0fdfa;padding:3px 6px;border-radius:3px;margin-top:4px;line-height:1.3;">{{insight.recommendation}}</div>
+                    }
+                    @if (insight.impact) {
+                      <div style="font-size:10px;color:#059669;font-weight:500;margin-top:4px;">{{insight.impact}}</div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ==================== PROPERTY REGISTER TAB ==================== -->
+      @if (activeTab() === 'register') {
+        <div class="section-header">
+          <div class="section-title"><mat-icon>landscape</mat-icon> Land Parcel Register <span class="ref-badge">LNIM001-008 | Sub-process 6.10</span></div>
+          <div class="section-actions">
+            <mat-form-field appearance="outline" class="filter-field"><mat-label>Zoning</mat-label>
+              <mat-select [(ngModel)]="filterZoning" (selectionChange)="loadParcels()">
+                <mat-option value="">All</mat-option>
+                @for(z of zoningOptions; track z) {<mat-option [value]="z">{{z}}</mat-option>}
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="filter-field"><mat-label>Ward</mat-label>
+              <mat-select [(ngModel)]="filterWard" (selectionChange)="loadParcels()">
+                <mat-option value="">All Wards</mat-option>
+                @for(w of wardOptions; track w) {<mat-option [value]="w">{{w}}</mat-option>}
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="filter-field"><mat-label>Ownership</mat-label>
+              <mat-select [(ngModel)]="filterOwnership" (selectionChange)="loadParcels()">
+                <mat-option value="">All</mat-option>
+                @for(o of ownershipOptions; track o) {<mat-option [value]="o">{{o}}</mat-option>}
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="filter-field"><mat-label>Search</mat-label>
+              <input matInput [(ngModel)]="filterSearch" (keyup.enter)="loadParcels()" placeholder="ERF / Title Deed...">
+            </mat-form-field>
+            <button mat-stroked-button (click)="filterZoning=''; filterWard=''; filterOwnership=''; filterSearch=''; loadParcels()"><mat-icon>filter_alt_off</mat-icon></button>
+            <button mat-flat-button color="primary" (click)="openForm('create-parcel')"><mat-icon>add</mat-icon> Register Parcel</button>
+          </div>
+        </div>
+        <div class="info-banner"><mat-icon>gavel</mat-icon> LNIM001: The system must maintain a comprehensive register of all land parcels held as inventory, including ERF number, title deed, zoning, extent, GPS coordinates, and mSCOA classification.</div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ERF No.</th><th>Title Deed</th><th>Description</th><th>Address</th><th>Hectares</th><th>Zoning</th><th>Land Use</th><th>Ward</th><th>Cost Price</th><th>Carrying Value</th><th>NRV</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              @for (p of parcels(); track p.landInventoryID) {
+                <tr [class.flagged-row]="p.requiresWriteDown">
+                  <td class="ref-cell">{{p.erfNumber}}</td>
+                  <td>{{p.titleDeedNumber}}</td>
+                  <td class="desc-cell">{{p.propertyDescription}}</td>
+                  <td class="desc-cell">{{p.physicalAddress}}</td>
+                  <td class="num">{{p.extentHectares | number:'1.2-2'}}</td>
+                  <td>{{p.zoningClassification}}</td>
+                  <td>{{p.landUseCategory}}</td>
+                  <td>{{p.municipalWard}}</td>
+                  <td class="num">{{formatRand(p.costPrice)}}</td>
+                  <td class="num highlight">{{formatRand(p.carryingValue)}}</td>
+                  <td class="num" [class.variance-alert]="p.requiresWriteDown">
+                    {{p.nrv ? formatRand(p.nrv) : '—'}}
+                    @if (p.requiresWriteDown) { <mat-icon class="flag-icon" matTooltip="NRV below carrying value — write-down required per GRAP 12">warning</mat-icon> }
+                  </td>
+                  <td><span class="status-chip" [class]="'s-' + statusName(p.statusID)">{{statusName(p.statusID)}}</span></td>
+                  <td class="actions-cell">
+                    <button mat-icon-button matTooltip="Edit" (click)="openForm('edit-parcel', p)"><mat-icon>edit</mat-icon></button>
+                    <button mat-icon-button matTooltip="View Details" (click)="openForm('view-parcel', p)"><mat-icon>visibility</mat-icon></button>
+                    <button mat-icon-button matTooltip="Run Valuation" (click)="openForm('run-single-valuation', p)"><mat-icon>assessment</mat-icon></button>
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="13" class="empty-cell">No land parcels found</td></tr> }
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span>Showing {{parcels().length}} of {{totalParcels()}} parcels</span><span class="spacer"></span>
+          <button mat-icon-button [disabled]="page() <= 1" (click)="page.set(page()-1); loadParcels()"><mat-icon>chevron_left</mat-icon></button>
+          <span>Page {{page()}}</span>
+          <button mat-icon-button (click)="page.set(page()+1); loadParcels()"><mat-icon>chevron_right</mat-icon></button>
+        </div>
+      }
+
+      <!-- ==================== TRANSACTIONS TAB ==================== -->
+      @if (activeTab() === 'transactions') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="txSection() === 'acquisitions'" (click)="txSection.set('acquisitions'); loadAcquisitions()"><mat-icon>add_shopping_cart</mat-icon> Acquisitions</button>
+          <button class="sub-btn" [class.active]="txSection() === 'transfers'" (click)="txSection.set('transfers'); loadTransfers()"><mat-icon>swap_horiz</mat-icon> Transfers</button>
+          <button class="sub-btn" [class.active]="txSection() === 'distributions'" (click)="txSection.set('distributions'); loadDistributions()"><mat-icon>sell</mat-icon> Distributions (Disposals)</button>
+          <button class="sub-btn" [class.active]="txSection() === 'reclassifications'" (click)="txSection.set('reclassifications'); loadReclassifications()"><mat-icon>category</mat-icon> Reclassifications</button>
+          <button class="sub-btn" [class.active]="txSection() === 'council'" (click)="txSection.set('council'); loadCouncilResolutions()"><mat-icon>account_balance</mat-icon> Council Resolutions</button>
+        </div>
+
+        <!-- ACQUISITIONS -->
+        @if (txSection() === 'acquisitions') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>add_shopping_cart</mat-icon> Land Acquisitions <span class="ref-badge">LNIM009-025 | Sub-process 6.7</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-acquisition')"><mat-icon>add</mat-icon> Record Acquisition</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Land acquisitions include purchase, donation, expropriation, and land reform transfers. Total cost includes purchase price, transfer costs, legal fees, surveying, and environmental assessment costs per GRAP 12.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Date</th><th>ERF No.</th><th>Method</th><th>Seller</th><th>Purchase Price</th><th>Transfer Costs</th><th>Legal Fees</th><th>Total Cost</th><th>Council Ref</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (a of acquisitions(); track a.acquisitionID) {
+                  <tr>
+                    <td>{{a.acquisitionID}}</td>
+                    <td>{{formatDate(a.acquisitionDate)}}</td>
+                    <td class="ref-cell">{{a.erfNumber}}</td>
+                    <td>{{a.acquisitionMethod}}</td>
+                    <td>{{a.sellerName || '—'}}</td>
+                    <td class="num">{{formatRand(a.purchasePrice)}}</td>
+                    <td class="num">{{formatRand(a.transferCosts)}}</td>
+                    <td class="num">{{formatRand(a.legalFees)}}</td>
+                    <td class="num highlight">{{formatRand(a.totalCost)}}</td>
+                    <td>{{a.councilResolutionRef || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(a.statusID)">{{statusName(a.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (a.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveAcquisition(a)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="12" class="empty-cell">No acquisitions found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- TRANSFERS -->
+        @if (txSection() === 'transfers') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>swap_horiz</mat-icon> Land Transfers To/From Inventory <span class="ref-badge">LNIM026-040 | Sub-process 6.8</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-transfer')"><mat-icon>add</mat-icon> Record Transfer</button></div>
+          </div>
+          <div class="workflow-steps">
+            <div class="step"><div class="step-num">1</div><div class="step-info"><strong>Initiate</strong><span>Record transfer details & reason</span></div></div>
+            <mat-icon class="step-arrow">arrow_forward</mat-icon>
+            <div class="step"><div class="step-num">2</div><div class="step-info"><strong>Rezoning</strong><span>If required, capture rezoning ref</span></div></div>
+            <mat-icon class="step-arrow">arrow_forward</mat-icon>
+            <div class="step"><div class="step-num">3</div><div class="step-info"><strong>Approve</strong><span>Council/delegated authority approval</span></div></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Date</th><th>Type</th><th>Direction</th><th>From</th><th>To</th><th>Carrying Value</th><th>Fair Value</th><th>Reason</th><th>Council Ref</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (t of transfers(); track t.transferID) {
+                  <tr>
+                    <td>{{t.transferID}}</td>
+                    <td>{{formatDate(t.transferDate)}}</td>
+                    <td>{{t.transferType}}</td>
+                    <td><span class="status-chip" [class]="t.transferDirection === 'In' ? 's-approved' : 's-pending'">{{t.transferDirection}}</span></td>
+                    <td>{{t.fromClassification}}</td>
+                    <td>{{t.toClassification}}</td>
+                    <td class="num">{{formatRand(t.carryingValueAtTransfer)}}</td>
+                    <td class="num">{{t.fairValueAtTransfer ? formatRand(t.fairValueAtTransfer) : '—'}}</td>
+                    <td class="desc-cell">{{t.reason}}</td>
+                    <td>{{t.councilResolutionRef || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(t.statusID)">{{statusName(t.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (t.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveTransfer(t)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="12" class="empty-cell">No transfers found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- DISTRIBUTIONS (DISPOSALS) -->
+        @if (txSection() === 'distributions') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>sell</mat-icon> Land Distributions (Sales & Disposals) <span class="ref-badge">LNIM041-060 | Sub-process 6.9</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-distribution')"><mat-icon>add</mat-icon> Record Distribution</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>gavel</mat-icon> All land disposals require Council resolution per MFMA s14. Gain/Loss = Selling Price − Carrying Value at date of disposal. Must be disclosed separately in AFS.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Date</th><th>Type</th><th>Recipient</th><th>Selling Price</th><th>Carrying Value</th><th>Gain / Loss</th><th>Council Ref</th><th>Deeds Ref</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (d of distributions(); track d.distributionID) {
+                  <tr>
+                    <td>{{d.distributionID}}</td>
+                    <td>{{formatDate(d.distributionDate)}}</td>
+                    <td>{{d.distributionType}}</td>
+                    <td>{{d.recipientName || '—'}}</td>
+                    <td class="num">{{formatRand(d.sellingPrice)}}</td>
+                    <td class="num">{{formatRand(d.carryingValue)}}</td>
+                    <td class="num" [style.color]="d.gainOrLoss >= 0 ? '#16a34a' : '#dc2626'" style="font-weight:600;">
+                      {{d.gainOrLoss >= 0 ? '+' : ''}}{{formatRand(d.gainOrLoss)}}
+                    </td>
+                    <td>{{d.councilResolutionRef || '—'}}</td>
+                    <td>{{d.deedsOfficeRef || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(d.statusID)">{{statusName(d.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (d.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveDistribution(d)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="11" class="empty-cell">No distributions found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- RECLASSIFICATIONS -->
+        @if (txSection() === 'reclassifications') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>category</mat-icon> Land Reclassifications <span class="ref-badge">LNIM036-040</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-reclassification')"><mat-icon>add</mat-icon> Record Reclassification</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Reclassification tracks when land changes category (e.g. from "Held for Sale" to "Held for Development"). Requires rezoning approval where applicable.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Date</th><th>ERF No.</th><th>From Classification</th><th>To Classification</th><th>Carrying Value</th><th>Reason</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (rc of reclassifications(); track rc.reclassificationID) {
+                  <tr>
+                    <td>{{rc.reclassificationID}}</td>
+                    <td>{{formatDate(rc.reclassificationDate)}}</td>
+                    <td class="ref-cell">{{rc.erfNumber || '—'}}</td>
+                    <td>{{rc.fromClassification}}</td>
+                    <td><mat-icon style="font-size:14px;vertical-align:middle;color:#94a3b8;">arrow_forward</mat-icon> {{rc.toClassification}}</td>
+                    <td class="num">{{formatRand(rc.carryingValueAtDate)}}</td>
+                    <td class="desc-cell">{{rc.reason}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(rc.statusID)">{{statusName(rc.statusID)}}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="8" class="empty-cell">No reclassifications found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- COUNCIL RESOLUTIONS -->
+        @if (txSection() === 'council') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>account_balance</mat-icon> Council Resolutions <span class="ref-badge">MFMA s14 | LNIM042</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-council-resolution')"><mat-icon>add</mat-icon> Record Resolution</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Resolution No.</th><th>Date</th><th>Type</th><th>Description</th><th>Related ERF</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (cr of councilResolutions(); track cr.resolutionID) {
+                  <tr>
+                    <td>{{cr.resolutionID}}</td>
+                    <td class="ref-cell">{{cr.resolutionNumber}}</td>
+                    <td>{{formatDate(cr.resolutionDate)}}</td>
+                    <td>{{cr.resolutionType}}</td>
+                    <td class="desc-cell">{{cr.description}}</td>
+                    <td>{{cr.relatedERF || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(cr.statusID)">{{statusName(cr.statusID)}}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="7" class="empty-cell">No council resolutions found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== FINANCIAL TAB ==================== -->
+      @if (activeTab() === 'financial') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="finSection() === 'valuations'" (click)="finSection.set('valuations'); loadValuations()"><mat-icon>assessment</mat-icon> NRV Valuations</button>
+          <button class="sub-btn" [class.active]="finSection() === 'impairments'" (click)="finSection.set('impairments'); loadImpairments()"><mat-icon>warning_amber</mat-icon> Impairments</button>
+          <button class="sub-btn" [class.active]="finSection() === 'reconciliations'" (click)="finSection.set('reconciliations'); loadReconciliations()"><mat-icon>balance</mat-icon> Reconciliations</button>
+          <button class="sub-btn" [class.active]="finSection() === 'adjustments'" (click)="finSection.set('adjustments'); loadAdjustingEntries()"><mat-icon>tune</mat-icon> Adjusting Entries</button>
+          <button class="sub-btn" [class.active]="finSection() === 'workingpapers'" (click)="finSection.set('workingpapers'); loadWorkingPapers()"><mat-icon>description</mat-icon> Working Papers</button>
+        </div>
+
+        <!-- NRV VALUATIONS -->
+        @if (finSection() === 'valuations') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>assessment</mat-icon> Net Realisable Value Valuations <span class="ref-badge">GRAP 12.28-12.34 | LNIM061-080</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('run-valuation')"><mat-icon>play_arrow</mat-icon> Run Valuation</button>
+              <button mat-stroked-button (click)="openForm('bulk-valuation')"><mat-icon>playlist_play</mat-icon> Bulk Run</button>
+            </div>
+          </div>
+          <div class="info-banner"><mat-icon>gavel</mat-icon> GRAP 12.28: Land inventory shall be measured at the lower of cost and net realisable value. NRV = Estimated selling price − Estimated costs to sell. Write-down required when NRV &lt; Carrying Value.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>ERF No.</th><th>Period</th><th>Cost Price</th><th>Carrying Value</th><th>Est. Selling Price</th><th>Costs to Sell</th><th>NRV</th><th>Write-Down</th><th>GRAP Ref</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (v of valuations(); track v.valuationID) {
+                  <tr [class.flagged-row]="v.requiresWriteDown">
+                    <td>{{v.valuationID}}</td>
+                    <td class="ref-cell">—</td>
+                    <td>P{{v.period}} {{v.financialYear}}</td>
+                    <td class="num">{{formatRand(v.costPrice)}}</td>
+                    <td class="num">{{formatRand(v.carryingValue)}}</td>
+                    <td class="num">{{formatRand(v.estimatedSellingPrice)}}</td>
+                    <td class="num">{{formatRand(v.estimatedCostsToSell)}}</td>
+                    <td class="num highlight">{{formatRand(v.nrv)}}</td>
+                    <td class="num" [class.variance-alert]="v.requiresWriteDown">
+                      {{formatRand(v.writeDownRequired)}}
+                      @if (v.requiresWriteDown) { <mat-icon class="flag-icon" matTooltip="Write-down required — NRV below carrying value">trending_down</mat-icon> }
+                    </td>
+                    <td>{{v.grap12Reference || 'GRAP 12.28'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(v.statusID)">{{statusName(v.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (v.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveValuation(v)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="12" class="empty-cell">No valuations found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- IMPAIRMENTS -->
+        @if (finSection() === 'impairments') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>warning_amber</mat-icon> Impairment Assessments <span class="ref-badge">GRAP 21/26 | LNIM081-095</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-impairment')"><mat-icon>add</mat-icon> New Assessment</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>gavel</mat-icon> GRAP 21: An entity shall assess at each reporting date whether there is any indication that an asset may be impaired. Impairment loss = Carrying Value − Recoverable Amount (higher of fair value less costs to sell, and value in use).</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Period</th><th>Type</th><th>Indicator</th><th>Carrying Value Before</th><th>Recoverable Amount</th><th>Impairment Loss</th><th>GRAP Ref</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (imp of impairments(); track imp.impairmentID) {
+                  <tr>
+                    <td>{{imp.impairmentID}}</td>
+                    <td>P{{imp.period}} {{imp.financialYear}}</td>
+                    <td>{{imp.impairmentType}}</td>
+                    <td class="desc-cell">{{imp.impairmentIndicator}}</td>
+                    <td class="num">{{formatRand(imp.carryingValueBefore)}}</td>
+                    <td class="num">{{formatRand(imp.recoverableAmount)}}</td>
+                    <td class="num" style="color:#dc2626;font-weight:600;">{{formatRand(imp.impairmentLoss)}}</td>
+                    <td>{{imp.grap21Reference || 'GRAP 21'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(imp.statusID)">{{statusName(imp.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (imp.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveImpairment(imp)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="10" class="empty-cell">No impairment assessments found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- RECONCILIATIONS -->
+        @if (finSection() === 'reconciliations') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>balance</mat-icon> Land Inventory Reconciliation <span class="ref-badge">LNIM096-110 | Sub-process 6.11</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('run-reconciliation')"><mat-icon>play_arrow</mat-icon> Run Reconciliation</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Reconciliation formula: Opening Parcels/Value + Acquisitions + Transfers In − Transfers Out − Disposals − NRV Write-Downs − Impairments = Closing Parcels/Value</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Period</th><th>Opening (#)</th><th>Opening (R)</th><th>+ Acquired</th><th>+ Transfers In</th><th>− Transfers Out</th><th>− Disposals</th><th>− NRV W/D</th><th>− Impairment</th><th>Closing (#)</th><th>Closing (R)</th><th>Balanced</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (rc of reconciliations(); track rc.reconciliationID) {
+                  <tr>
+                    <td>{{rc.reconciliationID}}</td>
+                    <td>P{{rc.period}} {{rc.financialYear}}</td>
+                    <td class="num">{{rc.openingParcelCount}}</td>
+                    <td class="num">{{formatRand(rc.openingValue)}}</td>
+                    <td class="num" style="color:#16a34a;">+{{rc.acquisitionsCount}} ({{formatRand(rc.acquisitionsValue)}})</td>
+                    <td class="num" style="color:#16a34a;">+{{rc.transfersInCount}}</td>
+                    <td class="num" style="color:#dc2626;">-{{rc.transfersOutCount}}</td>
+                    <td class="num" style="color:#dc2626;">-{{rc.disposalsCount}} ({{formatRand(rc.disposalsValue)}})</td>
+                    <td class="num" style="color:#dc2626;">{{formatRand(rc.nrvWriteDowns)}}</td>
+                    <td class="num" style="color:#dc2626;">{{formatRand(rc.impairmentAdjustments)}}</td>
+                    <td class="num highlight">{{rc.closingParcelCount}}</td>
+                    <td class="num highlight">{{formatRand(rc.closingValue)}}</td>
+                    <td>@if (rc.isBalanced) { <mat-icon style="color:#16a34a;font-size:18px;">check_circle</mat-icon> } @else { <mat-icon style="color:#dc2626;font-size:18px;">error</mat-icon> }</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(rc.statusID)">{{statusName(rc.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (rc.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveReconciliation(rc)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="15" class="empty-cell">No reconciliations found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- ADJUSTING ENTRIES -->
+        @if (finSection() === 'adjustments') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>tune</mat-icon> Adjusting Entries <span class="ref-badge">LNIM100-105</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-adjustment')"><mat-icon>add</mat-icon> New Entry</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Period</th><th>Type</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (ae of adjustingEntries(); track ae.entryID) {
+                  <tr>
+                    <td>{{ae.entryID}}</td>
+                    <td>P{{ae.period}} {{ae.financialYear}}</td>
+                    <td>{{ae.entryType}}</td>
+                    <td class="desc-cell">{{ae.description}}</td>
+                    <td class="num">{{formatRand(ae.debitAmount)}}</td>
+                    <td class="num">{{formatRand(ae.creditAmount)}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(ae.statusID)">{{statusName(ae.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (ae.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveAdjustingEntry(ae)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="8" class="empty-cell">No adjusting entries found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- WORKING PAPERS -->
+        @if (finSection() === 'workingpapers') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>description</mat-icon> Working Papers <span class="ref-badge">LNIM106-110</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-working-paper')"><mat-icon>add</mat-icon> New Working Paper</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Period</th><th>Type</th><th>Title</th><th>Version</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (wp of workingPapers(); track wp.workingPaperID) {
+                  <tr>
+                    <td>{{wp.workingPaperID}}</td>
+                    <td>P{{wp.period}} {{wp.financialYear}}</td>
+                    <td>{{wp.type}}</td>
+                    <td>{{wp.title}}</td>
+                    <td>v{{wp.version}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(wp.statusID)">{{statusName(wp.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="Edit" (click)="openForm('edit-working-paper', wp)"><mat-icon>edit</mat-icon></button>
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="7" class="empty-cell">No working papers found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== COMPLIANCE TAB ==================== -->
+      @if (activeTab() === 'compliance') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="compSection() === 'environmental'" (click)="compSection.set('environmental'); loadEnvironmentalAssessments()"><mat-icon>eco</mat-icon> Environmental</button>
+          <button class="sub-btn" [class.active]="compSection() === 'servitudes'" (click)="compSection.set('servitudes'); loadServitudes()"><mat-icon>share_location</mat-icon> Servitudes</button>
+          <button class="sub-btn" [class.active]="compSection() === 'policies'" (click)="compSection.set('policies'); loadPolicyReviews()"><mat-icon>policy</mat-icon> Policy Reviews</button>
+          <button class="sub-btn" [class.active]="compSection() === 'config'" (click)="compSection.set('config'); loadConfiguration()"><mat-icon>settings</mat-icon> Configuration</button>
+        </div>
+
+        <!-- ENVIRONMENTAL ASSESSMENTS -->
+        @if (compSection() === 'environmental') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>eco</mat-icon> Environmental Impact Assessments <span class="ref-badge">LNIM111-125 | NEMA</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-environmental')"><mat-icon>add</mat-icon> New Assessment</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Environmental assessments per NEMA (National Environmental Management Act). Required before disposal, rezoning, or development. Risk ratings inform impairment assessments.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Type</th><th>Date</th><th>Assessor</th><th>Risk Rating</th><th>Findings</th><th>Remediation Required</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (ea of environmentalAssessments(); track ea.assessmentID) {
+                  <tr>
+                    <td>{{ea.assessmentID}}</td>
+                    <td>{{ea.assessmentType}}</td>
+                    <td>{{formatDate(ea.assessmentDate)}}</td>
+                    <td>{{ea.assessorName}}</td>
+                    <td>
+                      <span class="status-chip" [class]="ea.riskRating === 'High' ? 's-pending' : ea.riskRating === 'Medium' ? 's-flagged' : 's-approved'">{{ea.riskRating}}</span>
+                    </td>
+                    <td class="desc-cell">{{ea.findings}}</td>
+                    <td>{{ea.remediationRequired ? 'Yes' : 'No'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(ea.statusID)">{{statusName(ea.statusID)}}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="8" class="empty-cell">No environmental assessments found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- SERVITUDES -->
+        @if (compSection() === 'servitudes') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>share_location</mat-icon> Servitudes & Encumbrances <span class="ref-badge">LNIM126-135</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-servitude')"><mat-icon>add</mat-icon> Record Servitude</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Servitudes are registered rights that third parties hold over municipal land — e.g. rights of way, utility easements, pipeline routes. These affect NRV and disposal options.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Type</th><th>Beneficiary</th><th>Description</th><th>Registration Date</th><th>Expiry</th><th>Active</th></tr></thead>
+              <tbody>
+                @for (s of servitudes(); track s.servitudeID) {
+                  <tr>
+                    <td>{{s.servitudeID}}</td>
+                    <td>{{s.servitudeType}}</td>
+                    <td>{{s.beneficiaryName}}</td>
+                    <td class="desc-cell">{{s.description}}</td>
+                    <td>{{formatDate(s.registrationDate)}}</td>
+                    <td>{{s.expiryDate ? formatDate(s.expiryDate) : 'Perpetual'}}</td>
+                    <td>@if (s.isActive) { <mat-icon style="color:#16a34a;font-size:18px;">check_circle</mat-icon> } @else { <mat-icon style="color:#dc2626;font-size:18px;">cancel</mat-icon> }</td>
+                  </tr>
+                } @empty { <tr><td colspan="7" class="empty-cell">No servitudes found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- POLICY REVIEWS -->
+        @if (compSection() === 'policies') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>policy</mat-icon> Land Inventory Policy Reviews <span class="ref-badge">LNIM136-140 | Sub-process 6.5</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-policy-review')"><mat-icon>add</mat-icon> New Review</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Policy</th><th>Type</th><th>Version</th><th>Reviewed By</th><th>Review Date</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (pr of policyReviews(); track pr.policyReviewID) {
+                  <tr>
+                    <td>{{pr.policyReviewID}}</td>
+                    <td>{{pr.policyName}}</td>
+                    <td>{{pr.policyType}}</td>
+                    <td>v{{pr.version}}</td>
+                    <td>{{pr.reviewedBy}}</td>
+                    <td>{{formatDate(pr.reviewDate)}}</td>
+                    <td><span class="status-chip" [class]="'s-' + statusName(pr.statusID)">{{statusName(pr.statusID)}}</span></td>
+                    <td class="actions-cell">
+                      @if (pr.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approvePolicyReview(pr)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="8" class="empty-cell">No policy reviews found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- CONFIGURATION -->
+        @if (compSection() === 'config') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>settings</mat-icon> System Configuration <span class="ref-badge">LNIM141-148 | Sub-process 6.6</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-config')"><mat-icon>add</mat-icon> New Parameter</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Parameter</th><th>Value</th><th>Category</th><th>Description</th><th>Version</th><th>Approval</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (c of configuration(); track c.configID) {
+                  <tr>
+                    <td>{{c.configID}}</td>
+                    <td>{{c.configKey}}</td>
+                    <td class="highlight">{{c.configValue}}</td>
+                    <td>{{c.category}}</td>
+                    <td class="desc-cell">{{c.description}}</td>
+                    <td>v{{c.version}}</td>
+                    <td><span class="status-chip" [class]="'s-' + (c.approvalStatus || 'pending')">{{c.approvalStatus || 'pending'}}</span></td>
+                    <td class="actions-cell">
+                      @if (c.approvalStatus === 'pending' || c.approvalStatus === 'Pending') { <button mat-icon-button matTooltip="Approve" (click)="approveConfig(c)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="8" class="empty-cell">No configuration parameters found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== AI ANALYTICS TAB ==================== -->
+      @if (activeTab() === 'analytics') {
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#8b5cf6;">donut_large</mat-icon> Portfolio Distribution by Zoning</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 12 — Land classification</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsZoningChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (z of analyticsZoning(); track z.zoning) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:12px;font-weight:500;color:#1e293b;">{{z.zoning}}</span>
+                  <span style="font-size:12px;color:#64748b;">{{z.parcelCount}} parcels</span>
+                  <span style="font-size:12px;font-weight:600;color:#8b5cf6;">{{formatRand(z.totalValue)}}</span>
+                  <span style="font-size:11px;color:#94a3b8;">{{z.percentOfValue}}%</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#3b82f6;">trending_up</mat-icon> Carrying Value Trend (12 Months)</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> MFMA s63 — Asset management</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsValueTrendChart"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#ef4444;">warning</mat-icon> NRV Write-Down Risk Matrix</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 12.28-12.34 — NRV measurement</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsNrvRiskChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (risk of analyticsNrvRisks(); track risk.erfNumber) {
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fef2f2;border-radius:6px;margin-bottom:4px;">
+                  <mat-icon style="font-size:14px;width:14px;height:14px;color:#dc2626;">error</mat-icon>
+                  <span style="font-size:11px;font-weight:600;color:#1e293b;">{{risk.erfNumber}}</span>
+                  <span style="font-size:10px;color:#dc2626;">CV: {{formatRand(risk.carryingValue)}} vs NRV: {{formatRand(risk.nrv)}}</span>
+                  <span style="font-size:10px;color:#64748b;flex:1;">Write-down: {{formatRand(risk.writeDown)}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#f59e0b;">swap_horiz</mat-icon> Acquisition vs Disposal Trend</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> MFMA s14 — Disposal of assets</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsAcqDispChart"></canvas></div>
+            <div style="display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+              <div style="flex:1;text-align:center;background:#f0fdf4;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Total Acquired</div>
+                <div style="font-size:18px;font-weight:700;color:#10b981;">{{analyticsAcqDispData().totalAcquired || 0}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#fef2f2;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Total Disposed</div>
+                <div style="font-size:18px;font-weight:700;color:#dc2626;">{{analyticsAcqDispData().totalDisposed || 0}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#eff6ff;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Net Gain/Loss</div>
+                <div style="font-size:18px;font-weight:700;color:#3b82f6;">{{formatRand(analyticsAcqDispData().netGainLoss || 0)}}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#8b5cf6;">warehouse</mat-icon> Ward Portfolio Distribution</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> MFMA s63(1)(a) — Safeguarding of assets</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsWardChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (w of analyticsWardData(); track w.ward) {
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;flex:2;">{{w.ward}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{w.parcels}} parcels</span>
+                  <div style="width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+                    <div [style.width.%]="w.utilisation" style="height:100%;border-radius:3px;" [style.background]="w.utilisation > 75 ? '#8b5cf6' : w.utilisation > 50 ? '#a78bfa' : '#c4b5fd'"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;width:40px;text-align:right;color:#8b5cf6;">{{w.utilisation}}%</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#dc2626;">warning_amber</mat-icon> Impairment Assessment Summary</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 21/26 — Impairment indicators</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsImpairmentChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px;">Impairment by Type</div>
+              @for (imp of analyticsImpairmentData(); track imp.type) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;">{{imp.type}}</span>
+                  <span style="font-size:11px;color:#dc2626;font-weight:600;">{{formatRand(imp.totalLoss)}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{imp.count}} parcels</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#059669;">eco</mat-icon> Environmental Risk Heatmap</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> NEMA — Environmental compliance</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsEnvRiskChart"></canvas></div>
+            <div style="display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+              <div style="flex:1;text-align:center;background:#fef2f2;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">High Risk</div>
+                <div style="font-size:18px;font-weight:700;color:#dc2626;">{{analyticsEnvData().highRisk || 0}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#fffbeb;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Medium Risk</div>
+                <div style="font-size:18px;font-weight:700;color:#f59e0b;">{{analyticsEnvData().mediumRisk || 0}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f0fdf4;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Low Risk</div>
+                <div style="font-size:18px;font-weight:700;color:#10b981;">{{analyticsEnvData().lowRisk || 0}}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#3b82f6;">analytics</mat-icon> Disposal Gain/Loss Analysis</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 12.40 — Revenue from disposal</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsGainLossChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (d of analyticsDisposalData(); track d.period) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;color:#1e293b;">{{d.period}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{d.disposals}} disposals</span>
+                  <span style="font-size:11px;font-weight:600;" [style.color]="d.netGainLoss >= 0 ? '#10b981' : '#dc2626'">{{d.netGainLoss >= 0 ? '+' : ''}}{{formatRand(d.netGainLoss)}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#059669;">verified</mat-icon> GRAP Compliance Matrix</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 12/21/26 — Full compliance</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+              @for (area of analyticsComplianceData(); track area.area) {
+                <div style="background:#f8fafc;border-radius:10px;padding:14px;border:1px solid #e2e8f0;">
+                  <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:8px;">{{area.area}}</div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size:11px;color:#64748b;">Score:</span>
+                    <span style="font-size:11px;font-weight:600;" [style.color]="area.score >= 90 ? '#10b981' : area.score >= 70 ? '#f59e0b' : '#dc2626'">{{area.score}}%</span>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <span style="font-size:10px;color:#10b981;background:#f0fdf4;padding:2px 6px;border-radius:3px;">{{area.compliant}} compliant</span>
+                    @if (area.nonCompliant > 0) {
+                      <span style="font-size:10px;color:#dc2626;background:#fef2f2;padding:2px 6px;border-radius:3px;">{{area.nonCompliant}} non-compliant</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            <div [style.background]="(analyticsOverallCompliance() || 0) >= 95 ? '#f0fdf4' : '#fffbeb'" style="border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:10px;color:#64748b;">Overall GRAP Compliance Score</div>
+              <div style="font-size:24px;font-weight:700;" [style.color]="(analyticsOverallCompliance() || 0) >= 95 ? '#10b981' : '#f59e0b'">{{analyticsOverallCompliance() || 0}}%</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#6366f1;">share_location</mat-icon> Servitude & Encumbrance Impact</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> Deeds Registries Act — Servitude registration</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="analyticsServitudeChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (s of analyticsServitudeData(); track s.type) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;">{{s.type}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{s.count}} active</span>
+                  <span style="font-size:11px;font-weight:600;color:#6366f1;">{{formatRand(s.valueImpact)}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+      }
+
+      <!-- ==================== REPORTS TAB ==================== -->
+      @if (activeTab() === 'reports') {
+        <div class="section-header">
+          <div class="section-title"><mat-icon>summarize</mat-icon> Monthly Reports <span class="ref-badge">Sub-process 6.12 | LNIM140-148</span></div>
+          <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('generate-report')"><mat-icon>auto_awesome</mat-icon> Generate Report</button></div>
+        </div>
+        <div class="report-types">
+          <div class="report-type-card">
+            <mat-icon style="color:#8b5cf6;">landscape</mat-icon>
+            <span class="rt-title">Property Register Report</span>
+            <span class="rt-desc">Full register with all parcel details, zoning, and values</span>
+          </div>
+          <div class="report-type-card">
+            <mat-icon style="color:#0284c7;">balance</mat-icon>
+            <span class="rt-title">Reconciliation Schedule</span>
+            <span class="rt-desc">Opening + movements = closing with full audit trail</span>
+          </div>
+          <div class="report-type-card">
+            <mat-icon style="color:#ea580c;">assessment</mat-icon>
+            <span class="rt-title">Valuation Summary</span>
+            <span class="rt-desc">NRV vs carrying value for all parcels, write-down schedule</span>
+          </div>
+          <div class="report-type-card">
+            <mat-icon style="color:#dc2626;">warning_amber</mat-icon>
+            <span class="rt-title">Impairment Report</span>
+            <span class="rt-desc">GRAP 21 impairment assessments and losses recognised</span>
+          </div>
+          <div class="report-type-card">
+            <mat-icon style="color:#059669;">eco</mat-icon>
+            <span class="rt-title">Environmental Compliance</span>
+            <span class="rt-desc">EIA status, risk ratings, and remediation tracking</span>
+          </div>
+          <div class="report-type-card">
+            <mat-icon style="color:#6366f1;">swap_horiz</mat-icon>
+            <span class="rt-title">Disposal Report</span>
+            <span class="rt-desc">All disposals with gain/loss analysis and Council resolution refs</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ID</th><th>Type</th><th>Period</th><th>Generated</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              @for (rp of monthlyReports(); track rp.reportID) {
+                <tr>
+                  <td>{{rp.reportID}}</td>
+                  <td>{{rp.reportType}}</td>
+                  <td>P{{rp.period}} {{rp.financialYear}}</td>
+                  <td>{{formatDate(rp.generatedDate)}}</td>
+                  <td><span class="status-chip" [class]="'s-' + statusName(rp.statusID)">{{statusName(rp.statusID)}}</span></td>
+                  <td class="actions-cell">
+                    @if (rp.statusID === 1) { <button mat-icon-button matTooltip="Approve" (click)="approveReport(rp)"><mat-icon>check_circle</mat-icon></button> }
+                    @if (rp.statusID === 2) { <button mat-icon-button matTooltip="Submit to Reporting Mechanism" (click)="submitReport(rp)"><mat-icon>send</mat-icon></button> }
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="6" class="empty-cell">No monthly reports found</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- ==================== FORM OVERLAYS ==================== -->
+      @if (formMode()) {
+        <div class="form-overlay" (click)="closeForm()">
+          <div class="form-panel" [class.wide]="isWideForm()" (click)="$event.stopPropagation()">
+            <div class="form-header">
+              <h3><mat-icon>{{formIcon()}}</mat-icon> {{formTitle()}}</h3>
+              <button mat-icon-button (click)="closeForm()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="form-body">
+
+              <!-- REGISTER PARCEL -->
+              @if (formMode() === 'create-parcel' || formMode() === 'edit-parcel') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>ERF Number</mat-label><input matInput [(ngModel)]="fd.erfNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Title Deed Number</mat-label><input matInput [(ngModel)]="fd.titleDeedNumber"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Property Description</mat-label><input matInput [(ngModel)]="fd.propertyDescription"></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Physical Address</mat-label><input matInput [(ngModel)]="fd.physicalAddress"></mat-form-field>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>GPS Coordinates</mat-label><input matInput [(ngModel)]="fd.gpsCoordinates" placeholder="-33.9631, 22.4617"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Extent (Hectares)</mat-label><input matInput type="number" [(ngModel)]="fd.extentHectares"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Zoning Classification</mat-label>
+                    <mat-select [(ngModel)]="fd.zoningClassification">@for(z of zoningOptions; track z) {<mat-option [value]="z">{{z}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Land Use Category</mat-label>
+                    <mat-select [(ngModel)]="fd.landUseCategory">@for(lu of landUseOptions; track lu) {<mat-option [value]="lu">{{lu}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Registration Division</mat-label><input matInput [(ngModel)]="fd.registrationDivision"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Municipal Ward</mat-label>
+                    <mat-select [(ngModel)]="fd.municipalWard">@for(w of wardOptions; track w) {<mat-option [value]="w">{{w}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Cost Price (R)</mat-label><input matInput type="number" [(ngModel)]="fd.costPrice"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Market Value (R)</mat-label><input matInput type="number" [(ngModel)]="fd.marketValue"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Municipal Valuation (R)</mat-label><input matInput type="number" [(ngModel)]="fd.municipalValuation"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Classification Category</mat-label>
+                    <mat-select [(ngModel)]="fd.classificationCategory">@for(cc of classificationOptions; track cc) {<mat-option [value]="cc">{{cc}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Held For Purpose</mat-label>
+                    <mat-select [(ngModel)]="fd.heldForPurpose">@for(hp of purposeOptions; track hp) {<mat-option [value]="hp">{{hp}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Ownership Status</mat-label>
+                    <mat-select [(ngModel)]="fd.ownershipStatus">@for(os of ownershipOptions; track os) {<mat-option [value]="os">{{os}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Acquisition Method</mat-label>
+                    <mat-select [(ngModel)]="fd.acquisitionMethod">@for(am of acquisitionMethods; track am) {<mat-option [value]="am">{{am}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Date Acquired</mat-label><input matInput [matDatepicker]="acquiredPicker" [(ngModel)]="fd.dateAcquired"><mat-datepicker-toggle matIconSuffix [for]="acquiredPicker"></mat-datepicker-toggle><mat-datepicker #acquiredPicker></mat-datepicker></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>SCOA Item Segment</mat-label><input matInput [(ngModel)]="fd.scoaItemSegment"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>SCOA Fund Segment</mat-label><input matInput [(ngModel)]="fd.scoaFundSegment"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>SCOA Function Segment</mat-label><input matInput [(ngModel)]="fd.scoaFunctionSegment"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE ACQUISITION -->
+              @if (formMode() === 'create-acquisition') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Acquisition Date</mat-label><input matInput [matDatepicker]="acquisitionPicker" [(ngModel)]="fd.acquisitionDate"><mat-datepicker-toggle matIconSuffix [for]="acquisitionPicker"></mat-datepicker-toggle><mat-datepicker #acquisitionPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Acquisition Method</mat-label>
+                    <mat-select [(ngModel)]="fd.acquisitionMethod">@for(am of acquisitionMethods; track am) {<mat-option [value]="am">{{am}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Seller Name</mat-label><input matInput [(ngModel)]="fd.sellerName"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>ERF Number</mat-label><input matInput [(ngModel)]="fd.erfNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Title Deed Number</mat-label><input matInput [(ngModel)]="fd.titleDeedNumber"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Purchase Price (R)</mat-label><input matInput type="number" [(ngModel)]="fd.purchasePrice"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Transfer Costs (R)</mat-label><input matInput type="number" [(ngModel)]="fd.transferCosts"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Legal Fees (R)</mat-label><input matInput type="number" [(ngModel)]="fd.legalFees"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Surveying Costs (R)</mat-label><input matInput type="number" [(ngModel)]="fd.surveyingCosts"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Environmental Costs (R)</mat-label><input matInput type="number" [(ngModel)]="fd.environmentalCosts"></mat-form-field>
+                </div>
+                <div class="calc-row" *ngIf="fd.purchasePrice">
+                  <span>Total Acquisition Cost: <strong>R{{((fd.purchasePrice || 0) + (fd.transferCosts || 0) + (fd.legalFees || 0) + (fd.surveyingCosts || 0) + (fd.environmentalCosts || 0)) | number:'1.2-2'}}</strong></span>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Council Resolution Ref</mat-label><input matInput [(ngModel)]="fd.councilResolutionRef"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>SCOA Item Segment</mat-label><input matInput [(ngModel)]="fd.scoaItemSegment"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>SCOA Fund Segment</mat-label><input matInput [(ngModel)]="fd.scoaFundSegment"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE TRANSFER -->
+              @if (formMode() === 'create-transfer') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Transfer Date</mat-label><input matInput [matDatepicker]="transferPicker" [(ngModel)]="fd.transferDate"><mat-datepicker-toggle matIconSuffix [for]="transferPicker"></mat-datepicker-toggle><mat-datepicker #transferPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Transfer Type</mat-label>
+                    <mat-select [(ngModel)]="fd.transferType"><mat-option value="Reclassification">Reclassification</mat-option><mat-option value="Rezoning">Rezoning</mat-option><mat-option value="PPE Transfer">PPE Transfer</mat-option><mat-option value="Investment Property">Investment Property</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Direction</mat-label>
+                    <mat-select [(ngModel)]="fd.transferDirection"><mat-option value="In">Into Inventory</mat-option><mat-option value="Out">Out of Inventory</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>From Classification</mat-label><input matInput [(ngModel)]="fd.fromClassification"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>To Classification</mat-label><input matInput [(ngModel)]="fd.toClassification"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Fair Value at Transfer (R)</mat-label><input matInput type="number" [(ngModel)]="fd.fairValueAtTransfer"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Council Resolution Ref</mat-label><input matInput [(ngModel)]="fd.councilResolutionRef"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Reason</mat-label><textarea matInput rows="2" [(ngModel)]="fd.reason"></textarea></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Rezoning Approval Ref (if applicable)</mat-label><input matInput [(ngModel)]="fd.rezoningApprovalRef"></mat-form-field>
+              }
+
+              <!-- CREATE DISTRIBUTION -->
+              @if (formMode() === 'create-distribution') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Distribution Date</mat-label><input matInput [matDatepicker]="distributionPicker" [(ngModel)]="fd.distributionDate"><mat-datepicker-toggle matIconSuffix [for]="distributionPicker"></mat-datepicker-toggle><mat-datepicker #distributionPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Distribution Type</mat-label>
+                    <mat-select [(ngModel)]="fd.distributionType"><mat-option value="Sale">Sale</mat-option><mat-option value="Donation">Donation</mat-option><mat-option value="Expropriation">Expropriation</mat-option><mat-option value="Land Reform">Land Reform</mat-option><mat-option value="Write-off">Write-off</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Recipient Name</mat-label><input matInput [(ngModel)]="fd.recipientName"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Selling Price (R)</mat-label><input matInput type="number" [(ngModel)]="fd.sellingPrice"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Council Resolution Ref</mat-label><input matInput [(ngModel)]="fd.councilResolutionRef"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Deeds Office Ref</mat-label><input matInput [(ngModel)]="fd.deedsOfficeRef"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>SCOA Item Segment</mat-label><input matInput [(ngModel)]="fd.scoaItemSegment"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE RECLASSIFICATION -->
+              @if (formMode() === 'create-reclassification') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Date</mat-label><input matInput [matDatepicker]="reclassificationPicker" [(ngModel)]="fd.reclassificationDate"><mat-datepicker-toggle matIconSuffix [for]="reclassificationPicker"></mat-datepicker-toggle><mat-datepicker #reclassificationPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Land Inventory ID</mat-label><input matInput type="number" [(ngModel)]="fd.landInventoryID"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>From Classification</mat-label><input matInput [(ngModel)]="fd.fromClassification"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>To Classification</mat-label><input matInput [(ngModel)]="fd.toClassification"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Reason</mat-label><textarea matInput rows="2" [(ngModel)]="fd.reason"></textarea></mat-form-field>
+              }
+
+              <!-- CREATE COUNCIL RESOLUTION -->
+              @if (formMode() === 'create-council-resolution') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Resolution Number</mat-label><input matInput [(ngModel)]="fd.resolutionNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Resolution Date</mat-label><input matInput [matDatepicker]="resolutionPicker" [(ngModel)]="fd.resolutionDate"><mat-datepicker-toggle matIconSuffix [for]="resolutionPicker"></mat-datepicker-toggle><mat-datepicker #resolutionPicker></mat-datepicker></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Type</mat-label>
+                    <mat-select [(ngModel)]="fd.resolutionType"><mat-option value="Acquisition">Acquisition</mat-option><mat-option value="Disposal">Disposal</mat-option><mat-option value="Transfer">Transfer</mat-option><mat-option value="Rezoning">Rezoning</mat-option><mat-option value="Donation">Donation</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Related ERF Number</mat-label><input matInput [(ngModel)]="fd.relatedERF"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="3" [(ngModel)]="fd.description"></textarea></mat-form-field>
+              }
+
+              <!-- RUN VALUATION -->
+              @if (formMode() === 'run-valuation' || formMode() === 'run-single-valuation') {
+                <div class="info-banner"><mat-icon>gavel</mat-icon> GRAP 12 NRV = Estimated selling price − Estimated costs to sell. Write-down required if NRV &lt; Carrying Value.</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Land Inventory ID</mat-label><input matInput type="number" [(ngModel)]="fd.landInventoryID"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Estimated Selling Price (R)</mat-label><input matInput type="number" [(ngModel)]="fd.estimatedSellingPrice"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Estimated Costs to Sell (R)</mat-label><input matInput type="number" [(ngModel)]="fd.estimatedCostsToSell"></mat-form-field>
+                </div>
+                <div class="calc-row" *ngIf="fd.estimatedSellingPrice">
+                  <span>NRV: <strong>R{{((fd.estimatedSellingPrice || 0) - (fd.estimatedCostsToSell || 0)) | number:'1.2-2'}}</strong></span>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Valuer Name</mat-label><input matInput [(ngModel)]="fd.valuerName"></mat-form-field>
+              }
+
+              <!-- BULK VALUATION -->
+              @if (formMode() === 'bulk-valuation') {
+                <div class="info-banner"><mat-icon>playlist_play</mat-icon> Run bulk NRV valuation for all land parcels in a given period. This will assess each parcel against its estimated selling price and costs to sell.</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE IMPAIRMENT -->
+              @if (formMode() === 'create-impairment') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Land Inventory ID</mat-label><input matInput type="number" [(ngModel)]="fd.landInventoryID"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Impairment Type</mat-label>
+                    <mat-select [(ngModel)]="fd.impairmentType"><mat-option value="Environmental">Environmental Contamination</mat-option><mat-option value="Physical">Physical Damage</mat-option><mat-option value="Legal">Legal Restriction</mat-option><mat-option value="Market">Market Decline</mat-option><mat-option value="Obsolescence">Obsolescence</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Impairment Indicator</mat-label><textarea matInput rows="2" [(ngModel)]="fd.impairmentIndicator"></textarea></mat-form-field>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Carrying Value Before (R)</mat-label><input matInput type="number" [(ngModel)]="fd.carryingValueBefore"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Recoverable Amount (R)</mat-label><input matInput type="number" [(ngModel)]="fd.recoverableAmount"></mat-form-field>
+                </div>
+                <div class="calc-row" *ngIf="fd.carryingValueBefore && fd.recoverableAmount">
+                  <span>Impairment Loss: <strong style="color:#dc2626;">R{{((fd.carryingValueBefore || 0) - (fd.recoverableAmount || 0)) | number:'1.2-2'}}</strong></span>
+                </div>
+              }
+
+              <!-- RUN RECONCILIATION -->
+              @if (formMode() === 'run-reconciliation') {
+                <div class="info-banner"><mat-icon>balance</mat-icon> Opening + Acquisitions + Transfers In − Transfers Out − Disposals − NRV Write-Downs − Impairments = Closing</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE ADJUSTMENT -->
+              @if (formMode() === 'create-adjustment') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Entry Type</mat-label>
+                    <mat-select [(ngModel)]="fd.entryType"><mat-option value="NRV Write-Down">NRV Write-Down</mat-option><mat-option value="Impairment">Impairment</mat-option><mat-option value="Correction">Correction</mat-option><mat-option value="Reclassification">Reclassification</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="2" [(ngModel)]="fd.description"></textarea></mat-form-field>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Debit Amount (R)</mat-label><input matInput type="number" [(ngModel)]="fd.debitAmount"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Credit Amount (R)</mat-label><input matInput type="number" [(ngModel)]="fd.creditAmount"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE ENVIRONMENTAL ASSESSMENT -->
+              @if (formMode() === 'create-environmental') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Land Inventory ID</mat-label><input matInput type="number" [(ngModel)]="fd.landInventoryID"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Assessment Type</mat-label>
+                    <mat-select [(ngModel)]="fd.assessmentType"><mat-option value="EIA">Environmental Impact Assessment</mat-option><mat-option value="Soil">Soil Contamination</mat-option><mat-option value="Water">Water Table Assessment</mat-option><mat-option value="Biodiversity">Biodiversity Study</mat-option><mat-option value="Heritage">Heritage Assessment</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Assessment Date</mat-label><input matInput [matDatepicker]="assessmentPicker" [(ngModel)]="fd.assessmentDate"><mat-datepicker-toggle matIconSuffix [for]="assessmentPicker"></mat-datepicker-toggle><mat-datepicker #assessmentPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Assessor Name</mat-label><input matInput [(ngModel)]="fd.assessorName"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Risk Rating</mat-label>
+                    <mat-select [(ngModel)]="fd.riskRating"><mat-option value="Low">Low</mat-option><mat-option value="Medium">Medium</mat-option><mat-option value="High">High</mat-option><mat-option value="Critical">Critical</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Findings</mat-label><textarea matInput rows="3" [(ngModel)]="fd.findings"></textarea></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Recommendations</mat-label><textarea matInput rows="2" [(ngModel)]="fd.recommendations"></textarea></mat-form-field>
+              }
+
+              <!-- CREATE SERVITUDE -->
+              @if (formMode() === 'create-servitude') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Land Inventory ID</mat-label><input matInput type="number" [(ngModel)]="fd.landInventoryID"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Servitude Type</mat-label>
+                    <mat-select [(ngModel)]="fd.servitudeType"><mat-option value="Right of Way">Right of Way</mat-option><mat-option value="Pipeline">Pipeline Servitude</mat-option><mat-option value="Utility">Utility Easement</mat-option><mat-option value="Conservation">Conservation Servitude</mat-option><mat-option value="Drainage">Drainage Servitude</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Beneficiary Name</mat-label><input matInput [(ngModel)]="fd.beneficiaryName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Registration Date</mat-label><input matInput [matDatepicker]="registrationPicker" [(ngModel)]="fd.registrationDate"><mat-datepicker-toggle matIconSuffix [for]="registrationPicker"></mat-datepicker-toggle><mat-datepicker #registrationPicker></mat-datepicker></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="2" [(ngModel)]="fd.description"></textarea></mat-form-field>
+              }
+
+              <!-- CREATE POLICY REVIEW -->
+              @if (formMode() === 'create-policy-review') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Policy Name</mat-label><input matInput [(ngModel)]="fd.policyName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Policy Type</mat-label>
+                    <mat-select [(ngModel)]="fd.policyType"><mat-option value="Accounting">Accounting Policy</mat-option><mat-option value="Valuation">Valuation Policy</mat-option><mat-option value="Disposal">Disposal Policy</mat-option><mat-option value="Acquisition">Acquisition Policy</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Proposed Changes</mat-label><textarea matInput rows="4" [(ngModel)]="fd.proposedChanges"></textarea></mat-form-field>
+              }
+
+              <!-- CREATE CONFIG -->
+              @if (formMode() === 'create-config') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Parameter Key</mat-label><input matInput [(ngModel)]="fd.configKey"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Value</mat-label><input matInput [(ngModel)]="fd.configValue"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="fd.category"><mat-option value="General">General</mat-option><mat-option value="Valuation">Valuation</mat-option><mat-option value="Classification">Classification</mat-option><mat-option value="Reporting">Reporting</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="2" [(ngModel)]="fd.description"></textarea></mat-form-field>
+              }
+
+              <!-- WORKING PAPER -->
+              @if (formMode() === 'create-working-paper' || formMode() === 'edit-working-paper') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Type</mat-label>
+                    <mat-select [(ngModel)]="fd.type"><mat-option value="Valuation">Valuation</mat-option><mat-option value="Reconciliation">Reconciliation</mat-option><mat-option value="Impairment">Impairment</mat-option><mat-option value="Year-End">Year-End</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Title</mat-label><input matInput [(ngModel)]="fd.title"></mat-form-field>
+              }
+
+              <!-- GENERATE REPORT -->
+              @if (formMode() === 'generate-report') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Financial Year</mat-label><input matInput [(ngModel)]="fd.financialYear" placeholder="2025/2026"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Period</mat-label><input matInput type="number" [(ngModel)]="fd.period" min="1" max="15"></mat-form-field>
+                </div>
+              }
+
+              <!-- VIEW PARCEL DETAILS -->
+              @if (formMode() === 'view-parcel' && editItem) {
+                <div class="detail-grid">
+                  <div class="detail-row"><span class="dl">ERF Number</span><span class="dv">{{editItem.erfNumber}}</span></div>
+                  <div class="detail-row"><span class="dl">Title Deed</span><span class="dv">{{editItem.titleDeedNumber}}</span></div>
+                  <div class="detail-row"><span class="dl">Description</span><span class="dv">{{editItem.propertyDescription}}</span></div>
+                  <div class="detail-row"><span class="dl">Address</span><span class="dv">{{editItem.physicalAddress}}</span></div>
+                  <div class="detail-row"><span class="dl">GPS</span><span class="dv">{{editItem.gpsCoordinates || '—'}}</span></div>
+                  <div class="detail-row"><span class="dl">Extent</span><span class="dv">{{editItem.extentHectares}} ha</span></div>
+                  <div class="detail-row"><span class="dl">Zoning</span><span class="dv">{{editItem.zoningClassification}}</span></div>
+                  <div class="detail-row"><span class="dl">Land Use</span><span class="dv">{{editItem.landUseCategory}}</span></div>
+                  <div class="detail-row"><span class="dl">Ward</span><span class="dv">{{editItem.municipalWard}}</span></div>
+                  <div class="detail-row"><span class="dl">Cost Price</span><span class="dv highlight">{{formatRand(editItem.costPrice)}}</span></div>
+                  <div class="detail-row"><span class="dl">Carrying Value</span><span class="dv highlight">{{formatRand(editItem.carryingValue)}}</span></div>
+                  <div class="detail-row"><span class="dl">Market Value</span><span class="dv">{{editItem.marketValue ? formatRand(editItem.marketValue) : '—'}}</span></div>
+                  <div class="detail-row"><span class="dl">NRV</span><span class="dv" [style.color]="editItem.requiresWriteDown ? '#dc2626' : '#16a34a'">{{editItem.nrv ? formatRand(editItem.nrv) : '—'}}</span></div>
+                  <div class="detail-row"><span class="dl">Classification</span><span class="dv">{{editItem.classificationCategory}}</span></div>
+                  <div class="detail-row"><span class="dl">Held For</span><span class="dv">{{editItem.heldForPurpose}}</span></div>
+                  <div class="detail-row"><span class="dl">Ownership</span><span class="dv">{{editItem.ownershipStatus}}</span></div>
+                  <div class="detail-row"><span class="dl">SCOA Item</span><span class="dv" style="font-family:monospace;">{{editItem.scoaItemSegment}}</span></div>
+                  <div class="detail-row"><span class="dl">SCOA Fund</span><span class="dv" style="font-family:monospace;">{{editItem.scoaFundSegment}}</span></div>
+                  <div class="detail-row"><span class="dl">SCOA Function</span><span class="dv" style="font-family:monospace;">{{editItem.scoaFunctionSegment}}</span></div>
+                </div>
+              }
+            </div>
+            @if (formMode() !== 'view-parcel') {
+              <div class="form-footer">
+                <button mat-stroked-button (click)="closeForm()">Cancel</button>
+                <button mat-flat-button color="primary" (click)="submitForm()"><mat-icon>save</mat-icon> {{submitLabel()}}</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>

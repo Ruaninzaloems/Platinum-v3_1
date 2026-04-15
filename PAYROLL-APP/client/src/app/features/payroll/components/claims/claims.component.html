@@ -1,0 +1,252 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Claims</h1>
+      <p class="page-subtitle">Capture and manage S&T and Travel reimbursement claims</p>
+    </div>
+    <button class="btn btn-primary" (click)="openAddForm()"><app-icon name="plus" [size]="14"></app-icon> Add Claim</button>
+  </div>
+
+  <div class="filters-bar">
+    <select class="form-control filter-select" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+      <option value="">All Statuses</option>
+      <option value="PENDING">Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="PAID">Paid</option>
+    </select>
+    <select class="form-control filter-select" [(ngModel)]="claimTypeFilter" (ngModelChange)="onFilterChange()">
+      <option value="">All Claim Types</option>
+      @for (ct of claimTypes; track ct.value) {
+        <option [value]="ct.value">{{ ct.label }}</option>
+      }
+    </select>
+    <div class="employee-filter-wrap">
+      <input class="form-control filter-input" type="text" placeholder="Search employee..." [(ngModel)]="filterEmployeeSearch" (input)="searchFilterEmployees()" />
+      @if (employeeFilterId) {
+        <button class="btn btn-sm btn-outline clear-filter-btn" (click)="clearEmployeeFilter()">✕</button>
+      }
+      @if (filterEmployees.length > 0) {
+        <div class="employee-dropdown filter-dropdown">
+          @for (emp of filterEmployees; track emp.id) {
+            <div class="employee-option" (click)="selectFilterEmployee(emp)">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading claims...</div>
+  } @else if (claims.length === 0) {
+    <div class="empty-state">
+      <h3>No claims found</h3>
+      <p>Click "Add Claim" to submit a new reimbursement claim</p>
+    </div>
+  } @else {
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="claims-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Claim Type</th>
+              <th>Sub-Type</th>
+              <th class="text-right">Amount</th>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Status</th>
+              <th style="width: 120px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (claim of claims; track claim.id) {
+              <tr>
+                <td>
+                  <div class="emp-cell">
+                    <span class="emp-cell-name">{{ claim.surname }}, {{ claim.first_name }}</span>
+                    <span class="emp-cell-code">{{ claim.employee_code }}</span>
+                  </div>
+                </td>
+                <td>{{ getClaimTypeLabel(claim.claim_type) }}</td>
+                <td>{{ claim.sub_type || '-' }}</td>
+                <td class="text-right amount-cell">{{ claim.amount | currencyZar }}</td>
+                <td>{{ claim.start_date | dateSa }}</td>
+                <td>{{ claim.reference_no || '-' }}</td>
+                <td><app-status-badge [status]="claim.status"></app-status-badge></td>
+                <td>
+                  @if (claim.status === 'PENDING') {
+                    <div class="action-buttons">
+                      <button class="btn btn-sm btn-approve" (click)="approveClaim(claim)" title="Approve">
+                        <app-icon name="check" [size]="12"></app-icon>
+                      </button>
+                      <button class="btn btn-sm btn-reject" (click)="rejectClaim(claim)" title="Reject">
+                        <app-icon name="x" [size]="12"></app-icon>
+                      </button>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <app-pagination [page]="page" [limit]="limit" [total]="total" (pageChange)="onPageChange($event)"></app-pagination>
+  }
+}
+
+@if (view === 'form') {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn" (click)="backToList()"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      <div>
+        <h1 class="page-title">Add Claim</h1>
+        <p class="page-subtitle">Submit a new S&T or Travel reimbursement claim</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" (click)="submitClaim()" [disabled]="formLoading">
+      @if (formLoading) { Submitting... } @else { <app-icon name="check" [size]="14"></app-icon> Submit Claim }
+    </button>
+  </div>
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="user" [size]="16"></app-icon> Employee Details</div>
+
+        <div class="form-group">
+          <label>Employee Number <span class="required">*</span></label>
+          <div class="employee-lookup">
+            <input class="form-control" placeholder="Search by name, code or ID..." [(ngModel)]="employeeSearch" (ngModelChange)="searchEmployees()">
+            @if (selectedEmployee) {
+              <button class="clear-btn" (click)="clearEmployee()">&times;</button>
+            }
+            @if (employees.length > 0 && !selectedEmployee) {
+              <div class="dropdown-list">
+                @for (emp of employees; track emp.id) {
+                  <div class="dropdown-item" (click)="selectEmployee(emp)">
+                    <span class="dropdown-item-name">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</span>
+                    <span class="dropdown-item-sub">{{ emp.id_number || emp.passport_number || '' }}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (employeeLoading) {
+              <div class="dropdown-list"><div class="dropdown-item" style="color:var(--text-muted)">Searching...</div></div>
+            }
+          </div>
+        </div>
+
+        @if (selectedEmployee) {
+          <div class="form-group">
+            <label>ID Number</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.id_number || '-'" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Full Name</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.first_name" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Surname</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.surname" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Passport Number</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.passport_number || '-'" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Employee Code</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.employee_code" readonly>
+          </div>
+        }
+
+        <div class="form-group">
+          <label>Claim Type <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="form.claim_type" (ngModelChange)="onClaimTypeChange()">
+            <option value="">-- Select Claim Type --</option>
+            @for (ct of claimTypes; track ct.value) {
+              <option [value]="ct.value">{{ ct.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Sub-Type <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="form.sub_type" (ngModelChange)="onSubTypeChange()" [disabled]="!form.claim_type || claimConfigurations.length === 0">
+            <option value="">-- Select Sub-Type --</option>
+            @for (config of claimConfigurations; track config.id) {
+              <option [value]="config.id">{{ getSubTypeLabel(config) }}</option>
+            }
+          </select>
+          @if (form.claim_type && claimConfigurations.length === 0) {
+            <span class="field-hint">No configurations found for this claim type</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="dollar" [size]="16"></app-icon> Claim Details</div>
+
+        <div class="form-group">
+          <label>Start Date <span class="required">*</span></label>
+          <app-date-input [(ngModel)]="form.start_date"></app-date-input>
+        </div>
+
+        @if (form.claim_type === 'S_AND_T') {
+          <div class="form-group">
+            <label>End Date <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="form.end_date"></app-date-input>
+            @if (dayCount > 0) {
+              <span class="field-hint">{{ dayCount }} day(s)</span>
+            }
+          </div>
+        }
+
+        @if (form.claim_type === 'TRAVEL') {
+          <div class="form-group">
+            <label>Kilometre <span class="required">*</span></label>
+            <input class="form-control" type="number" [(ngModel)]="form.kilometres" step="0.01" min="0" placeholder="Enter kilometres travelled">
+          </div>
+        }
+
+        <div class="form-group">
+          <label>Tariff</label>
+          <input class="form-control readonly-field" [value]="tariff ? 'R' + tariff.toFixed(2) : '-'" readonly>
+          @if (tariff && form.claim_type === 'TRAVEL') {
+            <span class="field-hint">Rate per kilometre</span>
+          }
+          @if (tariff && form.claim_type === 'S_AND_T') {
+            <span class="field-hint">Daily rate</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Claim Value</label>
+          <input class="form-control readonly-field claim-value" [value]="claimValue > 0 ? 'R' + claimValue.toFixed(2) : '-'" readonly>
+          @if (form.claim_type === 'TRAVEL' && tariff && form.kilometres > 0) {
+            <span class="field-hint">{{ form.kilometres }} km &times; R{{ tariff.toFixed(2) }}</span>
+          }
+          @if (form.claim_type === 'S_AND_T' && tariff && dayCount > 0) {
+            <span class="field-hint">{{ dayCount }} days &times; R{{ tariff.toFixed(2) }}</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Reference No</label>
+          <input class="form-control" [(ngModel)]="form.reference_no" placeholder="Optional reference number">
+        </div>
+
+        <div class="form-group">
+          <label>Reason</label>
+          <textarea class="form-control" [(ngModel)]="form.reason" placeholder="Reason for claim" rows="3"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,324 @@
+@if (!compilationContextLoading() && !hasCompilationContext()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#9e9e9e;margin-bottom:16px">playlist_add_check</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">No Active Compilation</h2>
+    <p style="color:#757575;margin:0 0 24px;max-width:400px">Select or create a compilation before running integrity checks.</p>
+    <button mat-flat-button color="primary" (click)="goToCompilations()">
+      <mat-icon>arrow_forward</mat-icon> Go to Compilations
+    </button>
+  </div>
+} @else if (!periodsLoading() && !allPeriodsReady()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#ff9800;margin-bottom:16px">hourglass_empty</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">Period Data Not Ready</h2>
+    <p style="color:#757575;margin:0 0 16px;max-width:460px">All required periods (current year and prior year) must be loaded, validated, and committed before running integrity checks.</p>
+    @if (missingPeriods().length > 0) {
+      <div style="margin-bottom:16px;color:#bf360c;font-weight:500">
+        Missing required periods: {{ missingPeriods().join(', ') }}
+      </div>
+    }
+    @if (periodStatuses().length > 0) {
+      <div style="margin-bottom:24px;text-align:left;background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;min-width:280px">
+        <div style="font-weight:500;margin-bottom:8px;color:#424242">Period Status:</div>
+        @for (p of periodStatuses(); track p.periodType) {
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0">
+            <span>{{ p.periodType }}</span>
+            <span [style.color]="p.status === 'committed' ? '#4caf50' : (p.status === 'validation_failed' ? '#f44336' : '#ff9800')">{{ p.status }}</span>
+          </div>
+        }
+      </div>
+    }
+    <button mat-flat-button color="primary" (click)="goToTbImport()">
+      <mat-icon>arrow_forward</mat-icon> Go to TB Import
+    </button>
+  </div>
+} @else if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="48"></mat-spinner>
+    <p>Running integrity checks...</p>
+  </div>
+} @else if (error()) {
+  <div class="error-container">
+    <mat-icon class="error-icon">error_outline</mat-icon>
+    <h3>Unable to run integrity checks</h3>
+    <p>{{ error() }}</p>
+    <button mat-flat-button color="primary" (click)="runChecks()" matTooltip="Retry running all integrity checks against the current financial year data">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+} @else if (data()) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1 matTooltip="Automated validation of TB/GL data integrity, accounting equation compliance, and cross-statement consistency">Financial Integrity & Balance Check</h1>
+        <p class="subtitle">
+          Data Validation Dashboard
+          @if (data()!.financialYear) {
+            <span class="fy-badge" matTooltip="Financial year being validated">{{ data()!.financialYear!.label }}</span>
+          }
+        </p>
+      </div>
+      <div class="page-actions">
+        <span class="last-run" matTooltip="Timestamp of the most recent integrity check run">
+          <mat-icon>schedule</mat-icon>
+          Last run: {{ formatTime(data()!.lastRunAt) }}
+        </span>
+        <button mat-flat-button color="primary" (click)="runChecks()" matTooltip="Re-run all 15 integrity validation checks against current TB and GL data">
+          <mat-icon>refresh</mat-icon> Re-run Checks
+        </button>
+      </div>
+    </div>
+
+    <div class="top-section">
+      <div class="score-ring-card" matTooltip="Overall data integrity health score calculated from all validation checks. Green (>90%) = Healthy, Amber (70-90%) = Review Needed, Red (<70%) = Issues Found">
+        <div class="score-ring" [class]="getScoreClass(data()!.overallScore)">
+          <svg viewBox="0 0 120 120" class="score-svg">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#e8ecf1" stroke-width="8"/>
+            <circle cx="60" cy="60" r="52" fill="none"
+                    [attr.stroke]="getScoreColor(data()!.overallScore)"
+                    stroke-width="8"
+                    stroke-linecap="round"
+                    [attr.stroke-dasharray]="getScoreDash(data()!.overallScore)"
+                    transform="rotate(-90 60 60)"/>
+          </svg>
+          <div class="score-value">
+            <span class="score-number">{{ data()!.overallScore }}</span>
+            <span class="score-percent">%</span>
+          </div>
+          <div class="score-label">Health Score</div>
+        </div>
+      </div>
+
+      <div class="summary-strip">
+        <div class="summary-card total" matTooltip="Total number of automated validation checks executed against the TB data">
+          <div class="summary-icon-wrap"><mat-icon>checklist</mat-icon></div>
+          <div class="summary-details">
+            <span class="summary-value">{{ data()!.totalChecks }}</span>
+            <span class="summary-label">Total Checks</span>
+          </div>
+        </div>
+        <div class="summary-card passed" matTooltip="Checks that passed validation — data is consistent and correct for these items">
+          <div class="summary-icon-wrap"><mat-icon>check_circle</mat-icon></div>
+          <div class="summary-details">
+            <span class="summary-value">{{ data()!.passed }}</span>
+            <span class="summary-label">Passed</span>
+          </div>
+        </div>
+        <div class="summary-card failed" matTooltip="Critical issues found — these checks indicate data integrity problems that must be resolved before AFS compilation">
+          <div class="summary-icon-wrap"><mat-icon>cancel</mat-icon></div>
+          <div class="summary-details">
+            <span class="summary-value">{{ data()!.failed }}</span>
+            <span class="summary-label">Failed</span>
+          </div>
+        </div>
+        <div class="summary-card warnings" matTooltip="Items that require review — may indicate minor issues or unusual patterns in the data">
+          <div class="summary-icon-wrap"><mat-icon>warning</mat-icon></div>
+          <div class="summary-details">
+            <span class="summary-value">{{ data()!.warnings }}</span>
+            <span class="summary-label">Warnings</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @for (cat of categories; track cat.id) {
+      <div class="category-section">
+        <div class="category-header" matTooltip="{{ cat.tooltip }}">
+          <mat-icon class="category-icon" [style.color]="cat.color">{{ cat.icon }}</mat-icon>
+          <span class="category-name">{{ cat.label }}</span>
+          <div class="category-badges">
+            @if (getCategoryChecks(cat.id, 'pass').length > 0) {
+              <span class="cat-badge pass" matTooltip="Passed checks in this category">
+                <mat-icon>check_circle</mat-icon> {{ getCategoryChecks(cat.id, 'pass').length }}
+              </span>
+            }
+            @if (getCategoryChecks(cat.id, 'fail').length > 0) {
+              <span class="cat-badge fail" matTooltip="Failed checks in this category — drill down for details">
+                <mat-icon>cancel</mat-icon> {{ getCategoryChecks(cat.id, 'fail').length }}
+              </span>
+            }
+            @if (getCategoryChecks(cat.id, 'warning').length > 0) {
+              <span class="cat-badge warning" matTooltip="Warning checks in this category">
+                <mat-icon>warning</mat-icon> {{ getCategoryChecks(cat.id, 'warning').length }}
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="checks-grid">
+          @for (check of getCategoryChecks(cat.id); track check.checkId) {
+            <mat-card class="check-card" [class]="'status-' + check.status"
+                      matTooltip="{{ check.message }}">
+              <div class="check-header" (click)="toggleCheck(check.checkId)">
+                <div class="check-status-icon" [class]="'icon-' + check.status"
+                     matTooltip="{{ check.status === 'pass' ? 'Validation passed' : check.status === 'fail' ? 'Validation failed — expand for details' : 'Review recommended — expand for details' }}">
+                  <mat-icon>{{ getStatusIcon(check.status) }}</mat-icon>
+                </div>
+                <div class="check-info">
+                  <span class="check-name">{{ check.checkName }}</span>
+                  <span class="check-severity" [class]="'sev-' + check.severity"
+                        matTooltip="{{ check.severity === 'critical' ? 'Critical — must be resolved before AFS compilation' : check.severity === 'warning' ? 'Warning — review recommended' : 'Informational — no action required' }}">
+                    {{ check.severity }}
+                  </span>
+                </div>
+                <div class="check-values" *ngIf="check.expectedValue !== undefined && check.status !== 'pass'">
+                  <div class="value-pair" matTooltip="Expected vs actual values for this validation check">
+                    <span class="value-label">Expected</span>
+                    <span class="value-amount">{{ formatCurrency(check.expectedValue!) }}</span>
+                  </div>
+                  <div class="value-pair">
+                    <span class="value-label">Actual</span>
+                    <span class="value-amount actual">{{ formatCurrency(check.actualValue!) }}</span>
+                  </div>
+                  <div class="value-pair diff" matTooltip="Absolute difference between expected and actual values">
+                    <span class="value-label">Diff</span>
+                    <span class="value-amount diff-amount">{{ formatCurrency(check.difference!) }}</span>
+                  </div>
+                </div>
+                @if (check.details.length > 0) {
+                  <button mat-icon-button class="expand-btn"
+                          matTooltip="{{ expandedChecks().has(check.checkId) ? 'Collapse drill-down details' : 'Expand to view affected accounts and drill-down to source' }}"
+                          (click)="$event.stopPropagation(); toggleCheck(check.checkId)">
+                    <mat-icon>{{ expandedChecks().has(check.checkId) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                }
+              </div>
+
+              <div class="check-message">
+                <mat-icon class="msg-icon" [class]="'icon-' + check.status">{{ getStatusIcon(check.status) }}</mat-icon>
+                {{ check.message }}
+              </div>
+
+              @if (expandedChecks().has(check.checkId) && check.details.length > 0) {
+                <div class="drill-down-panel">
+                  <div class="drill-header" matTooltip="Detailed breakdown of affected accounts with source file traceability for audit trail">
+                    <mat-icon>search</mat-icon>
+                    <span>Drill-Down: {{ check.details.length }} item(s) affected</span>
+                  </div>
+                  <div class="drill-table-wrap">
+                    <table class="drill-table">
+                      <thead>
+                        <tr>
+                          <th matTooltip="mSCOA account code or financial statement category">Account</th>
+                          <th matTooltip="Description of the account or line item">Description</th>
+                          <th [matTooltip]="check.columnLabels?.expected ? check.columnLabels!.expected + ' total' : 'The value that was expected based on accounting rules'">{{ check.columnLabels?.expected || 'Expected' }}</th>
+                          <th [matTooltip]="check.columnLabels?.actual ? check.columnLabels!.actual + ' total' : 'The actual value found in the Trial Balance data'">{{ check.columnLabels?.actual || 'Actual' }}</th>
+                          <th matTooltip="Absolute difference between expected and actual">Difference</th>
+                          <th matTooltip="Financial statement category (Assets, Liabilities, Revenue, etc.)">Category</th>
+                          <th matTooltip="Source file and line number for audit trail traceability">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (detail of check.details; track $index) {
+                          <tr [class.diff-row]="detail.difference !== 0"
+                              [class.clickable-row]="check.checkId === 'gl_tb_reconciliation'"
+                              (click)="check.checkId === 'gl_tb_reconciliation' ? loadGlDrillThrough(detail.category || detail.accountCode, 1, detail.itemType) : null">
+                            <td class="code-cell" matTooltip="Account: {{ detail.accountCode }}">{{ detail.accountCode }}</td>
+                            <td matTooltip="{{ detail.description }}">{{ detail.description }}</td>
+                            <td class="num-cell" matTooltip="Expected: {{ formatCurrency(detail.expectedValue) }}">{{ formatCurrency(detail.expectedValue) }}</td>
+                            <td class="num-cell" matTooltip="Actual: {{ formatCurrency(detail.actualValue) }}">{{ formatCurrency(detail.actualValue) }}</td>
+                            <td class="num-cell diff-cell" [class.negative]="detail.difference < 0" [class.positive]="detail.difference > 0"
+                                matTooltip="Difference: {{ formatCurrency(detail.difference) }}">
+                              {{ formatCurrency(detail.difference) }}
+                            </td>
+                            <td matTooltip="Category: {{ detail.category || 'N/A' }}">
+                              {{ detail.category || '-' }}
+                              @if (check.checkId === 'gl_tb_reconciliation') {
+                                <mat-icon class="drill-icon" matTooltip="Click to view GL journal entries for this category">open_in_new</mat-icon>
+                              }
+                            </td>
+                            <td class="source-cell" matTooltip="{{ detail.sourceFile ? 'Source: ' + detail.sourceFile + ' (Line ' + detail.sourceLineNumber + ')' : 'No source file information available' }}">
+                              @if (detail.sourceFile) {
+                                <span class="source-link">
+                                  <mat-icon class="source-icon">description</mat-icon>
+                                  {{ truncateFile(detail.sourceFile) }}:{{ detail.sourceLineNumber }}
+                                </span>
+                              } @else {
+                                <span class="no-source">-</span>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            </mat-card>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- GL Drill-Through Panel -->
+    @if (glDrillCategory()) {
+      <div class="gl-drillthrough-overlay" (click)="closeGlDrillThrough()">
+        <div class="gl-drillthrough-panel" (click)="$event.stopPropagation()">
+          <div class="gl-drill-header">
+            <div class="gl-drill-title">
+              <mat-icon>menu_book</mat-icon>
+              <span>GL Journal Entries: {{ glDrillCategory() }}</span>
+            </div>
+            <div class="gl-drill-meta">
+              @if (glDrillResult()) {
+                <span class="gl-drill-count">{{ glDrillResult()!.total | number }} entries</span>
+                <span class="gl-drill-page">Page {{ glDrillResult()!.page }} of {{ glDrillResult()!.totalPages }}</span>
+              }
+              <button mat-icon-button (click)="closeGlDrillThrough()" matTooltip="Close GL drill-through panel">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+          @if (glDrillLoading()) {
+            <div class="gl-drill-loading">
+              <mat-spinner diameter="32"></mat-spinner>
+              <span>Loading GL transactions...</span>
+            </div>
+          } @else if (glDrillResult()) {
+            <div class="gl-drill-table-wrap">
+              <table class="gl-drill-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Account</th>
+                    <th>Description</th>
+                    <th>Doc No</th>
+                    <th>Doc Type</th>
+                    <th>Amount</th>
+                    <th>Supplier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (entry of glDrillResult()!.entries; track entry.id) {
+                    <tr>
+                      <td class="date-cell">{{ entry.postingDate | date:'yyyy-MM-dd' }}</td>
+                      <td class="code-cell" matTooltip="{{ entry.scoaItemCode }}">{{ entry.scoaItemShortDesc || entry.scoaItemCode }}</td>
+                      <td class="desc-cell" matTooltip="{{ entry.transactionDescription }}">{{ entry.transactionDescription || '-' }}</td>
+                      <td class="code-cell">{{ entry.documentNumber || '-' }}</td>
+                      <td>{{ entry.documentType || '-' }}</td>
+                      <td class="num-cell" [class.negative]="entry.amount < 0" [class.positive]="entry.amount > 0">
+                        {{ formatCurrency(entry.amount) }}
+                      </td>
+                      <td class="desc-cell" matTooltip="{{ entry.supplierName }}">{{ entry.supplierName || '-' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (glDrillResult()!.totalPages > 1) {
+              <div class="gl-drill-pagination">
+                <button mat-stroked-button [disabled]="glDrillResult()!.page <= 1" (click)="glDrillPage(glDrillResult()!.page - 1)">
+                  <mat-icon>chevron_left</mat-icon> Previous
+                </button>
+                <span class="page-info">Page {{ glDrillResult()!.page }} of {{ glDrillResult()!.totalPages }}</span>
+                <button mat-stroked-button [disabled]="glDrillResult()!.page >= glDrillResult()!.totalPages" (click)="glDrillPage(glDrillResult()!.page + 1)">
+                  Next <mat-icon>chevron_right</mat-icon>
+                </button>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+}

@@ -1,0 +1,6774 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Organisational Performance Management API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication and user management
+  - name: cycles
+    description: Performance cycle management
+  - name: kpiGroups
+    description: KPI group configuration
+  - name: unitsOfMeasure
+    description: Units of measure configuration
+  - name: dataTypes
+    description: KPI data type configuration
+  - name: progressStatuses
+    description: KPI progress status configuration
+  - name: scorecardTypes
+    description: Scorecard type configuration
+  - name: nkpaWeightings
+    description: NKPA weighting configuration
+  - name: submissionDeadlines
+    description: Submission deadline configuration
+  - name: reportFields
+    description: Custom report field configuration
+  - name: competencyRequirements
+    description: Core competency requirement configuration
+  - name: auditLogs
+    description: Audit trail
+  - name: notifications
+    description: Notification configuration and centre
+  - name: scorecards
+    description: Organisational scorecard management
+  - name: scorecardKpis
+    description: Scorecard KPI planning
+  - name: quarterTargets
+    description: KPI quarterly target capture
+  - name: monthActivities
+    description: Monthly activity planning
+  - name: sdbip
+    description: SDBIP management
+  - name: actuals
+    description: Quarterly actual capture
+  - name: evidence
+    description: Evidence document management
+  - name: correctiveActions
+    description: Corrective and remedial action plans
+  - name: deptScorecards
+    description: Departmental scorecard management
+  - name: reviews
+    description: Review workflow
+  - name: moderation
+    description: Moderation and validation
+  - name: periodLocks
+    description: Period lock and unlock
+  - name: dashboards
+    description: Executive, departmental and overview dashboards
+  - name: reports
+    description: Report generation and retrieval
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current user info
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/users:
+    get:
+      operationId: listUsers
+      tags: [auth]
+      summary: List all users
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /auth/roles:
+    get:
+      operationId: listRoles
+      tags: [auth]
+      summary: List all roles
+      responses:
+        "200":
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+
+  /cycles:
+    get:
+      operationId: listCycles
+      tags: [cycles]
+      summary: List performance cycles
+      responses:
+        "200":
+          description: Cycle list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformanceCycle"
+    post:
+      operationId: createCycle
+      tags: [cycles]
+      summary: Create a performance cycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCycleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+
+  /cycles/{id}:
+    get:
+      operationId: getCycle
+      tags: [cycles]
+      summary: Get a single cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+    patch:
+      operationId: updateCycle
+      tags: [cycles]
+      summary: Update a cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCycleInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+    delete:
+      operationId: deleteCycle
+      tags: [cycles]
+      summary: Delete a draft cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /kpi-groups:
+    get:
+      operationId: listKpiGroups
+      tags: [kpiGroups]
+      summary: List KPI groups
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiGroup"
+    post:
+      operationId: createKpiGroup
+      tags: [kpiGroups]
+      summary: Create a KPI group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKpiGroupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiGroup"
+
+  /kpi-groups/{id}:
+    patch:
+      operationId: updateKpiGroup
+      tags: [kpiGroups]
+      summary: Update a KPI group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateKpiGroupInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiGroup"
+
+  /units-of-measure:
+    get:
+      operationId: listUnitsOfMeasure
+      tags: [unitsOfMeasure]
+      summary: List units of measure
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Units list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UnitOfMeasure"
+    post:
+      operationId: createUnitOfMeasure
+      tags: [unitsOfMeasure]
+      summary: Create a unit of measure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUnitOfMeasureInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitOfMeasure"
+
+  /units-of-measure/{id}:
+    patch:
+      operationId: updateUnitOfMeasure
+      tags: [unitsOfMeasure]
+      summary: Update a unit of measure
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUnitOfMeasureInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitOfMeasure"
+
+  /data-types:
+    get:
+      operationId: listDataTypes
+      tags: [dataTypes]
+      summary: List KPI data types
+      responses:
+        "200":
+          description: Data types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiDataType"
+    post:
+      operationId: createDataType
+      tags: [dataTypes]
+      summary: Create a KPI data type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDataTypeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiDataType"
+
+  /data-types/{id}:
+    patch:
+      operationId: updateDataType
+      tags: [dataTypes]
+      summary: Update a data type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDataTypeInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiDataType"
+
+  /progress-statuses:
+    get:
+      operationId: listProgressStatuses
+      tags: [progressStatuses]
+      summary: List progress statuses
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Progress statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProgressStatus"
+    post:
+      operationId: createProgressStatus
+      tags: [progressStatuses]
+      summary: Create a progress status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProgressStatusInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressStatus"
+
+  /progress-statuses/{id}:
+    patch:
+      operationId: updateProgressStatus
+      tags: [progressStatuses]
+      summary: Update a progress status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProgressStatusInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressStatus"
+
+  /scorecard-types:
+    get:
+      operationId: listScorecardTypes
+      tags: [scorecardTypes]
+      summary: List scorecard types
+      responses:
+        "200":
+          description: Scorecard types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScorecardType"
+    post:
+      operationId: createScorecardType
+      tags: [scorecardTypes]
+      summary: Create a scorecard type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScorecardTypeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardType"
+
+  /scorecard-types/{id}:
+    patch:
+      operationId: updateScorecardType
+      tags: [scorecardTypes]
+      summary: Update a scorecard type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScorecardTypeInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardType"
+
+  /nkpa-weightings:
+    get:
+      operationId: listNkpaWeightings
+      tags: [nkpaWeightings]
+      summary: List NKPA weightings
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [organisational, departmental]
+      responses:
+        "200":
+          description: NKPA weightings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NkpaWeighting"
+    post:
+      operationId: createNkpaWeighting
+      tags: [nkpaWeightings]
+      summary: Create an NKPA weighting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNkpaWeightingInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NkpaWeighting"
+
+  /nkpa-weightings/{id}:
+    patch:
+      operationId: updateNkpaWeighting
+      tags: [nkpaWeightings]
+      summary: Update an NKPA weighting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNkpaWeightingInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NkpaWeighting"
+    delete:
+      operationId: deleteNkpaWeighting
+      tags: [nkpaWeightings]
+      summary: Delete an NKPA weighting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /submission-deadlines:
+    get:
+      operationId: listSubmissionDeadlines
+      tags: [submissionDeadlines]
+      summary: List submission deadlines
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submission deadlines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubmissionDeadline"
+    post:
+      operationId: createSubmissionDeadline
+      tags: [submissionDeadlines]
+      summary: Create a submission deadline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubmissionDeadlineInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDeadline"
+
+  /submission-deadlines/{id}:
+    patch:
+      operationId: updateSubmissionDeadline
+      tags: [submissionDeadlines]
+      summary: Update a submission deadline
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubmissionDeadlineInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDeadline"
+
+  /report-fields:
+    get:
+      operationId: listReportFields
+      tags: [reportFields]
+      summary: List custom report fields
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: reportType
+          in: query
+          schema:
+            type: string
+            enum: [quarterly, midYear, annual]
+      responses:
+        "200":
+          description: Report fields
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportField"
+    post:
+      operationId: createReportField
+      tags: [reportFields]
+      summary: Create a custom report field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportFieldInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportField"
+
+  /report-fields/{id}:
+    patch:
+      operationId: updateReportField
+      tags: [reportFields]
+      summary: Update a report field
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReportFieldInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportField"
+    delete:
+      operationId: deleteReportField
+      tags: [reportFields]
+      summary: Delete a report field
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /competency-requirements:
+    get:
+      operationId: listCompetencyRequirements
+      tags: [competencyRequirements]
+      summary: List competency requirements
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Competency requirements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompetencyRequirement"
+    post:
+      operationId: createCompetencyRequirement
+      tags: [competencyRequirements]
+      summary: Create a competency requirement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompetencyRequirementInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyRequirement"
+
+  /competency-requirements/{id}:
+    patch:
+      operationId: updateCompetencyRequirement
+      tags: [competencyRequirements]
+      summary: Update a competency requirement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCompetencyRequirementInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyRequirement"
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [auditLogs]
+      summary: List audit log entries
+      parameters:
+        - name: entityType
+          in: query
+          schema:
+            type: string
+        - name: entityId
+          in: query
+          schema:
+            type: integer
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for current user
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notification-configs:
+    get:
+      operationId: listNotificationConfigs
+      tags: [notifications]
+      summary: List notification configurations
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notification configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationConfig"
+    post:
+      operationId: createNotificationConfig
+      tags: [notifications]
+      summary: Create a notification configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationConfigInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationConfig"
+
+  /notification-configs/{id}:
+    patch:
+      operationId: updateNotificationConfig
+      tags: [notifications]
+      summary: Update a notification configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationConfigInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationConfig"
+
+  /scorecards:
+    get:
+      operationId: listScorecards
+      tags: [scorecards]
+      summary: List scorecards
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scorecard list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Scorecard"
+    post:
+      operationId: createScorecard
+      tags: [scorecards]
+      summary: Create a scorecard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScorecardInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scorecard"
+
+  /scorecards/{id}:
+    get:
+      operationId: getScorecard
+      tags: [scorecards]
+      summary: Get a scorecard by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scorecard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scorecard"
+    patch:
+      operationId: updateScorecard
+      tags: [scorecards]
+      summary: Update a scorecard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScorecardInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scorecard"
+
+  /scorecards/{id}/transition:
+    post:
+      operationId: transitionScorecard
+      tags: [scorecards]
+      summary: Transition scorecard workflow status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowTransitionInput"
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scorecard"
+
+  /scorecards/{scorecardId}/kpis:
+    get:
+      operationId: listScorecardKpis
+      tags: [scorecardKpis]
+      summary: List KPIs for a scorecard
+      parameters:
+        - name: scorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScorecardKpi"
+    post:
+      operationId: createScorecardKpi
+      tags: [scorecardKpis]
+      summary: Create a KPI on a scorecard
+      parameters:
+        - name: scorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScorecardKpiInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardKpi"
+
+  /scorecards/{scorecardId}/revision-logs:
+    get:
+      operationId: listRevisionLogs
+      tags: [scorecards]
+      summary: List revision audit logs for a scorecard
+      parameters:
+        - name: scorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revision log list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipRevisionLog"
+    post:
+      operationId: createRevisionLogs
+      tags: [scorecards]
+      summary: Create revision audit log entries
+      parameters:
+        - name: scorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [revisionType]
+                    properties:
+                      kpiId:
+                        type: integer
+                      revisionType:
+                        type: string
+                      fieldName:
+                        type: string
+                      oldValue:
+                        type: string
+                      newValue:
+                        type: string
+                      revisionReason:
+                        type: string
+                      quarter:
+                        type: integer
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipRevisionLog"
+
+  /scorecard-kpis/{id}:
+    get:
+      operationId: getScorecardKpi
+      tags: [scorecardKpis]
+      summary: Get a KPI by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardKpi"
+    patch:
+      operationId: updateScorecardKpi
+      tags: [scorecardKpis]
+      summary: Update a KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScorecardKpiInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardKpi"
+    delete:
+      operationId: deleteScorecardKpi
+      tags: [scorecardKpis]
+      summary: Delete a draft KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /scorecard-kpis/{id}/transition:
+    post:
+      operationId: transitionScorecardKpi
+      tags: [scorecardKpis]
+      summary: Transition KPI workflow status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowTransitionInput"
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardKpi"
+
+  /scorecard-kpis/{kpiId}/quarter-targets:
+    get:
+      operationId: listQuarterTargets
+      tags: [quarterTargets]
+      summary: List quarterly targets for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Target list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiQuarterTarget"
+    put:
+      operationId: upsertQuarterTargets
+      tags: [quarterTargets]
+      summary: Set quarterly targets for a KPI (Q1-Q4)
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertQuarterTargetsInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiQuarterTarget"
+
+  /scorecard-kpis/{kpiId}/month-activities:
+    get:
+      operationId: listMonthActivities
+      tags: [monthActivities]
+      summary: List monthly activities for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiMonthActivity"
+    post:
+      operationId: createMonthActivity
+      tags: [monthActivities]
+      summary: Create a monthly activity
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMonthActivityInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiMonthActivity"
+
+  /month-activities/{id}:
+    patch:
+      operationId: updateMonthActivity
+      tags: [monthActivities]
+      summary: Update a monthly activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMonthActivityInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiMonthActivity"
+    delete:
+      operationId: deleteMonthActivity
+      tags: [monthActivities]
+      summary: Delete a monthly activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sdbip-items:
+    get:
+      operationId: listSdbipItems
+      tags: [sdbip]
+      summary: List SDBIP items
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: SDBIP item list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipItem"
+    post:
+      operationId: createSdbipItem
+      tags: [sdbip]
+      summary: Create an SDBIP item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSdbipItemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipItem"
+
+  /sdbip-items/{id}:
+    get:
+      operationId: getSdbipItem
+      tags: [sdbip]
+      summary: Get an SDBIP item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: SDBIP item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipItem"
+    patch:
+      operationId: updateSdbipItem
+      tags: [sdbip]
+      summary: Update an SDBIP item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSdbipItemInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipItem"
+
+  /sdbip-items/{id}/transition:
+    post:
+      operationId: transitionSdbipItem
+      tags: [sdbip]
+      summary: Transition SDBIP workflow status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowTransitionInput"
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipItem"
+
+  /sdbip-items/{id}/revise:
+    post:
+      operationId: reviseSdbipItem
+      tags: [sdbip]
+      summary: Revise an approved SDBIP item (preserves baseline)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviseSdbipInput"
+      responses:
+        "200":
+          description: Revised
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdbipItem"
+
+  /sdbip-items/{id}/revisions:
+    get:
+      operationId: listSdbipRevisions
+      tags: [sdbip]
+      summary: List revisions for an SDBIP item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revision list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipRevision"
+
+  /sdbip/generate:
+    post:
+      operationId: generateSdbipFromKpis
+      tags: [sdbip]
+      summary: Generate SDBIP items from approved scorecard KPIs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scorecardId:
+                  type: integer
+              required:
+                - scorecardId
+      responses:
+        "201":
+          description: Generated items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SdbipItem"
+
+  /kpi-actuals:
+    get:
+      operationId: listAllActuals
+      tags: [actuals]
+      summary: List all actuals with optional filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: reviewLevel
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Actual list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiQuarterActual"
+
+  /scorecard-kpis/{kpiId}/actuals:
+    get:
+      operationId: listKpiActuals
+      tags: [actuals]
+      summary: List actuals for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Actual list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiQuarterActual"
+    post:
+      operationId: createKpiActual
+      tags: [actuals]
+      summary: Submit a quarterly actual for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKpiActualInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiQuarterActual"
+
+  /kpi-actuals/{id}:
+    patch:
+      operationId: updateKpiActual
+      tags: [actuals]
+      summary: Update a quarterly actual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateKpiActualInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiQuarterActual"
+
+  /kpi-actuals/{id}/transition:
+    post:
+      operationId: transitionKpiActual
+      tags: [actuals]
+      summary: Transition an actual through review workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [submit, approve, return]
+                comments:
+                  type: string
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiQuarterActual"
+
+  /scorecard-kpis/{kpiId}/evidence:
+    get:
+      operationId: listKpiEvidence
+      tags: [evidence]
+      summary: List evidence documents for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Evidence list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiEvidenceDocument"
+    post:
+      operationId: uploadKpiEvidence
+      tags: [evidence]
+      summary: Upload evidence for a KPI
+      parameters:
+        - name: kpiId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadEvidenceInput"
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiEvidenceDocument"
+
+  /evidence/{id}/verify:
+    post:
+      operationId: verifyEvidence
+      tags: [evidence]
+      summary: Verify or reject evidence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEvidenceInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiEvidenceDocument"
+
+  /remedial-actions:
+    get:
+      operationId: listRemedialActions
+      tags: [correctiveActions]
+      summary: List remedial action plans
+      parameters:
+        - name: kpiId
+          in: query
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Action list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RemedialActionPlan"
+    post:
+      operationId: createRemedialAction
+      tags: [correctiveActions]
+      summary: Create a remedial action plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRemedialActionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemedialActionPlan"
+
+  /remedial-actions/{id}:
+    patch:
+      operationId: updateRemedialAction
+      tags: [correctiveActions]
+      summary: Update a remedial action plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRemedialActionInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemedialActionPlan"
+
+  /dept-scorecards:
+    get:
+      operationId: listDeptScorecards
+      tags: [deptScorecards]
+      summary: List departmental scorecards
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of departmental scorecards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeptScorecard"
+    post:
+      operationId: createDeptScorecard
+      tags: [deptScorecards]
+      summary: Create departmental scorecard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeptScorecardInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptScorecard"
+
+  /dept-scorecards/{id}:
+    patch:
+      operationId: updateDeptScorecard
+      tags: [deptScorecards]
+      summary: Update departmental scorecard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeptScorecardInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptScorecard"
+
+  /dept-scorecards/{id}/transition:
+    post:
+      operationId: transitionDeptScorecard
+      tags: [deptScorecards]
+      summary: Transition departmental scorecard workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeptScorecardTransitionInput"
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptScorecard"
+
+  /dept-scorecards/{id}/inherit-kpis:
+    post:
+      operationId: inheritKpisFromOrg
+      tags: [deptScorecards]
+      summary: Inherit KPIs from organisational scorecard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Inherited KPIs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeptScorecardKpi"
+
+  /dept-scorecards/{deptScorecardId}/kpis:
+    get:
+      operationId: listDeptScorecardKpis
+      tags: [deptScorecards]
+      summary: List KPIs for departmental scorecard
+      parameters:
+        - name: deptScorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of KPIs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeptScorecardKpi"
+    post:
+      operationId: createDeptScorecardKpi
+      tags: [deptScorecards]
+      summary: Add KPI to departmental scorecard
+      parameters:
+        - name: deptScorecardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeptKpiInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptScorecardKpi"
+
+  /dept-kpis/{id}:
+    patch:
+      operationId: updateDeptKpi
+      tags: [deptScorecards]
+      summary: Update departmental KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeptKpiInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptScorecardKpi"
+    delete:
+      operationId: deleteDeptKpi
+      tags: [deptScorecards]
+      summary: Delete departmental KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reviews:
+    get:
+      operationId: listReviews
+      tags: [reviews]
+      summary: List review submissions
+      parameters:
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+        - name: kpiId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiReviewSubmission"
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Submit a review action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiReviewSubmission"
+
+  /moderation:
+    get:
+      operationId: listModerations
+      tags: [moderation]
+      summary: List moderation outcomes
+      parameters:
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+        - name: kpiId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of moderation outcomes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KpiModerationOutcome"
+    post:
+      operationId: createModeration
+      tags: [moderation]
+      summary: Record moderation outcome
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModerationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiModerationOutcome"
+
+  /period-locks:
+    get:
+      operationId: listPeriodLocks
+      tags: [periodLocks]
+      summary: List period locks
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of period locks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PeriodLock"
+
+  /period-locks/lock:
+    post:
+      operationId: lockPeriod
+      tags: [periodLocks]
+      summary: Lock a reporting period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LockPeriodInput"
+      responses:
+        "200":
+          description: Locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeriodLock"
+
+  /period-locks/{id}/unlock:
+    post:
+      operationId: unlockPeriod
+      tags: [periodLocks]
+      summary: Unlock a reporting period
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnlockPeriodInput"
+      responses:
+        "200":
+          description: Unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeriodLock"
+
+  /dashboards/executive:
+    get:
+      operationId: getExecutiveDashboard
+      tags: [dashboards]
+      summary: Get executive dashboard data
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Executive dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutiveDashboardData"
+
+  /dashboards/department/{departmentId}:
+    get:
+      operationId: getDepartmentDashboard
+      tags: [dashboards]
+      summary: Get department dashboard data
+      parameters:
+        - name: departmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Department dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentDashboardData"
+
+  /dashboards/overview:
+    get:
+      operationId: getOverviewDashboard
+      tags: [dashboards]
+      summary: Get organisational overview dashboard
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Overview dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewDashboardData"
+
+  /dashboards/nkpa-performance:
+    get:
+      operationId: getNkpaPerformance
+      tags: [dashboards]
+      summary: Get NKPA performance breakdown
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: NKPA performance data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NkpaPerformanceData"
+
+  /dashboards/kpi-status-summary:
+    get:
+      operationId: getKpiStatusSummary
+      tags: [dashboards]
+      summary: Get KPI status distribution summary
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KPI status summary data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiStatusSummaryData"
+
+  /dashboards/financial-snapshot:
+    get:
+      operationId: getFinancialSnapshot
+      tags: [dashboards]
+      summary: Get financial snapshot with budget vs actual
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Financial snapshot data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialSnapshotData"
+
+  /dashboards/trendline:
+    get:
+      operationId: getTrendline
+      tags: [dashboards]
+      summary: Get quarterly performance trendline
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trendline data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendlineData"
+
+  /dashboards/top-underperforming:
+    get:
+      operationId: getTopUnderperforming
+      tags: [dashboards]
+      summary: Get top 5 underperforming KPIs
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top underperforming KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopUnderperformingData"
+
+  /dashboards/dept-ranking:
+    get:
+      operationId: getDeptRanking
+      tags: [dashboards]
+      summary: Get department ranking league table
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Department ranking data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeptRankingData"
+
+  /dashboards/evidence-compliance:
+    get:
+      operationId: getEvidenceCompliance
+      tags: [dashboards]
+      summary: Get evidence compliance rates
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Evidence compliance data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceComplianceData"
+
+  /reports/runs:
+    get:
+      operationId: listReportRuns
+      tags: [reports]
+      summary: List report runs
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: reportType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of report runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportRun"
+
+  /reports/generate:
+    post:
+      operationId: generateReport
+      tags: [reports]
+      summary: Generate a report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateReportInput"
+      responses:
+        "201":
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportRun"
+
+  /reports/runs/{id}:
+    get:
+      operationId: getReportRun
+      tags: [reports]
+      summary: Get a report run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportRun"
+
+  /agreements:
+    get:
+      operationId: listAgreements
+      summary: List individual performance agreements
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of agreements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IndividualAgreement"
+    post:
+      operationId: createAgreement
+      summary: Create individual performance agreement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgreementInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualAgreement"
+
+  /agreements/{id}:
+    get:
+      operationId: getAgreement
+      summary: Get agreement by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agreement detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualAgreement"
+    put:
+      operationId: updateAgreement
+      summary: Update agreement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgreementInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualAgreement"
+
+  /agreements/{id}/transition:
+    post:
+      operationId: transitionAgreement
+      summary: Transition agreement status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgreementTransitionInput"
+      responses:
+        "200":
+          description: Transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualAgreement"
+
+  /agreements/{agreementId}/kpas:
+    get:
+      operationId: listEmployeeKpas
+      summary: List KPAs for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of KPAs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeKpa"
+    post:
+      operationId: createEmployeeKpa
+      summary: Create KPA for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeKpaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKpa"
+
+  /employee-kpas/{id}:
+    put:
+      operationId: updateEmployeeKpa
+      summary: Update KPA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeKpaInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKpa"
+    delete:
+      operationId: deleteEmployeeKpa
+      summary: Delete KPA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /agreements/{agreementId}/kpis:
+    get:
+      operationId: listEmployeeKpis
+      summary: List KPIs for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of KPIs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeKpi"
+    post:
+      operationId: createEmployeeKpi
+      summary: Create KPI for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeKpiInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKpi"
+
+  /employee-kpis/{id}:
+    put:
+      operationId: updateEmployeeKpi
+      summary: Update employee KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeKpiInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKpi"
+    delete:
+      operationId: deleteEmployeeKpi
+      summary: Delete employee KPI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reviewer-assignments:
+    get:
+      operationId: listReviewerAssignments
+      summary: List reviewer assignments
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: employeeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of reviewer assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewerAssignment"
+    post:
+      operationId: createReviewerAssignment
+      summary: Create or update reviewer assignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewerAssignmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerAssignment"
+
+  /competency-templates:
+    get:
+      operationId: listCompetencyTemplates
+      summary: List competency templates
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompetencyTemplate"
+    post:
+      operationId: createCompetencyTemplate
+      summary: Create competency template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompetencyTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyTemplate"
+
+  /competency-templates/{id}:
+    put:
+      operationId: updateCompetencyTemplate
+      summary: Update competency template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompetencyTemplateInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyTemplate"
+
+  /competency-templates/{templateId}/items:
+    get:
+      operationId: listCompetencyItems
+      summary: List items in a competency template
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompetencyTemplateItem"
+    post:
+      operationId: createCompetencyItem
+      summary: Add item to competency template
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompetencyItemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyTemplateItem"
+
+  /competency-items/{id}:
+    put:
+      operationId: updateCompetencyItem
+      summary: Update competency item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompetencyItemInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetencyTemplateItem"
+    delete:
+      operationId: deleteCompetencyItem
+      summary: Delete competency item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /agreements/{agreementId}/competency-scores:
+    get:
+      operationId: listCompetencyScores
+      summary: List competency scores for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeCompetencyScore"
+    post:
+      operationId: scoreCompetency
+      summary: Score a competency for agreement
+      parameters:
+        - name: agreementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreCompetencyInput"
+      responses:
+        "201":
+          description: Scored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeCompetencyScore"
+
+  /individual-assessments:
+    get:
+      operationId: listIndividualAssessments
+      summary: List individual assessment records
+      parameters:
+        - name: agreementId
+          in: query
+          schema:
+            type: integer
+        - name: reviewerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assessments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IndividualAssessmentRecord"
+    post:
+      operationId: createIndividualAssessment
+      summary: Create individual assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIndividualAssessmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualAssessmentRecord"
+
+  /individual-moderations:
+    get:
+      operationId: listIndividualModerations
+      summary: List individual moderation records
+      parameters:
+        - name: agreementId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of moderation records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModerationRecordIndividual"
+    post:
+      operationId: createIndividualModeration
+      summary: Create individual moderation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIndividualModerationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationRecordIndividual"
+
+  /ai-insights/at-risk-kpis:
+    get:
+      operationId: getAtRiskKpis
+      summary: AI advisory - at-risk KPI predictor
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: At-risk KPIs with advisory analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAtRiskResponse"
+
+  /ai-insights/narrative-summary:
+    get:
+      operationId: getNarrativeSummary
+      summary: AI advisory - narrative summariser
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Executive narrative summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiNarrativeResponse"
+
+  /ai-insights/evidence-gaps:
+    get:
+      operationId: getEvidenceGaps
+      summary: AI advisory - evidence gap detector
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Evidence gap analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiEvidenceGapResponse"
+
+  /ai-insights/alignment-check:
+    get:
+      operationId: getAlignmentCheck
+      summary: AI advisory - cross-module alignment checker
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Alignment analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAlignmentResponse"
+
+  /ai-insights/dashboard:
+    get:
+      operationId: getAiDashboard
+      summary: AI advisory dashboard data
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: AI dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiDashboardData"
+
+  /ai-insights/log:
+    get:
+      operationId: listAiInsightLog
+      summary: List AI insight log entries
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+        - name: insightType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of logged AI insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiInsightLogEntry"
+
+  /integrations/sync-log:
+    get:
+      operationId: listIntegrationSyncLog
+      summary: List integration sync log entries
+      parameters:
+        - name: integrationType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of sync log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntegrationSyncLogEntry"
+
+  /integrations/hr-sync:
+    post:
+      operationId: triggerHrSync
+      summary: Trigger HR employee/post sync
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationSyncResult"
+
+  /integrations/budget-pull:
+    post:
+      operationId: triggerBudgetPull
+      summary: Pull budget values for budget-linked KPIs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetPullInput"
+      responses:
+        "200":
+          description: Budget pull result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationSyncResult"
+
+  /integrations/project-sync:
+    post:
+      operationId: triggerProjectSync
+      summary: Trigger project module sync (stub)
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  recordCount:
+                    type: integer
+                  message:
+                    type: string
+
+  /integrations/project-linkages:
+    get:
+      operationId: listProjectLinkages
+      summary: List project-to-agreement linkages
+      parameters:
+        - name: cycleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Linkage data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  linkages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        agreementId:
+                          type: integer
+                        employeeName:
+                          type: string
+                        deptScorecardId:
+                          type: integer
+                          nullable: true
+                        isLinked:
+                          type: boolean
+                  summary:
+                    type: string
+
+  /integrations/idp-objectives:
+    get:
+      operationId: listIdpObjectives
+      summary: List IDP objectives for KPI linkage
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of IDP objectives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdpObjective"
+
+  /workflow-configs:
+    get:
+      operationId: listWorkflowConfigs
+      summary: List workflow step configurations
+      parameters:
+        - name: scorecardTypeId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of workflow step configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowStepConfig"
+    post:
+      operationId: createWorkflowConfig
+      summary: Create workflow step configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowConfigInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepConfig"
+
+  /workflow-configs/{id}:
+    put:
+      operationId: updateWorkflowConfig
+      summary: Update workflow step configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowConfigInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepConfig"
+    delete:
+      operationId: deleteWorkflowConfig
+      summary: Delete workflow step configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /individual-dashboard:
+    get:
+      operationId: getIndividualDashboard
+      summary: Individual performance dashboard
+      parameters:
+        - name: cycleId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Individual dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndividualDashboardData"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        departmentId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+      required:
+        - id
+        - username
+        - displayName
+        - email
+        - role
+        - isActive
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - code
+        - description
+        - permissions
+
+    PerformanceCycle:
+      type: object
+      properties:
+        id:
+          type: integer
+        financialYearLabel:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Draft, Open, Closed, Archived]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - financialYearLabel
+        - startDate
+        - endDate
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateCycleInput:
+      type: object
+      properties:
+        financialYearLabel:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Draft, Open, Closed, Archived]
+          default: Draft
+      required:
+        - financialYearLabel
+        - startDate
+        - endDate
+
+    UpdateCycleInput:
+      type: object
+      properties:
+        financialYearLabel:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Draft, Open, Closed, Archived]
+
+    KpiGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        parentId:
+          type: integer
+          nullable: true
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - code
+        - cycleId
+        - isActive
+        - sortOrder
+
+    CreateKpiGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        parentId:
+          type: integer
+          nullable: true
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+          default: true
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - name
+        - code
+        - cycleId
+
+    UpdateKpiGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        parentId:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    UnitOfMeasure:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        abbreviation:
+          type: string
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - abbreviation
+        - cycleId
+        - isActive
+
+    CreateUnitOfMeasureInput:
+      type: object
+      properties:
+        name:
+          type: string
+        abbreviation:
+          type: string
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - name
+        - abbreviation
+        - cycleId
+
+    UpdateUnitOfMeasureInput:
+      type: object
+      properties:
+        name:
+          type: string
+        abbreviation:
+          type: string
+        isActive:
+          type: boolean
+
+    KpiDataType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+          enum: [numeric, percentage, currency, date, text, boolean]
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+        - isActive
+
+    CreateDataTypeInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+          enum: [numeric, percentage, currency, date, text, boolean]
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - name
+        - code
+
+    UpdateDataTypeInput:
+      type: object
+      properties:
+        name:
+          type: string
+        isActive:
+          type: boolean
+
+    ProgressStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        color:
+          type: string
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - code
+        - color
+        - cycleId
+        - isActive
+        - sortOrder
+
+    CreateProgressStatusInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        color:
+          type: string
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+          default: true
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - name
+        - code
+        - color
+        - cycleId
+
+    UpdateProgressStatusInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        color:
+          type: string
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    ScorecardType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - id
+        - name
+        - code
+        - description
+        - isActive
+
+    CreateScorecardTypeInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+          default: ""
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - name
+        - code
+
+    UpdateScorecardTypeInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+
+    NkpaWeighting:
+      type: object
+      properties:
+        id:
+          type: integer
+        nkpaName:
+          type: string
+        weight:
+          type: number
+          format: double
+        scope:
+          type: string
+          enum: [organisational, departmental]
+        cycleId:
+          type: integer
+        departmentId:
+          type: integer
+          nullable: true
+      required:
+        - id
+        - nkpaName
+        - weight
+        - scope
+        - cycleId
+
+    CreateNkpaWeightingInput:
+      type: object
+      properties:
+        nkpaName:
+          type: string
+        weight:
+          type: number
+          format: double
+        scope:
+          type: string
+          enum: [organisational, departmental]
+        cycleId:
+          type: integer
+        departmentId:
+          type: integer
+          nullable: true
+      required:
+        - nkpaName
+        - weight
+        - scope
+        - cycleId
+
+    UpdateNkpaWeightingInput:
+      type: object
+      properties:
+        nkpaName:
+          type: string
+        weight:
+          type: number
+          format: double
+
+    SubmissionDeadline:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        quarter:
+          type: integer
+          minimum: 1
+          maximum: 4
+        deadlineDate:
+          type: string
+          format: date
+        reminderDaysBefore:
+          type: integer
+        isActive:
+          type: boolean
+      required:
+        - id
+        - cycleId
+        - quarter
+        - deadlineDate
+        - reminderDaysBefore
+        - isActive
+
+    CreateSubmissionDeadlineInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        quarter:
+          type: integer
+          minimum: 1
+          maximum: 4
+        deadlineDate:
+          type: string
+          format: date
+        reminderDaysBefore:
+          type: integer
+          default: 7
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - cycleId
+        - quarter
+        - deadlineDate
+
+    UpdateSubmissionDeadlineInput:
+      type: object
+      properties:
+        deadlineDate:
+          type: string
+          format: date
+        reminderDaysBefore:
+          type: integer
+        isActive:
+          type: boolean
+
+    ReportField:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        reportType:
+          type: string
+          enum: [quarterly, midYear, annual]
+        fieldName:
+          type: string
+        fieldLabel:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, date, boolean, textarea]
+        isRequired:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - cycleId
+        - reportType
+        - fieldName
+        - fieldLabel
+        - fieldType
+        - isRequired
+        - sortOrder
+
+    CreateReportFieldInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        reportType:
+          type: string
+          enum: [quarterly, midYear, annual]
+        fieldName:
+          type: string
+        fieldLabel:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, date, boolean, textarea]
+        isRequired:
+          type: boolean
+          default: false
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - cycleId
+        - reportType
+        - fieldName
+        - fieldLabel
+        - fieldType
+
+    UpdateReportFieldInput:
+      type: object
+      properties:
+        fieldLabel:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, number, date, boolean, textarea]
+        isRequired:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    CompetencyRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        weight:
+          type: number
+          format: double
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - name
+        - description
+        - weight
+        - cycleId
+        - isActive
+        - sortOrder
+
+    CreateCompetencyRequirementInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          default: ""
+        weight:
+          type: number
+          format: double
+        cycleId:
+          type: integer
+        isActive:
+          type: boolean
+          default: true
+        sortOrder:
+          type: integer
+          default: 0
+      required:
+        - name
+        - weight
+        - cycleId
+
+    UpdateCompetencyRequirementInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        weight:
+          type: number
+          format: double
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: integer
+        oldValue:
+          type: string
+          nullable: true
+        newValue:
+          type: string
+          nullable: true
+        cycleId:
+          type: integer
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - userName
+        - action
+        - entityType
+        - entityId
+        - timestamp
+
+    AuditLogResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        total:
+          type: integer
+      required:
+        - data
+        - total
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [reminder, escalation, info, warning]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - title
+        - message
+        - type
+        - isRead
+        - createdAt
+
+    NotificationConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        eventType:
+          type: string
+        daysBefore:
+          type: integer
+        isEmail:
+          type: boolean
+        isInApp:
+          type: boolean
+        isActive:
+          type: boolean
+      required:
+        - id
+        - cycleId
+        - eventType
+        - daysBefore
+        - isEmail
+        - isInApp
+        - isActive
+
+    CreateNotificationConfigInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        eventType:
+          type: string
+        daysBefore:
+          type: integer
+          default: 7
+        isEmail:
+          type: boolean
+          default: false
+        isInApp:
+          type: boolean
+          default: true
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - cycleId
+        - eventType
+
+    UpdateNotificationConfigInput:
+      type: object
+      properties:
+        daysBefore:
+          type: integer
+        isEmail:
+          type: boolean
+        isInApp:
+          type: boolean
+        isActive:
+          type: boolean
+
+    Scorecard:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        cycleId:
+          type: integer
+        scorecardType:
+          type: string
+        departmentId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        approvedById:
+          type: integer
+          nullable: true
+        approvedAt:
+          type: string
+          nullable: true
+        approvalComments:
+          type: string
+          nullable: true
+        createdById:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - cycleId
+        - scorecardType
+        - status
+        - createdById
+
+    CreateScorecardInput:
+      type: object
+      properties:
+        name:
+          type: string
+        cycleId:
+          type: integer
+        scorecardType:
+          type: string
+          default: organisational
+        departmentId:
+          type: integer
+      required:
+        - name
+        - cycleId
+
+    UpdateScorecardInput:
+      type: object
+      properties:
+        name:
+          type: string
+        scorecardType:
+          type: string
+        departmentId:
+          type: integer
+
+    WorkflowTransitionInput:
+      type: object
+      properties:
+        action:
+          type: string
+        comments:
+          type: string
+      required:
+        - action
+
+    ScorecardKpi:
+      type: object
+      properties:
+        id:
+          type: integer
+        scorecardId:
+          type: integer
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        idpReference:
+          type: string
+          nullable: true
+        strategicObjective:
+          type: string
+          nullable: true
+        programme:
+          type: string
+          nullable: true
+        responsiblePostId:
+          type: integer
+          nullable: true
+        custodianPostId:
+          type: integer
+          nullable: true
+        baseline:
+          type: string
+          nullable: true
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+          nullable: true
+        evidenceSource:
+          type: string
+          nullable: true
+        evidencePortfolio:
+          type: string
+          nullable: true
+        weighting:
+          type: number
+        fundingSource:
+          type: string
+          nullable: true
+        budgetDescription:
+          type: string
+          nullable: true
+        unitOfMeasureId:
+          type: integer
+          nullable: true
+        dataTypeId:
+          type: integer
+          nullable: true
+        kpiGroupId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        isCumulative:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - scorecardId
+        - kpiNumber
+        - description
+        - annualTarget
+        - weighting
+        - status
+        - isCumulative
+        - sortOrder
+
+    SdbipRevisionLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        scorecardId:
+          type: integer
+        kpiId:
+          type: integer
+          nullable: true
+        revisionType:
+          type: string
+        fieldName:
+          type: string
+          nullable: true
+        oldValue:
+          type: string
+          nullable: true
+        newValue:
+          type: string
+          nullable: true
+        revisionReason:
+          type: string
+          nullable: true
+        quarter:
+          type: integer
+          nullable: true
+        userId:
+          type: integer
+        userName:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - scorecardId
+        - revisionType
+        - userId
+        - userName
+
+    CreateScorecardKpiInput:
+      type: object
+      properties:
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        idpReference:
+          type: string
+        strategicObjective:
+          type: string
+        programme:
+          type: string
+        responsiblePostId:
+          type: integer
+        custodianPostId:
+          type: integer
+        baseline:
+          type: string
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+        evidenceSource:
+          type: string
+        evidencePortfolio:
+          type: string
+        weighting:
+          type: number
+        fundingSource:
+          type: string
+        budgetDescription:
+          type: string
+        unitOfMeasureId:
+          type: integer
+        dataTypeId:
+          type: integer
+        kpiGroupId:
+          type: integer
+        isCumulative:
+          type: boolean
+      required:
+        - kpiNumber
+        - description
+        - annualTarget
+
+    UpdateScorecardKpiInput:
+      type: object
+      properties:
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        idpReference:
+          type: string
+        strategicObjective:
+          type: string
+        programme:
+          type: string
+        responsiblePostId:
+          type: integer
+        custodianPostId:
+          type: integer
+        baseline:
+          type: string
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+        evidenceSource:
+          type: string
+        evidencePortfolio:
+          type: string
+        weighting:
+          type: number
+        fundingSource:
+          type: string
+        budgetDescription:
+          type: string
+        unitOfMeasureId:
+          type: integer
+        dataTypeId:
+          type: integer
+        kpiGroupId:
+          type: integer
+        isCumulative:
+          type: boolean
+
+    KpiQuarterTarget:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        targetValue:
+          type: string
+        budgetValue:
+          type: number
+          nullable: true
+        evidenceExpected:
+          type: string
+          nullable: true
+        isApprovedBaseline:
+          type: boolean
+        baselineTargetValue:
+          type: string
+          nullable: true
+        baselineBudgetValue:
+          type: number
+          nullable: true
+        revisionReason:
+          type: string
+          nullable: true
+        revisedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - kpiId
+        - quarter
+        - targetValue
+        - isApprovedBaseline
+
+    UpsertQuarterTargetsInput:
+      type: object
+      properties:
+        targets:
+          type: array
+          items:
+            type: object
+            properties:
+              quarter:
+                type: integer
+              targetValue:
+                type: string
+              budgetValue:
+                type: number
+              evidenceExpected:
+                type: string
+              revisionReason:
+                type: string
+            required:
+              - quarter
+              - targetValue
+      required:
+        - targets
+
+    KpiMonthActivity:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        month:
+          type: integer
+        description:
+          type: string
+        dueDate:
+          type: string
+        ownerId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        completedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - kpiId
+        - quarter
+        - month
+        - description
+        - dueDate
+        - status
+
+    CreateMonthActivityInput:
+      type: object
+      properties:
+        quarter:
+          type: integer
+        month:
+          type: integer
+        description:
+          type: string
+        dueDate:
+          type: string
+        ownerId:
+          type: integer
+      required:
+        - quarter
+        - month
+        - description
+        - dueDate
+
+    UpdateMonthActivityInput:
+      type: object
+      properties:
+        description:
+          type: string
+        dueDate:
+          type: string
+        ownerId:
+          type: integer
+        status:
+          type: string
+
+    SdbipItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        kpiId:
+          type: integer
+          nullable: true
+        departmentId:
+          type: integer
+          nullable: true
+        description:
+          type: string
+        q1Target:
+          type: string
+          nullable: true
+        q2Target:
+          type: string
+          nullable: true
+        q3Target:
+          type: string
+          nullable: true
+        q4Target:
+          type: string
+          nullable: true
+        q1Budget:
+          type: number
+          nullable: true
+        q2Budget:
+          type: number
+          nullable: true
+        q3Budget:
+          type: number
+          nullable: true
+        q4Budget:
+          type: number
+          nullable: true
+        annualBudget:
+          type: number
+          nullable: true
+        responsiblePostId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - cycleId
+        - description
+        - status
+        - sortOrder
+
+    CreateSdbipItemInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        kpiId:
+          type: integer
+        departmentId:
+          type: integer
+        description:
+          type: string
+        q1Target:
+          type: string
+        q2Target:
+          type: string
+        q3Target:
+          type: string
+        q4Target:
+          type: string
+        q1Budget:
+          type: number
+        q2Budget:
+          type: number
+        q3Budget:
+          type: number
+        q4Budget:
+          type: number
+        annualBudget:
+          type: number
+        responsiblePostId:
+          type: integer
+      required:
+        - cycleId
+        - description
+
+    UpdateSdbipItemInput:
+      type: object
+      properties:
+        description:
+          type: string
+        departmentId:
+          type: integer
+        q1Target:
+          type: string
+        q2Target:
+          type: string
+        q3Target:
+          type: string
+        q4Target:
+          type: string
+        q1Budget:
+          type: number
+        q2Budget:
+          type: number
+        q3Budget:
+          type: number
+        q4Budget:
+          type: number
+        annualBudget:
+          type: number
+        responsiblePostId:
+          type: integer
+
+    ReviseSdbipInput:
+      type: object
+      properties:
+        reason:
+          type: string
+        q1Target:
+          type: string
+        q2Target:
+          type: string
+        q3Target:
+          type: string
+        q4Target:
+          type: string
+        q1Budget:
+          type: number
+        q2Budget:
+          type: number
+        q3Budget:
+          type: number
+        q4Budget:
+          type: number
+      required:
+        - reason
+
+    SdbipRevision:
+      type: object
+      properties:
+        id:
+          type: integer
+        sdbipItemId:
+          type: integer
+        revisionNumber:
+          type: integer
+        reason:
+          type: string
+        previousQ1Target:
+          type: string
+          nullable: true
+        previousQ2Target:
+          type: string
+          nullable: true
+        previousQ3Target:
+          type: string
+          nullable: true
+        previousQ4Target:
+          type: string
+          nullable: true
+        previousQ1Budget:
+          type: number
+          nullable: true
+        previousQ2Budget:
+          type: number
+          nullable: true
+        previousQ3Budget:
+          type: number
+          nullable: true
+        previousQ4Budget:
+          type: number
+          nullable: true
+        newQ1Target:
+          type: string
+          nullable: true
+        newQ2Target:
+          type: string
+          nullable: true
+        newQ3Target:
+          type: string
+          nullable: true
+        newQ4Target:
+          type: string
+          nullable: true
+        newQ1Budget:
+          type: number
+          nullable: true
+        newQ2Budget:
+          type: number
+          nullable: true
+        newQ3Budget:
+          type: number
+          nullable: true
+        newQ4Budget:
+          type: number
+          nullable: true
+        revisedById:
+          type: integer
+        approvedById:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+        approvedAt:
+          type: string
+          nullable: true
+      required:
+        - id
+        - sdbipItemId
+        - revisionNumber
+        - reason
+        - revisedById
+        - status
+
+    KpiQuarterActual:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        actualValue:
+          type: string
+        commentary:
+          type: string
+          nullable: true
+        isAchieved:
+          type: boolean
+          nullable: true
+        progressStatusId:
+          type: integer
+          nullable: true
+        isOnHold:
+          type: boolean
+        onHoldReason:
+          type: string
+          nullable: true
+        challengeNarrative:
+          type: string
+          nullable: true
+        correctiveAction:
+          type: string
+          nullable: true
+        underperformanceReason:
+          type: string
+          nullable: true
+        overperformanceReason:
+          type: string
+          nullable: true
+        budgetImplication:
+          type: string
+          nullable: true
+        analysisNotes:
+          type: string
+          nullable: true
+        submittedById:
+          type: integer
+        submittedAt:
+          type: string
+        isLateSubmission:
+          type: boolean
+        lateOverrideReason:
+          type: string
+          nullable: true
+        status:
+          type: string
+        reviewLevel:
+          type: string
+          nullable: true
+        reviewStatus:
+          type: string
+          nullable: true
+        reviewComments:
+          type: string
+          nullable: true
+        reviewedById:
+          type: integer
+          nullable: true
+        reviewedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - kpiId
+        - quarter
+        - actualValue
+        - submittedById
+        - isOnHold
+        - isLateSubmission
+        - status
+
+    CreateKpiActualInput:
+      type: object
+      properties:
+        quarter:
+          type: integer
+        actualValue:
+          type: string
+        commentary:
+          type: string
+        isAchieved:
+          type: boolean
+        progressStatusId:
+          type: integer
+        isOnHold:
+          type: boolean
+        onHoldReason:
+          type: string
+        challengeNarrative:
+          type: string
+        correctiveAction:
+          type: string
+        underperformanceReason:
+          type: string
+        overperformanceReason:
+          type: string
+        budgetImplication:
+          type: string
+        analysisNotes:
+          type: string
+        lateOverrideReason:
+          type: string
+      required:
+        - quarter
+        - actualValue
+
+    UpdateKpiActualInput:
+      type: object
+      properties:
+        actualValue:
+          type: string
+        commentary:
+          type: string
+        isAchieved:
+          type: boolean
+        progressStatusId:
+          type: integer
+        isOnHold:
+          type: boolean
+        onHoldReason:
+          type: string
+        challengeNarrative:
+          type: string
+        correctiveAction:
+          type: string
+        underperformanceReason:
+          type: string
+        overperformanceReason:
+          type: string
+        budgetImplication:
+          type: string
+        analysisNotes:
+          type: string
+
+    KpiEvidenceDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        filePath:
+          type: string
+        documentType:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        uploadedById:
+          type: integer
+        uploadedAt:
+          type: string
+        verificationStatus:
+          type: string
+        verifiedById:
+          type: integer
+          nullable: true
+        verifiedAt:
+          type: string
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+      required:
+        - id
+        - kpiId
+        - quarter
+        - fileName
+        - fileSize
+        - mimeType
+        - filePath
+        - uploadedById
+        - verificationStatus
+
+    VerifyEvidenceInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Verified, Rejected]
+        rejectionReason:
+          type: string
+      required:
+        - status
+
+    RemedialActionPlan:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        actionDescription:
+          type: string
+        actionOwnerIds:
+          type: string
+          nullable: true
+        dueDate:
+          type: string
+        status:
+          type: string
+        evidenceDocumentId:
+          type: integer
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        createdById:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - kpiId
+        - quarter
+        - actionDescription
+        - dueDate
+        - status
+        - createdById
+
+    CreateRemedialActionInput:
+      type: object
+      properties:
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        actionDescription:
+          type: string
+        actionOwnerIds:
+          type: string
+        dueDate:
+          type: string
+        evidenceDocumentId:
+          type: integer
+      required:
+        - kpiId
+        - quarter
+        - actionDescription
+        - dueDate
+
+    UploadEvidenceInput:
+      type: object
+      properties:
+        quarter:
+          type: integer
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        documentType:
+          type: string
+        description:
+          type: string
+      required:
+        - quarter
+        - fileName
+        - fileSize
+        - mimeType
+
+    UpdateRemedialActionInput:
+      type: object
+      properties:
+        actionDescription:
+          type: string
+        actionOwnerIds:
+          type: string
+        dueDate:
+          type: string
+        status:
+          type: string
+        evidenceDocumentId:
+          type: integer
+
+    DeptScorecard:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        cycleId:
+          type: integer
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        parentScorecardId:
+          type: integer
+          nullable: true
+        ownerId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        approvedById:
+          type: integer
+          nullable: true
+        approvedAt:
+          type: string
+          nullable: true
+        approvalComments:
+          type: string
+          nullable: true
+        createdById:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - cycleId
+        - departmentId
+        - departmentName
+        - status
+        - createdById
+
+    CreateDeptScorecardInput:
+      type: object
+      properties:
+        name:
+          type: string
+        cycleId:
+          type: integer
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        parentScorecardId:
+          type: integer
+        ownerId:
+          type: integer
+      required:
+        - name
+        - cycleId
+        - departmentId
+        - departmentName
+
+    UpdateDeptScorecardInput:
+      type: object
+      properties:
+        name:
+          type: string
+        departmentName:
+          type: string
+        ownerId:
+          type: integer
+
+    DeptScorecardTransitionInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [submit, approve, return, lock]
+        comments:
+          type: string
+      required:
+        - action
+
+    DeptScorecardKpi:
+      type: object
+      properties:
+        id:
+          type: integer
+        deptScorecardId:
+          type: integer
+        parentKpiId:
+          type: integer
+          nullable: true
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        strategicObjective:
+          type: string
+          nullable: true
+        nkpaLink:
+          type: string
+          nullable: true
+        responsiblePostId:
+          type: integer
+          nullable: true
+        baseline:
+          type: string
+          nullable: true
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+          nullable: true
+        weighting:
+          type: number
+        unitOfMeasureId:
+          type: integer
+          nullable: true
+        isCumulative:
+          type: boolean
+        isInherited:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - deptScorecardId
+        - kpiNumber
+        - description
+        - annualTarget
+        - weighting
+
+    CreateDeptKpiInput:
+      type: object
+      properties:
+        parentKpiId:
+          type: integer
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        strategicObjective:
+          type: string
+        nkpaLink:
+          type: string
+        responsiblePostId:
+          type: integer
+        baseline:
+          type: string
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+        weighting:
+          type: number
+        unitOfMeasureId:
+          type: integer
+        isCumulative:
+          type: boolean
+      required:
+        - kpiNumber
+        - description
+        - annualTarget
+
+    UpdateDeptKpiInput:
+      type: object
+      properties:
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        strategicObjective:
+          type: string
+        nkpaLink:
+          type: string
+        responsiblePostId:
+          type: integer
+        baseline:
+          type: string
+        annualTarget:
+          type: string
+        annualBudgetTarget:
+          type: number
+        weighting:
+          type: number
+        unitOfMeasureId:
+          type: integer
+        isCumulative:
+          type: boolean
+
+    KpiReviewSubmission:
+      type: object
+      properties:
+        id:
+          type: integer
+        actualId:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        reviewerUserId:
+          type: integer
+        action:
+          type: string
+        comments:
+          type: string
+          nullable: true
+        returnReason:
+          type: string
+          nullable: true
+        assessmentRating:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - actualId
+        - kpiId
+        - quarter
+        - reviewerUserId
+        - action
+
+    CreateReviewInput:
+      type: object
+      properties:
+        actualId:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        action:
+          type: string
+          enum: [approve, return, comment]
+        comments:
+          type: string
+        returnReason:
+          type: string
+        assessmentRating:
+          type: number
+      required:
+        - actualId
+        - kpiId
+        - quarter
+        - action
+
+    KpiModerationOutcome:
+      type: object
+      properties:
+        id:
+          type: integer
+        actualId:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        moderatorUserId:
+          type: integer
+        outcome:
+          type: string
+        scoreAdjustmentReason:
+          type: string
+          nullable: true
+        adjustedScore:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - actualId
+        - kpiId
+        - quarter
+        - moderatorUserId
+        - outcome
+
+    CreateModerationInput:
+      type: object
+      properties:
+        actualId:
+          type: integer
+        kpiId:
+          type: integer
+        quarter:
+          type: integer
+        outcome:
+          type: string
+        scoreAdjustmentReason:
+          type: string
+        adjustedScore:
+          type: number
+        notes:
+          type: string
+      required:
+        - actualId
+        - kpiId
+        - quarter
+        - outcome
+
+    PeriodLock:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        quarter:
+          type: integer
+          nullable: true
+        periodType:
+          type: string
+        isLocked:
+          type: boolean
+        lockedById:
+          type: integer
+          nullable: true
+        lockedAt:
+          type: string
+          nullable: true
+        lockComments:
+          type: string
+          nullable: true
+        reopenedById:
+          type: integer
+          nullable: true
+        reopenedAt:
+          type: string
+          nullable: true
+        reopenReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - cycleId
+        - periodType
+        - isLocked
+
+    LockPeriodInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        quarter:
+          type: integer
+        periodType:
+          type: string
+        lockComments:
+          type: string
+      required:
+        - cycleId
+        - periodType
+
+    UnlockPeriodInput:
+      type: object
+      properties:
+        reopenReason:
+          type: string
+      required:
+        - reopenReason
+
+    ExecutiveDashboardData:
+      type: object
+      properties:
+        totalKpis:
+          type: integer
+        achieved:
+          type: integer
+        notAchieved:
+          type: integer
+        atRisk:
+          type: integer
+        onHold:
+          type: integer
+        weightedPerformance:
+          type: number
+        topUnderperforming:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              actualValue:
+                type: string
+              targetValue:
+                type: string
+              variance:
+                type: number
+        departmentScores:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentId:
+                type: integer
+              departmentName:
+                type: string
+              score:
+                type: number
+              kpiCount:
+                type: integer
+        overdueSubmissions:
+          type: integer
+        unresolvedCorrectiveActions:
+          type: integer
+        evidenceOutstanding:
+          type: integer
+        budgetRiskKpis:
+          type: integer
+
+    DepartmentDashboardData:
+      type: object
+      properties:
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        overallScore:
+          type: number
+        kpiHeatmap:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              q1Status:
+                type: string
+              q2Status:
+                type: string
+              q3Status:
+                type: string
+              q4Status:
+                type: string
+        quarterTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              quarter:
+                type: integer
+              score:
+                type: number
+        evidenceCompleteness:
+          type: number
+        delayedActivities:
+          type: integer
+        unresolvedConstraints:
+          type: integer
+
+    OverviewDashboardData:
+      type: object
+      properties:
+        orgSummary:
+          type: object
+          properties:
+            totalKpis:
+              type: integer
+            avgScore:
+              type: number
+            achievedPct:
+              type: number
+        quarterComparison:
+          type: array
+          items:
+            type: object
+            properties:
+              quarter:
+                type: integer
+              achieved:
+                type: integer
+              notAchieved:
+                type: integer
+              score:
+                type: number
+        annualTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              year:
+                type: string
+              score:
+                type: number
+        exceptions:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              issue:
+                type: string
+
+    NkpaPerformanceData:
+      type: object
+      properties:
+        byNkpa:
+          type: array
+          items:
+            type: object
+            properties:
+              nkpaName:
+                type: string
+              totalKpis:
+                type: integer
+              achievedKpis:
+                type: integer
+              achievementRate:
+                type: number
+              weightedScore:
+                type: number
+              nkpaWeight:
+                type: number
+        byDepartment:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentId:
+                type: integer
+              departmentName:
+                type: string
+              totalKpis:
+                type: integer
+              achievedKpis:
+                type: integer
+              achievementRate:
+                type: number
+
+    KpiStatusSummaryData:
+      type: object
+      properties:
+        totalKpis:
+          type: integer
+        distribution:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+              color:
+                type: string
+
+    FinancialSnapshotData:
+      type: object
+      properties:
+        totalBudget:
+          type: number
+        totalSpend:
+          type: number
+        overallVariance:
+          type: number
+        byKpi:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              budgetAllocated:
+                type: number
+              actualSpend:
+                type: number
+              variance:
+                type: number
+        byDepartment:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentId:
+                type: integer
+              departmentName:
+                type: string
+              budgetAllocated:
+                type: number
+              actualSpend:
+                type: number
+              variance:
+                type: number
+
+    TrendlineData:
+      type: object
+      properties:
+        totalKpis:
+          type: integer
+        quarters:
+          type: array
+          items:
+            type: object
+            properties:
+              quarter:
+                type: integer
+              achievementRate:
+                type: number
+              achieved:
+                type: integer
+              notAchieved:
+                type: integer
+              total:
+                type: integer
+              periodChange:
+                type: number
+
+    TopUnderperformingData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              targetValue:
+                type: string
+              actualValue:
+                type: string
+              variance:
+                type: number
+              quarter:
+                type: integer
+
+    DeptRankingData:
+      type: object
+      properties:
+        rankings:
+          type: array
+          items:
+            type: object
+            properties:
+              rank:
+                type: integer
+              departmentId:
+                type: integer
+              departmentName:
+                type: string
+              weightedScore:
+                type: number
+              totalKpis:
+                type: integer
+              achievedKpis:
+                type: integer
+              achievementRate:
+                type: number
+
+    EvidenceComplianceData:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalDocuments:
+              type: integer
+            submitted:
+              type: integer
+            verified:
+              type: integer
+            pending:
+              type: integer
+            rejected:
+              type: integer
+            verificationRate:
+              type: number
+        byDepartment:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentId:
+                type: integer
+              departmentName:
+                type: string
+              totalDocuments:
+                type: integer
+              verified:
+                type: integer
+              pending:
+                type: integer
+              rejected:
+                type: integer
+              completenessRate:
+                type: number
+        byKpi:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiNumber:
+                type: string
+              description:
+                type: string
+              totalDocuments:
+                type: integer
+              verified:
+                type: integer
+              completenessRate:
+                type: number
+
+    ReportRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        reportType:
+          type: string
+        quarter:
+          type: integer
+          nullable: true
+        departmentId:
+          type: integer
+          nullable: true
+        scorecardType:
+          type: string
+          nullable: true
+        title:
+          type: string
+        status:
+          type: string
+        generatedById:
+          type: integer
+        generatedAt:
+          type: string
+          nullable: true
+        filePath:
+          type: string
+          nullable: true
+        fileFormat:
+          type: string
+          nullable: true
+        metadata:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - cycleId
+        - reportType
+        - title
+        - status
+        - generatedById
+
+    GenerateReportInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        reportType:
+          type: string
+          enum: [quarterly, mid-year, annual, institutional-evaluation]
+        quarter:
+          type: integer
+        departmentId:
+          type: integer
+        scorecardType:
+          type: string
+        title:
+          type: string
+      required:
+        - cycleId
+        - reportType
+        - title
+
+    IndividualAgreement:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        postTitle:
+          type: string
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        deptScorecardId:
+          type: integer
+          nullable: true
+        primaryReviewerId:
+          type: integer
+          nullable: true
+        secondaryReviewerId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        kpiWeightPct:
+          type: number
+        competencyWeightPct:
+          type: number
+        finalScore:
+          type: number
+          nullable: true
+        approvedById:
+          type: integer
+          nullable: true
+        approvedAt:
+          type: string
+          nullable: true
+        approvalComments:
+          type: string
+          nullable: true
+        lockedAt:
+          type: string
+          nullable: true
+        createdById:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - cycleId
+        - employeeId
+        - employeeName
+        - postTitle
+        - departmentId
+        - departmentName
+        - status
+        - kpiWeightPct
+        - competencyWeightPct
+        - createdById
+
+    CreateAgreementInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        employeeId:
+          type: integer
+        employeeName:
+          type: string
+        postTitle:
+          type: string
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        deptScorecardId:
+          type: integer
+        primaryReviewerId:
+          type: integer
+        secondaryReviewerId:
+          type: integer
+        kpiWeightPct:
+          type: number
+        competencyWeightPct:
+          type: number
+      required:
+        - cycleId
+        - employeeId
+        - employeeName
+        - postTitle
+        - departmentId
+        - departmentName
+
+    UpdateAgreementInput:
+      type: object
+      properties:
+        postTitle:
+          type: string
+        primaryReviewerId:
+          type: integer
+        secondaryReviewerId:
+          type: integer
+        kpiWeightPct:
+          type: number
+        competencyWeightPct:
+          type: number
+        deptScorecardId:
+          type: integer
+
+    AgreementTransitionInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [submit, approve, reject, lock, return_to_draft, start_quarterly, complete_quarterly, complete_midyear, complete_annual, accept, adjust, refer]
+        comments:
+          type: string
+      required:
+        - action
+
+    EmployeeKpa:
+      type: object
+      properties:
+        id:
+          type: integer
+        agreementId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        weighting:
+          type: number
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - agreementId
+        - title
+        - weighting
+
+    CreateEmployeeKpaInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        weighting:
+          type: number
+        sortOrder:
+          type: integer
+      required:
+        - title
+
+    EmployeeKpi:
+      type: object
+      properties:
+        id:
+          type: integer
+        kpaId:
+          type: integer
+        agreementId:
+          type: integer
+        deptKpiId:
+          type: integer
+          nullable: true
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        unitOfMeasure:
+          type: string
+          nullable: true
+        baseline:
+          type: string
+          nullable: true
+        annualTarget:
+          type: string
+        weighting:
+          type: number
+        q1Target:
+          type: string
+          nullable: true
+        q2Target:
+          type: string
+          nullable: true
+        q3Target:
+          type: string
+          nullable: true
+        q4Target:
+          type: string
+          nullable: true
+        q1Actual:
+          type: string
+          nullable: true
+        q2Actual:
+          type: string
+          nullable: true
+        q3Actual:
+          type: string
+          nullable: true
+        q4Actual:
+          type: string
+          nullable: true
+        q1Score:
+          type: number
+          nullable: true
+        q2Score:
+          type: number
+          nullable: true
+        q3Score:
+          type: number
+          nullable: true
+        q4Score:
+          type: number
+          nullable: true
+        annualScore:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - kpaId
+        - agreementId
+        - kpiNumber
+        - description
+        - annualTarget
+        - weighting
+
+    CreateEmployeeKpiInput:
+      type: object
+      properties:
+        kpaId:
+          type: integer
+        deptKpiId:
+          type: integer
+        kpiNumber:
+          type: string
+        description:
+          type: string
+        unitOfMeasure:
+          type: string
+        baseline:
+          type: string
+        annualTarget:
+          type: string
+        weighting:
+          type: number
+        q1Target:
+          type: string
+        q2Target:
+          type: string
+        q3Target:
+          type: string
+        q4Target:
+          type: string
+        q1Actual:
+          type: string
+        q2Actual:
+          type: string
+        q3Actual:
+          type: string
+        q4Actual:
+          type: string
+        q1Score:
+          type: number
+        q2Score:
+          type: number
+        q3Score:
+          type: number
+        q4Score:
+          type: number
+        annualScore:
+          type: number
+      required:
+        - kpaId
+        - kpiNumber
+        - description
+        - annualTarget
+
+    ReviewerAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: integer
+        employeeId:
+          type: integer
+        primaryReviewerId:
+          type: integer
+        secondaryReviewerId:
+          type: integer
+          nullable: true
+        version:
+          type: integer
+        isActive:
+          type: boolean
+        changedById:
+          type: integer
+        changeReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - cycleId
+        - employeeId
+        - primaryReviewerId
+        - changedById
+
+    CreateReviewerAssignmentInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        employeeId:
+          type: integer
+        primaryReviewerId:
+          type: integer
+        secondaryReviewerId:
+          type: integer
+        changeReason:
+          type: string
+      required:
+        - cycleId
+        - employeeId
+        - primaryReviewerId
+
+    CompetencyTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        postLevel:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - isActive
+
+    CreateCompetencyTemplateInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        postLevel:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - name
+
+    CompetencyTemplateItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        templateId:
+          type: integer
+        competencyName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        weighting:
+          type: number
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - templateId
+        - competencyName
+        - weighting
+
+    CreateCompetencyItemInput:
+      type: object
+      properties:
+        competencyName:
+          type: string
+        description:
+          type: string
+        weighting:
+          type: number
+        sortOrder:
+          type: integer
+      required:
+        - competencyName
+
+    EmployeeCompetencyScore:
+      type: object
+      properties:
+        id:
+          type: integer
+        agreementId:
+          type: integer
+        competencyItemId:
+          type: integer
+        competencyName:
+          type: string
+        weighting:
+          type: number
+        selfScore:
+          type: number
+          nullable: true
+        reviewerScore:
+          type: number
+          nullable: true
+        moderatedScore:
+          type: number
+          nullable: true
+        developmentNeed:
+          type: string
+          nullable: true
+        scoredById:
+          type: integer
+          nullable: true
+        scoredAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - agreementId
+        - competencyItemId
+        - competencyName
+        - weighting
+
+    ScoreCompetencyInput:
+      type: object
+      properties:
+        competencyItemId:
+          type: integer
+        competencyName:
+          type: string
+        weighting:
+          type: number
+        selfScore:
+          type: number
+        reviewerScore:
+          type: number
+        moderatedScore:
+          type: number
+        developmentNeed:
+          type: string
+      required:
+        - competencyItemId
+        - competencyName
+
+    IndividualAssessmentRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        agreementId:
+          type: integer
+        assessmentType:
+          type: string
+        quarter:
+          type: integer
+          nullable: true
+        reviewerId:
+          type: integer
+        kpiScore:
+          type: number
+          nullable: true
+        competencyScore:
+          type: number
+          nullable: true
+        overallScore:
+          type: number
+          nullable: true
+        comments:
+          type: string
+          nullable: true
+        developmentNeeds:
+          type: string
+          nullable: true
+        performanceGaps:
+          type: string
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - agreementId
+        - assessmentType
+        - reviewerId
+        - status
+
+    CreateIndividualAssessmentInput:
+      type: object
+      properties:
+        agreementId:
+          type: integer
+        assessmentType:
+          type: string
+          enum: [quarterly, mid-year, annual]
+        quarter:
+          type: integer
+        kpiScore:
+          type: number
+        competencyScore:
+          type: number
+        overallScore:
+          type: number
+        comments:
+          type: string
+        developmentNeeds:
+          type: string
+        performanceGaps:
+          type: string
+      required:
+        - agreementId
+        - assessmentType
+
+    ModerationRecordIndividual:
+      type: object
+      properties:
+        id:
+          type: integer
+        assessmentId:
+          type: integer
+        agreementId:
+          type: integer
+        moderatorId:
+          type: integer
+        outcome:
+          type: string
+        originalScore:
+          type: number
+          nullable: true
+        adjustedScore:
+          type: number
+          nullable: true
+        adjustmentReason:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - assessmentId
+        - agreementId
+        - moderatorId
+        - outcome
+
+    CreateIndividualModerationInput:
+      type: object
+      properties:
+        assessmentId:
+          type: integer
+        agreementId:
+          type: integer
+        outcome:
+          type: string
+          enum: [accepted, adjusted, referred]
+        originalScore:
+          type: number
+        adjustedScore:
+          type: number
+        adjustmentReason:
+          type: string
+        notes:
+          type: string
+      required:
+        - assessmentId
+        - agreementId
+        - outcome
+
+    AiAtRiskResponse:
+      type: object
+      properties:
+        atRiskKpis:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiDescription:
+                type: string
+              department:
+                type: string
+              currentScore:
+                type: number
+                nullable: true
+              riskLevel:
+                type: string
+              reason:
+                type: string
+              recommendation:
+                type: string
+        summary:
+          type: string
+        generatedAt:
+          type: string
+
+    AiNarrativeResponse:
+      type: object
+      properties:
+        narrative:
+          type: string
+        highlights:
+          type: array
+          items:
+            type: string
+        concerns:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        generatedAt:
+          type: string
+
+    AiEvidenceGapResponse:
+      type: object
+      properties:
+        gaps:
+          type: array
+          items:
+            type: object
+            properties:
+              kpiId:
+                type: integer
+              kpiDescription:
+                type: string
+              department:
+                type: string
+              quarter:
+                type: integer
+              gapType:
+                type: string
+              severity:
+                type: string
+              suggestion:
+                type: string
+        summary:
+          type: string
+        generatedAt:
+          type: string
+
+    AiAlignmentResponse:
+      type: object
+      properties:
+        alignmentIssues:
+          type: array
+          items:
+            type: object
+            properties:
+              sourceModule:
+                type: string
+              targetModule:
+                type: string
+              issue:
+                type: string
+              severity:
+                type: string
+              recommendation:
+                type: string
+        overallScore:
+          type: number
+        summary:
+          type: string
+        generatedAt:
+          type: string
+
+    AiDashboardData:
+      type: object
+      properties:
+        riskSummary:
+          type: object
+          properties:
+            high:
+              type: integer
+            medium:
+              type: integer
+            low:
+              type: integer
+        recentInsights:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiInsightLogEntry"
+        topRecommendations:
+          type: array
+          items:
+            type: string
+        narrativeExcerpt:
+          type: string
+        generatedAt:
+          type: string
+
+    AiInsightLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        insightType:
+          type: string
+        cycleId:
+          type: integer
+          nullable: true
+        departmentId:
+          type: integer
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        riskLevel:
+          type: string
+          nullable: true
+        isAdvisory:
+          type: boolean
+        generatedById:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - insightType
+        - isAdvisory
+
+    IntegrationSyncLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        integrationType:
+          type: string
+        direction:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        recordCount:
+          type: integer
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        syncedById:
+          type: integer
+          nullable: true
+        syncedAt:
+          type: string
+      required:
+        - id
+        - integrationType
+        - direction
+        - entityType
+        - status
+
+    IntegrationSyncResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        recordCount:
+          type: integer
+        message:
+          type: string
+
+    BudgetPullInput:
+      type: object
+      properties:
+        cycleId:
+          type: integer
+        departmentId:
+          type: integer
+      required:
+        - cycleId
+
+    IdpObjective:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        description:
+          type: string
+        chapter:
+          type: string
+          nullable: true
+
+    WorkflowStepConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        scorecardTypeId:
+          type: integer
+          nullable: true
+        stepName:
+          type: string
+        stepOrder:
+          type: integer
+        requiredRole:
+          type: string
+        isActive:
+          type: boolean
+        version:
+          type: integer
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - stepName
+        - stepOrder
+        - requiredRole
+        - isActive
+
+    CreateWorkflowConfigInput:
+      type: object
+      properties:
+        scorecardTypeId:
+          type: integer
+        stepName:
+          type: string
+        stepOrder:
+          type: integer
+        requiredRole:
+          type: string
+        isActive:
+          type: boolean
+        description:
+          type: string
+      required:
+        - stepName
+        - stepOrder
+        - requiredRole
+
+    IndividualDashboardData:
+      type: object
+      properties:
+        totalAgreements:
+          type: integer
+        statusBreakdown:
+          type: object
+          properties:
+            draft:
+              type: integer
+            submitted:
+              type: integer
+            approved:
+              type: integer
+            locked:
+              type: integer
+        averageScore:
+          type: number
+          nullable: true
+        assessmentsPending:
+          type: integer
+        departmentScores:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentName:
+                type: string
+              avgScore:
+                type: number
+                nullable: true
+              count:
+                type: integer

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Asset Management System</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    @keyframes plt-shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    @keyframes plt-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+    .app-preloader{position:fixed;inset:0;z-index:9999;background:#f8f9fb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:'Inter',sans-serif;transition:opacity .4s ease}
+    .app-preloader.hide{opacity:0;pointer-events:none}
+    .preloader-shield{width:56px;height:56px;background:#0f2b46;border-radius:14px;mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/%3E%3C/svg%3E");-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/%3E%3C/svg%3E");mask-size:contain;-webkit-mask-size:contain;mask-repeat:no-repeat;-webkit-mask-repeat:no-repeat;animation:plt-pulse 1.8s ease-in-out infinite}
+    .preloader-bar{width:200px;height:4px;border-radius:2px;background:linear-gradient(90deg,#e2e8f0 0%,#0f2b46 50%,#e2e8f0 100%);background-size:400px 4px;animation:plt-shimmer 1.5s ease-in-out infinite}
+    .preloader-text{font-size:13px;font-weight:500;color:#64748b;letter-spacing:.3px}
+  </style>
+</head>
+<body>
+  <div class="app-preloader" id="appPreloader">
+    <div class="preloader-shield"></div>
+    <div class="preloader-bar"></div>
+    <div class="preloader-text">Loading PLATINUM</div>
+  </div>
+  <app-root></app-root>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var start = Date.now();
+      var check = setInterval(function() {
+        var root = document.querySelector('app-root');
+        if ((root && root.children.length > 0) || Date.now() - start > 15000) {
+          clearInterval(check);
+          var el = document.getElementById('appPreloader');
+          if (el) { el.classList.add('hide'); setTimeout(function() { el.remove(); }, 500); }
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>

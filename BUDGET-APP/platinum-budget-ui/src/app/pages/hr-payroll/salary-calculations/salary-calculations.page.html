@@ -1,0 +1,434 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Salary & Benefit Calculations</h1>
+      <p class="page-subtitle">Salary increases, notch progression, temporary contracts, performance bonuses & vacant post budgets (HRPB11, HRPB12, HRPB14, HRPB36, HRPB37, HRPB48, HRPB61)</p>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activePanel === 'increases'" (click)="setPanel('increases')">
+      <mat-icon>trending_up</mat-icon> Salary Increases
+    </button>
+    <button class="tab-btn" [class.active]="activePanel === 'notch'" (click)="setPanel('notch')">
+      <mat-icon>stairs</mat-icon> Notch Progression
+    </button>
+    <button class="tab-btn" [class.active]="activePanel === 'contracts'" (click)="setPanel('contracts')">
+      <mat-icon>description</mat-icon> Temporary Contracts
+    </button>
+    <button class="tab-btn" [class.active]="activePanel === 'bonus'" (click)="setPanel('bonus')">
+      <mat-icon>emoji_events</mat-icon> Performance Bonus
+    </button>
+    <button class="tab-btn" [class.active]="activePanel === 'vacant'" (click)="setPanel('vacant')">
+      <mat-icon>person_off</mat-icon> Vacant Post Budget
+    </button>
+  </div>
+
+  <!-- Salary Increase Panel -->
+  <div class="panel-card" *ngIf="activePanel === 'increases'">
+    <div class="panel-header">
+      <h2>Salary Increase by Employee Category</h2>
+      <div class="panel-actions">
+        <button class="btn-secondary" (click)="calculatePercentageIncrease()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate Increases
+        </button>
+        <button class="btn-primary" (click)="openIncreaseDialog()">
+          <mat-icon>add</mat-icon> New Increase
+        </button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="tariff-table-wrap" *ngIf="salaryIncreases.length; else noIncreases">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Employee Category</th>
+              <th class="text-right">Increase %</th>
+              <th>Effective Date</th>
+              <th>Notch Progression</th>
+              <th>Locked</th>
+              <th>Created By</th>
+              <th>Created On</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let si of salaryIncreases">
+              <td class="fw-600">{{si.employeeCategory}}</td>
+              <td class="text-right mono">{{si.increasePercentage | number:'1.2-2'}}%</td>
+              <td>{{si.effectiveDate | date:'dd MMM yyyy'}}</td>
+              <td>
+                <span class="status-badge" [ngClass]="si.isNotchProgression ? 'status-approved' : 'status-draft'">
+                  {{si.isNotchProgression ? 'Yes' : 'No'}}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge" [ngClass]="si.isLocked ? 'status-locked' : 'status-draft'">
+                  {{si.isLocked ? 'Locked' : 'Open'}}
+                </span>
+              </td>
+              <td>{{si.createdBy}}</td>
+              <td>{{si.createdOn | date:'dd MMM yyyy'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noIncreases>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No salary increases defined yet</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Notch Progression Panel -->
+  <div class="panel-card" *ngIf="activePanel === 'notch'">
+    <div class="panel-header">
+      <h2>Notch Progression — Before/After Comparison</h2>
+      <div class="panel-actions">
+        <button class="btn-primary" (click)="calculateNotchProgression()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> {{calculating ? 'Calculating...' : 'Auto-Calculate Notch Increases'}}
+        </button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="tariff-table-wrap" *ngIf="salaryStructures.length; else noStructures">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Grade</th>
+              <th>Current Notch</th>
+              <th class="text-right">Current Annual Amount</th>
+              <th class="text-right">Hourly Rate</th>
+              <th>Bargaining Unit</th>
+              <th>Employee Category</th>
+              <th>Effective Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let ss of salaryStructures">
+              <td class="fw-600">{{ss.grade}}</td>
+              <td><span class="notch-badge">Notch {{ss.notch}}</span></td>
+              <td class="text-right mono">R {{ss.annualAmount | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{ss.hourlyRate | number:'1.2-2'}}</td>
+              <td>{{ss.bargainingUnit || '—'}}</td>
+              <td>{{ss.employeeCategory || '—'}}</td>
+              <td>{{ss.effectiveDate | date:'dd MMM yyyy'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noStructures>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No salary structures defined yet</p>
+        </div>
+      </ng-template>
+
+      <div class="result-card" *ngIf="notchResults">
+        <h3>Notch Progression Results</h3>
+        <p class="result-message">{{notchResults.message || 'Notch progression calculation completed.'}}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Temporary Contracts Panel -->
+  <div class="panel-card" *ngIf="activePanel === 'contracts'">
+    <div class="panel-header">
+      <h2>Temporary Contracts</h2>
+      <div class="panel-actions">
+        <button class="btn-secondary" (click)="calculateContractBudgets()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate Budgets
+        </button>
+        <button class="btn-primary" (click)="openContractDialog()">
+          <mat-icon>add</mat-icon> New Contract
+        </button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="tariff-table-wrap" *ngIf="temporaryContracts.length; else noContracts">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Employee Name</th>
+              <th>Department</th>
+              <th>Remuneration Type</th>
+              <th class="text-right">Rate</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th class="text-right">Calculated Budget</th>
+              <th>Created By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let tc of temporaryContracts">
+              <td class="fw-600">{{tc.employeeName}}</td>
+              <td>{{tc.department || '—'}}</td>
+              <td><span class="type-pill">{{tc.remunerationType}}</span></td>
+              <td class="text-right mono">R {{tc.rate | number:'1.2-2'}}</td>
+              <td>{{tc.contractStartDate | date:'dd MMM yyyy'}}</td>
+              <td>{{tc.contractEndDate | date:'dd MMM yyyy'}}</td>
+              <td class="text-right mono">R {{tc.calculatedBudget | number:'1.2-2'}}</td>
+              <td>{{tc.createdBy}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noContracts>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No temporary contracts defined yet</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Performance Bonus Panel -->
+  <div class="panel-card" *ngIf="activePanel === 'bonus'">
+    <div class="panel-header">
+      <h2>Performance Bonus Provision</h2>
+      <div class="panel-actions">
+        <button class="btn-secondary" (click)="calculateBonusBudget()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate Bonus Budget
+        </button>
+        <button class="btn-primary" (click)="openBonusDialog()">
+          <mat-icon>add</mat-icon> New Bonus Entry
+        </button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="tariff-table-wrap" *ngIf="performanceBonuses.length; else noBonuses">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Employee Category</th>
+              <th class="text-right">Bonus %</th>
+              <th class="text-right">Qualifying Employees</th>
+              <th class="text-right">Average Salary</th>
+              <th class="text-right">Estimated Total Cost</th>
+              <th>Created By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let pb of performanceBonuses">
+              <td class="fw-600">{{pb.department || '—'}}</td>
+              <td>{{pb.employeeCategory || '—'}}</td>
+              <td class="text-right mono">{{pb.bonusPercentage | number:'1.2-2'}}%</td>
+              <td class="text-right mono">{{pb.qualifyingEmployees}}</td>
+              <td class="text-right mono">R {{pb.averageSalary | number:'1.2-2'}}</td>
+              <td class="text-right mono">R {{pb.estimatedTotalCost | number:'1.2-2'}}</td>
+              <td>{{pb.createdBy}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noBonuses>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No performance bonus entries defined yet</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Vacant Post Budget Panel -->
+  <div class="panel-card" *ngIf="activePanel === 'vacant'">
+    <div class="panel-header">
+      <h2>Vacant Post Budget — Prorated Costs</h2>
+      <div class="panel-actions">
+        <span class="total-label">Total Vacant Post Budget: <strong class="mono">R {{getVacantPostBudget() | number:'1.2-2'}}</strong></span>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="tariff-table-wrap" *ngIf="vacantPosts.length; else noVacant">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Post Code</th>
+              <th>Title</th>
+              <th>Department</th>
+              <th>Job Level</th>
+              <th>Funded</th>
+              <th>Priority</th>
+              <th>Planned Start Date</th>
+              <th class="text-right">Annual Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let vp of vacantPosts">
+              <td class="fw-600 mono">{{vp.postCode}}</td>
+              <td>{{vp.title}}</td>
+              <td>{{vp.department || '—'}}</td>
+              <td>{{vp.jobLevel || '—'}}</td>
+              <td>
+                <span class="status-badge" [ngClass]="vp.isFunded ? 'status-approved' : 'status-unfunded'">
+                  {{vp.isFunded ? 'Funded' : 'Unfunded'}}
+                </span>
+              </td>
+              <td>
+                <span class="priority-badge" *ngIf="vp.priorityStatus">{{vp.priorityStatus}}</span>
+                <span class="text-muted" *ngIf="!vp.priorityStatus">—</span>
+              </td>
+              <td>{{vp.plannedStartDate ? (vp.plannedStartDate | date:'dd MMM yyyy') : '—'}}</td>
+              <td class="text-right mono">R {{vp.annualSalary | number:'1.2-2'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noVacant>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No vacant posts found</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Salary Increase Dialog -->
+  <div class="dialog-overlay" *ngIf="showIncreaseDialog" (click)="showIncreaseDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>New Salary Increase</h2>
+        <button class="btn-icon" (click)="showIncreaseDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Employee Category</label>
+            <select [(ngModel)]="increaseForm.employeeCategory">
+              <option value="Management">Management</option>
+              <option value="Professional">Professional</option>
+              <option value="Skilled">Skilled</option>
+              <option value="SemiSkilled">Semi-Skilled</option>
+              <option value="Unskilled">Unskilled</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Increase Percentage (%)</label>
+            <input type="number" [(ngModel)]="increaseForm.increasePercentage" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Effective Date</label>
+            <input type="date" [(ngModel)]="increaseForm.effectiveDate">
+          </div>
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" [(ngModel)]="increaseForm.isNotchProgression">
+              Notch Progression
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showIncreaseDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveIncrease()" [disabled]="savingIncrease">
+          {{savingIncrease ? 'Saving...' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Temporary Contract Dialog -->
+  <div class="dialog-overlay" *ngIf="showContractDialog" (click)="showContractDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>New Temporary Contract</h2>
+        <button class="btn-icon" (click)="showContractDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Employee Name</label>
+            <input [(ngModel)]="contractForm.employeeName" placeholder="Full name">
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="contractForm.department" placeholder="Department">
+          </div>
+          <div class="form-group">
+            <label>Remuneration Type</label>
+            <select [(ngModel)]="contractForm.remunerationType">
+              <option value="Hourly">Hourly</option>
+              <option value="Monthly">Monthly</option>
+              <option value="Fixed">Fixed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Rate (R)</label>
+            <input type="number" [(ngModel)]="contractForm.rate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Contract Start Date</label>
+            <input type="date" [(ngModel)]="contractForm.contractStartDate">
+          </div>
+          <div class="form-group">
+            <label>Contract End Date</label>
+            <input type="date" [(ngModel)]="contractForm.contractEndDate">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showContractDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveContract()" [disabled]="savingContract">
+          {{savingContract ? 'Saving...' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Bonus Dialog -->
+  <div class="dialog-overlay" *ngIf="showBonusDialog" (click)="showBonusDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>New Performance Bonus Entry</h2>
+        <button class="btn-icon" (click)="showBonusDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="bonusForm.department" placeholder="Department">
+          </div>
+          <div class="form-group">
+            <label>Employee Category</label>
+            <select [(ngModel)]="bonusForm.employeeCategory">
+              <option value="Management">Management</option>
+              <option value="Professional">Professional</option>
+              <option value="Skilled">Skilled</option>
+              <option value="SemiSkilled">Semi-Skilled</option>
+              <option value="Unskilled">Unskilled</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Bonus Percentage (%)</label>
+            <input type="number" [(ngModel)]="bonusForm.bonusPercentage" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Qualifying Employees</label>
+            <input type="number" [(ngModel)]="bonusForm.qualifyingEmployees">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showBonusDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveBonus()" [disabled]="savingBonus">
+          {{savingBonus ? 'Saving...' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,60 @@
+:host { display: block; }
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table thead th {
+  background: #f8fafc;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.data-table tbody td {
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.disabled-row td { opacity: 0.55; }
+
+.cycle-type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.cycle-monthly { background: #eff6ff; color: #2563eb; }
+.cycle-weekly { background: #f0fdf4; color: #16a34a; }
+.cycle-bi-weekly { background: #fefce8; color: #ca8a04; }
+
+.field-value {
+  font-size: 14px;
+  color: #334155;
+  padding: 9px 0;
+  font-weight: 500;
+}
+
+.required { color: #dc2626; }

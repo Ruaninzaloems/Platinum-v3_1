@@ -1,0 +1,43 @@
+CREATE TABLE [dbo].[Led_Journal_Asset](
+	[AssetJournal_ID] [int] IDENTITY(1,1) NOT NULL,
+	[FinYear] [nvarchar](9) NOT NULL,
+	[ProcessingMonth] [int] NOT NULL,
+	[TransactionID] [uniqueidentifier] NOT NULL,
+	[AssetJournalTransactionTypeID] [int] NOT NULL,
+	[TransactionDate] [datetime] NOT NULL,
+	[DebitVoteID] [int] NULL,
+	[CreditVoteID] [int] NULL,
+	[Amount] [decimal](16, 2) NOT NULL,
+	[DocumentNumber] [nvarchar](50) NULL,
+	[DateCaptured] [datetime] NOT NULL,
+	[CapturerID] [int] NOT NULL,
+	[IsAuthorised] [bit] NULL,
+	[FinAuthorisedByID] [int] NULL,
+	[FinAuthorisedDate] [datetime] NULL,
+	[ReferenceNumber] [nvarchar](50) NULL,
+	[ItemDescription] [nvarchar](50) NULL,
+	[intDocNumber] [int] NULL,
+	[AssetAcquisitionID] [int] NULL,
+	[AssetImprovementID] [int] NULL,
+	[AssetTransferID] [int] NULL,
+	[Asset_RegisterItem_ID] [int] NULL,
+	[Deprecation_ScheduledDate] [datetime] NULL,
+	[Deprecation_ScheduleID] [int] NULL,
+	[Deprecation_ScheduleItemID] [int] NULL,
+	[SCOAFundsID] [int] NULL,
+	[SCOARegionID] [int] NULL,
+	[SCOACostingID] [int] NULL,
+	[SCOAProjectID] [int] NULL,
+	[SCOAFunctionID] [int] NULL,
+	[SCOAItemID] [int] NULL,
+	[DivisionID] [int] NULL,
+	[Asset_Led_Header_ID] [int] NULL,
+	[Depreciation_RunType] [varchar](200) NULL,
+	[AssetMisclassificationID] [int] NULL,
+	[Reversal_AssetJournal_ID] [int] NULL,
+ CONSTRAINT [PK_Led_Journal_Asset] PRIMARY KEY CLUSTERED 
+(
+	[AssetJournal_ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 93, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO

@@ -1,0 +1,592 @@
+<div class="mscoa-container">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title">mSCOA Chart of Accounts</h1>
+      <p class="page-subtitle">Municipal Standard Chart of Accounts &mdash; browse segments, accounts, and GRAP mappings</p>
+    </div>
+    <div class="page-header-right">
+      <mat-form-field appearance="outline" class="version-switcher">
+        <mat-label>mSCOA Version</mat-label>
+        <mat-select [value]="selectedVersionId()" (selectionChange)="onVersionSwitch($event.value)">
+          @for (ver of versions(); track ver.id) {
+            <mat-option [value]="ver.id">
+              {{ ver.label }}
+              @if (ver.isCurrent) { (Active) }
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (selectedVersion()) {
+        <div class="version-badge">
+          <mat-icon class="version-icon">verified</mat-icon>
+          <div class="version-info">
+            <span class="version-label">{{ selectedVersion()!.label }}</span>
+            <span class="version-status">{{ selectedVersion()!.totalAccounts | number }} accounts
+              @if (selectedVersion()!.isCurrent) { &mdash; Active }
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="stats-strip">
+    @for (stat of segmentStats(); track stat.code) {
+      <div class="stat-card" [class.active]="selectedSegment() === stat.code"
+           (click)="selectSegment(stat.code)" matTooltip="Click to filter by segment {{ stat.code }}: {{ stat.name }}">
+        <div class="stat-icon-wrap" [style.background]="getSegmentColor(stat.code, 0.12)"
+             [style.color]="getSegmentColor(stat.code)">
+          <mat-icon>{{ getSegmentIcon(stat.code) }}</mat-icon>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">{{ stat.name }}</span>
+          <span class="stat-value">{{ stat.scoaFile }}</span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <mat-tab-group class="mscoa-tabs" [(selectedIndex)]="activeTab">
+    <mat-tab label="Chart Browser">
+      <div class="tab-content">
+        <div class="filter-bar">
+          <mat-form-field appearance="outline" class="filter-field search-field">
+            <mat-label>Search accounts</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [(ngModel)]="searchTerm" (keyup.enter)="searchChart()"
+                   placeholder="Account number or description..." matTooltip="Search by account number or description text">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Segment</mat-label>
+            <mat-select [(ngModel)]="filterSegment" (selectionChange)="searchChart()">
+              <mat-option value="">All Segments</mat-option>
+              @for (s of segmentStats(); track s.code) {
+                <mat-option [value]="s.code">{{ s.code }} &mdash; {{ s.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Posting Level</mat-label>
+            <mat-select [(ngModel)]="filterPostingLevel" (selectionChange)="searchChart()">
+              <mat-option value="">All Levels</mat-option>
+              <mat-option value="true">Posting Only</mat-option>
+              <mat-option value="false">Summary Only</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" (click)="searchChart()" class="search-btn" matTooltip="Search the mSCOA chart of accounts">
+            <mat-icon>search</mat-icon>
+            Search
+          </button>
+        </div>
+
+        @if (loading()) {
+          <mat-progress-bar mode="indeterminate" class="loading-bar"></mat-progress-bar>
+        }
+
+        @if (chartItems().length > 0) {
+          <div class="table-container">
+            <table mat-table [dataSource]="chartItems()" class="chart-table">
+              <ng-container matColumnDef="accountNumber">
+                <th mat-header-cell *matHeaderCellDef matTooltip="36-character mSCOA account number">Account Number</th>
+                <td mat-cell *matCellDef="let item" class="account-cell">
+                  <code class="account-code" matTooltip="{{ item.accountNumber }}">{{ item.accountNumber }}</code>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="segment">
+                <th mat-header-cell *matHeaderCellDef matTooltip="mSCOA segment prefix code (e.g. IA, IL, IR)">Segment</th>
+                <td mat-cell *matCellDef="let item">
+                  <span class="segment-chip" [style.background]="getSegmentColor(item.segment, 0.12)"
+                        [style.color]="getSegmentColor(item.segment)" matTooltip="Segment: {{ item.segment }}">
+                    {{ item.segment }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="description">
+                <th mat-header-cell *matHeaderCellDef matTooltip="Account description text">Description</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="desc-cell" [style.padding-left.px]="(item.level - 1) * 16">
+                    <span class="item-desc">{{ item.shortDescription || item.description }}</span>
+                    @if (item.statementType) {
+                      <span class="statement-tag">{{ item.statementType === 'Statement Financial Position' || item.statementType === 'Statement of Financial Position' ? 'SOFP' : 'SOFPerf' }}</span>
+                    }
+                  </div>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="level">
+                <th mat-header-cell *matHeaderCellDef matTooltip="Hierarchy level depth (L1 = top level)">Level</th>
+                <td mat-cell *matCellDef="let item">
+                  <span class="level-badge" matTooltip="Hierarchy level {{ item.level }}">L{{ item.level }}</span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="postingLevel">
+                <th mat-header-cell *matHeaderCellDef>Posting</th>
+                <td mat-cell *matCellDef="let item">
+                  @if (item.postingLevel) {
+                    <mat-icon class="posting-yes" matTooltip="Posting Level Account">check_circle</mat-icon>
+                  } @else {
+                    <mat-icon class="posting-no" matTooltip="Summary Level">radio_button_unchecked</mat-icon>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="hierarchy">
+                <th mat-header-cell *matHeaderCellDef matTooltip="Full hierarchy path from top-level to this account">Hierarchy Path</th>
+                <td mat-cell *matCellDef="let item">
+                  <span class="hierarchy-path">
+                    {{ getHierarchyPath(item) }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="chartColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: chartColumns;" class="chart-row"></tr>
+            </table>
+          </div>
+
+          <mat-paginator [length]="chartTotal()"
+                         [pageSize]="chartPageSize"
+                         [pageSizeOptions]="[50, 100, 200, 500]"
+                         (page)="onChartPageChange($event)"
+                         showFirstLastButtons>
+          </mat-paginator>
+        } @else if (!loading()) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon">search_off</mat-icon>
+            <h3>No accounts found</h3>
+            <p>{{ selectedVersion() ? 'Try adjusting your search filters' : 'No mSCOA chart version loaded. Upload a chart version from the Administration page.' }}</p>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="GRAP Mappings">
+      <div class="tab-content">
+        <div class="filter-bar">
+          <mat-form-field appearance="outline" class="filter-field search-field">
+            <mat-label>Search GRAP mappings</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput [(ngModel)]="grapSearchTerm" (keyup.enter)="searchGrapMappings()"
+                   placeholder="Account number, description, or class..." matTooltip="Search GRAP mappings by account number, description, or class">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Category (EALRE)</mat-label>
+            <mat-select [(ngModel)]="filterCategory" (selectionChange)="searchGrapMappings()">
+              <mat-option value="">All Categories</mat-option>
+              <mat-option value="Assets">Assets</mat-option>
+              <mat-option value="Liabilities">Liabilities</mat-option>
+              <mat-option value="Net Assets">Net Assets</mat-option>
+              <mat-option value="Revenue">Revenue</mat-option>
+              <mat-option value="Expenditure">Expenditure</mat-option>
+              <mat-option value="Gains and Losses">Gains and Losses</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Statement Type</mat-label>
+            <mat-select [(ngModel)]="filterStatementType" (selectionChange)="searchGrapMappings()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="Statement of Financial Position">SOFP</mat-option>
+              <mat-option value="Statement of Financial Performance">SOFPerf</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" (click)="searchGrapMappings()" class="search-btn" matTooltip="Search GRAP mapping entries">
+            <mat-icon>search</mat-icon>
+            Search
+          </button>
+        </div>
+
+        @if (loading()) {
+          <mat-progress-bar mode="indeterminate" class="loading-bar"></mat-progress-bar>
+        }
+
+        @if (grapItems().length > 0) {
+          <div class="table-container">
+            <table mat-table [dataSource]="grapItems()" class="chart-table">
+              <ng-container matColumnDef="accountNumber">
+                <th mat-header-cell *matHeaderCellDef matTooltip="mSCOA account number for this GRAP mapping">Account Number</th>
+                <td mat-cell *matCellDef="let item">
+                  <code class="account-code" matTooltip="{{ item.accountNumber }}">{{ item.accountNumber }}</code>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="category">
+                <th mat-header-cell *matHeaderCellDef matTooltip="GRAP category: Assets, Liabilities, Revenue, Expenditure, etc.">Category</th>
+                <td mat-cell *matCellDef="let item">
+                  <span class="category-chip" [class]="'cat-' + getCategoryClass(item.category)" matTooltip="Category: {{ item.category }}">
+                    {{ item.category }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="reportingItem">
+                <th mat-header-cell *matHeaderCellDef matTooltip="GRAP reporting line item">Reporting Item</th>
+                <td mat-cell *matCellDef="let item">{{ item.reportingItem || '-' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="subClass">
+                <th mat-header-cell *matHeaderCellDef matTooltip="GRAP sub-class classification">Sub Class</th>
+                <td mat-cell *matCellDef="let item">{{ item.subClass || '-' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="subClassBreakdown">
+                <th mat-header-cell *matHeaderCellDef matTooltip="Further breakdown of the sub-class">Breakdown</th>
+                <td mat-cell *matCellDef="let item">{{ item.subClassBreakdown || '-' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="postingLevel">
+                <th mat-header-cell *matHeaderCellDef matTooltip="Whether this is a posting-level account">Posting</th>
+                <td mat-cell *matCellDef="let item">
+                  @if (item.postingLevel) {
+                    <mat-icon class="posting-yes" matTooltip="Posting Level Account">check_circle</mat-icon>
+                  } @else {
+                    <mat-icon class="posting-no" matTooltip="Summary Level">radio_button_unchecked</mat-icon>
+                  }
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="grapColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: grapColumns;" class="chart-row"></tr>
+            </table>
+          </div>
+
+          <mat-paginator [length]="grapTotal()"
+                         [pageSize]="grapPageSize"
+                         [pageSizeOptions]="[50, 100, 200, 500]"
+                         (page)="onGrapPageChange($event)"
+                         showFirstLastButtons>
+          </mat-paginator>
+        } @else if (!loading()) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon">category</mat-icon>
+            <h3>No GRAP mappings found</h3>
+            <p>{{ selectedVersion() ? 'Try adjusting your search filters' : 'No mSCOA chart version loaded.' }}</p>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Segment Reference">
+      <div class="tab-content">
+        <div class="segment-grid">
+          @for (seg of allSegmentDetails(); track seg.code) {
+            <mat-card class="segment-ref-card" [class.active]="selectedSegment() === seg.code"
+                      (click)="selectSegment(seg.code)" matTooltip="Click to filter chart by segment {{ seg.code }}">
+              <div class="seg-card-header">
+                <div class="seg-code-badge" [style.background]="getSegmentColor(seg.code, 0.15)"
+                     [style.color]="getSegmentColor(seg.code)">
+                  {{ seg.code }}
+                </div>
+                <div class="seg-card-title">
+                  <span class="seg-name">{{ seg.name }}</span>
+                  <span class="seg-file">{{ seg.scoaFile }}</span>
+                </div>
+              </div>
+              <p class="seg-desc">{{ seg.description }}</p>
+              @if (seg.statementType) {
+                <span class="seg-statement-tag">{{ seg.statementType }}</span>
+              }
+              @if (getSegmentCount(seg.code)) {
+                <div class="seg-stats">
+                  <span class="seg-stat">{{ getSegmentCount(seg.code) | number }} accounts</span>
+                </div>
+              }
+            </mat-card>
+          }
+        </div>
+
+        <mat-divider class="section-divider"></mat-divider>
+
+        <h3 class="section-heading">Account Number Format</h3>
+        <mat-card class="format-card">
+          <div class="format-row">
+            <span class="format-label">Length:</span>
+            <span class="format-value">36 characters</span>
+          </div>
+          <div class="format-row">
+            <span class="format-label">Structure:</span>
+            <code class="format-code">PP NNN NNN NNN NNN NNN NNN NNN NNN NNN NNN NNN NNN</code>
+          </div>
+          <div class="format-row">
+            <span class="format-label">Prefix (PP):</span>
+            <span class="format-value">2-letter segment identifier (IA, IL, IR, IE, IZ, LN, CO, FD, FX, PC, PO, PD, RX)</span>
+          </div>
+          <div class="format-row">
+            <span class="format-label">Levels:</span>
+            <span class="format-value">Up to 12 three-digit level codes, zero-padded</span>
+          </div>
+          <div class="format-example">
+            <span class="format-label">Example:</span>
+            <code class="account-code example-code">IA001001001000000000000000000000000000</code>
+            <span class="format-value">= Assets &gt; Current Assets &gt; Cash and Cash Equivalents</span>
+          </div>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Version Management">
+      <div class="tab-content">
+        <div class="versions-list">
+          @for (ver of versions(); track ver.id) {
+            <mat-card class="version-card" [class.current]="ver.isCurrent" matTooltip="Chart version: {{ ver.label }}">
+              <div class="ver-card-header">
+                <div class="ver-title-area">
+                  <h3 class="ver-title">{{ ver.label }}</h3>
+                  @if (ver.isCurrent) {
+                    <span class="current-badge" matTooltip="This is the currently active chart version">ACTIVE</span>
+                  }
+                  <span class="status-badge" [class]="'status-' + ver.status">{{ ver.status | uppercase }}</span>
+                </div>
+                <div class="ver-card-actions">
+                  <button mat-stroked-button (click)="onVersionSwitch(ver.id)" matTooltip="Browse this version's chart">
+                    <mat-icon>visibility</mat-icon> Browse
+                  </button>
+                  <span class="ver-date">{{ ver.createdAt | date:'mediumDate' }}</span>
+                </div>
+              </div>
+              <div class="ver-details">
+                @if (ver.description) {
+                  <p class="ver-desc">{{ ver.description }}</p>
+                }
+                <div class="ver-stats-row">
+                  <div class="ver-stat">
+                    <span class="ver-stat-label">Total Accounts</span>
+                    <span class="ver-stat-value">{{ ver.totalAccounts | number }}</span>
+                  </div>
+                  <div class="ver-stat">
+                    <span class="ver-stat-label">Posting Level</span>
+                    <span class="ver-stat-value">{{ ver.postingLevelAccounts | number }}</span>
+                  </div>
+                  @if (ver.effectiveFrom) {
+                    <div class="ver-stat">
+                      <span class="ver-stat-label">Effective From</span>
+                      <span class="ver-stat-value">{{ ver.effectiveFrom | date:'mediumDate' }}</span>
+                    </div>
+                  }
+                  @if (ver.effectiveTo) {
+                    <div class="ver-stat">
+                      <span class="ver-stat-label">Effective To</span>
+                      <span class="ver-stat-value">{{ ver.effectiveTo | date:'mediumDate' }}</span>
+                    </div>
+                  }
+                </div>
+                @if (ver.segmentSummary) {
+                  <div class="seg-summary">
+                    @for (seg of getSegmentSummaryEntries(ver.segmentSummary); track seg.key) {
+                      <span class="seg-summary-chip" [style.background]="getSegmentColor(seg.key, 0.1)"
+                            [style.color]="getSegmentColor(seg.key)">
+                        {{ seg.key }}: {{ seg.value.total | number }}
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            </mat-card>
+          } @empty {
+            <div class="empty-state">
+              <mat-icon class="empty-icon">inventory_2</mat-icon>
+              <h3>No chart versions</h3>
+              <p>No mSCOA chart versions have been uploaded yet. Use the seed endpoint or upload a new version.</p>
+            </div>
+          }
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Version Comparison">
+      <div class="tab-content">
+        <div class="compare-controls">
+          <mat-form-field appearance="outline" class="compare-field">
+            <mat-label>Base Version</mat-label>
+            <mat-select [(ngModel)]="compareVersion1">
+              @for (ver of versions(); track ver.id) {
+                <mat-option [value]="ver.id">{{ ver.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-icon class="compare-arrow">arrow_forward</mat-icon>
+          <mat-form-field appearance="outline" class="compare-field">
+            <mat-label>Target Version</mat-label>
+            <mat-select [(ngModel)]="compareVersion2">
+              @for (ver of versions(); track ver.id) {
+                <mat-option [value]="ver.id">{{ ver.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <button mat-flat-button color="primary" [disabled]="!compareVersion1 || !compareVersion2 || compareVersion1 === compareVersion2"
+                  (click)="runComparison()" class="compare-btn">
+            <mat-icon>compare_arrows</mat-icon> Compare
+          </button>
+        </div>
+
+        @if (comparisonLoading()) {
+          <mat-progress-bar mode="indeterminate" class="loading-bar"></mat-progress-bar>
+        }
+
+        @if (comparisonError()) {
+          <div class="truncation-notice" style="background: #fef2f2; border-color: #fecaca;">
+            <mat-icon style="color: #dc2626;">error</mat-icon>
+            <span>{{ comparisonError() }}</span>
+          </div>
+        }
+
+        @if (comparison()) {
+          <div class="comparison-results">
+            <div class="compare-summary-strip">
+              <div class="compare-stat added">
+                <mat-icon>add_circle</mat-icon>
+                <div>
+                  <span class="compare-stat-value">{{ comparison()!.summary.added | number }}</span>
+                  <span class="compare-stat-label">Added</span>
+                </div>
+              </div>
+              <div class="compare-stat removed">
+                <mat-icon>remove_circle</mat-icon>
+                <div>
+                  <span class="compare-stat-value">{{ comparison()!.summary.removed | number }}</span>
+                  <span class="compare-stat-label">Removed</span>
+                </div>
+              </div>
+              <div class="compare-stat changed">
+                <mat-icon>change_circle</mat-icon>
+                <div>
+                  <span class="compare-stat-value">{{ comparison()!.summary.changed | number }}</span>
+                  <span class="compare-stat-label">Changed</span>
+                </div>
+              </div>
+              <div class="compare-stat unchanged">
+                <mat-icon>check_circle</mat-icon>
+                <div>
+                  <span class="compare-stat-value">{{ comparison()!.summary.unchanged | number }}</span>
+                  <span class="compare-stat-label">Unchanged</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="compare-segment-breakdown">
+              <h4 class="section-heading">Changes by Segment</h4>
+              <div class="seg-diff-grid">
+                @for (seg of getComparisonSegments(); track seg) {
+                  <div class="seg-diff-card">
+                    <span class="seg-diff-code" [style.background]="getSegmentColor(seg, 0.12)" [style.color]="getSegmentColor(seg)">{{ seg }}</span>
+                    <div class="seg-diff-counts">
+                      @if (comparison()!.bySegment.added[seg]) {
+                        <span class="diff-added">+{{ comparison()!.bySegment.added[seg] }}</span>
+                      }
+                      @if (comparison()!.bySegment.removed[seg]) {
+                        <span class="diff-removed">-{{ comparison()!.bySegment.removed[seg] }}</span>
+                      }
+                      @if (comparison()!.bySegment.changed[seg]) {
+                        <span class="diff-changed">~{{ comparison()!.bySegment.changed[seg] }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <mat-tab-group class="diff-tabs">
+              @if (comparison()!.added.length > 0) {
+                <mat-tab [label]="'Added (' + comparison()!.summary.added + ')'">
+                  <div class="diff-table-wrap">
+                    <table mat-table [dataSource]="comparison()!.added" class="diff-table">
+                      <ng-container matColumnDef="accountNumber">
+                        <th mat-header-cell *matHeaderCellDef>Account Number</th>
+                        <td mat-cell *matCellDef="let item"><code class="account-code">{{ item.accountNumber }}</code></td>
+                      </ng-container>
+                      <ng-container matColumnDef="segment">
+                        <th mat-header-cell *matHeaderCellDef>Segment</th>
+                        <td mat-cell *matCellDef="let item">
+                          <span class="segment-chip" [style.background]="getSegmentColor(item.segment, 0.12)" [style.color]="getSegmentColor(item.segment)">{{ item.segment }}</span>
+                        </td>
+                      </ng-container>
+                      <ng-container matColumnDef="description">
+                        <th mat-header-cell *matHeaderCellDef>Description</th>
+                        <td mat-cell *matCellDef="let item" class="diff-added-text">{{ item.description }}</td>
+                      </ng-container>
+                      <tr mat-header-row *matHeaderRowDef="['accountNumber', 'segment', 'description']"></tr>
+                      <tr mat-row *matRowDef="let row; columns: ['accountNumber', 'segment', 'description'];"></tr>
+                    </table>
+                  </div>
+                </mat-tab>
+              }
+              @if (comparison()!.removed.length > 0) {
+                <mat-tab [label]="'Removed (' + comparison()!.summary.removed + ')'">
+                  <div class="diff-table-wrap">
+                    <table mat-table [dataSource]="comparison()!.removed" class="diff-table">
+                      <ng-container matColumnDef="accountNumber">
+                        <th mat-header-cell *matHeaderCellDef>Account Number</th>
+                        <td mat-cell *matCellDef="let item"><code class="account-code">{{ item.accountNumber }}</code></td>
+                      </ng-container>
+                      <ng-container matColumnDef="segment">
+                        <th mat-header-cell *matHeaderCellDef>Segment</th>
+                        <td mat-cell *matCellDef="let item">
+                          <span class="segment-chip" [style.background]="getSegmentColor(item.segment, 0.12)" [style.color]="getSegmentColor(item.segment)">{{ item.segment }}</span>
+                        </td>
+                      </ng-container>
+                      <ng-container matColumnDef="description">
+                        <th mat-header-cell *matHeaderCellDef>Description</th>
+                        <td mat-cell *matCellDef="let item" class="diff-removed-text">{{ item.description }}</td>
+                      </ng-container>
+                      <tr mat-header-row *matHeaderRowDef="['accountNumber', 'segment', 'description']"></tr>
+                      <tr mat-row *matRowDef="let row; columns: ['accountNumber', 'segment', 'description'];"></tr>
+                    </table>
+                  </div>
+                </mat-tab>
+              }
+              @if (comparison()!.changed.length > 0) {
+                <mat-tab [label]="'Changed (' + comparison()!.summary.changed + ')'">
+                  <div class="diff-table-wrap">
+                    <table mat-table [dataSource]="comparison()!.changed" class="diff-table">
+                      <ng-container matColumnDef="accountNumber">
+                        <th mat-header-cell *matHeaderCellDef>Account Number</th>
+                        <td mat-cell *matCellDef="let item"><code class="account-code">{{ item.accountNumber }}</code></td>
+                      </ng-container>
+                      <ng-container matColumnDef="segment">
+                        <th mat-header-cell *matHeaderCellDef>Segment</th>
+                        <td mat-cell *matCellDef="let item">
+                          <span class="segment-chip" [style.background]="getSegmentColor(item.segment, 0.12)" [style.color]="getSegmentColor(item.segment)">{{ item.segment }}</span>
+                        </td>
+                      </ng-container>
+                      <ng-container matColumnDef="oldDescription">
+                        <th mat-header-cell *matHeaderCellDef>Old Description</th>
+                        <td mat-cell *matCellDef="let item" class="diff-removed-text">{{ item.oldDescription }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="newDescription">
+                        <th mat-header-cell *matHeaderCellDef>New Description</th>
+                        <td mat-cell *matCellDef="let item" class="diff-added-text">{{ item.newDescription }}</td>
+                      </ng-container>
+                      <tr mat-header-row *matHeaderRowDef="['accountNumber', 'segment', 'oldDescription', 'newDescription']"></tr>
+                      <tr mat-row *matRowDef="let row; columns: ['accountNumber', 'segment', 'oldDescription', 'newDescription'];"></tr>
+                    </table>
+                  </div>
+                </mat-tab>
+              }
+            </mat-tab-group>
+
+            @if (comparison()!.truncated) {
+              <div class="truncation-notice">
+                <mat-icon>info</mat-icon>
+                <span>Results are limited to {{ comparison()!.diffLimit }} items per category. Full totals are shown in the summary above.</span>
+              </div>
+            }
+          </div>
+        } @else if (!comparisonLoading()) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon">compare_arrows</mat-icon>
+            <h3>Compare mSCOA Versions</h3>
+            <p>Select two chart versions above to see which posting-level accounts were added, removed, or changed between them.</p>
+          </div>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

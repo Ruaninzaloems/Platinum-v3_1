@@ -1,0 +1,117 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Evidence Vault</h1>
+      <div class="subtitle">Secure document management</div>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="kpi-card" matTooltip="Total number of evidence documents uploaded">
+      <div class="kpi-label">Total Documents</div>
+      <div class="kpi-value">{{ documents().length }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Combined file size of all uploaded documents">
+      <div class="kpi-label">Total Size</div>
+      <div class="kpi-value">{{ totalSizeFormatted() }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Number of unique document categories">
+      <div class="kpi-label">Categories</div>
+      <div class="kpi-value">{{ uniqueCategories().length }}</div>
+    </div>
+  </div>
+
+  <div
+    class="upload-area"
+    [class.drag-over]="isDragOver()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()"
+    matTooltip="Drag and drop files or click to browse for evidence documents to upload"
+  >
+    <mat-icon style="font-size: 36px; width: 36px; height: 36px; margin-bottom: 8px;">cloud_upload</mat-icon>
+    <div style="font-size: 14px; font-weight: 600; color: var(--platinum-text-secondary);">
+      Drag & drop files here or click to browse
+    </div>
+    <div style="font-size: 12px; margin-top: 4px;">Supported: PDF, DOCX, XLSX, CSV, Images</div>
+    <input #fileInput type="file" hidden (change)="onFileSelected($event)" multiple>
+  </div>
+
+  <div class="filters-bar" style="margin-top: 16px;">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex: 1; min-width: 200px;" matTooltip="Search documents by file name or category">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput placeholder="Search documents..." [(ngModel)]="searchQuery" (ngModelChange)="applyFilters()">
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 160px;" matTooltip="Filter documents by category tag">
+      <mat-label>Category</mat-label>
+      <mat-select [(ngModel)]="categoryFilter" (ngModelChange)="applyFilters()">
+        <mat-option value="">All Categories</mat-option>
+        @for (cat of uniqueCategories(); track cat) {
+          <mat-option [value]="cat">{{ cat }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (filteredDocuments().length === 0 && !loading()) {
+    <div class="empty-state">
+      <mat-icon>folder_open</mat-icon>
+      <h3>No documents found</h3>
+      <p>Upload evidence documents to get started.</p>
+    </div>
+  }
+
+  @if (filteredDocuments().length > 0) {
+    <div class="detail-card" style="padding: 0; overflow: auto;">
+      <table class="data-table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th matTooltip="Original file name of the uploaded document">File Name</th>
+            <th matTooltip="Document category classification">Category</th>
+            <th class="amount-col" matTooltip="File size of the document">Size</th>
+            <th matTooltip="SHA-256 cryptographic hash for document integrity verification">SHA-256 Hash</th>
+            <th matTooltip="User who uploaded the document">Uploaded By</th>
+            <th matTooltip="Date the document was uploaded">Date</th>
+            <th matTooltip="Verify document integrity against stored hash">Verified</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (doc of filteredDocuments(); track doc.id) {
+            <tr>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="font-size: 18px; width: 18px; height: 18px; color: var(--platinum-text-muted);" matTooltip="Evidence file">insert_drive_file</mat-icon>
+                  {{ doc.originalName || doc.fileName }}
+                </div>
+              </td>
+              <td>
+                @if (doc.category) {
+                  <mat-chip-set>
+                    <mat-chip [matTooltip]="'Category: ' + doc.category">{{ doc.category }}</mat-chip>
+                  </mat-chip-set>
+                } @else {
+                  —
+                }
+              </td>
+              <td class="amount-col" [matTooltip]="'File size: ' + formatSize(doc.fileSize)">{{ formatSize(doc.fileSize) }}</td>
+              <td>
+                <span style="font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px;" [matTooltip]="doc.sha256Hash ? 'Full hash: ' + doc.sha256Hash : 'No hash available'">
+                  {{ doc.sha256Hash ? doc.sha256Hash.substring(0, 16) + '...' : '—' }}
+                </span>
+              </td>
+              <td>{{ doc.uploadedBy }}</td>
+              <td>{{ doc.createdAt | date:'mediumDate' }}</td>
+              <td>
+                <button mat-stroked-button (click)="verifyDocument(doc.id); $event.stopPropagation();" style="font-size: 11px; line-height: 28px; height: 28px;" matTooltip="Re-verify document integrity by recalculating SHA-256 hash">
+                  <mat-icon style="font-size: 16px; width: 16px; height: 16px;">verified</mat-icon>
+                  Verify
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

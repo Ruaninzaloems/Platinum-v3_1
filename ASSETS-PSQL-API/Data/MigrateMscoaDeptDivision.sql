@@ -1,0 +1,4 @@
+ALTER TABLE "AssetConfig_mSCOA" ADD COLUMN IF NOT EXISTS "DepartmentID" INTEGER;
+ALTER TABLE "AssetConfig_mSCOA" ADD COLUMN IF NOT EXISTS "DivisionID" INTEGER;
+ALTER TABLE "Asset_DepreciationSchedule_Item" ADD COLUMN IF NOT EXISTS "DepartmentID" INTEGER;
+ALTER TABLE "Asset_DepreciationSchedule_Item" ADD COLUMN IF NOT EXISTS "DivisionID" INTEGER;

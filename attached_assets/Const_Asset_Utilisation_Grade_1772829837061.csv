@@ -1,0 +1,6 @@
+﻿AssetUtilisationGradeID,AssetUtilisationGradeDesc,Enabled,DateCaptured,CapturerID,DateModified,ModifierID,Default
+1,Not Used,1,2020-06-06 15:00:02.377,1,NULL,NULL,1
+2,Underused,1,2020-06-06 15:00:02.487,1,NULL,NULL,1
+3,Normal use,1,2020-06-06 15:00:02.533,1,NULL,NULL,1
+4,At capacity,1,2020-06-06 15:00:02.597,1,NULL,NULL,1
+5,Overloaded,1,2020-06-06 15:00:02.660,1,NULL,NULL,1

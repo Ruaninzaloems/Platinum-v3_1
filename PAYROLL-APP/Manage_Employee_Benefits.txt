@@ -1,0 +1,2054 @@
+HR/Payroll
+Manage Employee Benefits
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page
+
+Payroll
+
+Manage Employee Benefits
+
+Version 1.1
+21 October 2019
+
+SebataEMS
+Copyright © 2014 - Sebata Municipal Solutions (Pty) Ltd.
+All rights reserved. All information contained in this document is confidential and proprietary to
+Sebata Municipal Solutions (Pty) Ltd. No part of this document may be photocopied or reproduced
+in any manner without the prior written consent of Sebata Municipal Solutions (Pty) Ltd.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 2 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Table of Contents
+1.
+2.
+3.
+4.
+5.
+
+MANAGE EMPLOYEE BENEFITS .............................................................................................. - 4 PRE - REQUISITES .................................................................................................................. - 4 PROCESS FLOW FOR MANAGING EMPLOYEE BENEFIT PLANS .................................................. - 5 RULES AND VALIDATIONS TO MANAGE EMPLOYEE BENEFITS ................................................. - 7 SETUP EMPLOYEE BENEFITS PLANS ........................................................................................ - 8 5.1 Role and Permission for Managing Employee Benefits ................................................................. - 8 5.2 Adding Medical Aid Schemes Settings ........................................................................................... - 9 5.3 Adding Retirement Funds Settings .............................................................................................. - 13 6. LINK EMPLOYEE TO BENEFIT PLANS AND MAINTAIN DEPENDANTS ....................................... - 17 6.1 Add a Medical Aid Scheme .......................................................................................................... - 18 6.1.1 Scheme tab ........................................................................................................................... - 18 6.1.2 Transaction Tab .................................................................................................................... - 21 6.1.3 Dependants tab .................................................................................................................... - 23 6.2 Capture Retirement Funds .......................................................................................................... - 25 6.2.1 Pension tab ........................................................................................................................... - 25 6.2.2 Provident tab ........................................................................................................................ - 27 6.2.3 Retirement tab ..................................................................................................................... - 28 7. MAINTAIN EMPLOYEE LINKED BENEFIT PLANS ..................................................................... - 30 8. TERMINATE EMPLOYEE LINKED BENEFIT PLANS ................................................................... - 34 9. GENERATE BENEFIT REPORT ................................................................................................ - 38 11. CONFIGURATION SETTINGS FOR MANAGE EMPLOYEE BENEFITS .......................................... - 44 11.1 Medical Aid Schemes Settings ................................................................................................... - 44 11.2 Retirement Funds Settings ........................................................................................................ - 48 11.2.1 Pension fund ...................................................................................................................... - 48 11.2.2 Provident fund.................................................................................................................... - 52 11.2.3 Retirement Annuity fund ................................................................................................... - 55 12. GLOSSARY ........................................................................................................................... - 58 13. NOTES ................................................................................................................................. - 59 -
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 3 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+1. MANAGE EMPLOYEE BENEFITS
+
+Manage Employee Benefits 6.2.3
+6.2.3.1
+
+6.2.3.2
+
+6.2.3.3
+
+6.2.3.4
+
+6.2.3.5
+
+Set-up Employee
+Benefit plans
+
+Link Employee to
+Benefit Plans &
+Maintain
+Dependants
+
+Maintain
+Employee
+Linked Benefit
+Plans
+
+Terminate
+Employee
+Linked Benefit
+Plans
+
+Generate
+Benefit Report
+
+This manual includes the following processes:
+1. Set-up Employee Benefit plans
+2. Link Employee to Benefit Plans
+3. Maintain Employee Linked Benefit Plans
+4. Terminate Employee Linked Benefit Plans
+5. Generate Benefit Report
+
+Icon identifies the role player (Capturer)
+Icon identifies the role player (Approval)
+
+2. PRE - REQUISITES
+The following must be in place to register a manage employee benefits:
+1.
+
+Medical Aid fund setup must be completed
+
+2.
+
+Retirement funds setup must be completed
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 4 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+3. PROCESS FLOW FOR MANAGING EMPLOYEE BENEFIT PLANS
+Process Summary:
+Setup Employee Benefit Plans
+1.
+
+Go To: EMS→ Configuration→ HR/Payroll Settings→ Payroll→ Medical Aid Schemes/Retirement fund
+
+2.
+
+ADD MEDICAL AID SCHEMES/RETIREMENT FUNDS
+Click “Add New”
+
+3.
+
+Complete the field of the Medical Aid Schemes/Retirement Funds page
+
+4.
+
+Submit
+END OF PROCESS
+Link Employee to Benefits Plans and Maintain Dependants
+
+1.
+
+Go To: EMS→Payroll→Employee→ Employee Details→Earning and Deductions
+
+2.
+
+To add employee Benefits, search the employee and Click on “Earnings and Deductions” tab.
+
+3.
+
+Click and complete the Medical Aid tab. Make sure all tabs are completed under the medical aid tab
+
+4.
+
+Click and complete the Retirement Funds tab. If applicable complete all tabs under Retirement funds.
+
+6.
+
+Retirement funds and Medical Aid History tab will auto-populate as the system generates results for
+any changes to a Retirement status.
+
+7.
+
+Submit
+END OF PROCESS
+Maintain Employee Linked Benefit Plans
+
+1.
+
+Go To: EMS→Payroll→Employee→ Employee Details→Earning and Deductions
+
+2.
+
+To update employee Benefits, search the employee and Click on “Earnings and Deductions” tab.
+
+4.
+
+Click and update the Retirement Funds tab. If applicable complete all tabs under Retirement funds.
+
+5.
+
+Retirement funds History tab will auto-populate as the system generates results for any changes to a
+Retirement status.
+
+6.
+
+Submit
+END OF PROCESS
+Terminate Employee Linked Benefit Plans
+
+1.
+
+Go To: EMS→Payroll→Employee→ Employee Details→Earning and Deductions
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 5 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+2.
+
+To terminate employee Benefits, search the employee and Click on “Earnings and Deductions” tab
+
+3.
+
+Click and update the Medical Aid tab by clicking the Update icon
+
+4.
+
+Complete the termination date and click on Update
+
+5.
+
+Medical Aid funds History tab will auto-populate as the system generates results for any changes to a
+Medical Aid status.
+
+6.
+
+Submit
+END OF PROCESS
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 6 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+4. RULES AND VALIDATIONS TO MANAGE EMPLOYEE BENEFITS
+The following Rules and Validations Apply:
+1.
+
+Permission rights to manage Employee benefits should be set up on the system.
+
+2.
+
+All compulsory fields * must be completed.
+
+3.
+
+The system will notify the capturer of any outstanding information needed to complete the
+“Employee Benefits” process.
+
+4.
+
+Missing fields will be indicated by a rules and validation information pop-up.
+
+“Add New” function button
+
+“Add New” information on System.
+
+“Submit” function button
+
+Save information on system.
+
+“Cancel” function button
+
+To return to the Previous Page.
+
+“Edit” function button
+
+Edit information on System.
+
+“Next” function button
+
+Navigate user to the next tab.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 7 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+5. SETUP EMPLOYEE BENEFITS PLANS
+Link Employee to
+Benefit Plans and
+Maintain
+Dependants
+
+Set Employee
+Benefit Plans
+
+Access
+
+Maintain
+Employee
+Linked
+Benefit Plans
+
+Terminate
+Employee
+Linked
+Benefit Plans
+
+Generate
+Benefit
+Report
+
+Capturer
+
+All supporting documents must be presented with the setting up of Employee Benefits.
+Specific Outcomes:
+➢ Successfully Setup Employee Benefits Plans
+5.1 Role and Permission for Managing Employee Benefits
+By adding the following permission to the user’s profile for the setup of the configurations. If a user has
+access to employee detail page, user will be able to link benefits.
+
+Employee Benefits Policy
+
+Stipulate the rules and regulation to follow creating employee Benefit
+Plans.
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 8 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+5.2 Adding Medical Aid Schemes Settings
+In this section we add different medical aid schemes that will be linked to an employee for a period.
+Payroll is date driven, it’s important to capture the correct start date for changes to records. From when
+a change should apply. The system will always default the End date to 31/12/9999.It is important to
+always populate the correct start date, in order to keep track of when changes in benefits occurred.
+If a new start date is captured the system will update the previous record/s end date to a day before the
+new start date to ensure that all changes to the medical aid is kept. An employee can only have one
+medical aid linked to it for a period and to see the history of which period the medical aid was active in
+the system
+Follow the below menu path:
+
+Configuration
+
+HR/Payroll
+Settings
+
+Payroll
+
+Medical Aid
+Schemes
+
+Click on “configuration icon”
+Click on “HR/Payroll Settings”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 9 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Payroll”
+Select “Medical Aid Schemes” from list of values
+Medical Aid Schemes
+
+Click “Add New”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 10 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Capture required information as per the table below
+Click “Submit”
+Step
+
+Field
+
+Description
+
+1.
+
+Start Date*
+
+Capture the Start Date
+
+2.
+
+Medical Aid Schemes*
+
+Select from the drop-down list as per the medical aid schemes
+created in config.
+
+3.
+
+Medical Aid Contribution
+Plan*
+
+Captured by the user
+
+4.
+
+Minimum Monthly Income
+
+Captured by the user
+
+5.
+
+Main Member Contribution* Captured by the user
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 11 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.
+
+Child Dependent
+Contribution*
+
+Captured by the user
+
+7.
+
+Student Dependant
+
+Tick box, if necessary. This will allow the contributions to be
+accurate for a student dependent.
+
+8.
+
+Disabled Dependant
+
+Tick box, if necessary
+
+9.
+
+End Date*
+
+Captured by the user
+
+10.
+
+Maximum Employer
+Contribution*
+
+Captured by the user
+
+11.
+
+Employer Contribution
+Percentage*
+
+Captured by the user
+
+12.
+
+Maximum Monthly Income
+
+Captured by the user
+
+13.
+
+Adult Dependent
+Contribution*
+
+Captured by the user
+
+14.
+
+Maximum on Child
+Dependents only
+
+Tick box, if necessary
+
+15.
+
+Maximum Dependents*
+
+Captured by the user
+
+Student Dependent
+
+If student tick-box is selected, and dependent is currently an adult,
+validate if dependent age is <=to Student Valid To age from the
+medical constant, then dependent type will be Child Dependent else
+Adult dependent. Same rule applies to Disabled dependents.
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 12 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+5.3 Adding Retirement Funds Settings
+In this section, the Capturer can add different types of retirement benefits such as pension, provident
+and retirement fund that will be linked to an employee for a period.
+It’s extremely important to populate Fund type and applicable Fund Category Factor correctly as it will
+impact the Fringe benefit linked to the Retirement fund and the monthly PAYE calculation for the
+employees that are linked to the specific funds.
+Follow the below menu path:
+Configuration
+
+HR/Payroll
+Settings
+
+Payroll
+
+Retirement
+Funds
+
+Click on “Configuration” icon
+Click on “HR/Payroll Settings”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 13 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Payroll”
+Click on “Retirement Funds”
+
+Click on “Add New”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 14 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Select the Benefit type from the drop-down list, in this case we select “Pension fund”
+Click on “Submit”
+
+Complete the required field marked in red star and click on “Submit”.
+Step
+
+Field
+
+1.
+
+Pension Fund Administrator* Select Pension Fund Administrator from drop-down list as per
+the config setup
+
+2.
+
+Clearance No*
+
+Enter Clearance number from the Clearance field
+
+3.
+
+Fund Type*
+
+Select Fund type from drop-down list
+
+SEBATA_Version_1.1_2019
+
+Description
+
+Copyright © Sebata Municipal Solutions
+
+Page - 15 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+4.
+
+Contribution type
+
+Tick Contribution type applicable
+
+5.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employer
+
+6.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employer
+
+7.
+
+Plan Name*
+
+Complete the Plan Name in the plan name field
+
+8.
+
+Fund Category Factor*
+
+Enter Fund Category Factor in the fund category factor field
+
+9.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employee
+
+10.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employee
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 16 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6. LINK EMPLOYEE TO BENEFIT PLANS AND MAINTAIN DEPENDANTS
+Link Employee to
+Benefit Plans and
+Maintain
+Dependants
+
+Set Employee
+Benefit Plans
+
+Access
+
+Maintain
+Employee
+Linked
+Benefit Plans
+
+Terminate
+Employee
+Linked
+Benefit Plans
+
+Generate
+Benefit
+Report
+
+Capturer
+
+All supporting documents must be presented with the setting up of Employee Benefits.
+Specific Outcomes:
+Outcomes:
+➢ Add Medical Aid Scheme to Employee information
+➢ Add Retirement Fund to Employee information
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 17 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.1 Add a Medical Aid Scheme
+6.1.1 Scheme tab
+In this section the user captures all the medical aid details of an employee such as the fund, plan and
+dates.
+
+Click on Payroll in the primary menu, click on “Employee” in the secondary menu
+Click on “Employee Details”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 18 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Enter the employee number in the Employee number field or Click on “Search”
+
+Click Medical Aid tab under Earnings and Deductions
+Click “Add Scheme”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 19 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Step
+
+Field
+
+Description
+
+1.
+
+Fund*
+
+Select Fund from the drop-down list
+
+2.
+
+Plan*
+
+Select Plan from the drop-down list
+
+3.
+
+Medical Aid Reference
+number
+
+Complete the reference number of the employee at the fund if
+applicable. The detail is important to populate benefit reports
+to the funds.
+
+4.
+
+Join Date*
+
+Enter date in the Join Date field
+
+5.
+
+Add
+
+Click “Add”
+
+Move over to the Extra Transaction tab
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 20 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.1.2 Transaction Tab
+In this section, the user captures any extra transactions related to the employee medical aid benefit,
+such as late joiner fee and any arrears amount contributions (if an adult dependent did not belong to
+any medical aid scheme before, then he get to pay a joiner fee as stipulated by most schemes).
+
+Click “Add Transaction”
+
+Step
+
+Field
+
+Description
+
+1.
+
+Contribution Type*
+
+Select Contribution type (Late joiner or arrear contribution)
+from the drop-down list
+
+2.
+
+Period From*
+
+Enter date from in the Period From field
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 21 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+3.
+
+Employer to Contribute*
+
+Select what is applicable
+
+4.
+
+Amount*
+
+Enter the amount in the Amount field
+
+5.
+
+Period To*
+
+Capture date in the Period To field
+
+6.
+
+Add
+
+Click “Add”
+
+The below transaction line will populate, where user can either edit or delete the line item
+
+Click “Submit”
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 22 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.1.3 Dependants tab
+In this section, if an employee has dependants that need to be included in the medical aid scheme.
+Dependants can be added by the Capturer.
+
+Click on “Add Dependant” button
+Complete all the mandatory fields marked in red star, then click on “Add” button
+
+Step
+
+Field
+
+Description
+
+1.
+
+Start Date*
+
+Capture start date in the Start Date field
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 23 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+2.
+
+Name*
+
+Capture Name in the Name field
+
+3.
+
+Surname*
+
+Capture Surname in the Surname field
+
+4.
+
+Gender*
+
+Select Gender in the drop-down list
+
+5.
+
+Employer Contribute*
+
+Tick this check box if the employer contributes, but if employer
+does not contribute DO NOT tick it.
+
+6.
+
+Dependant Type*
+
+Select Dependant Type in the drop-down list
+
+7.
+
+Add
+
+Click “Add”
+
+The below screen will appear, and user can be able to see the transaction, edit or delete the line item.
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 24 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.2 Capture Retirement Funds
+There are different types of retirement funds that employee can be linked to. Such as Pension fund,
+Provident fund and Retirement annuity.
+The employer’s contribution to a retirement fund (pension fund, provident fund or retirement annuity
+fund) is a fringe benefit taxed in the employee’s hands. Employees own contributions to a retirement
+fund plus the employer contributions to a retirement fund, are tax deductible up to certain limits, in
+employees’ hands. The growth and income within a fund while the employees are a member of the fund
+is tax free. Tax is only payable when the employees access the funds.
+Validation on retirement funds exists. The employer can only contribute to one; either Pension,
+Provident or Retirement funds, not all three.
+
+6.2.1 Pension tab
+
+Click on “Add Pension” under pension tab
+Complete fields marked with red under “Pension ”
+Click “Add Pension”.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 25 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Step
+
+Field
+
+Description
+
+1.
+
+Fund*
+
+Select fund from the drop-down list.
+
+2.
+
+Plan*
+
+Select Plan from the drop-down list
+
+4.
+
+Join Date*
+
+Capture the joining date from the Join Date field
+
+5.
+
+Terminate Date*
+
+Auto-populates
+
+6.
+
+Add*
+
+Click on “Add button”
+
+Private and Non-Private radio
+button
+
+If Non-Private is selected, it means the contributions will reflect on
+the payslip for company contributions and deductions. If Private radio
+button is selected the contributions will not reflect on the payslip as
+that means the employer will not contribute to the fund.
+Private option is used for PAYE calculation only to give employees the
+tax benefit for funds they belong to that they pay themselves through
+a debit order
+
+Move over to Provident fund if applicable.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 26 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.2.2 Provident tab
+
+Click on “Add Provident”
+
+Step
+
+Field
+
+Description
+
+1.
+
+Is Current*
+
+Tick-box, if applicable
+
+2.
+
+Fund*
+
+Select Fund from the drop-down list
+
+4.
+
+Plan*
+
+Select Plan from the drop-down list
+
+5.
+
+Join Date*
+
+Capture the joining date from the Join Date field
+
+6.
+
+Provident Amount*
+
+Enter the amount in the Provident Amount field
+
+7.
+
+Add
+
+Click on “Add”
+
+Private and Non-Private radio
+button
+
+SEBATA_Version_1.1_2019
+
+If Non private is selected, it means the contributions will reflect on the
+payslip for company contributions and deductions. If Private radio
+button is selected the contributions will not reflect on the payslip as
+that means the employer will not contribute to the fund.
+
+Copyright © Sebata Municipal Solutions
+
+Page - 27 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Is Current
+
+Private option is used for PAYE calculation only to give employees the
+tax benefit for funds they belong to that they pay themselves through
+a debit order
+It means the employer contribute and not only the employee
+
+Move over to Retirement fund tab if applicable
+6.2.3 Retirement tab
+
+Click on “Add Retirement” button
+Complete all mandatory fields marked in red star then click on “Add” button.
+
+Step
+
+Field
+
+Description
+
+1.
+
+Is Current*
+
+Tick-box, if applicable (If ticked, means employer contribute)
+
+2.
+
+Fund*
+
+Select Fund from the drop-down list
+
+4.
+
+Plan*
+
+Select Plan from the drop-down list
+
+5.
+
+Join Date*
+
+Capture the joining date from the Join Date field
+
+6.
+
+Termination Date*
+
+Auto-populates
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 28 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+7.
+
+Employee Contribution*
+
+Enter the amount in the Employee Contribution field
+
+8.
+
+Employer Contribution*
+
+Enter the amount in the Employer Contribution field
+
+9.
+
+Add
+
+Click on “Add” button
+
+Private and Non-Private radio
+button
+
+Is Current
+
+If Non private is selected, it means the contributions will reflect on the
+payslip for company contributions and deductions. If Private radio
+button is selected the contributions will not reflect on the payslip as
+that means the employer will not contribute to the fund.
+Private option is used for PAYE calculation only to give employees the
+tax benefit for funds they belong to that they pay themselves through
+a debit order
+It means the employer contribute and not only the employee
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 29 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+7. MAINTAIN EMPLOYEE LINKED BENEFIT PLANS
+
+Link Employee to
+Benefit Plans
+and Maintain
+Dependants
+
+Set Employee
+Benefit Plans
+
+Access
+
+Maintain
+Employee
+Linked
+Benefit Plans
+
+Terminate
+Employee
+Linked
+Benefit Plans
+
+Generate
+Benefit
+Report
+
+Capturer
+
+All supporting documents must be presented with the setting up of Employee Benefits.
+Specific Outcomes:
+Outcomes:
+➢ Maintain/Change Employee Linked Benefit Plan
+In this section, if for example an employee wants to increase/decrease his contribution to the current
+retirement fund benefit or if he wants to make any changes to the fund. The changes will be made, and
+system will be updated with the new amount/information.
+
+Click on Payroll in the primary menu, click on “Employee” in the secondary menu
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 30 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Employee Details”
+
+Enter the employee number in the Employee number field or Click on “Search”
+
+Click on “Retirement tab” under Retirement Funds tab
+Click on “Update icon”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 31 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Update the amount or any other information you want updated
+Click on “Update”
+
+Click “Submit”
+The below successful submission screen will populate
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 32 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click “Ok”
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 33 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+8. TERMINATE EMPLOYEE LINKED BENEFIT PLANS
+Link Employee to
+Benefit Plans and
+Maintain
+Dependants
+
+Set Employee
+Benefit Plans
+
+Access
+
+Maintain
+Employee
+Linked
+Benefit Plans
+
+Terminate
+Employee
+Linked
+Benefit Plans
+
+Generate
+Benefit
+Report
+
+Capturer
+
+All supporting documents must be presented with terminating Employee Linked Benefits.
+Specific Outcomes:
+Outcomes:
+➢ Terminate Employee Linked Benefit Plan
+In this section, should an employee want to terminate one of his benefits such as medical aid fund with
+a fund provider for reasons like resignation/retirement or termination, the payroll officer can go into
+the system and put an end date to the benefit. Termination process will update the end date of the
+benefits to the termination date. The user can change the end date of e.g. a Medical aid plan if the
+employees move between funds or stop the medical aid benefit while still employed.Therefore, an
+employee will no longer have that benefit linked to him. Then a new record can be created for the new
+benefit.
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 34 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on Payroll in the primary menu, click on “Employee” in the secondary menu
+Click on “Employee Details”
+
+Enter the employee number in the Employee number field and/or Click on “Search”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 35 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Medical Aid tab” under Earnings and Deductions tab
+Click on “Update icon”
+
+Enter the termination date in the Termination Date field
+Click “Update”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 36 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Note the Termination date
+Click “Submit”
+The below screen will populate.
+
+Click “Ok”
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 37 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+9. GENERATE BENEFIT REPORT
+
+Set Employee
+Benefit Plans
+
+Link Employee to
+Benefit Plans and
+Maintain
+Dependants
+
+Maintain
+Employee
+Linked
+Benefit Plans
+
+Terminate
+Employee
+Linked
+Benefit Plans
+
+Generate
+Benefit
+Report
+
+The below menu is used to select and generate the Employee Detail Report:
+Payroll
+
+Reports
+
+Config ReportsPayroll
+
+Benefit Detail
+
+Specific Outcomes:
+➢ Successfully generate reports.
+Medical Aid Scheme Report
+
+Select “Reports” from the sub-menu
+Select “Config Reports-Payroll” under Reports menu
+Then select “Medical Aid Scheme” from the list of values
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 38 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+The following Report will populate for analysis.
+Benefit Detail Report for Retirements
+
+Select “Reports” from the sub-menu
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 39 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Select “Config Reports-Payroll” under Reports menu
+Then select “Benefit Detail” from the list of values
+
+Report will populate for analysis.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 40 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+To show users monthly contributions per employee, the below report can be populated and be send to
+third parties.
+
+Click on “Reports” from sub menu
+Click on “Financial” under the Reports menu
+Select “Third Party Schedule”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 41 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Select the month from the drop-down list
+Select Cycle from the drop-down list
+Select the Template from drop-down list
+Based on the template selection the Creditor, File name and tick-boxes will auto-populate
+Click “Submit”
+
+Templates must first be created by the user and saved, then the template will appear the drop-down.
+This report gives the user the flexibility to setup a report with the relevant information they want to see
+in it. Template setup is a once-off action thereafter the template can be reused.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 42 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+The above Report will populate.
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 43 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+11. CONFIGURATION SETTINGS FOR MANAGE EMPLOYEE BENEFITS
+For more Detailed Information – refer to HR/Payroll Configuration Manual
+Access
+
+System Administrator
+
+11.1 Medical Aid Schemes Settings
+In this section a capturer can add different medical aid schemes that will be linked to an employee for a
+period. Payroll section is date driven, it’s important to put an end date.
+Whenever increase for medical aid occurs, the capturer will have to update the system with the new
+tariffs once a year.
+
+Click on “Configuration icon”
+Click on “HR/Payroll Settings” from the configuration menu
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 44 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Payroll”
+Select “Medical Aid Schemes” from list of values
+
+Click “Add New”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 45 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Capture required information as per the table below
+Click “Submit”
+Step
+
+Field
+
+Description
+
+1.
+
+Start Date*
+
+Capture the Start Date
+
+2.
+
+Medical Aid Schemes*
+
+Select from the drop-down list
+
+3.
+
+Medical Aid Contribution
+Plan*
+
+Capture contribution plan
+
+4.
+
+Minimum Monthly Income
+
+Capture amount
+
+5.
+
+Main Member Contribution* Capture contribution amount
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 46 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+6.
+
+Child Dependent
+Contribution*
+
+Capture contribution amount, if applicable
+
+7.
+
+Student Dependent
+
+Tick box, if applicable
+
+8.
+
+Disabled Dependent
+
+Tick box, if applicable
+
+9.
+
+End Date*
+
+Capture End date
+
+10.
+
+Maximum Employer
+Contribution*
+
+Capture amount if applicable
+
+11.
+
+Employer Contribution
+Percentage*
+
+Capture % if applicable
+
+12.
+
+Maximum Monthly Income
+
+Captured amount
+
+13.
+
+Adult Dependent
+Contribution*
+
+Capture contribution amount if applicable
+
+14.
+
+Maximum on Child
+Dependents only
+
+Tick box, if necessary
+
+15.
+
+Maximum Dependents*
+
+Capture maximum number of dependents, if 3 is the max, and
+if employee has 4 then the 4th one will not be paid by the
+medical aid as a child dependent.
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 47 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+11.2 Retirement Funds Settings
+The Capturer can add different types of retirement benefits such as pension, provident and retirement
+fund that will be linked to an employee for a period.
+Fund type is extremely important to populate it correctly as well as fund category applicable to fund
+type, because depending on this setting determine the tax fringe benefit for the employees that are
+linked to the specific funds.
+11.2.1 Pension fund
+
+Click on “Configuration” icon
+Click on “HR/Payroll Settings”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 48 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Payroll”
+Click on “Retirement Funds”
+
+Click on “Add New”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 49 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Select the Benefit type from the drop-down list, in this case we select “Pension fund”
+Click on “Submit”
+
+Complete the required field marked in red star and click on “Submit”.
+Step
+
+Field
+
+1.
+
+Pension Fund Administrator* Select Pension Fund Administrator from drop-down list
+
+2.
+
+Clearance No*
+
+Enter Clearance number from the Clearance field
+
+3.
+
+Fund Type*
+
+Select Fund type from drop-down list
+
+4.
+
+Contribution type
+
+Tick Contribution type applicable
+
+SEBATA_Version_1.1_2019
+
+Description
+
+Copyright © Sebata Municipal Solutions
+
+Page - 50 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+5.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employer
+
+6.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employer
+
+7.
+
+Plan Name*
+
+Complete the Plan Name in the plan name field
+
+8.
+
+Fund Category Factor*
+
+Enter Fund Category Factor in the fund category factor field
+
+9.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employee
+
+10.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employee
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 51 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+11.2.2 Provident fund
+
+Click on “Configuration” icon
+Click on “HR/Payroll Settings”
+
+Click on “Payroll”
+Click on “Retirement Funds”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 52 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Add New”
+
+Select the Benefit type from the drop-down list, in this case we select “Provident fund”
+Click on “Submit”
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 53 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Complete the required field marked in red star and click on “Submit”.
+Step
+
+Field
+
+1.
+
+Provident
+Administrator*
+
+Fund Select Provident Fund Administrator from drop-down list
+
+2.
+
+Clearance No*
+
+Enter Clearance number from the Clearance field
+
+3.
+
+Fund Type*
+
+Select Fund type from drop-down list
+
+4.
+
+Contribution type
+
+Tick Contribution type applicable
+
+5.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employer
+
+6.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employer
+
+7.
+
+Plan Name*
+
+Complete the Plan Name in the plan name field
+
+8.
+
+Fund Category Factor*
+
+Enter Fund Category Factor in the fund category factor field
+
+9.
+
+Contribution Value*
+
+Enter contribution value that will be contributed by employee
+
+10.
+
+Maximum Value*
+
+Enter maximum value that will be contributed by employee
+
+11.
+
+Submit
+
+Click “Submit”
+
+SEBATA_Version_1.1_2019
+
+Description
+
+Copyright © Sebata Municipal Solutions
+
+Page - 54 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+11.2.3 Retirement Annuity fund
+
+Click on “Configuration” icon
+Click on “HR/Payroll Settings”
+
+Click on “Payroll”
+Click on “Retirement Funds”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 55 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Click on “Add New”
+
+Select the Benefit type from the drop-down list, in this case we select “Retirement Annuities”
+Click on “Submit”
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 56 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+Complete the required field marked in red star and click on “Submit”.
+Step
+
+Field
+
+Description
+
+1.
+
+Retirement Fund
+Administrator*
+
+Select Retirement Fund Administrator from drop-down list
+
+2.
+
+Clearance No*
+
+Enter Clearance number from the Clearance field
+
+3.
+
+Fund Type*
+
+Select Fund type from drop-down list
+
+4.
+
+Fund Name*
+
+Complete Fund name in the Fund Name field
+
+5.
+
+Fund Category Factor*
+
+Enter Fund Category Factor in the field
+
+6.
+
+Submit
+
+Click “Submit”
+
+Notes:
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 57 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+12.GLOSSARY
+Authorisation / Approval
+
+The power or right to make decisions.
+
+Refine Search
+
+By using multiple “Search Options”, a more specific search can be
+done on the System.
+
+Validation
+
+To confirm that correct information is entered to continue with the
+Process.
+
+Configuration Settings
+
+Various reasons for use of parameters and initial settings for the
+System to apply these instructions.
+
+Compulsory Fields
+
+Field must be entered to continue with the process.
+
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 58 -of 59
+
+Payroll
+
+Manage Employee Benefits
+
+13.NOTES
+
+-END OF PROCESS
+SEBATA_Version_1.1_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 59 -of 59
+
+

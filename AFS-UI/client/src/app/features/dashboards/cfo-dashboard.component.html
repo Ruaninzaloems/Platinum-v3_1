@@ -1,0 +1,270 @@
+<div class="cfo-dashboard">
+  <div class="page-header">
+    <div>
+      <h1>CFO Executive Dashboard</h1>
+      <p class="subtitle">Real-time financial position and audit readiness overview</p>
+    </div>
+    <div class="header-actions">
+      <mat-form-field appearance="outline" class="period-filter-field">
+        <mat-label>Reporting Period</mat-label>
+        <mat-select [(ngModel)]="selectedPeriod" (selectionChange)="onPeriodChange()">
+          @for (p of periodOptions; track p.value) {
+            <mat-option [value]="p.value">{{ p.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span class="fy-badge" *ngIf="dashData()?.financialYear">
+        <mat-icon>calendar_today</mat-icon>
+        {{ dashData()?.financialYear?.label }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="skeleton-grid">
+    <div class="skeleton-card" *ngFor="let s of [1,2,3,4,5,6]">
+      <div class="skeleton-line w60"></div>
+      <div class="skeleton-line w40 h24"></div>
+      <div class="skeleton-line w80"></div>
+    </div>
+  </div>
+
+  <div *ngIf="!loading() && dashData()">
+    <!-- KPI Strip -->
+    <div class="kpi-strip">
+      <app-kpi-tile
+        [title]="'Net Surplus / Deficit'"
+        [value]="formatCurrency(surplus())"
+        [subtitle]="surplusLabel()"
+        [icon]="'account_balance'"
+        [trend]="surplus() >= 0 ? 'up' : 'down'"
+        [trendValue]="surplusPercent()"
+        [color]="surplus() >= 0 ? 'success' : 'danger'"
+      />
+      <app-kpi-tile
+        [title]="'Current Ratio'"
+        [value]="ratioValue('Current Ratio')"
+        [subtitle]="ratioNorm('Current Ratio')"
+        [icon]="'balance'"
+        [trend]="ratioTrend('Current Ratio')"
+        [color]="ratioColor('Current Ratio')"
+      />
+      <app-kpi-tile
+        [title]="'Collection Rate'"
+        [value]="ratioValue('Debt Collection Rate')"
+        [subtitle]="ratioNorm('Debt Collection Rate')"
+        [icon]="'payments'"
+        [trend]="ratioTrend('Debt Collection Rate')"
+        [color]="ratioColor('Debt Collection Rate')"
+      />
+      <app-kpi-tile
+        [title]="'CAPEX as % of Spend'"
+        [value]="ratioValue('CAPEX as % of Total Spend')"
+        [subtitle]="ratioNorm('CAPEX as % of Total Spend')"
+        [icon]="'construction'"
+        [trend]="'neutral'"
+        [color]="ratioColor('CAPEX as % of Total Spend')"
+      />
+      <app-kpi-tile
+        [title]="'Employee Cost %'"
+        [value]="ratioValue('Salaries & Wages %')"
+        [subtitle]="ratioNorm('Salaries & Wages %')"
+        [icon]="'groups'"
+        [trend]="ratioTrend('Salaries & Wages %')"
+        [color]="ratioColor('Salaries & Wages %')"
+      />
+      <app-kpi-tile
+        [title]="'AFS Readiness'"
+        [value]="dashData()!.kpis.avgCompleteness + '%'"
+        [subtitle]="dashData()!.kpis.totalCompilations + ' compilations'"
+        [icon]="'task_alt'"
+        [trend]="dashData()!.kpis.avgCompleteness >= 80 ? 'up' : 'down'"
+        [color]="dashData()!.kpis.avgCompleteness >= 80 ? 'success' : dashData()!.kpis.avgCompleteness >= 50 ? 'warning' : 'danger'"
+      />
+    </div>
+
+    <!-- Main Charts Row -->
+    <div class="main-row">
+      <mat-card class="chart-card revenue-chart">
+        <mat-card-header>
+          <mat-card-title>Revenue vs Expenditure</mat-card-title>
+          <mat-card-subtitle>Budget comparison for current financial year</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="bar-chart" *ngIf="dashData()!.budgetVsActual.length > 0">
+            <div class="bar-group" *ngFor="let item of dashData()!.budgetVsActual">
+              <div class="bar-label">{{ item.category }}</div>
+              <div class="bar-container">
+                <div class="bar actual" [style.width.%]="barWidth(item.actual, maxBudgetActual())" matTooltip="Actual: {{ formatCurrency(item.actual) }}">
+                  <span class="bar-value">{{ formatCurrency(item.actual) }}</span>
+                </div>
+                <div class="bar budget" [style.width.%]="barWidth(item.budget, maxBudgetActual())" matTooltip="Budget: {{ formatCurrency(item.budget) }}">
+                  <span class="bar-value">{{ formatCurrency(item.budget) }}</span>
+                </div>
+              </div>
+              <div class="variance-badge" [class.positive]="item.variance >= 0" [class.negative]="item.variance < 0">
+                {{ item.variancePercent >= 0 ? '+' : '' }}{{ item.variancePercent.toFixed(1) }}%
+              </div>
+            </div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="dot actual"></span> Actual</span>
+            <span class="legend-item"><span class="dot budget"></span> Budget</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="side-panel">
+        <mat-card class="health-card">
+          <mat-card-header>
+            <mat-card-title>Financial Health</mat-card-title>
+          </mat-card-header>
+          <mat-card-content class="gauge-center">
+            <app-gauge-chart
+              [value]="overallHealthScore()"
+              [label]="'Overall Score'"
+              [thresholds]="healthThresholds"
+            />
+          </mat-card-content>
+        </mat-card>
+
+        <div class="insight-list">
+          <app-ai-insight-card
+            *ngFor="let insight of aiInsights()"
+            [insight]="insight"
+            (actionClicked)="onInsightAction($event)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+      <mat-card class="risk-card">
+        <mat-card-header>
+          <mat-card-title>Top Risk Areas</mat-card-title>
+          <mat-card-subtitle>Based on financial ratios and audit data</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <table class="risk-table">
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Status</th>
+                <th>Key Metric</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let risk of topRisks()">
+                <td class="risk-area">{{ risk.area }}</td>
+                <td><app-traffic-light [status]="risk.status" [label]="''"/></td>
+                <td>{{ risk.metric }}</td>
+                <td class="risk-value">{{ risk.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="audit-card">
+        <mat-card-header>
+          <mat-card-title>Audit Status Summary</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="audit-metrics">
+            <div class="audit-metric">
+              <div class="metric-value" [class.danger]="dashData()!.kpis.openRfis > 10">{{ dashData()!.kpis.openRfis }}</div>
+              <div class="metric-label">Open RFIs</div>
+              <div class="metric-sub" *ngIf="dashData()!.kpis.overdueRfis > 0">
+                <mat-icon class="warn-icon">warning</mat-icon> {{ dashData()!.kpis.overdueRfis }} overdue
+              </div>
+            </div>
+            <div class="audit-metric">
+              <div class="metric-value" [class.danger]="dashData()!.kpis.unresolvedFindings > 5">{{ dashData()!.kpis.unresolvedFindings }}</div>
+              <div class="metric-label">Unresolved Findings</div>
+              <div class="metric-sub">{{ dashData()!.findingsBySeverity?.['material'] || 0 }} material</div>
+            </div>
+            <div class="audit-metric">
+              <app-progress-ring [value]="dashData()!.kpis.wpCompletion" [size]="64" [color]="dashData()!.kpis.wpCompletion >= 80 ? '#22c55e' : '#f59e0b'"/>
+              <div class="metric-label">WP Completion</div>
+            </div>
+            <div class="audit-metric">
+              <div class="metric-value compliance">{{ dashData()!.complianceScore }}%</div>
+              <div class="metric-label">Compliance Score</div>
+              <mat-progress-bar mode="determinate" [value]="dashData()!.complianceScore"
+                [color]="dashData()!.complianceScore >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Financial Position Strip -->
+    <mat-card class="position-card">
+      <mat-card-header>
+        <mat-card-title>Statement of Financial Position</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="position-strip">
+          <div class="position-item" *ngIf="dashData()!.tbSummary">
+            <span class="pos-label">Total Assets</span>
+            <span class="pos-value">{{ formatCurrency(Math.abs(dashData()!.tbSummary!.totalAssets)) }}</span>
+          </div>
+          <div class="position-divider">—</div>
+          <div class="position-item" *ngIf="dashData()!.tbSummary">
+            <span class="pos-label">Total Liabilities</span>
+            <span class="pos-value">{{ formatCurrency(Math.abs(dashData()!.tbSummary!.totalLiabilities)) }}</span>
+          </div>
+          <div class="position-divider">=</div>
+          <div class="position-item highlight" *ngIf="dashData()!.tbSummary">
+            <span class="pos-label">Net Assets</span>
+            <span class="pos-value">{{ formatCurrency(Math.abs(dashData()!.tbSummary!.netAssets)) }}</span>
+          </div>
+          <div class="position-divider">|</div>
+          <div class="position-item" *ngIf="dashData()!.tbSummary">
+            <span class="pos-label">Total Revenue</span>
+            <span class="pos-value revenue">{{ formatCurrency(Math.abs(dashData()!.tbSummary!.totalRevenue)) }}</span>
+          </div>
+          <div class="position-divider">—</div>
+          <div class="position-item" *ngIf="dashData()!.tbSummary">
+            <span class="pos-label">Total Expenditure</span>
+            <span class="pos-value expenditure">{{ formatCurrency(Math.abs(dashData()!.tbSummary!.totalExpenditure)) }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- EMS Connection Status -->
+    <mat-card class="ems-status-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon class="ems-icon">integration_instructions</mat-icon>
+          EMS Data Connection
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ems-status-strip">
+          <div class="ems-connection-status">
+            <div class="ems-dot" [class.connected]="emsStatus() === 'connected'" [class.disconnected]="emsStatus() !== 'connected'"></div>
+            <span class="ems-conn-label">{{ emsStatus() === 'connected' ? 'Connected to EMS' : emsStatus() === 'disconnected' ? 'EMS Disconnected' : 'Checking...' }}</span>
+          </div>
+          <div class="ems-stats" *ngIf="emsStats()">
+            <div class="ems-stat">
+              <span class="ems-stat-value">{{ emsStats()!.assetCount ?? '—' }}</span>
+              <span class="ems-stat-label">Assets</span>
+            </div>
+            <div class="ems-stat">
+              <span class="ems-stat-value">{{ emsStats()!.vendorCount ?? '—' }}</span>
+              <span class="ems-stat-label">Vendors</span>
+            </div>
+            <div class="ems-stat">
+              <span class="ems-stat-value">{{ emsStats()!.activePayroll ?? '—' }}</span>
+              <span class="ems-stat-label">Active Payroll</span>
+            </div>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

@@ -1,0 +1,1253 @@
+    <div class="contracts-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'main') {
+        <div class="tab-nav main-tabs">
+          <button class="tab-btn" [class.active]="mainTab() === 'dashboard'" (click)="mainTab.set('dashboard'); loadDashboardData()">
+            <mat-icon>dashboard</mat-icon> Dashboard
+          </button>
+          <button class="tab-btn" [class.active]="mainTab() === 'list'" (click)="mainTab.set('list'); loadContracts()">
+            <mat-icon>list_alt</mat-icon> Contract List
+          </button>
+          <button class="tab-btn" [class.active]="mainTab() === 'expiring'" (click)="mainTab.set('expiring'); loadExpiring(30)">
+            <mat-icon>schedule</mat-icon> Expiring
+          </button>
+          <button class="tab-btn" [class.active]="mainTab() === 'reports'" (click)="mainTab.set('reports')">
+            <mat-icon>assessment</mat-icon> Reports
+          </button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">
+            <mat-icon>auto_awesome</mat-icon> AI Analytics
+          </button>
+        </div>
+
+        @if (mainTab() === 'dashboard') {
+          <div class="kpi-strip">
+            <div class="kpi-tile">
+              <mat-icon class="kpi-icon" style="color:#1565c0">description</mat-icon>
+              <span class="kpi-value">{{dashboardKpis().activeCount}}</span>
+              <span class="kpi-label">Active Contracts</span>
+              <span class="kpi-detail" [matTooltip]="formatCurrencyFull(dashboardKpis().activeValue)">{{formatCurrency(dashboardKpis().activeValue)}}</span>
+            </div>
+            <div class="kpi-tile warning-tile">
+              <mat-icon class="kpi-icon" style="color:#ef6c00">warning</mat-icon>
+              <span class="kpi-value" style="color:#ef6c00">{{dashboardKpis().expiringCount}}</span>
+              <span class="kpi-label">Expiring Soon</span>
+              <span class="kpi-detail">Within 90 days</span>
+            </div>
+            <div class="kpi-tile">
+              <mat-icon class="kpi-icon" style="color:#2e7d32">check_circle</mat-icon>
+              <span class="kpi-value">{{dashboardKpis().completedCount}}</span>
+              <span class="kpi-label">Completed</span>
+              <span class="kpi-detail">All time</span>
+            </div>
+            <div class="kpi-tile">
+              <mat-icon class="kpi-icon" style="color:#6a1b9a">account_balance_wallet</mat-icon>
+              <span class="kpi-value" [matTooltip]="formatCurrencyFull(dashboardKpis().totalValue)">{{formatCurrency(dashboardKpis().totalValue)}}</span>
+              <span class="kpi-label">Total Value</span>
+              <span class="kpi-detail">All contracts</span>
+            </div>
+            <div class="kpi-tile">
+              <mat-icon class="kpi-icon" style="color:#00838f">speed</mat-icon>
+              <span class="kpi-value">{{dashboardKpis().avgPerformance | number:'1.1-1'}}</span>
+              <span class="kpi-label">Avg Performance</span>
+              <span class="kpi-detail">Score out of 100</span>
+            </div>
+            <div class="kpi-tile">
+              <mat-icon class="kpi-icon" style="color:#c9a84c">receipt_long</mat-icon>
+              <span class="kpi-value">{{dashboardKpis().pendingCerts}}</span>
+              <span class="kpi-label">Pending Certificates</span>
+              <span class="kpi-detail">Awaiting approval</span>
+            </div>
+          </div>
+
+          <div class="dashboard-row">
+            <div class="dashboard-card flex-2">
+              <h3><mat-icon>linear_scale</mat-icon> Contract Status Pipeline</h3>
+              <div class="pipeline-strip">
+                <div class="pipe-tile" (click)="mainTab.set('list'); filterStatus = 'draft'; loadContracts()">
+                  <mat-icon>edit_note</mat-icon>
+                  <span class="pipe-count">{{pipelineCounts().draft}}</span>
+                  <span class="pipe-label">Draft</span>
+                </div>
+                <div class="pipe-connector"></div>
+                <div class="pipe-tile" (click)="mainTab.set('list'); filterStatus = 'active'; loadContracts()">
+                  <mat-icon>play_circle</mat-icon>
+                  <span class="pipe-count">{{pipelineCounts().active}}</span>
+                  <span class="pipe-label">Active</span>
+                </div>
+                <div class="pipe-connector"></div>
+                <div class="pipe-tile" (click)="mainTab.set('list'); filterStatus = 'completed'; loadContracts()">
+                  <mat-icon>check_circle</mat-icon>
+                  <span class="pipe-count">{{pipelineCounts().completed}}</span>
+                  <span class="pipe-label">Completed</span>
+                </div>
+                <div class="pipe-connector"></div>
+                <div class="pipe-tile" (click)="mainTab.set('list'); filterStatus = 'expired'; loadContracts()">
+                  <mat-icon>event_busy</mat-icon>
+                  <span class="pipe-count">{{pipelineCounts().expired}}</span>
+                  <span class="pipe-label">Expired</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (expiringAlerts().length) {
+            <div class="dashboard-card">
+              <h3><mat-icon>notification_important</mat-icon> Expiring Contracts Alert</h3>
+              <div class="tender-table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Contract ID</th>
+                      <th>Title</th>
+                      <th>Supplier</th>
+                      <th>End Date</th>
+                      <th>Days Remaining</th>
+                      <th>Value</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of expiringAlerts(); track c.id) {
+                      <tr>
+                        <td class="ref-cell">{{c.referenceNumber}}</td>
+                        <td>{{c.title}}</td>
+                        <td>{{c.supplierName}}</td>
+                        <td>{{formatDate(c.endDate)}}</td>
+                        <td>
+                          <span class="badge" [class]="getDaysRemainingClass(getDaysRemaining(c))">{{getDaysRemaining(c)}} days</span>
+                        </td>
+                        <td class="value-cell" [matTooltip]="formatCurrencyFull(c.contractValue?.amount)">{{formatCurrency(c.contractValue?.amount)}}</td>
+                        <td>
+                          <button mat-icon-button matTooltip="View contract" (click)="viewContract(c)"><mat-icon>visibility</mat-icon></button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          @if (topContracts().length) {
+            <div class="dashboard-card">
+              <h3><mat-icon>trending_up</mat-icon> Top Contracts by Value</h3>
+              <div class="tender-table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Contract</th>
+                      <th>Supplier</th>
+                      <th>Department</th>
+                      <th>Value</th>
+                      <th>Status</th>
+                      <th>Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of topContracts(); track c.id; let i = $index) {
+                      <tr class="clickable-row" (click)="viewContract(c)">
+                        <td>{{i + 1}}</td>
+                        <td><strong>{{c.title}}</strong></td>
+                        <td>{{c.supplierName}}</td>
+                        <td>{{c.department}}</td>
+                        <td class="value-cell" [matTooltip]="formatCurrencyFull(c.contractValue?.amount)">{{formatCurrency(c.contractValue?.amount)}}</td>
+                        <td><span class="status-badge" [class]="'status-' + c.status">{{getStatusLabel(c.status)}}</span></td>
+                        <td>{{c.percentageComplete || 0}}%</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        }
+
+        @if (mainTab() === 'list') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search contracts..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="draft">Draft</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="completed">Completed</mat-option>
+                <mat-option value="expired">Expired</mat-option>
+                <mat-option value="terminated">Terminated</mat-option>
+                <mat-option value="suspended">Suspended</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="applyFilters()">
+                <mat-option value="">All Departments</mat-option>
+                @for (dept of departments; track dept) {
+                  <mat-option [value]="dept">{{dept}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Type" [(ngModel)]="filterType" (selectionChange)="applyFilters()">
+                <mat-option value="">All Types</mat-option>
+                <mat-option value="goods">Goods</mat-option>
+                <mat-option value="services">Services</mat-option>
+                <mat-option value="works">Works</mat-option>
+                <mat-option value="consulting">Consulting</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="applyFilters()" matTooltip="Filter contracts starting from this date">
+              <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterFromPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="applyFilters()" matTooltip="Filter contracts ending by this date">
+              <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterToPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Min Value (ZAR)</mat-label>
+              <input matInput type="number" [(ngModel)]="filterValueMin" (change)="applyFilters()" placeholder="0" matTooltip="Minimum contract value">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Max Value (ZAR)</mat-label>
+              <input matInput type="number" [(ngModel)]="filterValueMax" (change)="applyFilters()" placeholder="0" matTooltip="Maximum contract value">
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="clearFilters()" matTooltip="Clear all applied filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear All
+            </button>
+
+            <button mat-flat-button color="primary" (click)="openCreateContract()">
+              <mat-icon>add</mat-icon> New Contract
+            </button>
+          </div>
+
+
+          <div class="tender-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th (click)="sort('referenceNumber')">Contract ID <mat-icon>unfold_more</mat-icon></th>
+                  <th>Title</th>
+                  <th>Supplier</th>
+                  <th (click)="sort('contractValue')">Value <mat-icon>unfold_more</mat-icon></th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Status</th>
+                  <th>Completion</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of contracts(); track c.id) {
+                  <tr class="clickable-row" (click)="viewContract(c)">
+                    <td class="ref-cell">{{c.referenceNumber}}</td>
+                    <td class="title-cell"><span class="contract-title">{{c.title}}</span></td>
+                    <td>{{c.supplierName}}</td>
+                    <td class="value-cell" [matTooltip]="formatCurrencyFull(c.contractValue?.amount)">{{formatCurrency(c.contractValue?.amount)}}</td>
+                    <td>{{formatDate(c.startDate)}}</td>
+                    <td>{{formatDate(c.endDate)}}</td>
+                    <td><span class="status-badge" [class]="'status-' + c.status">{{getStatusLabel(c.status)}}</span></td>
+                    <td>{{c.percentageComplete || 0}}%</td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #actionMenu="matMenu">
+                        <button mat-menu-item (click)="viewContract(c)"><mat-icon>visibility</mat-icon> View</button>
+                        @if (c.status === 'draft') {
+                          <button mat-menu-item (click)="activateContract(c)"><mat-icon>play_circle</mat-icon> Activate</button>
+                        }
+                        @if (c.status === 'active') {
+                          <button mat-menu-item (click)="completeContract(c)"><mat-icon>check_circle</mat-icon> Complete</button>
+                        }
+                        @if (c.status !== 'terminated' && c.status !== 'completed' && c.status !== 'expired') {
+                          <button mat-menu-item (click)="voidContract(c)"><mat-icon>cancel</mat-icon> Void</button>
+                        }
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="9" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No contracts found matching your criteria</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Showing {{pageStart()}} - {{pageEnd()}} of {{totalContracts()}} contracts</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+              <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (mainTab() === 'expiring') {
+          <div class="expiring-controls">
+            <button mat-stroked-button [class.active]="expiringDays === 30" (click)="loadExpiring(30)">30 Days</button>
+            <button mat-stroked-button [class.active]="expiringDays === 60" (click)="loadExpiring(60)">60 Days</button>
+            <button mat-stroked-button [class.active]="expiringDays === 90" (click)="loadExpiring(90)">90 Days</button>
+          </div>
+
+          <div class="tender-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Contract ID</th>
+                  <th>Title</th>
+                  <th>Supplier</th>
+                  <th>End Date</th>
+                  <th>Days Remaining</th>
+                  <th>Value</th>
+                  <th>Department</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of expiringContracts(); track c.id) {
+                  <tr>
+                    <td class="ref-cell">{{c.referenceNumber}}</td>
+                    <td>{{c.title}}</td>
+                    <td>{{c.supplierName}}</td>
+                    <td>{{formatDate(c.endDate)}}</td>
+                    <td>
+                      <span class="badge" [class]="getDaysRemainingClass(getDaysRemaining(c))">{{getDaysRemaining(c)}} days</span>
+                    </td>
+                    <td class="value-cell" [matTooltip]="formatCurrencyFull(c.contractValue?.amount)">{{formatCurrency(c.contractValue?.amount)}}</td>
+                    <td>{{c.department}}</td>
+                    <td>
+                      <button mat-stroked-button color="primary" (click)="viewContract(c)" matTooltip="View contract details">
+                        <mat-icon>visibility</mat-icon> View
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="empty-state">
+                      <mat-icon>check_circle</mat-icon>
+                      <span>No contracts expiring within {{expiringDays}} days</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">{{expiringContracts().length}} expiring contracts</span>
+          </div>
+        }
+
+        @if (mainTab() === 'reports') {
+          <div class="reports-section">
+            <div class="dashboard-row">
+              <div class="dashboard-card">
+                <h3><mat-icon>pie_chart</mat-icon> Contract Summary by Status</h3>
+                <div class="report-grid">
+                  @for (s of reportStatusSummary(); track s.status) {
+                    <div class="report-stat-card">
+                      <span class="rs-label">{{getStatusLabel(s.status)}}</span>
+                      <span class="rs-value">{{s.count}}</span>
+                      <span class="rs-detail" [matTooltip]="formatCurrencyFull(s.totalValue)">{{formatCurrency(s.totalValue)}}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="dashboard-card">
+                <h3><mat-icon>domain</mat-icon> Contract Summary by Department</h3>
+                <div class="report-grid">
+                  @for (d of reportDeptSummary(); track d.department) {
+                    <div class="report-stat-card">
+                      <span class="rs-label">{{d.department}}</span>
+                      <span class="rs-value">{{d.count}}</span>
+                      <span class="rs-detail" [matTooltip]="formatCurrencyFull(d.totalValue)">{{formatCurrency(d.totalValue)}}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-card">
+              <h3><mat-icon>payments</mat-icon> Financial Summary</h3>
+              <div class="financial-summary-grid">
+                <div class="fin-card">
+                  <span class="fin-label">Total Contract Value</span>
+                  <span class="fin-value" [matTooltip]="formatCurrencyFull(reportFinancials().totalValue)">{{formatCurrency(reportFinancials().totalValue)}}</span>
+                </div>
+                <div class="fin-card">
+                  <span class="fin-label">Total Certified</span>
+                  <span class="fin-value" [matTooltip]="formatCurrencyFull(reportFinancials().totalCertified)">{{formatCurrency(reportFinancials().totalCertified)}}</span>
+                </div>
+                <div class="fin-card">
+                  <span class="fin-label">Total Paid</span>
+                  <span class="fin-value" [matTooltip]="formatCurrencyFull(reportFinancials().totalPaid)">{{formatCurrency(reportFinancials().totalPaid)}}</span>
+                </div>
+                <div class="fin-card">
+                  <span class="fin-label">Total Retention Held</span>
+                  <span class="fin-value" [matTooltip]="formatCurrencyFull(reportFinancials().totalRetention)">{{formatCurrency(reportFinancials().totalRetention)}}</span>
+                </div>
+                <div class="fin-card">
+                  <span class="fin-label">Total Penalties</span>
+                  <span class="fin-value" style="color:#c62828" [matTooltip]="formatCurrencyFull(reportFinancials().totalPenalties)">{{formatCurrency(reportFinancials().totalPenalties)}}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dashboard-card">
+              <h3><mat-icon>speed</mat-icon> Performance Scores Across Contracts</h3>
+              <div class="tender-table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Contract</th>
+                      <th>Supplier</th>
+                      <th>Avg Score</th>
+                      <th>Assessments</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of reportPerformance(); track p.contractId) {
+                      <tr>
+                        <td><strong>{{p.title}}</strong></td>
+                        <td>{{p.supplier}}</td>
+                        <td>
+                          <span class="perf-score" [style.color]="getScoreColor(p.avgScore)">{{p.avgScore | number:'1.1-1'}}</span>
+                        </td>
+                        <td>{{p.assessmentCount}}</td>
+                        <td><span class="status-badge" [class]="'status-' + p.status">{{getStatusLabel(p.status)}}</span></td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><span>No performance data available</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav main-tabs">
+          <button class="tab-btn" (click)="navigateTo('main')">
+            <mat-icon>dashboard</mat-icon> Dashboard
+          </button>
+          <button class="tab-btn active">
+            <mat-icon>auto_awesome</mat-icon> AI Analytics
+          </button>
+        </div>
+
+        @if (contractAnalytics()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #ef4444; font-size: 20px; width: 20px; height: 20px;">change_circle</mat-icon>
+                  Contract Variation Analysis
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fef2f2; padding: 2px 8px; border-radius: 4px;">MFMA s116, NT Instruction 3</span>
+              </div>
+              <div style="height: 220px; position: relative;">
+                <canvas id="contractVariationChart"></canvas>
+              </div>
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="font-size: 11px; color: #64748b;">Avg Variation: {{contractAnalytics().variationAnalysis.avgVariation}}%</span>
+                  <span style="font-size: 11px; font-weight: 600; color: {{contractAnalytics().variationAnalysis.avgVariation > 15 ? '#dc2626' : '#10b981'}};">
+                    {{contractAnalytics().variationAnalysis.avgVariation > 15 ? 'Above threshold' : 'Within threshold'}}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">event</mat-icon>
+                  Contract Renewal Calendar
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fffbeb; padding: 2px 8px; border-radius: 4px;">MFMA s112</span>
+              </div>
+              <div style="height: 200px; position: relative;">
+                <canvas id="contractExpiryChart"></canvas>
+              </div>
+              <div style="margin-top: 12px; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Upcoming Renewals</div>
+              @for (r of contractAnalytics().renewalCalendar.upcoming; track r.ref) {
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f8fafc;">
+                  <div>
+                    <span style="font-size: 11px; font-weight: 600; color: #1e293b;">{{r.ref}}</span>
+                    <span style="font-size: 10px; color: #64748b; margin-left: 6px;">{{r.vendor}}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 10px; color: #3b82f6;">R{{(r.value/1000000).toFixed(1)}}M</span>
+                    <span style="font-size: 10px; padding: 1px 6px; border-radius: 3px; background: {{r.daysToExpiry < 30 ? '#fecaca' : r.daysToExpiry < 60 ? '#fde68a' : '#dcfce7'}}; color: {{r.daysToExpiry < 30 ? '#991b1b' : r.daysToExpiry < 60 ? '#92400e' : '#166534'}}; font-weight: 600;">
+                      {{r.daysToExpiry}}d
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #8b5cf6; font-size: 20px; width: 20px; height: 20px;">assessment</mat-icon>
+                Contract Performance Matrix
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s116(2)(b)</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                  <tr>
+                    <th style="padding: 8px; text-align: left; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Contract</th>
+                    <th style="padding: 8px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Vendor</th>
+                    <th style="padding: 8px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Delivery</th>
+                    <th style="padding: 8px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Quality</th>
+                    <th style="padding: 8px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Budget</th>
+                    <th style="padding: 8px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Overall</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of contractAnalytics().performanceMatrix; track c.ref) {
+                    <tr>
+                      <td style="padding: 8px; font-weight: 600; color: #1e293b;">{{c.ref}}</td>
+                      <td style="padding: 8px; text-align: center; color: #64748b;">{{c.vendor}}</td>
+                      <td style="padding: 8px; text-align: center;">
+                        <span style="font-weight: 600; color: {{c.delivery >= 80 ? '#10b981' : c.delivery >= 60 ? '#f59e0b' : '#dc2626'}};">{{c.delivery}}%</span>
+                      </td>
+                      <td style="padding: 8px; text-align: center;">
+                        <span style="font-weight: 600; color: {{c.quality >= 80 ? '#10b981' : c.quality >= 60 ? '#f59e0b' : '#dc2626'}};">{{c.quality}}%</span>
+                      </td>
+                      <td style="padding: 8px; text-align: center;">
+                        <span style="font-weight: 600; color: {{c.budget >= 80 ? '#10b981' : c.budget >= 60 ? '#f59e0b' : '#dc2626'}};">{{c.budget}}%</span>
+                      </td>
+                      <td style="padding: 8px; text-align: center;">
+                        <div style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; background: {{c.overall >= 80 ? '#dcfce7' : c.overall >= 60 ? '#fef3c7' : '#fecaca'}};">
+                          <span style="font-weight: 700; font-size: 12px; color: {{c.overall >= 80 ? '#166534' : c.overall >= 60 ? '#92400e' : '#991b1b'}};">{{c.overall}}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @else {
+          <div style="text-align: center; padding: 60px; color: #94a3b8;">
+            <mat-icon style="font-size: 48px; width: 48px; height: 48px; margin-bottom: 16px;">analytics</mat-icon>
+            <p>Loading analytics data...</p>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'create') {
+        <div class="detail-card">
+          <div class="form-header">
+            <button mat-icon-button (click)="currentView.set('main')"><mat-icon>arrow_back</mat-icon></button>
+            <h2>New Contract</h2>
+          </div>
+          <div class="form-grid">
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Title</mat-label>
+              <input matInput [(ngModel)]="contractForm.title" placeholder="Contract title">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Supplier Name</mat-label>
+              <input matInput [(ngModel)]="contractForm.supplierName" placeholder="Supplier name">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Department</mat-label>
+              <mat-select [(ngModel)]="contractForm.department">
+                @for (dept of departments; track dept) {
+                  <mat-option [value]="dept">{{dept}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Type</mat-label>
+              <mat-select [(ngModel)]="contractForm.type">
+                <mat-option value="goods">Goods</mat-option>
+                <mat-option value="services">Services</mat-option>
+                <mat-option value="works">Works</mat-option>
+                <mat-option value="consulting">Consulting</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Contract Value (ZAR)</mat-label>
+              <input matInput type="number" [(ngModel)]="contractForm.value" placeholder="0.00">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Start Date</mat-label>
+              <input matInput [matDatepicker]="startPicker" [(ngModel)]="contractForm.startDate">
+              <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>End Date</mat-label>
+              <input matInput [matDatepicker]="endPicker" [(ngModel)]="contractForm.endDate">
+              <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Terms</mat-label>
+              <textarea matInput [(ngModel)]="contractForm.terms" rows="3" placeholder="Contract terms and conditions"></textarea>
+            </mat-form-field>
+          </div>
+          <div class="form-actions">
+            <button mat-stroked-button (click)="currentView.set('main')">Cancel</button>
+            <button mat-flat-button color="primary" (click)="saveContract()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> Create Contract
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'detail' && selectedContract()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedContract()!.referenceNumber}} — {{selectedContract()!.title}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedContract()!.status">{{getStatusLabel(selectedContract()!.status)}}</span>
+              <span class="type-badge">{{getTypeLabel(selectedContract()!.type)}}</span>
+              <span class="dept-tag">{{selectedContract()!.department}}</span>
+              <span class="supplier-tag"><mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">business</mat-icon> {{selectedContract()!.supplierName}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Contract Value</span>
+            <span class="value-amount" [matTooltip]="formatCurrencyFull(selectedContract()!.contractValue?.amount)">{{formatCurrencyFull(selectedContract()!.contractValue?.amount)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedContract()!.status === 'draft') {
+              <button mat-flat-button color="primary" (click)="activateContract(selectedContract()!)" [disabled]="saving()"><mat-icon>play_circle</mat-icon> Activate</button>
+            }
+            @if (selectedContract()!.status === 'draft' || selectedContract()!.status === 'active') {
+              <button mat-stroked-button (click)="sendSigningInvitation()" [disabled]="saving()"><mat-icon>send</mat-icon> Sign Invitation</button>
+            }
+            @if (selectedContract()!.status !== 'terminated' && selectedContract()!.status !== 'completed' && selectedContract()!.status !== 'expired') {
+              <button mat-stroked-button color="warn" (click)="voidContract(selectedContract()!)" [disabled]="saving()"><mat-icon>cancel</mat-icon> Void</button>
+            }
+          </div>
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'overview'" (click)="detailTab.set('overview')">Overview</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'milestones'" (click)="detailTab.set('milestones')">Milestones</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'certificates'" (click)="detailTab.set('certificates'); loadPaymentCertificates()">Payment Certificates</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'performance'" (click)="detailTab.set('performance'); loadPerformance()">Performance</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'penalties'" (click)="detailTab.set('penalties'); loadPenalties()">Penalties</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'retention'" (click)="detailTab.set('retention'); loadRetentionGuarantee()">Retention & Guarantees</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents')">Documents</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'correspondence'" (click)="detailTab.set('correspondence'); loadCorrespondence()">Correspondence</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'variations'" (click)="detailTab.set('variations'); loadVariations()">Variations</button>
+        </div>
+
+        @if (detailTab() === 'overview') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>info</mat-icon> Contract Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Contract Value</label>
+                    <span [matTooltip]="formatCurrencyFull(selectedContract()!.contractValue?.amount)">{{formatCurrencyFull(selectedContract()!.contractValue?.amount)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Start Date</label>
+                    <span>{{formatDate(selectedContract()!.startDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>End Date</label>
+                    <span>{{formatDate(selectedContract()!.endDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Department</label>
+                    <span>{{selectedContract()!.department}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Type</label>
+                    <span>{{getTypeLabel(selectedContract()!.type)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Payment Terms</label>
+                    <span>{{selectedContract()!.paymentTerms || '-'}}</span>
+                  </div>
+                  @if (selectedContract()!.escalationClause) {
+                    <div class="detail-field">
+                      <label>Escalation Clause</label>
+                      <span>{{selectedContract()!.escalationClause}}</span>
+                    </div>
+                  }
+                  @if (selectedContract()!.penaltyClause) {
+                    <div class="detail-field">
+                      <label>Penalty Clause</label>
+                      <span>{{selectedContract()!.penaltyClause}}</span>
+                    </div>
+                  }
+                  @if (selectedContract()!.retentionPercentage) {
+                    <div class="detail-field">
+                      <label>Retention</label>
+                      <span>{{selectedContract()!.retentionPercentage}}%</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>calendar_today</mat-icon> Key Dates</h3>
+                <div class="dates-list">
+                  <div class="date-item">
+                    <span class="date-label">Created</span>
+                    <span class="date-value">{{formatDate(selectedContract()!.createdDate)}}</span>
+                  </div>
+                  @if (selectedContract()!.signedDate) {
+                    <div class="date-item">
+                      <span class="date-label">Signed</span>
+                      <span class="date-value">{{formatDate(selectedContract()!.signedDate)}}</span>
+                    </div>
+                  }
+                  <div class="date-item">
+                    <span class="date-label">Start</span>
+                    <span class="date-value">{{formatDate(selectedContract()!.startDate)}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">End</span>
+                    <span class="date-value">{{formatDate(selectedContract()!.endDate)}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            @if (contractDashboard()) {
+              <div class="detail-cards-row">
+                <div class="detail-card flex-1">
+                  <h3><mat-icon>donut_large</mat-icon> Completion</h3>
+                  <div class="completion-display">
+                    <span class="completion-pct">{{contractDashboard()?.completion?.percentage || 0}}%</span>
+                    <mat-progress-bar mode="determinate" [value]="contractDashboard()?.completion?.percentage || 0"></mat-progress-bar>
+                    <div class="completion-details">
+                      <span>{{contractDashboard()?.completion?.completedMilestones || 0}} of {{contractDashboard()?.completion?.totalMilestones || 0}} milestones completed</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-card flex-1">
+                  <h3><mat-icon>account_balance</mat-icon> Financial Summary</h3>
+                  <div class="fin-summary">
+                    <div class="fin-row">
+                      <span class="fin-label">Contract Value</span>
+                      <span class="fin-val" [matTooltip]="formatCurrencyFull(contractDashboard()?.financial?.contractValue || 0)">{{formatCurrency(contractDashboard()?.financial?.contractValue || 0)}}</span>
+                    </div>
+                    <div class="fin-row">
+                      <span class="fin-label">Total Certified</span>
+                      <span class="fin-val" [matTooltip]="formatCurrencyFull(contractDashboard()?.financial?.totalCertified || 0)">{{formatCurrency(contractDashboard()?.financial?.totalCertified || 0)}}</span>
+                    </div>
+                    <div class="fin-row">
+                      <span class="fin-label">Total Paid</span>
+                      <span class="fin-val" [matTooltip]="formatCurrencyFull(contractDashboard()?.financial?.totalPaid || 0)">{{formatCurrency(contractDashboard()?.financial?.totalPaid || 0)}}</span>
+                    </div>
+                    <div class="fin-row">
+                      <span class="fin-label">Remaining</span>
+                      <span class="fin-val" [matTooltip]="formatCurrencyFull(contractDashboard()?.financial?.remaining || 0)">{{formatCurrency(contractDashboard()?.financial?.remaining || 0)}}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-card flex-1">
+                  <h3><mat-icon>verified_user</mat-icon> Budget vs Actual</h3>
+                  <div class="budget-comparison">
+                    <div class="budget-row">
+                      <span class="budget-label">Budget</span>
+                      <div class="budget-bar-track">
+                        <div class="budget-bar-fill" style="width:100%;background:#90caf9"></div>
+                      </div>
+                      <span class="budget-val" [matTooltip]="formatCurrencyFull(selectedContract()!.contractValue?.amount || 0)">{{formatCurrency(selectedContract()!.contractValue?.amount || 0)}}</span>
+                    </div>
+                    <div class="budget-row">
+                      <span class="budget-label">Actual</span>
+                      <div class="budget-bar-track">
+                        <div class="budget-bar-fill" [style.width.%]="getBudgetPct()" [style.background]="getBudgetPct() > 100 ? '#ef5350' : '#66bb6a'"></div>
+                      </div>
+                      <span class="budget-val" [matTooltip]="formatCurrencyFull(selectedContract()!.totalCertified?.amount || 0)">{{formatCurrency(selectedContract()!.totalCertified?.amount || 0)}}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (selectedContract()!.notes) {
+              <div class="detail-card">
+                <h3><mat-icon>notes</mat-icon> Notes</h3>
+                <p class="notes-text">{{selectedContract()!.notes}}</p>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'milestones') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>flag</mat-icon> Milestones</h3>
+              @if (selectedContract()!.milestones?.length) {
+                <div class="milestone-progress">
+                  <mat-progress-bar mode="determinate" [value]="getMilestoneProgress()"></mat-progress-bar>
+                  <span class="milestone-progress-text">{{getCompletedMilestones()}} of {{selectedContract()!.milestones.length}} completed ({{getMilestoneProgress() | number:'1.0-0'}}%)</span>
+                </div>
+
+                <div class="milestone-timeline">
+                  @for (m of selectedContract()!.milestones; track m.id; let last = $last) {
+                    <div class="milestone-item" [class]="'ms-' + m.status">
+                      <div class="ms-indicator">
+                        @if (m.status === 'completed') {
+                          <mat-icon style="color:#2e7d32">check_circle</mat-icon>
+                        } @else if (m.status === 'in_progress') {
+                          <mat-icon style="color:#1565c0">radio_button_checked</mat-icon>
+                        } @else {
+                          <mat-icon style="color:#94a3b8">radio_button_unchecked</mat-icon>
+                        }
+                      </div>
+                      <div class="ms-content">
+                        <div class="ms-header-row">
+                          <strong>{{m.description}}</strong>
+                          <span class="status-badge" [class]="'status-' + m.status">{{getStatusLabel(m.status)}}</span>
+                        </div>
+                        <div class="ms-details">
+                          <span>Due: {{formatDate(m.dueDate)}}</span>
+                          @if (m.completedDate) {
+                            <span>Completed: {{formatDate(m.completedDate)}}</span>
+                          }
+                          @if (m.percentage) {
+                            <span>Weight: {{m.percentage}}%</span>
+                          }
+                          @if (m.certifiedAmount?.amount) {
+                            <span [matTooltip]="formatCurrencyFull(m.certifiedAmount.amount)">Certified: {{formatCurrency(m.certifiedAmount.amount)}}</span>
+                          }
+                        </div>
+                        @if (m.status !== 'completed' && selectedContract()!.status === 'active') {
+                          <button mat-stroked-button color="primary" (click)="completeMilestone(m)" [disabled]="saving()" style="margin-top:8px">
+                            <mat-icon>check</mat-icon> Complete Milestone
+                          </button>
+                        }
+                      </div>
+                    </div>
+                    @if (!last) {
+                      <div class="ms-connector" [class.completed]="m.status === 'completed'"></div>
+                    }
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">No milestones defined for this contract.</p>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'certificates') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>receipt_long</mat-icon> Payment Certificates</h3>
+              @if (paymentCertificates().length) {
+                <div class="tender-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Certificate ID</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (cert of paymentCertificates(); track cert.id) {
+                        <tr>
+                          <td class="ref-cell">{{cert.id}}</td>
+                          <td>{{cert.description || cert.milestoneDescription || '-'}}</td>
+                          <td class="value-cell" [matTooltip]="formatCurrencyFull(cert.financials?.grossValue || cert.amount || 0)">{{formatCurrency(cert.financials?.grossValue || cert.amount || 0)}}</td>
+                          <td><span class="status-badge" [class]="'status-' + (cert.status || 'pending')">{{getStatusLabel(cert.status || 'pending')}}</span></td>
+                          <td>{{formatDate(cert.createdDate || cert.date)}}</td>
+                          <td>
+                            @if (cert.status !== 'approved' && cert.status !== 'completed') {
+                              <button mat-stroked-button color="primary" (click)="approveCertificate(cert)" [disabled]="saving()" matTooltip="Approve this payment certificate">
+                                <mat-icon>check</mat-icon> Approve
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No payment certificates issued for this contract.</p>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'performance') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>speed</mat-icon> Performance Assessment</h3>
+              @if (performanceSummary()) {
+                <div class="perf-overall">
+                  <span class="perf-overall-label">Overall Score</span>
+                  <span class="perf-overall-score" [style.color]="getScoreColor(performanceSummary()?.averageScore)">{{performanceSummary()?.averageScore | number:'1.1-1'}}</span>
+                  <span class="perf-overall-detail">Based on {{performanceSummary()?.totalAssessments || 0}} assessments</span>
+                </div>
+              }
+
+              <div class="perf-form-card">
+                <h4>Submit New Assessment</h4>
+                <div class="perf-dimensions">
+                  @for (dim of performanceDimensions; track dim.key) {
+                    <div class="perf-dim-row">
+                      <label>{{dim.label}}</label>
+                      <div class="perf-slider-row">
+                        <input type="range" min="0" max="100" step="1" [(ngModel)]="perfForm[dim.key]" class="perf-slider">
+                        <span class="perf-slider-val">{{perfForm[dim.key]}}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;margin-top:12px">
+                  <mat-label>Comments</mat-label>
+                  <textarea matInput [(ngModel)]="perfComments" rows="2" placeholder="Assessment comments"></textarea>
+                </mat-form-field>
+                <div class="form-actions">
+                  <button mat-flat-button color="primary" (click)="submitPerformance()" [disabled]="saving()">
+                    <mat-icon>send</mat-icon> Submit Assessment
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            @if (performanceHistory().length) {
+              <div class="detail-card">
+                <h3><mat-icon>history</mat-icon> Performance History</h3>
+                <div class="tender-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Quality</th>
+                        <th>Delivery</th>
+                        <th>Cost</th>
+                        <th>Service</th>
+                        <th>Overall</th>
+                        <th>Evaluated By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (p of performanceHistory(); track p.id || $index) {
+                        <tr>
+                          <td>{{formatDate(p.date || p.evaluatedDate)}}</td>
+                          <td [style.color]="getScoreColor(p.dimensions?.quality || p.quality)">{{p.dimensions?.quality || p.quality || '-'}}</td>
+                          <td [style.color]="getScoreColor(p.dimensions?.delivery || p.delivery)">{{p.dimensions?.delivery || p.delivery || '-'}}</td>
+                          <td [style.color]="getScoreColor(p.dimensions?.cost || p.cost)">{{p.dimensions?.cost || p.cost || '-'}}</td>
+                          <td [style.color]="getScoreColor(p.dimensions?.service || p.service)">{{p.dimensions?.service || p.service || '-'}}</td>
+                          <td><strong [style.color]="getScoreColor(p.score || p.overall)">{{p.score || p.overall || '-'}}</strong></td>
+                          <td>{{p.evaluatedBy || '-'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'penalties') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>gavel</mat-icon> Penalties</h3>
+              @if (penalties().length) {
+                <div class="penalty-total">
+                  <span class="penalty-total-label">Total Penalties</span>
+                  <span class="penalty-total-amount" [matTooltip]="formatCurrencyFull(getTotalPenalties())">{{formatCurrency(getTotalPenalties())}}</span>
+                </div>
+                <div class="tender-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Reason</th>
+                        <th>Date</th>
+                        <th>Recorded By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (p of penalties(); track p.id || $index) {
+                        <tr>
+                          <td><span class="badge badge-danger">{{p.type}}</span></td>
+                          <td class="value-cell" [matTooltip]="formatCurrencyFull(p.amount)">{{formatCurrency(p.amount)}}</td>
+                          <td>{{p.reason}}</td>
+                          <td>{{formatDate(p.date || p.recordedDate)}}</td>
+                          <td>{{p.recordedBy || '-'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No penalties recorded for this contract.</p>
+              }
+
+              <div class="penalty-form-card">
+                <h4>Record New Penalty</h4>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Penalty Type</mat-label>
+                    <mat-select [(ngModel)]="penaltyForm.type">
+                      <mat-option value="late_delivery">Late Delivery</mat-option>
+                      <mat-option value="non_compliance">Non-Compliance</mat-option>
+                      <mat-option value="quality">Quality Deficiency</mat-option>
+                      <mat-option value="sla_breach">SLA Breach</mat-option>
+                      <mat-option value="liquidated_damages">Liquidated Damages</mat-option>
+                      <mat-option value="other">Other</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Amount (ZAR)</mat-label>
+                    <input matInput type="number" [(ngModel)]="penaltyForm.amount" placeholder="0.00">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="form-field-full">
+                    <mat-label>Reason</mat-label>
+                    <textarea matInput [(ngModel)]="penaltyForm.reason" rows="2" placeholder="Reason for penalty"></textarea>
+                  </mat-form-field>
+                </div>
+                <div class="form-actions">
+                  <button mat-flat-button color="warn" (click)="recordPenalty()" [disabled]="saving()">
+                    <mat-icon>add</mat-icon> Record Penalty
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'retention') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-1">
+                <h3><mat-icon>savings</mat-icon> Retention</h3>
+                @if (retentionInfo()) {
+                  <div class="retention-grid">
+                    <div class="retention-field">
+                      <label>Retention Percentage</label>
+                      <span>{{retentionInfo()?.retentionPercentage || 0}}%</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Amount Held</label>
+                      <span [matTooltip]="formatCurrencyFull(retentionInfo()?.amountHeld || 0)">{{formatCurrency(retentionInfo()?.amountHeld || 0)}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Release Conditions</label>
+                      <span>{{retentionInfo()?.releaseConditions || 'Standard release upon completion'}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Status</label>
+                      <span class="status-badge" [class]="'status-' + (retentionInfo()?.status || 'active')">{{getStatusLabel(retentionInfo()?.status || 'active')}}</span>
+                    </div>
+                  </div>
+                } @else {
+                  <p class="empty-text">No retention applicable for this contract.</p>
+                }
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>shield</mat-icon> Performance Guarantee</h3>
+                @if (guaranteeInfo()) {
+                  <div class="retention-grid">
+                    <div class="retention-field">
+                      <label>Guarantee Type</label>
+                      <span>{{guaranteeInfo()?.type || 'Bank Guarantee'}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Guarantee Amount</label>
+                      <span [matTooltip]="formatCurrencyFull(guaranteeInfo()?.amount || 0)">{{formatCurrency(guaranteeInfo()?.amount || 0)}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Expiry Date</label>
+                      <span>{{formatDate(guaranteeInfo()?.expiryDate)}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Bank / Institution</label>
+                      <span>{{guaranteeInfo()?.bank || '-'}}</span>
+                    </div>
+                    <div class="retention-field">
+                      <label>Release Status</label>
+                      <span class="status-badge" [class]="'status-' + (guaranteeInfo()?.releaseStatus || 'held')">{{guaranteeInfo()?.releaseStatus || 'Held'}}</span>
+                    </div>
+                  </div>
+                } @else {
+                  <p class="empty-text">No performance guarantee for this contract.</p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'documents') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>folder</mat-icon> Documents</h3>
+              @if (selectedContract()!.documents?.length || selectedContract()!.attachments?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Uploaded</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (doc of (selectedContract()!.documents || selectedContract()!.attachments || []); track doc.id || $index) {
+                        <tr>
+                          <td><strong>{{doc.name || doc.fileName}}</strong></td>
+                          <td><span class="badge badge-info">{{doc.type || doc.category || 'Document'}}</span></td>
+                          <td>{{formatDate(doc.uploadedAt || doc.date)}}</td>
+                          <td>
+                            <button mat-icon-button color="warn" matTooltip="Delete document"><mat-icon>delete</mat-icon></button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No documents uploaded for this contract.</p>
+              }
+
+              <div class="upload-section">
+                <h4>Upload Document</h4>
+                <div class="upload-area">
+                  <mat-icon>cloud_upload</mat-icon>
+                  <p>Drag & drop or click to upload</p>
+                  <input type="file" (change)="onDocumentSelected($event)" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer;top:0;left:0">
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'correspondence') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>mail</mat-icon> Correspondence</h3>
+              @if (correspondence().length) {
+                <div class="correspondence-timeline">
+                  @for (item of correspondence(); track item.id || $index) {
+                    <div class="corr-item" [class.sent]="item.direction === 'sent' || item.type === 'outgoing'" [class.received]="item.direction === 'received' || item.type === 'incoming'">
+                      <div class="corr-indicator">
+                        @if (item.direction === 'sent' || item.type === 'outgoing') {
+                          <mat-icon style="color:#1565c0">send</mat-icon>
+                        } @else {
+                          <mat-icon style="color:#2e7d32">inbox</mat-icon>
+                        }
+                      </div>
+                      <div class="corr-content">
+                        <div class="corr-header">
+                          <strong>{{item.subject || item.reference || 'Correspondence'}}</strong>
+                          <span class="corr-date">{{formatDate(item.date || item.createdAt)}}</span>
+                        </div>
+                        @if (item.body || item.content) {
+                          <p class="corr-body">{{item.body || item.content}}</p>
+                        }
+                        @if (item.from || item.to) {
+                          <span class="corr-meta">{{item.from ? 'From: ' + item.from : ''}} {{item.to ? 'To: ' + item.to : ''}}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">No correspondence recorded for this contract.</p>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'variations') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>swap_horiz</mat-icon> Variations / Change Orders</h3>
+              @if (variations().length) {
+                <div class="variation-impact">
+                  <span class="variation-impact-label">Total Variation Impact</span>
+                  <span class="variation-impact-value" [matTooltip]="formatCurrencyFull(getTotalVariationImpact())" [style.color]="getTotalVariationImpact() >= 0 ? '#2e7d32' : '#c62828'">
+                    {{getTotalVariationImpact() >= 0 ? '+' : ''}}{{formatCurrency(getTotalVariationImpact())}}
+                  </span>
+                </div>
+                <div class="tender-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Description</th>
+                        <th>Value Change</th>
+                        <th>Status</th>
+                        <th>Request Date</th>
+                        <th>Approved</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (v of variations(); track v.id) {
+                        <tr>
+                          <td class="ref-cell">{{v.id}}</td>
+                          <td>{{v.description}}</td>
+                          <td class="value-cell" [matTooltip]="formatCurrencyFull(v.valueChange?.amount || v.variationValue?.amount || 0)" [style.color]="(v.valueChange?.amount || v.variationValue?.amount || 0) >= 0 ? '#2e7d32' : '#c62828'">
+                            {{(v.valueChange?.amount || v.variationValue?.amount || 0) >= 0 ? '+' : ''}}{{formatCurrency(v.valueChange?.amount || v.variationValue?.amount || 0)}}
+                          </td>
+                          <td><span class="status-badge" [class]="'status-' + v.status">{{getStatusLabel(v.status)}}</span></td>
+                          <td>{{formatDate(v.requestDate)}}</td>
+                          <td>{{v.approvedDate ? formatDate(v.approvedDate) : '-'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No variations recorded for this contract.</p>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>

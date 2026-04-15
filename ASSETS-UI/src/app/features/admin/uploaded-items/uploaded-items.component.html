@@ -1,0 +1,109 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Uploaded Asset Items</h1>
+      <p class="page-subtitle">Review and approve staged asset uploads</p>
+    </div>
+    <div class="header-actions">
+      <select class="fin-year-select" [(ngModel)]="financialYear" (ngModelChange)="onFinancialYearChange()">
+        <option value="">All Financial Years</option>
+        @for (fy of financialYears; track fy) {
+          <option [value]="fy">{{fy}}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (jobs().length > 0) {
+    <div class="pending-jobs">
+      <h3 class="section-title">Pending Approval</h3>
+      @for (job of jobs(); track job.id) {
+        <div class="job-card">
+          <div class="job-info">
+            <span class="job-filename">{{job.filename}}</span>
+            <span class="job-meta">{{job.no_RecordsInserted}} records | Run ID: {{job.runID}} | Uploaded: {{job.date_Created | date:'medium'}}</span>
+          </div>
+          @if (isApproving(job.id) && approveProgress()) {
+            <div class="approve-progress">
+              <div class="progress-header">
+                <mat-icon class="progress-icon">hourglass_top</mat-icon>
+                <span class="progress-message">{{approveProgress().message}}</span>
+                <span class="progress-percent">{{approveProgress().percent}}%</span>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="approveProgress().percent"></mat-progress-bar>
+            </div>
+          } @else {
+            <div class="job-actions">
+              <select class="job-fy-select" [ngModel]="getJobFinancialYear(job.id)" (ngModelChange)="setJobFinancialYear(job.id, $event)">
+                <option value="">Select Financial Year</option>
+                @for (fy of financialYears; track fy) {
+                  <option [value]="fy">{{fy}}</option>
+                }
+              </select>
+              <button mat-flat-button [class]="canApprove(job.id) ? 'btn-approve' : 'btn-approve-disabled'" (click)="approveJob(job)" [disabled]="!canApprove(job.id)">
+                <mat-icon>check_circle</mat-icon> Approve
+              </button>
+              <button mat-stroked-button class="btn-reject" (click)="rejectJob(job)" [disabled]="approvingJobId() !== null">
+                <mat-icon>cancel</mat-icon> Reject
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <h3 class="section-title" style="padding: 16px 16px 0;">Summary by Asset Type, Category and Measurement Type</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Asset Type</th>
+            <th>Category</th>
+            <th>Sub Category</th>
+            <th>Measurement Type</th>
+            <th class="num-col">No. of Records</th>
+            <th class="num-col">Opening Balance Cost</th>
+            <th class="num-col">Accum. Depreciation</th>
+            <th class="num-col">Accum. Impairment</th>
+            <th class="num-col">Carrying Amount</th>
+            <th class="num-col">Revaluation Reserve OB</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track $index) {
+            <tr>
+              <td>{{item.assetType}}</td>
+              <td>{{item.assetCategory}}</td>
+              <td>{{item.assetSubCategory}}</td>
+              <td>{{item.measurementType}}</td>
+              <td class="num-cell">{{item.numberOfRecords}}</td>
+              <td class="num-cell">{{formatCurrency(item.openingBalanceCost)}}</td>
+              <td class="num-cell">{{formatCurrency(item.accumulatedDepreciation)}}</td>
+              <td class="num-cell">{{formatCurrency(item.accumulatedImpairment)}}</td>
+              <td class="num-cell">{{formatCurrency(item.carryingAmount)}}</td>
+              <td class="num-cell">{{formatCurrency(item.revaluationOpeningBalance)}}</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="4"><strong>TOTALS</strong></td>
+            <td class="num-cell"><strong>{{totals().numberOfRecords}}</strong></td>
+            <td class="num-cell"><strong>{{formatCurrency(totals().openingBalanceCost)}}</strong></td>
+            <td class="num-cell"><strong>{{formatCurrency(totals().accumulatedDepreciation)}}</strong></td>
+            <td class="num-cell"><strong>{{formatCurrency(totals().accumulatedImpairment)}}</strong></td>
+            <td class="num-cell"><strong>{{formatCurrency(totals().carryingAmount)}}</strong></td>
+            <td class="num-cell"><strong>{{formatCurrency(totals().revaluationOpeningBalance)}}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No uploaded items found</div>
+      }
+    </div>
+  }
+</div>

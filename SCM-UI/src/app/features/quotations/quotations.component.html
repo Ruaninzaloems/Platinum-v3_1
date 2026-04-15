@@ -1,0 +1,1802 @@
+    <div class="quotations-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error-bar]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- ===================== DASHBOARD VIEW ===================== -->
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">RFQ List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total: ' + (dashSummary().totalRfqs || 0) + ' RFQs worth ' + formatCurrencyFull(dashSummary().totalEstimatedValue?.amount || 0)">
+            <mat-icon>request_quote</mat-icon>
+            <span class="kpi-value">{{dashSummary().totalRfqs || 0}}</span>
+            <span class="kpi-label">Total RFQs</span>
+            <span class="kpi-detail">{{formatCurrency(dashSummary().totalEstimatedValue?.amount || 0)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total awarded value: ' + formatCurrencyFull(dashSummary().totalAwardedValue?.amount || 0)">
+            <mat-icon>emoji_events</mat-icon>
+            <span class="kpi-value">{{formatCurrency(dashSummary().totalAwardedValue?.amount || 0)}}</span>
+            <span class="kpi-label">Awarded Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(dashSummary().byStatus?.pending_approval || 0) + ' RFQs pending approval'" [style.border-left-color]="(dashSummary().byStatus?.pending_approval || 0) > 0 ? '#ef6c00' : '#2e7d32'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(dashSummary().byStatus?.pending_approval || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{dashSummary().byStatus?.pending_approval || 0}}</span>
+            <span class="kpi-label">Pending Approval</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(dashSummary().byStatus?.published || 0) + ' RFQs open for quotation'">
+            <mat-icon>publish</mat-icon>
+            <span class="kpi-value">{{dashSummary().byStatus?.published || 0}}</span>
+            <span class="kpi-label">Published</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average ' + (dashSummary().averageQuotesPerRfq || 0) + ' quotes per RFQ'">
+            <mat-icon>format_list_numbered</mat-icon>
+            <span class="kpi-value">{{dashSummary().averageQuotesPerRfq || 0}}</span>
+            <span class="kpi-label">Avg Quotes/RFQ</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average turnaround: ' + (dashSummary().averageTurnaroundDays || 0) + ' days from creation to award'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{dashSummary().averageTurnaroundDays || 0}}</span>
+            <span class="kpi-label">Avg Turnaround (d)</span>
+          </div>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" (click)="filterByStatus('draft')" [matTooltip]="(dashSummary().byStatus?.draft || 0) + ' draft RFQs'">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('published')" [matTooltip]="(dashSummary().byStatus?.published || 0) + ' published RFQs'">
+            <mat-icon>publish</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.published || 0}}</span>
+            <span class="pipe-label">Published</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('closed')" [matTooltip]="(dashSummary().byStatus?.closed || 0) + ' closed RFQs'">
+            <mat-icon>lock</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.closed || 0}}</span>
+            <span class="pipe-label">Closed</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('evaluated')" [matTooltip]="(dashSummary().byStatus?.evaluated || 0) + ' evaluated RFQs'">
+            <mat-icon>assessment</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.evaluated || 0}}</span>
+            <span class="pipe-label">Evaluated</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('pending_approval')" [matTooltip]="(dashSummary().byStatus?.pending_approval || 0) + ' pending approval'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.pending_approval || 0}}</span>
+            <span class="pipe-label">Pending</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('awarded')" [matTooltip]="(dashSummary().byStatus?.awarded || 0) + ' awarded RFQs'">
+            <mat-icon>emoji_events</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.awarded || 0}}</span>
+            <span class="pipe-label">Awarded</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('declined')" [matTooltip]="(dashSummary().byStatus?.declined || 0) + ' declined RFQs'">
+            <mat-icon>thumb_down</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.declined || 0}}</span>
+            <span class="pipe-label">Declined</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('voided')" [matTooltip]="(dashSummary().byStatus?.voided || 0) + ' voided RFQs'">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.voided || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-col-left">
+            <div class="detail-card">
+              <h3><mat-icon>savings</mat-icon> Savings Overview</h3>
+              <div class="budget-cards">
+                <div class="budget-card bg-blue">
+                  <span class="budget-label">Total Estimated</span>
+                  <span class="budget-value" [matTooltip]="formatCurrencyFull(dashSummary().totalEstimatedValue?.amount || 0)">{{formatCurrency(dashSummary().totalEstimatedValue?.amount || 0)}}</span>
+                </div>
+                <div class="budget-card bg-green">
+                  <span class="budget-label">Total Awarded</span>
+                  <span class="budget-value" [matTooltip]="formatCurrencyFull(dashSummary().totalAwardedValue?.amount || 0)">{{formatCurrency(dashSummary().totalAwardedValue?.amount || 0)}}</span>
+                </div>
+                <div class="budget-card bg-amber">
+                  <span class="budget-label">Savings %</span>
+                  <span class="budget-value">{{dashSummary().savingsPercentage || 0}}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>account_balance_wallet</mat-icon> Budget Votes</h3>
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>Vote #</th>
+                    <th>Description</th>
+                    <th>Budget</th>
+                    <th>Available</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (vote of budgetVotes(); track vote.voteNumber) {
+                    <tr>
+                      <td class="ref-cell">{{vote.voteNumber}}</td>
+                      <td>{{vote.description}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(vote.totalBudget || 0)">{{formatCurrency(vote.totalBudget || 0)}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(vote.available || 0)" [style.color]="vote.available < 1000000 ? '#c62828' : '#2e7d32'">{{formatCurrency(vote.available || 0)}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="empty-text">No budget data</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="dashboard-col-right">
+            <div class="detail-card">
+              <h3><mat-icon>gavel</mat-icon> Process Boundaries</h3>
+              @for (boundary of config().processBoundaries || []; track boundary.id) {
+                <div class="boundary-card" [class.boundary-disabled]="!boundary.enabled">
+                  <div class="boundary-header">
+                    <span class="boundary-label">{{boundary.label}}</span>
+                    @if (!boundary.enabled) {
+                      <span class="boundary-tag disabled-tag">Disabled</span>
+                    }
+                  </div>
+                  <div class="boundary-range">
+                    <span [matTooltip]="'From: ' + formatCurrencyFull(boundary.rangeFrom)">{{formatCurrency(boundary.rangeFrom)}}</span>
+                    <mat-icon>arrow_forward</mat-icon>
+                    <span [matTooltip]="boundary.rangeTo ? 'To: ' + formatCurrencyFull(boundary.rangeTo) : 'No upper limit'">{{boundary.rangeTo ? formatCurrency(boundary.rangeTo) : 'No limit'}}</span>
+                  </div>
+                  <div class="boundary-meta">
+                    @if (boundary.minQuotes > 0) {
+                      <span class="boundary-tag">Min {{boundary.minQuotes}} quotes</span>
+                    }
+                    @if (boundary.scoring) {
+                      <span class="boundary-tag">{{boundary.scoring}}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>verified</mat-icon> Approval Chain</h3>
+              <div class="approval-chain-display">
+                @for (level of config().approvalChain || []; track level.level) {
+                  <div class="chain-node">
+                    <div class="chain-level">L{{level.level}}</div>
+                    <div class="chain-info">
+                      <span class="chain-role">{{level.label}}</span>
+                      <span class="chain-limit" [matTooltip]="level.maxAmount ? 'Up to ' + formatCurrencyFull(level.maxAmount) : 'Unlimited'">{{level.maxAmount ? 'Up to ' + formatCurrency(level.maxAmount) : 'Unlimited'}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+      }
+
+      <!-- ===================== AI ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">RFQ List</button>
+          <button class="tab-btn active">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #10b981; font-size: 20px; width: 20px; height: 20px;">fact_check</mat-icon>
+                3-Quote Compliance Rate
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">SCM Reg 17(a), Reg 28</span>
+            </div>
+            @if (quotAnalytics()) {
+              <div style="height: 240px; position: relative;">
+                <canvas id="quoteComplianceChart"></canvas>
+              </div>
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                <div style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Exemption Reasons</div>
+                @for (ex of quotAnalytics().threeQuoteCompliance.exemptionReasons; track ex.reason) {
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f8fafc;">
+                    <span style="font-size: 11px; color: #334155;">{{ex.reason}}</span>
+                    <span style="font-size: 11px; font-weight: 600; color: #3b82f6;">{{ex.count}}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">donut_large</mat-icon>
+                Award Concentration
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: {{quotAnalytics()?.awardConcentration?.concentrationLevel === 'High' ? '#fef2f2' : '#f1f5f9'}}; padding: 2px 8px; border-radius: 4px;">HHI: {{quotAnalytics()?.awardConcentration?.hhi || 'N/A'}}</span>
+            </div>
+            @if (quotAnalytics()) {
+              <div style="height: 240px; position: relative;">
+                <canvas id="awardConcentrationChart"></canvas>
+              </div>
+              <div style="text-align: center; margin-top: 8px; font-size: 11px; color: {{quotAnalytics().awardConcentration.concentrationLevel === 'High' ? '#dc2626' : quotAnalytics().awardConcentration.concentrationLevel === 'Moderate' ? '#f59e0b' : '#10b981'}}; font-weight: 600;">
+                Concentration: {{quotAnalytics().awardConcentration.concentrationLevel}}
+              </div>
+            }
+          </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+              <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">response</mat-icon>
+              Quote Response Rate by Category
+            </h3>
+            <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112 — Competitive</span>
+          </div>
+          @if (quotAnalytics()) {
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+              @for (cat of quotAnalytics().responseRate.categories; track cat; let i = $index) {
+                <div style="background: #f8fafc; border-radius: 10px; padding: 14px; text-align: center; border: 1px solid #e2e8f0;">
+                  <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">{{cat}}</div>
+                  <div style="font-size: 22px; font-weight: 700; color: {{quotAnalytics().responseRate.rates[i] > 70 ? '#10b981' : quotAnalytics().responseRate.rates[i] > 50 ? '#f59e0b' : '#dc2626'}};">
+                    {{quotAnalytics().responseRate.rates[i]}}%
+                  </div>
+                  <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">{{quotAnalytics().responseRate.responded[i]}}/{{quotAnalytics().responseRate.invited[i]}} responded</div>
+                  <div style="height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                    <div [style.width.%]="quotAnalytics().responseRate.rates[i]" style="height: 100%; border-radius: 2px; background: {{quotAnalytics().responseRate.rates[i] > 70 ? '#10b981' : quotAnalytics().responseRate.rates[i] > 50 ? '#f59e0b' : '#dc2626'}}; transition: width 0.8s ease;"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>psychology</mat-icon> AI Quotation Insights
+            <span style="font-size: 11px; color: #94a3b8; margin-left: 8px; font-weight: 400;">
+              {{aiInsights().length > 0 && aiInsights()[0].aiGenerated ? 'Powered by AI' : 'Rule-based analysis'}}
+            </span>
+          </h3>
+          @if (aiInsights().length > 0) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              @for (insight of aiInsights(); track insight.id) {
+                <div style="display: flex; gap: 12px; padding: 14px; background: #f8fafc; border-radius: 10px; border-left: 3px solid {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}}; cursor: pointer;" [matTooltip]="insight.recommendation || ''">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: {{insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'}}; color: {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}};">
+                    <mat-icon>{{insight.icon || 'format_quote'}}</mat-icon>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">{{insight.title}}</div>
+                    <div style="font-size: 12px; color: #64748b; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{insight.message}}</div>
+                    @if (insight.legislationRef) {
+                      <div style="display: inline-flex; align-items: center; gap: 4px; background: #f3e8ff; color: #7c3aed; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">
+                        <mat-icon style="font-size: 12px; width: 12px; height: 12px;">menu_book</mat-icon>
+                        {{insight.legislationRef}}
+                      </div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size: 11px; color: #0d9488; background: #f0fdfa; padding: 4px 8px; border-radius: 4px; margin-top: 6px; line-height: 1.4;">{{insight.recommendation}}</div>
+                    }
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                      @if (insight.financialImpact) {
+                        <span style="font-size: 11px; color: #059669; font-weight: 500;">{{insight.financialImpact}}</span>
+                      } @else {
+                        <span></span>
+                      }
+                      @if (insight.confidence) {
+                        <span style="font-size: 10px; color: #94a3b8; font-style: italic;">{{(insight.confidence * 100).toFixed(0)}}% confidence</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div style="text-align: center; padding: 20px; color: #94a3b8;">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p style="margin-top: 8px;">Loading AI insights...</p>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== LIST VIEW ===================== -->
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn active">RFQ List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === ''" (click)="filterByStatusList('')">
+            <mat-icon>list</mat-icon>
+            <span class="pipe-count">{{dashSummary().totalRfqs || 0}}</span>
+            <span class="pipe-label">All</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatusList('draft')">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'published'" (click)="filterByStatusList('published')">
+            <mat-icon>publish</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.published || 0}}</span>
+            <span class="pipe-label">Published</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'closed'" (click)="filterByStatusList('closed')">
+            <mat-icon>lock</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.closed || 0}}</span>
+            <span class="pipe-label">Closed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'evaluated'" (click)="filterByStatusList('evaluated')">
+            <mat-icon>assessment</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.evaluated || 0}}</span>
+            <span class="pipe-label">Evaluated</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'pending_approval'" (click)="filterByStatusList('pending_approval')">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.pending_approval || 0}}</span>
+            <span class="pipe-label">Pending</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'awarded'" (click)="filterByStatusList('awarded')">
+            <mat-icon>emoji_events</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.awarded || 0}}</span>
+            <span class="pipe-label">Awarded</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'voided'" (click)="filterByStatusList('voided')">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{dashSummary().byStatus?.voided || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search RFQs..." [(ngModel)]="searchQuery" (keyup.enter)="loadRfqs()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="loadRfqs()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments; track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="showAdvanced.set(!showAdvanced())">
+            <mat-icon>{{showAdvanced() ? 'expand_less' : 'tune'}}</mat-icon> Filters
+          </button>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="openCaptureForm()">
+            <mat-icon>add</mat-icon> New RFQ
+          </button>
+        </div>
+
+        @if (showAdvanced()) {
+          <div class="advanced-filters">
+            <mat-form-field appearance="outline">
+              <mat-label>Business Area</mat-label>
+              <mat-select [(ngModel)]="filterBusinessArea" (selectionChange)="loadRfqs()">
+                <mat-option value="">All Areas</mat-option>
+                @for (ba of config().businessAreas || []; track ba) {
+                  <mat-option [value]="ba">{{ba}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Sub-Sector</mat-label>
+              <mat-select [(ngModel)]="filterSubSector" (selectionChange)="loadRfqs()">
+                <mat-option value="">All Sub-Sectors</mat-option>
+                @for (ss of config().subSectors || []; track ss) {
+                  <mat-option [value]="ss">{{ss}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Service Type</mat-label>
+              <mat-select [(ngModel)]="filterServiceType" (selectionChange)="loadRfqs()">
+                <mat-option value="">All Types</mat-option>
+                @for (st of config().serviceTypes || []; track st) {
+                  <mat-option [value]="st">{{st}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Vote Number</mat-label>
+              <mat-select [(ngModel)]="filterVoteNumber" (selectionChange)="loadRfqs()">
+                <mat-option value="">All Votes</mat-option>
+                @for (vote of budgetVotes(); track vote.voteNumber) {
+                  <mat-option [value]="vote.voteNumber">{{vote.voteNumber}} — {{vote.description}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Assigned Buyer</mat-label>
+              <mat-select [(ngModel)]="filterAssignedBuyer" (selectionChange)="loadRfqs()">
+                <mat-option value="">All Buyers</mat-option>
+                @for (buyer of buyersList(); track buyer.id) {
+                  <mat-option [value]="buyer.id">{{buyer.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="loadRfqs()">
+              <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="loadRfqs()">
+              <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterToPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Value Min (ZAR)</mat-label>
+              <input matInput type="number" [(ngModel)]="filterValueMin" (change)="loadRfqs()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Value Max (ZAR)</mat-label>
+              <input matInput type="number" [(ngModel)]="filterValueMax" (change)="loadRfqs()">
+            </mat-form-field>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference #</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Department</th>
+                <th>Est. Cost</th>
+                <th>Quotes</th>
+                <th>Compliance</th>
+                <th>Closing Date</th>
+                <th>Buyer</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (rfq of rfqs(); track rfq.id) {
+                <tr class="data-row" (click)="viewRfq(rfq)">
+                  <td class="ref-cell">{{rfq.referenceNumber}}</td>
+                  <td>{{rfq.title}}</td>
+                  <td><span class="status-badge" [class]="'status-' + rfq.status">{{getStatusLabel(rfq.status)}}</span></td>
+                  <td>{{rfq.department || '—'}}</td>
+                  <td class="value-cell" [matTooltip]="formatCurrencyFull(rfq.estimatedCost?.amount || 0)">{{formatCurrency(rfq.estimatedCost?.amount || 0)}}</td>
+                  <td>{{rfq.quotes?.length || 0}}</td>
+                  <td>
+                    @if (getCompliantQuoteCount(rfq) >= 3) {
+                      <span class="status-badge compliance-compliant" [matTooltip]="getCompliantQuoteCount(rfq) + ' compliant quotes'">3+ Quotes</span>
+                    } @else if (rfq.threeQuoteJustification) {
+                      <span class="status-badge compliance-pending" [matTooltip]="'Justified: ' + rfq.threeQuoteJustification">Justified</span>
+                    } @else if (rfq.quotes?.length > 0) {
+                      <span class="status-badge compliance-non_compliant" [matTooltip]="'Only ' + getCompliantQuoteCount(rfq) + ' compliant quote(s) — justification required'">Below 3</span>
+                    } @else {
+                      <span style="color:#94a3b8">—</span>
+                    }
+                  </td>
+                  <td>{{rfq.closingDate || '—'}}</td>
+                  <td>{{rfq.assignedBuyerName || '—'}}</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="rfqActionMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #rfqActionMenu="matMenu">
+                      <button mat-menu-item (click)="viewRfq(rfq)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (rfq.status === 'draft') {
+                        <button mat-menu-item (click)="editRfq(rfq)"><mat-icon>edit</mat-icon> Edit</button>
+                        <button mat-menu-item (click)="publishRfq(rfq.id)"><mat-icon>publish</mat-icon> Publish</button>
+                      }
+                      @if (rfq.status === 'buyer_assigned') {
+                        <button mat-menu-item (click)="editRfq(rfq)"><mat-icon>edit</mat-icon> Edit</button>
+                        <button mat-menu-item (click)="submitRfq(rfq.id)"><mat-icon>send</mat-icon> Submit for Approval</button>
+                        <button mat-menu-item (click)="publishRfq(rfq.id)"><mat-icon>publish</mat-icon> Publish</button>
+                      }
+                      @if (rfq.status === 'submitted') {
+                        <button mat-menu-item (click)="approveRfq(rfq.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                        <button mat-menu-item (click)="declineRfq(rfq.id)"><mat-icon>cancel</mat-icon> Decline</button>
+                      }
+                      @if (rfq.status === 'published') {
+                        <button mat-menu-item (click)="closeRfq(rfq.id)"><mat-icon>lock</mat-icon> Close</button>
+                      }
+                      @if (rfq.status === 'closed') {
+                        <button mat-menu-item (click)="evaluateRfq(rfq.id)"><mat-icon>assessment</mat-icon> Evaluate</button>
+                      }
+                      @if (rfq.status === 'pending_approval') {
+                        <button mat-menu-item (click)="approveRfq(rfq.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                        <button mat-menu-item (click)="declineRfq(rfq.id)"><mat-icon>cancel</mat-icon> Decline</button>
+                      }
+                      @if (!['voided', 'awarded'].includes(rfq.status)) {
+                        <button mat-menu-item (click)="voidRfq(rfq.id)"><mat-icon>delete_forever</mat-icon> Void</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="10" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No RFQs found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <div class="page-info-section">
+            <span class="page-info">Showing {{pageStart()}} – {{pageEnd()}} of {{totalRfqs()}} RFQs</span>
+            <mat-form-field appearance="outline" class="page-size-select">
+              <mat-select [(ngModel)]="pageSizeValue" (selectionChange)="onPageSizeChange()">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== CAPTURE / EDIT VIEW ===================== -->
+      @if (currentView() === 'capture') {
+        <div class="form-header">
+          <button mat-icon-button (click)="cancelCapture()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>{{editMode() ? 'Edit RFQ' : 'Create New RFQ'}}</h2>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>description</mat-icon> RFQ Details</h3>
+          <div class="capture-form">
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="rfqForm.title" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Linked Requisition</mat-label>
+                <mat-select [(ngModel)]="rfqForm.requisitionRef" (selectionChange)="onRequisitionSelected($event.value)">
+                  <mat-option value="">— None —</mat-option>
+                  @for (req of availableRequisitions(); track req.id) {
+                    <mat-option [value]="req.requisitionNumber || req.referenceNumber">
+                      {{req.requisitionNumber || req.referenceNumber}} — {{req.title || req.description || 'Untitled'}}
+                    </mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Select an approved requisition to auto-fill details</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="rfqForm.department" required>
+                  @for (dept of departments; track dept) {
+                    <mat-option [value]="dept">{{dept}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Service Type</mat-label>
+                <mat-select [(ngModel)]="rfqForm.serviceType">
+                  @for (st of config().serviceTypes || []; track st) {
+                    <mat-option [value]="st">{{st}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Business Area</mat-label>
+                <mat-select [(ngModel)]="rfqForm.businessArea">
+                  @for (ba of config().businessAreas || []; track ba) {
+                    <mat-option [value]="ba">{{ba}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Sub-Sector</mat-label>
+                <mat-select [(ngModel)]="rfqForm.subSector">
+                  @for (ss of config().subSectors || []; track ss) {
+                    <mat-option [value]="ss">{{ss}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Scoring Method</mat-label>
+                <mat-select [(ngModel)]="rfqForm.scoringMethod">
+                  @for (sm of config().scoringMethods || []; track sm.id) {
+                    <mat-option [value]="sm.id" [matTooltip]="sm.description">{{sm.label}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Estimated Cost (ZAR)</mat-label>
+                <input matInput type="number" [(ngModel)]="rfqForm.estimatedCostAmount" (change)="validateRouteForValue()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Vote Number</mat-label>
+                <mat-select [(ngModel)]="rfqForm.voteNumber" (selectionChange)="onVoteChange()">
+                  <mat-option value="">None</mat-option>
+                  @for (vote of budgetVotes(); track vote.voteNumber) {
+                    <mat-option [value]="vote.voteNumber" [matTooltip]="'Available: ' + formatCurrencyFull(vote.available)">{{vote.voteNumber}} — {{vote.description}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Closing Date</mat-label>
+                <input matInput [matDatepicker]="closingPicker" [(ngModel)]="rfqForm.closingDate">
+                <mat-datepicker-toggle matIconSuffix [for]="closingPicker"></mat-datepicker-toggle>
+                <mat-datepicker #closingPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Closing Time</mat-label>
+                <input matInput type="time" [(ngModel)]="rfqForm.closingTime">
+              </mat-form-field>
+            </div>
+
+            @if (budgetValidationResult()) {
+              <div class="budget-validation-inline" [class.budget-pass]="budgetValidationResult()!.passed" [class.budget-fail]="!budgetValidationResult()!.passed">
+                <mat-icon>{{budgetValidationResult()!.passed ? 'check_circle' : 'error'}}</mat-icon>
+                <div>
+                  <span class="bv-title">Budget Validation: {{budgetValidationResult()!.passed ? 'Passed' : 'Failed'}}</span>
+                  <span class="bv-detail">Available: {{formatCurrencyFull(budgetValidationResult()!.available || 0)}} | Required: {{formatCurrencyFull(budgetValidationResult()!.required || 0)}}</span>
+                  @if (budgetValidationResult()!.error) {
+                    <span class="bv-error">{{budgetValidationResult()!.error}}</span>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (routeValidation()) {
+              <div class="route-validation-inline" [class.route-matched]="routeValidation()!.matched" [class.route-warning]="!routeValidation()!.matched">
+                <mat-icon>{{routeValidation()!.matched ? 'verified' : 'warning'}}</mat-icon>
+                <div>
+                  @if (routeValidation()!.matched) {
+                    <span class="rv-title">Procurement Method: {{routeValidation()!.label}}</span>
+                    <span class="rv-detail">
+                      {{routeValidation()!.description}}
+                      @if (routeValidation()!.scoring) { | Scoring: {{routeValidation()!.scoring}} }
+                      @if (routeValidation()!.minQuotes > 0) { | Min Quotes: {{routeValidation()!.minQuotes}} }
+                      @if (routeValidation()!.advertDays > 0) { | Advert: {{routeValidation()!.advertDays}} days }
+                    </span>
+                  } @else {
+                    <span class="rv-title">{{routeValidation()!.warning}}</span>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Person</mat-label>
+                <input matInput [(ngModel)]="rfqForm.contactPerson">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Email</mat-label>
+                <input matInput type="email" [(ngModel)]="rfqForm.contactEmail">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Phone</mat-label>
+                <input matInput [(ngModel)]="rfqForm.contactPhone">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="form-field-full">
+              <mat-label>Description</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="rfqForm.description"></textarea>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-top:16px">
+          <h3>
+            <mat-icon>list_alt</mat-icon> Line Items
+            <button mat-stroked-button style="margin-left:auto;font-size:12px" (click)="addLineItem()">
+              <mat-icon>add</mat-icon> Add Line
+            </button>
+          </h3>
+          @for (item of formLineItems; track $index; let i = $index) {
+            <div class="line-item-row">
+              <div class="line-item-fields">
+                <mat-form-field appearance="outline" class="line-desc">
+                  <mat-label>Description</mat-label>
+                  <input matInput [(ngModel)]="item.description">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="line-sm">
+                  <mat-label>Qty</mat-label>
+                  <input matInput type="number" [(ngModel)]="item.quantity">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="line-sm">
+                  <mat-label>UoM</mat-label>
+                  <mat-select [(ngModel)]="item.unitOfMeasure">
+                    <mat-option value="each">Each</mat-option>
+                    <mat-option value="pairs">Pairs</mat-option>
+                    <mat-option value="boxes">Boxes</mat-option>
+                    <mat-option value="packs">Packs</mat-option>
+                    <mat-option value="litres">Litres</mat-option>
+                    <mat-option value="meters">Meters</mat-option>
+                    <mat-option value="kg">Kg</mat-option>
+                    <mat-option value="tons">Tons</mat-option>
+                    <mat-option value="hours">Hours</mat-option>
+                    <mat-option value="days">Days</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="line-sm">
+                  <mat-label>Est. Unit Cost</mat-label>
+                  <input matInput type="number" [(ngModel)]="item.estimatedUnitCost">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="line-sm">
+                  <mat-label>UNSPSC</mat-label>
+                  <input matInput [(ngModel)]="item.unspscCode">
+                </mat-form-field>
+              </div>
+              <div class="line-total">
+                <span class="line-total-label">Line Total</span>
+                <span class="line-total-value" [matTooltip]="formatCurrencyFull((item.quantity || 0) * (item.estimatedUnitCost || 0))">{{formatCurrency((item.quantity || 0) * (item.estimatedUnitCost || 0))}}</span>
+              </div>
+              <button mat-icon-button color="warn" (click)="removeLineItem(i)" [disabled]="formLineItems.length <= 1">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          }
+          <div class="order-totals">
+            <div class="total-line grand">
+              <span>Estimated Total</span>
+              <span [matTooltip]="formatCurrencyFull(getFormTotal())">{{formatCurrency(getFormTotal())}}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-top:16px">
+          <h3><mat-icon>note</mat-icon> Notes</h3>
+          <mat-form-field appearance="outline" class="form-field-full">
+            <textarea matInput rows="3" [(ngModel)]="rfqForm.notes"></textarea>
+          </mat-form-field>
+        </div>
+
+        <div class="form-actions">
+          <button mat-stroked-button (click)="cancelCapture()">Cancel</button>
+          <button mat-flat-button color="primary" (click)="saveRfq()" [disabled]="saving()">
+            <mat-icon>save</mat-icon> {{editMode() ? 'Update RFQ' : 'Create RFQ'}}
+          </button>
+        </div>
+      }
+
+      <!-- ===================== DETAIL VIEW ===================== -->
+      @if (currentView() === 'detail' && selectedRfq()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('list')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedRfq()!.referenceNumber}} — {{selectedRfq()!.title}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedRfq()!.status">{{getStatusLabel(selectedRfq()!.status)}}</span>
+              <span class="dept-tag">{{selectedRfq()!.department}}</span>
+              @if (selectedRfq()!.scoringMethod) {
+                <span class="ref-type-badge">{{getScoringLabel(selectedRfq()!.scoringMethod)}}</span>
+              }
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Estimated Cost</span>
+            <span class="value-amount" [matTooltip]="formatCurrencyFull(selectedRfq()!.estimatedCost?.amount || 0)">{{formatCurrency(selectedRfq()!.estimatedCost?.amount || 0)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedRfq()!.status === 'draft') {
+              <button mat-stroked-button (click)="editRfq(selectedRfq()!)"><mat-icon>edit</mat-icon> Edit</button>
+              @if (!selectedRfq()!.assignedBuyer && !selectedRfq()!.assignedBuyerName) {
+                <button mat-stroked-button [disabled]="true" [matTooltip]="'Assign a buyer before publishing'"><mat-icon>publish</mat-icon> Publish</button>
+                <button mat-flat-button color="primary" (click)="openAssignBuyer()"><mat-icon>person_add</mat-icon> Assign Buyer</button>
+              } @else {
+                @if (!selectedRfq()!.closingDate || !selectedRfq()!.lineItems?.length) {
+                  <button mat-flat-button color="primary" (click)="publishRfq(selectedRfq()!.id)" [matTooltip]="!selectedRfq()!.closingDate ? 'Missing closing date' : 'No line items added'"><mat-icon>publish</mat-icon> Publish</button>
+                } @else {
+                  <button mat-flat-button color="primary" (click)="publishRfq(selectedRfq()!.id)"><mat-icon>publish</mat-icon> Publish</button>
+                }
+                <button mat-stroked-button (click)="openAssignBuyer()"><mat-icon>person_add</mat-icon> Assign Buyer</button>
+              }
+            }
+            @if (selectedRfq()!.status === 'buyer_assigned') {
+              <button mat-stroked-button (click)="editRfq(selectedRfq()!)"><mat-icon>edit</mat-icon> Edit</button>
+              <button mat-flat-button color="primary" (click)="submitRfq(selectedRfq()!.id)"><mat-icon>send</mat-icon> Submit for Approval</button>
+              <button mat-stroked-button (click)="publishRfq(selectedRfq()!.id)"><mat-icon>publish</mat-icon> Publish</button>
+              <button mat-stroked-button (click)="openAssignBuyer()"><mat-icon>person_add</mat-icon> Re-assign Buyer</button>
+            }
+            @if (selectedRfq()!.status === 'submitted') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveRfq(selectedRfq()!.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="declineRfq(selectedRfq()!.id)"><mat-icon>cancel</mat-icon> Decline</button>
+            }
+            @if (selectedRfq()!.status === 'approved') {
+              <button mat-flat-button color="primary" (click)="publishRfq(selectedRfq()!.id)"><mat-icon>publish</mat-icon> Publish to Vendors</button>
+              <button mat-flat-button style="background:#ef6c00;color:white" (click)="closeRfq(selectedRfq()!.id)" matTooltip="Direct procurement — skip publishing and add quotes manually"><mat-icon>lock</mat-icon> Close for Direct Award</button>
+            }
+            @if (selectedRfq()!.status === 'published') {
+              <button mat-flat-button style="background:#ef6c00;color:white" (click)="closeRfq(selectedRfq()!.id)"><mat-icon>lock</mat-icon> Close</button>
+            }
+            @if (selectedRfq()!.status === 'closed') {
+              <button mat-flat-button style="background:#7b1fa2;color:white" (click)="evaluateRfq(selectedRfq()!.id)"><mat-icon>assessment</mat-icon> Evaluate</button>
+            }
+            @if (selectedRfq()!.status === 'evaluated') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="showAwardPanel.set(true)"><mat-icon>emoji_events</mat-icon> Award</button>
+            }
+            @if (selectedRfq()!.status === 'pending_approval') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveRfq(selectedRfq()!.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="declineRfq(selectedRfq()!.id)"><mat-icon>cancel</mat-icon> Decline</button>
+            }
+            @if (selectedRfq()!.status === 'declined') {
+              <button mat-stroked-button (click)="returnToCapturer(selectedRfq()!.id)"><mat-icon>undo</mat-icon> Return to Capturer</button>
+            }
+            @if (!['voided', 'awarded'].includes(selectedRfq()!.status)) {
+              <button mat-stroked-button color="warn" (click)="voidRfq(selectedRfq()!.id)"><mat-icon>delete_forever</mat-icon> Void</button>
+            }
+          </div>
+        </div>
+
+        <div class="workflow-stepper">
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(1)"><mat-icon>edit_note</mat-icon></div>
+            <span class="step-label" [class]="getStepState(1)">Draft</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(1) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(2)"><mat-icon>person_add</mat-icon></div>
+            <span class="step-label" [class]="getStepState(2)">Buyer Assigned</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(2) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(3)"><mat-icon>publish</mat-icon></div>
+            <span class="step-label" [class]="getStepState(3)">Published</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(3) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(4)"><mat-icon>lock</mat-icon></div>
+            <span class="step-label" [class]="getStepState(4)">Closed</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(4) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(5)"><mat-icon>assessment</mat-icon></div>
+            <span class="step-label" [class]="getStepState(5)">Evaluated</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(5) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(6)"><mat-icon>emoji_events</mat-icon></div>
+            <span class="step-label" [class]="getStepState(6)">Awarded</span>
+          </div>
+          <div class="step-connector" [class.completed]="getStepState(6) === 'completed'"></div>
+          <div class="workflow-step">
+            <div class="step-circle" [class]="getStepState(7)"><mat-icon>check_circle</mat-icon></div>
+            <span class="step-label" [class]="getStepState(7)">Approved</span>
+          </div>
+        </div>
+
+        @if (getNextActionMessage()) {
+          <div class="next-action-banner">
+            <mat-icon>info</mat-icon>
+            <span>{{getNextActionMessage()}}</span>
+          </div>
+        }
+
+        <div class="detail-tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'info'" (click)="detailTab.set('info')">Information</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'lines'" (click)="detailTab.set('lines')">Line Items ({{selectedRfq()!.lineItems?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'quotes'" (click)="detailTab.set('quotes')">Quotes ({{selectedRfq()!.quotes?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'adjudication'" (click)="detailTab.set('adjudication')">Adjudication</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'budget'" (click)="detailTab.set('budget'); loadBudgetCheck()">Budget</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents'); loadDocuments()">Documents ({{rfqDocuments().length}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'notifications'" (click)="detailTab.set('notifications'); loadNotifications()">Notifications</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'audit'" (click)="detailTab.set('audit'); loadAuditTrail()">Audit Trail</button>
+        </div>
+
+        @if (detailTab() === 'info') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>info</mat-icon> RFQ Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Reference Number</label>
+                    <span>{{selectedRfq()!.referenceNumber}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Requisition Ref</label>
+                    <span style="color:#1e40af;font-weight:500">{{selectedRfq()!.requisitionRef || '—'}}</span>
+                  </div>
+                  @if (selectedRfq()!.demandPlanRef) {
+                    <div class="detail-field">
+                      <label>Demand Plan</label>
+                      <span style="color:#1e40af;font-weight:500">{{selectedRfq()!.demandPlanRef}}</span>
+                    </div>
+                  }
+                  <div class="detail-field">
+                    <label>Department</label>
+                    <span>{{selectedRfq()!.department}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Service Type</label>
+                    <span>{{selectedRfq()!.serviceType || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Business Area</label>
+                    <span>{{selectedRfq()!.businessArea || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Sub-Sector</label>
+                    <span>{{selectedRfq()!.subSector || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Scoring Method</label>
+                    <span>{{getScoringLabel(selectedRfq()!.scoringMethod)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Vote Number</label>
+                    <span>{{selectedRfq()!.voteNumber || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Created By</label>
+                    <span>{{selectedRfq()!.createdByName}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Assigned Buyer</label>
+                    <span>{{selectedRfq()!.assignedBuyerName || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Created Date</label>
+                    <span>{{formatDateTime(selectedRfq()!.createdDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Published Date</label>
+                    <span>{{selectedRfq()!.publishedDate ? formatDateTime(selectedRfq()!.publishedDate) : '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Closing Date</label>
+                    <span>{{selectedRfq()!.closingDate || '—'}} {{selectedRfq()!.closingTime || ''}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Estimated Cost</label>
+                    <span [matTooltip]="formatCurrencyFull(selectedRfq()!.estimatedCost?.amount || 0)">{{formatCurrency(selectedRfq()!.estimatedCost?.amount || 0)}}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-card flex-1">
+                <h3><mat-icon>contact_mail</mat-icon> Contact Details</h3>
+                <div class="detail-field">
+                  <label>Contact Person</label>
+                  <span>{{selectedRfq()!.contactPerson || '—'}}</span>
+                </div>
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Email</label>
+                  <span>{{selectedRfq()!.contactEmail || '—'}}</span>
+                </div>
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Phone</label>
+                  <span>{{selectedRfq()!.contactPhone || '—'}}</span>
+                </div>
+                @if (selectedRfq()!.comments) {
+                  <div class="detail-field" style="margin-top:12px">
+                    <label>Comments</label>
+                    <span class="desc-text">{{selectedRfq()!.comments}}</span>
+                  </div>
+                }
+                @if (selectedRfq()!.notes) {
+                  <div class="detail-field" style="margin-top:12px">
+                    <label>Notes</label>
+                    <span class="desc-text">{{selectedRfq()!.notes}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            @if (selectedRfq()!.threeQuoteJustification) {
+              <div class="detail-card" style="border-color:#ef6c00;background:#fff8f0">
+                <h3><mat-icon style="color:#ef6c00">warning</mat-icon> Three-Quote Justification</h3>
+                <span class="desc-text">{{selectedRfq()!.threeQuoteJustification}}</span>
+              </div>
+            }
+
+            @if (selectedRfq()!.overruleReason) {
+              <div class="detail-card" style="border-color:#c62828;background:#fff5f5">
+                <h3><mat-icon style="color:#c62828">gavel</mat-icon> Overrule Reason</h3>
+                <span class="desc-text">{{selectedRfq()!.overruleReason}}</span>
+              </div>
+            }
+
+            @if (selectedRfq()!.voidDetails) {
+              <div class="detail-card void-card">
+                <h3><mat-icon>cancel</mat-icon> Void Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Voided By</label>
+                    <span>{{selectedRfq()!.voidDetails!.voidedByName}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Void Date</label>
+                    <span>{{formatDateTime(selectedRfq()!.voidDetails!.voidedDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Reason</label>
+                    <span class="desc-text">{{selectedRfq()!.voidDetails!.reason}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Budget Released</label>
+                    <span [matTooltip]="formatCurrencyFull(selectedRfq()!.voidDetails!.budgetReleasedAmount?.amount || 0)">{{selectedRfq()!.voidDetails!.budgetReleased ? formatCurrency(selectedRfq()!.voidDetails!.budgetReleasedAmount?.amount || 0) : 'No'}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (selectedRfq()!.approvalChain?.length) {
+              <div class="detail-card">
+                <h3><mat-icon>verified</mat-icon> Approval Chain</h3>
+                <div class="audit-list">
+                  @for (approval of selectedRfq()!.approvalChain; track approval.level) {
+                    <div class="audit-item">
+                      <div class="audit-dot" [class]="approval.status === 'approved' ? 'dot-approval' : 'dot-rejection'"></div>
+                      <div class="audit-content">
+                        <span class="audit-action">Level {{approval.level}} — {{approval.role}} — {{approval.status | uppercase}}</span>
+                        <span class="audit-detail">{{approval.userName}} {{approval.comments ? '— ' + approval.comments : ''}}</span>
+                        <span class="audit-date">{{formatDateTime(approval.date)}}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'lines') {
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>UoM</th>
+                    <th>Est. Unit Cost</th>
+                    <th>Est. Total</th>
+                    <th>UNSPSC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of selectedRfq()!.lineItems; track $index; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{item.description || item.purchaseItem || item.name || '—'}}</td>
+                      <td>{{item.quantity}}</td>
+                      <td>{{item.unitOfMeasure}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(item.estimatedUnitCost?.amount || item.estimatedUnitPrice?.amount || 0)">{{formatCurrency(item.estimatedUnitCost?.amount || item.estimatedUnitPrice?.amount || 0)}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(item.estimatedTotal?.amount || (item.estimatedUnitCost?.amount || item.estimatedUnitPrice?.amount || 0) * (item.quantity || 0))">{{formatCurrency(item.estimatedTotal?.amount || (item.estimatedUnitCost?.amount || item.estimatedUnitPrice?.amount || 0) * (item.quantity || 0))}}</td>
+                      <td>{{item.unspscCode || '—'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="7" class="empty-state">No line items</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'quotes') {
+          <div class="detail-card">
+            <h3>
+              <mat-icon>receipt_long</mat-icon> Supplier Quotes ({{selectedRfq()!.quotes?.length || 0}})
+              @if (['approved', 'published', 'closed'].includes(selectedRfq()!.status)) {
+                <button mat-stroked-button style="margin-left:auto;font-size:12px" (click)="showAddQuote() ? showAddQuote.set(false) : initQuoteForm()">
+                  <mat-icon>add</mat-icon> Add Quote
+                </button>
+              }
+            </h3>
+
+            @if ((selectedRfq()!.quotes?.length || 0) < 3 && !selectedRfq()!.threeQuoteJustification && ['closed', 'evaluated'].includes(selectedRfq()!.status)) {
+              <div class="budget-validation-inline budget-fail" style="margin-bottom:16px">
+                <mat-icon>warning</mat-icon>
+                <div>
+                  <span class="bv-title">Fewer than 3 quotes received</span>
+                  <span class="bv-detail">A justification is required per SCM Regulations.</span>
+                  <button mat-stroked-button style="margin-top:8px;font-size:12px" (click)="submitThreeQuoteJustification()">
+                    <mat-icon>edit</mat-icon> Add Justification
+                  </button>
+                </div>
+              </div>
+            }
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Status</th>
+                    <th>Compliance</th>
+                    <th>Total (Excl VAT)</th>
+                    <th>Total (Incl VAT)</th>
+                    <th>B-BBEE Level</th>
+                    <th>B-BBEE Pts</th>
+                    <th>Price Score</th>
+                    <th>Total Score</th>
+                    <th>Delivery</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (quote of selectedRfq()!.quotes; track quote.id) {
+                    <tr [class.awarded-row]="quote.status === 'awarded'" [class.non-compliant-row]="quote.complianceStatus === 'non_compliant'">
+                      <td class="ref-cell">{{quote.supplierName}}</td>
+                      <td><span class="status-badge" [class]="'status-' + quote.status">{{getQuoteStatusLabel(quote.status)}}</span></td>
+                      <td><span class="status-badge" [class]="'compliance-' + quote.complianceStatus">{{quote.complianceStatus}}</span></td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(quote.totalExclVat?.amount || 0)">{{formatCurrency(quote.totalExclVat?.amount || 0)}}</td>
+                      <td class="value-cell" [matTooltip]="formatCurrencyFull(quote.totalInclVat?.amount || 0)">{{formatCurrency(quote.totalInclVat?.amount || 0)}}</td>
+                      <td>Level {{quote.bbbeeLevel}}</td>
+                      <td>{{quote.bbbeePoints || 0}}</td>
+                      <td>{{quote.priceScore !== null ? quote.priceScore : '—'}}</td>
+                      <td><strong>{{quote.totalScore !== null ? quote.totalScore : '—'}}</strong></td>
+                      <td>{{quote.deliveryDays || 0}} days</td>
+                      <td class="actions-cell">
+                        <button mat-icon-button [matMenuTriggerFor]="quoteMenu">
+                          <mat-icon>more_vert</mat-icon>
+                        </button>
+                        <mat-menu #quoteMenu="matMenu">
+                          @if (quote.complianceStatus === 'pending') {
+                            <button mat-menu-item (click)="updateQuoteStatus(quote.id, 'compliant')"><mat-icon>check</mat-icon> Mark Compliant</button>
+                            <button mat-menu-item (click)="updateQuoteStatus(quote.id, 'non_compliant')"><mat-icon>close</mat-icon> Mark Non-Compliant</button>
+                          }
+                          @if (selectedRfq()!.status === 'evaluated' && quote.complianceStatus === 'compliant') {
+                            <button mat-menu-item (click)="awardToQuote(quote)"><mat-icon>emoji_events</mat-icon> Award</button>
+                          }
+                          <button mat-menu-item (click)="updateVendorStatus(quote.supplierId, 'responded')"><mat-icon>reply</mat-icon> Mark Responded</button>
+                          <button mat-menu-item (click)="updateVendorStatus(quote.supplierId, 'no_response')"><mat-icon>do_not_disturb</mat-icon> Mark No Response</button>
+                          <button mat-menu-item (click)="updateVendorStatus(quote.supplierId, 'non_compliant')"><mat-icon>block</mat-icon> Mark Non-Compliant</button>
+                        </mat-menu>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="11" class="empty-state">No quotes received yet</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (showAddQuote()) {
+            <div class="detail-card" style="margin-top:16px;border:2px dashed #3b82f6;background:#fafbff">
+              <h3><mat-icon>add_circle</mat-icon> Add Supplier Quote</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Supplier (from Vendor Management)</mat-label>
+                  <mat-select [(ngModel)]="quoteForm.supplierId" (selectionChange)="onVendorSelected($event.value)">
+                    @for (vendor of registeredVendors(); track $index) {
+                      <mat-option [value]="vendor.supplierId || vendor.id">
+                        {{vendor.supplierName || vendor.name}} <span style="color:#94a3b8;font-size:11px">(Level {{vendor.bbbeeLevel}})</span>
+                      </mat-option>
+                    }
+                    @empty {
+                      <mat-option disabled>No invited vendors found</mat-option>
+                    }
+                  </mat-select>
+                  <mat-hint>Select a vendor invited during RFQ publishing</mat-hint>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>B-BBEE Level</mat-label>
+                  <mat-select [(ngModel)]="quoteForm.bbbeeLevel">
+                    @for (lvl of [1,2,3,4,5,6,7,8]; track lvl) {
+                      <mat-option [value]="lvl">Level {{lvl}} ({{getBbbeePoints(lvl)}} pts)</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Delivery Days</mat-label>
+                  <input matInput type="number" [(ngModel)]="quoteForm.deliveryDays">
+                </mat-form-field>
+              </div>
+              <h4 style="font-size:13px;font-weight:600;color:#64748b;margin:12px 0 8px">Line Item Prices</h4>
+              @for (ql of quoteForm.lineItems; track $index; let i = $index) {
+                <div class="line-item-row">
+                  <div class="line-item-fields">
+                    <mat-form-field appearance="outline" class="line-desc">
+                      <mat-label>Description</mat-label>
+                      <input matInput [(ngModel)]="ql.description" readonly>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="line-sm">
+                      <mat-label>Unit Price</mat-label>
+                      <input matInput type="number" [(ngModel)]="ql.unitPrice">
+                    </mat-form-field>
+                  </div>
+                  <div class="line-total">
+                    <span class="line-total-label">Total</span>
+                    <span class="line-total-value" [matTooltip]="formatCurrencyFull((ql.unitPrice || 0) * (ql.quantity || 1))">{{formatCurrency((ql.unitPrice || 0) * (ql.quantity || 1))}}</span>
+                  </div>
+                </div>
+              }
+              <div class="order-totals">
+                <div class="total-line">
+                  <span>Total (Excl VAT)</span>
+                  <span [matTooltip]="formatCurrencyFull(getQuoteFormTotal())">{{formatCurrency(getQuoteFormTotal())}}</span>
+                </div>
+                <div class="total-line">
+                  <span>VAT (15%)</span>
+                  <span [matTooltip]="formatCurrencyFull(getQuoteFormTotal() * 0.15)">{{formatCurrency(getQuoteFormTotal() * 0.15)}}</span>
+                </div>
+                <div class="total-line grand">
+                  <span>Total (Incl VAT)</span>
+                  <span [matTooltip]="formatCurrencyFull(getQuoteFormTotal() * 1.15)">{{formatCurrency(getQuoteFormTotal() * 1.15)}}</span>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showAddQuote.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="addQuote()" [disabled]="saving()">
+                  <mat-icon>save</mat-icon> Save Quote
+                </button>
+              </div>
+            </div>
+          }
+        }
+
+        @if (detailTab() === 'adjudication') {
+          <div class="detail-card">
+            <h3><mat-icon>assessment</mat-icon> Adjudication Report</h3>
+            @if (selectedRfq()!.adjudicationReport) {
+              <div class="detail-grid" style="margin-bottom:16px">
+                <div class="detail-field">
+                  <label>Recommended Supplier</label>
+                  <span style="color:#2e7d32;font-weight:700">{{selectedRfq()!.adjudicationReport!.recommendedSupplierName}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Scoring Method</label>
+                  <span>{{getScoringLabel(selectedRfq()!.adjudicationReport!.method)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Lowest Price</label>
+                  <span class="value-cell" [matTooltip]="formatCurrencyFull(selectedRfq()!.adjudicationReport!.lowestPrice?.amount || 0)">{{formatCurrency(selectedRfq()!.adjudicationReport!.lowestPrice?.amount || 0)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Total Responses</label>
+                  <span>{{selectedRfq()!.adjudicationReport!.totalResponses}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Compliant</label>
+                  <span style="color:#2e7d32">{{selectedRfq()!.adjudicationReport!.compliantResponses}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Non-Compliant</label>
+                  <span style="color:#c62828">{{selectedRfq()!.adjudicationReport!.nonCompliant}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>No Response</label>
+                  <span>{{selectedRfq()!.adjudicationReport!.noResponse}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Adjudicated By</label>
+                  <span>{{selectedRfq()!.adjudicationReport!.adjudicatedBy}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Date</label>
+                  <span>{{formatDateTime(selectedRfq()!.adjudicationReport!.adjudicatedDate)}}</span>
+                </div>
+              </div>
+
+              @if (selectedRfq()!.adjudicationReport!.scores?.length) {
+                <h4 style="font-size:13px;font-weight:600;color:#64748b;margin:0 0 8px">Score Comparison</h4>
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Supplier</th>
+                        <th>Total (Excl VAT)</th>
+                        <th>Price Score (/80)</th>
+                        <th>B-BBEE Points (/20)</th>
+                        <th>Total Score (/100)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (score of getSortedScores(); track score.quoteId; let i = $index) {
+                        <tr [class.awarded-row]="i === 0">
+                          <td>{{i + 1}}</td>
+                          <td class="ref-cell">{{score.supplierName}}</td>
+                          <td class="value-cell" [matTooltip]="formatCurrencyFull(score.totalExclVat?.amount || 0)">{{formatCurrency(score.totalExclVat?.amount || 0)}}</td>
+                          <td>{{score.priceScore}}</td>
+                          <td>{{score.bbbeePoints}}</td>
+                          <td><strong>{{score.totalScore}}</strong></td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            } @else {
+              <div class="empty-text">
+                @if (['closed', 'published'].includes(selectedRfq()!.status)) {
+                  <span>No adjudication performed yet. Click "Evaluate" to adjudicate this RFQ.</span>
+                } @else {
+                  <span>Adjudication not available for this RFQ status.</span>
+                }
+              </div>
+            }
+          </div>
+
+          @if (showAwardPanel() && selectedRfq()!.status === 'evaluated') {
+            <div class="detail-card" style="margin-top:16px;border:2px solid #2e7d32;background:#f0fff4">
+              <h3><mat-icon style="color:#2e7d32">emoji_events</mat-icon> Award RFQ</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Award to Quote</mat-label>
+                  <mat-select [(ngModel)]="awardQuoteId">
+                    @for (quote of getCompliantQuotes(); track quote.id) {
+                      <mat-option [value]="quote.id">
+                        {{quote.supplierName}} — {{formatCurrency(quote.totalExclVat?.amount || 0)}} (Score: {{quote.totalScore || 0}})
+                        {{isRecommended(quote) ? ' ★ Recommended' : ''}}
+                      </mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              @if (awardQuoteId && !isRecommendedQuoteId(awardQuoteId)) {
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Overrule Reason (mandatory)</mat-label>
+                  <textarea matInput rows="2" [(ngModel)]="overruleReason"></textarea>
+                </mat-form-field>
+              }
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showAwardPanel.set(false)">Cancel</button>
+                <button mat-flat-button style="background:#2e7d32;color:white" (click)="awardRfq()" [disabled]="saving()">
+                  <mat-icon>emoji_events</mat-icon> Award
+                </button>
+              </div>
+            </div>
+          }
+        }
+
+        @if (detailTab() === 'budget') {
+          @if (budgetCheckResult()) {
+            <div class="budget-validation-inline" [class.budget-pass]="budgetCheckResult()!.passed" [class.budget-fail]="!budgetCheckResult()!.passed" style="margin-bottom:16px">
+              <mat-icon>{{budgetCheckResult()!.passed ? 'check_circle' : 'error'}}</mat-icon>
+              <div>
+                <span class="bv-title">Current Stage: {{budgetCheckResult()!.stage | uppercase}} — {{budgetCheckResult()!.passed ? 'Passed' : 'Failed'}}</span>
+                <span class="bv-detail">Available: {{formatCurrencyFull(budgetCheckResult()!.available || 0)}} | Required: {{formatCurrencyFull(budgetCheckResult()!.required || 0)}} | Department: {{budgetCheckResult()!.department || '—'}}</span>
+              </div>
+            </div>
+          }
+          <div class="detail-card">
+            <h3><mat-icon>account_balance</mat-icon> Budget Validation Chain</h3>
+            <div class="budget-state-machine">
+              <div class="state-node" [class.completed]="selectedRfq()!.budgetValidation?.atCapture?.passed" [class.failed]="selectedRfq()!.budgetValidation?.atCapture && !selectedRfq()!.budgetValidation?.atCapture?.passed">
+                <mat-icon>{{selectedRfq()!.budgetValidation?.atCapture?.passed ? 'check_circle' : (selectedRfq()!.budgetValidation?.atCapture ? 'error' : 'radio_button_unchecked')}}</mat-icon>
+                <span class="state-label">At Capture</span>
+                @if (selectedRfq()!.budgetValidation?.atCapture) {
+                  <span class="state-amount" [matTooltip]="'Available: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atCapture!.available) + ' | Required: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atCapture!.required)">
+                    {{selectedRfq()!.budgetValidation!.atCapture!.passed ? 'Passed' : 'Failed'}}
+                  </span>
+                }
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="selectedRfq()!.budgetValidation?.atAdjudication?.passed" [class.failed]="selectedRfq()!.budgetValidation?.atAdjudication && !selectedRfq()!.budgetValidation?.atAdjudication?.passed">
+                <mat-icon>{{selectedRfq()!.budgetValidation?.atAdjudication?.passed ? 'check_circle' : (selectedRfq()!.budgetValidation?.atAdjudication ? 'error' : 'radio_button_unchecked')}}</mat-icon>
+                <span class="state-label">At Adjudication</span>
+                @if (selectedRfq()!.budgetValidation?.atAdjudication) {
+                  <span class="state-amount" [matTooltip]="'Available: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atAdjudication!.available) + ' | Required: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atAdjudication!.required)">
+                    {{selectedRfq()!.budgetValidation!.atAdjudication!.passed ? 'Passed' : 'Failed'}}
+                  </span>
+                }
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="selectedRfq()!.budgetValidation?.atAward?.passed" [class.failed]="selectedRfq()!.budgetValidation?.atAward && !selectedRfq()!.budgetValidation?.atAward?.passed">
+                <mat-icon>{{selectedRfq()!.budgetValidation?.atAward?.passed ? 'check_circle' : (selectedRfq()!.budgetValidation?.atAward ? 'error' : 'radio_button_unchecked')}}</mat-icon>
+                <span class="state-label">At Award</span>
+                @if (selectedRfq()!.budgetValidation?.atAward) {
+                  <span class="state-amount" [matTooltip]="'Available: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atAward!.available) + ' | Required: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atAward!.required)">
+                    {{selectedRfq()!.budgetValidation!.atAward!.passed ? 'Passed' : 'Failed'}}
+                  </span>
+                }
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="selectedRfq()!.budgetValidation?.atApproval?.passed" [class.failed]="selectedRfq()!.budgetValidation?.atApproval && !selectedRfq()!.budgetValidation?.atApproval?.passed">
+                <mat-icon>{{selectedRfq()!.budgetValidation?.atApproval?.passed ? 'check_circle' : (selectedRfq()!.budgetValidation?.atApproval ? 'error' : 'radio_button_unchecked')}}</mat-icon>
+                <span class="state-label">At Approval</span>
+                @if (selectedRfq()!.budgetValidation?.atApproval) {
+                  <span class="state-amount" [matTooltip]="'Available: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atApproval!.available) + ' | Required: ' + formatCurrencyFull(selectedRfq()!.budgetValidation!.atApproval!.required)">
+                    {{selectedRfq()!.budgetValidation!.atApproval!.passed ? 'Passed' : 'Failed'}}
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'documents') {
+          <div class="detail-card">
+            <h3>
+              <mat-icon>folder</mat-icon> Documents ({{rfqDocuments().length}})
+              <button mat-stroked-button style="margin-left:auto;font-size:12px" (click)="showDocUpload.set(!showDocUpload())">
+                <mat-icon>upload_file</mat-icon> Upload
+              </button>
+            </h3>
+
+            @if (showDocUpload()) {
+              <div style="padding:16px;border:2px dashed #3b82f6;border-radius:10px;background:#fafbff;margin-bottom:16px">
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Name</mat-label>
+                    <input matInput [(ngModel)]="docForm.name">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Type</mat-label>
+                    <mat-select [(ngModel)]="docForm.type">
+                      <mat-option value="rfq_document">RFQ Document</mat-option>
+                      <mat-option value="specification">Specification</mat-option>
+                      <mat-option value="vendor_response">Vendor Response</mat-option>
+                      <mat-option value="evaluation_report">Evaluation Report</mat-option>
+                      <mat-option value="award_letter">Award Letter</mat-option>
+                      <mat-option value="correspondence">Correspondence</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Description</mat-label>
+                  <input matInput [(ngModel)]="docForm.description">
+                </mat-form-field>
+                <div class="form-actions">
+                  <button mat-stroked-button (click)="showDocUpload.set(false)">Cancel</button>
+                  <button mat-flat-button color="primary" (click)="uploadDocument()" [disabled]="saving()">
+                    <mat-icon>upload</mat-icon> Upload Document
+                  </button>
+                </div>
+              </div>
+            }
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Uploaded By</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (doc of rfqDocuments(); track doc.id) {
+                    <tr>
+                      <td class="ref-cell">{{doc.name}}</td>
+                      <td><span class="status-badge" [class]="'doctype-' + doc.type">{{getDocTypeLabel(doc.type)}}</span></td>
+                      <td>{{doc.uploadedByName || doc.uploadedBy}}</td>
+                      <td>{{formatDateTime(doc.uploadedDate)}}</td>
+                      <td class="actions-cell">
+                        <button mat-icon-button color="warn" (click)="deleteDocument(doc.id)" [matTooltip]="'Remove document'">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state">No documents uploaded</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'notifications') {
+          <div class="detail-card">
+            <h3><mat-icon>notifications</mat-icon> Vendor Notifications</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Supplier ID</th>
+                    <th>Type</th>
+                    <th>Channel</th>
+                    <th>Sent Date</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (notif of vendorNotifications(); track $index) {
+                    <tr>
+                      <td>{{notif.supplierId}}</td>
+                      <td><span class="status-badge" [class]="'notif-' + notif.type">{{notif.type}}</span></td>
+                      <td>{{notif.channel}}</td>
+                      <td>{{formatDateTime(notif.sentDate)}}</td>
+                      <td><span class="status-badge" [class]="'notif-status-' + notif.status">{{notif.status}}</span></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state">No notifications sent</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'audit') {
+          <div class="detail-card">
+            <h3><mat-icon>timeline</mat-icon> Audit Trail</h3>
+            @if (auditTrail().length) {
+              <div class="audit-list">
+                @for (entry of auditTrail(); track $index) {
+                  <div class="audit-item">
+                    <div class="audit-dot" [class]="getAuditDotClass(entry.action)"></div>
+                    <div class="audit-content">
+                      <span class="audit-action">{{entry.action}}</span>
+                      <span class="audit-detail">{{entry.details}}</span>
+                      <span class="audit-date">{{formatDateTime(entry.timestamp)}} — {{entry.userId}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty-text">No audit trail available</div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===================== VENDOR SELECTION PANEL ===================== -->
+      @if (currentView() === 'vendor-select') {
+        <div class="form-header">
+          <button mat-icon-button (click)="cancelVendorSelect()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>Select Vendors for Invitation — {{vendorSelectRfqId}}</h2>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>filter_list</mat-icon> Vendor Filters</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Business Area</mat-label>
+              <mat-select [(ngModel)]="vendorFilterBusinessArea" (selectionChange)="loadRotationalVendors()">
+                <mat-option value="">All</mat-option>
+                @for (ba of config().businessAreas || []; track ba) {
+                  <mat-option [value]="ba">{{ba}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Sub-Sector</mat-label>
+              <mat-select [(ngModel)]="vendorFilterSubSector" (selectionChange)="loadRotationalVendors()">
+                <mat-option value="">All</mat-option>
+                @for (ss of config().subSectors || []; track ss) {
+                  <mat-option [value]="ss">{{ss}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Province</mat-label>
+              <mat-select [(ngModel)]="vendorFilterProvince" (selectionChange)="loadRotationalVendors()">
+                <mat-option value="">All</mat-option>
+                @for (p of provinces; track p) {
+                  <mat-option [value]="p">{{p}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-stroked-button class="reset-filters-btn" (click)="vendorFilterBusinessArea = ''; vendorFilterSubSector = ''; vendorFilterProvince = ''; loadRotationalVendors()">
+              <mat-icon>filter_alt_off</mat-icon> Reset Filters
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-top:16px">
+          <h3><mat-icon>people</mat-icon> Rotational Vendor Pool ({{rotationalVendors().length}})</h3>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="check-col">
+                    <mat-checkbox [checked]="allVendorsSelected()" (change)="toggleSelectAllVendors()"></mat-checkbox>
+                  </th>
+                  <th>Supplier</th>
+                  <th>Business Area</th>
+                  <th>Sub-Sector</th>
+                  <th>Province</th>
+                  <th>B-BBEE</th>
+                  <th>Times Invited</th>
+                  <th>Times Awarded</th>
+                  <th>Rotation Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (vendor of rotationalVendors(); track vendor.supplierId) {
+                  <tr>
+                    <td class="check-col" (click)="$event.stopPropagation()">
+                      <mat-checkbox [checked]="isVendorSelected(vendor.supplierId)" (change)="toggleVendorSelection(vendor.supplierId)"></mat-checkbox>
+                    </td>
+                    <td class="ref-cell">{{vendor.supplierName}}</td>
+                    <td>{{vendor.businessArea}}</td>
+                    <td>{{vendor.subSector}}</td>
+                    <td>{{vendor.province}}</td>
+                    <td><span class="bbbee-badge" [class]="'bbbee-' + vendor.bbbeeLevel">Level {{vendor.bbbeeLevel}}</span></td>
+                    <td>{{vendor.timesInvited}}</td>
+                    <td>{{vendor.timesAwarded}}</td>
+                    <td>{{vendor.rotationScore}}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty-state">No vendors found matching filters</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (selectedVendorIds().length > 0) {
+            <div class="form-actions">
+              <span style="font-size:13px;color:#64748b">{{selectedVendorIds().length}} vendors selected</span>
+              <button mat-flat-button color="primary" (click)="confirmPublishWithVendors()" [disabled]="saving()">
+                <mat-icon>publish</mat-icon> Publish & Invite Selected Vendors
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== REPORTS VIEW ===================== -->
+      @if (currentView() === 'reports') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">RFQ List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn active">Reports</button>
+        </div>
+
+        <div class="reports-grid">
+          <div class="detail-card">
+            <h3><mat-icon>assignment</mat-icon> Quotation List Report</h3>
+            <p class="desc-text">Full register of all quotations with status and value summary.</p>
+            <button mat-flat-button color="primary" (click)="loadReport('list')" [disabled]="loading()">
+              <mat-icon>search</mat-icon> Generate Report
+            </button>
+          </div>
+          <div class="detail-card">
+            <h3><mat-icon>report_problem</mat-icon> Exception Report</h3>
+            <p class="desc-text">Overdue RFQs, budget exceeded, fewer-than-3 quotes without justification, overridden recommendations.</p>
+            <button mat-flat-button color="warn" (click)="loadReport('exception')" [disabled]="loading()">
+              <mat-icon>search</mat-icon> Generate Report
+            </button>
+          </div>
+          <div class="detail-card">
+            <h3><mat-icon>description</mat-icon> Quotation Register</h3>
+            <p class="desc-text">Full register of all quotations with status and value summary.</p>
+            <button mat-flat-button color="primary" (click)="loadReport('register')" [disabled]="loading()">
+              <mat-icon>search</mat-icon> Generate Report
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-top:16px">
+          <h3><mat-icon>filter_list</mat-icon> Report Filters</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="reportFilterFromPicker" [(ngModel)]="reportFilterDateFrom">
+              <mat-datepicker-toggle matIconSuffix [for]="reportFilterFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #reportFilterFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="reportFilterToPicker" [(ngModel)]="reportFilterDateTo">
+              <mat-datepicker-toggle matIconSuffix [for]="reportFilterToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #reportFilterToPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Status</mat-label>
+              <mat-select [(ngModel)]="reportFilterStatus">
+                <mat-option value="">All</mat-option>
+                <mat-option value="draft">Draft</mat-option>
+                <mat-option value="published">Published</mat-option>
+                <mat-option value="closed">Closed</mat-option>
+                <mat-option value="evaluated">Evaluated</mat-option>
+                <mat-option value="awarded">Awarded</mat-option>
+                <mat-option value="voided">Voided</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Department</mat-label>
+              <mat-select [(ngModel)]="reportFilterDepartment">
+                <mat-option value="">All Departments</mat-option>
+                @for (dept of departments; track dept) {
+                  <mat-option [value]="dept">{{dept}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (reportData()) {
+          <div class="detail-card" style="margin-top:16px">
+            <h3>
+              <mat-icon>assessment</mat-icon> {{reportData()!.reportName || 'Report'}}
+              <button mat-stroked-button style="margin-left:auto;font-size:12px" (click)="printReport()">
+                <mat-icon>print</mat-icon> Print / Export
+              </button>
+            </h3>
+            @if (reportData()!.summary) {
+              <div class="report-summary">
+                @for (key of getReportSummaryKeys(); track key) {
+                  <div class="report-stat">
+                    <span class="rs-label">{{key}}</span>
+                    <span class="rs-value">{{formatReportValue(reportData()!.summary[key])}}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (reportData()!.data?.length) {
+              <div class="table-wrapper" style="margin-top:12px">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      @for (col of getReportColumns(); track col) {
+                        <th>{{col}}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of reportData()!.data; track $index) {
+                      <tr>
+                        @for (col of getReportColumns(); track col) {
+                          <td>{{formatReportCell(row, col)}}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-text" style="margin-top:12px">No results found</div>
+            }
+          </div>
+        }
+      }
+
+      @if (showBuyerDialog()) {
+        <div class="buyer-dialog-overlay" (click)="showBuyerDialog.set(false)">
+          <div class="buyer-dialog" (click)="$event.stopPropagation()">
+            <h3>Assign Buyer</h3>
+            <mat-form-field appearance="outline" style="width:100%">
+              <mat-label>Select Buyer</mat-label>
+              <mat-select [(ngModel)]="selectedBuyerId">
+                @for (user of scmUsers(); track user.id) {
+                  <mat-option [value]="user.id">{{user.name}} — {{user.role || ''}} {{user.department ? '(' + user.department + ')' : ''}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <div class="dialog-actions">
+              <button mat-stroked-button (click)="showBuyerDialog.set(false)">Cancel</button>
+              <button mat-flat-button color="primary" (click)="confirmAssignBuyer()">Confirm</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

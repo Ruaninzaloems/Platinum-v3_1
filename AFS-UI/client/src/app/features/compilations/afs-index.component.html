@@ -1,0 +1,92 @@
+<div class="index-toolbar">
+  <div class="toolbar-left">
+    <button mat-icon-button (click)="goBack()" matTooltip="Back to compilation">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <span class="toolbar-title">AFS Section Index</span>
+  </div>
+  <div class="toolbar-right">
+    <button mat-stroked-button (click)="saveOrder()" [disabled]="saving" matTooltip="Save the current section order">
+      <mat-icon>{{ saving ? 'hourglass_empty' : 'save' }}</mat-icon>
+      {{ saving ? 'Saving...' : 'Save Order' }}
+    </button>
+    <button mat-flat-button class="btn-primary" (click)="goToPreview()" matTooltip="Open AFS Preview">
+      <mat-icon>preview</mat-icon> Preview AFS
+    </button>
+  </div>
+</div>
+
+<div class="index-container">
+  @if (loading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading sections...</p>
+    </div>
+  } @else {
+    <div class="index-header">
+      <h2>{{ compilation?.name || 'AFS Compilation' }}</h2>
+      <p class="index-subtitle">Drag sections to reorder them. Expand to preview contents.</p>
+    </div>
+
+    <div cdkDropList (cdkDropListDropped)="drop($event)" class="section-list">
+      @for (section of sections; track section.id; let i = $index) {
+        <div cdkDrag class="section-card" [class.expanded]="expandedSectionId === section.id">
+          <div class="section-card-header" (click)="toggleExpand(section.id)">
+            <div class="drag-handle" cdkDragHandle>
+              <mat-icon>drag_indicator</mat-icon>
+            </div>
+            <div class="section-order">{{ i + 1 }}</div>
+            <mat-icon class="section-type-icon">{{ getSectionIcon(section.sectionType) }}</mat-icon>
+            <div class="section-info">
+              <div class="section-title">{{ section.title }}</div>
+              <div class="section-meta">
+                <span class="section-type-badge" [attr.data-type]="section.sectionType">{{ getSectionTypeBadge(section.sectionType) }}</span>
+                <span class="line-count">{{ section.lineItems?.length || 0 }} line items</span>
+                <span class="page-estimate">~{{ estimatePages(section) }} {{ estimatePages(section) === 1 ? 'page' : 'pages' }}</span>
+              </div>
+            </div>
+            <mat-icon class="expand-icon">{{ expandedSectionId === section.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </div>
+
+          @if (expandedSectionId === section.id && section.lineItems?.length) {
+            <div class="section-preview">
+              <table class="preview-table">
+                <thead>
+                  <tr>
+                    <th class="col-label">Line Item</th>
+                    <th class="col-type">Type</th>
+                    <th class="col-amount">Current Year</th>
+                    <th class="col-amount">Prior Year</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of section.lineItems; track item.templateLineItem?.id || $index; let j = $index) {
+                    @if (j < 15) {
+                      <tr [class.header-row]="item.templateLineItem?.lineType === 'header'"
+                          [class.total-row]="item.templateLineItem?.isTotal"
+                          [class.spacer-row]="item.templateLineItem?.lineType === 'spacer'">
+                        <td class="col-label" [style.padding-left.px]="8 + (item.templateLineItem?.indentLevel || 0) * 16">
+                          {{ item.templateLineItem?.label || '—' }}
+                        </td>
+                        <td class="col-type">{{ item.templateLineItem?.lineType || 'data' }}</td>
+                        <td class="col-amount">{{ formatAmount(item.currentYearAmount) }}</td>
+                        <td class="col-amount">{{ formatAmount(item.priorYearAmount) }}</td>
+                      </tr>
+                    }
+                  }
+                  @if (section.lineItems.length > 15) {
+                    <tr>
+                      <td colspan="4" class="more-items">... and {{ section.lineItems.length - 15 }} more line items</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <div class="drag-placeholder" *cdkDragPlaceholder></div>
+        </div>
+      }
+    </div>
+  }
+</div>

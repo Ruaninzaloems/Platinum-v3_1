@@ -1,0 +1,26 @@
+@if (breadcrumbs.length > 0) {
+  <div class="drilldown-breadcrumbs">
+    <button type="button" class="breadcrumb-item breadcrumb-root" (click)="resetToRoot()">Root</button>
+    @for (crumb of breadcrumbs; track crumb.scoaId; let i = $index) {
+      <span class="breadcrumb-sep">&rsaquo;</span>
+      <button type="button" class="breadcrumb-item" (click)="onBreadcrumbClick(i)">{{ crumb.label }}</button>
+    }
+  </div>
+}
+@if (finalizedItem) {
+  <div class="drilldown-finalized">
+    <span class="finalized-label">{{ formatItem(finalizedItem) }}</span>
+    <button type="button" class="btn-clear" (click)="resetToRoot()" title="Clear selection">&times;</button>
+  </div>
+} @else if (loading) {
+  <select class="form-input" disabled>
+    <option>Loading...</option>
+  </select>
+} @else {
+  <select class="form-input" [(ngModel)]="dropdownValue" (ngModelChange)="onSelect($event)">
+    <option value="">{{ placeholder }}</option>
+    @for (item of currentOptions; track item.scoaId) {
+      <option [value]="item.scoaId">{{ formatItem(item) }}</option>
+    }
+  </select>
+}

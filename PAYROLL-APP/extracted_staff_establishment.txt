@@ -1,0 +1,2198 @@
+   HR/Payroll
+
+   Staff Establishment
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions   Page
+Payroll                                                                                          Staff Establishment
+
+
+
+
+                                                         Version 1.0
+
+                                                     20 November 2019
+
+
+
+
+                                                 SebataEMS
+                                        Copyright © 2014 - Sebata Municipal Solutions (Pty) Ltd.
+                   All rights reserved. All information contained in this document is confidential and proprietary to
+                  Sebata Municipal Solutions (Pty) Ltd. No part of this document may be photocopied or reproduced
+                        in any manner without the prior written consent of Sebata Municipal Solutions (Pty) Ltd.
+
+
+
+
+SEBATA_Version_1.0_2019                  Copyright © Sebata Municipal Solutions                                   Page - 2 -of 85
+Payroll                                                                                                Staff Establishment
+
+
+Table of Contents
+1. STAFF ESTABLISHMENT.............................................................................................................. - 4 -
+2. PRE - REQUISITES....................................................................................................................... - 5 -
+3. PROCESS FLOW FOR STAFF ESTABLISHMENT .............................................................................. - 6 -
+4. RULES AND VALIDATIONS FOR JOB PROFILE AND POSITION........................................................ - 7 -
+5. CAPTURE A JOB PROFILE ............................................................................................................ - 8 -
+5.1 Role and Permission for Capturing a Job Profile and Position .................................................... - 8 -
+5.3 Add New Job Profile ................................................................................................................ - 9 -
+   5.3.1 Job Profile Tab .................................................................................................................- 10 -
+   5.3.2 Competency Tab ..............................................................................................................- 16 -
+   5.3.3 Authority Tab ..................................................................................................................- 25 -
+   5.3.4 History Tab ......................................................................................................................- 26 -
+5.4 Update “Edit” Job Profile......................................................................................................- 28 -
+6. CAPTURE POSITION PROFILE .....................................................................................................- 30 -
+6.1 Add a new Position.................................................................................................................- 30 -
+   6.1.1 Position Tab ....................................................................................................................- 32 -
+   6.1.2 Qualification Tab .............................................................................................................- 38 -
+   6.1.3 Skills Tab .........................................................................................................................- 40 -
+   6.1.4 Competency Tab ..............................................................................................................- 42 -
+7. VIEW ORGANOGRAM ...............................................................................................................- 47 -
+7.1 To View an Organogram .........................................................................................................- 47 -
+8.GENERATE STAFF ESTABLISHMENT REPORTS ..............................................................................- 49 -
+   8.1        Organogram Report ...................................................................................................- 49 -
+   8.2        Task Grade Report......................................................................................................- 51 -
+   8.3        Job Profile Report.......................................................................................................- 52 -
+   8.4        Position Reporting Lines Report ..................................................................................- 54 -
+9.CONFIGURATION SETTINGS FOR JOB PROFILIES AND POSITIONS ................................................- 56 -
+   9.1        Department and Divisions Settings ..............................................................................- 56 -
+   9.2        Task Grade and Notches .............................................................................................- 59 -
+   9.3        Employee Subtypes ....................................................................................................- 62 -
+   9.4        Condition of Service ...................................................................................................- 64 -
+   9.5        Salary Transaction ......................................................................................................- 66 -
+   9.6        Salary Transaction Group ............................................................................................- 72 -
+   9.7        Payroll Constant .........................................................................................................- 75 -
+   9.8        Upper Limit................................................................................................................- 77 -
+   9.9        Competency Library ...................................................................................................- 80 -
+   9.10       Qualification Library ...................................................................................................- 82 -
+10.GLOSSARY ...............................................................................................................................- 84 -
+11.NOTES.....................................................................................................................................- 85 -
+
+
+
+
+SEBATA_Version_1.0_2019                       Copyright © Sebata Municipal Solutions                                     Page - 3 -of 85
+Payroll                                                                       Staff Establishment
+
+
+    1. STAFF ESTABLISHMENT
+
+
+                                          Staff Establishment 6.1.1
+
+          6.1.1.1               6.1.1.2                      6.1.1.3                   6.1.1.4
+      Capture Job           Capture Position          View Organogram      Generate Staff Establishment
+        Profile                 Profile                                              Reports
+This manual includes the following processes:
+
+     1. Capture Job Profiles
+
+     2. Capture Positions
+
+     3. View Organogram
+
+     4. Generate Staff Establishment Reports
+
+The capturing of Job Profile(s) that can be linked to Position(s) and the capturing of a Position(s) that can
+be linked to Job Profile(s) and Employee(s) is a standard business process to setup the staff establishment
+in Sebata EMS.
+
+
+
+
+                                 Icon identifies the role player (Capturer)
+
+
+                                 Icon identifies the role player (Approval)
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                  Page - 4 -of 85
+Payroll                                                                     Staff Establishment
+
+
+      2. PRE - REQUISITES
+The following must be in place to manage Job Profiles and Positions:
+
+
+ 1.       An approved Organogram.
+
+
+ 2.       Approved Budget must be initialized in Planning.
+
+
+ 3.       Department and Division HR/Payroll sections setup must be completed
+
+
+ 4.       Task Grade and Notches setup must be completed
+
+
+ 5.       Employee Subtype setup must be complete.
+
+
+ 6.       Condition of Service setup must be completed.
+
+
+ 7.       Salary Transaction setup must be completed.
+
+
+ 8.       Salary Transaction Groups setup must be completed.
+
+
+ 9.       Payroll Constant setup must be completed.
+
+
+ 10.      Upper Limit setup must be completed.
+
+
+ 9.       Competency Library setup must be completed.
+
+
+ 10.      Qualification Library setup must be completed.
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions               Page - 5 -of 85
+Payroll                                                                             Staff Establishment
+
+
+      3. PROCESS FLOW FOR STAFF ESTABLISHMENT
+Process Summary:
+
+              Capture a Job Profile
+
+ 1.           Go To: EMS → Payroll → HR→ Organogram → Job Profile
+
+ 2.           To add a new Job Profile, click “Add New”, continue to capture all the sections.
+
+ 3.           Capture all Information on the Job Detail Tab
+
+ 4.           Click on Submit to save the Job Profile or proceed with the capturing of the rest of the tabs.
+
+ 5.           Select Edit Button to complete the rest of the tabs on the sheet if the select button were clicked after
+              the Job Detail Tab was completely captured.
+
+ 6.           Complete all required fields on the rest of the Tabs
+
+ 7.           Job Profile History Tab will auto-populate when the system generates the Job Profile.
+
+ 8.           Click Submit
+
+              END OF PROCESS
+
+             Capture a Position
+
+ 1.          Go To: Payroll→HR→Organogram→Position
+
+ 2.          To add a new Position, click on “Add New”. continue to capture all compulsory fields on the Positions
+             Tab then submit in order to create the new Position.
+
+ 3.          Update the Qualification tab.
+
+ 4.          Update the of Skills tab.
+
+ 5.          Update the Competency tab.
+
+ 6.          Position History tab will auto-populate as the system generates results for any changes to a Position
+             status.
+
+ 7.          Click Submit.
+
+              END OF PROCESS
+
+              View Organogram
+
+ 1.           Go To: Payroll→HR→Organogram→Job Profile Organogram.
+
+ 2.           The Job Profile Organogram Chart screen will populate for viewing.
+
+              END OF PROCESS
+
+
+
+
+SEBATA_Version_1.0_2019               Copyright © Sebata Municipal Solutions                      Page - 6 -of 85
+Payroll                                                                     Staff Establishment
+
+
+              Generate Staff Establishment Report
+
+ 1.           Go To: Payroll→Report→Employee→Organogram.
+
+ 2.           Select a Department from the drop-down menu.
+
+ 3.           Click Submit.
+
+              END OF PROCESS
+
+
+
+
+      4. RULES AND VALIDATIONS FOR JOB PROFILE AND POSITION
+
+
+The following Rules and Validations Apply:
+
+
+ 1.          Permission rights to create a Job Profile and Position should be set up on the system.
+
+ 2.          All compulsory fields * must be completed.
+
+ 3.          The system will notify the capturer of any outstanding information needed to complete the
+             “Add Job Profile” process.
+
+ 4.          Missing fields will be indicated by a rules and validation information pop-up.
+
+ 5.          System generated Job Profile ID will be created when the Job Profile is being captured.
+
+
+
+
+“Add New” function button         “Add New” information on System.
+
+
+“Submit” function button          Save information on system.
+
+
+“Cancel” function button          To return to the Previous Page.
+
+
+“Edit” function button            Edit information on System.
+
+
+“Next” function button            Navigate user to the next tab.
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                Page - 7 -of 85
+Payroll                                                                              Staff Establishment
+
+
+    5. CAPTURE A JOB PROFILE
+
+                                                                                                       Generate
+                                      Capture
+    Capture Job                                                            View                          Staff
+                                      Position
+      Profile                                                           Organogram                   Establishmen
+                                       Profile
+                                                                                                       t Report
+
+
+
+             Access       Capturer
+
+
+
+
+Specific Outcomes:
+
+    ➢ Successfully capture a New Job Profile
+
+    ➢ Successfully edit an existing Job Profile
+
+    5.1 Role and Permission for Capturing a Job Profile and Position
+
+                                                                                             Create Roles and
+            Configuration                                  Users
+                                                                                               Permissions
+
+    ➢ By adding the following permission to the user’s profile, the user will be able to add /edit Job
+      Profiles and Positions.
+
+
+
+
+SEBATA_Version_1.0_2019              Copyright © Sebata Municipal Solutions                      Page - 8 -of 85
+Payroll                                                                      Staff Establishment
+
+
+5.3 Add New Job Profile
+Follow the menu below to capture a Job Profile:
+
+       Payroll                      HR                          Organogram              Job Profile
+
+
+Job profiles can be added, viewed and modified in this section. The information in this section is used to
+populate the municipality’s organizational structure (organogram), as well as for budgeting and reporting
+purposes, etc.
+
+There are different sections with additional information/details that need to be completed to set up a job
+profile:
+
+
+
+
+Click “Payroll” in the primary navigation bar.
+
+Select “HR” in the secondary navigation bar, select “Organogram” and then click on Job Profile.
+
+
+
+
+Click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                 Page - 9 -of 85
+Payroll                                                                     Staff Establishment
+
+
+  5.3.1 Job Profile Tab
+
+This includes the job title, occupation level, task grade, etc. There are also sections relating to OFO, WSP
+report setup, competencies, human relations skills (internal & external) and job dimensions.
+
+
+
+
+Capture the mandatory fields marked with the red star as per the table below.
+
+ Step     Field                            Description
+
+ 1.       Job Title*                       Complete Job Title field
+
+ 2.       Employee Type*                   Select Employee Type from drop-down list
+
+ 3.       Employee Subtype*                Select Employee Subtype from drop-down list
+
+ 4.       Salary Transaction Group*        Select a Salary Transaction Group from drop-down list
+
+ 5.       Task Grade/Upper Limit*          Select Task Grade or Upper Limit from drop-down list
+
+ 6.       Recommended Contractor           When applicable, Complete Recommended Contractor Rate
+          Rate                             field
+
+ 7.       Allow Over Time                  Select the Allow Over Time box if it is applicable to a specific
+                                           Job Profile
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                Page - 10 -of 85
+Payroll                                                                     Staff Establishment
+
+
+ 8.       Performance Assessment           Select the Performance Assessment box if it is applicable to a
+                                           specific Job Profile
+
+ 9.       Occupational Level*              Select an Occupational Level from drop-down list
+
+ 10.      Job Description Code*            Complete Job Description Code field
+
+ 11.      Start date*                      Enter Start Date
+
+ 12.      End date*                        Enter End Date
+
+ 13.      Disable Job Profile              When applicable select the box to disable a Job Profile
+
+
+
+
+Upper Limit                       Upper Limit field appears only when you select Employee Type from
+                                  drop-down list for “Senior Management”, “Ward Councilors” or “Board
+                                  Member of Entities”
+
+
+OFO Fields:
+
+
+
+
+Capture the mandatory fields marked with the red star as per the table below:
+
+
+ Step     Field                            Description
+
+ 14.      Major Group*                     Select Major Group from drop-down list
+
+ 15.      Sub Major Group*                 Select Sub Major Group from drop-down list
+
+ 16.      Minor Group*                     Select Minor Group from drop-down list
+
+ 17.      Unit Group*                      Select Unit Group from drop-down list
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                Page - 11 -of 85
+Payroll                                                                     Staff Establishment
+
+
+ 18.      Occupations*                    Select Occupations from drop-down list
+
+ 19.      Specialist Title                Select Specialist Title from drop-down list
+
+ 20.      OFO Code                        Auto-Populates
+
+ 21.      Occupation                      Auto-Populates
+
+
+
+
+OFO Codes                      OFO is Organizational Framework for Occupations and is required to be
+                               completed to ensure the WSP reports are populated correctly.
+
+
+
+WSP Report Setup fields:
+
+
+
+
+Capture the mandatory fields marked with the red star as per the table below
+
+
+ Step     Field                           Description
+
+ 22.      Employment Category*            Select Employment Category from drop-down list
+
+ 23.      Employment Code*                Select Employment Code from drop-down list
+
+
+ 24.      Work Area                       Auto-Populates or Select from drop down
+
+
+
+
+WPS Report Setup               WPS is Work Performance Standards
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                 Page - 12 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Click “Submit”
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 13 -of 85
+Payroll                                                                          Staff Establishment
+
+
+
+
+                          After completing all fields of the Job Detail tab, click “Submit” in order to
+ Job Profile
+                          save the Job profile. Then click on the “Edit” button to continue with the
+                          process to populate the other tabs of the Job Profile.
+
+
+
+Job Duties and Responsibilities Tab
+
+New duties and responsibilities can be added, or existing duties and responsibilities can be modified. It
+is also used to indicate whether it should be used for recruitment and for performance measurement.
+
+
+
+
+Move to the “Job Duties and Responsibilities” tab and click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019               Copyright © Sebata Municipal Solutions                 Page - 14 -of 85
+Payroll                                                                    Staff Establishment
+
+
+
+
+ Step     Field                          Description
+
+ 1.       Priority*                      Select Priority Status from drop-down List
+
+ 2.       Name*                          Complete Name field
+
+ 3.       Description*                   Complete Description field
+
+ 4.       Use for Recruitment            Select Use for Recruitment from the drop-down list
+
+ 5.       Performance Measure            Select Performance Measurement from drop-down list
+
+ 6.       Duty                           Tick Duty box if applicable.
+
+ 7.       Responsibilities               Tick Responsibility box applicable.
+
+Complete ”Job Duties and Responsibilities” fields, and “Add/Update”.
+
+
+
+
+SEBATA_Version_1.0_2019         Copyright © Sebata Municipal Solutions                Page - 15 -of 85
+Payroll                                                                   Staff Establishment
+
+
+  5.3.2 Competency Tab
+Under Competency tab user need to capture Qualification; Skills and Competency Requirements.
+
+Qualification Tab
+
+New qualifications can be added, or existing qualifications can be modified. It is also used to indicate
+whether it should be used for recruitment.
+
+
+
+
+Move to primary tab “Competency” then to the “Qualification” tab, and click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 16 -of 85
+Payroll                                                                    Staff Establishment
+
+
+
+
+ Step     Field                           Description
+
+ 1.       Education                       Select Education box if applicable
+
+ 2.       Professional Accreditation      Select Professional Accreditation box if applicable
+
+ 3.       NQF Level*                      Select the relevant NQF level from the drop-down list
+
+ 4.       Qualification Type *            Select the relevant Qualification type from the drop-down list
+
+ 5.       Field of Study*                 Select Field of study from the drop-down list
+
+ 6.       Qualification Description*      Select the Qualification Description from the drop-down list
+
+ 7.       Professional Body               Select the applicable Professional Body from the drop-down list
+
+ 8.       Use for Requirement*            Select if the education or accreditation should form part of
+                                          recruitment criteria, from the drop-down list.
+
+Complete “Qualifications” fields, and click on “Add/Update”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                Page - 17 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 18 -of 85
+Payroll                                                                        Staff Establishment
+
+Skills Tab
+
+New skills can be added, or existing skills can be modified. Also indicate if it is job essential.
+
+
+
+
+Move to the “Skills” tab and click on “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                  Page - 19 -of 85
+Payroll                                                                     Staff Establishment
+
+
+
+
+ Step     Field                           Description
+
+ 1.       Skills Type*                    Select the Skill Type from the drop-down list
+
+ 2.       Skills Sub Type*                Complete Skills Sub Type field
+
+ 3.       Description*                    Complete Description field
+
+ 4.       Minimum Requirement             Select Minimum Requirements box if applicable
+
+ 5.       Job Essential                   Select Job Essential box if applicable
+
+ 6.       Use for Requirement*            Select if the Use Recruitment criteria drop down
+
+Complete “Skills” fields, and “Add/Update”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                   Page - 20 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 21 -of 85
+Payroll                                                                    Staff Establishment
+
+
+Competency Requirements Tab
+
+The competency requirements and minimum proficiency level are added and modified in this section
+and should also indicate whether it is mandatory for the job profile.
+
+
+
+
+Move to the “Competency Requirements” tab and click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions              Page - 22 -of 85
+Payroll                                                                  Staff Establishment
+
+
+
+
+ Step     Field                         Description
+
+ 1.       Competency Type*              Select the required Competency from the drop-down list.
+
+ 2.       Competency Requirements*      Select the Competency Requirements from the drop-down list.
+
+ 3.       Minimum Proficiency Level*    Select the required Minimum Proficiency Level from the drop-
+                                        down list.
+
+ 4.       Cascade Score*                Select the relevant Cascade Score of the Competency
+
+ 5.       Mandatory                     Select Mandatory box if applicable.
+
+Complete Competency Requirements fields, and “Add/Update”.
+
+
+
+
+SEBATA_Version_1.0_2019        Copyright © Sebata Municipal Solutions               Page - 23 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 24 -of 85
+Payroll                                                                       Staff Establishment
+
+
+  5.3.3 Authority Tab
+In this section the authority of the job profile is loaded, for example which decisions can be made
+independently, and which ones should be escalated, may this position authorize expenditure, etc.
+
+
+
+
+Move to the “Authority” primary tab in order to complete fields under the “Delegate Authority”
+secondary field.
+
+
+ Step     Field                              Description
+
+ 1.       Which Decisions can be Complete if information is available
+          made Independently
+
+ 2.       Which Decisions should be          Complete if information is available
+          Escalated
+
+ 3.       Can this Position Draft            Select Yes or No
+          and/or Change Policies
+
+ 4.       Description                        Complete if information is available
+
+ 5.       May this Position enter into       Select Yes or No
+          Contractual Agreements on
+          Behalf of the Municipality?
+
+
+SEBATA_Version_1.0_2019             Copyright © Sebata Municipal Solutions               Page - 25 -of 85
+Payroll                                                                       Staff Establishment
+
+
+ 6.       May this Position Authorise       Select Yes or No
+          Expenditure
+
+ 7.       List the implications of          Complete if information is available
+          wrong decisions made by
+          this position in terms of the
+          Four Preceding Questions
+
+ 8.       Authority to Escalate?            Select “Authority to Escalate” if applicable
+
+
+Complete “Delegate Authority” fields, Click “Submit”
+
+
+  5.3.4 History Tab
+  The Job Profile History and Position Linked to job Profile will populate in this section.
+
+
+
+
+The system will auto populate the information once the Job Profile is submitted. This is a view only
+screen that keep track of changes to the Job Profile.
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                  Page - 26 -of 85
+Payroll                                                                    Staff Establishment
+
+
+  Position Linked to Job Profile
+
+
+
+
+The system will auto populate this Position Linked to Job Profiles Tab as soon as Positions are linked to
+it.
+This is a view only tab and give the user a view of all Positions that are linked to the Job Profile.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions               Page - 27 -of 85
+Payroll                                                                      Staff Establishment
+
+
+       5.4 Update “Edit” Job Profile
+
+
+
+
+The Job Profile screen is in a view only mode up and till the Edit button is Clicked.
+After the Edit button was clicked a Submit button become visible, the user can navigate to the
+applicable field/fields that needs editing. If the start date should stay the same as the current job profile
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                Page - 28 -of 85
+Payroll                                                                      Staff Establishment
+
+start date the user must still populate the date, this is to ensure the user use the correct date. Once all
+changes are done the user need to populate a new start date, if applicable in order to generate a new
+Job Profile history record to keep track of all changes on the Job Profile and then click on the Submit
+button to save all changes to the Job Profile.
+
+
+
+
+Navigation      between     Job The user can move from one Job Profile to another by using the top
+Profiles                         navigation function next to the Status of the Job Profile.
+
+                                 The Job Profile Description field allow the user to type in a specific word
+                                 to search for Job Profiles that contain the word in order to select the
+                                 applicable Job Profile.
+
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                 Page - 29 -of 85
+Payroll                                                                           Staff Establishment
+
+
+6. CAPTURE POSITION PROFILE
+
+                                                                                               Generate
+                                       Capture
+          Capture Job                                                   View                     Staff
+                                       Position
+            Profile                                                  Organogram               Establishm
+                                        Profile
+                                                                                              ent Report
+
+
+             Access       Capturer
+
+
+
+
+All supporting documents must be presented with the Creation of New Position.
+
+Specific Outcomes:
+
+    ➢ Add new Position information correctly
+
+    ➢ Activate new Position
+
+
+
+
+Staff Establishment Policy           Stipulate the rules and regulation to follow creating a Position.
+
+
+6.1 Add a new Position
+
+Follow the menu below to capture or view a Position:
+
+       Payroll                         HR                          Organogram                 Position
+
+
+In this section the position details, such as the position, start and end date, whether the position is at
+managerial level (department, division or none), etc. are populated. The position is also linked to a
+department, division, sub-function, etc. The position can also be split into additional departments /
+divisions and the business rules are also set up in this section.
+
+This also links the mSCOA segment to the position. It is important to set up the department and division
+
+configuration first and set up projects in Planning to be able to link positions .
+
+
+
+
+SEBATA_Version_1.0_2019              Copyright © Sebata Municipal Solutions                  Page - 30 -of 85
+Payroll                                                                    Staff Establishment
+
+
+
+
+Click “Payroll” in the primary navigation bar.
+Select “HR” in the secondary navigation bar, select “Organogram” and then click on “Position” to select.
+
+
+
+
+Once on the Positions screen, in order to create a new Position, click on “Add New”, the “New
+Positions” pop-up screen appears for the capturer to enter the specific number of Positions that needs
+to be created, then click “OK” to continue.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions              Page - 31 -of 85
+Payroll                                                                        Staff Establishment
+
+
+6.1.1 Position Tab
+
+Positions can be added, viewed and modified in this section. The information in this section is used to
+link the position to the job title, department/s, division/s, function codes, business rules, etc. It is also
+used for budgeting and reporting purposes, etc.
+
+
+
+
+ Step     Field                             Description
+
+ 1.       Position*                         Enter Position Description.
+
+ 2.       Start Date*                       Enter Start Date (Start date validation Position start date
+                                            cannot be before Job Profile Start date).
+
+ 3.       End Date*                         Enter End Date.
+
+ 4.       Manager*                          Choose which level of management does that position fall
+                                            under.
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                  Page - 32 -of 85
+Payroll                                                                     Staff Establishment
+
+
+ 5.       Funds                          Enter Funds (Select YES if funded, NO if not Funded), if Yes is
+                                         picked then the “Business Rules” section is activated, and it
+                                         means that the position is budgeted for.
+                                         If no, the position is not funded, and user won’t be able to
+                                         appoint an employee on that position.
+
+ 6.       Positions*                     Number of positions may be re-entered, as they were initially
+                                         entered at the initial “New Positions” pop-up.
+
+ 7.       Capacity                       Auto-populates to 100% when a new position is added, and the
+                                         user will not be able to change it. The value should always be
+                                         100 as the additional Department/Division split handles the
+                                         different value
+
+ 8.       Circular No                    Enter Circular Number if available
+
+ 9.       Advert No/Ref                  Enter Advert No/Ref if available
+
+ 10.      Performance Assessment         Performance Assessment box is ticked if that position qualified
+                                         for performance bonus. (As soon as the Job Profile is Linked the
+                                         Field will auto populate as per setup of the Job Profile)
+
+ 11.      Non-Employee                   Non-Employee box is ticked if applicable. Non-employees will
+                                         not form part of any payroll Cycle. These positions will only give
+                                         users permissions to EMS
+
+ 12       Department*                    Select Department
+
+ 13.      Division*                      Select Division
+
+ 14.      Sub Function*                  Auto-populate according to the Division but can be overwritten
+                                         by selecting an applicable Function for the specific Position
+
+ 15.      HR/Payroll Project*            Auto-populate according to the Division but can be overwritten
+                                         by selecting an applicable HR/Payroll Project for the specific
+                                         Position.
+
+ 16.      HR/Payroll Region*             Auto-populate according to the Division, but can be
+                                         overwritten by selecting an applicable HR/Payroll Region for
+                                         the specific Position
+
+
+Complete fields of “Position Detail” and “Department/Division and Function Codes” area
+
+
+
+
+SEBATA_Version_1.0_2019         Copyright © Sebata Municipal Solutions                 Page - 33 -of 85
+Payroll                                                                   Staff Establishment
+
+Example of SCOA Setup for ledger
+
+
+
+
+Funds (Yes)                   If ticked “YES” the Business Rules section will populate.
+
+
+Funds                         This field will identify if the position was budgeted for. All positions
+                              linked to employees should be funded. If a position is not funded, the
+                              position will be vacant, and it will not be available for selection when
+                              adding a new employee
+
+
+
+
+SEBATA_Version_1.0_2019        Copyright © Sebata Municipal Solutions                 Page - 34 -of 85
+Payroll                                                                 Staff Establishment
+
+
+
+
+Business Rules
+
+ Step     Field                         Description
+
+ 1.       Job Profile*                  Select Job Profile.
+
+ 2.       SCOA Expense Item*            Select SCOA Expense Item from the drop-down list.
+
+
+SEBATA_Version_1.0_2019        Copyright © Sebata Municipal Solutions              Page - 35 -of 85
+Payroll                                                                        Staff Establishment
+
+
+ 3.       Salary Transaction Group*          Auto-Populates according to Job Profile selected under
+                                             Business rules, but can be overwritten
+
+ 4.       Employee Type*                     Auto-Populates according to Job Profile selected under
+                                             Business rules
+
+ 5.       Employee Sub Type*                 Auto-Populates according to Job Profile selected under
+                                             Business rules
+
+ 6.       Conditions of Service*             Auto-Populates according to Division           selected          under
+                                             Department/Division and Function Codes
+
+ 7.       Lock Fields                        Tick bocks if the Position’s Business Rules is not to change with
+                                             Changes to the Job Profile.
+
+Complete fields of the “Business Rules” area, and then Click “Submit”
+
+
+
+
+Click “Ok”
+
+
+
+
+Submit Position                    If the Submit button is clicked the system will create the Position and
+                                   populate the information from the Job Profile on the Qualification,
+                                   Skills and Competency tab, if it was populated on the job profile, the
+                                   user can populate any additional information that is Positions specific
+                                   for the tabs at a later stage.
+
+
+To capture other tabs after submitting. Click the “Edit” button to be able to capture other tabs
+
+
+
+
+SEBATA_Version_1.0_2019             Copyright © Sebata Municipal Solutions                 Page - 36 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Click “Edit”
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 37 -of 85
+Payroll                                                                     Staff Establishment
+
+
+6.1.2 Qualification Tab
+New qualifications can be added, or existing qualifications can be modified. It is also used to indicate
+whether it should be used for recruitment.
+
+
+
+
+Click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                Page - 38 -of 85
+Payroll                                                                     Staff Establishment
+
+
+
+
+ Step     Field                           Description
+
+ 1.       Other Position Qualification    Complete the Other Position Qualification Fields and tick the
+          Fields                          applicable boxes.
+
+
+ 2.       Education                       Education should be ticked if record represent Educational
+                                          information.
+
+ 3.       Professional Accreditation      Professional Accreditation should be ticked if record represent
+                                          Provisional Accreditation information.
+
+ 4.       NQF Level*                      Select the relevant NQF level of the qualification.
+
+ 5.       Qualification Type              Select Qualification Type from the drop-down list.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                 Page - 39 -of 85
+Payroll                                                                        Staff Establishment
+
+
+ 6.       Field of Study*                   Select the field of study from the drop-down list
+
+ 7.       Qualification Description*        Select the Qualification description from the drop-down list
+
+ 8.       Use for Requirement*              Select if this education or accreditation should be for part of
+                                            recruitment criteria.
+
+ 9.       Professional Body*                Select the Professional Body to which the accreditation or
+                                            education is linked to.
+
+Complete fields “Position Qualification” then Click “Add/Update”.
+
+
+6.1.3 Skills Tab
+New skills can be added, or existing skills can be modified. Also indicate if it is job essential.
+
+
+
+
+Click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                  Page - 40 -of 85
+Payroll                                                                     Staff Establishment
+
+
+
+
+ Step     Field                           Description
+
+ 1.       Skill Type*                     Select Skill Type from the drop-down list.
+
+ 2.       Skill Sub-Type*                 Capture the Skill Sub Type in the field.
+
+ 3.       Description*                    Capture the description.
+
+ 4.       Minimum Requirement             Tick-box if applicable.
+
+ 5.       Job Essential                   Tick-box if applicable.
+
+ 6.       Use for Recruitment             Select Use for Recruitment (True or False) from the drop-down
+                                          list.
+
+Complete fields “Skills” then Click “Add/Update”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                Page - 41 -of 85
+Payroll                                                                      Staff Establishment
+
+
+6.1.4 Competency Tab
+The competency type, requirements, minimum proficiency level, etc. are added and modified in this
+section and should also indicate whether it is mandatory for the position.
+
+
+
+
+Click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                 Page - 42 -of 85
+Payroll                                                                    Staff Establishment
+
+
+
+
+ Step     Field                           Description
+
+ 1.       Competency Type*                Select the Competency Type from the drop-down list.
+
+
+ 2.       Competency Requirement*         Select the Competency Requirement from the drop-down list.
+
+ 3.       Competency Sub-Type *           Capture the Competency Subtype in the field.
+
+ 4.       Minimum Proficiency Level*      Select Minimum Proficiency Level from the drop-down list.
+
+ 5.       Weighing*                       Capture the Weighting in the field.
+
+ 6.       Cascade Score*                  Select Cascade Score from the drop-down list.
+
+ 7.       Mandatory                       Tick-box if applicable.
+
+
+Complete fields “Competency” then Click “Add/Update”.
+
+Once user finished capturing all information,the below screen will populate and click on “Edit” to be
+able to get the submit button,once screen populate then click on “Submit” button.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions               Page - 43 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Click “Edit”
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 44 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Click “Submit”
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 45 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Click “Ok”
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 46 -of 85
+Payroll                                                                           Staff Establishment
+
+
+7. VIEW ORGANOGRAM
+
+                                                                                               Generate
+                                       Capture
+          Capture Job                                                   View                     Staff
+                                       Position
+            Profile                                                  Organogram               Establishm
+                                        Profile
+                                                                                              ent Report
+
+
+             Access       Capturer
+
+
+Specific Outcomes:
+
+    ➢ View an Organogram
+7.1 To View an Organogram
+
+    ➢ Follow the menu below to view an Organogram:
+
+                                                                                             Job Profile
+       Payroll                         HR                          Organogram
+                                                                                            Organogram
+
+This section includes a complete organogram for the municipality from the CFO downwards.
+
+
+
+
+Click “Payroll” in the primary navigation bar.
+
+Select “HR” in the secondary navigation bar, select “Organogram” and then click on Job Profile
+Organogram.
+
+The Organogram will populate below as follows:
+
+
+
+
+SEBATA_Version_1.0_2019              Copyright © Sebata Municipal Solutions                  Page - 47 -of 85
+Payroll                                                            Staff Establishment
+
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 48 -of 85
+Payroll                                                                       Staff Establishment
+
+
+8.GENERATE STAFF ESTABLISHMENT REPORTS
+
+
+                                Capture                                                     Generate Staff
+    Capture Job                                                     View
+                                Position                                                    Establishment
+      Profile                                                    Organogram
+                                 Profile                                                       Report
+
+
+
+The below menu is used to select and generate the Report:
+
+          Payroll               Reports                          Employee                Oragongram
+
+
+Specific Outcomes:
+
+    ➢ Successfully generate reports.
+
+8.1 Organogram Report
+
+
+
+
+Select “Reports” from the sub-menu.
+
+Select “Employee” under Reports menu then select “Organogram”.
+
+
+
+
+SEBATA_Version_1.0_2019         Copyright © Sebata Municipal Solutions                   Page - 49 -of 85
+Payroll                                                                  Staff Establishment
+
+
+
+
+Select a Department from the drop-down menu.
+
+Click “Submit”
+
+
+
+
+The above Organogram List Report will populate for analysis.
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019         Copyright © Sebata Municipal Solutions              Page - 50 -of 85
+Payroll                                                                   Staff Establishment
+
+8.2 Task Grade Report
+
+
+
+
+Select “Reports” from the sub-menu.
+
+Select “Config Reports-Staff Establishment” under Reports menu then select “Task Grade”.
+
+
+
+
+The Payroll Task Grade Report will populate for analysis.
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 51 -of 85
+Payroll                                                                   Staff Establishment
+
+8.3 Job Profile Report
+
+
+
+
+Select “Reports” from the sub-menu.
+
+Select “HR” under Reports menu then select “Job Profile Report”, then the Job Profile Report screen will
+populate
+
+
+
+
+Select the Report Type from the drop-down list
+
+Click “Search”
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 52 -of 85
+Payroll                                                                      Staff Establishment
+
+
+
+
+Report will populate for analysis
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019             Copyright © Sebata Municipal Solutions              Page - 53 -of 85
+Payroll                                                                   Staff Establishment
+
+8.4 Position Reporting Lines Report
+
+
+
+
+Select “Reports” from the sub-menu.
+
+Select “HR” under Reports menu then select “Position Reporting Lines Report”, then the next screen will
+populate
+
+
+
+
+Select the Cycle from the drop-down list
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 54 -of 85
+Payroll                                                                    Staff Establishment
+
+Capture date in the Date field and click “Search”
+
+
+
+
+The report will populate
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions              Page - 55 -of 85
+Payroll                                                                              Staff Establishment
+
+
+     9.CONFIGURATION SETTINGS FOR JOB PROFILIES AND POSITIONS
+For more Detailed Information – refer to HR/Payroll Configuration Manual
+
+
+          Access         System Administrator
+
+
+9.1 Department and Divisions Settings
+
+Manage Department and Division is important as all the modules use this setting and not only Payroll.
+For Payroll it’s important to link the correct HR/Payroll project to the Division. The division need to be
+linked to the correct HR/Payroll project in order to setup a Position. Then only can we setup Positions.
+
+
+The user can only after the Divisions were linked populate Positions. The Job Profiles and Positions is
+setup under Payroll>HR>Organogram>Job Profile and Payroll>HR>Organogram>Position. Once
+Organogram is setup employees can be added.
+
+
+
+
+Click “Department and Division” from General Settings menu
+
+
+
+
+Click “Add New”
+
+
+
+SEBATA_Version_1.0_2019                     Copyright © Sebata Municipal Solutions              Page - 56 -of 85
+Payroll                                                                   Staff Establishment
+
+
+
+
+ Step     Field                          Description
+
+ 1.       Financial Year*                Auto-populates current financial year.
+
+ 2.       Department Code*               Capture Department Code in the Department Code field.
+
+ 3.       Department*                    Capture Department name in the Department field.
+
+ 4.       Department Enabled*            Make sure that Department Enabled is ticked.
+
+ 5.       Division Code*                 Capture Division Code in the Division Code field.
+
+ 6.       Division*                      Capture Division name in the Division field.
+
+ 7.       Function*                      Select Function from the drop-down list.
+
+ 8.       HR/Payroll Project             Select Project from the drop-down list.
+
+
+
+SEBATA_Version_1.0_2019         Copyright © Sebata Municipal Solutions                  Page - 57 -of 85
+Payroll                                                                      Staff Establishment
+
+
+ 9.       Condition of Service*            Select Condition of Service from the drop-down list.
+
+ 10.      Division Enabled                 Tick Division Enabled if applicable.
+
+ 11.      Effective Date*                  Enter date in the Effective Date field.
+
+ 12.      Submit                           Click “Submit”.
+
+
+
+
+HR/Payroll Project                Only projects that contain Employee Related Cost and Remuneration of
+                                  Councilors. SCOA items with the setup combination of Department,
+                                  Division and Function will be available in the drop-down list for
+                                  selection.
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                Page - 58 -of 85
+Payroll                                                                      Staff Establishment
+
+9.2 Task Grade and Notches
+
+This section is important for sharing different salary brackets that employees need to be paid on. Task
+Grades and Notch configuration allow the user to setup the different Task Grades and Notch
+combinations for the municipality. The information will be municipal specific according to its grading.
+The information will be municipal specific. Need to link to a specific Task Grade. Job profiles for
+Employee Type Municipal Staff need to be linked to a TASK Grade in order to link Employees to the
+applicable Notch for a Task Grade.
+
+
+
+
+There are two types of increases:
+
+Yearly Notch increase: indicate when will the employee move from Notch 1 to Notch 2 within a Task
+Grade.
+Bargaining Agreement increase: This is a once-off yearly increase usually on the 1st of July. This is
+according to the Salary and Wage Collective Agreement.
+
+
+
+
+Click on “Task Grades and Notches” from the Staff Establishment menu
+
+
+
+
+SEBATA_Version_1.0_2019             Copyright © Sebata Municipal Solutions              Page - 59 -of 85
+Payroll                                                                Staff Establishment
+
+
+
+
+Click “Add New”
+
+
+
+
+ Step     Field                       Description
+
+ 1.       Task Grade Name*            Capture Task Grade Name in the Task Grade Name field, this is
+                                      usually from Task Grade 1 to Task Grade 28, just update the
+                                      example in the screenshot to bring in line with current client’s
+                                      values
+
+
+
+
+SEBATA_Version_1.0_2019      Copyright © Sebata Municipal Solutions                Page - 60 -of 85
+Payroll                                                                      Staff Establishment
+
+
+ 2.       Minimum Salary*                   Enter minimum salary in the Minimum Salary field
+
+ 3.       Maximum Salary*                   Enter maximum salary in the Maximum Salary field
+
+ 4.       Task Skill Level*                 Select Task Skill Level from the drop-down list
+
+ 5.       Notch*                            Enter Notch in the Notch field, this is the notch name usually
+                                            from 1 to 12
+
+ 6.       Yearly Notch Increase*            Capture notch increase in the Yearly Notch Increase field
+
+ 7.       On appointment Date or            Tick/select one of the two (If on Notch Increase is selected a
+          Notch Increase Date               field Notch increase will display and the user need to populate
+                                            the month when the notch increase should take place)
+
+
+
+
+ 8.       Submit                            Click “Submit”
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                Page - 61 -of 85
+Payroll                                                                   Staff Establishment
+
+9.3 Employee Subtypes
+
+This setup will enable the user to populate specific Method of Calculation formulas for specific Employee
+Subtypes. Different employee subtypes are set up and linked to an employee type.
+
+
+
+
+Click “Employee Subtypes” under Staff Establishment menu.
+
+
+
+
+Click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 62 -of 85
+Payroll                                                                     Staff Establishment
+
+
+
+ Step     Field                           Description
+
+ 1.       Employee Type*                  Select Employee Type from the drop-down list.
+
+ 2.       Subtype Description*            Enter brief subtype description in the field.
+
+
+ 3.       Exclude UIF                     If ticked the Non-Contribution Reason field will display. Need
+                                          to populate the correct value from the list to generate the
+                                          correct information on the UIF Declaration Report.
+
+
+
+
+ 4.       Exclude SDL                     Tick if SDL is excluded.
+
+
+ 5.       Enable Bonus                    Tick if Bonus is enabled. If Bonus Payment is applicable for the
+                                          employee Subtype
+
+
+ 6.       Submit                          Click “Submit”.
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                   Page - 63 -of 85
+Payroll                                                                   Staff Establishment
+
+9.4 Condition of Service
+
+Condition of service is set up and modified in this section. This information is used to populate
+the Department and Division Configuration for the HR/Payroll sections as well as the positions.
+The Position will by default display the value as per the selected Department and Division, but
+the user will be able to edit this field on the Position screen.
+
+The employee Detail screen will inherit the value from the Position. If the Condition of Service
+for an employee needs to change, the user needs to Edit the Condition of Service on the
+Position.
+The Condition of Service will assist in setup of Method of Calculation Formulas and Leave
+calculations rules
+
+
+
+
+Click “Condition of Service” under Staff Establishment menu.
+
+
+
+
+Click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions              Page - 64 -of 85
+Payroll                                                                          Staff Establishment
+
+
+
+
+ Step     Field                            Description
+
+ 1.       Condition of Service*            Capture condition of service in the field.
+
+ 2.       Description*                     Capture description in the field.
+
+ 3.       Start Date*                      Enter date in the Start date field.
+
+ 4.       End Date*                        Enter date in the End date field.
+
+
+ 5.       Submit                           Click “Submit”
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                    Page - 65 -of 85
+Payroll                                                                    Staff Establishment
+
+9.5 Salary Transaction
+
+This section is extremely important as all earnings, company contributions, deductions and Fringe
+benefits must have a Salary Transaction.
+
+
+The salary transaction link the SCOA Item, IRP5 Code as well as the Methods of calculation.
+If the Method of Calculation is set to system calculate the user need to populate a Method of
+Calculation. If the Calculation Method is set to user input, the Method of Calculation Tab will not be
+available, and the user will need to populate the transaction value manually for the employee Currently
+there are 32 system salary transactions, but additional ones can be setup on the system.
+
+
+
+
+Click “Salary Transaction” from the Payroll menu.
+
+
+
+
+Click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions               Page - 66 -of 85
+Payroll                                                                        Staff Establishment
+
+
+
+
+ Step     Field                            Description
+
+ 1.       Start Date*                      Capture date from the Start Date field.
+
+ 2.       Transaction Type*                Select Transaction Type from the drop-down list.
+
+ 3.       Title*                           Capture Title in the Title field.
+
+ 4.       End Date*                        Capture end date from the End Date field.
+
+ 5.       Calculation Method*              Select Calculation Method from the drop-down list.
+
+ 6.       Pro-rated transaction            Tick-box if applicable
+
+ 7.       Group on Payslip According       Tick-box if applicable. This tick box will group salary transaction
+          to IRP5 Code?                    on the payslip per IRP5 Code and description
+
+ 8.       Retirement Funding Income        Tick-box if applicable. If this tick-box is selected the salary
+                                           transactions will be used to calculate the Retirement fund
+                                           contributions. All RFI marked salary transactions will be added
+                                           together to determine the value of the Retirement Fund
+                                           contributions and deductions as per the Retirement
+                                           Configuration
+
+ 9.       Bulk Upload?                     Tick-box if applicable. Only Salary transactions marked for Bulk
+                                           upload will be available for selection under the bulk upload
+                                           section
+
+ 10.      Next                             Click “Next”.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                  Page - 67 -of 85
+Payroll                                                                       Staff Establishment
+
+
+
+
+ Step     Field                              Description
+
+ 1.       Salary Control Project*            Select salary Control Project from the drop-down list.
+
+ 2.       Salary Control SCOA Debit Select Control SCOA Debit Item from the drop-down list.
+          Item*
+
+ 3.       Salary Control SCOA Credit Select Control SCOA Credit Item from the drop-down list.
+          Item *
+
+ 4.       Municipal Staff*                   Select Municipal Staff from the drop-down list. Applicable SCOA
+                                             Expenditure Item.
+
+ 5.       Earning is not applicable to       Tick-box if applicable. If this tick box is selected the Salary
+          employee type Post                 Transaction will not be setup for transactions for Post-
+          Retirement                         Retirement transactions
+
+ 6.       Post Retirement*                   Select Post Retirement from the drop-down list. Applicable
+                                             SCOA Expenditure Item
+
+ 7.       Next                               Click “Next”.
+
+
+
+
+SEBATA_Version_1.0_2019             Copyright © Sebata Municipal Solutions                Page - 68 -of 85
+Payroll                                                                   Staff Establishment
+
+
+
+
+Select “SARS Code” from the drop-down list.
+
+Click “Next”.
+
+System will ask if you wish to capture method of calculation as per the screen below.
+
+
+
+
+Click “Yes”.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                 Page - 69 -of 85
+Payroll                                                                    Staff Establishment
+
+
+
+
+The screen will populate to indicate that salary Transaction was successfully saved. Click “Ok”
+
+System will move you to method of calculation tab.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                Page - 70 -of 85
+Payroll                                                                      Staff Establishment
+
+
+
+
+ Step     Field                             Description
+
+ 1.       Start Date*                       Capture date from the Start Date field.
+
+ 2.       End Date*                         Capture date from the End Date field.
+
+
+ 3.       Condition of Service *            Select Condition of Service from the drop-down list.
+
+ 4.       Employee Type*                    Select Employee Type from the drop-down list.
+
+ 5.       Employee Subtype*                 Select Employee Subtype from the drop-down list.
+
+ 6.       Formula*                          Capture Formula in the Formula field. Ask assistance from
+                                            System provider to formulate the correct formula where
+                                            applicable.
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions               Page - 71 -of 85
+Payroll                                                                       Staff Establishment
+
+
+ 7.       Submit                           Click “Submit”.
+
+9.6 Salary Transaction Group
+
+This section is used to group together a specific combination of salary transactions that will be
+applicable to a specific group of employees.
+
+
+For example, a salary transaction group for Councilors or permanent employees, need to link applicable
+salary transaction are selected for specific group.
+
+
+
+                                 By default, the 32 System Salary Transactions will be linked when the
+Salary Transaction Group
+                                 user adds a new Salary Transaction group. The user can then disable
+                                 the ones that is not applicable to the group for example a Salary
+                                 Transaction Group for temporary workers the Medical Aid and
+                                 Retirement fund Salary Transaction can be disabled. Salary
+                                 Transaction Group changes will pull through to all employees linked to
+                                 the Salary Transaction Group
+                                  Note Validations on Basic salary, salary transaction and PAYE Salary
+                                 transactions, if they are not linked to a group or to an employee record
+                                 the Trial run for that employee will Fail.
+
+
+
+
+Click “Salary Transaction Groups” from Payroll menu.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                 Page - 72 -of 85
+Payroll                                                                      Staff Establishment
+
+
+
+
+Select Salary Transaction Group from the drop-down list.
+
+Click “Add New”.
+
+
+
+
+Capture all the required fields in the Salary Transaction Group.
+
+ Step     Field                            Description
+
+ 1.       Salary Transactions Group*       Already captured (see first table).
+
+ 2.       Transaction Type                 Select Transaction type from the drop-down list.
+
+ 3.       Salary Transaction *             Select Salary Transaction from the drop-down list.
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions                Page - 73 -of 85
+Payroll                                                            Staff Establishment
+
+
+ 4.       Taxable                  Auto-populates.
+
+
+ 6.       Title                    Auto-populates.
+
+ 7.       Taxable %                Auto-populates.
+
+ 8.        Enabled                 Auto-populates
+
+ 9.       Submit                   Click “Submit”.
+
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 74 -of 85
+Payroll                                                                   Staff Establishment
+
+9.7 Payroll Constant
+The payroll constant is used in the method of calculation. Correct Constant Start date, Description and
+Value must be captured.
+
+
+
+
+Click “Payroll Constant” from the Payroll menu.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions               Page - 75 -of 85
+Payroll                                                                  Staff Establishment
+
+
+
+
+Click “Add New”.
+
+
+
+
+ Step     Field                    Description
+
+ 1.       Start Date*              Enter date in the Start date field.
+
+ 2.       Constant*                Capture the Constant name in the field.
+
+ 3.       Description*             Capture Description in the field.
+
+ 4.       Amount/Value*            Enter the amount.
+
+ 5.       End Date*                Enter date in the End date field.
+
+ 6.       Submit                   Click “Submit”.
+
+
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions                    Page - 76 -of 85
+Payroll                                                                   Staff Establishment
+
+9.8 Upper Limit
+
+The minimum, midpoint and maximum value for an employee type, subtype, position and municipal
+grading is set up in this section and includes the effective date range, estimated % increase and increase
+date range. This will affect Section 57 employees (Senior managers and Councilors) that are not falling
+under Task grade and notches. This will bring the system in line with mSCOA and the upper limit
+specifications as per the Government Gazette.
+
+
+
+
+Click “Upper Limit” from the Payroll menu.
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions               Page - 77 -of 85
+Payroll                                                                Staff Establishment
+
+
+
+
+Click “Add New”.
+
+
+
+
+ Step     Field                        Description
+
+ 1.       Start Date*                  Capture date in the field
+
+ 2.       Employee Type*               Select Employee type from the drop-down list.
+
+ 3.       Employee Subtype*            Select Employee Subtype from the drop-down list.
+
+
+
+
+SEBATA_Version_1.0_2019       Copyright © Sebata Municipal Solutions              Page - 78 -of 85
+Payroll                                                                  Staff Establishment
+
+
+ 4.       Job Title*                    Select Job Profile from the drop-down list.
+
+ 5.       Municipal Grading*            Select Municipal Grading from the drop-down list.
+
+ 6.       End Date*                     Capture date in the field
+
+ 7.       Minimum Value                 Capture the Minimum value in the field.
+
+ 8.       Midpoint Value                Capture Midpoint value in the field.
+
+ 9.       Maximum Value                 Capture Maximum value in the field.
+
+ 10.      Submit                        Click “Submit”.
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019        Copyright © Sebata Municipal Solutions                 Page - 79 -of 85
+Payroll                                                                 Staff Establishment
+
+9.9 Competency Library
+
+The competency library consists of the core competence requirements that are linked to the core
+competence types.
+
+
+
+
+Click “Competency Library” from the HR menu.
+
+
+
+
+Click “Add New”.
+
+
+
+
+SEBATA_Version_1.0_2019        Copyright © Sebata Municipal Solutions              Page - 80 -of 85
+Payroll                                                                     Staff Establishment
+
+
+
+
+Capture the relevant fields as per below table.
+
+
+ Step     Field                                 Description
+
+ 1.       Core Competence Type*                 Select the Core Competency Type from the drop-down list.
+
+ 2.       Core Competence Requirement*          Capture the Core Competence Requirement in the field.
+
+ 3.       Core Competence Description*          Capture the Core Competence Description in the field.
+
+ 4.       Enabled                               Tick box, if necessary.
+
+ 5.       Add/Update                            Click “Add/Update”.
+
+
+
+
+Enabled                          Click “Enabled” in order to activate the settings or untick if
+                                 deactivating the settings.
+
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019          Copyright © Sebata Municipal Solutions                 Page - 81 -of 85
+Payroll                                                                     Staff Establishment
+
+9.10      Qualification Library
+
+The qualification library consists of various qualifications and their corresponding details, such as NQF
+level, qualification short code and whether it is for educational or professional accreditation purposes.
+
+
+
+
+Click “Qualification Library” from the HR menu.
+
+
+
+
+Click “Add New”
+
+
+
+
+SEBATA_Version_1.0_2019           Copyright © Sebata Municipal Solutions               Page - 82 -of 85
+Payroll                                                                        Staff Establishment
+
+
+
+
+ Step     Field                                   Description
+
+ 1.       Education*                              Tick box, to capture educational qualifications.
+
+ 2.       Professional Accreditation              Tick box, if applicable.
+
+
+ 3.       NQF Level *                             Select the NQF level from the drop-down list.
+
+ 4.       Qualification Type*                     Select Qualification type from the drop-down list
+
+ 5.       Qualification Short Code*               Capture the Qualification short code in the field.
+
+ 6.       Qualification Description *             Capture the Qualification Description in the field.
+
+ 7.       Professional Body code                  Capture if applicable, not compulsory.
+
+ 8.       Professional Body Name                  Capture if applicable, not Compulsory.
+
+ 9.       Add/Update                              Click “Add/Update”.
+
+
+Notes:
+
+
+
+
+SEBATA_Version_1.0_2019            Copyright © Sebata Municipal Solutions                  Page - 83 -of 85
+Payroll                                                               Staff Establishment
+
+
+    10.GLOSSARY
+
+ Authorisation / Approval     The power or right to make decisions.
+
+ Refine Search                By using multiple “Search Options”, a more specific search can be
+                              done on the System.
+
+ Validation                   To confirm that correct information is entered to continue with the
+                              Process.
+
+ Configuration Settings       Various reasons for use of parameters and initial settings for the
+                              System to apply these instructions.
+
+ Compulsory Fields            Field must be entered to continue with the process.
+
+
+
+
+SEBATA_Version_1.0_2019     Copyright © Sebata Municipal Solutions               Page - 84 -of 85
+Payroll                                                            Staff Establishment
+
+
+    11.NOTES
+
+
+
+
+-END OF PROCESS
+
+
+SEBATA_Version_1.0_2019   Copyright © Sebata Municipal Solutions              Page - 85 -of 85
+

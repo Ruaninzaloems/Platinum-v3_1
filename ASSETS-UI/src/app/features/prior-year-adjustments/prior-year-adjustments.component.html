@@ -1,0 +1,733 @@
+<div class="pya-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Prior Year Adjustments</h1>
+      <p class="page-subtitle">GRAP-compliant corrections to asset register balances for prior financial periods</p>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn" [class.active]="activeTab === 'capture'" (click)="activeTab = 'capture'">
+        <mat-icon>edit_note</mat-icon> Capture Adjustment
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'review'" (click)="activeTab = 'review'; loadReviewList()">
+        <mat-icon>rule</mat-icon> Review Queue
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================ CAPTURE TAB ============================================================ -->
+  @if (activeTab === 'capture') {
+    <div class="wizard-progress">
+      <div class="wizard-step" [class.done]="captureStep > 1" [class.active]="captureStep === 1">
+        <div class="step-circle">@if (captureStep > 1) { <mat-icon>check</mat-icon> } @else { 1 }</div>
+        <span>Select Asset</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 1"></div>
+      <div class="wizard-step" [class.done]="captureStep > 2" [class.active]="captureStep === 2">
+        <div class="step-circle">@if (captureStep > 2) { <mat-icon>check</mat-icon> } @else { 2 }</div>
+        <span>Adjustment Type</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 2"></div>
+      <div class="wizard-step" [class.done]="captureStep > 3" [class.active]="captureStep === 3">
+        <div class="step-circle">@if (captureStep > 3) { <mat-icon>check</mat-icon> } @else { 3 }</div>
+        <span>Input Values</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 3"></div>
+      <div class="wizard-step" [class.active]="captureStep === 4">
+        <div class="step-circle">4</div>
+        <span>Preview &amp; Submit</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: Asset Search -->
+    @if (captureStep === 1) {
+      <div class="section-card">
+        <div class="section-title">Search Asset</div>
+        <div class="field-grid">
+          <div>
+            <div class="field-label">Asset Register ID</div>
+            <div class="search-input-wrap">
+              <input class="field-input" [(ngModel)]="searchId" placeholder="Type ID to search..." (input)="onSearchIdInput()" (keydown.enter)="searchAssets()">
+              @if (searchLoading) { <mat-spinner diameter="16" class="search-spinner"></mat-spinner> }
+              @else { <mat-icon class="search-icon-inline">search</mat-icon> }
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Description (partial)</div>
+            <input class="field-input" [(ngModel)]="searchDesc" placeholder="e.g. Ford Ranger" (keydown.enter)="searchAssets()">
+          </div>
+        </div>
+        @if (searchResults().length > 0) {
+          <div class="results-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Description</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Measurement</th>
+                  <th class="num-col">Cost</th>
+                  <th class="num-col">Acc Dep</th>
+                  <th class="num-col">Acc Imp</th>
+                  <th class="num-col">Carrying Amt</th>
+                  <th class="num-col">RUL</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of searchResults(); track a.assetRegisterItem_ID) {
+                  <tr>
+                    <td>{{a.assetRegisterItem_ID}}</td>
+                    <td class="desc-col">{{a.description}}</td>
+                    <td>{{a.assetTypeDesc}}</td>
+                    <td>{{a.assetCategoryDesc}}</td>
+                    <td>{{a.measurementTypeDesc}}</td>
+                    <td class="num-col">{{a.purchaseAmount | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.accumulatedDepreciationClosingBalance | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.accumulatedImpairmentClosingBalance | number:'1.2-2'}}</td>
+                    <td class="num-col carrying-col">{{a.carryingAmountClosingBalance | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.remainingUsefulLife}}</td>
+                    <td><button class="select-btn" (click)="selectAsset(a)">Select</button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (!searchLoading && searchResults().length === 0 && (searchId.trim() || searchDesc.trim())) {
+          <div class="empty-msg">No assets found. Try a different ID or description.</div>
+        }
+      </div>
+    }
+
+    <!-- STEP 2: Adjustment Type -->
+    @if (captureStep === 2) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(1)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <strong>{{selectedAsset?.assetRegisterItem_ID}}</strong> — {{selectedAsset?.description}}
+            <span class="pill-meta">{{selectedAsset?.measurementTypeDesc}} · Carrying: R {{selectedAsset?.carryingAmountClosingBalance | number:'1.2-2'}}</span>
+          </div>
+        </div>
+        <div class="section-title" style="margin-top:16px">Select Adjustment Type</div>
+        <div class="type-grid">
+          @for (t of adjustmentTypes; track t.code) {
+            <div class="type-card" [class.selected]="selectedTypeCode === t.code" (click)="selectType(t.code)">
+              <div class="type-code">{{t.code}}</div>
+              <div class="type-label">{{t.label}}</div>
+              <div class="type-desc">{{t.description}}</div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: Input Values -->
+    @if (captureStep === 3) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(2)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <strong>{{selectedAsset?.assetRegisterItem_ID}}</strong> — {{selectedAsset?.description}}
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+        </div>
+
+        <div class="two-col-layout">
+          <div>
+            <!-- Current balances snapshot -->
+            <div class="snapshot-card">
+              <div class="snapshot-title">Current Asset Balances (Snapshot)</div>
+              <div class="snapshot-grid">
+                <div class="snapshot-row"><span>Historical Cost</span><span>R {{selectedAsset?.purchaseAmount | number:'1.2-2'}}</span></div>
+                <div class="snapshot-row"><span>Acc. Depreciation</span><span>R {{selectedAsset?.accumulatedDepreciationClosingBalance | number:'1.2-2'}}</span></div>
+                <div class="snapshot-row"><span>Acc. Impairment</span><span>R {{selectedAsset?.accumulatedImpairmentClosingBalance | number:'1.2-2'}}</span></div>
+                <div class="snapshot-row highlight"><span>Carrying Amount</span><span>R {{selectedAsset?.carryingAmountClosingBalance | number:'1.2-2'}}</span></div>
+                <div class="snapshot-row"><span>Residual Value</span><span>R {{selectedAsset?.residualValue | number:'1.2-2'}}</span></div>
+                <div class="snapshot-row"><span>RUL (yrs)</span><span>{{selectedAsset?.remainingUsefulLife}}</span></div>
+                <div class="snapshot-row"><span>EUL (yrs)</span><span>{{selectedAsset?.usefullLife}}</span></div>
+                @if (selectedAsset?.revaluationReserveClosingBalance) {
+                  <div class="snapshot-row"><span>Revaluation Reserve</span><span>R {{selectedAsset?.revaluationReserveClosingBalance | number:'1.2-2'}}</span></div>
+                }
+                <div class="snapshot-row"><span>Measurement</span><span>{{selectedAsset?.measurementTypeDesc}}</span></div>
+                <div class="snapshot-row"><span>Acquisition Date</span><span>{{selectedAsset?.acquisitionDate | date:'shortDate'}}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Adjustment Inputs</div>
+            <div class="field-stack">
+
+              <div>
+                <div class="field-label">Effective Date *</div>
+                <input type="date" class="field-input" [(ngModel)]="effectiveDate">
+                <div class="field-hint">Date as at which the correction takes effect</div>
+              </div>
+
+              @if (needsNewCost()) {
+                <div>
+                  <div class="field-label">{{selectedTypeCode === 'DEEMED_COST' ? 'Deemed Cost (Opening Balance)' : 'Corrected Historical Cost'}} *</div>
+                  <input type="number" class="field-input" [(ngModel)]="newCostAmount" placeholder="e.g. 450000.00" min="0">
+                </div>
+              }
+
+              @if (needsNewValuation()) {
+                <div>
+                  <div class="field-label">New Carrying Value (after restatement) *</div>
+                  <input type="number" class="field-input" [(ngModel)]="newValuationAmount" placeholder="e.g. 380000.00" min="0">
+                  <div class="field-hint">Backend will derive new cost and acc. dep. using restatement method</div>
+                </div>
+              }
+
+              @if (needsNewRUL()) {
+                <div>
+                  <div class="field-label">{{selectedTypeCode === 'DEEMED_COST' ? 'Estimated Useful Life (EUL, yrs)' : 'New Remaining Useful Life (RUL, yrs)'}} *</div>
+                  <input type="number" class="field-input" [(ngModel)]="newRUL" placeholder="e.g. 8" min="0" step="0.5">
+                </div>
+              }
+
+              @if (needsNewAcquisitionDate()) {
+                <div>
+                  <div class="field-label">{{selectedTypeCode === 'DEEMED_COST' ? 'In-Service / Acquisition Date' : 'Corrected Acquisition Date'}} *</div>
+                  <input type="date" class="field-input" [(ngModel)]="newAcquisitionDate">
+                  <div class="field-hint">Backend recalculates accumulated depreciation from this date</div>
+                </div>
+              }
+
+              @if (needsNewResidual()) {
+                <div>
+                  <div class="field-label">New Residual Value {{selectedTypeCode === 'RESIDUAL' ? '*' : ''}}</div>
+                  <input type="number" class="field-input" [(ngModel)]="newResidualValue" placeholder="e.g. 15000.00" min="0">
+                </div>
+              }
+
+              @if (needsResidualEffectiveDate()) {
+                <div>
+                  <div class="field-label">Residual Value Effective Date</div>
+                  <input type="date" class="field-input" [(ngModel)]="residualValueEffectiveDate">
+                </div>
+              }
+
+              @if (needsImpairment()) {
+                <div>
+                  <div class="field-label">{{isImpairmentReversal() ? 'Reversal Amount (positive) *' : 'Impairment Loss Amount *'}}</div>
+                  <input type="number" class="field-input" [(ngModel)]="newImpairmentAmount" placeholder="e.g. 25000.00" min="0">
+                  @if (isImpairmentReversal()) {
+                    <div class="field-hint">GRAP-capped: cannot exceed original impairment recognised</div>
+                  }
+                </div>
+              }
+
+              @if (needsImpairmentEffectiveDate()) {
+                <div>
+                  <div class="field-label">Impairment Effective Date</div>
+                  <input type="date" class="field-input" [(ngModel)]="impairmentEffectiveDate">
+                </div>
+              }
+
+              @if (needsDisposal()) {
+                <div>
+                  <div class="field-label">Disposal Date *</div>
+                  <input type="date" class="field-input" [(ngModel)]="disposalDate">
+                </div>
+                <div>
+                  <div class="field-label">Disposal Proceeds (R)</div>
+                  <input type="number" class="field-input" [(ngModel)]="disposalProceeds" placeholder="0.00" min="0">
+                </div>
+                <div>
+                  <div class="field-label">Disposal Reason / Narrative *</div>
+                  <input class="field-input" [(ngModel)]="disposalReason" placeholder="e.g. Sold at auction — Lot 14">
+                </div>
+              }
+
+              <div class="gl-section">
+                <div class="gl-title">GL Coding @if (selectedTypeCode === 'DATE') { <span class="gl-compulsory">(Compulsory for DATE adjustments)</span> } @else { <span class="gl-optional">(Optional — required to post GL journals)</span> }</div>
+                <div class="gl-vote-grid">
+                  <!-- DEBIT VOTE -->
+                  <div class="gl-vote-col">
+                    <div class="gl-vote-heading">Debit Vote</div>
+                    <div>
+                      <div class="field-label">Debit Financial Year</div>
+                      <select class="field-input" [(ngModel)]="drFinYear" (change)="onDrFinYearChange()">
+                        <option value="">{{glFinYearsLoading ? 'Loading...' : 'Select year...'}}</option>
+                        @for (y of glFinYears; track y) {
+                          <option [value]="y">{{y}}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <div class="field-label">Debit Project</div>
+                      <select class="field-input" [(ngModel)]="selectedDrProjectId" [disabled]="!drFinYear" (change)="onDrProjectChange()">
+                        <option value="">{{drProjectsLoading ? 'Loading...' : (drFinYear ? 'Select project...' : 'Select year first')}}</option>
+                        @for (p of drProjects; track p.projectId) {
+                          <option [value]="p.projectId">{{p.projectCode}} | {{p.projectName}}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <div class="field-label">Debit SCOA Item</div>
+                      <select class="field-input" [(ngModel)]="selectedDrScoaItemId" [disabled]="!selectedDrProjectId">
+                        <option value="">{{drScoaLoading ? 'Loading...' : (selectedDrProjectId ? 'Select SCOA item...' : 'Select project first')}}</option>
+                        @for (s of drScoaItems; track s.planProjectItemId) {
+                          <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <!-- CREDIT VOTE -->
+                  <div class="gl-vote-col">
+                    <div class="gl-vote-heading">Credit Vote</div>
+                    <div>
+                      <div class="field-label">Credit Financial Year</div>
+                      <select class="field-input" [(ngModel)]="crFinYear" (change)="onCrFinYearChange()">
+                        <option value="">{{glFinYearsLoading ? 'Loading...' : 'Select year...'}}</option>
+                        @for (y of glFinYears; track y) {
+                          <option [value]="y">{{y}}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <div class="field-label">Credit Project</div>
+                      <select class="field-input" [(ngModel)]="selectedCrProjectId" [disabled]="!crFinYear" (change)="onCrProjectChange()">
+                        <option value="">{{crProjectsLoading ? 'Loading...' : (crFinYear ? 'Select project...' : 'Select year first')}}</option>
+                        @for (p of crProjects; track p.projectId) {
+                          <option [value]="p.projectId">{{p.projectCode}} | {{p.projectName}}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <div class="field-label">Credit SCOA Item</div>
+                      <select class="field-input" [(ngModel)]="selectedCrScoaItemId" [disabled]="!selectedCrProjectId">
+                        <option value="">{{crScoaLoading ? 'Loading...' : (selectedCrProjectId ? 'Select SCOA item...' : 'Select project first')}}</option>
+                        @for (s of crScoaItems; track s.planProjectItemId) {
+                          <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="field-label">Comments / Audit Trail Narrative</div>
+                <textarea class="field-input" [(ngModel)]="comments" rows="3" placeholder="Reason for adjustment, supporting reference, authorisation..."></textarea>
+              </div>
+
+            </div>
+
+            @if (calcError) {
+              <div class="error-banner"><mat-icon>error</mat-icon>{{calcError}}</div>
+            }
+
+            <div class="form-actions">
+              <button class="primary-btn" (click)="calculate()" [disabled]="!canProceedToPreview() || calculating">
+                @if (calculating) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+                @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">calculate</mat-icon> }
+                {{calculating ? 'Calculating...' : 'Calculate &amp; Preview'}}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 4: Preview & Submit -->
+    @if (captureStep === 4 && calcResult) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(3)"><mat-icon>arrow_back</mat-icon> Back to Values</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <strong>{{selectedAsset?.assetRegisterItem_ID}}</strong> — {{selectedAsset?.description}}
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+        </div>
+
+        @if (calcResult.hasResidualValueWarning) {
+          <div class="warning-banner"><mat-icon>warning</mat-icon>Residual value warning: residual value exceeds carrying amount.</div>
+        }
+        @if (calcResult.hasImpairmentWarning) {
+          <div class="warning-banner"><mat-icon>warning</mat-icon>Impairment warning: reversal amount exceeds previously recognised impairment.</div>
+        }
+
+        <!-- Journal Lines -->
+        @if (calcResult.journalLines && calcResult.journalLines.length > 0) {
+          <div class="preview-section-title"><mat-icon>receipt_long</mat-icon> Proposed Journal Entries</div>
+          <div class="journal-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Account</th>
+                  <th>Description</th>
+                  <th class="num-col">Debit (R)</th>
+                  <th class="num-col">Credit (R)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (j of calcResult.journalLines; track $index) {
+                  <tr>
+                    <td><span class="period-tag">{{j.period}}</span></td>
+                    <td>{{j.account}}</td>
+                    <td>{{j.description}}</td>
+                    <td class="num-col">{{j.debit ? (j.debit | number:'1.2-2') : ''}}</td>
+                    <td class="num-col">{{j.credit ? (j.credit | number:'1.2-2') : ''}}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Delta summary -->
+        <div class="preview-section-title" style="margin-top:20px"><mat-icon>table_chart</mat-icon> Impact on Asset Register Balances</div>
+        <div class="delta-table-wrap">
+          <table class="delta-table">
+            <thead>
+              <tr>
+                <th>Balance</th>
+                <th class="num-col">Current Period<br><small>FY Impact</small></th>
+                <th class="num-col">Comparative Period<br><small>Prior Year Restatement</small></th>
+                <th class="num-col">Earlier Periods<br><small>Opening Balance</small></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Cost / Valuation</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.currentPeriod_CostDelta)">{{formatNum(calcResult.currentPeriod_CostDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.comparativePeriod_CostDelta)">{{formatNum(calcResult.comparativePeriod_CostDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.priorPeriods_CostDelta)">{{formatNum(calcResult.priorPeriods_CostDelta)}}</td>
+              </tr>
+              <tr>
+                <td>Accumulated Depreciation</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.currentPeriod_AccDepDelta)">{{formatNum(calcResult.currentPeriod_AccDepDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.comparativePeriod_AccDepDelta)">{{formatNum(calcResult.comparativePeriod_AccDepDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.priorPeriods_AccDepDelta)">{{formatNum(calcResult.priorPeriods_AccDepDelta)}}</td>
+              </tr>
+              <tr>
+                <td>Accumulated Impairment</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.currentPeriod_AccImpDelta)">{{formatNum(calcResult.currentPeriod_AccImpDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.comparativePeriod_AccImpDelta)">{{formatNum(calcResult.comparativePeriod_AccImpDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.priorPeriods_AccImpDelta)">{{formatNum(calcResult.priorPeriods_AccImpDelta)}}</td>
+              </tr>
+              <tr>
+                <td>Revaluation Reserve</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.currentPeriod_RRDelta)">{{formatNum(calcResult.currentPeriod_RRDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.comparativePeriod_RRDelta)">{{formatNum(calcResult.comparativePeriod_RRDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.priorPeriods_RRDelta)">{{formatNum(calcResult.priorPeriods_RRDelta)}}</td>
+              </tr>
+              <tr>
+                <td>Depreciation Charge</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.currentPeriod_DepChargeDelta)">{{formatNum(calcResult.currentPeriod_DepChargeDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.comparativePeriod_DepChargeDelta)">{{formatNum(calcResult.comparativePeriod_DepChargeDelta)}}</td>
+                <td class="num-col" [ngClass]="signClass(calcResult.priorPeriods_DepChargeDelta)">{{formatNum(calcResult.priorPeriods_DepChargeDelta)}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="delta-legend">
+          <span class="delta-pos-sample">Positive = increase to asset register balance</span>
+          <span class="delta-neg-sample">Negative = decrease to balance</span>
+        </div>
+
+        <!-- Document Upload -->
+        <div class="doc-upload-section">
+          <div class="preview-section-title"><mat-icon>attach_file</mat-icon> Supporting Document</div>
+          @if (!captureDocFile) {
+            <label class="doc-upload-label">
+              <input type="file" style="display:none" (change)="onCaptureDocSelect($event)">
+              <mat-icon>upload_file</mat-icon> Choose file to attach...
+            </label>
+            <div class="doc-hint">PDF, image or spreadsheet (max 20 MB). Attach before submitting.</div>
+          } @else {
+            <div class="doc-selected">
+              <mat-icon>description</mat-icon>
+              <span>{{captureDocFile.name}}</span>
+              <button type="button" class="ghost-btn-sm" (click)="clearCaptureDoc()"><mat-icon>close</mat-icon></button>
+            </div>
+          }
+          @if (captureDocError) {
+            <div class="error-banner"><mat-icon>error</mat-icon>{{captureDocError}}</div>
+          }
+        </div>
+
+        <div class="form-actions" style="margin-top:20px">
+          <button class="submit-btn" (click)="submit()" [disabled]="!canSubmit()">
+            @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+            @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
+            {{submitting ? 'Submitting...' : 'Submit for Approval'}}
+          </button>
+          <button class="ghost-btn" (click)="goBackCapture(3)">Edit Values</button>
+          <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ============================================================ REVIEW TAB ============================================================ -->
+  @if (activeTab === 'review') {
+    <div class="review-filter-bar">
+      <button class="filter-btn" [class.active]="reviewFilter === 'Pending'" (click)="reviewFilter = 'Pending'; loadReviewList(); selectedReview = null">Pending</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'Approved'" (click)="reviewFilter = 'Approved'; loadReviewList(); selectedReview = null">Approved</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'Rejected'" (click)="reviewFilter = 'Rejected'; loadReviewList(); selectedReview = null">Rejected</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'All'" (click)="reviewFilter = 'All'; loadReviewList(); selectedReview = null">All</button>
+    </div>
+
+    <div class="review-layout">
+      <div class="review-list-panel">
+        <div class="panel-header">
+          <mat-icon>list</mat-icon> Adjustments <span class="count-badge">({{reviewList().length}})</span>
+        </div>
+        @if (reviewLoading) {
+          <div class="panel-loading"><mat-spinner diameter="24"></mat-spinner></div>
+        } @else if (reviewList().length === 0) {
+          <div class="panel-empty">No {{reviewFilter === 'All' ? '' : reviewFilter.toLowerCase()}} adjustments found</div>
+        } @else {
+          @for (item of reviewList(); track item.priorYearAdjustment_ID) {
+            <div class="review-card" [class.selected]="selectedReview?.priorYearAdjustment_ID === item.priorYearAdjustment_ID" (click)="selectReview(item)">
+              <div class="review-card-id">#{{item.priorYearAdjustment_ID}}</div>
+              <div class="review-card-desc">{{item.assetDescription || 'Asset ' + item.assetRegisterItem_ID}}</div>
+              <div class="review-card-meta">
+                <span class="badge" [ngClass]="getStatusClass(item.status)">{{item.status}}</span>
+                <span class="type-tag">{{getTypeLabel(item.adjustmentTypeCode)}}</span>
+              </div>
+              <div class="review-card-meta" style="margin-top:2px">
+                <span>{{item.finYear}}</span>
+                <span>&middot;</span>
+                <span>{{item.effectiveDate | date:'shortDate'}}</span>
+                <span>&middot;</span>
+                <span>{{item.dateCaptured | date:'shortDate'}}</span>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="review-detail-panel">
+        @if (!selectedReview) {
+          <div class="panel-empty-center">
+            <mat-icon style="font-size:48px;width:48px;height:48px;color:#cbd5e1">fact_check</mat-icon>
+            <p>Select an adjustment from the list to review details</p>
+          </div>
+        } @else if (reviewDetailLoading) {
+          <div class="panel-empty-center"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else if (reviewDetail) {
+          <div class="detail-header">
+            <div>
+              <div class="detail-id">#{{selectedReview.priorYearAdjustment_ID}} — {{reviewDetail.record?.assetDescription || 'Asset ' + selectedReview.assetRegisterItem_ID}}</div>
+              <div class="detail-meta">{{getTypeLabel(selectedReview.adjustmentTypeCode)}} · {{selectedReview.finYear}} · Effective {{selectedReview.effectiveDate | date:'shortDate'}}</div>
+            </div>
+            <span class="badge lg" [ngClass]="getStatusClass(selectedReview.status)">{{selectedReview.status}}</span>
+          </div>
+
+          <!-- Input values submitted -->
+          <div class="detail-section">
+            <div class="detail-section-title">Submitted Values</div>
+            <div class="detail-grid">
+              @if (reviewDetail.record?.newCostAmount != null) {
+                <div class="detail-row"><span>New Cost</span><span>R {{formatNum(reviewDetail.record?.newCostAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.newValuationAmount != null) {
+                <div class="detail-row"><span>New Carrying Value</span><span>R {{formatNum(reviewDetail.record?.newValuationAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.newRUL != null) {
+                <div class="detail-row"><span>New RUL / EUL (yrs)</span><span>{{reviewDetail.record?.newRUL}}</span></div>
+              }
+              @if (reviewDetail.record?.newAcquisitionDate) {
+                <div class="detail-row"><span>New Acquisition Date</span><span>{{reviewDetail.record?.newAcquisitionDate | date:'shortDate'}}</span></div>
+              }
+              @if (reviewDetail.record?.newResidualValue != null) {
+                <div class="detail-row"><span>New Residual Value</span><span>R {{formatNum(reviewDetail.record?.newResidualValue)}}</span></div>
+              }
+              @if (reviewDetail.record?.newImpairmentAmount != null) {
+                <div class="detail-row"><span>Impairment / Reversal Amount</span><span>R {{formatNum(reviewDetail.record?.newImpairmentAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.disposalDate) {
+                <div class="detail-row"><span>Disposal Date</span><span>{{reviewDetail.record?.disposalDate | date:'shortDate'}}</span></div>
+              }
+              @if (reviewDetail.record?.disposalProceeds != null) {
+                <div class="detail-row"><span>Disposal Proceeds</span><span>R {{formatNum(reviewDetail.record?.disposalProceeds)}}</span></div>
+              }
+              @if (reviewDetail.record?.disposalReason) {
+                <div class="detail-row"><span>Disposal Reason</span><span>{{reviewDetail.record?.disposalReason}}</span></div>
+              }
+              @if (reviewDetail.record?.drPlanProjectItemID) {
+                <div class="detail-row"><span>Dr Plan Project Item</span><span>{{reviewDetail.record?.drPlanProjectItemID}}</span></div>
+              }
+              @if (reviewDetail.record?.crPlanProjectItemID) {
+                <div class="detail-row"><span>Cr Plan Project Item</span><span>{{reviewDetail.record?.crPlanProjectItemID}}</span></div>
+              }
+              @if (reviewDetail.record?.comments) {
+                <div class="detail-row full"><span>Comments</span><span>{{reviewDetail.record?.comments}}</span></div>
+              }
+            </div>
+          </div>
+
+          <!-- Snapshot at time of capture -->
+          <div class="detail-section">
+            <div class="detail-section-title">Asset Snapshot at Capture</div>
+            <div class="detail-grid">
+              <div class="detail-row"><span>Cost</span><span>R {{formatNum(reviewDetail.record?.snapshotCost)}}</span></div>
+              <div class="detail-row"><span>Acc. Dep.</span><span>R {{formatNum(reviewDetail.record?.snapshotAccDep)}}</span></div>
+              <div class="detail-row"><span>Acc. Imp.</span><span>R {{formatNum(reviewDetail.record?.snapshotAccImp)}}</span></div>
+              <div class="detail-row"><span>Carrying Amount</span><span>R {{formatNum(reviewDetail.record?.snapshotCarryingAmount)}}</span></div>
+              <div class="detail-row"><span>Residual Value</span><span>R {{formatNum(reviewDetail.record?.snapshotResidualValue)}}</span></div>
+              <div class="detail-row"><span>RUL (yrs)</span><span>{{reviewDetail.record?.snapshotRUL}}</span></div>
+              <div class="detail-row"><span>EUL (yrs)</span><span>{{reviewDetail.record?.snapshotEUL}}</span></div>
+              @if (reviewDetail.record?.snapshotRR) {
+                <div class="detail-row"><span>Revaluation Reserve</span><span>R {{formatNum(reviewDetail.record?.snapshotRR)}}</span></div>
+              }
+            </div>
+          </div>
+
+          <!-- Balance deltas -->
+          <div class="detail-section">
+            <div class="detail-section-title">Calculated Balance Impacts</div>
+            <table class="delta-table compact">
+              <thead>
+                <tr>
+                  <th>Balance</th>
+                  <th class="num-col">Current Period</th>
+                  <th class="num-col">Comparative</th>
+                  <th class="num-col">Prior Periods</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cost / Valuation</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.currentPeriod_CostDelta)">{{formatNum(reviewDetail.record?.currentPeriod_CostDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.comparativePeriod_CostDelta)">{{formatNum(reviewDetail.record?.comparativePeriod_CostDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.priorPeriods_CostDelta)">{{formatNum(reviewDetail.record?.priorPeriods_CostDelta)}}</td>
+                </tr>
+                <tr>
+                  <td>Acc. Depreciation</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.currentPeriod_AccDepDelta)">{{formatNum(reviewDetail.record?.currentPeriod_AccDepDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.comparativePeriod_AccDepDelta)">{{formatNum(reviewDetail.record?.comparativePeriod_AccDepDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.priorPeriods_AccDepDelta)">{{formatNum(reviewDetail.record?.priorPeriods_AccDepDelta)}}</td>
+                </tr>
+                <tr>
+                  <td>Acc. Impairment</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.currentPeriod_AccImpDelta)">{{formatNum(reviewDetail.record?.currentPeriod_AccImpDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.comparativePeriod_AccImpDelta)">{{formatNum(reviewDetail.record?.comparativePeriod_AccImpDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.priorPeriods_AccImpDelta)">{{formatNum(reviewDetail.record?.priorPeriods_AccImpDelta)}}</td>
+                </tr>
+                <tr>
+                  <td>Revaluation Reserve</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.currentPeriod_RRDelta)">{{formatNum(reviewDetail.record?.currentPeriod_RRDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.comparativePeriod_RRDelta)">{{formatNum(reviewDetail.record?.comparativePeriod_RRDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.priorPeriods_RRDelta)">{{formatNum(reviewDetail.record?.priorPeriods_RRDelta)}}</td>
+                </tr>
+                <tr>
+                  <td>Depreciation Charge</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.currentPeriod_DepChargeDelta)">{{formatNum(reviewDetail.record?.currentPeriod_DepChargeDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.comparativePeriod_DepChargeDelta)">{{formatNum(reviewDetail.record?.comparativePeriod_DepChargeDelta)}}</td>
+                  <td class="num-col" [ngClass]="signClass(reviewDetail.record?.priorPeriods_DepChargeDelta)">{{formatNum(reviewDetail.record?.priorPeriods_DepChargeDelta)}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Documents & Export -->
+          <div class="detail-section">
+            <div class="detail-section-title">
+              <mat-icon>attach_file</mat-icon> Documents
+              <button class="export-btn" (click)="exportTransactions(selectedReview.priorYearAdjustment_ID)" style="margin-left:auto">
+                <mat-icon>download</mat-icon> Export Transactions (Excel)
+              </button>
+            </div>
+            @if (reviewDocsLoading) {
+              <div class="panel-loading" style="padding:8px"><mat-spinner diameter="18"></mat-spinner></div>
+            } @else if (reviewDocs.length === 0) {
+              <div class="doc-hint">No supporting documents attached.</div>
+            } @else {
+              @for (doc of reviewDocs; track doc.priorYearDocument_ID) {
+                <div class="doc-row">
+                  <mat-icon>description</mat-icon>
+                  <span class="doc-name">{{doc.originalFileName || 'Document ' + doc.priorYearDocument_ID}}</span>
+                  <span class="doc-date">{{doc.uploadedDate | date:'shortDate'}}</span>
+                  <button class="ghost-btn-sm" (click)="downloadReviewDoc(doc.priorYearDocument_ID)"><mat-icon>download</mat-icon></button>
+                </div>
+              }
+            }
+            <!-- Upload additional doc -->
+            @if (!reviewDocFile) {
+              <label class="doc-upload-label" style="margin-top:8px">
+                <input type="file" style="display:none" (change)="onReviewDocSelect($event)">
+                <mat-icon>upload_file</mat-icon> Upload additional document...
+              </label>
+            } @else {
+              <div class="doc-selected" style="margin-top:8px">
+                <mat-icon>description</mat-icon>
+                <span>{{reviewDocFile.name}}</span>
+                <button type="button" class="submit-btn" [disabled]="reviewDocUploading" (click)="uploadReviewDoc()" style="margin-left:8px;padding:4px 12px">
+                  @if (reviewDocUploading) { <mat-spinner diameter="14" style="display:inline-block;vertical-align:middle"></mat-spinner> }
+                  @else { Upload }
+                </button>
+                <button type="button" class="ghost-btn-sm" (click)="reviewDocFile = null"><mat-icon>close</mat-icon></button>
+              </div>
+            }
+            @if (reviewDocError) {
+              <div class="error-banner" style="margin-top:4px"><mat-icon>error</mat-icon>{{reviewDocError}}</div>
+            }
+          </div>
+
+          <!-- Approve/Reject actions -->
+          @if (selectedReview.status === 'Pending') {
+            <div class="approval-actions">
+              @if (!showApproveForm && !showRejectForm) {
+                <button class="approve-btn" (click)="showApproveForm = true">
+                  <mat-icon>check_circle</mat-icon> Approve &amp; Post to Asset Register
+                </button>
+                <button class="reject-btn" (click)="showRejectForm = true">
+                  <mat-icon>cancel</mat-icon> Reject
+                </button>
+              }
+              @if (showApproveForm) {
+                <div class="action-form">
+                  <div class="field-label">Approval Comments (optional)</div>
+                  <textarea class="field-input" [(ngModel)]="approveComments" rows="2" placeholder="Supporting reference or note..."></textarea>
+                  <div class="action-form-btns">
+                    <button class="approve-btn" (click)="approveRecord()" [disabled]="approving">
+                      @if (approving) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+                      {{approving ? 'Approving...' : 'Confirm Approval'}}
+                    </button>
+                    <button class="ghost-btn" (click)="showApproveForm = false">Cancel</button>
+                  </div>
+                </div>
+              }
+              @if (showRejectForm) {
+                <div class="action-form">
+                  <div class="field-label">Rejection Reason *</div>
+                  <textarea class="field-input" [(ngModel)]="rejectReason" rows="2" placeholder="Reason for rejection..."></textarea>
+                  <div class="action-form-btns">
+                    <button class="reject-btn" (click)="rejectRecord()" [disabled]="rejecting || !rejectReason.trim()">
+                      @if (rejecting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+                      {{rejecting ? 'Rejecting...' : 'Confirm Rejection'}}
+                    </button>
+                    <button class="ghost-btn" (click)="showRejectForm = false">Cancel</button>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else if (selectedReview.status === 'Approved') {
+            <div class="approved-info">
+              <mat-icon>check_circle</mat-icon>
+              Approved on {{reviewDetail.record?.approvedDate | date:'medium'}}
+              @if (reviewDetail.record?.comments) { <span> — {{reviewDetail.record?.comments}}</span> }
+            </div>
+          } @else if (selectedReview.status === 'Rejected') {
+            <div class="rejected-info">
+              <mat-icon>cancel</mat-icon>
+              Rejected on {{reviewDetail.record?.rejectedDate | date:'medium'}}
+              @if (reviewDetail.record?.rejectionReason) { <span> — {{reviewDetail.record?.rejectionReason}}</span> }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>

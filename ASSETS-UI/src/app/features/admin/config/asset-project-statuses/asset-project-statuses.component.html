@@ -1,0 +1,76 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Asset Project Statuses</h1>
+      <p class="page-subtitle">Manage project status classifications</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button routerLink="/config">
+        <mat-icon>arrow_back</mat-icon> Back to Config
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="openAdd()">
+        <mat-icon>add</mat-icon> Add Status
+      </button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Project Status</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Status Description *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.statusDesc" placeholder="e.g. In Progress" (keyup.enter)="save()" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.statusDesc.trim() || saving()">
+          @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+          {{editingId() ? 'Update' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Status Description</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.assetProjectStatusId) {
+            <tr>
+              <td class="id-cell">{{item.assetProjectStatusId}}</td>
+              <td class="desc-cell">{{item.statusDesc}}</td>
+              <td class="actions-cell">
+                @if (deleteConfirmId === item.assetProjectStatusId) {
+                  <span style="font-size:12px;color:#ef4444;margin-right:4px">Delete?</span>
+                  <button mat-stroked-button style="font-size:11px;padding:2px 8px;min-height:28px;margin-right:4px" (click)="cancelDelete()">No</button>
+                  <button mat-flat-button style="background:#ef4444;color:white;font-size:11px;padding:2px 8px;min-height:28px" (click)="doDelete(item.assetProjectStatusId)">Yes</button>
+                } @else {
+                  <button mat-icon-button (click)="openEdit(item)">
+                    <mat-icon class="action-icon edit">edit</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="confirmDelete(item.assetProjectStatusId)">
+                    <mat-icon class="action-icon delete">delete</mat-icon>
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No project statuses defined yet. Click "Add Status" to create one.</div>
+      }
+    </div>
+  }
+</div>

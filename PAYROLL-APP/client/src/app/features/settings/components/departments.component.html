@@ -1,0 +1,98 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Departments</h1>
+    <p class="page-subtitle">Manage organisational departments and divisions</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ items.length }}</span>
+    <span class="summary-label">Total Departments</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ activeCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ inactiveCount }}</span>
+    <span class="summary-label">Inactive</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search departments..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredItems.length }} results</span>
+  </div>
+  <button class="btn btn-primary" (click)="openModal()">
+    <app-icon name="plus" [size]="16"></app-icon> Add New
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading">Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      @if (filteredItems.length === 0) {
+        <div style="text-align:center;color:#64748b;padding:32px">
+          <h3>No departments found</h3>
+          <p>Try adjusting your search or click "Add New" to get started</p>
+        </div>
+      } @else {
+        <table class="jp-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of filteredItems; track item.id || $index) {
+              <tr>
+                <td>{{ item.code }}</td>
+                <td>{{ item.name }}</td>
+                <td><app-status-badge [status]="item.enabled !== false ? 'Active' : 'Inactive'"></app-status-badge></td>
+                <td>
+                  <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-sm" (click)="openModal(item)"><app-icon name="edit" [size]="12"></app-icon></button>
+                    <button class="btn btn-sm" (click)="deleteItem(item)"><app-icon name="trash" [size]="12"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editItem.id ? 'Edit' : 'Add' }} Departments</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Code</label>
+          <input class="form-control" [(ngModel)]="editItem.code" >
+        </div>
+      <div class="form-group">
+          <label>Name</label>
+          <input class="form-control" [(ngModel)]="editItem.name" >
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">Save</button>
+      </div>
+    </div>
+  </div>
+}

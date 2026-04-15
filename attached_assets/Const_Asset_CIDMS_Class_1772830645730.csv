@@ -1,0 +1,52 @@
+﻿1,Housing,1,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+2,Operational buildings,1,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+3,Licences and rights,2,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+4,Servitudes,2,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+5,Conservation areas,3,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+6,Historic buildings,3,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+7,Monuments,3,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+8,Other heritage,3,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+9,Works of art,3,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+10,Investment property,4,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+11,Community facilities,5,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+12,"Community facilities, operational buildings, sports and recreational facilities and housing",5,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+13,Sport and recreation facilities,5,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+14,Coastal infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+15,Electrical infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+16,Information and communications infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+17,Rail infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+18,Roads infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+19,Sanitation infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+20,Solid-waste infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+21,Stormwater infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+22,Water-supply infrastructure,6,1,2020-01-28 15:27:49.263,1,NULL,NULL,1
+23,Furniture and Office Equipment,1,1,2021-05-07 15:32:29.333,199,NULL,NULL,NULL
+24,Information and Communication Infrastructure,1,1,2021-05-07 15:38:07.280,199,NULL,NULL,NULL
+25,Machinery and Equipment,1,1,2021-05-07 15:38:28.637,199,NULL,NULL,NULL
+26,Transport Assets,1,1,2021-05-07 15:38:49.463,199,NULL,NULL,NULL
+27,Community Facilities,1,1,2021-06-14 11:03:06.440,199,NULL,NULL,NULL
+28,Computer Equipment,1,1,2021-06-15 16:59:44.953,199,NULL,NULL,NULL
+29,Security Measures,1,1,2021-11-11 08:30:15.013,199,2021-11-11 08:40:03.713,199,NULL
+30,Sport and Recreation Facilities,7,1,2022-06-07 12:45:41.467,251,NULL,NULL,NULL
+31,Community Facilities,7,1,2022-06-07 12:46:21.243,251,NULL,NULL,NULL
+32,Land,1,1,2022-10-04 12:05:22.140,252,NULL,NULL,NULL
+33,Other assets,1,1,2022-10-06 08:24:27.977,252,NULL,NULL,NULL
+34,Community Facilities,8,1,2022-10-06 11:53:56.120,252,2022-10-06 16:02:00.360,252,NULL
+35,Electrical Infrastructure,8,1,2022-10-06 16:02:35.700,252,NULL,NULL,NULL
+36,Roads Infrastructure,8,1,2022-10-06 16:03:51.553,252,NULL,NULL,NULL
+37,Sport and Recreation Facilities,8,1,2022-10-06 16:05:01.677,252,NULL,NULL,NULL
+38,Other,2,1,2022-11-30 12:38:27.597,199,NULL,NULL,NULL
+39,Electrical Infrastructure,10,1,2024-04-18 12:24:17.070,562,NULL,NULL,0
+40,Roads infrastructure,10,1,2024-04-18 12:24:29.627,562,NULL,NULL,0
+41,Housing,9,1,2024-04-18 12:24:48.773,562,NULL,NULL,0
+42,Operational Buildings,9,1,2024-04-18 12:24:57.560,562,2024-12-11 06:33:33.000,271,0
+43,Furniture and Office Equipment,11,1,2024-04-19 16:02:02.717,562,NULL,NULL,0
+44,Computer Equipment,12,1,2024-04-19 16:02:12.480,562,NULL,NULL,0
+45,Machinery and Equipment,13,1,2024-04-19 16:02:26.043,562,NULL,NULL,0
+46,Transport Assets,14,1,2024-04-19 16:02:34.420,562,NULL,NULL,0
+47,Clearview Fence,6,1,2025-02-03 16:04:47.027,271,NULL,NULL,0
+48,Drone,11,1,2025-02-17 11:22:06.930,271,NULL,NULL,0
+49,Firearms,1,1,2025-02-25 12:57:08.407,271,NULL,NULL,0
+50,Community Assets,7,1,2025-03-12 08:12:09.273,271,NULL,NULL,0
+51,Buildings,4,1,2025-11-11 16:08:06.570,271,NULL,NULL,0
+52,Outdoor Furniture,4,1,2025-11-11 16:48:00.037,271,NULL,NULL,0

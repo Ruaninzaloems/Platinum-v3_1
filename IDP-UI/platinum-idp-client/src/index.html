@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Platinum ERP - IDP Management</title>
+  <base href="/idp-app/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Platinum ERP Integrated Development Plan Management Module for South African Municipalities">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+  <style>
+    @keyframes plt-shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    @keyframes plt-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+    .app-preloader{position:fixed;inset:0;z-index:9999;background:#f8f9fb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:'Inter',sans-serif;transition:opacity .4s ease}
+    .app-preloader.hide{opacity:0;pointer-events:none}
+    .preloader-shield{width:48px;height:48px;background:#0f2b46;border-radius:12px;mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/%3E%3C/svg%3E");-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/%3E%3C/svg%3E");mask-size:contain;-webkit-mask-size:contain;mask-repeat:no-repeat;-webkit-mask-repeat:no-repeat;animation:plt-pulse 1.8s ease-in-out infinite}
+    .preloader-bar{width:180px;height:3px;border-radius:2px;background:linear-gradient(90deg,#e2e8f0 0%,#0f2b46 50%,#e2e8f0 100%);background-size:400px 3px;animation:plt-shimmer 1.5s ease-in-out infinite}
+    .preloader-text{font-size:12px;font-weight:500;color:#64748b;letter-spacing:.3px}
+  </style>
+  <div class="app-preloader" id="appPreloader">
+    <div class="preloader-shield"></div>
+    <div class="preloader-bar"></div>
+    <div class="preloader-text">Loading IDP</div>
+  </div>
+  <app-root></app-root>
+  <script>
+    document.addEventListener('DOMContentLoaded',function(){var s=Date.now();var c=setInterval(function(){var r=document.querySelector('app-root');if((r&&r.children.length>0)||Date.now()-s>15000){clearInterval(c);var e=document.getElementById('appPreloader');if(e){e.classList.add('hide');setTimeout(function(){e.remove()},500)}}},100)});
+  </script>
+</body>
+</html>

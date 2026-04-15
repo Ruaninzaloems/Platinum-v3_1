@@ -1,0 +1,1675 @@
+    <div class="orders-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- ===================== DASHBOARD VIEW ===================== -->
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active" (click)="currentView.set('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Order List</button>
+          <button class="tab-btn" (click)="navigateTo('cessions')">Cessions</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total: ' + (summary().totalOrders || 0) + ' orders worth ' + formatCurrencyFull(summary().totalValue || 0)">
+            <mat-icon>shopping_cart</mat-icon>
+            <span class="kpi-value">{{summary().totalOrders || 0}}</span>
+            <span class="kpi-label">Total Orders</span>
+            <span class="kpi-detail">{{formatCurrency(summary().totalValue || 0)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().awaitingApproval || 0) + ' orders pending approval action'" [style.border-left-color]="(summary().awaitingApproval || 0) > 0 ? '#ef6c00' : '#2e7d32'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().awaitingApproval || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{summary().awaitingApproval || 0}}</span>
+            <span class="kpi-label">Awaiting Approval</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Budget committed across all active orders: ' + formatCurrencyFull(summary().committedBudget || 0)">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summary().committedBudget || 0)}}</span>
+            <span class="kpi-label">Committed Budget</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().dispatched || 0) + ' orders dispatched to suppliers'">
+            <mat-icon>local_shipping</mat-icon>
+            <span class="kpi-value">{{summary().dispatched || 0}}</span>
+            <span class="kpi-label">Dispatched</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().overdue || 0) + ' orders overdue for delivery'" [style.border-left-color]="(summary().overdue || 0) > 0 ? '#c62828' : '#2e7d32'">
+            <mat-icon>warning</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().overdue || 0) > 0 ? '#c62828' : '#2e7d32'">{{summary().overdue || 0}}</span>
+            <span class="kpi-label">Overdue</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average days from order creation to approval: ' + (summary().avgApprovalDays || 0) + ' days'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{summary().avgApprovalDays || 0}}</span>
+            <span class="kpi-label">Avg Approval Days</span>
+          </div>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" (click)="filterByStatus('draft')" [matTooltip]="(pipeline().draft || 0) + ' draft orders'">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{pipeline().draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('awaiting_approval')" [matTooltip]="(pipeline().awaiting_approval || 0) + ' awaiting approval'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="pipe-count">{{pipeline().awaiting_approval || 0}}</span>
+            <span class="pipe-label">Awaiting Approval</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('approved')" [matTooltip]="(pipeline().approved || 0) + ' approved orders'">
+            <mat-icon>check_circle</mat-icon>
+            <span class="pipe-count">{{pipeline().approved || 0}}</span>
+            <span class="pipe-label">Approved</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('dispatched')" [matTooltip]="(pipeline().dispatched || 0) + ' dispatched orders'">
+            <mat-icon>local_shipping</mat-icon>
+            <span class="pipe-count">{{pipeline().dispatched || 0}}</span>
+            <span class="pipe-label">Dispatched</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('partially_received')" [matTooltip]="(pipeline().partially_received || 0) + ' partially received'">
+            <mat-icon>inventory</mat-icon>
+            <span class="pipe-count">{{pipeline().partially_received || 0}}</span>
+            <span class="pipe-label">Partial Received</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('completed')" [matTooltip]="(pipeline().completed || 0) + ' completed orders'">
+            <mat-icon>task_alt</mat-icon>
+            <span class="pipe-count">{{pipeline().completed || 0}}</span>
+            <span class="pipe-label">Completed</span>
+          </div>
+          <div class="pipe-tile" (click)="filterByStatus('voided')" [matTooltip]="(pipeline().voided || 0) + ' voided orders'">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{pipeline().voided || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-col-left">
+            <div class="detail-card">
+              <h3><mat-icon>account_balance_wallet</mat-icon> Budget Overview</h3>
+              <div class="budget-cards">
+                <div class="budget-card bg-green">
+                  <span class="budget-label">Total Available</span>
+                  <span class="budget-value">{{formatCurrencyFull(budgetOverview().totalAvailable || 0)}}</span>
+                </div>
+                <div class="budget-card bg-blue">
+                  <span class="budget-label">Total Reserved</span>
+                  <span class="budget-value">{{formatCurrencyFull(budgetOverview().totalReserved || 0)}}</span>
+                </div>
+                <div class="budget-card bg-amber">
+                  <span class="budget-label">Total Committed</span>
+                  <span class="budget-value">{{formatCurrencyFull(budgetOverview().totalCommitted || 0)}}</span>
+                </div>
+                <div class="budget-card bg-red">
+                  <span class="budget-label">Total Consumed</span>
+                  <span class="budget-value">{{formatCurrencyFull(budgetOverview().totalConsumed || 0)}}</span>
+                </div>
+              </div>
+              @if (budgetOverview().departments?.length) {
+                <div class="dept-breakdown">
+                  <span class="section-sublabel">Department Breakdown</span>
+                  @for (dept of budgetOverview().departments || []; track dept.name) {
+                    <div class="dept-row">
+                      <span class="dept-name">{{dept.name}}</span>
+                      <span class="dept-val">{{formatCurrency(dept.committed || 0)}} committed</span>
+                      <div class="dept-bar-track">
+                        <div class="dept-bar-fill" [style.width.%]="getDeptBarWidth(dept)" [style.background]="getDeptBarColor(dept)"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>speed</mat-icon> SLA Performance</h3>
+              @if (slaPerformance().metrics?.length) {
+                @for (metric of slaPerformance().metrics || []; track metric.name) {
+                  <div class="sla-indicator">
+                    <span class="sla-label">{{metric.name}}</span>
+                    <div class="sla-values">
+                      <span class="sla-actual" [class]="getSlaClass(metric.actual, metric.target)">{{metric.actual || 0}}d</span>
+                      <span class="sla-target">/ {{metric.target}}d target</span>
+                    </div>
+                    <div class="sla-bar-track">
+                      <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(metric.actual, metric.target)" [style.background]="getSlaBarColor(metric.actual, metric.target)"></div>
+                    </div>
+                  </div>
+                }
+              } @else {
+                <div class="sla-indicator">
+                  <span class="sla-label">Order to Approval</span>
+                  <div class="sla-values">
+                    <span class="sla-actual" [class]="getSlaClass(slaPerformance().avgOrderToApproval, 3)">{{slaPerformance().avgOrderToApproval || 0}}d</span>
+                    <span class="sla-target">/ 3d target</span>
+                  </div>
+                  <div class="sla-bar-track">
+                    <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(slaPerformance().avgOrderToApproval, 3)" [style.background]="getSlaBarColor(slaPerformance().avgOrderToApproval, 3)"></div>
+                  </div>
+                </div>
+                <div class="sla-indicator">
+                  <span class="sla-label">Order to Dispatch</span>
+                  <div class="sla-values">
+                    <span class="sla-actual" [class]="getSlaClass(slaPerformance().avgOrderToDispatch, 5)">{{slaPerformance().avgOrderToDispatch || 0}}d</span>
+                    <span class="sla-target">/ 5d target</span>
+                  </div>
+                  <div class="sla-bar-track">
+                    <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(slaPerformance().avgOrderToDispatch, 5)" [style.background]="getSlaBarColor(slaPerformance().avgOrderToDispatch, 5)"></div>
+                  </div>
+                </div>
+                <div class="sla-indicator">
+                  <span class="sla-label">Order to Delivery</span>
+                  <div class="sla-values">
+                    <span class="sla-actual" [class]="getSlaClass(slaPerformance().avgOrderToDelivery, 14)">{{slaPerformance().avgOrderToDelivery || 0}}d</span>
+                    <span class="sla-target">/ 14d target</span>
+                  </div>
+                  <div class="sla-bar-track">
+                    <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(slaPerformance().avgOrderToDelivery, 14)" [style.background]="getSlaBarColor(slaPerformance().avgOrderToDelivery, 14)"></div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>hourglass_empty</mat-icon> Aging Analysis</h3>
+              <div class="aging-cards">
+                <div class="aging-card">
+                  <span class="aging-range">0–7 days</span>
+                  <span class="aging-count">{{aging().range_0_7?.count || 0}}</span>
+                  <span class="aging-value">{{formatCurrency(aging().range_0_7?.value || 0)}}</span>
+                </div>
+                <div class="aging-card">
+                  <span class="aging-range">8–14 days</span>
+                  <span class="aging-count">{{aging().range_8_14?.count || 0}}</span>
+                  <span class="aging-value">{{formatCurrency(aging().range_8_14?.value || 0)}}</span>
+                </div>
+                <div class="aging-card aging-warn">
+                  <span class="aging-range">15–30 days</span>
+                  <span class="aging-count">{{aging().range_15_30?.count || 0}}</span>
+                  <span class="aging-value">{{formatCurrency(aging().range_15_30?.value || 0)}}</span>
+                </div>
+                <div class="aging-card aging-danger">
+                  <span class="aging-range">30+ days</span>
+                  <span class="aging-count">{{aging().range_30_plus?.count || 0}}</span>
+                  <span class="aging-value">{{formatCurrency(aging().range_30_plus?.value || 0)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-col-right">
+            <div class="detail-card">
+              <h3><mat-icon>store</mat-icon> Top 10 Suppliers</h3>
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Supplier</th>
+                    <th>Orders</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (supplier of topSuppliers(); track supplier.name; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{supplier.name}}</td>
+                      <td>{{supplier.orderCount || 0}}</td>
+                      <td class="value-cell">{{formatCurrency(supplier.totalValue || 0)}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="empty-text">No supplier data available</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>auto_awesome</mat-icon> AI Insights</h3>
+              @for (insight of aiInsights(); track insight.title) {
+                <div class="insight-card" [class]="'insight-' + (insight.severity || 'info')">
+                  <mat-icon>{{insight.icon || 'lightbulb'}}</mat-icon>
+                  <div class="insight-content">
+                    <span class="insight-title">{{insight.title}}</span>
+                    <span class="insight-desc">{{insight.description}}</span>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-text">No AI insights available</div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>bar_chart</mat-icon> Monthly Trend</h3>
+              <div class="chart-container">
+                @for (month of monthlyTrend(); track month.month) {
+                  <div class="chart-bar-wrapper" [matTooltip]="month.month + ': ' + (month.count || 0) + ' orders (' + formatCurrency(month.value || 0) + ')'">
+                    <div class="chart-bar" [style.height.%]="getBarHeight(month)"></div>
+                    <span class="chart-label">{{month.month?.substring(0, 3)}}</span>
+                  </div>
+                } @empty {
+                  <div class="empty-text">No trend data</div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+      }
+
+      <!-- ===================== AI ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Order List</button>
+          <button class="tab-btn" (click)="navigateTo('cessions')">Cessions</button>
+          <button class="tab-btn active">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">swap_horiz</mat-icon>
+                PO → GRN → Invoice → Payment Pipeline
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s112, s115</span>
+            </div>
+            @if (orderAnalyticsData()) {
+              <div style="height: 220px; position: relative;">
+                <canvas id="orderPipelineChart"></canvas>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                @for (stage of orderAnalyticsData()?.conversionPipeline?.stages || []; track stage.stage) {
+                  <div style="text-align: center;">
+                    <div style="font-size: 10px; color: #94a3b8;">{{stage.stage}}</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #1e293b;">{{stage.count}}</div>
+                    <div style="font-size: 10px; color: #64748b;">~{{stage.avgDays}}d avg</div>
+                  </div>
+                }
+              </div>
+              <div style="margin-top: 8px; text-align: center; font-size: 11px; color: #10b981; font-weight: 600;">
+                Overall Conversion: {{orderAnalyticsData().conversionPipeline.conversionRates.overall}}%
+              </div>
+            }
+          </div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <mat-icon style="color: #8b5cf6; font-size: 20px; width: 20px; height: 20px;">pie_chart</mat-icon>
+                Spend by Procurement Method
+              </h3>
+              <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">SCM Reg 28</span>
+            </div>
+            @if (orderAnalyticsData()) {
+              <div style="height: 250px; position: relative;">
+                <canvas id="spendByMethodChart"></canvas>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (orderAnalyticsData()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">grid_on</mat-icon>
+                  PO Amendments Heatmap
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fffbeb; padding: 2px 8px; border-radius: 4px;">Audit Risk Indicator</span>
+              </div>
+              <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                  <thead>
+                    <tr>
+                      <th style="padding: 6px 8px; text-align: left; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0;">Vendor</th>
+                      @for (dept of orderAnalyticsData()?.amendmentsHeatmap?.departments || []; track dept) {
+                        <th style="padding: 6px 4px; text-align: center; color: #94a3b8; font-weight: 500; border-bottom: 1px solid #e2e8f0; font-size: 9px;">{{dept.split(' ')[0]}}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (vendor of orderAnalyticsData()?.amendmentsHeatmap?.vendors || []; track vendor; let i = $index) {
+                      <tr>
+                        <td style="padding: 6px 8px; font-size: 10px; color: #334155; white-space: nowrap;">{{vendor}}</td>
+                        @for (val of orderAnalyticsData()?.amendmentsHeatmap?.data?.[i] || []; track $index; let j = $index) {
+                          <td style="padding: 4px; text-align: center;">
+                            <div style="width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin: auto; font-size: 10px; font-weight: 600; background: {{val === 0 ? '#f8fafc' : val <= 2 ? '#fef3c7' : val <= 3 ? '#fed7aa' : '#fecaca'}}; color: {{val === 0 ? '#cbd5e1' : val <= 2 ? '#92400e' : val <= 3 ? '#c2410c' : '#991b1b'}};">
+                              {{val}}
+                            </div>
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #dc2626; font-size: 20px; width: 20px; height: 20px;">price_check</mat-icon>
+                  Price Reasonableness Check
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">AI Analysis</span>
+              </div>
+              @for (item of orderAnalyticsData()?.priceReasonableness || []; track item.item) {
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 11px; font-weight: 600; color: #1e293b;">{{item.item}}</div>
+                    <div style="font-size: 10px; color: #64748b;">Hist avg: R{{item.historicalAvg}}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 12px; font-weight: 700; color: #1e293b;">R{{item.currentPrice}}</div>
+                    <div style="font-size: 10px; font-weight: 600; color: {{item.status === 'overpriced' ? '#dc2626' : item.status === 'marginal' ? '#f59e0b' : '#10b981'}};">
+                      {{item.variance > 0 ? '+' : ''}}{{item.variance}}%
+                    </div>
+                  </div>
+                  <div style="width: 8px; height: 8px; border-radius: 50%; background: {{item.status === 'overpriced' ? '#dc2626' : item.status === 'marginal' ? '#f59e0b' : '#10b981'}};"></div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="detail-card" style="grid-column: 1 / -1;">
+          <h3><mat-icon>psychology</mat-icon> AI Order Management Insights
+            <span style="font-size: 11px; color: #94a3b8; margin-left: 8px; font-weight: 400;">
+              {{orderAiInsights().length > 0 && orderAiInsights()[0].aiGenerated ? 'Powered by AI' : 'Rule-based analysis'}}
+            </span>
+          </h3>
+          @if (orderAiInsights().length > 0) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              @for (insight of orderAiInsights(); track insight.id) {
+                <div style="display: flex; gap: 12px; padding: 14px; background: #f8fafc; border-radius: 10px; border-left: 3px solid {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}}; cursor: pointer;" [matTooltip]="insight.recommendation || ''">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: {{insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'}}; color: {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}};">
+                    <mat-icon>{{insight.icon || 'local_shipping'}}</mat-icon>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">{{insight.title}}</div>
+                    <div style="font-size: 12px; color: #64748b; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{insight.message}}</div>
+                    @if (insight.legislationRef) {
+                      <div style="display: inline-flex; align-items: center; gap: 4px; background: #f3e8ff; color: #7c3aed; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">
+                        <mat-icon style="font-size: 12px; width: 12px; height: 12px;">menu_book</mat-icon>
+                        {{insight.legislationRef}}
+                      </div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size: 11px; color: #0d9488; background: #f0fdfa; padding: 4px 8px; border-radius: 4px; margin-top: 6px; line-height: 1.4;">{{insight.recommendation}}</div>
+                    }
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                      @if (insight.financialImpact) {
+                        <span style="font-size: 11px; color: #059669; font-weight: 500;">{{insight.financialImpact}}</span>
+                      } @else {
+                        <span></span>
+                      }
+                      @if (insight.confidence) {
+                        <span style="font-size: 10px; color: #94a3b8; font-style: italic;">{{(insight.confidence * 100).toFixed(0)}}% confidence</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div style="text-align: center; padding: 20px; color: #94a3b8;">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p style="margin-top: 8px;">Loading AI insights...</p>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== LIST VIEW ===================== -->
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn active" (click)="currentView.set('list')">Order List</button>
+          <button class="tab-btn" (click)="navigateTo('cessions')">Cessions</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div class="pipeline-strip">
+          <div class="pipe-tile" [class.active]="filterStatus === 'draft'" (click)="filterByStatus('draft')">
+            <mat-icon>edit_note</mat-icon>
+            <span class="pipe-count">{{pipeline().draft || 0}}</span>
+            <span class="pipe-label">Draft</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'awaiting_approval'" (click)="filterByStatus('awaiting_approval')">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="pipe-count">{{pipeline().awaiting_approval || 0}}</span>
+            <span class="pipe-label">Awaiting</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'approved'" (click)="filterByStatus('approved')">
+            <mat-icon>check_circle</mat-icon>
+            <span class="pipe-count">{{pipeline().approved || 0}}</span>
+            <span class="pipe-label">Approved</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'dispatched'" (click)="filterByStatus('dispatched')">
+            <mat-icon>local_shipping</mat-icon>
+            <span class="pipe-count">{{pipeline().dispatched || 0}}</span>
+            <span class="pipe-label">Dispatched</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'partially_received'" (click)="filterByStatus('partially_received')">
+            <mat-icon>inventory</mat-icon>
+            <span class="pipe-count">{{pipeline().partially_received || 0}}</span>
+            <span class="pipe-label">Partial</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'completed'" (click)="filterByStatus('completed')">
+            <mat-icon>task_alt</mat-icon>
+            <span class="pipe-count">{{pipeline().completed || 0}}</span>
+            <span class="pipe-label">Completed</span>
+          </div>
+          <div class="pipe-tile" [class.active]="filterStatus === 'voided'" (click)="filterByStatus('voided')">
+            <mat-icon>cancel</mat-icon>
+            <span class="pipe-count">{{pipeline().voided || 0}}</span>
+            <span class="pipe-label">Voided</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search orders..." [(ngModel)]="searchQuery" (keyup.enter)="loadOrders()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadOrders()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="awaiting_approval">Awaiting Approval</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+              <mat-option value="declined">Declined</mat-option>
+              <mat-option value="dispatched">Dispatched</mat-option>
+              <mat-option value="partially_received">Partially Received</mat-option>
+              <mat-option value="completed">Completed</mat-option>
+              <mat-option value="voided">Voided</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="showAdvanced.set(!showAdvanced())">
+            <mat-icon>{{showAdvanced() ? 'expand_less' : 'tune'}}</mat-icon> Filters
+          </button>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="openCaptureForm()">
+            <mat-icon>add</mat-icon> New Order
+          </button>
+        </div>
+
+        @if (showAdvanced()) {
+          <div class="advanced-filters">
+            <mat-form-field appearance="outline">
+              <mat-label>Department</mat-label>
+              <mat-select [(ngModel)]="filterDepartment" (selectionChange)="loadOrders()">
+                <mat-option value="">All Departments</mat-option>
+                @for (dept of departments; track dept) {
+                  <mat-option [value]="dept">{{dept}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Reference Type</mat-label>
+              <mat-select [(ngModel)]="filterReferenceType" (selectionChange)="loadOrders()">
+                <mat-option value="">All Types</mat-option>
+                <mat-option value="quotation">Quotation</mat-option>
+                <mat-option value="informal_tender">Informal Tender</mat-option>
+                <mat-option value="tender">Tender</mat-option>
+                <mat-option value="contract">Contract</mat-option>
+                <mat-option value="direct">Direct</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Financial Year</mat-label>
+              <mat-select [(ngModel)]="filterFinancialYear" (selectionChange)="loadOrders()">
+                <mat-option value="">All Years</mat-option>
+                @for (fy of financialYears(); track fy) {
+                  <mat-option [value]="fy">{{fy}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Supplier Name</mat-label>
+              <input matInput [(ngModel)]="filterSupplier" (keyup.enter)="loadOrders()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Quotation #</mat-label>
+              <input matInput [(ngModel)]="filterQuotation" (keyup.enter)="loadOrders()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Contract #</mat-label>
+              <input matInput [(ngModel)]="filterContract" (keyup.enter)="loadOrders()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Requisition #</mat-label>
+              <input matInput [(ngModel)]="filterRequisition" (keyup.enter)="loadOrders()">
+            </mat-form-field>
+          </div>
+        }
+
+        @if (selectedOrders().length > 0) {
+          <div class="bulk-actions">
+            <span class="bulk-count">{{selectedOrders().length}} selected</span>
+            <button mat-stroked-button color="warn" (click)="bulkVoidOrders()">
+              <mat-icon>cancel</mat-icon> Bulk Void
+            </button>
+            <button mat-stroked-button (click)="bulkExport()">
+              <mat-icon>download</mat-icon> Bulk Export
+            </button>
+            <button mat-stroked-button (click)="selectedOrders.set([])">
+              <mat-icon>deselect</mat-icon> Clear Selection
+            </button>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th class="check-col">
+                  <mat-checkbox [checked]="allSelected()" (change)="toggleSelectAll()"></mat-checkbox>
+                </th>
+                <th>Order #</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Total Value</th>
+                <th>Ref Type</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (order of orders(); track order.id) {
+                <tr class="order-row" (click)="viewOrder(order)">
+                  <td class="check-col" (click)="$event.stopPropagation()">
+                    <mat-checkbox [checked]="isSelected(order.id)" (change)="toggleSelectOrder(order.id)"></mat-checkbox>
+                  </td>
+                  <td class="ref-cell">{{order.orderNumber}}</td>
+                  <td>{{formatDate(order.createdAt)}}</td>
+                  <td>{{order.supplier?.name || '—'}}</td>
+                  <td>{{order.department || '—'}}</td>
+                  <td><span class="status-badge" [class]="'status-' + order.status">{{getStatusLabel(order.status)}}</span></td>
+                  <td class="value-cell">{{formatCurrencyFull(order.totalValue?.amount || 0)}}</td>
+                  <td><span class="ref-type-badge">{{getReferenceTypeLabel(order.referenceType)}}</span></td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="orderActionMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #orderActionMenu="matMenu">
+                      <button mat-menu-item (click)="viewOrder(order)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (order.status === 'draft' || order.status === 'declined') {
+                        <button mat-menu-item (click)="editOrder(order)"><mat-icon>edit</mat-icon> Edit</button>
+                      }
+                      @if (order.status === 'draft') {
+                        <button mat-menu-item (click)="submitOrder(order.id)"><mat-icon>send</mat-icon> Submit</button>
+                      }
+                      @if (order.status === 'submitted' || order.status === 'awaiting_approval') {
+                        <button mat-menu-item (click)="approveOrder(order.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                        <button mat-menu-item (click)="declineOrder(order.id)"><mat-icon>cancel</mat-icon> Decline</button>
+                      }
+                      @if (order.status === 'approved') {
+                        <button mat-menu-item (click)="dispatchOrder(order.id)"><mat-icon>local_shipping</mat-icon> Dispatch</button>
+                      }
+                      @if (!['voided', 'completed'].includes(order.status)) {
+                        <button mat-menu-item (click)="voidOrder(order.id)"><mat-icon>delete_forever</mat-icon> Void</button>
+                      }
+                      @if (order.status === 'dispatched') {
+                        <button mat-menu-item (click)="resendOrder(order.id)"><mat-icon>refresh</mat-icon> Resend</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No orders found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <div class="page-info-section">
+            <span class="page-info">Showing {{pageStart()}} – {{pageEnd()}} of {{totalOrders()}} orders</span>
+            <mat-form-field appearance="outline" class="page-size-select">
+              <mat-select [(ngModel)]="pageSizeValue" (selectionChange)="onPageSizeChange()">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+                <mat-option [value]="100">100</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== DETAIL VIEW ===================== -->
+      @if (currentView() === 'detail' && selectedOrder()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('list')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedOrder()!.orderNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedOrder()!.status">{{getStatusLabel(selectedOrder()!.status)}}</span>
+              @if (selectedOrder()!.referenceType) {
+                <span class="ref-type-badge">{{getReferenceTypeLabel(selectedOrder()!.referenceType)}}</span>
+              }
+              <span class="dept-tag">{{selectedOrder()!.department}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Total Value</span>
+            <span class="value-amount">{{formatCurrencyFull(selectedOrder()!.totalValue?.amount || 0)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (['draft', 'declined'].includes(selectedOrder()!.status)) {
+              <button mat-stroked-button (click)="editOrder(selectedOrder()!)"><mat-icon>edit</mat-icon> Edit</button>
+            }
+            @if (selectedOrder()!.status === 'draft') {
+              <button mat-flat-button color="primary" (click)="submitOrder(selectedOrder()!.id)"><mat-icon>send</mat-icon> Submit</button>
+            }
+            @if (['submitted', 'awaiting_approval'].includes(selectedOrder()!.status)) {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveOrder(selectedOrder()!.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+              <button mat-stroked-button color="warn" (click)="declineOrder(selectedOrder()!.id)"><mat-icon>cancel</mat-icon> Decline</button>
+            }
+            @if (selectedOrder()!.status === 'approved') {
+              <button mat-flat-button color="primary" (click)="dispatchOrder(selectedOrder()!.id)"><mat-icon>local_shipping</mat-icon> Dispatch</button>
+            }
+            @if (!['voided', 'completed'].includes(selectedOrder()!.status)) {
+              <button mat-stroked-button color="warn" (click)="voidOrder(selectedOrder()!.id)"><mat-icon>delete_forever</mat-icon> Void</button>
+            }
+            @if (selectedOrder()!.status === 'dispatched') {
+              <button mat-stroked-button (click)="resendOrder(selectedOrder()!.id)"><mat-icon>refresh</mat-icon> Resend</button>
+            }
+            <button mat-stroked-button (click)="printOrder()"><mat-icon>print</mat-icon> Print</button>
+          </div>
+        </div>
+
+        <div class="detail-tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'info'" (click)="detailTab.set('info')">Information</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'lines'" (click)="detailTab.set('lines')">Line Items ({{selectedOrder()!.lineItems?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'budget'" (click)="detailTab.set('budget')">Budget</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'history'" (click)="detailTab.set('history')">History</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'sla'" (click)="detailTab.set('sla')">SLA</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'correspondence'" (click)="detailTab.set('correspondence'); loadCorrespondence()">Correspondence</button>
+        </div>
+
+        @if (detailTab() === 'info') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>business</mat-icon> Supplier Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Supplier Name</label>
+                    <span>{{selectedOrder()!.supplier?.name || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Supplier Number</label>
+                    <span>{{selectedOrder()!.supplier?.supplierNumber || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Contact Person</label>
+                    <span>{{selectedOrder()!.contactPerson || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Telephone</label>
+                    <span>{{selectedOrder()!.contactTelephone || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Email</label>
+                    <span>{{selectedOrder()!.contactEmail || '—'}}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-card flex-1">
+                <h3><mat-icon>local_shipping</mat-icon> Delivery & Payment</h3>
+                <div class="detail-field">
+                  <label>Delivery Address</label>
+                  <span>{{selectedOrder()!.deliveryAddress || '—'}}</span>
+                </div>
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Payment Terms</label>
+                  <span>{{selectedOrder()!.paymentTerms || '—'}}</span>
+                </div>
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Delivery Terms</label>
+                  <span>{{selectedOrder()!.deliveryTerms || '—'}}</span>
+                </div>
+                @if (selectedOrder()!.specialInstructions) {
+                  <div class="detail-field" style="margin-top:12px">
+                    <label>Special Instructions</label>
+                    <span class="desc-text">{{selectedOrder()!.specialInstructions}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>link</mat-icon> Reference Information</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Reference Type</label>
+                  <span>{{getReferenceTypeLabel(selectedOrder()!.referenceType)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Reference Number</label>
+                  <span>{{selectedOrder()!.referenceNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Requisition Ref</label>
+                  <span style="color:#1e40af;font-weight:500">{{selectedOrder()!.requisitionNumber || selectedOrder()!.requisitionRef || '—'}}</span>
+                </div>
+                @if (selectedOrder()!.quotationRef) {
+                  <div class="detail-field">
+                    <label>Quotation Ref</label>
+                    <span style="color:#1e40af;font-weight:500">{{selectedOrder()!.quotationRef}}</span>
+                  </div>
+                }
+                @if (selectedOrder()!.demandPlanRef) {
+                  <div class="detail-field">
+                    <label>Demand Plan</label>
+                    <span style="color:#1e40af;font-weight:500">{{selectedOrder()!.demandPlanRef}}</span>
+                  </div>
+                }
+                <div class="detail-field">
+                  <label>Contract Number</label>
+                  <span>{{selectedOrder()!.contractNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Financial Year</label>
+                  <span>{{selectedOrder()!.financialYear || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Department</label>
+                  <span>{{selectedOrder()!.department || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Cost Centre</label>
+                  <span>{{selectedOrder()!.costCentre || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created By</label>
+                  <span>{{selectedOrder()!.createdBy?.name || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Created At</label>
+                  <span>{{formatDate(selectedOrder()!.createdAt)}}</span>
+                </div>
+              </div>
+            </div>
+
+            @if (selectedOrder()!.partialOrder?.isPartial) {
+              <div class="detail-card">
+                <h3><mat-icon>pie_chart</mat-icon> Partial Order Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Original Quantity</label>
+                    <span>{{selectedOrder()!.partialOrder.originalQuantity}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Ordered Quantity</label>
+                    <span>{{selectedOrder()!.partialOrder.orderedQuantity}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Remaining Quantity</label>
+                    <span>{{selectedOrder()!.partialOrder.remainingQuantity}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (selectedOrder()!.voidDetails) {
+              <div class="detail-card void-card">
+                <h3><mat-icon>cancel</mat-icon> Void Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Voided By</label>
+                    <span>{{selectedOrder()!.voidDetails.voidedBy}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Void Date</label>
+                    <span>{{formatDate(selectedOrder()!.voidDetails.voidDate)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Void Reason</label>
+                    <span class="desc-text">{{selectedOrder()!.voidDetails.voidReason}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Void Type</label>
+                    <span>{{selectedOrder()!.voidDetails.voidType}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Budget Released</label>
+                    <span>{{formatCurrencyFull(selectedOrder()!.voidDetails.budgetReleased)}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'lines') {
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            <div class="table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>Qty Ordered</th>
+                    <th>Qty Received</th>
+                    <th>Qty Remaining</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                    <th>mSCOA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of selectedOrder()!.lineItems || []; track item.id; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{item.description}}</td>
+                      <td>{{item.quantity || item.orderedQuantity || 0}}</td>
+                      <td>{{item.quantityReceived || 0}}</td>
+                      <td>{{item.remainingQuantity || (item.quantity - (item.quantityReceived || 0))}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(item.unitPrice?.amount || item.estimatedUnitPrice?.amount || 0)}}</td>
+                      <td class="value-cell">{{formatCurrencyFull(item.totalPrice?.amount || item.estimatedTotal?.amount || 0)}}</td>
+                      <td>
+                        @if (item.mscoaSegment) {
+                          <span class="mscoa-badge" [matTooltip]="getMscoaTooltip(item.mscoaSegment)">{{item.mscoaSegment.fund || '—'}}</span>
+                        } @else {
+                          <span>—</span>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="8" class="empty-state">No line items</td></tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="total-row">
+                    <td colspan="5"></td>
+                    <td class="value-cell"><strong>Subtotal</strong></td>
+                    <td class="value-cell"><strong>{{formatCurrencyFull(selectedOrder()!.subtotal?.amount || selectedOrder()!.totalValue?.amount || 0)}}</strong></td>
+                    <td></td>
+                  </tr>
+                  <tr class="total-row">
+                    <td colspan="5"></td>
+                    <td class="value-cell">VAT</td>
+                    <td class="value-cell">{{formatCurrencyFull(selectedOrder()!.vatTotal?.amount || selectedOrder()!.vatAmount?.amount || 0)}}</td>
+                    <td></td>
+                  </tr>
+                  <tr class="total-row grand-total">
+                    <td colspan="5"></td>
+                    <td class="value-cell"><strong>Total</strong></td>
+                    <td class="value-cell"><strong>{{formatCurrencyFull(selectedOrder()!.totalIncVat?.amount || selectedOrder()!.totalValue?.amount || 0)}}</strong></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'budget') {
+          <div class="detail-card">
+            <h3><mat-icon>account_balance</mat-icon> Budget State Machine</h3>
+            <div class="budget-state-machine">
+              <div class="state-node" [class.active]="selectedOrder()!.budgetState?.state === 'available'" [class.completed]="isBudgetStateCompleted('available')">
+                <mat-icon>account_balance_wallet</mat-icon>
+                <span class="state-label">Available</span>
+                <span class="state-amount">{{formatCurrency(selectedOrder()!.budgetState?.availableAmount || 0)}}</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.active]="selectedOrder()!.budgetState?.state === 'reserved'" [class.completed]="isBudgetStateCompleted('reserved')">
+                <mat-icon>bookmark</mat-icon>
+                <span class="state-label">Reserved</span>
+                <span class="state-amount">{{formatCurrency(selectedOrder()!.budgetState?.reservedAmount || 0)}}</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.active]="selectedOrder()!.budgetState?.state === 'committed'" [class.completed]="isBudgetStateCompleted('committed')">
+                <mat-icon>lock</mat-icon>
+                <span class="state-label">Committed</span>
+                <span class="state-amount">{{formatCurrency(selectedOrder()!.budgetState?.committedAmount || 0)}}</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.active]="selectedOrder()!.budgetState?.state === 'consumed'" [class.completed]="isBudgetStateCompleted('consumed')">
+                <mat-icon>receipt</mat-icon>
+                <span class="state-label">Consumed</span>
+                <span class="state-amount">{{formatCurrency(selectedOrder()!.budgetState?.consumedAmount || 0)}}</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.active]="selectedOrder()!.budgetState?.state === 'released'">
+                <mat-icon>lock_open</mat-icon>
+                <span class="state-label">Released</span>
+              </div>
+            </div>
+          </div>
+
+          @if (budgetHistory().length) {
+            <div class="detail-card">
+              <h3><mat-icon>history</mat-icon> Budget History</h3>
+              <div class="audit-list">
+                @for (entry of budgetHistory(); track entry.date) {
+                  <div class="audit-item">
+                    <div class="audit-dot" [class]="'dot-' + (entry.type || 'action')"></div>
+                    <div class="audit-content">
+                      <span class="audit-action">{{entry.action}}</span>
+                      <span class="audit-detail">{{entry.description}} — {{formatCurrencyFull(entry.amount || 0)}}</span>
+                      <span class="audit-date">{{formatDateTime(entry.date)}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        @if (detailTab() === 'history') {
+          <div class="detail-card">
+            <h3><mat-icon>timeline</mat-icon> Approval History</h3>
+            @if (selectedOrder()!.approvalHistory?.length) {
+              <div class="audit-list">
+                @for (entry of selectedOrder()!.approvalHistory || []; track entry.date) {
+                  <div class="audit-item">
+                    <div class="audit-dot" [class]="getAuditDotClass(entry.action)"></div>
+                    <div class="audit-content">
+                      <span class="audit-action">{{entry.action}}</span>
+                      <span class="audit-detail">{{entry.userName}} {{entry.comments ? '— ' + entry.comments : ''}}</span>
+                      <span class="audit-date">{{formatDateTime(entry.date)}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty-text">No approval history available</div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'sla') {
+          <div class="detail-card">
+            <h3><mat-icon>speed</mat-icon> SLA Tracking</h3>
+            @if (selectedOrder()!.slaTracking) {
+              <div class="sla-grid">
+                <div class="sla-stage-card">
+                  <span class="sla-stage-label">Order to Approval</span>
+                  <div class="sla-stage-values">
+                    <span class="sla-actual-val" [class]="getSlaClass(selectedOrder()!.slaTracking.orderToApprovalActual, selectedOrder()!.slaTracking.orderToApprovalTarget)">
+                      {{selectedOrder()!.slaTracking.orderToApprovalActual ?? '—'}}d
+                    </span>
+                    <span class="sla-target-val">/ {{selectedOrder()!.slaTracking.orderToApprovalTarget}}d target</span>
+                  </div>
+                  <div class="sla-bar-track">
+                    <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(selectedOrder()!.slaTracking.orderToApprovalActual, selectedOrder()!.slaTracking.orderToApprovalTarget)" [style.background]="getSlaBarColor(selectedOrder()!.slaTracking.orderToApprovalActual, selectedOrder()!.slaTracking.orderToApprovalTarget)"></div>
+                  </div>
+                </div>
+                <div class="sla-stage-card">
+                  <span class="sla-stage-label">Order to Dispatch</span>
+                  <div class="sla-stage-values">
+                    <span class="sla-actual-val" [class]="getSlaClass(selectedOrder()!.slaTracking.orderToDispatchActual, selectedOrder()!.slaTracking.orderToDispatchTarget)">
+                      {{selectedOrder()!.slaTracking.orderToDispatchActual ?? '—'}}d
+                    </span>
+                    <span class="sla-target-val">/ {{selectedOrder()!.slaTracking.orderToDispatchTarget}}d target</span>
+                  </div>
+                  <div class="sla-bar-track">
+                    <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(selectedOrder()!.slaTracking.orderToDispatchActual, selectedOrder()!.slaTracking.orderToDispatchTarget)" [style.background]="getSlaBarColor(selectedOrder()!.slaTracking.orderToDispatchActual, selectedOrder()!.slaTracking.orderToDispatchTarget)"></div>
+                  </div>
+                </div>
+                @if (selectedOrder()!.slaTracking.orderToDeliveryTarget) {
+                  <div class="sla-stage-card">
+                    <span class="sla-stage-label">Order to Delivery</span>
+                    <div class="sla-stage-values">
+                      <span class="sla-actual-val" [class]="getSlaClass(selectedOrder()!.slaTracking.orderToDeliveryActual, selectedOrder()!.slaTracking.orderToDeliveryTarget)">
+                        {{selectedOrder()!.slaTracking.orderToDeliveryActual ?? '—'}}d
+                      </span>
+                      <span class="sla-target-val">/ {{selectedOrder()!.slaTracking.orderToDeliveryTarget}}d target</span>
+                    </div>
+                    <div class="sla-bar-track">
+                      <div class="sla-bar-fill" [style.width.%]="getSlaBarWidth(selectedOrder()!.slaTracking.orderToDeliveryActual, selectedOrder()!.slaTracking.orderToDeliveryTarget)" [style.background]="getSlaBarColor(selectedOrder()!.slaTracking.orderToDeliveryActual, selectedOrder()!.slaTracking.orderToDeliveryTarget)"></div>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty-text">No SLA tracking data available</div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'correspondence') {
+          <div class="detail-card">
+            <h3><mat-icon>mail</mat-icon> Correspondence</h3>
+            @if (correspondence().length) {
+              <div class="audit-list">
+                @for (item of correspondence(); track item.date) {
+                  <div class="audit-item">
+                    <div class="audit-dot dot-action"></div>
+                    <div class="audit-content">
+                      <span class="audit-action">{{item.type || item.subject}}</span>
+                      <span class="audit-detail">{{item.message || item.body}}</span>
+                      <span class="audit-date">{{formatDateTime(item.date)}} — {{item.sentBy || item.from}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty-text">No correspondence records</div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===================== CAPTURE/EDIT VIEW ===================== -->
+      @if (currentView() === 'capture') {
+        <div class="form-header">
+          <button mat-icon-button (click)="cancelCapture()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>{{editMode() ? 'Edit Order' : 'Create New Order'}}</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>business</mat-icon> Supplier & Department</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Supplier Name</mat-label>
+                <input matInput [(ngModel)]="orderForm.supplierName" placeholder="Enter supplier name">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="orderForm.department">
+                  @for (dept of departments; track dept) {
+                    <mat-option [value]="dept">{{dept}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Cost Centre</mat-label>
+                <input matInput [(ngModel)]="orderForm.costCentre">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Reference Type</mat-label>
+                <mat-select [(ngModel)]="orderForm.referenceType" (selectionChange)="onReferenceTypeChange($event.value)">
+                  <mat-option value="quotation">Quotation</mat-option>
+                  <mat-option value="informal_tender">Informal Tender</mat-option>
+                  <mat-option value="tender">Tender</mat-option>
+                  <mat-option value="contract">Contract</mat-option>
+                  <mat-option value="direct">Direct</mat-option>
+                </mat-select>
+              </mat-form-field>
+              @if (orderForm.referenceType === 'tender') {
+                <mat-form-field appearance="outline">
+                  <mat-label>Select Awarded Tender</mat-label>
+                  <mat-select [(ngModel)]="orderForm.referenceNumber" (selectionChange)="onTenderSelected($event.value)">
+                    @if (loadingTenders()) {
+                      <mat-option disabled>Loading tenders...</mat-option>
+                    }
+                    @for (t of awardedTenders(); track t.id) {
+                      <mat-option [value]="t.referenceNumber">{{t.referenceNumber}} — {{t.title}} ({{formatCurrencyFull(t.estimatedValue?.amount || t.awardAmount || 0)}})</mat-option>
+                    }
+                    @if (!loadingTenders() && awardedTenders().length === 0) {
+                      <mat-option disabled>No awarded tenders available</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              } @else {
+                <mat-form-field appearance="outline">
+                  <mat-label>Reference Number</mat-label>
+                  <input matInput [(ngModel)]="orderForm.referenceNumber">
+                </mat-form-field>
+              }
+              <mat-form-field appearance="outline">
+                <mat-label>Contract Number</mat-label>
+                <input matInput [(ngModel)]="orderForm.contractNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Financial Year</mat-label>
+                <mat-select [(ngModel)]="orderForm.financialYear">
+                  @for (fy of financialYears(); track fy) {
+                    <mat-option [value]="fy">{{fy}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Payment Terms</mat-label>
+                <input matInput [(ngModel)]="orderForm.paymentTerms" placeholder="e.g. 30 days">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Delivery Terms</mat-label>
+                <input matInput [(ngModel)]="orderForm.deliveryTerms" placeholder="e.g. Ex Works">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Delivery Address</mat-label>
+                <input matInput [(ngModel)]="orderForm.deliveryAddress">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Special Instructions</mat-label>
+                <textarea matInput [(ngModel)]="orderForm.specialInstructions" rows="2"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>person</mat-icon> Contact Person</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Name</mat-label>
+                <input matInput [(ngModel)]="orderForm.contactPerson">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Telephone</mat-label>
+                <input matInput [(ngModel)]="orderForm.contactTelephone">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Email</mat-label>
+                <input matInput [(ngModel)]="orderForm.contactEmail" type="email">
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            @for (line of formLineItems; track line; let i = $index) {
+              <div class="line-item-row">
+                <div class="line-item-fields">
+                  <mat-form-field appearance="outline" class="line-desc">
+                    <mat-label>Description</mat-label>
+                    <input matInput [(ngModel)]="line.description">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-sm">
+                    <mat-label>UNSPSC</mat-label>
+                    <input matInput [(ngModel)]="line.unspscCode">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-xs">
+                    <mat-label>Qty</mat-label>
+                    <input matInput type="number" [(ngModel)]="line.quantity" min="1">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-sm">
+                    <mat-label>UoM</mat-label>
+                    <mat-select [(ngModel)]="line.unitOfMeasure">
+                      <mat-option value="each">Each</mat-option>
+                      <mat-option value="kg">Kg</mat-option>
+                      <mat-option value="litre">Litre</mat-option>
+                      <mat-option value="metre">Metre</mat-option>
+                      <mat-option value="box">Box</mat-option>
+                      <mat-option value="pack">Pack</mat-option>
+                      <mat-option value="hour">Hour</mat-option>
+                      <mat-option value="day">Day</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-sm">
+                    <mat-label>Unit Price</mat-label>
+                    <input matInput type="number" [(ngModel)]="line.unitPrice" min="0" step="0.01">
+                  </mat-form-field>
+                  <div class="line-total">
+                    <span class="line-total-label">Total</span>
+                    <span class="line-total-value">{{formatCurrencyFull((line.quantity || 0) * (line.unitPrice || 0))}}</span>
+                  </div>
+                  <mat-form-field appearance="outline" class="line-xs">
+                    <mat-label>VAT %</mat-label>
+                    <input matInput type="number" [(ngModel)]="line.vatRate" min="0" step="0.01">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="line-sm">
+                    <mat-label>mSCOA</mat-label>
+                    <input matInput [(ngModel)]="line.mscoaSegment">
+                  </mat-form-field>
+                </div>
+                <button mat-icon-button color="warn" (click)="removeLineItem(i)" [disabled]="formLineItems.length <= 1">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            }
+            <button mat-stroked-button (click)="addLineItem()" style="margin-top:8px">
+              <mat-icon>add</mat-icon> Add Line Item
+            </button>
+
+            <div class="order-totals">
+              <div class="total-line">
+                <span>Subtotal</span>
+                <span class="value-cell">{{formatCurrencyFull(getFormSubtotal())}}</span>
+              </div>
+              <div class="total-line">
+                <span>VAT</span>
+                <span class="value-cell">{{formatCurrencyFull(getFormVat())}}</span>
+              </div>
+              <div class="total-line grand">
+                <span>Total</span>
+                <span class="value-cell">{{formatCurrencyFull(getFormTotal())}}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <div class="partial-toggle">
+              <mat-slide-toggle [(ngModel)]="orderForm.isPartial">Partial Order</mat-slide-toggle>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="cancelCapture()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveOrder()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save Draft'}}
+            </button>
+            <button mat-flat-button style="background:#2e7d32;color:white" (click)="saveAndSubmit()" [disabled]="saving()">
+              <mat-icon>send</mat-icon> {{saving() ? 'Submitting...' : 'Save & Submit'}}
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== CESSIONS VIEW ===================== -->
+      @if (currentView() === 'cessions') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Order List</button>
+          <button class="tab-btn active" (click)="currentView.set('cessions')">Cessions</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn" (click)="navigateTo('reports')">Reports</button>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search by order number..." [(ngModel)]="cessionFilterOrder" (keyup.enter)="loadCessions()">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Directive Type</mat-label>
+            <mat-select [(ngModel)]="cessionFilterType" (selectionChange)="loadCessions()">
+              <mat-option value="">All Types</mat-option>
+              @for (ct of cessionTypes(); track ct.id) {
+                <mat-option [value]="ct.code">{{ct.description}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Cedant Name</mat-label>
+            <input matInput [(ngModel)]="cessionFilterCedant" (keyup.enter)="loadCessions()">
+          </mat-form-field>
+          <button mat-flat-button color="primary" (click)="showCessionForm.set(true)">
+            <mat-icon>add</mat-icon> Add Cession
+          </button>
+        </div>
+
+        @if (showCessionForm()) {
+          <div class="detail-card cession-form-card">
+            <h3><mat-icon>add_circle</mat-icon> Capture Cession / Directive</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Order Number</mat-label>
+                <input matInput [(ngModel)]="cessionForm.orderNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Cedant Vendor</mat-label>
+                <input matInput [(ngModel)]="cessionForm.cedantName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Cedant Percentage</mat-label>
+                <input matInput type="number" [(ngModel)]="cessionForm.cedantPercentage" step="0.00000001" min="0" max="100">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Beneficiary Vendor</mat-label>
+                <input matInput [(ngModel)]="cessionForm.beneficiaryName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Beneficiary Percentage</mat-label>
+                <input matInput type="number" [(ngModel)]="cessionForm.beneficiaryPercentage" step="0.00000001" min="0" max="100">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Cession/Directive Type</mat-label>
+                <mat-select [(ngModel)]="cessionForm.cessionDirectiveType">
+                  @for (ct of cessionTypes(); track ct.id) {
+                    <mat-option [value]="ct.code">{{ct.description}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date</mat-label>
+                <input matInput [matDatepicker]="cessionPicker" [(ngModel)]="cessionForm.cessionDate">
+                <mat-datepicker-toggle matIconSuffix [for]="cessionPicker"></mat-datepicker-toggle>
+                <mat-datepicker #cessionPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Total Claim Amount</mat-label>
+                <input matInput type="number" [(ngModel)]="cessionForm.totalClaimAmount" min="0" step="0.01">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description</mat-label>
+                <textarea matInput [(ngModel)]="cessionForm.description" rows="2"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="cessionForm.comments" rows="2"></textarea>
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-stroked-button (click)="showCessionForm.set(false)">Cancel</button>
+              <button mat-flat-button color="primary" (click)="createCession()" [disabled]="saving()">
+                <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save Cession'}}
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th>Cession ID</th>
+                <th>Order #</th>
+                <th>Cedant</th>
+                <th>Beneficiary</th>
+                <th>Type</th>
+                <th>Percentage</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (cession of cessions(); track cession.id) {
+                <tr class="order-row" (click)="viewCession(cession)">
+                  <td class="ref-cell">{{cession.id}}</td>
+                  <td>{{cession.orderNumber}}</td>
+                  <td>{{cession.cedant?.name || '—'}}</td>
+                  <td>{{cession.beneficiary?.name || '—'}}</td>
+                  <td>{{cession.cessionDirectiveType || '—'}}</td>
+                  <td>{{formatPercentage(cession.cedantPercentage)}}</td>
+                  <td class="value-cell">{{formatCurrencyFull(cession.totalClaimAmount?.amount || 0)}}</td>
+                  <td><span class="status-badge" [class]="'status-' + (cession.status || 'draft')">{{cession.status || 'Draft'}}</span></td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button (click)="viewCession(cession)" matTooltip="View">
+                      <mat-icon>visibility</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteCession(cession.id)" matTooltip="Delete">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No cessions found</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- ===================== CESSION DETAIL VIEW ===================== -->
+      @if (currentView() === 'cession-detail' && selectedCession()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="navigateTo('cessions')"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>Cession: {{selectedCession()!.id}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + (selectedCession()!.status || 'draft')">{{selectedCession()!.status || 'Draft'}}</span>
+              <span class="dept-tag">Order: {{selectedCession()!.orderNumber}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button mat-stroked-button color="warn" (click)="deleteCession(selectedCession()!.id)">
+              <mat-icon>delete</mat-icon> Delete
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>person</mat-icon> Cedant</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Name</label>
+                  <span>{{selectedCession()!.cedant?.name || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Registration</label>
+                  <span>{{selectedCession()!.cedant?.registrationNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Percentage</label>
+                  <span>{{formatPercentage(selectedCession()!.cedantPercentage)}}</span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-card flex-1">
+              <h3><mat-icon>person_outline</mat-icon> Beneficiary</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Name</label>
+                  <span>{{selectedCession()!.beneficiary?.name || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Registration</label>
+                  <span>{{selectedCession()!.beneficiary?.registrationNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Percentage</label>
+                  <span>{{formatPercentage(selectedCession()!.beneficiaryPercentage)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>info</mat-icon> Cession Details</h3>
+            <div class="detail-grid">
+              <div class="detail-field">
+                <label>Type</label>
+                <span>{{selectedCession()!.cessionDirectiveType || '—'}}</span>
+              </div>
+              <div class="detail-field">
+                <label>Date</label>
+                <span>{{formatDate(selectedCession()!.cessionDate)}}</span>
+              </div>
+              <div class="detail-field">
+                <label>Total Claim Amount</label>
+                <span>{{formatCurrencyFull(selectedCession()!.totalClaimAmount?.amount || 0)}}</span>
+              </div>
+              <div class="detail-field">
+                <label>Description</label>
+                <span class="desc-text">{{selectedCession()!.description || '—'}}</span>
+              </div>
+              @if (selectedCession()!.comments) {
+                <div class="detail-field">
+                  <label>Comments</label>
+                  <span class="desc-text">{{selectedCession()!.comments}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (selectedCession()!.documents?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>attach_file</mat-icon> Documents</h3>
+              <div class="doc-list">
+                @for (doc of selectedCession()!.documents || []; track doc.name) {
+                  <div class="doc-item">
+                    <mat-icon class="doc-icon">description</mat-icon>
+                    <div class="doc-info">
+                      <span class="doc-name">{{doc.name}}</span>
+                      <span class="doc-meta">{{doc.type || 'Document'}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== REPORTS VIEW ===================== -->
+      @if (currentView() === 'reports') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('dashboard')">Dashboard</button>
+          <button class="tab-btn" (click)="navigateTo('list')">Order List</button>
+          <button class="tab-btn" (click)="navigateTo('cessions')">Cessions</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+          <button class="tab-btn active" (click)="currentView.set('reports')">Reports</button>
+        </div>
+
+        <div class="reports-grid">
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Order List Report</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Order Number</mat-label>
+                <input matInput [(ngModel)]="reportFilters.orderNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor Name</mat-label>
+                <input matInput [(ngModel)]="reportFilters.vendorName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Quotation #</mat-label>
+                <input matInput [(ngModel)]="reportFilters.quotationNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contract #</mat-label>
+                <input matInput [(ngModel)]="reportFilters.contractNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Status</mat-label>
+                <mat-select [(ngModel)]="reportFilters.status">
+                  <mat-option value="">All</mat-option>
+                  <mat-option value="draft">Draft</mat-option>
+                  <mat-option value="approved">Approved</mat-option>
+                  <mat-option value="dispatched">Dispatched</mat-option>
+                  <mat-option value="completed">Completed</mat-option>
+                  <mat-option value="voided">Voided</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date From</mat-label>
+                <input matInput [matDatepicker]="fromPicker" [(ngModel)]="reportFilters.dateFrom">
+                <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+                <mat-datepicker #fromPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date To</mat-label>
+                <input matInput [matDatepicker]="toPicker" [(ngModel)]="reportFilters.dateTo">
+                <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+                <mat-datepicker #toPicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-flat-button color="primary" (click)="loadReport('order-list')" [disabled]="loading()">
+                <mat-icon>search</mat-icon> Generate Report
+              </button>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>payments</mat-icon> Outstanding Payments Report</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Order Number</mat-label>
+                <input matInput [(ngModel)]="paymentReportFilters.orderNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor Name</mat-label>
+                <input matInput [(ngModel)]="paymentReportFilters.vendorName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contract #</mat-label>
+                <input matInput [(ngModel)]="paymentReportFilters.contractNumber">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Request Type</mat-label>
+                <mat-select [(ngModel)]="paymentReportFilters.requestType">
+                  <mat-option value="">All</mat-option>
+                  <mat-option value="standard">Standard</mat-option>
+                  <mat-option value="blanket">Blanket</mat-option>
+                  <mat-option value="contract">Contract</mat-option>
+                  <mat-option value="emergency">Emergency</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-flat-button color="primary" (click)="loadReport('outstanding-payments')" [disabled]="loading()">
+                <mat-icon>search</mat-icon> Generate Report
+              </button>
+            </div>
+          </div>
+        </div>
+
+        @if (reportData()) {
+          <div class="detail-card" style="margin-top:16px">
+            <h3><mat-icon>assessment</mat-icon> {{reportData()!.title || 'Report Results'}}</h3>
+            @if (reportData()!.summary) {
+              <div class="report-summary">
+                @for (key of getReportSummaryKeys(); track key) {
+                  <div class="report-stat">
+                    <span class="rs-label">{{key}}</span>
+                    <span class="rs-value">{{reportData()!.summary[key]}}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (reportData()!.data?.length) {
+              <div class="table-wrapper" style="margin-top:12px">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      @for (col of getReportColumns(); track col) {
+                        <th>{{col}}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of reportData()!.data || []; track row) {
+                      <tr>
+                        @for (col of getReportColumns(); track col) {
+                          <td>{{row[col] ?? '—'}}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-text" style="margin-top:12px">No results found</div>
+            }
+          </div>
+        }
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

@@ -1,0 +1,439 @@
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
+    <div>
+      <h1>Maintenance Request MR-{{requestId}}</h1>
+      @if (request()) {
+        <p class="subtitle">{{request().maintenanceDescription}}</p>
+      }
+    </div>
+  </div>
+  @if (request()) {
+    @if (request().isApproved) {
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn-print" (click)="printRequest()"><mat-icon>print</mat-icon> Print</button>
+        <span class="status-badge status-approved">Approved</span>
+      </div>
+    } @else {
+      <span class="status-badge status-pending">Pending Approval</span>
+    }
+  }
+</div>
+
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading request...</span>
+  </div>
+} @else if (!request()) {
+  <div class="empty-state">
+    <mat-icon>error_outline</mat-icon>
+    <h3>Request Not Found</h3>
+  </div>
+} @else {
+  <div class="tabs">
+    <button class="tab-btn" [class.active]="activeTab() === 'details'" (click)="setTab('details')">
+      <mat-icon>description</mat-icon> Request Details
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'workorders'" (click)="setTab('workorders')">
+      <mat-icon>engineering</mat-icon> Work Orders ({{workOrders().length}})
+    </button>
+  </div>
+
+  @if (activeTab() === 'details') {
+    <div class="detail-card">
+      @if (form.isApproved) {
+        <div class="approved-notice">
+          <mat-icon>lock</mat-icon>
+          This request has been approved and is read-only. No changes can be made.
+        </div>
+      }
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Service Group</label>
+          <select [(ngModel)]="form.assetServiceGroupId" [disabled]="form.isApproved">
+            <option value="">Select</option>
+            @for (sg of serviceGroups(); track sg.assetServiceGroupId) {
+              <option [value]="sg.assetServiceGroupId">{{sg.assetServiceGroupDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Asset Type</label>
+          <select [(ngModel)]="form.assetTypeId" [disabled]="form.isApproved">
+            <option value="">Select</option>
+            @for (at of assetTypes(); track at.assetTypeId) {
+              <option [value]="at.assetTypeId">{{at.assetTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Asset Category</label>
+          <select [(ngModel)]="form.assetCategoryId" [disabled]="form.isApproved">
+            <option value="">Select</option>
+            @for (ac of assetCategories(); track ac.assetCategoryId) {
+              <option [value]="ac.assetCategoryId">{{ac.assetCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sub-Category</label>
+          <select [(ngModel)]="form.assetSubCategoryId" [disabled]="form.isApproved">
+            <option [ngValue]="null">Select</option>
+            @for (sc of assetSubCategories(); track sc.assetSubCategoryId) {
+              <option [value]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Request Date</label>
+          <input type="date" [(ngModel)]="form.requestDate" [disabled]="form.isApproved">
+        </div>
+        <div class="form-group">
+          <label>Lead Time</label>
+          <select [(ngModel)]="form.leadTimeId" [disabled]="form.isApproved">
+            <option value="">Select</option>
+            @for (lt of leadTimes(); track lt.leadTimeId) {
+              <option [value]="lt.leadTimeId">{{lt.maintenanceDesc}} ({{lt.leadTimeDays}} days)</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Proposed Closing Date</label>
+          <input type="date" [value]="getProposedClosing()" disabled>
+        </div>
+        <div class="form-group">
+          <label>Approved</label>
+          <select [(ngModel)]="form.isApproved" [disabled]="form.isApproved">
+            <option [ngValue]="false">No</option>
+            <option [ngValue]="true">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date Captured</label>
+          <input type="text" [value]="formatDate(form.dateCaptured)" disabled>
+        </div>
+        <div class="form-group">
+          <label>Date Modified</label>
+          <input type="text" [value]="formatDate(form.dateModified)" disabled>
+        </div>
+        <div class="form-group span-two">
+          <label>Asset</label>
+          <div class="asset-search-row">
+            <div class="asset-search-section">
+              <div class="search-container">
+                <mat-icon class="search-icon">search</mat-icon>
+                <input type="text"
+                  class="search-input"
+                  placeholder="Type asset ID, barcode, or description to search..."
+                  [value]="assetSearchTerm"
+                  (input)="onAssetSearch($event)"
+                  (blur)="closeAssetDropdown()"
+                  [disabled]="!!selectedAsset() || !form.assetTypeId || !form.assetCategoryId || form.isApproved"
+                  [title]="(!form.assetTypeId || !form.assetCategoryId) ? 'Select Asset Type and Category first' : ''">
+                @if (selectedAsset() && !form.isApproved) {
+                  <button class="clear-btn" (click)="clearAsset()"><mat-icon>close</mat-icon></button>
+                }
+              </div>
+              @if (assetShowDropdown && assetFilteredResults().length > 0) {
+                <div class="search-dropdown">
+                  @for (asset of assetFilteredResults(); track asset.assetId) {
+                    <div class="search-dropdown-item" (mousedown)="selectAsset(asset)">
+                      <div class="dropdown-main">
+                        <span class="dropdown-id">{{asset.assetId}}</span>
+                        <span class="dropdown-desc">{{asset.description}}</span>
+                      </div>
+                      <div class="dropdown-meta">
+                        <span>{{asset.categoryName}}</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              @if (assetShowDropdown && assetFilteredResults().length === 0 && assetSearchTerm.length >= 2) {
+                <div class="search-dropdown">
+                  <div class="search-dropdown-empty">No assets found matching "{{assetSearchTerm}}"</div>
+                </div>
+              }
+              @if (selectedAsset(); as asset) {
+                <div class="selected-asset-chip">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#2563eb">inventory_2</mat-icon>
+                  <span class="chip-id">{{asset.assetId}}</span>
+                  <span class="chip-sep">—</span>
+                  <span class="chip-desc">{{asset.description}}</span>
+                  @if (asset.barcode) {
+                    <span class="chip-barcode">Barcode: {{asset.barcode}}</span>
+                  }
+                </div>
+              }
+            </div>
+            <button class="btn-map"
+              (click)="openMapModal()"
+              [disabled]="!form.assetTypeId || !form.assetCategoryId || form.isApproved"
+              [title]="(!form.assetTypeId || !form.assetCategoryId) ? 'Select Asset Type and Category first' : 'Select asset from map'">
+              <mat-icon>map</mat-icon> Map
+            </button>
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Description</label>
+          <textarea rows="3" [(ngModel)]="form.maintenanceDescription" [disabled]="form.isApproved"></textarea>
+        </div>
+      </div>
+      @if (!form.isApproved) {
+        <div class="form-actions">
+          <button class="btn-primary" (click)="saveRequest()"><mat-icon>save</mat-icon> Save Changes</button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (showMapModal) {
+    <div class="modal-overlay" (click)="closeMapModal()">
+      <div class="map-modal" (click)="$event.stopPropagation()">
+        <div class="map-modal-header">
+          <span style="font-size:15px;font-weight:600;color:#1e293b">Select Asset from Map</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:13px;color:#64748b">{{mapSelectedCount}} selected</span>
+            <button mat-flat-button style="background:#2563eb;color:white;height:36px" (click)="confirmMapSelection()">Select Asset</button>
+            <button mat-icon-button (click)="closeMapModal()"><mat-icon>close</mat-icon></button>
+          </div>
+        </div>
+        <div class="map-modal-body">
+          @if (mapLoading) {
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10">
+              <mat-spinner diameter="40"></mat-spinner>
+            </div>
+          }
+          <div id="maint-asset-map" style="width:100%;height:100%"></div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab() === 'workorders') {
+    <div class="detail-card">
+      <div class="section-header">
+        <h3>Work Orders</h3>
+        @if (!form.isApproved) {
+          <button class="btn-primary btn-sm" (click)="openNewWorkOrder()"><mat-icon>add</mat-icon> Add Work Order</button>
+        }
+      </div>
+
+      @if (!form.isApproved && showWorkOrderForm()) {
+        <div class="inline-form">
+          <h4>{{editingWorkOrder() ? 'Edit' : 'New'}} Work Order</h4>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label>Description *</label>
+              <input type="text" [(ngModel)]="woForm.workOrderDesc" placeholder="Work order description">
+            </div>
+            <div class="form-group">
+              <label>Work Order Date</label>
+              <input type="date" [(ngModel)]="woForm.workOrderDate">
+            </div>
+            <div class="form-group">
+              <label>Requisition Number</label>
+              <input type="number" [(ngModel)]="woForm.requisitionNumber" placeholder="Requisition #">
+            </div>
+            <div class="form-group">
+              <label>Amount (R)</label>
+              <input type="number" [(ngModel)]="woForm.amount" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group full-width scoa-section-label">
+              <strong>Debit Side (mSCOA)</strong>
+            </div>
+            <div class="scoa-pair-wrapper">
+              <div class="form-group">
+                <label>Debit Project</label>
+                <select [(ngModel)]="woForm.debitProjectId" (change)="onDebitProjectChange()">
+                  <option [ngValue]="null">Select project</option>
+                  @for (p of planProjects(); track p.projectId) {
+                    <option [value]="p.projectId">{{p.projectCode}} - {{p.projectName}}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Debit SCOA Item</label>
+                <select [(ngModel)]="woForm.debitPlanProjectItemId">
+                  <option [ngValue]="null">Select SCOA item</option>
+                  @for (si of debitScoaItems(); track si.planProjectItemId) {
+                    <option [value]="si.planProjectItemId">{{si.scoaDesc}}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="form-group full-width scoa-section-label">
+              <strong>Credit Side (mSCOA)</strong>
+            </div>
+            <div class="scoa-pair-wrapper">
+              <div class="form-group">
+                <label>Credit Project</label>
+                <select [(ngModel)]="woForm.creditProjectId" (change)="onCreditProjectChange()">
+                  <option [ngValue]="null">Select project</option>
+                  @for (p of planProjects(); track p.projectId) {
+                    <option [value]="p.projectId">{{p.projectCode}} - {{p.projectName}}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Credit SCOA Item</label>
+                <select [(ngModel)]="woForm.creditPlanProjectItemId">
+                  <option [ngValue]="null">Select SCOA item</option>
+                  @for (si of creditScoaItems(); track si.planProjectItemId) {
+                    <option [value]="si.planProjectItemId">{{si.scoaDesc}}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="cancelWorkOrderForm()">Cancel</button>
+            <button class="btn-primary" (click)="saveWorkOrder()">{{editingWorkOrder() ? 'Update' : 'Create'}}</button>
+          </div>
+        </div>
+      }
+
+      @if (workOrdersLoading()) {
+        <div class="loading-container">
+          <mat-spinner diameter="32"></mat-spinner>
+        </div>
+      } @else if (workOrders().length === 0) {
+        <div class="empty-inline">
+          <mat-icon>engineering</mat-icon>
+          <p>No work orders linked to this request yet.</p>
+        </div>
+      } @else {
+        @for (wo of workOrders(); track wo.maintenanceWorksOrderId) {
+          <div class="wo-card">
+            <div class="wo-header" (click)="toggleWorkOrderExpand(wo.maintenanceWorksOrderId)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <mat-icon class="expand-icon" [class.expanded]="isExpanded(wo.maintenanceWorksOrderId)">chevron_right</mat-icon>
+                <div>
+                  <strong>WO-{{wo.maintenanceWorksOrderId}}</strong>
+                  <span class="wo-desc">{{wo.workOrderDesc}}</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="wo-date">{{formatDate(wo.workOrderDate)}}</span>
+                @if (wo.amount != null) {
+                  <span class="wo-amount">R {{wo.amount | number:'1.2-2'}}</span>
+                }
+                @if (!form.isApproved) {
+                  <button mat-icon-button class="action-btn" (click)="editWorkOrder(wo); $event.stopPropagation()"><mat-icon>edit</mat-icon></button>
+                  <button mat-icon-button class="action-btn danger" (click)="deleteWorkOrder(wo); $event.stopPropagation()"><mat-icon>delete</mat-icon></button>
+                }
+              </div>
+            </div>
+
+            @if (isExpanded(wo.maintenanceWorksOrderId)) {
+              <div class="wo-body">
+                <div class="wo-info-grid">
+                  <div><span class="info-label">Requisition #:</span> {{wo.requisitionNumber || '-'}}</div>
+                  <div><span class="info-label">Amount:</span> {{wo.amount != null ? 'R ' + (wo.amount | number:'1.2-2') : '-'}}</div>
+                  <div><span class="info-label">Debit Project:</span> {{wo.debitProjectName || '-'}}</div>
+                  <div><span class="info-label">Debit SCOA Item:</span> {{wo.debitScoaDesc || '-'}}</div>
+                  <div><span class="info-label">Credit Project:</span> {{wo.creditProjectName || '-'}}</div>
+                  <div><span class="info-label">Credit SCOA Item:</span> {{wo.creditScoaDesc || '-'}}</div>
+                </div>
+
+                <div class="detail-section">
+                  <div class="section-header">
+                    <h4>Line Items</h4>
+                    @if (!form.isApproved) {
+                      <button class="btn-primary btn-xs" (click)="openNewDetail(wo.maintenanceWorksOrderId)"><mat-icon>add</mat-icon> Add Item</button>
+                    }
+                  </div>
+
+                  @if (!form.isApproved && showDetailForm() === wo.maintenanceWorksOrderId) {
+                    <div class="inline-form nested">
+                      <div class="form-grid-sm">
+                        <div class="form-group">
+                          <label>Technician #</label>
+                          <input type="text" [(ngModel)]="detailForm.technicianNumber">
+                        </div>
+                        <div class="form-group">
+                          <label>Line Item #</label>
+                          <input type="text" [(ngModel)]="detailForm.lineItemNumber">
+                        </div>
+                        <div class="form-group">
+                          <label>Item Type</label>
+                          <input type="text" [(ngModel)]="detailForm.itemType" placeholder="Labour / Material">
+                        </div>
+                        <div class="form-group">
+                          <label>Commodity</label>
+                          <select [(ngModel)]="detailForm.commodityId">
+                            <option [ngValue]="null">Select commodity</option>
+                            @for (c of commodities(); track c.commodityId) {
+                              <option [value]="c.commodityId">{{c.commodityDesc}}</option>
+                            }
+                          </select>
+                        </div>
+                        <div class="form-group">
+                          <label>Qty Ordered</label>
+                          <input type="number" [(ngModel)]="detailForm.quantityOrdered">
+                        </div>
+                        <div class="form-group">
+                          <label>Qty Received</label>
+                          <input type="number" [(ngModel)]="detailForm.quantityReceived">
+                        </div>
+                        <div class="form-group">
+                          <label>Value</label>
+                          <input type="number" [(ngModel)]="detailForm.value" step="0.01">
+                        </div>
+                      </div>
+                      <div class="form-actions">
+                        <button class="btn-secondary btn-sm" (click)="cancelDetailForm()">Cancel</button>
+                        <button class="btn-primary btn-sm" (click)="saveDetail()">{{editingDetail() ? 'Update' : 'Add'}}</button>
+                      </div>
+                    </div>
+                  }
+
+                  @if (isDetailsLoading(wo.maintenanceWorksOrderId)) {
+                    <div class="loading-container sm"><mat-spinner diameter="24"></mat-spinner></div>
+                  } @else if (getDetails(wo.maintenanceWorksOrderId).length === 0) {
+                    <p class="no-items">No line items yet.</p>
+                  } @else {
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>Technician #</th>
+                          <th>Line Item #</th>
+                          <th>Type</th>
+                          <th>Commodity</th>
+                          <th>Qty Ordered</th>
+                          <th>Qty Received</th>
+                          <th>Value</th>
+                          @if (!form.isApproved) { <th></th> }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (d of getDetails(wo.maintenanceWorksOrderId); track d.maintenanceWorksOrderDetailsId) {
+                          <tr>
+                            <td>{{d.technicianNumber || '-'}}</td>
+                            <td>{{d.lineItemNumber || '-'}}</td>
+                            <td>{{d.itemType || '-'}}</td>
+                            <td>{{d.commodityDesc || '-'}}</td>
+                            <td>{{d.quantityOrdered ?? '-'}}</td>
+                            <td>{{d.quantityReceived ?? '-'}}</td>
+                            <td>{{d.value ? 'R ' + (d.value | number:'1.2-2') : '-'}}</td>
+                            @if (!form.isApproved) {
+                              <td>
+                                <button mat-icon-button class="action-btn-sm" (click)="editDetail(d)"><mat-icon>edit</mat-icon></button>
+                                <button mat-icon-button class="action-btn-sm danger" (click)="deleteDetail(d)"><mat-icon>delete</mat-icon></button>
+                              </td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+  }
+}

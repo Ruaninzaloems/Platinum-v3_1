@@ -1,0 +1,4 @@
+﻿AssetStatus_ID,AssetStatusDesc,Enabled,DateCaptured,CapturerID,DateModified,ModifierID,Default
+1,In Use,1,2019-06-28 15:41:39.027,1,NULL,NULL,1
+2,Future Use,1,2019-06-28 15:41:39.030,1,NULL,NULL,1
+3,Leased to Others,1,2019-06-28 15:41:39.037,1,NULL,NULL,1

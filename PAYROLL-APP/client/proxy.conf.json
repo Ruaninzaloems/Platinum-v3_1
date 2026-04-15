@@ -1,0 +1,14 @@
+{
+  "/api": {
+    "target": "http://localhost:6000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/api": "/api/v1" }
+  },
+  "/payroll-app/api": {
+    "target": "http://localhost:6000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/payroll-app/api": "/api/v1" }
+  }
+}

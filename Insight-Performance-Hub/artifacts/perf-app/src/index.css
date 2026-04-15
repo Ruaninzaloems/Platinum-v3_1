@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=SF+Mono:wght@500;600&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, monospace;
+
+  /* Platinum Brand Colors */
+  --color-platinum-primary: hsl(209 65% 17%);
+  --color-platinum-primary-light: hsl(210 55% 23%);
+  --color-platinum-accent: hsl(43 52% 54%);
+  
+  --color-background: hsl(220 33% 98%); /* #f8f9fb */
+  --color-foreground: hsl(215 28% 17%); /* #1e293b */
+  
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(215 28% 17%);
+  
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(215 28% 17%);
+  
+  --color-primary: hsl(209 65% 17%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  
+  --color-secondary: hsl(215 25% 65%);
+  --color-secondary-foreground: hsl(215 28% 17%);
+  
+  --color-muted: hsl(214 32% 91%);
+  --color-muted-foreground: hsl(215 16% 47%);
+  
+  --color-accent: hsl(43 52% 54%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  
+  --color-destructive: hsl(1 83% 63%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  
+  --color-success: hsl(122 39% 49%);
+  --color-success-light: hsl(123 46% 91%);
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-light: hsl(44 100% 94%);
+  --color-info: hsl(207 90% 61%);
+  --color-info-light: hsl(206 82% 94%);
+
+  --color-border: hsl(214 20% 90%); /* #e8ecf1 */
+  --color-input: hsl(214 20% 90%);
+  --color-ring: hsl(209 65% 17%);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem; /* 12px */
+  --radius-xl: 1rem;
+}
+
+:root {
+  --background: 220 33% 98%;
+  --foreground: 215 28% 17%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 28% 17%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 28% 17%;
+  --primary: 209 65% 17%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 65%;
+  --secondary-foreground: 215 28% 17%;
+  --muted: 214 32% 91%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 43 52% 54%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 1 83% 63%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 20% 90%;
+  --input: 214 20% 90%;
+  --ring: 209 65% 17%;
+  --radius: 0.75rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased font-sans selection:bg-accent/20;
+    color-scheme: light;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-semibold;
+  }
+}
+
+@layer utilities {
+  .platinum-card {
+    @apply bg-white border border-border rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200;
+  }
+  
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-platinum-primary to-accent;
+  }
+}
+
+@keyframes shimmer {
+  0% { width: 0%; margin-left: 0; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+
+/* Custom Scrollbar for sleekness */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(215 25% 80%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(215 16% 65%);
+}

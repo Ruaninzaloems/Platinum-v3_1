@@ -1,0 +1,362 @@
+@if (loading()) {
+  <div style="display:flex;justify-content:center;padding:80px"><mat-spinner diameter="40"></mat-spinner></div>
+} @else if (!project()) {
+  <div style="text-align:center;padding:80px;color:#94a3b8">Project not found</div>
+} @else {
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+    <button mat-icon-button routerLink="/wip" style="color:#64748b"><mat-icon>arrow_back</mat-icon></button>
+    <div>
+      <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">{{project().projectName}}</h1>
+      <div style="font-size:13px;color:#64748b;margin-top:2px">
+        {{project().projectNo || project().projectNumber || 'No project no.'}}
+        @if (project().contractNumber) { &nbsp;&middot;&nbsp; Contract: <strong>{{project().contractNumber}}</strong> }
+        &nbsp;&middot;&nbsp; <span class="mscoa-tag">{{project().finYear}}</span>
+      </div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <span [class]="getStatusClass(project().statusDesc || project().status)">{{project().statusDesc || project().status || 'Active'}}</span>
+      @if (!editMode) {
+        <button mat-stroked-button (click)="startEdit()"><mat-icon>edit</mat-icon> Edit</button>
+      } @else {
+        <button mat-stroked-button (click)="cancelEdit()">Cancel</button>
+        <button mat-flat-button style="background:#0f2b46;color:white" [disabled]="saving()" (click)="saveEdit()">
+          @if (saving()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px"></mat-spinner> }
+          <mat-icon>save</mat-icon> Save
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr);margin:16px 0 12px">
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-blue"><mat-icon>account_balance_wallet</mat-icon></div>
+      <div><div class="kpi-label">Contract Value</div><div class="kpi-value" style="font-size:16px">{{formatCurrency(project().contractValue)}}</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-amber"><mat-icon>trending_up</mat-icon></div>
+      <div><div class="kpi-label">WIP Opening Balance</div><div class="kpi-value" style="font-size:16px">{{formatCurrency(project().wipOpeningBalance)}}</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-teal"><mat-icon>analytics</mat-icon></div>
+      <div><div class="kpi-label">WIP Closing Balance</div><div class="kpi-value" style="font-size:16px">{{formatCurrency(project().wipClosingBalance)}}</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-wrap icon-green"><mat-icon>speed</mat-icon></div>
+      <div><div class="kpi-label">Financial Progress</div><div class="kpi-value" style="font-size:16px">{{calcFinancialProgress()}}</div></div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab==='details'" (click)="setTab('details')">
+      <mat-icon style="font-size:16px;vertical-align:middle;margin-right:4px">info</mat-icon> WIP Project Details
+    </button>
+    <button class="tab-btn" [class.active]="activeTab==='payments'" (click)="setTab('payments')">
+      <mat-icon style="font-size:16px;vertical-align:middle;margin-right:4px">receipt_long</mat-icon> Payment Summary
+    </button>
+  </div>
+
+  @if (activeTab === 'details') {
+    @if (!editMode) {
+      <div class="section-card">
+        <div class="section-title">Contract Information</div>
+        <div class="field-grid">
+          <div><div class="field-label">Project No</div><div class="field-value">{{project().projectNo || project().projectNumber || ''}}</div></div>
+          <div><div class="field-label">Contract Number</div><div class="field-value">{{project().contractNumber || ''}}</div></div>
+          <div><div class="field-label">Contract Value</div><div class="field-value">{{formatCurrency(project().contractValue)}}</div></div>
+          <div><div class="field-label">Contract Start Date</div><div class="field-value">{{formatDate(project().contractStartDate)}}</div></div>
+          <div><div class="field-label">Contract End Date</div><div class="field-value">{{formatDate(project().contractEndDate)}}</div></div>
+          <div><div class="field-label">Financial Year</div><div class="field-value">{{project().finYear || ''}}</div></div>
+          <div><div class="field-label">Project Status</div><div class="field-value"><span [class]="getStatusClass(project().statusDesc || project().status)">{{project().statusDesc || project().status || ''}}</span></div></div>
+          <div><div class="field-label">Budget Project</div><div class="field-value">{{getBudgetProjectName(project().budgetProjectId)}}</div></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Organisation & Location</div>
+        <div class="field-grid">
+          <div><div class="field-label">Department</div><div class="field-value">{{getDeptDesc(project().departmentId)}}</div></div>
+          <div><div class="field-label">Division</div><div class="field-value">{{getDivisionDesc(project().divisionId)}}</div></div>
+          <div><div class="field-label">Custodian</div><div class="field-value">{{getCustodianName(project().custodianId)}}</div></div>
+          <div><div class="field-label">Latitude</div><div class="field-value">{{project().latitude || ''}}</div></div>
+          <div><div class="field-label">Longitude</div><div class="field-value">{{project().longitude || ''}}</div></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Project Dates</div>
+        <div class="field-grid">
+          <div><div class="field-label">Start Date</div><div class="field-value">{{formatDate(project().startDate)}}</div></div>
+          <div><div class="field-label">Expected End Date</div><div class="field-value">{{formatDate(project().expectedEndDate)}}</div></div>
+          <div><div class="field-label">Actual End Date</div><div class="field-value">{{formatDate(project().actualEndDate)}}</div></div>
+          <div><div class="field-label">Completion Date</div><div class="field-value">{{formatDate(project().completionDate)}}</div></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Financial Movements</div>
+        <div class="field-grid">
+          <div><div class="field-label">WIP Opening Balance</div><div class="field-value">{{formatCurrency(project().wipOpeningBalance)}}</div></div>
+          <div><div class="field-label">Restated Opening Balance</div><div class="field-value">{{formatCurrency(project().restatedOpeningBalance)}}</div></div>
+          <div><div class="field-label">Additions</div><div class="field-value" style="font-weight:600;color:#059669">{{formatCurrency(project().additions)}}</div></div>
+          <div><div class="field-label">Transfer of Assets</div><div class="field-value">{{formatCurrency(project().transferOfAssets)}}</div></div>
+          <div><div class="field-label">Write Off</div><div class="field-value">{{formatCurrency(project().writeOff)}}</div></div>
+          <div><div class="field-label">Impairment</div><div class="field-value">{{formatCurrency(project().impairment)}}</div></div>
+          <div><div class="field-label">Prior Year Adjustment</div><div class="field-value">{{formatCurrency(project().priorYearAdjustment)}}</div></div>
+          <div><div class="field-label">WIP Closing Balance</div><div class="field-value" style="font-weight:700;color:#0f2b46;font-size:15px">{{formatCurrency(project().wipClosingBalance)}}</div></div>
+          <div><div class="field-label">Financial Progress</div><div class="field-value">{{calcFinancialProgress()}}</div></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="section-title" style="margin:0">Funding Sources</div>
+        </div>
+        @if (fundingLoading()) {
+          <div style="text-align:center;padding:20px"><mat-spinner diameter="24"></mat-spinner></div>
+        } @else {
+          @if (fundingRows().length > 0) {
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+              @for (f of fundingRows(); track f.wipRegisterFundingId) {
+                <div class="funding-chip">
+                  <span>{{f.fundingSourceDesc || getFundingSourceDesc(f.fundingSourceId)}}</span>
+                  @if (deleteFundingConfirmId === f.wipRegisterFundingId) {
+                    <button style="background:#ef4444;color:white;border:none;padding:2px 6px;border-radius:4px;font-size:11px;cursor:pointer;margin-left:4px" (click)="deleteFunding(f.wipRegisterFundingId)">Confirm</button>
+                    <button style="background:none;border:none;color:#64748b;font-size:11px;cursor:pointer" (click)="cancelDeleteFunding()">Cancel</button>
+                  } @else {
+                    <button style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:0 2px;line-height:1" (click)="confirmDeleteFunding(f.wipRegisterFundingId)">
+                      <mat-icon style="font-size:14px">close</mat-icon>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">No funding sources linked</div>
+          }
+          <div style="display:flex;gap:8px;align-items:center">
+            <select style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-width:200px" [(ngModel)]="newFundingSourceId">
+              <option [ngValue]="null">Select funding source...</option>
+              @for (fs of getFilteredFundingSources(); track fs.fundingSourceId) {
+                <option [ngValue]="fs.fundingSourceId">{{fs.fundingSourceDesc}}</option>
+              }
+            </select>
+            <button mat-flat-button style="background:#0f2b46;color:white;font-size:12px" [disabled]="!newFundingSourceId || fundingSaving()" (click)="addFundingSource()">
+              @if (fundingSaving()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px"></mat-spinner> }
+              <mat-icon style="font-size:16px">add</mat-icon> Add
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="section-card">
+        <div class="section-title">Contract Information</div>
+        <div class="field-grid">
+          <div><div class="field-label">Project Name *</div><input class="field-input" [(ngModel)]="editData.projectName" /></div>
+          <div><div class="field-label">Project No</div><input class="field-input" [(ngModel)]="editData.projectNo" /></div>
+          <div><div class="field-label">Contract Number</div><input class="field-input" [(ngModel)]="editData.contractNumber" /></div>
+          <div><div class="field-label">Contract Start Date</div><input type="date" class="field-input" [(ngModel)]="editData.contractStartDate" /></div>
+          <div><div class="field-label">Contract End Date</div><input type="date" class="field-input" [(ngModel)]="editData.contractEndDate" /></div>
+          <div><div class="field-label">Contract Value (R)</div><input type="number" class="field-input" [(ngModel)]="editData.contractValue" /></div>
+          <div><div class="field-label">Financial Year</div>
+            <select class="field-input" [(ngModel)]="editData.finYear">
+              <option value="">Select Year</option>
+              @for (fy of financialYears; track fy) {
+                <option [value]="fy">{{fy}}</option>
+              }
+            </select>
+          </div>
+          <div><div class="field-label">Project Status</div>
+            <select class="field-input" [(ngModel)]="editData.statusId">
+              <option [ngValue]="null">Select Status</option>
+              @for (s of statuses(); track s.projectStatusId) {
+                <option [ngValue]="s.projectStatusId">{{s.statusDesc}}</option>
+              }
+            </select>
+          </div>
+          <div><div class="field-label">Total Budget (R)</div><input type="number" class="field-input" [(ngModel)]="editData.totalBudget" /></div>
+          <div>
+            <div class="field-label">Budget Project</div>
+            <select class="field-input" [(ngModel)]="editData.budgetProjectId">
+              <option [ngValue]="null">Select Budget Project</option>
+              @for (pp of planProjects(); track pp.projectId) {
+                <option [ngValue]="pp.projectId">{{pp.projectCode}} - {{pp.projectName}}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Organisation & Location</div>
+        <div class="field-grid">
+          <div>
+            <div class="field-label">Department</div>
+            <select class="field-input" [(ngModel)]="editData.departmentId" (ngModelChange)="onEditDepartmentChange()">
+              <option [ngValue]="null">Select Department</option>
+              @for (d of departments(); track d.id) {
+                <option [ngValue]="d.id">{{d.description}}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Division</div>
+            <select class="field-input" [(ngModel)]="editData.divisionId">
+              <option [ngValue]="null">Select Division</option>
+              @for (dv of getFilteredDivisions(); track dv.id) {
+                <option [ngValue]="dv.id">{{dv.description}}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Custodian</div>
+            <select class="field-input" [(ngModel)]="editData.custodianId">
+              <option [ngValue]="null">Select Custodian</option>
+              @for (emp of employees(); track emp.employeeId) {
+                <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
+              }
+            </select>
+          </div>
+          <div><div class="field-label">Latitude</div><input class="field-input" [(ngModel)]="editData.latitude" /></div>
+          <div><div class="field-label">Longitude</div><input class="field-input" [(ngModel)]="editData.longitude" /></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Project Dates</div>
+        <div class="field-grid">
+          <div><div class="field-label">Start Date</div><input type="date" class="field-input" [(ngModel)]="editData.startDate" /></div>
+          <div><div class="field-label">Expected End Date</div><input type="date" class="field-input" [(ngModel)]="editData.expectedEndDate" /></div>
+          <div><div class="field-label">Actual End Date</div><input type="date" class="field-input" [(ngModel)]="editData.actualEndDate" /></div>
+          <div><div class="field-label">Completion Date</div><input type="date" class="field-input" [(ngModel)]="editData.completionDate" /></div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Financial Movements (editable)</div>
+        <div class="field-grid">
+          <div><div class="field-label">WIP Opening Balance (R)</div><input type="number" class="field-input" [(ngModel)]="editData.wipOpeningBalance" /></div>
+          <div><div class="field-label">Restated Opening Balance (R)</div><input type="number" class="field-input" [(ngModel)]="editData.restatedOpeningBalance" /></div>
+          <div><div class="field-label">WIP Closing Balance (R)</div><input type="number" class="field-input" [(ngModel)]="editData.wipClosingBalance" /></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px 20px;margin-top:12px">
+          <div><div class="field-label">Transfer of Assets (R)</div><input type="number" class="field-input" [(ngModel)]="editData.transferOfAssets" /></div>
+          <div><div class="field-label">Write Off (R)</div><input type="number" class="field-input" [(ngModel)]="editData.writeOff" /></div>
+          <div><div class="field-label">Impairment (R)</div><input type="number" class="field-input" [(ngModel)]="editData.impairment" /></div>
+          <div><div class="field-label">Prior Year Adjustment (R)</div><input type="number" class="field-input" [(ngModel)]="editData.priorYearAdjustment" /></div>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#166534">
+          <mat-icon style="font-size:14px;vertical-align:middle;margin-right:4px">info</mat-icon>
+          Additions and WIP Closing Balance are auto-calculated from captured invoices. Financial Progress is calculated as Additions / Total Budget.
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'payments') {
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:#64748b">
+        {{invoices().length}} invoice(s) &middot;
+        Total excl VAT: <strong>{{formatCurrency(totalInvoiceAmount())}}</strong> &middot;
+        VAT: <strong>{{formatCurrency(totalInvoiceVat())}}</strong> &middot;
+        Total incl VAT: <strong>{{formatCurrency(totalInvoiceTotal())}}</strong>
+      </div>
+      <button mat-flat-button style="background:#0f2b46;color:white" (click)="toggleInvoiceForm()">
+        <mat-icon>{{showInvoiceForm ? 'close' : 'add'}}</mat-icon> {{showInvoiceForm && !editInvoiceId ? 'Cancel' : 'Capture New Invoice'}}
+      </button>
+    </div>
+
+    @if (showInvoiceForm) {
+      <div class="inline-form">
+        <h4 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;display:flex;align-items:center;gap:6px">
+          <mat-icon style="font-size:18px;color:#3b82f6">receipt</mat-icon>
+          {{editInvoiceId ? 'Edit Invoice' : 'Capture New Invoice'}}
+        </h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 14px;margin-bottom:12px">
+          <div style="grid-column:1/-1"><div class="field-label">Description</div><input class="field-input" [(ngModel)]="newInvoice.description" /></div>
+          <div><div class="field-label">Invoice Number *</div><input class="field-input" [(ngModel)]="newInvoice.invoiceNumber" /></div>
+          <div><div class="field-label">Invoice Date</div><input type="date" class="field-input" [(ngModel)]="newInvoice.invoiceDate" /></div>
+          <div><div class="field-label">Vendor</div><select class="field-input" [(ngModel)]="newInvoice.vendorId"><option [ngValue]="null">-- Select Vendor --</option>@for (v of vendors(); track v.vendorId) {<option [ngValue]="v.vendorId">{{v.vendorName}}</option>}</select></div>
+          <div><div class="field-label">Amount excl. VAT (R)</div><input type="number" class="field-input" [(ngModel)]="newInvoice.amount" (ngModelChange)="onInvoiceAmountChange()" /></div>
+          <div><div class="field-label">VAT Amount (R)</div><input type="number" class="field-input" [(ngModel)]="newInvoice.vatAmount" (ngModelChange)="onInvoiceAmountChange()" /></div>
+          <div><div class="field-label">Total Amount (R)</div><input type="number" class="field-input" style="background:#f8fafc;font-weight:600" [(ngModel)]="newInvoice.totalAmount" readonly /></div>
+          <div><div class="field-label">GL Doc Number</div><input class="field-input" [(ngModel)]="newInvoice.documentNumber" /></div>
+          <div><div class="field-label">Payment Reference</div><input class="field-input" [(ngModel)]="newInvoice.paymentReference" /></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button mat-stroked-button (click)="toggleInvoiceForm()">Cancel</button>
+          <button mat-flat-button style="background:#0f2b46;color:white" [disabled]="invoiceSaving()" (click)="saveInvoice()">
+            @if (invoiceSaving()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px"></mat-spinner> }
+            <mat-icon>save</mat-icon> {{editInvoiceId ? 'Update Invoice' : 'Save Invoice'}}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (invoicesLoading()) {
+      <div style="display:flex;justify-content:center;padding:40px"><mat-spinner diameter="32"></mat-spinner></div>
+    } @else if (invoices().length === 0) {
+      <div style="text-align:center;padding:40px;color:#94a3b8;background:white;border:1px solid #e2e8f0;border-radius:10px">
+        <mat-icon style="font-size:36px;width:36px;height:36px;margin-bottom:8px">receipt_long</mat-icon>
+        <div style="font-size:14px;font-weight:500">No invoices captured</div>
+        <div style="font-size:12px;margin-top:4px">Click "Capture New Invoice" to add payment records</div>
+      </div>
+    } @else {
+      <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:white">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Invoice Number</th>
+              <th>Invoice Date</th>
+              <th>Vendor</th>
+              <th style="text-align:right">Amount (excl VAT)</th>
+              <th style="text-align:right">VAT Amount</th>
+              <th style="text-align:right">Total Amount</th>
+              <th>GL Doc Number</th>
+              <th>Payment Reference</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (inv of invoices(); track inv.wipRegisterDetailId) {
+              <tr>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" [title]="inv.description || ''">{{inv.description || ''}}</td>
+                <td style="font-weight:500">{{inv.invoiceNumber}}</td>
+                <td style="font-size:12px;color:#64748b;white-space:nowrap">{{formatDate(inv.invoiceDate)}}</td>
+                <td>{{getVendorName(inv.vendorId)}}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">{{formatCurrency(inv.amount)}}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">{{formatCurrency(inv.vatAmount)}}</td>
+                <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">{{formatCurrency(inv.totalAmount)}}</td>
+                <td>{{inv.documentNumber || ''}}</td>
+                <td>{{inv.paymentReference || ''}}</td>
+                <td>
+                  @if (deleteInvoiceConfirmId === inv.wipRegisterDetailId) {
+                    <div style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:11px;color:#ef4444">Delete?</span>
+                      <div style="display:flex;gap:4px">
+                        <button mat-stroked-button style="font-size:11px;padding:2px 6px;min-height:24px" (click)="cancelDeleteInvoice()">No</button>
+                        <button mat-flat-button style="background:#ef4444;color:white;font-size:11px;padding:2px 6px;min-height:24px" (click)="deleteInvoice(inv.wipRegisterDetailId)">Yes</button>
+                      </div>
+                    </div>
+                  } @else {
+                    <div style="display:flex;gap:4px">
+                      <button mat-icon-button style="width:28px;height:28px;line-height:28px" (click)="editInvoice(inv)">
+                        <mat-icon style="font-size:16px">edit</mat-icon>
+                      </button>
+                      <button mat-icon-button style="width:28px;height:28px;line-height:28px;color:#ef4444" (click)="confirmDeleteInvoice(inv.wipRegisterDetailId)">
+                        <mat-icon style="font-size:16px">delete</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:700;background:#f8fafc;border-top:2px solid #e2e8f0">
+              <td colspan="4" style="text-align:right;font-size:12px;color:#64748b;text-transform:uppercase">Totals</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums">{{formatCurrency(totalInvoiceAmount())}}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums">{{formatCurrency(totalInvoiceVat())}}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;color:#0f2b46">{{formatCurrency(totalInvoiceTotal())}}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    }
+  }
+}

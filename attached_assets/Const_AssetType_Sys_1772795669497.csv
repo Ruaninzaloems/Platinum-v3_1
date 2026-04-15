@@ -1,0 +1,7 @@
+﻿AssetType_ID,AssetTypeDesc,Enabled,DateCaptured,CapturerID,DateModified,ModifierID,Default,RequireStatus,NoUsefuleLife
+1,Biological Assets,1,2019-06-28 15:41:42.703,1,NULL,NULL,1,0,NULL
+2,Heritage Assets,1,2019-06-28 15:41:42.707,1,NULL,NULL,1,0,NULL
+3,Intangible Assets,1,2019-06-28 15:41:42.710,1,NULL,NULL,1,1,NULL
+4,"Property, Plant and Equipment",1,2019-06-28 15:41:42.717,1,NULL,NULL,1,0,NULL
+5,Investment Property,1,2019-06-28 15:41:42.720,1,NULL,NULL,1,0,NULL
+6,Construction Work-in-progress,1,2019-06-28 15:41:42.723,1,NULL,NULL,1,0,1

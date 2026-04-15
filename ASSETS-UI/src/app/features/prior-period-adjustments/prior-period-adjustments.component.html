@@ -1,0 +1,615 @@
+<div class="ppa-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Prior Period Adjustments</h1>
+      <p class="page-subtitle">Correct transactions in earlier closed periods of the current financial year — summaries cascade forward automatically</p>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn" [class.active]="activeTab === 'capture'" (click)="activeTab = 'capture'">
+        <mat-icon>edit_note</mat-icon> Capture Adjustment
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'review'" (click)="activeTab = 'review'; loadReviewList()">
+        <mat-icon>rule</mat-icon> Review Queue
+      </button>
+    </div>
+  </div>
+
+  @if (activeTab === 'capture') {
+    <div class="wizard-progress">
+      <div class="wizard-step" [class.done]="captureStep > 1" [class.active]="captureStep === 1">
+        <div class="step-circle">@if (captureStep > 1) { <mat-icon>check</mat-icon> } @else { 1 }</div>
+        <span>Search</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 1"></div>
+      <div class="wizard-step" [class.done]="captureStep > 2" [class.active]="captureStep === 2">
+        <div class="step-circle">@if (captureStep > 2) { <mat-icon>check</mat-icon> } @else { 2 }</div>
+        <span>Type</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 2"></div>
+      <div class="wizard-step" [class.done]="captureStep > 3" [class.active]="captureStep === 3">
+        <div class="step-circle">@if (captureStep > 3) { <mat-icon>check</mat-icon> } @else { 3 }</div>
+        <span>Period &amp; Amount</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 3"></div>
+      <div class="wizard-step" [class.done]="captureStep > 4" [class.active]="captureStep === 4">
+        <div class="step-circle">@if (captureStep > 4) { <mat-icon>check</mat-icon> } @else { 4 }</div>
+        <span>Downstream Impact</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 4"></div>
+      <div class="wizard-step" [class.done]="captureStep > 5" [class.active]="captureStep === 5">
+        <div class="step-circle">@if (captureStep > 5) { <mat-icon>check</mat-icon> } @else { 5 }</div>
+        <span>GL Coding</span>
+      </div>
+      <div class="wizard-line" [class.done]="captureStep > 5"></div>
+      <div class="wizard-step" [class.active]="captureStep === 6">
+        <div class="step-circle">6</div>
+        <span>Preview &amp; Submit</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: SEARCH -->
+    @if (captureStep === 1) {
+      <div class="section-card">
+        <div class="section-title">Search Asset</div>
+        <div class="field-grid">
+          <div>
+            <div class="field-label">Asset Register ID</div>
+            <div class="search-input-wrap">
+              <input class="field-input" [(ngModel)]="searchId" placeholder="Type ID to search..." (input)="onSearchIdInput()" (keydown.enter)="searchAssets()">
+              @if (searchLoading) { <mat-spinner diameter="16" class="search-spinner"></mat-spinner> }
+              @else { <mat-icon class="search-icon-inline">search</mat-icon> }
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Description (partial)</div>
+            <input class="field-input" [(ngModel)]="searchDesc" placeholder="e.g. Ford Ranger" (keydown.enter)="searchAssets()">
+          </div>
+        </div>
+        @if (searchResults().length > 0) {
+          <div class="results-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Description</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Measurement</th>
+                  <th class="num-col">Cost</th>
+                  <th class="num-col">Acc Dep</th>
+                  <th class="num-col">Acc Imp</th>
+                  <th class="num-col">Carrying Amt</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of searchResults(); track a.AssetRegisterItem_ID) {
+                  <tr>
+                    <td>{{a.AssetRegisterItem_ID}}</td>
+                    <td class="desc-col">{{a.Description}}</td>
+                    <td>{{a.AssetTypeDesc}}</td>
+                    <td>{{a.AssetCategoryDesc}}</td>
+                    <td>{{a.MeasurementTypeDesc}}</td>
+                    <td class="num-col">{{a.PurchaseAmount | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.AccumulatedDepreciationClosingBalance | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.AccumulatedImpairmentClosingBalance | number:'1.2-2'}}</td>
+                    <td class="num-col">{{a.CarryingAmountClosingBalance | number:'1.2-2'}}</td>
+                    <td><button class="select-btn" (click)="selectAsset(a)">Select</button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (!searchLoading && searchResults().length === 0 && (searchId.trim() || searchDesc.trim())) {
+          <div class="empty-msg">No assets found. Try a different ID or description.</div>
+        }
+      </div>
+    }
+
+    <!-- STEP 2: ADJUSTMENT TYPE -->
+    @if (captureStep === 2) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(1)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span>
+          </div>
+        </div>
+        <div class="section-title" style="margin-top:12px">Select Adjustment Type</div>
+        <div class="type-grid">
+          @for (t of adjustmentTypes; track t.code) {
+            <div class="type-card" (click)="selectType(t.code)">
+              <div class="type-code">{{t.code}}</div>
+              <div class="type-label">{{t.label}}</div>
+              <div class="type-desc">{{t.description}}</div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: PERIOD & AMOUNT -->
+    @if (captureStep === 3) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(2)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span>
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+        </div>
+
+        <div class="two-col-layout" style="margin-top:16px">
+          <div class="snapshot-card">
+            <div class="snapshot-title">Current Balances</div>
+            <div class="snapshot-grid">
+              <div class="snapshot-row"><span>Cost</span><span>R {{formatNum(selectedAsset?.PurchaseAmount)}}</span></div>
+              <div class="snapshot-row"><span>Acc. Dep.</span><span>R {{formatNum(selectedAsset?.AccumulatedDepreciationClosingBalance)}}</span></div>
+              <div class="snapshot-row"><span>Acc. Imp.</span><span>R {{formatNum(selectedAsset?.AccumulatedImpairmentClosingBalance)}}</span></div>
+              <div class="snapshot-row highlight"><span>Carrying Amt</span><span>R {{formatNum(selectedAsset?.CarryingAmountClosingBalance)}}</span></div>
+              <div class="snapshot-row"><span>Residual Val.</span><span>R {{formatNum(selectedAsset?.ResidualValue)}}</span></div>
+              <div class="snapshot-row"><span>RUL (yrs)</span><span>{{selectedAsset?.RemainingUsefulLife}}</span></div>
+              @if (selectedAsset?.RevaluationReserveClosingBalance) {
+                <div class="snapshot-row"><span>Reval. Reserve</span><span>R {{formatNum(selectedAsset?.RevaluationReserveClosingBalance)}}</span></div>
+              }
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Period &amp; Amount Details</div>
+
+            <div style="margin-bottom:16px">
+              <div class="field-label">Target Period *</div>
+              @if (availablePeriods.length === 0) {
+                <div class="info-banner">
+                  <mat-icon>info</mat-icon>
+                  No closed prior periods available — only closed periods can be adjusted.
+                </div>
+              } @else {
+                <select class="field-input" [(ngModel)]="selectedTargetPeriod">
+                  <option [ngValue]="0" disabled>Select target period...</option>
+                  @for (p of availablePeriods; track p.period) {
+                    <option [ngValue]="p.period">FY {{p.finYear}} — Period {{p.period}} ({{getPeriodLabel(p.period)}})</option>
+                  }
+                </select>
+                <div class="field-hint">Only closed periods are available for prior period adjustments (earlier than current period {{currentPeriod}})</div>
+              }
+            </div>
+
+            <div style="margin-bottom:16px">
+              <div class="field-label">Transaction Date *</div>
+              <input class="field-input" type="date" [(ngModel)]="transactionDate">
+              <div class="field-hint">Date of the adjustment transaction</div>
+            </div>
+
+            <div style="margin-bottom:16px">
+              <div class="field-label">{{getAmountLabel()}} *</div>
+              <input class="field-input" type="number" [(ngModel)]="adjustmentAmount" placeholder="Enter amount..." step="0.01">
+              <div class="field-hint">Enter the corrected amount for the target period</div>
+            </div>
+
+            <div class="field-grid" style="margin-bottom:16px">
+              <div>
+                <div class="field-label">Debit Amount (R)</div>
+                <input class="field-input" type="number" [(ngModel)]="debitAmount" placeholder="0.00" step="0.01">
+              </div>
+              <div>
+                <div class="field-label">Credit Amount (R)</div>
+                <input class="field-input" type="number" [(ngModel)]="creditAmount" placeholder="0.00" step="0.01">
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px">
+              <div class="field-label">Narration</div>
+              <input class="field-input" [(ngModel)]="narration" placeholder="Transaction narration...">
+              <div class="field-hint">Description for the GL journal entry</div>
+            </div>
+
+            <div style="margin-bottom:16px">
+              <div class="field-label">Comments</div>
+              <textarea class="field-input" [(ngModel)]="comments" rows="2" placeholder="Reason for adjustment..."></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="submit-btn" (click)="proceedToDownstreamImpact()" [disabled]="!canProceedStep3()">
+                Next: Check Downstream Impact <mat-icon style="font-size:18px;vertical-align:middle;margin-left:4px">arrow_forward</mat-icon>
+              </button>
+              <button class="ghost-btn" (click)="goBackCapture(2)">Change Type</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 4: DOWNSTREAM IMPACT -->
+    @if (captureStep === 4) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(3)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span>
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+          <div class="type-pill">Period {{selectedTargetPeriod}}</div>
+        </div>
+
+        <div class="section-title" style="margin-top:12px">Downstream Impact Analysis</div>
+        <p style="color:#64748b;margin:0 0 16px">This check identifies transactions in subsequent periods that may be affected by this adjustment.</p>
+
+        @if (downstreamLoading) {
+          <div class="info-banner">
+            <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:8px"></mat-spinner>
+            Analysing downstream transactions...
+          </div>
+        }
+        @if (downstreamChecked && downstreamImpactCount > 0) {
+          <div class="warning-banner">
+            <mat-icon>warning</mat-icon>
+            <div>
+              <strong>Downstream Impact Warning:</strong> {{downstreamWarning}}
+            </div>
+          </div>
+        }
+        @if (downstreamChecked && downstreamImpactCount === 0) {
+          <div class="info-banner">
+            <mat-icon>check_circle</mat-icon>
+            No downstream transactions found for this asset after period {{selectedTargetPeriod}}. The adjustment can be applied without affecting subsequent periods.
+          </div>
+        }
+
+        @if (downstreamChecked) {
+          <div class="form-actions" style="margin-top:24px">
+            <button class="submit-btn" (click)="proceedToGlCoding()">
+              Next: GL Coding <mat-icon style="font-size:18px;vertical-align:middle;margin-left:4px">arrow_forward</mat-icon>
+            </button>
+            <button class="ghost-btn" (click)="goBackCapture(3)">Back to Values</button>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- STEP 5: GL CODING -->
+    @if (captureStep === 5) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(4)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span>
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+        </div>
+
+        <div class="section-title" style="margin-top:12px">GL Coding (Optional)</div>
+        <p style="color:#64748b;margin:0 0 16px">Select debit and credit accounts for the journal entry. Skip this step if GL coding is not required.</p>
+
+        <div class="gl-vote-grid">
+          <div class="gl-vote-col">
+            <div class="gl-vote-heading">Debit Leg</div>
+            <div>
+              <div class="field-label">Financial Year</div>
+              <select class="field-input" [(ngModel)]="drFinYear" (ngModelChange)="onDrFinYearChange()">
+                <option value="">Select...</option>
+                @for (fy of glFinYears; track fy) { <option [value]="fy">{{fy}}</option> }
+              </select>
+            </div>
+            @if (drFinYear) {
+              <div>
+                <div class="field-label">Project</div>
+                <select class="field-input" [(ngModel)]="selectedDrProjectId" (ngModelChange)="onDrProjectChange()">
+                  <option value="">Select project...</option>
+                  @for (p of drProjects; track p.projectId) { <option [value]="p.projectId">{{p.projectName}}</option> }
+                </select>
+              </div>
+            }
+            @if (selectedDrProjectId) {
+              <div>
+                <div class="field-label">mSCOA Item</div>
+                <select class="field-input" [(ngModel)]="selectedDrScoaItemId">
+                  <option value="">Select item...</option>
+                  @for (s of drScoaItems; track s.planProjectItemId) { <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option> }
+                </select>
+              </div>
+            }
+          </div>
+          <div class="gl-vote-col">
+            <div class="gl-vote-heading">Credit Leg</div>
+            <div>
+              <div class="field-label">Financial Year</div>
+              <select class="field-input" [(ngModel)]="crFinYear" (ngModelChange)="onCrFinYearChange()">
+                <option value="">Select...</option>
+                @for (fy of glFinYears; track fy) { <option [value]="fy">{{fy}}</option> }
+              </select>
+            </div>
+            @if (crFinYear) {
+              <div>
+                <div class="field-label">Project</div>
+                <select class="field-input" [(ngModel)]="selectedCrProjectId" (ngModelChange)="onCrProjectChange()">
+                  <option value="">Select project...</option>
+                  @for (p of crProjects; track p.projectId) { <option [value]="p.projectId">{{p.projectName}}</option> }
+                </select>
+              </div>
+            }
+            @if (selectedCrProjectId) {
+              <div>
+                <div class="field-label">mSCOA Item</div>
+                <select class="field-input" [(ngModel)]="selectedCrScoaItemId">
+                  <option value="">Select item...</option>
+                  @for (s of crScoaItems; track s.planProjectItemId) { <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option> }
+                </select>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top:24px">
+          <button class="submit-btn" (click)="proceedToPreview()">
+            Next: Preview &amp; Submit <mat-icon style="font-size:18px;vertical-align:middle;margin-left:4px">arrow_forward</mat-icon>
+          </button>
+          <button class="ghost-btn" (click)="proceedToPreview()">Skip GL Coding</button>
+          <button class="ghost-btn" (click)="goBackCapture(4)">Back</button>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 6: PREVIEW & SUBMIT -->
+    @if (captureStep === 6) {
+      <div class="section-card">
+        <div class="step-breadcrumb">
+          <button class="back-link" (click)="goBackCapture(5)"><mat-icon>arrow_back</mat-icon> Back</button>
+          <div class="asset-pill">
+            <mat-icon>inventory_2</mat-icon>
+            <span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span>
+          </div>
+          <div class="type-pill">{{selectedType?.label}}</div>
+        </div>
+
+        <div class="section-title" style="margin-top:12px">Review &amp; Submit</div>
+
+        <div class="detail-grid" style="margin-bottom:16px">
+          <div class="detail-row"><span>Asset</span><span>#{{selectedAsset?.AssetRegisterItem_ID}} — {{selectedAsset?.Description}}</span></div>
+          <div class="detail-row"><span>Adjustment Type</span><span>{{selectedType?.label}}</span></div>
+          <div class="detail-row"><span>Target Period</span><span>FY {{currentFinYear}} — Period {{selectedTargetPeriod}} ({{getPeriodLabel(selectedTargetPeriod)}})</span></div>
+          <div class="detail-row"><span>Transaction Date</span><span>{{transactionDate}}</span></div>
+          <div class="detail-row"><span>{{getAmountLabel()}}</span><span>R {{formatNum(adjustmentAmount)}}</span></div>
+          @if (debitAmount) {
+            <div class="detail-row"><span>Debit Amount</span><span>R {{formatNum(debitAmount)}}</span></div>
+          }
+          @if (creditAmount) {
+            <div class="detail-row"><span>Credit Amount</span><span>R {{formatNum(creditAmount)}}</span></div>
+          }
+          @if (narration) {
+            <div class="detail-row full"><span>Narration</span><span>{{narration}}</span></div>
+          }
+          @if (comments) {
+            <div class="detail-row full"><span>Comments</span><span>{{comments}}</span></div>
+          }
+          @if (selectedDrScoaItemId) {
+            <div class="detail-row"><span>Dr Plan Project Item</span><span>{{selectedDrScoaItemId}}</span></div>
+          }
+          @if (selectedCrScoaItemId) {
+            <div class="detail-row"><span>Cr Plan Project Item</span><span>{{selectedCrScoaItemId}}</span></div>
+          }
+        </div>
+
+        @if (downstreamImpactCount > 0) {
+          <div class="warning-banner" style="margin-bottom:16px">
+            <mat-icon>warning</mat-icon>
+            <div>
+              <strong>Downstream Impact:</strong> {{downstreamWarning}}
+            </div>
+          </div>
+        }
+
+        <div class="info-banner" style="margin-bottom:16px">
+          <mat-icon>info</mat-icon>
+          This adjustment will be submitted for approval. On approval, a transaction will be posted to the target period and transaction summaries will be recalculated from that period forward. Existing transactions in subsequent periods remain unchanged and may require additional prior period adjustments if materially affected.
+        </div>
+
+        <div class="form-actions">
+          <button class="submit-btn" (click)="submit()" [disabled]="submitting">
+            @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+            @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
+            {{submitting ? 'Submitting...' : 'Submit for Approval'}}
+          </button>
+          <button class="ghost-btn" (click)="goBackCapture(5)">Back to GL Coding</button>
+          <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'review') {
+    <div class="review-filter-bar">
+      <button class="filter-btn" [class.active]="reviewFilter === 'Pending'" (click)="reviewFilter = 'Pending'; loadReviewList(); selectedReview = null">Pending</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'Approved'" (click)="reviewFilter = 'Approved'; loadReviewList(); selectedReview = null">Approved</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'Rejected'" (click)="reviewFilter = 'Rejected'; loadReviewList(); selectedReview = null">Rejected</button>
+      <button class="filter-btn" [class.active]="reviewFilter === 'All'" (click)="reviewFilter = 'All'; loadReviewList(); selectedReview = null">All</button>
+    </div>
+
+    <div class="review-layout">
+      <div class="review-list-panel">
+        <div class="panel-header">
+          <mat-icon>list</mat-icon> Adjustments <span class="count-badge">({{reviewList().length}})</span>
+        </div>
+        @if (reviewLoading) {
+          <div class="panel-loading"><mat-spinner diameter="24"></mat-spinner></div>
+        } @else if (reviewList().length === 0) {
+          <div class="panel-empty">No {{reviewFilter === 'All' ? '' : reviewFilter.toLowerCase()}} adjustments found</div>
+        } @else {
+          @for (item of reviewList(); track item.PriorPeriodAdjustment_ID) {
+            <div class="review-card" [class.selected]="selectedReview?.PriorPeriodAdjustment_ID === item.PriorPeriodAdjustment_ID" (click)="selectReview(item)">
+              <div class="review-card-id">#{{item.PriorPeriodAdjustment_ID}}</div>
+              <div class="review-card-desc">{{item.AssetDescription || 'Asset ' + item.AssetRegisterItem_ID}}</div>
+              <div class="review-card-meta">
+                <span class="badge" [ngClass]="getStatusClass(item.Status)">{{item.Status}}</span>
+                <span class="type-tag">{{getTypeLabel(item.AdjustmentTypeCode)}}</span>
+              </div>
+              <div class="review-card-meta" style="margin-top:2px">
+                <span>{{item.TargetFinYear}}</span>
+                <span>&middot;</span>
+                <span>Period {{item.TargetFinPeriod}}</span>
+                <span>&middot;</span>
+                <span>{{item.DateCaptured | date:'shortDate'}}</span>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="review-detail-panel">
+        @if (!selectedReview) {
+          <div class="panel-empty-center">
+            <mat-icon style="font-size:48px;width:48px;height:48px;color:#cbd5e1">fact_check</mat-icon>
+            <p>Select an adjustment from the list to review details</p>
+          </div>
+        } @else if (reviewDetailLoading) {
+          <div class="panel-empty-center"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else if (reviewDetail) {
+          <div class="detail-header">
+            <div>
+              <div class="detail-id">#{{selectedReview.PriorPeriodAdjustment_ID}} — {{reviewDetail.record?.AssetDescription || 'Asset ' + selectedReview.AssetRegisterItem_ID}}</div>
+              <div class="detail-meta">{{getTypeLabel(selectedReview.AdjustmentTypeCode)}} · FY {{selectedReview.TargetFinYear}} · Period {{selectedReview.TargetFinPeriod}} ({{getPeriodLabel(selectedReview.TargetFinPeriod)}})</div>
+            </div>
+            <span class="badge lg" [ngClass]="getStatusClass(selectedReview.Status)">{{selectedReview.Status}}</span>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Submitted Values</div>
+            <div class="detail-grid">
+              @if (reviewDetail.record?.TransactionDate) {
+                <div class="detail-row"><span>Transaction Date</span><span>{{reviewDetail.record?.TransactionDate | date:'mediumDate'}}</span></div>
+              }
+              @if (reviewDetail.record?.DebitAmount != null) {
+                <div class="detail-row"><span>Debit Amount</span><span>R {{formatNum(reviewDetail.record?.DebitAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.CreditAmount != null) {
+                <div class="detail-row"><span>Credit Amount</span><span>R {{formatNum(reviewDetail.record?.CreditAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.Narration) {
+                <div class="detail-row full"><span>Narration</span><span>{{reviewDetail.record?.Narration}}</span></div>
+              }
+              @if (reviewDetail.record?.NewDepreciationAmount != null) {
+                <div class="detail-row"><span>New Depreciation Amount</span><span>R {{formatNum(reviewDetail.record?.NewDepreciationAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.NewCostAmount != null) {
+                <div class="detail-row"><span>New Cost Amount</span><span>R {{formatNum(reviewDetail.record?.NewCostAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.NewImpairmentAmount != null) {
+                <div class="detail-row"><span>Impairment Amount</span><span>R {{formatNum(reviewDetail.record?.NewImpairmentAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.NewImpairmentReversalAmount != null) {
+                <div class="detail-row"><span>Impairment Reversal Amount</span><span>R {{formatNum(reviewDetail.record?.NewImpairmentReversalAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.NewRevaluationAmount != null) {
+                <div class="detail-row"><span>Revaluation Amount</span><span>R {{formatNum(reviewDetail.record?.NewRevaluationAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.AdjustmentAmount != null) {
+                <div class="detail-row"><span>Adjustment Amount</span><span>R {{formatNum(reviewDetail.record?.AdjustmentAmount)}}</span></div>
+              }
+              @if (reviewDetail.record?.DrPlanProjectItemID) {
+                <div class="detail-row"><span>Dr Plan Project Item</span><span>{{reviewDetail.record?.DrPlanProjectItemID}}</span></div>
+              }
+              @if (reviewDetail.record?.CrPlanProjectItemID) {
+                <div class="detail-row"><span>Cr Plan Project Item</span><span>{{reviewDetail.record?.CrPlanProjectItemID}}</span></div>
+              }
+              @if (reviewDetail.record?.Comments) {
+                <div class="detail-row full"><span>Comments</span><span>{{reviewDetail.record?.Comments}}</span></div>
+              }
+            </div>
+          </div>
+
+          @if (reviewDetail.record?.DownstreamImpactCount > 0) {
+            <div class="detail-section">
+              <div class="warning-banner" style="margin:0">
+                <mat-icon>warning</mat-icon>
+                <div>
+                  <strong>Downstream Impact Warning:</strong> {{reviewDetail.record?.DownstreamImpactCount}} transaction(s) in subsequent periods
+                  @if (reviewDetail.record?.DownstreamImpactTypes) { ({{reviewDetail.record?.DownstreamImpactTypes}}) }
+                  — approving this adjustment will trigger a recalculation cascade through all affected periods including any closed periods.
+                  Existing transactions in subsequent periods remain unchanged and may require additional prior period adjustments if materially affected.
+                </div>
+              </div>
+            </div>
+          }
+
+          <div class="detail-section">
+            <div class="detail-section-title">Asset Snapshot at Capture</div>
+            <div class="detail-grid">
+              <div class="detail-row"><span>Cost</span><span>R {{formatNum(reviewDetail.record?.SnapshotCost)}}</span></div>
+              <div class="detail-row"><span>Acc. Dep.</span><span>R {{formatNum(reviewDetail.record?.SnapshotAccDep)}}</span></div>
+              <div class="detail-row"><span>Acc. Imp.</span><span>R {{formatNum(reviewDetail.record?.SnapshotAccImp)}}</span></div>
+              <div class="detail-row"><span>Carrying Amount</span><span>R {{formatNum(reviewDetail.record?.SnapshotCarryingAmount)}}</span></div>
+              <div class="detail-row"><span>Residual Value</span><span>R {{formatNum(reviewDetail.record?.SnapshotResidualValue)}}</span></div>
+              <div class="detail-row"><span>RUL (yrs)</span><span>{{reviewDetail.record?.SnapshotRUL}}</span></div>
+              @if (reviewDetail.record?.SnapshotRR) {
+                <div class="detail-row"><span>Revaluation Reserve</span><span>R {{formatNum(reviewDetail.record?.SnapshotRR)}}</span></div>
+              }
+            </div>
+          </div>
+
+          @if (selectedReview.Status === 'Pending') {
+            <div class="approval-actions">
+              @if (!showApproveForm && !showRejectForm) {
+                <button class="approve-btn" (click)="showApproveForm = true">
+                  <mat-icon>check_circle</mat-icon> Approve &amp; Post
+                </button>
+                <button class="reject-btn" (click)="showRejectForm = true">
+                  <mat-icon>cancel</mat-icon> Reject
+                </button>
+              }
+              @if (showApproveForm) {
+                <div class="action-form">
+                  <div class="warning-banner" style="margin-bottom:12px">
+                    <mat-icon>warning</mat-icon>
+                    <div>
+                      <strong>Confirm:</strong> Approving this adjustment will post a transaction to period {{selectedReview.TargetFinPeriod}} and recalculate all transaction summaries from period {{selectedReview.TargetFinPeriod}} through the current period. Existing transactions in subsequent periods remain unchanged and may require additional prior period adjustments if materially affected. This cannot be undone.
+                    </div>
+                  </div>
+                  <div class="field-label">Approval Comments (optional)</div>
+                  <textarea class="field-input" [(ngModel)]="approveComments" rows="2" placeholder="Supporting reference or note..."></textarea>
+                  <div class="action-form-btns">
+                    <button class="approve-btn" (click)="approveRecord()" [disabled]="approving">
+                      @if (approving) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+                      {{approving ? 'Approving...' : 'Confirm Approval'}}
+                    </button>
+                    <button class="ghost-btn" (click)="showApproveForm = false">Cancel</button>
+                  </div>
+                </div>
+              }
+              @if (showRejectForm) {
+                <div class="action-form">
+                  <div class="field-label">Rejection Reason *</div>
+                  <textarea class="field-input" [(ngModel)]="rejectReason" rows="2" placeholder="Reason for rejection..."></textarea>
+                  <div class="action-form-btns">
+                    <button class="reject-btn" (click)="rejectRecord()" [disabled]="rejecting || !rejectReason.trim()">
+                      @if (rejecting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+                      {{rejecting ? 'Rejecting...' : 'Confirm Rejection'}}
+                    </button>
+                    <button class="ghost-btn" (click)="showRejectForm = false">Cancel</button>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else if (selectedReview.Status === 'Approved') {
+            <div class="approved-info">
+              <mat-icon>check_circle</mat-icon>
+              Approved on {{reviewDetail.record?.ApprovedDate | date:'medium'}}
+              @if (reviewDetail.record?.Comments) { <span> — {{reviewDetail.record?.Comments}}</span> }
+            </div>
+          } @else if (selectedReview.Status === 'Rejected') {
+            <div class="rejected-info">
+              <mat-icon>cancel</mat-icon>
+              Rejected on {{reviewDetail.record?.RejectedDate | date:'medium'}}
+              @if (reviewDetail.record?.RejectionReason) { <span> — {{reviewDetail.record?.RejectionReason}}</span> }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>

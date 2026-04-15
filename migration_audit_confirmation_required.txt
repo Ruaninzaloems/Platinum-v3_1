@@ -1,0 +1,730 @@
+================================================================================
+MIGRATION AUDIT REPORT — migration_PSQL_to_SQLServer.sql
+Mnquma Local Municipality (EC122) Asset Management System
+Generated: 2026-03-19
+================================================================================
+
+This file covers TWO sections:
+
+  SECTION A — DUPLICATE COLUMNS (already exist under a different name)
+              These should be REMOVED from the migration. Code should use
+              the existing canonical column name.
+
+  SECTION B — NEW COLUMNS requiring your confirmation
+              These do not exist in the live SQL Server (FullDB) schema.
+              Each entry shows the proposed column, its type, and a
+              description of its purpose. Please mark KEEP or REMOVE.
+
+================================================================================
+SECTION A — CONFIRMED DUPLICATES (remove from migration)
+================================================================================
+
+These migration additions duplicate existing FullDB columns. No new functionality
+is added by keeping them — they only create confusion and break the "no changes
+to existing structure" rule.
+
+TABLE: Asset_Transaction_Summary
+  Migration adds       → Existing canonical column
+  AssetRegisterItem_ID → AssetRegisterItemID
+  FinYear              → FinancialYear
+  CarryingAmount       → CurrentValue
+  DateCaptured         → (system-generated table; auditing cols not needed)
+  CapturerID           → (system-generated table; auditing cols not needed)
+
+TABLE: Asset_Depreciation
+  Migration adds       → Existing canonical column
+  DepreciationAmount   → DepreciationValue
+  MonthID              → Depreciation_MonthID
+
+TABLE: Asset_DepreciationApproval
+  Migration adds       → Existing canonical column
+  DepreciationApproval_ID → Depreciation_ApprovalID  (same PK, duplicate name)
+  ApprovedByID         → ApprovedBy
+
+TABLE: Asset_Disposal
+  Migration adds       → Existing canonical column
+  SalePrice            → TotalDisposalValue  (the disposal proceeds/sale price)
+
+TABLE: Asset_Disposal_Approval
+  Migration adds       → Existing canonical column
+  DisposalApproval_ID  → AssetDisposalApproval_ID  (same PK, duplicate name)
+  ApprovalDate         → ApprovedDate
+  ApprovedByID         → ApprovedBy
+
+TABLE: Asset_FundingSource
+  Migration adds       → Existing canonical column
+  FundingSourceDesc    → Description
+  DateCaptured         → Date_Created
+  CapturerID           → Created_by
+
+TABLE: Asset_Impairment
+  Migration adds       → Existing canonical column
+  AssetRegisterItem_ID → Asset_ItemID
+  Reason               → ReasonForChange
+  ImpairmentDate2      → ImpairmentDate  *** see clarification question below ***
+
+TABLE: Asset_ImpairmentPostings
+  Migration adds       → Existing canonical column
+  AssetImpairment_ID   → Impairment_ID
+
+TABLE: Asset_WIPApprovalItems
+  Migration adds       → Existing canonical column
+  ApprovalDate         → ApprovedDate
+  ApprovedByID         → ApproverID
+  DateCaptured         → CapturerDate
+
+TABLE: Asset_WIP_Register
+  Migration adds       → Existing canonical column
+  ProjectNumber        → ProjectNo
+  ActualEndDate        → CompletionDate  *** see clarification question below ***
+
+TABLE: Asset_WIP_Register_Funding
+  Migration adds       → Existing canonical column
+  FundingSource_ID     → FundingSourceID  (same column, underscore variation)
+
+TABLE: Asset_BulkValidation
+  Migration adds               → Existing canonical column
+  CurrentReplacementCostCRC    → CurrentReplacemantCostCRC  (typo in original)
+  DonorName                    → DonorName_CompanyName_ParastatalName
+  DonorDate                    → DateDonated
+
+TABLE: Const_AssetDisposalMethod
+  Migration adds         → Existing canonical column
+  AssetDisposalMethodDesc → AssetDisposalMethod  (the existing column IS the desc)
+
+TABLE: Asset_FairValueApproval
+  Migration adds         → Existing canonical column
+  RegistrationItemFairValue_Id → This is the PK of the parent Asset_FairValue table;
+                                 as a FK here it may be valid — see clarification below.
+
+
+================================================================================
+SECTION B — NEW COLUMNS (confirmation required)
+================================================================================
+
+For each entry below, please respond: KEEP or REMOVE
+If KEEP, the column stays in the migration and the API code will use it.
+If REMOVE, it will be dropped from the migration.
+
+Already confirmed KEEP by prior approval:
+    Asset_Transaction_Summary.RefurbImpairmentValu   [KEEP - already approved]
+  Asset_Register_Transactions.RefurbImpairmentValue [KEEP - already approved]
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Depreciation
+Existing columns: Asset_Depreciation_ID, AssetRegisterItem_ID, ResidualValue,
+  ReadyForUse, UsefullLife, DepreciationValue, ExpectedDepreciationRate,
+  AmortisationValue, ExpectedAmortisationRate, EvidenceDocument,
+  ActualUnitProducedThisYear, ExpectedUnitsOfProduction, RevaluationAmount,
+  RevaluationDate, AccumulatedDepreciation, CurrentYearDepreciation,
+  TransferredDepreciation, AccumulatedDepreciationClosingBalance, ModifierID,
+  DateCaptured, CapturerID, DateModified, AccumulatedDepreciationOtherChanges,
+  AccumulatedDepreciationDisposal, AccumulatedDepreciationTransfer,
+  AccumulatedImpairmentClosingBalance, CarryingAmountClosingBalance, OrderNumber,
+  InvoiceDate, Supplier_ID, SupplierCode, InvoiceNumber, EftRefNr, AssetType_ID,
+  Asset_Condition_ID, IsApproved, Depreciation_ScheduledItemID,
+  Depreciation_ScheduleID, Depreciation_MonthID, Depreciation_RunType,
+  Reversal_Asset_Depreciation_ID, DaysFromLastRun, AccumulatedDepreciationCurrentYear
+
+New columns proposed:
+  DepreciationDate   DATETIME    — The date the depreciation transaction applies to
+                                   (distinct from DateCaptured which is when it was
+                                   entered). KEEP or REMOVE?
+
+  CarryingAmount     DECIMAL(18,2) — Carrying amount at the point of this depreciation
+                                     record (snapshot). Note: CarryingAmountClosingBalance
+                                     already exists. KEEP or REMOVE?
+
+  RunType_ID         INT         — FK to a run-type lookup (e.g. Monthly/Annual/Manual).
+                                   KEEP or REMOVE?
+
+  RunStatus_ID       INT         — FK to a run-status lookup (e.g. Pending/Complete).
+                                   KEEP or REMOVE?
+
+  FinYear            NVARCHAR(9) — Financial year string (e.g. "2025/2026").
+                                   KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_DepreciationApproval
+Existing columns: Depreciation_ApprovalID, DepreciationDate, AssignedApprover,
+  IsApproved, IsDeclined, ApprovedBy, DeclinedBy, DeclinedReason, IsEditable,
+  Enabled, DateCaptured, CapturerId, DateModified, ModifierId, PendingApproval
+
+New columns proposed:
+  FinYear            NVARCHAR(9) — Financial year for this approval batch.
+                                   KEEP or REMOVE?
+
+  MonthID            INT         — Month reference for this approval.
+                                   KEEP or REMOVE?
+
+  ApprovalTypeID     INT         — FK to Const_Asset_Depreciation_Approval_Type.
+                                   KEEP or REMOVE?
+
+  ApprovalDate       DATETIME    — Date the approval action was taken (DepreciationDate
+                                   exists but records the dep. transaction date, not
+                                   approval date). KEEP or REMOVE?
+
+  Status             NVARCHAR(50) — Workflow status (e.g. Pending/Approved/Declined).
+                                    KEEP or REMOVE?
+
+  Comments           NVARCHAR(MAX) — Approver comments/notes.
+                                     KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_DepreciationSchedule
+Existing columns: Asset_DepreciationSchedule_ID, FinYear, CapturerId,
+  AssignedApproverId, PendingApproval, IsApproved, IsDeclined, DeclinedReason
+
+New columns proposed:
+  RunDate            DATETIME    — Date the depreciation schedule run was executed.
+                                   KEEP or REMOVE?
+
+  RunType_ID         INT         — FK to run-type lookup. KEEP or REMOVE?
+
+  RunStatus_ID       INT         — FK to run-status lookup. KEEP or REMOVE?
+
+  TotalAssets        INT         — Count of assets processed in this schedule run.
+                                   KEEP or REMOVE?
+
+  TotalDepreciation  DECIMAL(18,2) — Sum of depreciation calculated in this run.
+                                     KEEP or REMOVE?
+
+  DateCaptured       DATETIME    — When this schedule record was created.
+                                   KEEP or REMOVE?
+
+  DateModified       DATETIME    — When this schedule record was last modified.
+                                   KEEP or REMOVE?
+
+  ModifierID         INT         — User who last modified this record.
+                                   KEEP or REMOVE?
+
+  ScheduledDate      DATETIME    — The target date for which depreciation is scheduled.
+                                   KEEP or REMOVE?
+
+  StatusID           INT         — FK to a status lookup for the schedule.
+                                   KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_DepreciationSchedule_Item
+  (This is an existing table — columns listed below are all being added)
+
+Existing columns: Asset_DepreciationSchedule_ID (PK only — very sparse table in FullDB)
+
+New columns proposed (all new, support line-item detail per scheduled run):
+  AssetRegisterItem_ID   INT             KEEP or REMOVE?
+  DepreciationAmount     DECIMAL(18,2)   KEEP or REMOVE?
+  AccumulatedDepreciation DECIMAL(18,2)  KEEP or REMOVE?
+  CarryingAmount         DECIMAL(18,2)   KEEP or REMOVE?
+  DateCaptured           DATETIME        KEEP or REMOVE?
+  AssetType_ID           INT             KEEP or REMOVE?
+  AssetCategory_ID       INT             KEEP or REMOVE?
+  Asset_SubCategory_ID   INT             KEEP or REMOVE?
+  MeasurementType_ID     INT             KEEP or REMOVE?
+  AssetStatus_ID         INT             KEEP or REMOVE?
+  FinancialPeriod        INT             KEEP or REMOVE?
+  FinYear                NVARCHAR(9)     KEEP or REMOVE?
+  TotalAssets            INT             KEEP or REMOVE?
+  TotalDepreciation      DECIMAL(18,2)   KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Disposal
+Existing columns: AssetDisposal_ID, AssetItemID, AssetDisposalMethodID,
+  DisposalDate, TotalDisposalValue, DisposalValueYear, AmountProfitLoss,
+  CapacityDateDisposal, DisposalResidualValue, DisposalReason, CouncilResolution,
+  Reference, DateCaptured, CapturerID, DateModified, ModifierID,
+  AssetJournalMethodID, DateDisposed
+
+New columns proposed:
+  CarryingAmount     DECIMAL(18,2) — Carrying amount at the time of disposal.
+                                     KEEP or REMOVE?
+
+  Status             NVARCHAR(50) — Workflow status (Pending/Submitted/Approved/Rejected).
+                                    KEEP or REMOVE?
+
+  FinYear            NVARCHAR(9)  — Financial year of the disposal.
+                                    KEEP or REMOVE?
+
+  Approved           BIT          — Whether disposal is approved (flag).
+                                    KEEP or REMOVE?
+
+  ApprovedDate       DATETIME     — Date of approval. KEEP or REMOVE?
+
+  ApprovedBy         INT          — User ID who approved. KEEP or REMOVE?
+
+  RejectedBy         INT          — User ID who rejected. KEEP or REMOVE?
+
+  RejectedDate       DATETIME     — Date of rejection. KEEP or REMOVE?
+
+  RejectionReason    NVARCHAR(MAX) — Reason for rejection. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Disposal_Approval
+Existing columns: AssetDisposalApproval_ID, AssetItemID, AssetDisposalMethodID,
+  DisposalDate, TotalDisposalValue, DisposalValueYear, AmountProfitLoss,
+  CapacityDateDisposal, DisposalResidualValue, DisposalReason, CouncilResolution,
+  Reference, DateCaptured, CapturerID, DateModified, ModifierID,
+  AssetJournalMethodID, IsApprove, DeclineReason, ApprovedBy, ApprovedDate,
+  DisposalProceedsAmount, SalesDoc
+
+New columns proposed:
+  AssetDisposal_ID   INT          — FK linking this approval back to Asset_Disposal.
+                                    KEEP or REMOVE?
+
+  Status             NVARCHAR(50) — Workflow status (Pending/Approved/Declined).
+                                    KEEP or REMOVE?
+
+  Comments           NVARCHAR(MAX) — Approver comments. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_FairValue
+Existing columns: RegistrationItemFairValue_Id, AssetRegisterItem_ID,
+  AssetDescription, AssetClass, AssetCategory, Location, ValueDeterminant,
+  FairValue, FairValueDate, DateCaptured, CapturerID, DateModified, ModifierID,
+  DebitVoteID, CreditVoteID
+
+New columns proposed:
+  PreviousCarryingAmount  DECIMAL(18,2) — Carrying amount before fair value adjustment.
+                                          KEEP or REMOVE?
+
+  GainLoss               DECIMAL(18,2) — The gain or loss resulting from the fair
+                                          value change. KEEP or REMOVE?
+
+  Status                 NVARCHAR(50)  — Workflow status. KEEP or REMOVE?
+
+  FinYear                NVARCHAR(9)   — Financial year. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_FairValueApproval
+  (Table exists in FullDB but schema could not be verified — need clarification)
+
+New columns proposed:
+  RegistrationItemFairValue_Id  INT — FK to Asset_FairValue. KEEP or REMOVE?
+                                      CLARIFICATION: Is this the FK linking this
+                                      approval record to the parent fair value record?
+                                      If yes, this is a genuine new FK column.
+
+  ApprovalDate          DATETIME      KEEP or REMOVE?
+  ApprovedByID          INT           KEEP or REMOVE?
+  Status                NVARCHAR(50)  KEEP or REMOVE?
+  Comments              NVARCHAR(MAX) KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_FundingSource
+Existing columns: Id, FundingSource_ID, AssetRegisterItem_ID, Amount,
+  Created_by, Date_Created, Description, Percentage, SubIdentification_ID
+
+New columns proposed:
+  FundingSourceCode  NVARCHAR(50)  — A short code identifier for the funding source.
+                                     KEEP or REMOVE?
+
+  Enabled            SMALLINT      — Active/inactive flag. KEEP or REMOVE?
+
+  DateModified       DATETIME      — Last modification date. KEEP or REMOVE?
+
+  ModifierID         INT           — User who last modified. KEEP or REMOVE?
+
+  FinYear            NVARCHAR(9)   — Financial year. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Impairment
+Existing columns: Impairment_ID, Asset_ItemID, FairValueMethodID, ApprovedDate,
+  DateCaptured, CapturerID, DateModified, ModifierID, ApprovedBy, AssetType,
+  ValuationType, ScenarioMethod, Approved, IsRejected, TransactionProjectDR,
+  TransactionProjectItemDR, TransactionProjectCR, TransactionProjectItemCR,
+  SCOAItemDR, SCOAItemCR, FilePath, FileName, ReasonForChange, IsReversal,
+  ImpairmentDate
+
+New columns proposed:
+  ImpairmentAmount      DECIMAL(18,2) — The monetary amount of the impairment.
+                                        KEEP or REMOVE?
+
+  PreviousCarryingAmount DECIMAL(18,2) — Carrying amount before impairment.
+                                         KEEP or REMOVE?
+
+  NewCarryingAmount     DECIMAL(18,2) — Carrying amount after impairment is applied.
+                                        KEEP or REMOVE?
+
+  Status                NVARCHAR(50)  — Workflow status (Pending/Approved/Rejected).
+                                        KEEP or REMOVE?
+
+  FinYear               NVARCHAR(9)   — Financial year. KEEP or REMOVE?
+
+  RemainingUsefulLife   DECIMAL(18,2) — RUL at time of impairment. KEEP or REMOVE?
+
+  ImpairmentDate2       DATETIME      — *** CLARIFICATION REQUIRED ***
+                                        ImpairmentDate already exists. What is
+                                        ImpairmentDate2? Is this a different date
+                                        (e.g. effective date vs. capture date), or
+                                        was it added by mistake? KEEP or REMOVE?
+
+  CatchUpDepreciation   DECIMAL(18,2) — Catch-up depreciation amount after impairment.
+                                        KEEP or REMOVE?
+
+  CatchUpDays           INT           — Number of days for catch-up depreciation.
+                                        KEEP or REMOVE?
+
+  RejectedBy            INT           — User who rejected. KEEP or REMOVE?
+
+  RejectedDate          DATETIME      — Date of rejection. KEEP or REMOVE?
+
+  RejectionReason       NVARCHAR(MAX) — Reason for rejection. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_ImpairmentPostings
+Existing columns: Id, Impairment_ID, DRAcc, CRAcc, FairValueAmt, CostToSell,
+  PresentValue, ImpairmentLostAmt, DRAccText, CRAccText, Approved, PortionedLoss,
+  IsReversal, CarryingValue, NewCarryingValue, AmountFromRevaluationReserve
+
+New columns proposed:
+  PostingDate   DATETIME      — Date the GL posting was made. KEEP or REMOVE?
+
+  PostedByID    INT           — User who posted. KEEP or REMOVE?
+
+  Status        NVARCHAR(50)  — Posting status (Draft/Posted/Reversed). KEEP or REMOVE?
+
+  DateCaptured  DATETIME      — When the posting record was created. KEEP or REMOVE?
+
+  CapturerID    INT           — Who created the posting record. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_MaintenanceWorkOrder
+Existing columns: MaintenanceWorksOrderID, WorkOrderDesc, AssetRegisterItemID,
+  WorkOrderDate, RequisitionNumber, DebitAccount, DebitAmount, CreditAccount,
+  CreditAmount, MaintainerID, WorkOrderTypeID, WorkOrderStatusID
+
+New columns proposed:
+  RequestID  INT — FK linking this work order to a maintenance request.
+                   KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Refurb
+Existing columns: Asset_RefurbID, AssetRegisterID, FinancialPeriod, FinancialYear,
+  RefurbDate, Refurb_DT, Refurb_CT, Refurb_Depreciation, Refurb_Revaluation,
+  isApproved, DateCaptured, CapturerID, DateModified, ModifierID
+
+New columns proposed:
+  DebitPlanProjectItemId   INT          — Debit-side plan/project item FK for GL.
+                                          KEEP or REMOVE?
+
+  CreditPlanProjectItemId  INT          — Credit-side plan/project item FK for GL.
+                                          KEEP or REMOVE?
+
+  Refurb_Impairment        DECIMAL(18,2) — Impairment component of the refurb transaction.
+                                           KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Register_Items
+  (Core asset register — high importance, confirm carefully)
+
+Existing columns (key ones): AssetRegisterItem_ID, Description, BarCode,
+  AcquisitionDate, UsefullLife, ResidualValue, CommisioningDate, etc.
+  (Full schema has 70+ columns)
+
+New columns proposed:
+  DateModified            DATETIME      — Last modification date. KEEP or REMOVE?
+
+  InvoiceNo               NVARCHAR(100) — Invoice number linked to the asset acquisition.
+                                          KEEP or REMOVE?
+
+  DisposalDocNo           NVARCHAR(100) — Document number for disposal transaction.
+                                          KEEP or REMOVE?
+
+  PaymentNo               NVARCHAR(100) — Payment reference number. KEEP or REMOVE?
+
+  FundingDescription      NVARCHAR(500) — Description of the funding source/arrangement.
+                                          KEEP or REMOVE?
+
+  LocationDescription     NVARCHAR(500) — Free-text location description. KEEP or REMOVE?
+
+  RoomResponsiblePerson   NVARCHAR(200) — Name of person responsible for the room/space.
+                                          KEEP or REMOVE?
+
+  ITHardwareResponsiblePerson NVARCHAR(200) — Name of person responsible for IT hardware.
+                                               KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_Revaluations
+Existing columns: Asset_RevaluationsID, AssetRegisterID, Revaluation, Asset,
+  Profit, RevalModel, RevalautionAmt, RevalutionDate, UserID, DiffDepAcc,
+  DiffBook, ProjectDR, ProjectItemDR, ProjectCR, ProjectItemCR, PostDateTime,
+  SCOAItemDR, SCOAItemCR, FilePath, FileName, SurplusAmount, DepreciationAdjustment,
+  Approved, ApprovedBy, ApprovedDate
+
+New columns proposed:
+  RejectedBy       INT           — User ID who rejected. KEEP or REMOVE?
+
+  RejectedDate     DATETIME      — Date of rejection. KEEP or REMOVE?
+
+  RejectionReason  NVARCHAR(MAX) — Reason for rejection. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_WIPApprovalItems
+Existing columns: Id, AssetID, TransactionID, TransactionAmountDR,
+  TransactionAmountCR, DR_SCOAID, CR_SCOAID, TransactionDescription,
+  IsApproved, IsDeclined, CapturerID, ApproverID, CapturerDate, ApprovedDate,
+  DeclinedDate, ProjectDR, ProjectItemDR, ProjectCR, ProjectItemCR
+
+New columns proposed:
+  WIPRegister_ID  INT           — FK linking approval items to a WIP Register record.
+                                   KEEP or REMOVE?
+
+  Status          NVARCHAR(50)  — Workflow status. KEEP or REMOVE?
+
+  Comments        NVARCHAR(MAX) — Approval/declination comments. KEEP or REMOVE?
+
+  DateModified    DATETIME      — Last modification date. KEEP or REMOVE?
+
+  ModifierID      INT           — Who last modified. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_WIP_Register
+Existing columns: WIPRegister_ID, AssetRegisterItem_ID, ProjectNo, ProjectName,
+  ProjectStatusID, ContractID, ContractStartDate, ContractEndDate, ContractNumber,
+  FundingTypeID, DepartmentID, DivisionID, CustodianID, Latitude, Longitude,
+  ContractValue, WIPOpeningBalance, RestatedOpeningBalance, Additions,
+  TransferOfAssets, WriteOff, Impairment, PriorYearAdjustment, WIPClosingBalance,
+  FinancialProgress, BudgetProjectID, BudgetProjectItemID, CompletionDate,
+  IsApproved, DateCaptured, CapturerID, DateModified, ModifierID
+
+New columns proposed:
+  StartDate          DATETIME    — *** CLARIFICATION: Is this the project start date
+                                    (different from ContractStartDate which is the
+                                    contract commencement date)? KEEP or REMOVE?
+
+  ExpectedEndDate    DATETIME    — *** CLARIFICATION: Is this different from
+                                    ContractEndDate? E.g. project expected completion
+                                    vs. contract expiry? KEEP or REMOVE?
+
+  TotalBudget        DECIMAL(18,2) — Total project budget. KEEP or REMOVE?
+
+  TotalExpenditure   DECIMAL(18,2) — Total expenditure to date. KEEP or REMOVE?
+
+  AssetType_ID       INT         — Asset type classification for WIP project.
+                                   KEEP or REMOVE?
+
+  AssetCategory_ID   INT         — Asset category for WIP project. KEEP or REMOVE?
+
+  FinYear            NVARCHAR(9) — Financial year. KEEP or REMOVE?
+
+  Status             NVARCHAR(50) — Project status (Active/Completed/Cancelled etc.).
+                                    KEEP or REMOVE?
+
+  ProjectComplete    SMALLINT    — Flag (0/1) indicating project is complete.
+                                   KEEP or REMOVE?
+
+  UnbundlingStatus   NVARCHAR(50) — Status of WIP unbundling process. KEEP or REMOVE?
+
+  UnbundlingComment  NVARCHAR(MAX) — Comment on unbundling. KEEP or REMOVE?
+
+  ApproverID         INT         — User responsible for approving unbundling/completion.
+                                   KEEP or REMOVE?
+
+  UnbundlingApprovedDate DATETIME — Date unbundling was approved. KEEP or REMOVE?
+
+  ActualSurvey       NVARCHAR(MAX) — Survey data or notes. KEEP or REMOVE?
+
+  MainAssetDescription NVARCHAR(500) — Description of the main/parent asset.
+                                       KEEP or REMOVE?
+
+  ScmContractID      INT         — FK to SCM (Supply Chain) contract record
+                                   (different from ContractID). KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_WIP_Register_Details
+Existing columns: WIPRegisterDetails_ID, WIPRegister_ID, InvoiceId, InvoiceNumber,
+  InvoiceDate, VendorID, Amount, VatAmount, TotalAmount, DocumentNumber,
+  PaymentReference, DateCaptured, CapturerID, DateModified, ModifierID
+
+New columns proposed:
+  Description       NVARCHAR(500) — Line item description. KEEP or REMOVE?
+
+  TransactionDate   DATETIME    — *** CLARIFICATION: Is this different from InvoiceDate?
+                                   (e.g. payment date vs invoice date) KEEP or REMOVE?
+
+  ReferenceNumber   NVARCHAR(100) — *** CLARIFICATION: Is this different from both
+                                     DocumentNumber and PaymentReference? What does
+                                     it reference? KEEP or REMOVE?
+
+  ScmInvoiceDetailId INT        — FK to SCM invoice detail record. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_WIP_Register_Funding
+Existing columns: WIPRegister_ID, FundingSourceID, DateCaptured, CapturerID,
+  DateModified, ModifierID
+
+New columns proposed:
+  WIPRegisterFunding_ID  INT IDENTITY — New surrogate PK (table currently uses
+                                        composite PK WIPRegister_ID + FundingSourceID).
+                                        KEEP or REMOVE?
+
+  FundingType_ID         INT          — FK to a funding type lookup. KEEP or REMOVE?
+
+  Amount                 DECIMAL(18,2) — Funding amount allocated from this source.
+                                         KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_WIP_Register_Items
+Existing columns: WIPRegistrationItem_Id, AssetRegisterItem_ID, ProjectId, AssetId,
+  OrderValue, CompletionAmount, RetentionAmount, UnbundledAmount,
+  CompletedPercentage, CompletionDate, SubCategory, AssetGroupType, AssetType,
+  Component, Nersa, UsefulLife, ResidualValue, UoM, DIM1, DIM2, DIM3,
+  DimensionQty, CreditAccount, DebitAmount, CreditAmount, DateCaptured, CapturerID,
+  DateModified, ModifierID, DebitAccount, SendToBilling
+
+New columns proposed (24 columns — all genuinely new):
+  WIPRegister_ID          INT          — FK to Asset_WIP_Register. KEEP or REMOVE?
+  Description             NVARCHAR(500) KEEP or REMOVE?
+  Amount                  DECIMAL(18,2) KEEP or REMOVE?
+  TransferDate            DATETIME     KEEP or REMOVE?
+  Status                  NVARCHAR(50) KEEP or REMOVE?
+  IsAssetItem             SMALLINT     — Flag: is this unbundled item an asset? KEEP or REMOVE?
+  AssetDescription        NVARCHAR(500) KEEP or REMOVE?
+  Rate                    DECIMAL(18,2) KEEP or REMOVE?
+  Quantity                DECIMAL(18,8) KEEP or REMOVE?
+  CIDMSAccountingGroupID  INT          KEEP or REMOVE?
+  CIDMSAccountingSubGroupID INT        KEEP or REMOVE?
+  CIDMSClassID            INT          KEEP or REMOVE?
+  CIDMSGroupTypeID        INT          KEEP or REMOVE?
+  CIDMSAssetTypeID        INT          KEEP or REMOVE?
+  CIDMSComponentTypeID    INT          KEEP or REMOVE?
+  CIDMSSubComponentTypeID INT          KEEP or REMOVE?
+  AssetTypeID             INT          — (Note: AssetType text col exists; this is the FK ID version) KEEP or REMOVE?
+  AssetCategoryID         INT          KEEP or REMOVE?
+  AssetSubCategoryID      INT          KEEP or REMOVE?
+  MeasurementTypeID       INT          KEEP or REMOVE?
+  AssetStatusID           INT          KEEP or REMOVE?
+  BudgetProjectID         INT          — (Note: ProjectId exists; different from BudgetProjectID?) KEEP or REMOVE?
+  BudgetProjectItemID     INT          KEEP or REMOVE?
+  BoqGroupId              INT          — Bill of Quantities group. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_BulkUploadJobs
+Existing columns: ID, Filename, UserId, IsDonated, Activate_Validation, Processed,
+  Date_Created, Job_Status, Date_Ran, No_RecordsInserted, No_RecodsNotValidating,
+  Total_Records, ValidationError_Path, ServiceID, ProcessDate, RunID, ContractNumber
+
+New columns proposed:
+  ApprovedByID   INT          — User who approved the bulk upload job. KEEP or REMOVE?
+  ApprovedDate   DATETIME     — Date approved. KEEP or REMOVE?
+  UploadType     NVARCHAR(50) — Type of upload (e.g. New Assets / Update / Disposal).
+                                 KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Asset_BulkValidation
+Existing columns: (extensive — 130+ columns including all standard asset fields)
+  Key existing cols: CurrentReplacemantCostCRC (note typo), DonorName_CompanyName_ParastatalName,
+  DateDonated, DepreciationOffset, DeemedCost, RevaluationDate, CarryingAmount
+
+New columns proposed (extended upload template fields):
+  Diameter                     DECIMAL(18,4) KEEP or REMOVE?
+  Capacity                     DECIMAL(18,4) KEEP or REMOVE?
+  Street                       NVARCHAR(250) KEEP or REMOVE?
+  StandNumber                  NVARCHAR(100) KEEP or REMOVE?
+  Floor                        NVARCHAR(250) KEEP or REMOVE?
+  Room                         NVARCHAR(250) KEEP or REMOVE?
+  Zone                         NVARCHAR(250) KEEP or REMOVE?
+  Region                       NVARCHAR(100) KEEP or REMOVE?
+  GISFeatureID                 NVARCHAR(100) — (GISFeautureID with typo exists; this is the corrected name) KEEP or REMOVE?
+  FundingSource                NVARCHAR(200) KEEP or REMOVE?
+  FundType                     NVARCHAR(200) KEEP or REMOVE?
+  PurchaseAmountFinanceCharges DECIMAL(18,2) KEEP or REMOVE?
+  PurchaseAmountMovement       DECIMAL(18,2) KEEP or REMOVE?
+  AccumulatedDepreciationMovement DECIMAL(18,2) KEEP or REMOVE?
+  AccumulatedImpairmentMovement   DECIMAL(18,2) KEEP or REMOVE?
+  DepreciationPerMonth         DECIMAL(18,2) KEEP or REMOVE?
+  FairValue                    DECIMAL(18,2) KEEP or REMOVE?
+  DisposalCarryingAmount       DECIMAL(18,2) KEEP or REMOVE?
+  DisposalSalePrice            DECIMAL(18,2) KEEP or REMOVE?
+  DisposalProfitLoss           DECIMAL(18,2) KEEP or REMOVE?
+  DonorConditions              NVARCHAR(MAX) KEEP or REMOVE?
+  RevaluationOpeningBalance    DECIMAL(18,2) KEEP or REMOVE?
+  MovementInRevaluationReserve DECIMAL(18,2) KEEP or REMOVE?
+  TransferDate                 DATETIME      KEEP or REMOVE?
+  TransferFromMunicipality     NVARCHAR(200) KEEP or REMOVE?
+  TransferToMunicipality       NVARCHAR(200) KEEP or REMOVE?
+  TransferNatureOfTransfer     NVARCHAR(200) KEEP or REMOVE?
+  TransferReasonOfTransfer     NVARCHAR(200) KEEP or REMOVE?
+  DepreciationOffset           DECIMAL(18,2) KEEP or REMOVE?
+  DeemedCost                   DECIMAL(18,2) KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Cons_Vendor
+Existing columns: Vendor_ID, VendorName, ... (100+ columns but no Enabled flag)
+
+New columns proposed:
+  Enabled  SMALLINT — Active/inactive flag for vendor record. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Const_Asset_Calculation_Type
+Existing columns: Asset_Calculation_Type_ID, TypeDescription, DateCaptured,
+  CapturerID, DateModified, ModifierID, CalculationTypeFormula
+
+New columns proposed:
+  Enabled  SMALLINT — Active/inactive flag. KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Const_Asset_ComponentType
+Existing columns: Asset_ComponentType_ID, Asset_Component_Description, Enabled,
+  DateCaptured, Capturer_ID, DateModified, Modifier_ID
+
+New columns proposed:
+  Default  SMALLINT — Flag to mark one component type as the system default.
+                      KEEP or REMOVE?
+
+--------------------------------------------------------------------------------
+TABLE: Const_Asset_Depreciation_Approval_Type
+Existing columns: Asset_Depreciation_Approval_Type_ID, ApprovalTypeDesc
+
+New columns proposed:
+  Enabled      SMALLINT  KEEP or REMOVE?
+  DateCaptured DATETIME  KEEP or REMOVE?
+  CapturerID   INT       KEEP or REMOVE?
+  DateModified DATETIME  KEEP or REMOVE?
+  ModifierID   INT       KEEP or REMOVE?
+
+================================================================================
+CLARIFICATION QUESTIONS (requires specific answers)
+================================================================================
+
+Q1. Asset_Impairment — ImpairmentDate2
+    ImpairmentDate already exists. What is ImpairmentDate2 intended to store?
+    (a) A different date concept (e.g. effective date vs. GL posting date)
+    (b) It was added by mistake and should be removed
+
+Q2. Asset_WIP_Register — StartDate vs ContractStartDate
+    The table already has ContractStartDate. Is StartDate a different concept
+    (e.g. the actual project kick-off date as distinct from contract signing date)?
+    (a) Yes, different concept — KEEP both
+    (b) Same concept — REMOVE StartDate
+
+Q3. Asset_WIP_Register — ExpectedEndDate vs ContractEndDate
+    The table already has ContractEndDate and CompletionDate. What is
+    ExpectedEndDate? (a) The revised/expected project completion forecast
+    (different from contracted end date) — KEEP
+    (b) Same as ContractEndDate — REMOVE
+
+Q4. Asset_WIP_Register_Details — TransactionDate vs InvoiceDate
+    The table has InvoiceDate. Is TransactionDate:
+    (a) The GL posting/payment date (different from the invoice date) — KEEP
+    (b) The same as InvoiceDate — REMOVE
+
+Q5. Asset_WIP_Register_Details — ReferenceNumber vs DocumentNumber/PaymentReference
+    The table already has DocumentNumber and PaymentReference. What does
+    ReferenceNumber store?
+    (a) A different reference (e.g. SCM order reference) — KEEP
+    (b) Duplicate of an existing column — REMOVE
+
+Q6. Asset_FairValueApproval — RegistrationItemFairValue_Id
+    Is this the FK column linking approval records back to the parent
+    Asset_FairValue table (RegistrationItemFairValue_Id is the PK there)?
+    (a) Yes, it is the FK — KEEP
+    (b) No — REMOVE
+
+Q7. Asset_WIP_Register_Items — BudgetProjectID vs ProjectId
+    The table already has ProjectId. Is BudgetProjectID:
+    (a) A link to the budget/planning system (different table from ProjectId) — KEEP
+    (b) The same concept as ProjectId — REMOVE
+
+================================================================================
+END OF REPORT
+================================================================================

@@ -1,0 +1,39 @@
+﻿AssetCategoryID,AssetCategoryDesc,Enabled,DateCaptured,CapturerID,DateModified,ModifierID,RevaluationByCostModel,RevaluationByRevalutionModel,Default,TypeID,RequireStatus
+1,Consumable_Mature,1,2019-06-28 15:41:42.853,1,NULL,NULL,1,0,1,1,0
+2,Consumable_Immature,1,2019-06-28 15:41:42.857,1,NULL,NULL,0,1,1,1,0
+3,Bearer_Mature,1,2019-06-28 15:41:42.860,1,NULL,NULL,0,1,1,1,0
+4,Bearer_Immature,1,2019-06-28 15:41:42.867,1,NULL,NULL,0,1,1,1,0
+5,Other Heritage Assets,1,2019-06-28 15:41:42.870,1,NULL,NULL,1,0,1,2,0
+6,Historic Buildings,1,2019-06-28 15:41:42.873,1,NULL,NULL,1,0,1,2,0
+7,Works of Art,1,2019-06-28 15:41:42.880,1,NULL,NULL,1,0,1,2,0
+8,Monuments,1,2019-06-28 15:41:42.883,1,NULL,NULL,0,1,1,2,0
+9,Conservation Area,1,2019-06-28 15:41:42.887,1,NULL,NULL,1,0,1,2,0
+10,Internally Generated,1,2019-06-28 15:41:42.890,1,NULL,NULL,1,0,1,3,1
+11,Other,1,2019-06-28 15:41:42.897,1,NULL,NULL,0,1,1,3,1
+12,Land,1,2019-06-28 15:41:42.900,1,NULL,NULL,0,1,1,4,1
+13,Transport Assets,1,2019-06-28 15:41:42.903,1,NULL,NULL,0,0,1,4,1
+14,Electrical Infrastructure,1,2019-06-28 15:41:42.910,1,NULL,NULL,1,0,1,4,1
+15,Water Supply Infrastructure,1,2019-06-28 15:41:42.913,1,NULL,NULL,0,0,1,4,0
+16,Sanitation Infrastructure,1,2019-06-28 15:41:42.917,1,NULL,NULL,0,0,1,4,0
+17,Solid Waste Infrastructure,1,2019-06-28 15:41:42.920,1,NULL,NULL,0,0,1,4,0
+18,Rails Infrastructure,1,2019-06-28 15:41:42.923,1,NULL,NULL,0,0,1,4,0
+19,Machinery and Equipment,1,2019-06-28 15:41:42.930,1,NULL,NULL,0,0,1,4,1
+20,Furniture and Office Equipment,1,2019-06-28 15:41:42.933,1,NULL,NULL,0,0,1,4,1
+21,Computer Equipment,1,2019-06-28 15:41:42.937,1,NULL,NULL,0,0,1,4,1
+23,"Zoo, Marine and Non-biological Animals",1,2019-06-28 15:41:42.947,1,NULL,NULL,0,0,1,4,0
+24,Information and Communication Infrastructure,1,2019-06-28 15:41:42.950,1,NULL,NULL,0,0,1,4,0
+25,Coastal Infrastructure,1,2019-06-28 15:41:42.953,1,NULL,NULL,0,0,1,4,0
+26,Storm water Infrastructure,1,2019-06-28 15:41:42.960,1,NULL,NULL,0,0,1,4,0
+27,Community Assets,1,2019-06-28 15:41:42.963,1,NULL,NULL,0,0,1,4,0
+28,Other Assets,1,2019-06-28 15:41:42.967,1,NULL,NULL,0,0,1,4,0
+29,Roads Infrastructure,1,2019-06-28 15:41:42.977,1,NULL,NULL,0,0,1,4,0
+30,Outsourced,1,2019-06-28 15:41:42.980,1,NULL,NULL,0,0,1,6,0
+31,Own Account Construction,1,2019-06-28 15:41:42.983,1,NULL,NULL,0,0,1,6,0
+32,Borrowing Cost,1,2019-06-28 15:41:42.987,1,NULL,NULL,0,0,1,6,0
+35,Software License,0,2022-04-13 15:02:36.473,209,NULL,NULL,0,0,NULL,3,1
+37,Computer software,0,2022-11-17 20:27:55.703,251,2022-11-17 20:29:32.257,251,0,0,NULL,3,1
+38,Server Software,0,2022-11-17 20:30:18.820,251,NULL,NULL,0,0,NULL,3,1
+39,Other Software,0,2022-11-17 20:30:48.240,251,NULL,NULL,0,0,NULL,3,1
+41,Compact keyboard,1,2024-11-11 15:25:33.880,169,NULL,NULL,0,0,NULL,4,1
+42,carry case,1,2024-11-11 15:26:22.993,169,NULL,NULL,0,0,NULL,4,1
+43,Cartridges,1,2024-11-11 15:29:26.880,169,NULL,NULL,0,0,NULL,4,1

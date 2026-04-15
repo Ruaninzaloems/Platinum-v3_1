@@ -1,0 +1,67 @@
+:host {
+  display: contents;
+}
+
+.nav-subgroup {
+  margin: 0;
+}
+
+.nav-subgroup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 20px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  border-radius: 6px;
+  margin: 1px 4px;
+}
+
+.nav-subgroup-header:hover {
+  background: #f1f5f9;
+  color: #0f2b46;
+}
+
+.nav-subgroup-header .nav-icon {
+  display: flex;
+  align-items: center;
+}
+
+.nav-subgroup-header .nav-icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-subgroup-header .nav-chevron {
+  margin-left: auto;
+  font-size: 8px;
+  transition: transform 0.2s;
+  color: #94a3b8;
+}
+
+.nav-subgroup-header.expanded .nav-chevron {
+  transform: rotate(90deg);
+}
+
+.nav-subgroup-children {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.nav-subgroup-children.show {
+  max-height: 800px;
+}
+
+.nav-child-deep {
+  padding-left: 40px !important;
+  font-size: 12.5px !important;
+}

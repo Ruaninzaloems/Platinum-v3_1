@@ -1,0 +1,545 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Leave Management</h1>
+    <p class="page-subtitle">Manage employee leave requests and balances</p>
+  </div>
+</div>
+
+<div class="stat-cards">
+  <div class="stat-card" style="border-left-color: #4F6AFF">
+    <div class="stat-value">{{ total || '...' }}</div>
+    <div class="stat-label">Total Requests</div>
+  </div>
+  <div class="stat-card" style="border-left-color: #F59E0B">
+    <div class="stat-value">{{ statusCounts['PENDING'] || 0 }}</div>
+    <div class="stat-label">Pending</div>
+  </div>
+  <div class="stat-card" style="border-left-color: #10B981">
+    <div class="stat-value">{{ statusCounts['APPROVED'] || 0 }}</div>
+    <div class="stat-label">Approved</div>
+  </div>
+  <div class="stat-card" style="border-left-color: #EF4444">
+    <div class="stat-value">{{ statusCounts['REJECTED'] || 0 }}</div>
+    <div class="stat-label">Rejected</div>
+  </div>
+</div>
+
+<div class="detail-tabs">
+  @for (tab of tabs; track tab.id) {
+    <button class="detail-tab" [class.active]="activeView === tab.id" (click)="setActiveView(tab.id)">
+      <app-icon [name]="tab.icon" [size]="14"></app-icon> {{ tab.label }}
+    </button>
+  }
+</div>
+
+@if (activeView === 'transactions') {
+  <div class="toolbar">
+    <div class="toolbar-search">
+      <input type="text" placeholder="Search by name, code, or ID..." [(ngModel)]="searchTerm">
+    </div>
+    <div class="toolbar-filter">
+      <select [(ngModel)]="filters.status" (ngModelChange)="onFilterChange()">
+        <option value="">All Statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="APPROVED">Approved</option>
+        <option value="REJECTED">Rejected</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+      <select [(ngModel)]="filters.leave_type_id" (ngModelChange)="onFilterChange()">
+        <option value="">All Leave Types</option>
+        @for (lt of leaveTypes; track lt.id) {
+          <option [value]="lt.id">{{ lt.name }}</option>
+        }
+      </select>
+    </div>
+    <button class="btn btn-primary" (click)="openModal()">+ New Leave Request</button>
+  </div>
+
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading leave transactions...</div>
+  } @else {
+    <div class="data-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Leave Type</th>
+            <th>From</th>
+            <th>To</th>
+            <th style="text-align:center">Days</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filteredTransactions.length === 0) {
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px">No leave transactions found</td></tr>
+          }
+          @for (t of filteredTransactions; track t.id) {
+            <tr class="clickable-row" (click)="showTransactionDetail(t)">
+              <td><strong>{{ t.employee_code }}</strong> {{ t.first_name }} {{ t.surname }}</td>
+              <td><span class="badge badge-info">{{ t.leave_type_code || '' }}</span> {{ t.leave_type_name }}</td>
+              <td>{{ t.start_date?.split('T')[0] || '-' }}</td>
+              <td>{{ t.end_date?.split('T')[0] || '-' }}</td>
+              <td style="text-align:center;font-weight:600">{{ t.days }}</td>
+              <td><span class="status-badge" [ngClass]="'status-' + (t.status || '').toLowerCase()">{{ t.status }}</span></td>
+              <td>
+                <div class="action-bar">
+                  @if (t.status === 'PENDING') {
+                    <button class="action-btn success" (click)="approveLeave(t.id); $event.stopPropagation()">Approve</button>
+                    <button class="action-btn danger" (click)="openRejectModal(t.id); $event.stopPropagation()">Reject</button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (total > 0) {
+      <app-pagination [page]="page" [limit]="limit" [total]="total" (pageChange)="onPageChange($event)"></app-pagination>
+    }
+  }
+}
+
+@if (activeView === 'balances') {
+  <div class="toolbar">
+    <div class="toolbar-search" style="max-width:400px">
+      <select class="form-control" style="width:100%" [(ngModel)]="selectedBalanceEmployee" (ngModelChange)="onBalanceEmployeeChange()">
+        <option value="">-- Select Employee --</option>
+        @for (emp of employees; track emp.id) {
+          <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (balanceLoading) {
+    <div class="loading"><div class="spinner"></div>Loading balances...</div>
+  } @else if (!selectedBalanceEmployee) {
+    <div class="empty-state">
+      <div class="empty-icon"><app-icon name="user" [size]="32"></app-icon></div>
+      <div class="empty-title">Select an Employee</div>
+      <div class="empty-desc">Choose an employee from the dropdown to view their leave balances</div>
+    </div>
+  } @else {
+    @if (balanceEmployee) {
+      <div style="margin-bottom:16px;padding:12px 16px;background:#F8F9FB;border-radius:8px;font-size:14px">
+        <strong>{{ balanceEmployee.employee_code }}</strong> - {{ balanceEmployee.title || '' }} {{ balanceEmployee.first_name }} {{ balanceEmployee.surname }} | {{ balanceEmployee.department_name || 'No Department' }} | {{ balanceEmployee.position_title || 'No Position' }}
+      </div>
+    }
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      @if (balanceResults.length === 0) {
+        <div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:40px">No leave balances found</div>
+      }
+      @for (b of balanceResults; track b.code) {
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:#1E293B">{{ b.leave_type }}</div>
+              <div style="font-size:12px;color:#94A3B8">{{ b.code }}</div>
+            </div>
+            <div style="font-size:24px;font-weight:700" [style.color]="b.available < 0 ? '#EF4444' : '#10B981'">{{ b.available.toFixed(1) }}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div style="text-align:center;padding:6px;background:#F8F9FB;border-radius:6px">
+              <div style="font-size:11px;color:#94A3B8;text-transform:uppercase">Entitlement</div>
+              <div style="font-size:16px;font-weight:600;color:#1E293B">{{ b.entitlement }}</div>
+            </div>
+            <div style="text-align:center;padding:6px;background:#F8F9FB;border-radius:6px">
+              <div style="font-size:11px;color:#94A3B8;text-transform:uppercase">Accrued</div>
+              <div style="font-size:16px;font-weight:600;color:#1E293B">{{ parseFloat(b.accrued_days || 0).toFixed(1) }}</div>
+            </div>
+            <div style="text-align:center;padding:6px;background:#F8F9FB;border-radius:6px">
+              <div style="font-size:11px;color:#94A3B8;text-transform:uppercase">Taken</div>
+              <div style="font-size:16px;font-weight:600;color:#EF4444">{{ parseFloat(b.taken_days || 0).toFixed(1) }}</div>
+            </div>
+          </div>
+          <div style="background:#E2E8F0;border-radius:4px;height:6px;overflow:hidden">
+            <div [style.height]="'100%'" [style.width]="b.pct + '%'" [style.background]="getBalanceBarColor(b.pct)" style="border-radius:4px;transition:width 0.3s"></div>
+          </div>
+          <div style="font-size:11px;color:#94A3B8;margin-top:4px">{{ b.pct.toFixed(0) }}% utilized</div>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (activeView === 'calendar') {
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="action-btn" (click)="calendarPrevMonth()"><app-icon name="chevronLeft" [size]="16"></app-icon></button>
+      <select class="form-control" style="width:140px" [(ngModel)]="calendarMonth" (ngModelChange)="calendarMonthChange()">
+        @for (m of monthNames; track $index) {
+          <option [value]="$index + 1">{{ m }}</option>
+        }
+      </select>
+      <select class="form-control" style="width:100px" [(ngModel)]="calendarYear" (ngModelChange)="calendarYearChange()">
+        @for (y of yearOptions; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+      <button class="action-btn" (click)="calendarNextMonth()"><app-icon name="chevronRight" [size]="16"></app-icon></button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="badge badge-info" style="background:#DBEAFE;color:#1D4ED8">Annual</span>
+      <span class="badge badge-warning" style="background:#FEF3C7;color:#92400E">Sick</span>
+      <span class="badge badge-success" style="background:#D1FAE5;color:#065F46">Family</span>
+      <span class="badge" style="background:#EDE9FE;color:#5B21B6">Maternity</span>
+      <span class="badge" style="background:#FEF3C7;color:#92400E">Holiday</span>
+    </div>
+  </div>
+
+  @if (calendarLoading) {
+    <div class="loading"><div class="spinner"></div>Loading calendar...</div>
+  } @else {
+    <div class="data-grid" style="overflow-x:auto">
+      <table style="font-size:12px">
+        <thead>
+          <tr>
+            <th style="min-width:160px;position:sticky;left:0;background:#F8F9FB;z-index:2">Employee</th>
+            @for (h of calendarDayHeaders; track h.day) {
+              <th style="text-align:center;min-width:32px;font-size:11px"
+                  [style.background]="h.isHoliday ? '#FEF3C7' : (h.isWeekend ? '#F3F4F6' : '')"
+                  [title]="h.isHoliday">{{ h.day }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (calendarEmployees.length === 0) {
+            <tr><td [attr.colspan]="daysInMonth + 1" style="text-align:center;color:var(--text-muted);padding:40px">No leave data for this period</td></tr>
+          }
+          @for (emp of calendarEmployees; track emp.employee_id) {
+            <tr>
+              <td style="position:sticky;left:0;background:#fff;z-index:1;font-size:13px"><strong>{{ emp.employee_code || '' }}</strong> {{ emp.first_name || '' }} {{ emp.surname || '' }}</td>
+              @for (h of calendarDayHeaders; track h.day) {
+                <td [ngStyle]="getDayCellStyle(h.day, emp)" [title]="getDayCellContent(h.day, emp) || h.isHoliday || ''">{{ getDayCellContent(h.day, emp) }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeView === 'policies') {
+  <div style="margin-bottom:16px">
+    <h3 style="font-size:16px;font-weight:600;color:#1E293B;margin:0 0 4px">Leave Policies</h3>
+    <p style="font-size:13px;color:#64748B;margin:0">Manage accrual methods, balances and carry-over rules per leave type</p>
+  </div>
+  @if (policiesLoading) {
+    <div class="loading"><div class="spinner"></div>Loading leave policies...</div>
+  } @else {
+    <div class="data-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>Leave Type</th>
+            <th>Accrual Method</th>
+            <th style="text-align:center">Accrual Amount</th>
+            <th style="text-align:center">Max Balance</th>
+            <th style="text-align:center">Carry Over Limit</th>
+            <th style="text-align:center">Cycle (Months)</th>
+            <th style="text-align:center">Cycle Entitlement</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (policies.length === 0) {
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px">No leave policies configured</td></tr>
+          }
+          @for (p of policies; track p.id) {
+            <tr>
+              <td><strong>{{ p.leave_type_name || '-' }}</strong></td>
+              <td>{{ p.accrual_method || '-' }}</td>
+              <td style="text-align:center">{{ p.accrual_amount || '-' }}</td>
+              <td style="text-align:center">{{ p.max_balance || '-' }}</td>
+              <td style="text-align:center">{{ p.carry_over_limit || '-' }}</td>
+              <td style="text-align:center">{{ p.cycle_months || '-' }}</td>
+              <td style="text-align:center">{{ p.cycle_entitlement || '-' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeView === 'reports') {
+  <div style="margin-bottom:20px">
+    <h3 style="font-size:16px;font-weight:600;color:#1E293B;margin:0 0 4px">Leave Reports</h3>
+    <p style="font-size:13px;color:#64748B;margin:0">Generate and view leave reports across the organisation</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px">
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:20px;cursor:pointer" (click)="loadBalanceReport()">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:40px;height:40px;border-radius:8px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;color:#1D4ED8"><app-icon name="users" [size]="20"></app-icon></div>
+        <div>
+          <div style="font-weight:600;font-size:15px;color:#1E293B">Balance Report</div>
+          <div style="font-size:12px;color:#64748B">Employee leave balances by type</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:20px;cursor:pointer" (click)="loadUtilisationReport()">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:40px;height:40px;border-radius:8px;background:#D1FAE5;display:flex;align-items:center;justify-content:center;color:#065F46"><app-icon name="barChart" [size]="20"></app-icon></div>
+        <div>
+          <div style="font-weight:600;font-size:15px;color:#1E293B">Utilisation Report</div>
+          <div style="font-size:12px;color:#64748B">Leave usage by type and status</div>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <select class="form-control" style="width:120px" [(ngModel)]="reportYear" (click)="$event.stopPropagation()">
+          <option [value]="reportYear - 1">{{ reportYear - 1 }}</option>
+          <option [value]="reportYear">{{ reportYear }}</option>
+          <option [value]="reportYear + 1">{{ reportYear + 1 }}</option>
+        </select>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:20px;cursor:pointer" (click)="loadLeaveLiability()">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:40px;height:40px;border-radius:8px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;color:#92400E"><app-icon name="dollarSign" [size]="20"></app-icon></div>
+        <div>
+          <div style="font-weight:600;font-size:15px;color:#1E293B">Leave Liability</div>
+          <div style="font-size:12px;color:#64748B">Calculate total leave liability amount</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (reportLoading) {
+    <div class="loading"><div class="spinner"></div>Loading report...</div>
+  }
+  @if (reportResults && reportType === 'balance') {
+    <h4 style="margin-bottom:12px;font-size:15px;font-weight:600"><app-icon name="fileText" [size]="16"></app-icon> Balance Report</h4>
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Employee</th><th>Leave Type</th><th style="text-align:center">Balance (Days)</th></tr></thead>
+        <tbody>
+          @if (reportResults.balances.length === 0) {
+            <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:40px">No balance data available</td></tr>
+          }
+          @for (b of reportResults.balances; track $index) {
+            <tr>
+              <td><strong>{{ b.employee_code || '' }}</strong> {{ b.first_name || '' }} {{ b.surname || '' }}</td>
+              <td>{{ b.leave_type || '-' }}</td>
+              <td style="text-align:center;font-weight:600" [style.color]="parseFloat(b.balance) < 0 ? '#EF4444' : '#10B981'">{{ b.balance }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  @if (reportResults && reportType === 'utilisation') {
+    <h4 style="margin-bottom:12px;font-size:15px;font-weight:600"><app-icon name="barChart" [size]="16"></app-icon> Utilisation Report - {{ reportYear }}</h4>
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Leave Type</th><th style="text-align:center">Total Days</th><th style="text-align:center">Approved</th><th style="text-align:center">Rejected</th><th style="text-align:center">Pending</th></tr></thead>
+        <tbody>
+          @if (reportResults.utilisation.length === 0) {
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:40px">No utilisation data for this year</td></tr>
+          }
+          @for (u of reportResults.utilisation; track $index) {
+            <tr>
+              <td><strong>{{ u.leave_type || '-' }}</strong></td>
+              <td style="text-align:center">{{ parseFloat(u.total_days || 0).toFixed(1) }}</td>
+              <td style="text-align:center"><span class="badge badge-success">{{ u.approved || 0 }}</span></td>
+              <td style="text-align:center"><span class="badge badge-danger">{{ u.rejected || 0 }}</span></td>
+              <td style="text-align:center"><span class="badge badge-warning">{{ u.pending || 0 }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeView === 'types') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <h3 style="font-size:16px;font-weight:600;color:#1E293B;margin:0 0 4px">Leave Type Configuration</h3>
+      <p style="font-size:13px;color:#64748B;margin:0">BCEA-compliant leave types with accrual rules and limits</p>
+    </div>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Leave Type</th>
+          <th>Scheme</th>
+          <th style="text-align:center">Annual Days</th>
+          <th style="text-align:center">Max Accumulation</th>
+          <th style="text-align:center">Accrual Freq</th>
+          <th style="text-align:center">Docs Required</th>
+          <th style="text-align:center">Paid</th>
+          <th style="text-align:center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (leaveTypes.length === 0) {
+          <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:40px">No leave types configured</td></tr>
+        }
+        @for (t of leaveTypes; track t.id) {
+          <tr>
+            <td><span class="badge badge-info">{{ t.code }}</span></td>
+            <td><strong>{{ t.name }}</strong></td>
+            <td>{{ t.scheme_name || '-' }}</td>
+            <td style="text-align:center">{{ t.accrual_days || '-' }}</td>
+            <td style="text-align:center">{{ t.max_accumulation || '-' }}</td>
+            <td style="text-align:center">{{ t.accrual_frequency || '-' }}</td>
+            <td style="text-align:center">{{ t.requires_documentation ? 'Yes' : 'No' }}</td>
+            <td style="text-align:center">{{ t.paid ? 'Yes' : 'No' }}</td>
+            <td style="text-align:center"><span class="status-badge" [ngClass]="t.enabled ? 'status-active' : 'status-inactive'">{{ t.enabled ? 'Active' : 'Inactive' }}</span></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>New Leave Request</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Employee <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newLeave.employee_id" (ngModelChange)="checkBalance()">
+              <option value="">-- Select Employee --</option>
+              @for (emp of employees; track emp.id) {
+                <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Leave Type <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newLeave.leave_type_id" (ngModelChange)="checkBalance()">
+              <option value="">-- Select Leave Type --</option>
+              @for (lt of leaveTypes; track lt.id) {
+                <option [value]="lt.id">{{ lt.name }} ({{ lt.code }})</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Start Date <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="newLeave.start_date" (ngModelChange)="calculateWorkingDays()"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>End Date <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="newLeave.end_date" (ngModelChange)="calculateWorkingDays()"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>Working Days <span class="required">*</span></label>
+            <input class="form-control" type="number" [(ngModel)]="newLeave.days" min="0.5" step="0.5">
+            <div class="form-hint">Auto-calculated excluding weekends & public holidays</div>
+          </div>
+          <div class="form-group full-width">
+            <label>Reason</label>
+            <textarea class="form-control" [(ngModel)]="newLeave.reason" placeholder="Enter reason for leave request..."></textarea>
+          </div>
+          @if (balanceCheck && !balanceCheck.notFound) {
+            <div class="full-width" style="padding:12px;border-radius:8px;margin-top:8px"
+                 [style.border]="'1px solid ' + (balanceCheckInsufficient ? '#FCA5A5' : '#A7F3D0')"
+                 [style.background]="balanceCheckInsufficient ? '#FEF2F2' : '#ECFDF5'">
+              <div style="font-weight:600;font-size:14px;margin-bottom:4px"
+                   [style.color]="balanceCheckInsufficient ? '#DC2626' : '#059669'">
+                {{ balanceCheckInsufficient ? 'BCEA Warning: Insufficient Balance' : 'Balance Available' }}
+              </div>
+              <div style="font-size:13px;color:#475569">
+                <strong>{{ balanceCheck.leave_type || balanceCheck.code }}</strong>:
+                Entitlement: {{ balanceCheck.annual_entitlement || '-' }} days |
+                Accrued: {{ parseFloat(balanceCheck.accrued_days).toFixed(1) }} |
+                Taken: {{ parseFloat(balanceCheck.taken_days).toFixed(1) }} |
+                <strong>Available: {{ balanceCheck.available.toFixed(1) }} days</strong>
+              </div>
+            </div>
+          }
+          @if (balanceCheck && balanceCheck.notFound) {
+            <div class="full-width" style="padding:12px;border-radius:8px;border:1px solid #E2E8F0;background:#F8F9FB;margin-top:8px;font-size:13px;color:#64748B">
+              No balance record found for this leave type. First-time request will be created.
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveLeave()" [disabled]="submitting">{{ submitting ? 'Submitting...' : 'Submit Leave Request' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRejectModal) {
+  <div class="modal-overlay visible" (click)="showRejectModal = false">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Reject Leave Request</h3>
+        <button class="modal-close" (click)="showRejectModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Rejection Reason <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="rejectReason" rows="3" placeholder="Enter reason for rejecting this leave request..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showRejectModal = false">Cancel</button>
+        <button class="btn btn-danger" (click)="submitReject()">Reject Leave</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showDetailModal && detailTransaction) {
+  <div class="modal-overlay visible" (click)="showDetailModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Leave Request #{{ detailTransaction.id }}</h3>
+        <button class="modal-close" (click)="showDetailModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="info-grid" style="margin-bottom:20px">
+          <div class="info-item"><div class="info-label">Employee</div><div class="info-value">{{ detailTransaction.employee_code }} - {{ detailTransaction.first_name }} {{ detailTransaction.surname }}</div></div>
+          <div class="info-item"><div class="info-label">Leave Type</div><div class="info-value">{{ detailTransaction.leave_type_name }}</div></div>
+          <div class="info-item"><div class="info-label">Start Date</div><div class="info-value">{{ detailTransaction.start_date?.split('T')[0] || '-' }}</div></div>
+          <div class="info-item"><div class="info-label">End Date</div><div class="info-value">{{ detailTransaction.end_date?.split('T')[0] || '-' }}</div></div>
+          <div class="info-item"><div class="info-label">Days</div><div class="info-value">{{ detailTransaction.days }}</div></div>
+          <div class="info-item"><div class="info-label">Status</div><div class="info-value"><span class="status-badge" [ngClass]="'status-' + (detailTransaction.status || '').toLowerCase()">{{ detailTransaction.status }}</span></div></div>
+          <div class="info-item"><div class="info-label">Reason</div><div class="info-value">{{ detailTransaction.reason || '-' }}</div></div>
+          <div class="info-item"><div class="info-label">Created</div><div class="info-value">{{ detailTransaction.created_at ? (detailTransaction.created_at | dateSa) : '-' }}</div></div>
+        </div>
+        @if (detailBalances.length > 0) {
+          <h4 style="margin-bottom:12px;font-size:15px;font-weight:600">Employee Leave Balances</h4>
+          <div class="data-grid">
+            <table>
+              <thead><tr><th>Leave Type</th><th style="text-align:center">Entitlement</th><th style="text-align:center">Accrued</th><th style="text-align:center">Taken</th><th style="text-align:center">Balance</th></tr></thead>
+              <tbody>
+                @for (b of detailBalances; track b.code) {
+                  <tr>
+                    <td><span class="badge badge-info">{{ b.code }}</span> {{ b.leave_type }}</td>
+                    <td style="text-align:center">{{ parseFloat(b.annual_entitlement || 0) }}</td>
+                    <td style="text-align:center">{{ parseFloat(b.accrued_days || 0).toFixed(1) }}</td>
+                    <td style="text-align:center">{{ parseFloat(b.taken_days || 0).toFixed(1) }}</td>
+                    <td style="text-align:center;font-weight:700" [style.color]="parseFloat(b.balance_days || 0) < 0 ? '#EF4444' : '#10B981'">{{ parseFloat(b.balance_days || 0).toFixed(1) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showDetailModal = false">Close</button>
+        @if (detailTransaction.status === 'PENDING') {
+          <button class="btn btn-danger" (click)="showDetailModal = false; openRejectModal(detailTransaction.id)">Reject</button>
+          <button class="btn btn-primary" (click)="showDetailModal = false; approveLeave(detailTransaction.id)">Approve</button>
+        }
+      </div>
+    </div>
+  </div>
+}

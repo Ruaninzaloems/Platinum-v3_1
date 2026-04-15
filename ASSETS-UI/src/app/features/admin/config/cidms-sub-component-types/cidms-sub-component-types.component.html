@@ -1,0 +1,108 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">CIDMS Sub Component Types</h1>
+      <p class="page-subtitle">Manage CIDMS sub component type classifications</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
+      <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Sub Component Type</button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Sub Component Type</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Component Type *</label>
+          <select class="form-input" [(ngModel)]="formData.assetCIDMSComponentTypeID">
+            <option [ngValue]="null" disabled>Select component type</option>
+            @for (ct of componentTypes(); track ct.assetCIDMSComponentTypeID) {
+              <option [ngValue]="ct.assetCIDMSComponentTypeID">{{ct.assetCIDMSComponentTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Sub Component Type Description *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.assetCIDMSSubComponentTypeDesc" placeholder="Enter sub component type description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Nature</label>
+          <select class="form-input" [(ngModel)]="formData.nature">
+            @for (n of natureOptions; track n.value) {
+              <option [ngValue]="n.value">{{n.label}}</option>
+            }
+          </select>
+        </div>
+        <div class="checkbox-field">
+          <input type="checkbox" [checked]="formData.infrastructure === 1" (change)="onInfrastructureChange($any($event.target).checked)" id="infrastructure">
+          <label for="infrastructure" style="cursor:pointer">Infrastructure</label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.assetCIDMSSubComponentTypeDesc">{{editingId() ? 'Update' : 'Create'}}</button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Component Type</th><th>Sub Component Type Description</th><th>Infrastructure</th><th>Nature</th><th>Status</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
+        <tbody>
+          @for (item of items(); track item.assetCIDMSSubComponentTypeID) {
+            <tr>
+              <td class="id-cell">{{item.assetCIDMSSubComponentTypeID}}</td>
+              <td><span class="type-badge">{{getComponentTypeName(item.assetCIDMSComponentTypeID)}}</span></td>
+              <td class="desc-cell">{{item.assetCIDMSSubComponentTypeDesc}}</td>
+              <td><span class="status-badge" [class.active]="item.infrastructure === 1">{{item.infrastructure === 1 ? 'Yes' : 'No'}}</span></td>
+              <td>{{getNatureLabel(item.nature)}}</td>
+              <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
+              <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="openEdit(item)"><mat-icon class="action-icon edit">edit</mat-icon></button>
+                <button mat-icon-button (click)="confirmDelete(item)"><mat-icon class="action-icon delete">delete</mat-icon></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) { <div class="empty-state">No sub component types found</div> }
+    </div>
+  }
+
+  @if (showImport()) {
+    <div class="modal-overlay" (click)="closeImport()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Import Sub Component Types from Excel</h3>
+          <button mat-icon-button (click)="closeImport()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="modal-body">
+          <button mat-stroked-button (click)="downloadTemplate()" class="template-btn"><mat-icon>download</mat-icon> Download Template</button>
+          <div class="upload-area" (click)="fileInput.click()">
+            <input #fileInput type="file" accept=".xlsx,.xls" style="display:none" (change)="onImportFileSelected($event)">
+            <mat-icon class="upload-icon">cloud_upload</mat-icon>
+            @if (importFile()) { <span>{{importFile()!.name}}</span> } @else { <span>Click to select .xlsx file</span> }
+          </div>
+          @if (importSuccess()) { <div class="import-success"><mat-icon>check_circle</mat-icon> {{importSuccess()}}</div> }
+          @if (importErrors().length > 0) {
+            <div class="import-errors"><h4>Import Errors</h4><div class="error-list">
+              @for (err of importErrors(); track err.row) { <div class="error-row"><span class="error-row-num">Row {{err.row}}</span><span class="error-col">{{err.column}}</span><span class="error-msg">{{err.message}}</span></div> }
+            </div></div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button mat-stroked-button (click)="closeImport()">Cancel</button>
+          <button mat-flat-button class="btn-primary" (click)="doImport()" [disabled]="!importFile() || importing()">{{importing() ? 'Importing...' : 'Import'}}</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

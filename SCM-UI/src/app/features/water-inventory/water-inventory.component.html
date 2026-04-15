@@ -1,0 +1,1490 @@
+    <div class="water-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          {{notification()}}
+          <button mat-icon-button (click)="notification.set('')"><mat-icon>close</mat-icon></button>
+        </div>
+      }
+
+      <div class="main-tabs">
+        <button class="main-tab" [class.active]="activeTab() === 'dashboard'" (click)="switchTab('dashboard')">Dashboard</button>
+        <button class="main-tab" [class.active]="activeTab() === 'operations'" (click)="switchTab('operations')">Operations</button>
+        <button class="main-tab" [class.active]="activeTab() === 'financial'" (click)="switchTab('financial')">Financial</button>
+        <button class="main-tab" [class.active]="activeTab() === 'compliance'" (click)="switchTab('compliance')">Compliance</button>
+        <button class="main-tab" [class.active]="activeTab() === 'config'" (click)="switchTab('config')">Configuration</button>
+        <button class="main-tab" [class.active]="activeTab() === 'damlevels'" (click)="switchTab('damlevels')">Dam Levels</button>
+        <button class="main-tab" [class.active]="activeTab() === 'analytics'" (click)="switchTab('analytics')">AI Analytics</button>
+        <button class="main-tab" [class.active]="activeTab() === 'reports'" (click)="switchTab('reports')">Reports</button>
+      </div>
+
+      <!-- ==================== DASHBOARD TAB ==================== -->
+      @if (activeTab() === 'dashboard') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" matTooltip="Total storage points across all routes">
+            <mat-icon style="color:#0284c7;">water_drop</mat-icon>
+            <span class="kpi-value">{{dash().totalStoragePoints || 0}}</span>
+            <span class="kpi-label">Storage Points</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total reservoir capacity in kilolitres">
+            <mat-icon style="color:#0ea5e9;">opacity</mat-icon>
+            <span class="kpi-value">{{formatNum(dash().totalCapacityKl)}}</span>
+            <span class="kpi-label">Capacity (kl)</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Current water volume on hand">
+            <mat-icon style="color:#06b6d4;">water</mat-icon>
+            <span class="kpi-value">{{formatNum(dash().currentVolumeKl)}}</span>
+            <span class="kpi-label">Current Volume (kl)</span>
+            <span class="kpi-sub">{{dash().utilisationPercent || 0}}% utilised</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total inventory value at weighted average cost">
+            <mat-icon style="color:#10b981;">payments</mat-icon>
+            <span class="kpi-value">{{formatRand(dash().totalValueZar)}}</span>
+            <span class="kpi-label">Inventory Value</span>
+            <span class="kpi-sub">WAC: R{{(dash().wacPerKl || 0).toFixed(2)}}/kl</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Non-Revenue Water percentage — Blue Drop target: < 30%'" [class.alert]="(dash().nrwPercentage || 0) > 30">
+            <mat-icon [style.color]="(dash().nrwPercentage || 0) > 30 ? '#ef4444' : '#10b981'">pie_chart</mat-icon>
+            <span class="kpi-value" [style.color]="(dash().nrwPercentage || 0) > 30 ? '#ef4444' : '#10b981'">{{(dash().nrwPercentage || 0).toFixed(1)}}%</span>
+            <span class="kpi-label">NRW %</span>
+            <span class="kpi-sub">Target: &lt;30%</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Blue Drop compliance score">
+            <mat-icon style="color:#3b82f6;">verified</mat-icon>
+            <span class="kpi-value" style="color:#3b82f6;">{{(dash().blueDropScore || 0).toFixed(1)}}%</span>
+            <span class="kpi-label">Blue Drop</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Green Drop compliance score">
+            <mat-icon style="color:#22c55e;">eco</mat-icon>
+            <span class="kpi-value" style="color:#22c55e;">{{(dash().greenDropScore || 0).toFixed(1)}}%</span>
+            <span class="kpi-label">Green Drop</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(dash().activeAlerts || 0) + ' active alerts requiring attention'" [class.alert]="(dash().activeAlerts || 0) > 0">
+            <mat-icon [style.color]="(dash().activeAlerts || 0) > 0 ? '#ef4444' : '#10b981'">notifications_active</mat-icon>
+            <span class="kpi-value" [style.color]="(dash().activeAlerts || 0) > 0 ? '#ef4444' : '#10b981'">{{dash().activeAlerts || 0}}</span>
+            <span class="kpi-label">Alerts</span>
+          </div>
+        </div>
+
+        <div class="module-grid">
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('readings')" matTooltip="Capture and approve meter readings for all storage holding points">
+            <div class="module-icon" style="background:#eff6ff;color:#0284c7;"><mat-icon>speed</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Meter Readings</span>
+              <span class="module-count">{{dash().meterReadingsThisMonth || 0}} this month</span>
+              <span class="module-ref">WATIM001-005, 016, 018</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('stocktakes')" matTooltip="3-step stocktake: Count → Verify → Approve with variance analysis">
+            <div class="module-icon" style="background:#f0fdf4;color:#16a34a;"><mat-icon>fact_check</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Stocktakes</span>
+              <span class="module-count">{{dash().pendingStocktakes || 0}} pending</span>
+              <span class="module-ref">WATIM030-045</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('acquisitions')" matTooltip="Record water acquisitions with WAC calculation">
+            <div class="module-icon" style="background:#fef3c7;color:#d97706;"><mat-icon>add_shopping_cart</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Acquisitions</span>
+              <span class="module-count">{{dash().acquisitionsThisMonth || 0}} this month</span>
+              <span class="module-ref">WATIM046-055, Sub-process 5.7</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('distributions')" matTooltip="Track water distribution to consumers">
+            <div class="module-icon" style="background:#ede9fe;color:#7c3aed;"><mat-icon>local_shipping</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Distributions</span>
+              <span class="module-count">{{dash().distributionsThisMonth || 0}} this month</span>
+              <span class="module-ref">Sub-process 5.8</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('losses')" matTooltip="Water loss calculation, formulas, and NRW management">
+            <div class="module-icon" style="background:#fef2f2;color:#dc2626;"><mat-icon>water_damage</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Water Losses</span>
+              <span class="module-count">{{formatNum(dash().lossesThisMonthKl)}} kl this month</span>
+              <span class="module-ref">WATIM003, 009, Sub-process 5.9</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('operations'); opSection.set('treatment')" matTooltip="Treatment plant volumes and purification costs">
+            <div class="module-icon" style="background:#ecfdf5;color:#059669;"><mat-icon>science</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Treatment & Purification</span>
+              <span class="module-count">Cost tracking</span>
+              <span class="module-ref">WATIM046-055</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('financial'); finSection.set('valuations')" matTooltip="NRV valuation per GRAP 12.28-12.34">
+            <div class="module-icon" style="background:#fff7ed;color:#ea580c;"><mat-icon>assessment</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Valuations (GRAP 12)</span>
+              <span class="module-count">NRV assessment</span>
+              <span class="module-ref">WATIM002, Sub-process 5.11</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('financial'); finSection.set('reconciliations')" matTooltip="Full reconciliation: opening + acquisitions - distributions - losses = closing">
+            <div class="module-icon" style="background:#f0f9ff;color:#0369a1;"><mat-icon>balance</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Reconciliation</span>
+              <span class="module-count">Monthly schedule</span>
+              <span class="module-ref">Sub-process 5.12</span>
+            </div>
+          </div>
+          <div class="module-card" (click)="switchTab('compliance'); compSection.set('quality')" matTooltip="Blue Drop / Green Drop / No Drop compliance tracking">
+            <div class="module-icon" style="background:#eff6ff;color:#2563eb;"><mat-icon>health_and_safety</mat-icon></div>
+            <div class="module-info">
+              <span class="module-title">Quality Compliance</span>
+              <span class="module-count">Blue Drop: {{(dash().blueDropScore || 0).toFixed(0)}}%</span>
+              <span class="module-ref">WATIM236-251</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card"><h4><mat-icon>trending_up</mat-icon> NRW Trend (12 Months)</h4><div class="chart-canvas-wrap"><canvas id="nrwTrendChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>pie_chart</mat-icon> Water Balance</h4><div class="chart-canvas-wrap"><canvas id="waterBalanceChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>bar_chart</mat-icon> Route NRW Comparison</h4><div class="chart-canvas-wrap"><canvas id="routeNrwChart"></canvas></div></div>
+          <div class="chart-card"><h4><mat-icon>science</mat-icon> Treatment Plant Efficiency</h4><div class="chart-canvas-wrap"><canvas id="treatmentChart"></canvas></div></div>
+        </div>
+      }
+
+      <!-- ==================== DAM LEVELS TAB ==================== -->
+      @if (activeTab() === 'damlevels') {
+        <div class="dam-section">
+          <div class="dam-section-header">
+            <div class="dam-section-title">
+              <mat-icon style="color:#0284c7;">water</mat-icon>
+              <span>Dam Levels & Supply Forecast</span>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> WATIM001 — Water resource monitoring</span>
+            </div>
+            <div class="dam-headline-kpi" [class.critical]="daysOfSupply() < 30" [class.warning]="daysOfSupply() >= 30 && daysOfSupply() < 90" [class.safe]="daysOfSupply() >= 90">
+              <div class="headline-icon">
+                <mat-icon>{{daysOfSupply() < 30 ? 'crisis_alert' : daysOfSupply() < 90 ? 'warning' : 'check_circle'}}</mat-icon>
+              </div>
+              <div class="headline-content">
+                <div class="headline-number">{{daysOfSupply()}}</div>
+                <div class="headline-label">Days of Supply</div>
+                <div class="headline-sub">at current daily avg of {{formatNum(dailyAvgConsumption())}} kl/day</div>
+              </div>
+              <div class="headline-scenarios">
+                <div class="scenario-pill normal" matTooltip="Normal consumption: daily average from last 30 days">
+                  <span class="sc-label">Normal</span><span class="sc-value">{{daysOfSupply()}}d</span>
+                </div>
+                <div class="scenario-pill peak" matTooltip="Peak consumption: highest daily consumption recorded (summer)">
+                  <span class="sc-label">Peak</span><span class="sc-value">{{daysOfSupplyPeak()}}d</span>
+                </div>
+                <div class="scenario-pill drought" matTooltip="Drought scenario: peak consumption + zero inflow">
+                  <span class="sc-label">Drought</span><span class="sc-value">{{daysOfSupplyDrought()}}d</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dam-gauges">
+            @for (dam of damLevels(); track dam.name) {
+              <div class="dam-gauge-card" [class.critical-dam]="dam.levelPercent < 15" [class.warning-dam]="dam.levelPercent >= 15 && dam.levelPercent < 30">
+                <div class="dam-name">{{dam.name}}</div>
+                <div class="gauge-container">
+                  <svg viewBox="0 0 120 120" class="gauge-svg">
+                    <defs>
+                      <linearGradient [id]="'waterGrad-' + dam.name.split(' ').join('')" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0%" [attr.stop-color]="dam.levelPercent < 15 ? '#dc2626' : dam.levelPercent < 30 ? '#f59e0b' : dam.levelPercent < 60 ? '#0ea5e9' : '#0284c7'" />
+                        <stop offset="100%" [attr.stop-color]="dam.levelPercent < 15 ? '#fca5a5' : dam.levelPercent < 30 ? '#fde68a' : dam.levelPercent < 60 ? '#7dd3fc' : '#38bdf8'" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="8" />
+                    <circle cx="60" cy="60" r="52" fill="none"
+                      [attr.stroke]="'url(#waterGrad-' + dam.name.split(' ').join('') + ')'"
+                      stroke-width="8" stroke-linecap="round"
+                      [attr.stroke-dasharray]="(dam.levelPercent / 100 * 326.7) + ' ' + (326.7 - dam.levelPercent / 100 * 326.7)"
+                      stroke-dashoffset="81.7"
+                      style="transition: stroke-dasharray 1.5s cubic-bezier(0.4, 0, 0.2, 1);" />
+                    <text x="60" y="52" text-anchor="middle" style="font-size:22px;font-weight:800;" transform="rotate(90 60 60)"
+                      [attr.fill]="dam.levelPercent < 15 ? '#dc2626' : dam.levelPercent < 30 ? '#f59e0b' : '#0284c7'">
+                      {{dam.levelPercent}}%
+                    </text>
+                    <text x="60" y="68" text-anchor="middle" style="font-size:9px;fill:#94a3b8;" transform="rotate(90 60 60)">
+                      {{formatNum(dam.currentKl)}} kl
+                    </text>
+                    <text x="60" y="80" text-anchor="middle" style="font-size:8px;fill:#cbd5e1;" transform="rotate(90 60 60)">
+                      of {{formatNum(dam.capacityKl)}} kl
+                    </text>
+                  </svg>
+                  @if (dam.levelPercent < 15) {
+                    <div class="pulse-ring"></div>
+                  }
+                </div>
+                <div class="dam-meta">
+                  <div class="dam-meta-row">
+                    <mat-icon style="font-size:12px;width:12px;height:12px;color:#64748b;">trending_down</mat-icon>
+                    <span>{{dam.dailyDrawdownKl > 0 ? '-' : ''}}{{formatNum(dam.dailyDrawdownKl)}} kl/day</span>
+                  </div>
+                  <div class="dam-meta-row">
+                    <mat-icon style="font-size:12px;width:12px;height:12px;color:#64748b;">calendar_today</mat-icon>
+                    <span>~{{dam.daysRemaining}} days supply</span>
+                  </div>
+                  <div class="dam-meta-row">
+                    <mat-icon style="font-size:12px;width:12px;height:12px;color:#64748b;">{{dam.trend === 'falling' ? 'south' : dam.trend === 'rising' ? 'north' : 'east'}}</mat-icon>
+                    <span style="font-weight:600;" [style.color]="dam.trend === 'falling' ? '#dc2626' : dam.trend === 'rising' ? '#10b981' : '#f59e0b'">{{dam.trend | titlecase}}</span>
+                  </div>
+                </div>
+                <div class="dam-history-bar">
+                  <div class="dam-bar-label">12-mo range</div>
+                  <div class="dam-range-track">
+                    <div class="dam-range-fill" [style.left.%]="dam.yearLowPercent" [style.width.%]="dam.yearHighPercent - dam.yearLowPercent"></div>
+                    <div class="dam-range-marker" [style.left.%]="dam.levelPercent" [matTooltip]="'Current: ' + dam.levelPercent + '%'"></div>
+                  </div>
+                  <div class="dam-range-labels">
+                    <span>Low: {{dam.yearLowPercent}}%</span>
+                    <span>High: {{dam.yearHighPercent}}%</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="dam-forecast-row">
+            <div class="forecast-chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><mat-icon style="color:#3b82f6;">ssid_chart</mat-icon> Dam Level Forecast — Multi-Scenario (12 Months)</h3>
+                <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> AI Predictive Model</span>
+              </div>
+              <div style="height:280px;position:relative;"><canvas id="damForecastChart"></canvas></div>
+              <div class="forecast-legend">
+                <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Optimistic (avg rainfall)</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Baseline (below-avg rainfall)</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#dc2626;"></span> Drought (zero rainfall)</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#ef4444;border:1px dashed #ef4444;"></span> Critical Threshold (15%)</div>
+              </div>
+            </div>
+
+            <div class="restriction-panel">
+              <div class="restriction-header">
+                <mat-icon style="color:#f59e0b;">policy</mat-icon>
+                <span>Restriction Forecast</span>
+              </div>
+              <div class="restriction-timeline">
+                @for (r of restrictionForecast(); track r.level) {
+                  <div class="restriction-card" [class.active-restriction]="r.isCurrentLevel" [class.future-restriction]="!r.isCurrentLevel && !r.triggered">
+                    <div class="restriction-level" [style.background]="r.color">Level {{r.level}}</div>
+                    <div class="restriction-info">
+                      <div class="restriction-name">{{r.name}}</div>
+                      <div class="restriction-desc">{{r.description}}</div>
+                      @if (r.isCurrentLevel) {
+                        <div class="restriction-status active"><mat-icon style="font-size:12px;width:12px;height:12px;">radio_button_checked</mat-icon> Currently Active</div>
+                      } @else if (r.triggered) {
+                        <div class="restriction-status triggered"><mat-icon style="font-size:12px;width:12px;height:12px;">check_circle</mat-icon> {{r.triggerDate}}</div>
+                      } @else {
+                        <div class="restriction-status predicted">
+                          <mat-icon style="font-size:12px;width:12px;height:12px;">schedule</mat-icon>
+                          @if (r.predictedDate) {
+                            Est. {{r.predictedDate}}
+                          } @else {
+                            Not forecast
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="weather-card">
+                <div class="weather-header"><mat-icon style="color:#0ea5e9;">cloud</mat-icon> Seasonal Weather Outlook</div>
+                <div class="weather-grid">
+                  @for (w of weatherOutlook(); track w.month) {
+                    <div class="weather-month" [matTooltip]="w.month + ': ' + w.rainfallMm + 'mm expected, ' + w.tempAvgC + '°C avg'">
+                      <div class="wm-month">{{w.monthShort}}</div>
+                      <mat-icon class="wm-icon" [style.color]="w.rainfallMm > 60 ? '#0ea5e9' : w.rainfallMm > 30 ? '#94a3b8' : '#f59e0b'">
+                        {{w.rainfallMm > 60 ? 'thunderstorm' : w.rainfallMm > 30 ? 'cloud' : 'wb_sunny'}}
+                      </mat-icon>
+                      <div class="wm-rain">{{w.rainfallMm}}mm</div>
+                      <div class="wm-temp">{{w.tempAvgC}}°C</div>
+                    </div>
+                  }
+                </div>
+                <div class="weather-summary">
+                  <mat-icon style="font-size:14px;width:14px;height:14px;color:#64748b;">info</mat-icon>
+                  <span>{{weatherSummary()}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="inflow-outflow-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#8b5cf6;">swap_vert</mat-icon> Daily Inflow vs Consumption (30 Days)</h3>
+              <div style="display:flex;gap:12px;">
+                <div class="io-summary-pill inflow"><mat-icon style="font-size:14px;width:14px;height:14px;">arrow_downward</mat-icon> Avg Inflow: {{formatNum(avgDailyInflow())}} kl/day</div>
+                <div class="io-summary-pill outflow"><mat-icon style="font-size:14px;width:14px;height:14px;">arrow_upward</mat-icon> Avg Consumption: {{formatNum(dailyAvgConsumption())}} kl/day</div>
+                <div class="io-summary-pill" [class.deficit]="avgDailyInflow() < dailyAvgConsumption()" [class.surplus]="avgDailyInflow() >= dailyAvgConsumption()">
+                  <mat-icon style="font-size:14px;width:14px;height:14px;">{{avgDailyInflow() >= dailyAvgConsumption() ? 'add_circle' : 'remove_circle'}}</mat-icon>
+                  Net: {{avgDailyInflow() >= dailyAvgConsumption() ? '+' : ''}}{{formatNum(avgDailyInflow() - dailyAvgConsumption())}} kl/day
+                </div>
+              </div>
+            </div>
+            <div style="height:220px;position:relative;"><canvas id="inflowOutflowChart"></canvas></div>
+          </div>
+        </div>
+      }
+
+      <!-- ==================== OPERATIONS TAB ==================== -->
+      @if (activeTab() === 'operations') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="opSection() === 'readings'" (click)="opSection.set('readings'); loadMeterReadings()"><mat-icon>speed</mat-icon> Meter Readings</button>
+          <button class="sub-btn" [class.active]="opSection() === 'stocktakes'" (click)="opSection.set('stocktakes'); loadStocktakes()"><mat-icon>fact_check</mat-icon> Stocktakes</button>
+          <button class="sub-btn" [class.active]="opSection() === 'acquisitions'" (click)="opSection.set('acquisitions'); loadAcquisitions()"><mat-icon>add_shopping_cart</mat-icon> Acquisitions</button>
+          <button class="sub-btn" [class.active]="opSection() === 'distributions'" (click)="opSection.set('distributions'); loadDistributions()"><mat-icon>local_shipping</mat-icon> Distributions</button>
+          <button class="sub-btn" [class.active]="opSection() === 'losses'" (click)="opSection.set('losses'); loadWaterLosses()"><mat-icon>water_damage</mat-icon> Water Losses</button>
+          <button class="sub-btn" [class.active]="opSection() === 'treatment'" (click)="opSection.set('treatment'); loadTreatment()"><mat-icon>science</mat-icon> Treatment</button>
+        </div>
+
+        <!-- METER READINGS -->
+        @if (opSection() === 'readings') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>speed</mat-icon> Bulk Meter Readings <span class="ref-badge">WATIM001-005, 016, 018</span></div>
+            <div class="section-actions">
+              <mat-form-field appearance="outline" class="filter-field"><mat-label>Route</mat-label>
+                <mat-select [(ngModel)]="filterRoute" (selectionChange)="loadMeterReadings()"><mat-option value="">All Routes</mat-option>@for(r of routes(); track r.id) {<mat-option [value]="r.id">{{r.routeName}}</mat-option>}</mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="filter-field"><mat-label>Status</mat-label>
+                <mat-select [(ngModel)]="filterStatus" (selectionChange)="loadMeterReadings()"><mat-option value="">All</mat-option><mat-option value="pending">Pending</mat-option><mat-option value="approved">Approved</mat-option><mat-option value="flagged">Flagged</mat-option></mat-select>
+              </mat-form-field>
+              <button mat-stroked-button (click)="filterRoute=''; filterStatus=''; loadMeterReadings()"><mat-icon>filter_alt_off</mat-icon></button>
+              <button mat-flat-button color="primary" (click)="openForm('create-reading')"><mat-icon>add</mat-icon> New Reading</button>
+              <button mat-stroked-button color="primary" (click)="openForm('bulk-reading')"><mat-icon>upload</mat-icon> Bulk Import</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Storage Point</th><th>Route</th><th>Date</th><th>Previous</th><th>Current</th><th>Consumption (kl)</th><th>Variance</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (r of meterReadings(); track r.id) {
+                  <tr [class.flagged-row]="r.varianceFlagged">
+                    <td>{{r.id}}</td>
+                    <td>{{r.storagePointName}}</td>
+                    <td>{{r.routeName}}</td>
+                    <td>{{formatDate(r.readingDate)}}</td>
+                    <td class="num">{{r.previousReading | number:'1.0-0'}}</td>
+                    <td class="num">{{r.currentReading | number:'1.0-0'}}</td>
+                    <td class="num">{{r.consumptionKl | number:'1.0-0'}}</td>
+                    <td class="num" [class.variance-alert]="r.varianceFlagged">
+                      {{(r.variancePercent || 0) | number:'1.1-1'}}%
+                      @if (r.varianceFlagged) { <mat-icon class="flag-icon" matTooltip=">20% variance — requires investigation">warning</mat-icon> }
+                    </td>
+                    <td><span class="status-chip" [class]="'s-' + r.status">{{r.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (r.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveReading(r)"><mat-icon>check_circle</mat-icon></button> }
+                      <button mat-icon-button matTooltip="Amend" (click)="openForm('amend-reading', r)"><mat-icon>edit</mat-icon></button>
+                      <button mat-icon-button matTooltip="History" (click)="openForm('reading-history', r)"><mat-icon>history</mat-icon></button>
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="10" class="empty-cell">No meter readings found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination"><span>Showing {{meterReadings().length}} readings</span><span class="spacer"></span><button mat-icon-button [disabled]="page() <= 1" (click)="page.set(page()-1); loadMeterReadings()"><mat-icon>chevron_left</mat-icon></button><span>Page {{page()}}</span><button mat-icon-button (click)="page.set(page()+1); loadMeterReadings()"><mat-icon>chevron_right</mat-icon></button></div>
+        }
+
+        <!-- STOCKTAKES -->
+        @if (opSection() === 'stocktakes') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>fact_check</mat-icon> Water Stocktakes — 3-Step Workflow <span class="ref-badge">WATIM030-045</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('create-stocktake')"><mat-icon>add</mat-icon> New Stocktake</button>
+            </div>
+          </div>
+          <div class="workflow-steps">
+            <div class="step"><div class="step-num">1</div><div class="step-info"><strong>Count</strong><span>Record physical volumes at each storage point</span></div></div>
+            <mat-icon class="step-arrow">arrow_forward</mat-icon>
+            <div class="step"><div class="step-num">2</div><div class="step-info"><strong>Verify</strong><span>Independent checker verifies counts</span></div></div>
+            <mat-icon class="step-arrow">arrow_forward</mat-icon>
+            <div class="step"><div class="step-num">3</div><div class="step-info"><strong>Approve</strong><span>Manager approves with variance analysis</span></div></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Date</th><th>Route</th><th>Points</th><th>Counted</th><th>Variances</th><th>Variance Value</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (s of stocktakes(); track s.id) {
+                  <tr>
+                    <td class="ref-cell">{{s.referenceNumber}}</td>
+                    <td>{{formatDate(s.stocktakeDate)}}</td>
+                    <td>{{s.routeName || 'All Routes'}}</td>
+                    <td class="num">{{s.totalPoints}}</td>
+                    <td class="num">{{s.countedPoints}}</td>
+                    <td class="num" [class.variance-alert]="s.varianceCount > 0">{{s.varianceCount}}</td>
+                    <td class="num" [class.variance-alert]="s.varianceValueZar > 0">{{formatRand(s.varianceValueZar)}}</td>
+                    <td><span class="status-chip" [class]="'s-' + s.status">{{s.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (s.status === 'draft' || s.status === 'created') { <button mat-icon-button matTooltip="Capture Counts" (click)="openForm('count-stocktake', s)"><mat-icon>edit_note</mat-icon></button> }
+                      @if (s.status === 'counted') { <button mat-icon-button matTooltip="Verify Counts" (click)="openForm('verify-stocktake', s)"><mat-icon>fact_check</mat-icon></button> }
+                      @if (s.status === 'verified') { <button mat-icon-button matTooltip="Approve" (click)="openForm('approve-stocktake', s)"><mat-icon>check_circle</mat-icon></button> }
+                      <button mat-icon-button matTooltip="Variance Report" (click)="viewVarianceReport(s)"><mat-icon>assessment</mat-icon></button>
+                      @if (s.status !== 'approved' && s.status !== 'cancelled') { <button mat-icon-button matTooltip="Cancel" (click)="cancelStocktake(s)" style="color:#dc2626;"><mat-icon>cancel</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="9" class="empty-cell">No stocktakes found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- ACQUISITIONS -->
+        @if (opSection() === 'acquisitions') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>add_shopping_cart</mat-icon> Water Acquisitions <span class="ref-badge">Sub-process 5.7</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-acquisition')"><mat-icon>add</mat-icon> Record Acquisition</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Acquisitions update the Weighted Average Cost (WAC) automatically: New WAC = (Existing Value + Acquisition Cost) / (Existing Volume + New Volume)</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Date</th><th>Source</th><th>Volume (kl)</th><th>Unit Cost</th><th>Transport</th><th>Treatment</th><th>Total Cost</th><th>WAC Before</th><th>WAC After</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (a of acquisitions(); track a.id) {
+                  <tr>
+                    <td class="ref-cell">{{a.referenceNumber}}</td>
+                    <td>{{formatDate(a.acquisitionDate)}}</td>
+                    <td>{{a.sourceName}}</td>
+                    <td class="num">{{a.volumeKl | number:'1.0-0'}}</td>
+                    <td class="num">R{{a.unitCostZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{a.transportCostZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{a.treatmentCostZar | number:'1.2-2'}}</td>
+                    <td class="num highlight">R{{a.totalAcquisitionCostZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{a.wacBefore | number:'1.4-4'}}</td>
+                    <td class="num highlight">R{{a.wacAfter | number:'1.4-4'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + a.status">{{a.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (a.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveAcquisition(a)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="12" class="empty-cell">No acquisitions found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- DISTRIBUTIONS -->
+        @if (opSection() === 'distributions') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>local_shipping</mat-icon> Water Distributions <span class="ref-badge">Sub-process 5.8</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-distribution')"><mat-icon>add</mat-icon> Record Distribution</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Date</th><th>From</th><th>Consumer</th><th>Type</th><th>Volume (kl)</th><th>WAC/kl</th><th>Value</th><th>Tariff/kl</th><th>Revenue</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (d of distributions(); track d.id) {
+                  <tr>
+                    <td class="ref-cell">{{d.referenceNumber}}</td>
+                    <td>{{formatDate(d.distributionDate)}}</td>
+                    <td>{{d.fromStoragePoint}}</td>
+                    <td>{{d.toConsumer}}</td>
+                    <td>{{d.consumerType}}</td>
+                    <td class="num">{{d.volumeKl | number:'1.0-0'}}</td>
+                    <td class="num">R{{d.wacPerKl | number:'1.4-4'}}</td>
+                    <td class="num">R{{d.totalValueZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{d.tariffPerKl | number:'1.2-2'}}</td>
+                    <td class="num highlight">R{{d.revenueZar | number:'1.2-2'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + d.status">{{d.status}}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="11" class="empty-cell">No distributions found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- WATER LOSSES -->
+        @if (opSection() === 'losses') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>water_damage</mat-icon> Water Loss Management <span class="ref-badge">WATIM003, 009, Sub-process 5.9</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('create-loss')"><mat-icon>add</mat-icon> Record Loss</button>
+              <button mat-stroked-button (click)="openForm('manage-loss-formulas')"><mat-icon>functions</mat-icon> Formulas</button>
+              <button mat-stroked-button (click)="openForm('manage-implementation-plans')"><mat-icon>playlist_add_check</mat-icon> Implementation Plans</button>
+            </div>
+          </div>
+          <div class="loss-kpis">
+            <div class="loss-kpi"><span class="loss-label">Physical Loss</span><span class="loss-value" style="color:#ef4444;">{{latestLoss()?.physicalLossKl || 0 | number:'1.0-0'}} kl</span></div>
+            <div class="loss-kpi"><span class="loss-label">Commercial Loss</span><span class="loss-value" style="color:#f59e0b;">{{latestLoss()?.commercialLossKl || 0 | number:'1.0-0'}} kl</span></div>
+            <div class="loss-kpi"><span class="loss-label">Unbilled Authorised</span><span class="loss-value" style="color:#6b7280;">{{latestLoss()?.unbilledAuthorisedKl || 0 | number:'1.0-0'}} kl</span></div>
+            <div class="loss-kpi"><span class="loss-label">Total Loss</span><span class="loss-value" style="color:#dc2626;">{{latestLoss()?.totalLossKl || 0 | number:'1.0-0'}} kl</span></div>
+            <div class="loss-kpi"><span class="loss-label">NRW %</span><span class="loss-value" [style.color]="(latestLoss()?.nrwPercentage || 0) > 30 ? '#dc2626' : '#16a34a'">{{(latestLoss()?.nrwPercentage || 0).toFixed(1)}}%</span></div>
+            <div class="loss-kpi"><span class="loss-label">Value Lost</span><span class="loss-value" style="color:#dc2626;">{{formatRand(latestLoss()?.valueLostZar)}}</span></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Period</th><th>Route</th><th>Produced (kl)</th><th>Distributed (kl)</th><th>Billed (kl)</th><th>Physical Loss</th><th>Commercial Loss</th><th>Total Loss</th><th>NRW %</th><th>Value Lost</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (l of waterLosses(); track l.id) {
+                  <tr>
+                    <td>{{getMonthName(l.periodMonth)}} {{l.periodYear}}</td>
+                    <td>{{l.routeName || 'All'}}</td>
+                    <td class="num">{{l.totalProducedKl | number:'1.0-0'}}</td>
+                    <td class="num">{{l.totalDistributedKl | number:'1.0-0'}}</td>
+                    <td class="num">{{l.totalBilledKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#ef4444;">{{l.physicalLossKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#f59e0b;">{{l.commercialLossKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#dc2626;font-weight:600;">{{l.totalLossKl | number:'1.0-0'}}</td>
+                    <td class="num" [style.color]="l.nrwPercentage > 30 ? '#dc2626' : '#16a34a'">{{l.nrwPercentage | number:'1.1-1'}}%</td>
+                    <td class="num" style="color:#dc2626;">{{formatRand(l.valueLostZar)}}</td>
+                    <td><span class="status-chip" [class]="'s-' + l.status">{{l.status}}</span></td>
+                  </tr>
+                } @empty { <tr><td colspan="11" class="empty-cell">No water loss records found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- TREATMENT & PURIFICATION -->
+        @if (opSection() === 'treatment') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>science</mat-icon> Treatment & Purification Costs <span class="ref-badge">WATIM046-055</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('create-treatment')"><mat-icon>add</mat-icon> Record Treatment Data</button>
+              <button mat-stroked-button (click)="openForm('create-purification-cost')"><mat-icon>payments</mat-icon> Purification Costs</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Plant</th><th>Period</th><th>Raw (kl)</th><th>Treated (kl)</th><th>Output (kl)</th><th>Process Loss</th><th>Chemical Cost</th><th>Energy Cost</th><th>Labour Cost</th><th>Total Cost</th><th>Cost/kl</th></tr></thead>
+              <tbody>
+                @for (t of treatment(); track t.id) {
+                  <tr>
+                    <td>{{t.treatmentPlantName}}</td>
+                    <td>{{getMonthName(t.periodMonth)}} {{t.periodYear}}</td>
+                    <td class="num">{{t.rawWaterVolumeKl | number:'1.0-0'}}</td>
+                    <td class="num">{{t.treatedVolumeKl | number:'1.0-0'}}</td>
+                    <td class="num">{{t.outputVolumeKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#ef4444;">{{t.processLossPercent | number:'1.1-1'}}%</td>
+                    <td class="num">R{{t.chemicalCostZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{t.energyCostZar | number:'1.2-2'}}</td>
+                    <td class="num">R{{t.labourCostZar | number:'1.2-2'}}</td>
+                    <td class="num highlight">R{{t.totalCostZar | number:'1.2-2'}}</td>
+                    <td class="num highlight">R{{t.costPerKlZar | number:'1.2-2'}}</td>
+                  </tr>
+                } @empty { <tr><td colspan="11" class="empty-cell">No treatment data found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== FINANCIAL TAB ==================== -->
+      @if (activeTab() === 'financial') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="finSection() === 'valuations'" (click)="finSection.set('valuations'); loadValuations()"><mat-icon>assessment</mat-icon> NRV Valuations</button>
+          <button class="sub-btn" [class.active]="finSection() === 'reconciliations'" (click)="finSection.set('reconciliations'); loadReconciliations()"><mat-icon>balance</mat-icon> Reconciliations</button>
+          <button class="sub-btn" [class.active]="finSection() === 'wac'" (click)="finSection.set('wac'); loadWac()"><mat-icon>calculate</mat-icon> WAC Tracker</button>
+          <button class="sub-btn" [class.active]="finSection() === 'adjustments'" (click)="finSection.set('adjustments'); loadAdjustingEntries()"><mat-icon>tune</mat-icon> Adjusting Entries</button>
+          <button class="sub-btn" [class.active]="finSection() === 'workingpapers'" (click)="finSection.set('workingpapers'); loadWorkingPapers()"><mat-icon>description</mat-icon> Working Papers</button>
+        </div>
+
+        <!-- NRV VALUATIONS -->
+        @if (finSection() === 'valuations') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>assessment</mat-icon> Net Realisable Value Valuations <span class="ref-badge">GRAP 12.28-12.34 | WATIM002</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('run-valuation')"><mat-icon>play_arrow</mat-icon> Run Valuation</button>
+              <button mat-stroked-button (click)="openForm('manage-nrv-formulas')"><mat-icon>functions</mat-icon> NRV Formulas</button>
+            </div>
+          </div>
+          <div class="info-banner"><mat-icon>gavel</mat-icon> GRAP 12.28: Inventories shall be measured at the lower of cost and net realisable value. GRAP 12.34: NRV = Estimated selling price - estimated costs of completion - estimated costs necessary to make the sale.</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Period</th><th>Volume (kl)</th><th>WAC/kl</th><th>Carrying Value</th><th>NRV/kl</th><th>NRV Total</th><th>Write-Down</th><th>GRAP</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (v of valuations(); track v.id) {
+                  <tr>
+                    <td class="ref-cell">{{v.referenceNumber}}</td>
+                    <td>{{getMonthName(v.periodMonth)}} {{v.periodYear}}</td>
+                    <td class="num">{{v.totalVolumeKl | number:'1.0-0'}}</td>
+                    <td class="num">R{{v.wacPerKl | number:'1.4-4'}}</td>
+                    <td class="num">{{formatRand(v.carryingValueZar)}}</td>
+                    <td class="num">R{{v.nrvPerKl | number:'1.4-4'}}</td>
+                    <td class="num">{{formatRand(v.nrvTotalZar)}}</td>
+                    <td class="num" [class.variance-alert]="v.writeDownRequiredZar > 0">{{formatRand(v.writeDownRequiredZar)}}</td>
+                    <td>@if (v.grapCompliant) { <mat-icon style="color:#16a34a;font-size:18px;">check_circle</mat-icon> } @else { <mat-icon style="color:#dc2626;font-size:18px;">cancel</mat-icon> }</td>
+                    <td><span class="status-chip" [class]="'s-' + v.status">{{v.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (v.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveValuation(v)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="11" class="empty-cell">No valuations found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- RECONCILIATIONS -->
+        @if (finSection() === 'reconciliations') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>balance</mat-icon> Water Inventory Reconciliation <span class="ref-badge">Sub-process 5.12 | WATIM012</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('run-reconciliation')"><mat-icon>play_arrow</mat-icon> Run Reconciliation</button></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> Reconciliation formula: Opening Balance + Acquisitions − Distributions − Losses ± Adjustments = Closing Balance</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Period</th><th>Opening (kl)</th><th>Opening (R)</th><th>+ Acquired</th><th>− Distributed</th><th>− Losses</th><th>± Adjustments</th><th>Closing (kl)</th><th>Closing (R)</th><th>Balanced</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (rc of reconciliations(); track rc.id) {
+                  <tr>
+                    <td class="ref-cell">{{rc.referenceNumber}}</td>
+                    <td>{{getMonthName(rc.periodMonth)}} {{rc.periodYear}}</td>
+                    <td class="num">{{rc.openingBalanceKl | number:'1.0-0'}}</td>
+                    <td class="num">{{formatRand(rc.openingValueZar)}}</td>
+                    <td class="num" style="color:#16a34a;">+{{rc.acquisitionsKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#dc2626;">-{{rc.distributionsKl | number:'1.0-0'}}</td>
+                    <td class="num" style="color:#dc2626;">-{{rc.lossesKl | number:'1.0-0'}}</td>
+                    <td class="num" [style.color]="rc.adjustmentsKl >= 0 ? '#16a34a' : '#dc2626'">{{rc.adjustmentsKl >= 0 ? '+' : ''}}{{rc.adjustmentsKl | number:'1.0-0'}}</td>
+                    <td class="num highlight">{{rc.closingBalanceKl | number:'1.0-0'}}</td>
+                    <td class="num highlight">{{formatRand(rc.closingValueZar)}}</td>
+                    <td>@if (rc.isBalanced) { <mat-icon style="color:#16a34a;font-size:18px;">check_circle</mat-icon> } @else { <mat-icon style="color:#dc2626;font-size:18px;">error</mat-icon> }</td>
+                    <td><span class="status-chip" [class]="'s-' + rc.status">{{rc.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (rc.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveReconciliation(rc)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="13" class="empty-cell">No reconciliations found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- WAC TRACKER -->
+        @if (finSection() === 'wac') {
+          <div class="section-header"><div class="section-title"><mat-icon>calculate</mat-icon> Weighted Average Cost Tracker <span class="ref-badge">WATIM008</span></div></div>
+          <div class="wac-display">
+            <div class="wac-card"><span class="wac-label">Current WAC</span><span class="wac-amount">R{{(wacData()?.currentWac || 0) | number:'1.4-4'}}/kl</span></div>
+            <div class="wac-card"><span class="wac-label">Volume on Hand</span><span class="wac-amount">{{(wacData()?.totalVolumeKl || 0) | number:'1.0-0'}} kl</span></div>
+            <div class="wac-card"><span class="wac-label">Total Inventory Value</span><span class="wac-amount">{{formatRand(wacData()?.totalValueZar)}}</span></div>
+          </div>
+          <div class="info-banner"><mat-icon>info</mat-icon> WAC Formula: (Existing Stock Value + New Purchase Value) ÷ (Existing Stock Quantity + New Purchase Quantity). Applied on acquisitions and distributions per GRAP 12.</div>
+        }
+
+        <!-- ADJUSTING ENTRIES -->
+        @if (finSection() === 'adjustments') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>tune</mat-icon> Adjusting Entries <span class="ref-badge">WATIM010-011</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-adjustment')"><mat-icon>add</mat-icon> New Entry</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Description</th><th>Debit</th><th>Credit</th><th>Amount</th><th>Volume (kl)</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (ae of adjustingEntries(); track ae.id) {
+                  <tr>
+                    <td class="ref-cell">{{ae.referenceNumber}}</td>
+                    <td>{{formatDate(ae.entryDate)}}</td>
+                    <td>{{ae.entryType}}</td>
+                    <td>{{ae.description}}</td>
+                    <td class="num">{{ae.debitAccountCode}}</td>
+                    <td class="num">{{ae.creditAccountCode}}</td>
+                    <td class="num highlight">{{formatRand(ae.amountZar)}}</td>
+                    <td class="num">{{ae.volumeKl || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + ae.status">{{ae.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (ae.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveAdjustingEntry(ae)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="10" class="empty-cell">No adjusting entries found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- WORKING PAPERS -->
+        @if (finSection() === 'workingpapers') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>description</mat-icon> Working Papers <span class="ref-badge">WATIM007</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-working-paper')"><mat-icon>add</mat-icon> New Working Paper</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Type</th><th>Title</th><th>Period</th><th>Prepared By</th><th>Prepared Date</th><th>Reviewed By</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (wp of workingPapers(); track wp.id) {
+                  <tr>
+                    <td class="ref-cell">{{wp.referenceNumber}}</td>
+                    <td>{{wp.paperType}}</td>
+                    <td>{{wp.title}}</td>
+                    <td>{{getMonthName(wp.periodMonth)}} {{wp.periodYear}}</td>
+                    <td>{{wp.preparedBy}}</td>
+                    <td>{{formatDate(wp.preparedDate)}}</td>
+                    <td>{{wp.reviewedBy || '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + wp.status">{{wp.status}}</span></td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="Edit" (click)="openForm('edit-working-paper', wp)"><mat-icon>edit</mat-icon></button>
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="9" class="empty-cell">No working papers found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== COMPLIANCE TAB ==================== -->
+      @if (activeTab() === 'compliance') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="compSection() === 'quality'" (click)="compSection.set('quality'); loadQualityCompliance()"><mat-icon>health_and_safety</mat-icon> Blue/Green Drop</button>
+          <button class="sub-btn" [class.active]="compSection() === 'policies'" (click)="compSection.set('policies'); loadPolicyReviews()"><mat-icon>policy</mat-icon> Policy Reviews</button>
+        </div>
+
+        <!-- QUALITY COMPLIANCE -->
+        @if (compSection() === 'quality') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>health_and_safety</mat-icon> Blue Drop / Green Drop / No Drop Compliance <span class="ref-badge">WATIM236-251 | Water Services Act s9</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-compliance')"><mat-icon>add</mat-icon> New Assessment</button></div>
+          </div>
+          <div class="compliance-kpis">
+            <div class="comp-card blue-drop">
+              <mat-icon>water_drop</mat-icon>
+              <div class="comp-info">
+                <span class="comp-label">Blue Drop</span>
+                <span class="comp-score">{{(dash().blueDropScore || 0).toFixed(1)}}%</span>
+                <span class="comp-target">Target: ≥95%</span>
+                <mat-progress-bar mode="determinate" [value]="dash().blueDropScore || 0" color="primary"></mat-progress-bar>
+              </div>
+            </div>
+            <div class="comp-card green-drop">
+              <mat-icon>eco</mat-icon>
+              <div class="comp-info">
+                <span class="comp-label">Green Drop</span>
+                <span class="comp-score">{{(dash().greenDropScore || 0).toFixed(1)}}%</span>
+                <span class="comp-target">Target: ≥90%</span>
+                <mat-progress-bar mode="determinate" [value]="dash().greenDropScore || 0" color="accent"></mat-progress-bar>
+              </div>
+            </div>
+            <div class="comp-card nrw-card">
+              <mat-icon>pie_chart</mat-icon>
+              <div class="comp-info">
+                <span class="comp-label">NRW Performance</span>
+                <span class="comp-score">{{(dash().nrwPercentage || 0).toFixed(1)}}%</span>
+                <span class="comp-target">Target: &lt;30% (Blue Drop std)</span>
+                <mat-progress-bar mode="determinate" [value]="100 - (dash().nrwPercentage || 0)" [color]="(dash().nrwPercentage || 0) > 30 ? 'warn' : 'primary'"></mat-progress-bar>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Type</th><th>Assessment Date</th><th>Overall Score</th><th>Drinking Water</th><th>Wastewater</th><th>Microbiological</th><th>Chemical</th><th>Status</th><th>Next Assessment</th></tr></thead>
+              <tbody>
+                @for (qc of qualityCompliance(); track qc.id) {
+                  <tr>
+                    <td><span class="status-chip" [class]="qc.complianceType === 'Blue Drop' ? 's-approved' : qc.complianceType === 'Green Drop' ? 's-completed' : 's-pending'">{{qc.complianceType}}</span></td>
+                    <td>{{formatDate(qc.assessmentDate)}}</td>
+                    <td class="num highlight">{{qc.overallScore | number:'1.1-1'}}%</td>
+                    <td class="num">{{qc.drinkingWaterScore ? (qc.drinkingWaterScore | number:'1.1-1') + '%' : '—'}}</td>
+                    <td class="num">{{qc.wastewaterScore ? (qc.wastewaterScore | number:'1.1-1') + '%' : '—'}}</td>
+                    <td class="num">{{qc.microbiologicalCompliance ? (qc.microbiologicalCompliance | number:'1.1-1') + '%' : '—'}}</td>
+                    <td class="num">{{qc.chemicalCompliance ? (qc.chemicalCompliance | number:'1.1-1') + '%' : '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + qc.status">{{qc.status}}</span></td>
+                    <td>{{qc.nextAssessmentDate ? formatDate(qc.nextAssessmentDate) : '—'}}</td>
+                  </tr>
+                } @empty { <tr><td colspan="9" class="empty-cell">No compliance assessments found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- POLICY REVIEWS -->
+        @if (compSection() === 'policies') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>policy</mat-icon> Water Inventory Policy Reviews <span class="ref-badge">Sub-process 5.5</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-policy-review')"><mat-icon>add</mat-icon> New Review</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Policy</th><th>Review Date</th><th>Current Version</th><th>Proposed Changes</th><th>Reviewed By</th><th>Status</th><th>Effective Date</th><th>Next Review</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (pr of policyReviews(); track pr.id) {
+                  <tr>
+                    <td>{{pr.policyName}}</td>
+                    <td>{{formatDate(pr.reviewDate)}}</td>
+                    <td>{{pr.currentVersion}}</td>
+                    <td class="desc-cell">{{pr.proposedChanges}}</td>
+                    <td>{{pr.reviewedBy}}</td>
+                    <td><span class="status-chip" [class]="'s-' + pr.status">{{pr.status}}</span></td>
+                    <td>{{pr.effectiveDate ? formatDate(pr.effectiveDate) : '—'}}</td>
+                    <td>{{pr.nextReviewDate ? formatDate(pr.nextReviewDate) : '—'}}</td>
+                    <td class="actions-cell">
+                      @if (pr.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approvePolicyReview(pr)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="9" class="empty-cell">No policy reviews found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== CONFIGURATION TAB ==================== -->
+      @if (activeTab() === 'config') {
+        <div class="sub-nav">
+          <button class="sub-btn" [class.active]="cfgSection() === 'network'" (click)="cfgSection.set('network'); loadRoutes()"><mat-icon>route</mat-icon> Network & Routes</button>
+          <button class="sub-btn" [class.active]="cfgSection() === 'assettypes'" (click)="cfgSection.set('assettypes'); loadAssetTypes()"><mat-icon>category</mat-icon> Asset Types</button>
+          <button class="sub-btn" [class.active]="cfgSection() === 'params'" (click)="cfgSection.set('params'); loadConfiguration()"><mat-icon>settings</mat-icon> Parameters</button>
+        </div>
+
+        @if (cfgSection() === 'network') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>route</mat-icon> Water Network — Routes & Nodes <span class="ref-badge">WATIM056-075</span></div>
+            <div class="section-actions">
+              <button mat-flat-button color="primary" (click)="openForm('create-route')"><mat-icon>add</mat-icon> New Route</button>
+              <button mat-stroked-button (click)="openForm('create-node')"><mat-icon>add_circle</mat-icon> New Node</button>
+            </div>
+          </div>
+          <h4 style="margin:16px 0 8px;color:#1e293b;font-size:14px;"><mat-icon style="font-size:16px;vertical-align:middle;">route</mat-icon> Routes</h4>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Route Name</th><th>Description</th><th>Nodes</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (r of routes(); track r.id) {
+                  <tr>
+                    <td>{{r.id}}</td>
+                    <td>{{r.routeName}}</td>
+                    <td class="desc-cell">{{r.description}}</td>
+                    <td class="num">{{r.nodeCount}}</td>
+                    <td><span class="status-chip" [class]="r.enabled ? 's-approved' : 's-cancelled'">{{r.enabled ? 'Active' : 'Inactive'}}</span></td>
+                    <td class="actions-cell"><button mat-icon-button matTooltip="View Nodes" (click)="loadRouteNodes(r.id)"><mat-icon>visibility</mat-icon></button></td>
+                  </tr>
+                } @empty { <tr><td colspan="6" class="empty-cell">No routes configured</td></tr> }
+              </tbody>
+            </table>
+          </div>
+          @if (routeNodes().length > 0) {
+            <h4 style="margin:16px 0 8px;color:#1e293b;font-size:14px;"><mat-icon style="font-size:16px;vertical-align:middle;">share</mat-icon> Nodes for Selected Route</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>ID</th><th>Node Name</th><th>Type</th><th>Asset Type</th><th>Capacity (kl)</th><th>Inflow Meter</th><th>Outflow Meter</th><th>Status</th></tr></thead>
+                <tbody>
+                  @for (n of routeNodes(); track n.id) {
+                    <tr>
+                      <td>{{n.id}}</td>
+                      <td>{{n.nodeName}}</td>
+                      <td>{{n.nodeType}}</td>
+                      <td>{{n.assetTypeName || '—'}}</td>
+                      <td class="num">{{n.capacityKl | number:'1.0-0'}}</td>
+                      <td>{{n.inflowMeterNumber || '—'}}</td>
+                      <td>{{n.outflowMeterNumber || '—'}}</td>
+                      <td><span class="status-chip" [class]="n.enabled ? 's-approved' : 's-cancelled'">{{n.enabled ? 'Active' : 'Inactive'}}</span></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+
+        @if (cfgSection() === 'assettypes') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>category</mat-icon> Water Asset Types <span class="ref-badge">WATIM056</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-asset-type')"><mat-icon>add</mat-icon> New Asset Type</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Description</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (at of assetTypes(); track at.id) {
+                  <tr>
+                    <td>{{at.id}}</td>
+                    <td>{{at.description}}</td>
+                    <td>{{at.category}}</td>
+                    <td><span class="status-chip" [class]="at.enabled ? 's-approved' : 's-cancelled'">{{at.enabled ? 'Active' : 'Inactive'}}</span></td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="Edit" (click)="openForm('edit-asset-type', at)"><mat-icon>edit</mat-icon></button>
+                      <button mat-icon-button matTooltip="Delete" (click)="deleteAssetType(at)" style="color:#dc2626;"><mat-icon>delete</mat-icon></button>
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="5" class="empty-cell">No asset types configured</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (cfgSection() === 'params') {
+          <div class="section-header">
+            <div class="section-title"><mat-icon>settings</mat-icon> System Configuration Parameters <span class="ref-badge">WATIM004, Sub-process 5.6</span></div>
+            <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('create-config')"><mat-icon>add</mat-icon> New Parameter</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Parameter</th><th>Value</th><th>Category</th><th>Description</th><th>Last Modified</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                @for (c of configuration(); track c.id) {
+                  <tr>
+                    <td>{{c.parameterName}}</td>
+                    <td class="highlight">{{c.parameterValue}}</td>
+                    <td>{{c.category}}</td>
+                    <td class="desc-cell">{{c.description}}</td>
+                    <td>{{c.lastModifiedDate ? formatDate(c.lastModifiedDate) : '—'}}</td>
+                    <td><span class="status-chip" [class]="'s-' + c.status">{{c.status}}</span></td>
+                    <td class="actions-cell">
+                      @if (c.status === 'pending') { <button mat-icon-button matTooltip="Approve" (click)="approveConfig(c)"><mat-icon>check_circle</mat-icon></button> }
+                    </td>
+                  </tr>
+                } @empty { <tr><td colspan="7" class="empty-cell">No configuration parameters found</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      <!-- ==================== REPORTS TAB ==================== -->
+      @if (activeTab() === 'reports') {
+        <div class="section-header">
+          <div class="section-title"><mat-icon>summarize</mat-icon> Monthly Reports <span class="ref-badge">WATIM017, Sub-process 5.13</span></div>
+          <div class="section-actions"><button mat-flat-button color="primary" (click)="openForm('generate-report')"><mat-icon>auto_awesome</mat-icon> Generate Report</button></div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Ref</th><th>Type</th><th>Period</th><th>Generated</th><th>Generated By</th><th>Status</th><th>Approved By</th><th>Submitted To</th><th>Actions</th></tr></thead>
+            <tbody>
+              @for (rp of monthlyReports(); track rp.id) {
+                <tr>
+                  <td class="ref-cell">{{rp.referenceNumber}}</td>
+                  <td>{{rp.reportType}}</td>
+                  <td>{{getMonthName(rp.periodMonth)}} {{rp.periodYear}}</td>
+                  <td>{{formatDate(rp.generatedDate)}}</td>
+                  <td>{{rp.generatedBy}}</td>
+                  <td><span class="status-chip" [class]="'s-' + rp.status">{{rp.status}}</span></td>
+                  <td>{{rp.approvedBy || '—'}}</td>
+                  <td>{{rp.submittedTo || '—'}}</td>
+                  <td class="actions-cell">
+                    @if (rp.status === 'generated') { <button mat-icon-button matTooltip="Approve" (click)="approveReport(rp)"><mat-icon>check_circle</mat-icon></button> }
+                    @if (rp.status === 'approved') { <button mat-icon-button matTooltip="Submit to Reporting Mechanism" (click)="submitReport(rp)"><mat-icon>send</mat-icon></button> }
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="9" class="empty-cell">No monthly reports found</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- ==================== AI ANALYTICS TAB ==================== -->
+      @if (activeTab() === 'analytics') {
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#ef4444;">trending_up</mat-icon> NRW Trend Analysis (24 Months)</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> WATIM017 — Blue Drop Target &lt;30%</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiNrwTrendChart"></canvas></div>
+            <div style="display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+              <div style="flex:1;text-align:center;background:#fef2f2;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Current NRW</div>
+                <div style="font-size:18px;font-weight:700;" [style.color]="(analyticsNrwSummary().currentNrw || 0) > 30 ? '#dc2626' : '#10b981'">{{(analyticsNrwSummary().currentNrw || 0).toFixed(1)}}%</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f0fdf4;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">12-Month Improvement</div>
+                <div style="font-size:18px;font-weight:700;color:#10b981;">{{(analyticsNrwSummary().improvement || 0).toFixed(1)}}%</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#eff6ff;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Predicted (6 Mo)</div>
+                <div style="font-size:18px;font-weight:700;color:#3b82f6;">{{(analyticsNrwSummary().predicted || 0).toFixed(1)}}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#0284c7;">route</mat-icon> Route Efficiency Comparison</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> WATIM001-005 — Network monitoring</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiRouteEfficiencyChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (r of analyticsRouteEfficiency(); track r.route) {
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;flex:2;">{{r.route}}</span>
+                  <div style="width:80px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+                    <div [style.width.%]="r.efficiency" style="height:100%;border-radius:3px;" [style.background]="r.efficiency >= 80 ? '#10b981' : r.efficiency >= 60 ? '#f59e0b' : '#dc2626'"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;width:45px;text-align:right;" [style.color]="r.efficiency >= 80 ? '#10b981' : r.efficiency >= 60 ? '#f59e0b' : '#dc2626'">{{r.efficiency}}%</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#8b5cf6;">water_damage</mat-icon> Water Loss Category Breakdown</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> IWA Water Balance — Real vs Apparent Loss</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiLossCategoryChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (cat of analyticsLossCategories(); track cat.category) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;">{{cat.category}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{formatNum(cat.volumeKl)}} kl</span>
+                  <span style="font-size:11px;font-weight:600;color:#8b5cf6;">{{cat.percentage.toFixed(1)}}%</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#f59e0b;">payments</mat-icon> Cost Per Kilolitre Trend</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 12 — WAC Valuation</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiCostTrendChart"></canvas></div>
+            <div style="display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+              <div style="flex:1;text-align:center;background:#fffbeb;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Current WAC</div>
+                <div style="font-size:18px;font-weight:700;color:#f59e0b;">R{{(analyticsCostData().currentWac || 0).toFixed(2)}}/kl</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#eff6ff;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Avg Tariff</div>
+                <div style="font-size:18px;font-weight:700;color:#3b82f6;">R{{(analyticsCostData().avgTariff || 0).toFixed(2)}}/kl</div>
+              </div>
+              <div style="flex:1;text-align:center;" [style.background]="(analyticsCostData().margin || 0) >= 0 ? '#f0fdf4' : '#fef2f2'" style="border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Margin</div>
+                <div style="font-size:18px;font-weight:700;" [style.color]="(analyticsCostData().margin || 0) >= 0 ? '#10b981' : '#dc2626'">{{(analyticsCostData().margin || 0) >= 0 ? '+' : ''}}{{(analyticsCostData().margin || 0).toFixed(1)}}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#059669;">science</mat-icon> Treatment Plant Performance</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> WATIM012 — Treatment efficiency</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiTreatmentChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (p of analyticsTreatmentPlants(); track p.name) {
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;flex:2;">{{p.name}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{p.volumeKl | number}} kl/mo</span>
+                  <span style="font-size:11px;font-weight:600;" [style.color]="p.efficiency >= 90 ? '#10b981' : p.efficiency >= 80 ? '#f59e0b' : '#dc2626'">{{p.efficiency}}%</span>
+                  <span style="font-size:11px;color:#94a3b8;">R{{p.costPerKl.toFixed(2)}}/kl</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#dc2626;">warning_amber</mat-icon> Consumption Anomaly Detection</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> AI-Powered — Pattern analysis</span>
+            </div>
+            @for (a of analyticsAnomalies(); track a.storagePoint) {
+              <div style="padding:10px;border:1px solid {{a.severity === 'critical' ? '#fecaca' : a.severity === 'warning' ? '#fde68a' : '#e2e8f0'}};border-radius:10px;margin-bottom:8px;background:{{a.severity === 'critical' ? '#fef2f2' : a.severity === 'warning' ? '#fffbeb' : '#f8fafc'}};">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <mat-icon style="font-size:16px;width:16px;height:16px;" [style.color]="a.severity === 'critical' ? '#dc2626' : a.severity === 'warning' ? '#f59e0b' : '#64748b'">{{a.severity === 'critical' ? 'error' : a.severity === 'warning' ? 'warning' : 'info'}}</mat-icon>
+                    <span style="font-size:12px;font-weight:600;color:#1e293b;">{{a.storagePoint}}</span>
+                  </div>
+                  <span style="font-size:10px;color:#64748b;background:white;padding:1px 6px;border-radius:3px;">{{a.route}}</span>
+                </div>
+                <div style="font-size:11px;color:#475569;margin-bottom:4px;">{{a.description}}</div>
+                <div style="display:flex;gap:8px;">
+                  <span style="font-size:10px;color:#dc2626;font-weight:600;">Variance: {{a.variance > 0 ? '+' : ''}}{{a.variance.toFixed(1)}}%</span>
+                  <span style="font-size:10px;color:#64748b;">Expected: {{formatNum(a.expectedKl)}} kl | Actual: {{formatNum(a.actualKl)}} kl</span>
+                </div>
+              </div>
+            }
+            @if (analyticsAnomalies().length === 0) {
+              <div style="text-align:center;padding:40px;color:#94a3b8;">
+                <mat-icon style="font-size:36px;width:36px;height:36px;margin-bottom:8px;">check_circle</mat-icon>
+                <p style="font-size:12px;">No anomalies detected — all readings within expected ranges</p>
+              </div>
+            }
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#3b82f6;">analytics</mat-icon> Demand Forecasting (6 Months)</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> AI Predictive — Seasonal modelling</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiDemandForecastChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (f of analyticsForecast(); track f.month) {
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;color:#1e293b;">{{f.month}}</span>
+                  <span style="font-size:11px;color:#3b82f6;">Forecast: {{formatNum(f.forecastKl)}} kl</span>
+                  <span style="font-size:11px;color:#64748b;">Confidence: {{f.confidence}}%</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="chart-card auto-h">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#059669;">verified</mat-icon> Blue/Green Drop Compliance Matrix</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> DWS Regulatory Framework</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+              @for (area of analyticsComplianceAreas(); track area.area) {
+                <div style="background:#f8fafc;border-radius:10px;padding:14px;border:1px solid #e2e8f0;">
+                  <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:8px;">{{area.area}}</div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size:11px;color:#64748b;">Score:</span>
+                    <span style="font-size:11px;font-weight:600;" [style.color]="area.score >= 90 ? '#10b981' : area.score >= 70 ? '#f59e0b' : '#dc2626'">{{area.score}}%</span>
+                  </div>
+                  <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+                    <div [style.width.%]="area.score" style="height:100%;border-radius:3px;" [style.background]="area.score >= 90 ? '#10b981' : area.score >= 70 ? '#f59e0b' : '#dc2626'"></div>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:6px;">
+                    <span style="font-size:10px;color:#10b981;background:#f0fdf4;padding:2px 6px;border-radius:3px;">{{area.compliant}} compliant</span>
+                    @if (area.nonCompliant > 0) {
+                      <span style="font-size:10px;color:#dc2626;background:#fef2f2;padding:2px 6px;border-radius:3px;">{{area.nonCompliant}} gaps</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            <div [style.background]="(analyticsOverallCompliance() || 0) >= 85 ? '#f0fdf4' : '#fffbeb'" style="border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:10px;color:#64748b;">Overall Water Quality Compliance</div>
+              <div style="font-size:24px;font-weight:700;" [style.color]="(analyticsOverallCompliance() || 0) >= 85 ? '#10b981' : '#f59e0b'">{{analyticsOverallCompliance() || 0}}%</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#6366f1;">account_balance</mat-icon> Revenue vs Cost Analysis</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> MFMA s64 — Revenue management</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiRevenueCostChart"></canvas></div>
+            <div style="display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+              <div style="flex:1;text-align:center;background:#f0fdf4;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Total Revenue</div>
+                <div style="font-size:16px;font-weight:700;color:#10b981;">{{formatRand(analyticsRevenueData().totalRevenue || 0)}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#fef2f2;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Total Cost</div>
+                <div style="font-size:16px;font-weight:700;color:#dc2626;">{{formatRand(analyticsRevenueData().totalCost || 0)}}</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#eff6ff;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#64748b;">Cost Recovery</div>
+                <div style="font-size:16px;font-weight:700;color:#3b82f6;">{{(analyticsRevenueData().costRecovery || 0).toFixed(1)}}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><mat-icon style="color:#f59e0b;">hub</mat-icon> Infrastructure Age & Risk</h3>
+              <span class="legislation-badge"><mat-icon style="font-size:10px;width:10px;height:10px;">menu_book</mat-icon> GRAP 17 — Asset lifecycle</span>
+            </div>
+            <div style="height:250px;position:relative;"><canvas id="aiInfraAgeChart"></canvas></div>
+            <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;">
+              @for (b of analyticsInfraBrackets(); track b.bracket) {
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                  <span style="font-size:11px;font-weight:500;color:#1e293b;">{{b.bracket}}</span>
+                  <span style="font-size:11px;color:#64748b;">{{b.count}} assets</span>
+                  <span style="font-size:11px;font-weight:600;" [style.color]="b.riskLevel === 'high' ? '#dc2626' : b.riskLevel === 'medium' ? '#f59e0b' : '#10b981'">{{b.riskLevel | uppercase}}</span>
+                  <span style="font-size:11px;color:#94a3b8;">{{formatRand(b.replacementCost)}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+      }
+
+      <!-- ==================== FORM OVERLAYS ==================== -->
+      @if (formMode()) {
+        <div class="form-overlay" (click)="closeForm()">
+          <div class="form-panel" [class.wide]="isWideForm()" (click)="$event.stopPropagation()">
+            <div class="form-header">
+              <h3><mat-icon>{{formIcon()}}</mat-icon> {{formTitle()}}</h3>
+              <button mat-icon-button (click)="closeForm()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="form-body">
+              <!-- CREATE METER READING -->
+              @if (formMode() === 'create-reading') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Storage Point</mat-label>
+                    <mat-select [(ngModel)]="fd.storagePointId"><mat-option value="">Select...</mat-option>@for(n of allNodes(); track n.id) {<mat-option [value]="n.id">{{n.nodeName}} ({{n.routeName}})</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Reading Date</mat-label><input matInput [matDatepicker]="readingPicker" [(ngModel)]="fd.readingDate"><mat-datepicker-toggle matIconSuffix [for]="readingPicker"></mat-datepicker-toggle><mat-datepicker #readingPicker></mat-datepicker></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Previous Reading</mat-label><input matInput type="number" [(ngModel)]="fd.previousReading"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Current Reading</mat-label><input matInput type="number" [(ngModel)]="fd.currentReading"></mat-form-field>
+                </div>
+                <div class="calc-row" *ngIf="fd.currentReading && fd.previousReading">
+                  <span>Consumption: <strong>{{fd.currentReading - fd.previousReading}} kl</strong></span>
+                  <span [style.color]="getVariance() > 20 ? '#dc2626' : '#16a34a'">Variance: <strong>{{getVariance() | number:'1.1-1'}}%</strong></span>
+                  @if (getVariance() > 20) { <span class="flag-text"><mat-icon style="font-size:16px;vertical-align:middle;">warning</mat-icon> >20% variance — will be auto-flagged for investigation</span> }
+                </div>
+              }
+
+              <!-- AMEND READING -->
+              @if (formMode() === 'amend-reading') {
+                <div class="info-banner"><mat-icon>info</mat-icon> Amending reading for {{editItem?.storagePointName}} on {{formatDate(editItem?.readingDate)}}</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Corrected Reading</mat-label><input matInput type="number" [(ngModel)]="fd.currentReading"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Reason for Amendment</mat-label><input matInput [(ngModel)]="fd.amendReason"></mat-form-field>
+                </div>
+              }
+
+              <!-- BULK READING -->
+              @if (formMode() === 'bulk-reading') {
+                <div class="info-banner"><mat-icon>upload</mat-icon> Upload a CSV file with columns: StoragePointId, ReadingDate, PreviousReading, CurrentReading</div>
+                <input type="file" accept=".csv" (change)="handleFile($event)">
+              }
+
+              <!-- CREATE STOCKTAKE -->
+              @if (formMode() === 'create-stocktake') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Stocktake Date</mat-label><input matInput [matDatepicker]="stocktakePicker" [(ngModel)]="fd.stocktakeDate"><mat-datepicker-toggle matIconSuffix [for]="stocktakePicker"></mat-datepicker-toggle><mat-datepicker #stocktakePicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Route (optional)</mat-label>
+                    <mat-select [(ngModel)]="fd.routeId"><mat-option value="">All Routes</mat-option>@for(r of routes(); track r.id) {<mat-option [value]="r.id">{{r.routeName}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+              }
+
+              <!-- COUNT / VERIFY / APPROVE STOCKTAKE -->
+              @if (formMode() === 'count-stocktake' || formMode() === 'verify-stocktake' || formMode() === 'approve-stocktake') {
+                <div class="info-banner"><mat-icon>info</mat-icon> {{formMode() === 'count-stocktake' ? 'Record physical volumes at each storage point' : formMode() === 'verify-stocktake' ? 'Independently verify the physical counts' : 'Review variances and approve the stocktake'}}</div>
+                <div class="form-row"><mat-form-field appearance="outline"><mat-label>Comments</mat-label><textarea matInput rows="3" [(ngModel)]="fd.comments"></textarea></mat-form-field></div>
+              }
+
+              <!-- CREATE ACQUISITION -->
+              @if (formMode() === 'create-acquisition') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Acquisition Date</mat-label><input matInput [matDatepicker]="acquisitionPicker" [(ngModel)]="fd.acquisitionDate"><mat-datepicker-toggle matIconSuffix [for]="acquisitionPicker"></mat-datepicker-toggle><mat-datepicker #acquisitionPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Source Type</mat-label>
+                    <mat-select [(ngModel)]="fd.sourceType"><mat-option value="bulk_purchase">Bulk Purchase</mat-option><mat-option value="water_board">Water Board</mat-option><mat-option value="borehole">Borehole</mat-option><mat-option value="other">Other</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Source Name</mat-label><input matInput [(ngModel)]="fd.sourceName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Volume (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.volumeKl"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Unit Cost (R/kl)</mat-label><input matInput type="number" [(ngModel)]="fd.unitCostZar"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Transport Cost (R)</mat-label><input matInput type="number" [(ngModel)]="fd.transportCostZar"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Treatment Cost (R)</mat-label><input matInput type="number" [(ngModel)]="fd.treatmentCostZar"></mat-form-field>
+                </div>
+                <div class="calc-row" *ngIf="fd.volumeKl && fd.unitCostZar">
+                  <span>Total: <strong>R{{((fd.volumeKl * fd.unitCostZar) + (fd.transportCostZar || 0) + (fd.treatmentCostZar || 0)) | number:'1.2-2'}}</strong></span>
+                </div>
+              }
+
+              <!-- CREATE DISTRIBUTION -->
+              @if (formMode() === 'create-distribution') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Distribution Date</mat-label><input matInput [matDatepicker]="distributionPicker" [(ngModel)]="fd.distributionDate"><mat-datepicker-toggle matIconSuffix [for]="distributionPicker"></mat-datepicker-toggle><mat-datepicker #distributionPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>From Storage Point</mat-label><input matInput [(ngModel)]="fd.fromStoragePoint"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Consumer</mat-label><input matInput [(ngModel)]="fd.toConsumer"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Consumer Type</mat-label>
+                    <mat-select [(ngModel)]="fd.consumerType"><mat-option value="residential">Residential</mat-option><mat-option value="commercial">Commercial</mat-option><mat-option value="industrial">Industrial</mat-option><mat-option value="municipal">Municipal</mat-option><mat-option value="agricultural">Agricultural</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Volume (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.volumeKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Tariff/kl (R)</mat-label><input matInput type="number" [(ngModel)]="fd.tariffPerKl"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE WATER LOSS -->
+              @if (formMode() === 'create-loss') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Route (optional)</mat-label>
+                    <mat-select [(ngModel)]="fd.routeId"><mat-option value="">All Routes</mat-option>@for(r of routes(); track r.id) {<mat-option [value]="r.id">{{r.routeName}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Total Produced (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.totalProducedKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Total Distributed (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.totalDistributedKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Total Billed (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.totalBilledKl"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Physical Loss (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.physicalLossKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Commercial Loss (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.commercialLossKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Unbilled Authorised (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.unbilledAuthorisedKl"></mat-form-field>
+                </div>
+              }
+
+              <!-- RUN VALUATION -->
+              @if (formMode() === 'run-valuation') {
+                <div class="info-banner"><mat-icon>gavel</mat-icon> GRAP 12 NRV = Estimated selling price − Estimated costs of completion − Estimated costs necessary to make the sale</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                </div>
+              }
+
+              <!-- RUN RECONCILIATION -->
+              @if (formMode() === 'run-reconciliation') {
+                <div class="info-banner"><mat-icon>balance</mat-icon> Opening + Acquisitions − Distributions − Losses ± Adjustments = Closing</div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE TREATMENT -->
+              @if (formMode() === 'create-treatment') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Treatment Plant</mat-label><input matInput [(ngModel)]="fd.treatmentPlantName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Raw Water (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.rawWaterVolumeKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Treated (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.treatedVolumeKl"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Output (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.outputVolumeKl"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Chemical Cost (R)</mat-label><input matInput type="number" [(ngModel)]="fd.chemicalCostZar"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Energy Cost (R)</mat-label><input matInput type="number" [(ngModel)]="fd.energyCostZar"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Labour Cost (R)</mat-label><input matInput type="number" [(ngModel)]="fd.labourCostZar"></mat-form-field>
+                </div>
+              }
+
+              <!-- CREATE ADJUSTMENT -->
+              @if (formMode() === 'create-adjustment') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Entry Date</mat-label><input matInput [matDatepicker]="entryPicker" [(ngModel)]="fd.entryDate"><mat-datepicker-toggle matIconSuffix [for]="entryPicker"></mat-datepicker-toggle><mat-datepicker #entryPicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Type</mat-label>
+                    <mat-select [(ngModel)]="fd.entryType"><mat-option value="write_down">Write-Down (NRV)</mat-option><mat-option value="correction">Correction</mat-option><mat-option value="reclassification">Reclassification</mat-option><mat-option value="loss_adjustment">Loss Adjustment</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Debit Account</mat-label><input matInput [(ngModel)]="fd.debitAccountCode"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Credit Account</mat-label><input matInput [(ngModel)]="fd.creditAccountCode"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Amount (R)</mat-label><input matInput type="number" [(ngModel)]="fd.amountZar"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Volume (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.volumeKl"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="2" [(ngModel)]="fd.description"></textarea></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Reason</mat-label><textarea matInput rows="2" [(ngModel)]="fd.reason"></textarea></mat-form-field>
+              }
+
+              <!-- GENERATE REPORT -->
+              @if (formMode() === 'generate-report') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Report Type</mat-label>
+                    <mat-select [(ngModel)]="fd.reportType"><mat-option value="MonthlyInventoryReport">Monthly Inventory Report</mat-option><mat-option value="ReconciliationSchedule">Reconciliation Schedule</mat-option><mat-option value="WaterLossReport">Water Loss Report</mat-option><mat-option value="ValuationSummary">Valuation Summary</mat-option><mat-option value="ComplianceReport">Compliance Report</mat-option><mat-option value="NRWAnalysisReport">NRW Analysis Report</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                </div>
+              }
+
+              <!-- GENERIC FORMS (working paper, policy review, compliance, config, route, node, asset type) -->
+              @if (formMode() === 'create-working-paper' || formMode() === 'edit-working-paper') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Paper Type</mat-label>
+                    <mat-select [(ngModel)]="fd.paperType"><mat-option value="Valuation">Valuation</mat-option><mat-option value="Reconciliation">Reconciliation</mat-option><mat-option value="Stocktake">Stocktake</mat-option><mat-option value="Water Loss">Water Loss</mat-option><mat-option value="Year-End">Year-End</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Month</mat-label>
+                    <mat-select [(ngModel)]="fd.periodMonth">@for(m of months; track m.v) {<mat-option [value]="m.v">{{m.l}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Year</mat-label><input matInput type="number" [(ngModel)]="fd.periodYear"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Title</mat-label><input matInput [(ngModel)]="fd.title"></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="3" [(ngModel)]="fd.description"></textarea></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Notes</mat-label><textarea matInput rows="3" [(ngModel)]="fd.notes"></textarea></mat-form-field>
+              }
+
+              @if (formMode() === 'create-policy-review') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Policy Name</mat-label><input matInput [(ngModel)]="fd.policyName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Current Version</mat-label><input matInput [(ngModel)]="fd.currentVersion"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Proposed Changes</mat-label><textarea matInput rows="4" [(ngModel)]="fd.proposedChanges"></textarea></mat-form-field>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Effective Date</mat-label><input matInput [matDatepicker]="effectivePicker" [(ngModel)]="fd.effectiveDate"><mat-datepicker-toggle matIconSuffix [for]="effectivePicker"></mat-datepicker-toggle><mat-datepicker #effectivePicker></mat-datepicker></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Next Review Date</mat-label><input matInput [matDatepicker]="nextReviewPicker" [(ngModel)]="fd.nextReviewDate"><mat-datepicker-toggle matIconSuffix [for]="nextReviewPicker"></mat-datepicker-toggle><mat-datepicker #nextReviewPicker></mat-datepicker></mat-form-field>
+                </div>
+              }
+
+              @if (formMode() === 'create-compliance') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Compliance Type</mat-label>
+                    <mat-select [(ngModel)]="fd.complianceType"><mat-option value="Blue Drop">Blue Drop</mat-option><mat-option value="Green Drop">Green Drop</mat-option><mat-option value="No Drop">No Drop</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Assessment Date</mat-label><input matInput [matDatepicker]="assessmentPicker" [(ngModel)]="fd.assessmentDate"><mat-datepicker-toggle matIconSuffix [for]="assessmentPicker"></mat-datepicker-toggle><mat-datepicker #assessmentPicker></mat-datepicker></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Overall Score (%)</mat-label><input matInput type="number" [(ngModel)]="fd.overallScore"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Drinking Water Score (%)</mat-label><input matInput type="number" [(ngModel)]="fd.drinkingWaterScore"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Wastewater Score (%)</mat-label><input matInput type="number" [(ngModel)]="fd.wastewaterScore"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Microbiological (%)</mat-label><input matInput type="number" [(ngModel)]="fd.microbiologicalCompliance"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Chemical (%)</mat-label><input matInput type="number" [(ngModel)]="fd.chemicalCompliance"></mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Findings</mat-label><textarea matInput rows="3" [(ngModel)]="fd.findings"></textarea></mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Corrective Actions</mat-label><textarea matInput rows="3" [(ngModel)]="fd.correctiveActions"></textarea></mat-form-field>
+              }
+
+              @if (formMode() === 'create-route') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Route Name</mat-label><input matInput [(ngModel)]="fd.routeName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Description</mat-label><input matInput [(ngModel)]="fd.description"></mat-form-field>
+                </div>
+              }
+
+              @if (formMode() === 'create-node') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Route</mat-label>
+                    <mat-select [(ngModel)]="fd.routeId">@for(r of routes(); track r.id) {<mat-option [value]="r.id">{{r.routeName}}</mat-option>}</mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Node Name</mat-label><input matInput [(ngModel)]="fd.nodeName"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Node Type</mat-label>
+                    <mat-select [(ngModel)]="fd.nodeType"><mat-option value="Reservoir">Reservoir</mat-option><mat-option value="Pipeline">Pipeline</mat-option><mat-option value="Pump Station">Pump Station</mat-option><mat-option value="Treatment Plant">Treatment Plant</mat-option><mat-option value="Meter Point">Meter Point</mat-option></mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Capacity (kl)</mat-label><input matInput type="number" [(ngModel)]="fd.capacityKl"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Inflow Meter No.</mat-label><input matInput [(ngModel)]="fd.inflowMeterNumber"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Outflow Meter No.</mat-label><input matInput [(ngModel)]="fd.outflowMeterNumber"></mat-form-field>
+                </div>
+              }
+
+              @if (formMode() === 'create-asset-type' || formMode() === 'edit-asset-type') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Description</mat-label><input matInput [(ngModel)]="fd.description"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="fd.category"><mat-option value="Reservoir">Reservoir</mat-option><mat-option value="Pipeline">Pipeline</mat-option><mat-option value="Pump">Pump</mat-option><mat-option value="Treatment">Treatment</mat-option><mat-option value="Meter">Meter</mat-option><mat-option value="Valve">Valve</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+              }
+
+              @if (formMode() === 'create-config') {
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Parameter Name</mat-label><input matInput [(ngModel)]="fd.parameterName"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>Value</mat-label><input matInput [(ngModel)]="fd.parameterValue"></mat-form-field>
+                </div>
+                <div class="form-row">
+                  <mat-form-field appearance="outline"><mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="fd.category"><mat-option value="General">General</mat-option><mat-option value="Meter Reading">Meter Reading</mat-option><mat-option value="Valuation">Valuation</mat-option><mat-option value="Water Loss">Water Loss</mat-option><mat-option value="Compliance">Compliance</mat-option></mat-select>
+                  </mat-form-field>
+                </div>
+                <mat-form-field appearance="outline" style="width:100%;"><mat-label>Description</mat-label><textarea matInput rows="2" [(ngModel)]="fd.description"></textarea></mat-form-field>
+              }
+            </div>
+            <div class="form-footer">
+              <button mat-stroked-button (click)="closeForm()">Cancel</button>
+              <button mat-flat-button color="primary" (click)="submitForm()"><mat-icon>save</mat-icon> {{submitLabel()}}</button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>

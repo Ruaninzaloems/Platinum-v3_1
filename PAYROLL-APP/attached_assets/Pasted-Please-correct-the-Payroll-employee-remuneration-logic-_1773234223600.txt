@@ -1,0 +1,59 @@
+Please correct the Payroll employee remuneration logic. I previously explained Upper Limits incorrectly, so this prompt replaces that logic.
+
+==================================================
+CORE REMUNERATION RULES
+==================================================
+
+There are 2 different remuneration models in the system:
+
+1. TASK GRADE EMPLOYEES
+2. UPPER LIMIT EMPLOYEES
+
+These must be handled differently.
+
+--------------------------------------------------
+A. TASK GRADE EMPLOYEES
+--------------------------------------------------
+For employees linked to a Task Grade:
+- the employee’s salary is derived directly from the Task Grade structure / notch / salary setup
+- Task Grade determines the employee’s salary-related values
+- in this case, the basic salary can be taken directly from the Task Grade-linked remuneration setup
+
+--------------------------------------------------
+B. UPPER LIMIT EMPLOYEES
+--------------------------------------------------
+For employees linked to an Upper Limit:
+- the Upper Limit value is NOT the employee’s basic salary
+- the Upper Limit value represents the employee’s TOTAL PACKAGE target
+- example:
+  - if employee is linked to Upper Limit = Maximum = 2,077,380.00
+  - then the employee’s total package must equal 2,077,380.00
+- the employee’s actual package is made up through a Salary Structure
+- the Salary Structure contains multiple Salary Transactions / package components
+- each component has a value and a flag indicating whether it is included in the package or not
+
+IMPORTANT RULE:
+- ONLY salary structure components marked as “Included in Package” must be counted toward the package total
+- components not marked as included must NOT count toward the package total
+- therefore:
+  - Upper Limit = target package total
+  - Salary Structure included items = actual package makeup
+  - one of those included items may be Basic Salary, but the Upper Limit itself is not the Basic Salary
+
+==================================================
+RELATIONSHIP FLOW
+==================================================
+
+The system hierarchy is:
+
+- Employee Type determines remuneration model / applicability
+- Job Profile can be linked to either:
+  - Task Grade
+  - Upper Limit
+- Position links to Job Profile
+- Employee links to Position
+- Employee may then have a Salary Structure linked / maintained
+
+This is VERY important:
+- The system must correctly determine whether the employee uses Task Grade or Upper Limit
+- It must not treat Upper Limit employees as if the upper limit amount is the basic salary

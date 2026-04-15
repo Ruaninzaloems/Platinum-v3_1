@@ -1,0 +1,234 @@
+<mat-sidenav-container class="app-container">
+  <mat-sidenav #sidenav mode="side" opened class="app-sidenav">
+    <div class="sidenav-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <mat-icon>account_balance</mat-icon>
+        </div>
+        <div>
+          <div class="brand-name">PLATINUM</div>
+          <div class="brand-sub">BUDGET MANAGEMENT</div>
+        </div>
+      </div>
+    </div>
+    <div class="sidenav-nav">
+      <a class="nav-link" routerLink="/dashboard" routerLinkActive="active-link">
+        <mat-icon class="nav-icon">dashboard</mat-icon>
+        <span>Dashboard</span>
+      </a>
+
+      <mat-accordion class="sidebar-accordion" multi>
+        <mat-expansion-panel class="sidebar-panel" [expanded]="isGroupActive('/budget-versions') || isGroupActive('/budget-strings') || isGroupActive('/projects') || isGroupActive('/virements') || isGroupActive('/virement-policy') || isGroupActive('/budget-approval')" hideToggle>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon class="group-icon">settings</mat-icon>
+              <span class="group-title">Budget Management</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <mat-accordion class="sub-accordion" multi>
+            <mat-expansion-panel class="sub-panel" [expanded]="isGroupActive('/projects')" hideToggle>
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon class="nav-icon sub-parent-icon">folder_open</mat-icon>
+                  <span class="sub-parent-title">Projects</span>
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <a class="nav-link sub-link" routerLink="/projects" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact:true}">
+                <span>Project Budgets</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/export-original-budget" routerLinkActive="active-link">
+                <span>Export Original Budget</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/export-adjustment-budget" routerLinkActive="active-link">
+                <span>Export Adjustment Budget</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/import" routerLinkActive="active-link">
+                <span>Import Projects</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/register" routerLinkActive="active-link">
+                <span>Register Projects / Exception List</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/zero-budget" routerLinkActive="active-link">
+                <span>Add Zero Budget Items to Current Budget</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/projects/cp3-sync" routerLinkActive="active-link">
+                <span>CP3 Project Sync</span>
+              </a>
+            </mat-expansion-panel>
+          </mat-accordion>
+          <mat-accordion class="sub-accordion" multi>
+            <mat-expansion-panel class="sub-panel" [expanded]="isGroupActive('/budget-approval')" hideToggle>
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon class="nav-icon sub-parent-icon">approval</mat-icon>
+                  <span class="sub-parent-title">Budget Approval</span>
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <a class="nav-link sub-link" routerLink="/budget-approval/approve-draft" routerLinkActive="active-link">
+                <span>Approve Draft</span>
+              </a>
+              <a class="nav-link sub-link" routerLink="/budget-approval/approve-final" routerLinkActive="active-link">
+                <span>Approve Final</span>
+              </a>
+            </mat-expansion-panel>
+          </mat-accordion>
+          <a class="nav-link" routerLink="/budget-versions" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">history</mat-icon>
+            <span>Budget Versions</span>
+          </a>
+          <a class="nav-link" routerLink="/budget-strings" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">code</mat-icon>
+            <span>mSCOA Strings</span>
+          </a>
+          <a class="nav-link" routerLink="/virements" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">swap_horiz</mat-icon>
+            <span>Virements</span>
+          </a>
+          <a class="nav-link" routerLink="/virement-policy" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">policy</mat-icon>
+            <span>Virement Policy</span>
+          </a>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel class="sidebar-panel" [expanded]="isGroupActive('/billing')" hideToggle>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon class="group-icon">receipt_long</mat-icon>
+              <span class="group-title">Billing Budgeting</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a class="nav-link" routerLink="/billing/tariffs" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">receipt_long</mat-icon>
+            <span>Service & Tariffs</span>
+          </a>
+          <a class="nav-link" routerLink="/billing/scenarios" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">compare_arrows</mat-icon>
+            <span>Tariff Scenarios</span>
+          </a>
+          <a class="nav-link" routerLink="/billing/consumers" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">groups</mat-icon>
+            <span>Consumer Categories</span>
+          </a>
+          <a class="nav-link" routerLink="/billing/revenue" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">trending_up</mat-icon>
+            <span>Revenue Projections</span>
+          </a>
+          <a class="nav-link" routerLink="/billing/rebates" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">discount</mat-icon>
+            <span>Rebate Management</span>
+          </a>
+          <a class="nav-link" routerLink="/billing/draft-budget" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">summarize</mat-icon>
+            <span>Draft Revenue Budget</span>
+          </a>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel class="sidebar-panel" [expanded]="isGroupActive('/creditors')" hideToggle>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon class="group-icon">account_balance_wallet</mat-icon>
+              <span class="group-title">Creditors Budgeting</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a class="nav-link" routerLink="/creditors/expenditure" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">category</mat-icon>
+            <span>Expenditure & Cost Items</span>
+          </a>
+          <a class="nav-link" routerLink="/creditors/scenarios" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">compare_arrows</mat-icon>
+            <span>Expenditure Scenarios</span>
+          </a>
+          <a class="nav-link" routerLink="/creditors/categories" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">account_balance</mat-icon>
+            <span>Creditor Categories</span>
+          </a>
+          <a class="nav-link" routerLink="/creditors/projections" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">analytics</mat-icon>
+            <span>Expenditure Projections</span>
+          </a>
+          <a class="nav-link" routerLink="/creditors/liabilities" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">account_balance_wallet</mat-icon>
+            <span>Creditor Liabilities</span>
+          </a>
+          <a class="nav-link" routerLink="/creditors/draft-budget" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">summarize</mat-icon>
+            <span>Draft Expenditure Budget</span>
+          </a>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel class="sidebar-panel" [expanded]="isGroupActive('/hr-payroll')" hideToggle>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon class="group-icon">people</mat-icon>
+              <span class="group-title">HR & Payroll Budgeting</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a class="nav-link" routerLink="/hr-payroll/post-establishment" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">badge</mat-icon>
+            <span>Post Establishment</span>
+          </a>
+          <a class="nav-link" routerLink="/hr-payroll/salary-calculations" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">calculate</mat-icon>
+            <span>Salary & Benefits</span>
+          </a>
+          <a class="nav-link" routerLink="/hr-payroll/variable-benefits" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">schedule</mat-icon>
+            <span>Variable Benefits & Travel</span>
+          </a>
+          <a class="nav-link" routerLink="/hr-payroll/statutory-deductions" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">gavel</mat-icon>
+            <span>Statutory Deductions</span>
+          </a>
+          <a class="nav-link" routerLink="/hr-payroll/benefit-obligations" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">account_balance</mat-icon>
+            <span>Benefit Obligations</span>
+          </a>
+          <a class="nav-link" routerLink="/hr-payroll/draft-budget" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">summarize</mat-icon>
+            <span>Draft Payroll Budget</span>
+          </a>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel class="sidebar-panel" [expanded]="isGroupActive('/validation') || isGroupActive('/reports') || isGroupActive('/analytics')" hideToggle>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon class="group-icon">monitoring</mat-icon>
+              <span class="group-title">Monitoring</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a class="nav-link" routerLink="/validation" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">verified</mat-icon>
+            <span>Validation</span>
+          </a>
+          <a class="nav-link" routerLink="/reports" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">description</mat-icon>
+            <span>Reports</span>
+          </a>
+          <a class="nav-link" routerLink="/analytics" routerLinkActive="active-link">
+            <mat-icon class="nav-icon">insights</mat-icon>
+            <span>Analytics</span>
+          </a>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </div>
+    <div class="sidenav-footer">
+      <span class="version-text">v1.0.0 | Platinum ERP</span>
+    </div>
+  </mat-sidenav>
+  <mat-sidenav-content class="app-content">
+    <mat-toolbar class="app-toolbar">
+      <button mat-icon-button (click)="sidenav.toggle()" class="menu-toggle">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="municipality-name">Demo Municipality</span>
+      <span class="spacer"></span>
+      <span class="period-badge">FY 2025/2026</span>
+      <span class="spacer-sm"></span>
+      <button mat-icon-button><mat-icon>notifications_none</mat-icon></button>
+      <div class="user-avatar">CFO</div>
+    </mat-toolbar>
+    <div class="content-area">
+      <router-outlet></router-outlet>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

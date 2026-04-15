@@ -1,0 +1,11 @@
+{
+  "name": "pya-manual-generator",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "node GenerateManual.mjs"
+  },
+  "dependencies": {
+    "docx": "^9.3.0"
+  }
+}

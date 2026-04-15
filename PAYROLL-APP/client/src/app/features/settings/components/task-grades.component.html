@@ -1,0 +1,391 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Task Grades</h1>
+      <p class="page-subtitle">Manage task grade levels and notch scales</p>
+    </div>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ grades.length }}</span>
+      <span class="summary-label">Total Task Grades</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ inactiveCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search task grades..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+      <span class="result-count">{{ filteredGrades.length }} results</span>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()">
+      <app-icon name="plus" [size]="16"></app-icon> Add Task Grade
+    </button>
+  </div>
+
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th style="width:60px;text-align:center">ID</th>
+            <th class="col-name">Name</th>
+            <th class="col-salary">Min Salary</th>
+            <th class="col-salary">Max Salary</th>
+            <th class="col-notches">Notches</th>
+            <th class="col-date">Start Date</th>
+            <th class="col-date">End Date</th>
+            <th class="col-status">Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (g of pagedGrades; track g.id) {
+            <tr (click)="openDetail(g)">
+              <td style="text-align:center;color:var(--text-muted);font-size:12px">{{ g.id }}</td>
+              <td><span class="title-text">{{ g.grade_name }}</span></td>
+              <td style="text-align:right">{{ g.min_salary | currencyZar }}</td>
+              <td style="text-align:right">{{ g.max_salary | currencyZar }}</td>
+              <td style="text-align:center"><button type="button" class="notch-count-badge" (click)="openDetailToNotches(g); $event.stopPropagation()" title="View notches for {{ g.grade_name }}" aria-label="View {{ g.actual_notch_count || 0 }} notches for {{ g.grade_name }}">{{ g.actual_notch_count || 0 }}</button></td>
+              <td>{{ g.start_date | dateSa }}</td>
+              <td>{{ formatEndDate(g.end_date) }}</td>
+              <td>
+                <span class="status-pill" [class.status-active]="g.enabled !== false" [class.status-inactive]="g.enabled === false">
+                  {{ g.enabled !== false ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm" (click)="editFromList(g); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteFromList(g); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </td>
+            </tr>
+          }
+          @if (filteredGrades.length === 0 && !loading) {
+            <tr><td colspan="9" style="text-align:center;padding:32px;color:#94a3b8;">No task grades found</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (filteredGrades.length > limit) {
+      <div class="table-footer">
+        <app-pagination [total]="filteredGrades.length" [page]="page" [limit]="limit" (pageChange)="page = $event; cdr.detectChanges()"></app-pagination>
+      </div>
+    }
+  </div>
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list">
+        <app-icon name="arrow-left" [size]="14"></app-icon> Back
+      </button>
+      <div class="detail-title-block">
+        <h2 style="margin:0;font-size:18px;color:#0f2b46;">{{ pageTitle }}</h2>
+        <div class="detail-meta">
+          @if (mode !== 'create' && grade.id) {
+            <span class="code-badge">ID: {{ grade.id }}</span>
+          }
+          @if (mode !== 'create') {
+            <span class="status-pill" [class.status-active]="grade.enabled !== false" [class.status-inactive]="grade.enabled === false">
+              {{ grade.enabled !== false ? 'Active' : 'Inactive' }}
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (mode === 'view') {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span style="font-size:12px;color:#94a3b8;">{{ currentIndex + 1 }} / {{ grades.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= grades.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="enterEdit()">
+          <app-icon name="edit" [size]="14"></app-icon> Edit
+        </button>
+      }
+      @if (mode === 'edit' || mode === 'create') {
+        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary btn-sm" (click)="save()">
+          <app-icon name="check" [size]="14"></app-icon> {{ mode === 'create' ? 'Create' : 'Save Changes' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'details'" (click)="activeTab = 'details'; cdr.detectChanges()">Task Grade Details</button>
+    <button class="tab-btn" [class.active]="activeTab === 'notches'" (click)="switchToNotches()" [disabled]="mode === 'create'">Notches</button>
+    <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="switchToHistory()" [disabled]="mode === 'create'">History</button>
+  </div>
+
+  @if (activeTab === 'details') {
+    <div class="list-card detail-card">
+      <div class="section-title">Task Grade Information</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">START DATE <span class="required">*</span></label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="grade.start_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ grade.start_date | dateSa }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">END DATE</label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="grade.end_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ formatEndDate(grade.end_date) }}</div>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">GRADE NAME <span class="required">*</span></label>
+          @if (isEditable) {
+            <input type="text" class="form-control" [(ngModel)]="grade.grade_name" placeholder="Enter grade name">
+          } @else {
+            <div class="field-value">{{ grade.grade_name || '—' }}</div>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">MINIMUM SALARY (ANNUAL) <span class="required">*</span></label>
+          @if (isEditable) {
+            <input type="number" class="form-control" [(ngModel)]="grade.min_salary" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ grade.min_salary | currencyZar }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">MAXIMUM SALARY (ANNUAL) <span class="required">*</span></label>
+          @if (isEditable) {
+            <input type="number" class="form-control" [(ngModel)]="grade.max_salary" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ grade.max_salary | currencyZar }}</div>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">TASK SKILL LEVEL</label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="grade.task_skill_level_id">
+              <option [ngValue]="null">— Select —</option>
+              @for (sl of skillLevels; track sl.id) {
+                <option [ngValue]="sl.id">{{ sl.description }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value">{{ getSkillLevelLabel(grade.task_skill_level_id) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">NUMBER OF NOTCHES</label>
+          <div class="field-value">{{ grade.actual_notch_count || 0 }}</div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">YEARLY NOTCH LEVEL INCREASE</label>
+          @if (isEditable) {
+            <input type="number" class="form-control" [(ngModel)]="grade.yearly_notch_level_increase" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ grade.yearly_notch_level_increase || 0 }}</div>
+          }
+        </div>
+        <div class="form-group"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">NOTCH INCREASE DATE METHOD</label>
+          @if (isEditable) {
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="increaseDateMethod" value="employment" [(ngModel)]="increaseDateMethod"> Use Employment Date
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="increaseDateMethod" value="specific" [(ngModel)]="increaseDateMethod"> Use Specific Increase Date
+              </label>
+            </div>
+          } @else {
+            <div class="field-value">{{ grade.use_specific_notch_increase_date ? 'Specific Increase Date' : 'Employment Date' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          @if (grade.use_specific_notch_increase_date) {
+            <label class="form-label">INCREASE MONTH</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="grade.notch_increase_month">
+                <option [ngValue]="null">— Select Month —</option>
+                @for (m of months; track m.value) {
+                  <option [ngValue]="m.value">{{ m.label }}</option>
+                }
+              </select>
+            } @else {
+              <div class="field-value">{{ getMonthLabel(grade.notch_increase_month) }}</div>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="grade.exclude_from_yearly_increase" [disabled]="!isEditable"> Exclude from Yearly Increase
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="grade.enabled" [disabled]="!isEditable"> Active
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'notches') {
+    <div class="list-card detail-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="section-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none">Notches for {{ grade.grade_code }}</div>
+        <button class="btn btn-primary btn-sm" (click)="openNotchModal()">
+          <app-icon name="plus" [size]="14"></app-icon> Add Notch
+        </button>
+      </div>
+      @if (notchesLoading) {
+        <div class="loading"><div class="spinner"></div>Loading notches...</div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th style="text-align:center">Notch</th>
+                <th style="text-align:right">Min Salary (Annual)</th>
+                <th style="text-align:right">Max Salary (Annual)</th>
+                <th style="text-align:right">Min Monthly</th>
+                <th style="text-align:right">Max Monthly</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th style="width:80px">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (notches.length === 0) {
+                <tr><td colspan="8" class="empty-state">No notches defined. Click "Add Notch" to create notch salary ranges.</td></tr>
+              } @else {
+                @for (n of notches; track n.id) {
+                  <tr>
+                    <td style="text-align:center;font-weight:600">{{ n.notch_number }}</td>
+                    <td style="text-align:right">{{ n.min_salary | currencyZar }}</td>
+                    <td style="text-align:right">{{ n.max_salary | currencyZar }}</td>
+                    <td style="text-align:right">{{ monthlyAmount(n.min_salary) | currencyZar }}</td>
+                    <td style="text-align:right">{{ monthlyAmount(n.max_salary) | currencyZar }}</td>
+                    <td>{{ n.start_date | dateSa }}</td>
+                    <td>{{ formatEndDate(n.end_date) }}</td>
+                    <td>
+                      <button class="btn btn-sm" (click)="openNotchModal(n)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteNotch(n)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab === 'history') {
+    <div class="list-card detail-card">
+      <div class="section-title">Change History</div>
+      @if (historyLoading) {
+        <div class="loading"><div class="spinner"></div>Loading history...</div>
+      } @else if (history.length === 0) {
+        <div class="empty-state">No history records found</div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th style="width:100px">Type</th>
+                <th style="width:90px">Action</th>
+                <th>Description</th>
+                <th style="width:150px">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of history; track h.id) {
+                <tr>
+                  <td>
+                    <span class="history-type-pill" [class.history-grade]="h.record_type === 'grade'" [class.history-notch]="h.record_type === 'notch'">
+                      {{ h.record_type === 'grade' ? 'Grade' : 'Notch' }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="change-type-pill" [class.change-create]="h.change_type === 'CREATE'" [class.change-update]="h.change_type === 'UPDATE'" [class.change-delete]="h.change_type === 'DELETE'">
+                      {{ h.change_type }}
+                    </span>
+                  </td>
+                  <td>{{ historyDescription(h) }}</td>
+                  <td>{{ formatDateTime(h.changed_at) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (showNotchModal) {
+  <div class="modal-overlay visible" (click)="showNotchModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editNotch.id ? 'Edit Notch ' + editNotch.notch_number : 'Add Notch' }} — {{ grade.grade_code }}</h3>
+        <button class="modal-close" (click)="showNotchModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group"><label>Start Date *</label><app-date-input [(ngModel)]="editNotch.start_date"></app-date-input></div>
+          <div class="form-group">
+            <label>End Date</label>
+            <app-date-input [(ngModel)]="editNotch.end_date"></app-date-input>
+            <span class="form-hint">Leave blank for open-ended</span>
+          </div>
+          <div class="form-group"><label>Notch Number *</label><input class="form-control" type="number" [(ngModel)]="editNotch.notch_number" min="1"></div>
+          <div></div>
+          <div class="form-group"><label>Minimum Salary (Annual) *</label><input class="form-control" type="number" [(ngModel)]="editNotch.min_salary" step="0.01" min="0"></div>
+          <div class="form-group"><label>Maximum Salary (Annual) *</label><input class="form-control" type="number" [(ngModel)]="editNotch.max_salary" step="0.01" min="0"></div>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:12px">Employee salary defaults to minimum notch value but can be any value within the min-max range.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showNotchModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveNotch()">{{ editNotch.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}

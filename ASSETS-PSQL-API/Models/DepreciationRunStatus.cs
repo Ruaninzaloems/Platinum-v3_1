@@ -1,0 +1,12 @@
+namespace AssetManagement.Models;
+
+public class DepreciationRunStatus
+{
+    public int RunStatus_ID { get; set; }
+    public string? RunStatusDesc { get; set; }
+    public int Enabled { get; set; } = 1;
+    public DateTime? DateCaptured { get; set; }
+    public int? CapturerID { get; set; }
+    public DateTime? DateModified { get; set; }
+    public int? ModifierID { get; set; }
+}

@@ -1,0 +1,240 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton" style="width:320px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton" style="width:240px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div class="kpi-strip">
+      @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="skeleton" style="height:100px;border-radius:12px;flex:1;min-width:150px"></div>
+      }
+    </div>
+    <div class="skeleton" style="width:100%;height:300px;border-radius:12px;margin-bottom:16px"></div>
+    <div class="dashboard-grid">
+      <div class="skeleton" style="height:250px;border-radius:12px"></div>
+      <div class="skeleton" style="height:250px;border-radius:12px"></div>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="error-container">
+    <mat-icon class="error-icon">error_outline</mat-icon>
+    <h3>Unable to load dashboard</h3>
+    <p>{{ error }}</p>
+    <button mat-flat-button color="primary" (click)="loadData()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>AFS Compilation Control Centre</h1>
+        <p class="subtitle">
+          Monitor compilation progress, outstanding items, and team workload
+          @if (data.financialYear) {
+            <span class="fy-badge">{{ data.financialYear.label }}</span>
+          }
+        </p>
+      </div>
+      <div class="page-actions">
+        <mat-form-field appearance="outline" class="period-filter-field">
+          <mat-label>Reporting Period</mat-label>
+          <mat-select [(ngModel)]="selectedPeriod" (selectionChange)="onPeriodChange()">
+            @for (p of periodOptions; track p.value) {
+              <mat-option [value]="p.value">{{ p.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-stroked-button (click)="loadData()">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+        <button mat-flat-button color="primary" (click)="navigate('/compilations')">
+          <mat-icon>add</mat-icon> New Compilation
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile
+        title="Total Compilations"
+        [value]="data.kpis.totalCompilations"
+        icon="description"
+        color="primary"
+        subtitle="All compilations">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Draft"
+        [value]="statusCount('draft')"
+        icon="edit_note"
+        color="info"
+        subtitle="In draft status">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="In Review"
+        [value]="statusCount('in_review') + statusCount('pending_review')"
+        icon="rate_review"
+        color="warning"
+        subtitle="Awaiting review">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Approved"
+        [value]="data.kpis.approved"
+        icon="check_circle"
+        color="success"
+        subtitle="Review completed">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Published"
+        [value]="data.kpis.published"
+        icon="publish"
+        color="primary"
+        subtitle="Final published">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Avg Completeness"
+        [value]="data.kpis.avgCompleteness + '%'"
+        icon="donut_large"
+        [color]="data.kpis.avgCompleteness >= 80 ? 'success' : data.kpis.avgCompleteness >= 50 ? 'warning' : 'danger'"
+        subtitle="Average completion">
+      </app-kpi-tile>
+    </div>
+
+    <mat-card class="detail-card">
+      <div class="card-title">
+        <mat-icon>grid_view</mat-icon> Statement Completion Grid
+      </div>
+      @if (recentComps.length === 0) {
+        <div class="empty-state">
+          <mat-icon>description</mat-icon>
+          <h3>No compilations found</h3>
+          <p>Create your first AFS compilation to see progress here</p>
+        </div>
+      } @else {
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Compilation</th>
+                <th>Status</th>
+                <th>Completeness</th>
+                <th>Preparer</th>
+                <th>Last Updated</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (comp of recentComps; track comp.id) {
+                <tr (click)="navigate('/compilations/' + comp.id)">
+                  <td class="ref-cell">{{ comp.name }}</td>
+                  <td>
+                    <span class="status-badge" [class]="comp.status">{{ formatStatus(comp.status) }}</span>
+                  </td>
+                  <td>
+                    <div class="completeness-cell">
+                      <app-progress-ring
+                        [value]="comp.completenessPercentage || 0"
+                        [size]="44"
+                        [strokeWidth]="5"
+                        [color]="getCompletenessColor(comp.completenessPercentage || 0)">
+                      </app-progress-ring>
+                    </div>
+                  </td>
+                  <td>{{ comp.preparedBy || '—' }}</td>
+                  <td class="date-cell">{{ comp.lastCalculatedAt ? (comp.lastCalculatedAt | date:'medium') : '—' }}</td>
+                  <td>
+                    <button mat-icon-button matTooltip="View compilation">
+                      <mat-icon>chevron_right</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </mat-card>
+
+    <div class="dashboard-grid">
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>assignment_late</mat-icon> Incomplete Working Papers
+        </div>
+        @if (incompleteWps.length === 0) {
+          <div class="empty-mini">
+            <mat-icon>check_circle</mat-icon>
+            <span>All working papers complete</span>
+          </div>
+        } @else {
+          <div class="wp-list">
+            @for (wp of incompleteWps; track wp.reference) {
+              <div class="wp-item" (click)="navigate('/working-papers')">
+                <app-traffic-light
+                  [status]="getWpTrafficLight(wp.status)"
+                  [label]="wp.reference + ' — ' + wp.title">
+                </app-traffic-light>
+                <span class="status-badge" [class]="wp.status">{{ formatStatus(wp.status) }}</span>
+              </div>
+            }
+          </div>
+        }
+        <div class="wp-summary">
+          <span class="wp-summary-label">WP Completion</span>
+          <mat-progress-bar mode="determinate" [value]="data.kpis.wpCompletion"
+            [color]="data.kpis.wpCompletion >= 80 ? 'primary' : 'warn'">
+          </mat-progress-bar>
+          <span class="wp-summary-value">{{ data.kpis.wpCompletion }}%</span>
+        </div>
+      </mat-card>
+
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>note_alt</mat-icon> Missing Disclosure Notes
+        </div>
+        @if (missingDisclosures.length === 0) {
+          <div class="empty-mini">
+            <mat-icon>check_circle</mat-icon>
+            <span>No missing disclosure items detected</span>
+          </div>
+        } @else {
+          <div class="disclosure-list">
+            @for (item of missingDisclosures; track item.checkId) {
+              <div class="disclosure-item">
+                <app-traffic-light
+                  [status]="item.severity === 'critical' ? 'red' : item.severity === 'warning' ? 'amber' : 'green'"
+                  [label]="item.checkName">
+                </app-traffic-light>
+                <span class="disclosure-msg">{{ item.message }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+    </div>
+
+    <mat-card class="detail-card">
+      <div class="card-title">
+        <mat-icon>groups</mat-icon> Team Workload
+      </div>
+      @if (teamWorkload.length === 0) {
+        <div class="empty-mini">
+          <mat-icon>person_off</mat-icon>
+          <span>No compilation assignments found</span>
+        </div>
+      } @else {
+        <div class="workload-chart">
+          @for (member of teamWorkload; track member.name) {
+            <div class="workload-row">
+              <span class="workload-name">{{ member.name }}</span>
+              <div class="workload-bar-track">
+                <div class="workload-bar-fill" [style.width.%]="getBarPercent(member.count)" [style.background]="getBarColor(member.count)"></div>
+              </div>
+              <span class="workload-count">{{ member.count }}</span>
+            </div>
+          }
+        </div>
+      }
+    </mat-card>
+  </div>
+}

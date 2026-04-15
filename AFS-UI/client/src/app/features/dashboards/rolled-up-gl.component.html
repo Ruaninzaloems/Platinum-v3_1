@@ -1,0 +1,287 @@
+<div class="rolled-up-gl">
+  <div class="header-bar">
+    <div class="header-left">
+      <mat-icon class="header-icon">auto_stories</mat-icon>
+      <div>
+        <h2 class="page-title">Rolled-Up General Ledger</h2>
+        <p class="page-subtitle">mSCOA/GRAP-compliant summarised ledger with drill-through to source transactions</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="exportCsv()" [disabled]="exporting || !financialYearId" matTooltip="Export full dataset as CSV">
+        @if (exporting) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner> Exporting...
+        } @else {
+          <mat-icon>download</mat-icon> Export CSV
+        }
+      </button>
+    </div>
+  </div>
+
+  <div class="filters-bar">
+    <mat-form-field appearance="outline" class="filter-field fy-field">
+      <mat-label>Financial Year</mat-label>
+      <mat-select [(ngModel)]="financialYearId" (selectionChange)="onFilterChange()">
+        @for (fy of financialYears; track fy.id) {
+          <mat-option [value]="fy.id">{{ fy.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Reporting Period</mat-label>
+      <mat-select [(ngModel)]="selectedReportingPeriod" (selectionChange)="onFilterChange()">
+        @for (p of reportingPeriodOptions; track p.value) {
+          <mat-option [value]="p.value">{{ p.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Month</mat-label>
+      <mat-select [(ngModel)]="filterPeriod" (selectionChange)="onFilterChange()">
+        @for (p of periodOptions; track p.value) {
+          <mat-option [value]="p.value">{{ p.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Item Type</mat-label>
+      <mat-select [(ngModel)]="filterItemType" (selectionChange)="onFilterChange()">
+        @for (it of itemTypeOptions; track it.value) {
+          <mat-option [value]="it.value">{{ it.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field search-field">
+      <mat-label>Search account code or description</mat-label>
+      <input matInput [(ngModel)]="filterSearch" (input)="onSearchInput()" placeholder="e.g. Deposits, IA001...">
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Aggregating general ledger...</p>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error }}</p>
+      <button mat-stroked-button (click)="loadData()">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error && entries.length > 0) {
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-value">{{ formatNumber(stats.rawTransactions) }}</div>
+        <div class="stat-label">Raw Transactions</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-value">{{ formatNumber(stats.rolledUpRows) }}</div>
+        <div class="stat-label">Rolled-Up Rows</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-value">{{ stats.compressionRatio }}%</div>
+        <div class="stat-label">Compression</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ formatCurrency(grandTotalDebit) }}</div>
+        <div class="stat-label">Total Debits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ formatCurrency(grandTotalCredit) }}</div>
+        <div class="stat-label">Total Credits</div>
+      </div>
+    </div>
+
+    <div class="category-summary">
+      @for (cat of categoryTotals; track cat.itemType) {
+        <div class="cat-chip" [style.border-left-color]="getCategoryColor(cat.itemType)">
+          <mat-icon class="cat-icon" [style.color]="getCategoryColor(cat.itemType)">{{ getCategoryIcon(cat.itemType) }}</mat-icon>
+          <div class="cat-info">
+            <span class="cat-name">{{ cat.category }}</span>
+            <span class="cat-detail">{{ cat.distinctAccounts }} accounts | {{ formatNumber(cat.rawTransactionCount) }} txns</span>
+          </div>
+          <span class="cat-amount" [style.color]="getCategoryColor(cat.itemType)">{{ formatCurrency(cat.netAmount) }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="gl-table-container">
+      <table class="gl-table">
+        <thead>
+          <tr>
+            <th class="col-expand"></th>
+            <th class="col-code">mSCOA Item Code</th>
+            <th class="col-desc">Account Description</th>
+            <th class="col-period">Period</th>
+            <th class="col-count">Txns</th>
+            <th class="col-docs">Docs</th>
+            <th class="col-amount">Total Debit</th>
+            <th class="col-amount">Total Credit</th>
+            <th class="col-amount">Net Amount</th>
+            <th class="col-action">Drill</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (group of groupedEntries | keyvalue; track group.key) {
+            <tr class="group-header" (click)="toggleGroup(group.key)">
+              <td colspan="10">
+                <div class="group-header-content">
+                  <mat-icon class="group-chevron">{{ collapsedGroups.has(group.key) ? 'chevron_right' : 'expand_more' }}</mat-icon>
+                  <mat-icon class="group-type-icon" [style.color]="getCategoryColor(group.value[0].itemType)">
+                    {{ getCategoryIcon(group.value[0].itemType) }}
+                  </mat-icon>
+                  <span class="group-name">{{ group.key }}</span>
+                  <span class="group-badge">{{ group.value.length }} rows</span>
+                  <span class="group-subtotal">
+                    Dr {{ formatCurrency(getGroupSubtotal(group.key).debit) }}
+                    &nbsp;|&nbsp;
+                    Cr {{ formatCurrency(getGroupSubtotal(group.key).credit) }}
+                    &nbsp;|&nbsp;
+                    Net {{ formatCurrency(getGroupSubtotal(group.key).net) }}
+                  </span>
+                </div>
+              </td>
+            </tr>
+            @if (!collapsedGroups.has(group.key)) {
+              @for (entry of group.value; track entry.accountCode + entry.period) {
+                <tr class="data-row" [class.negative]="entry.netAmount < 0">
+                  <td></td>
+                  <td class="col-code mono">{{ entry.accountCode }}</td>
+                  <td class="col-desc">{{ entry.accountDescription }}</td>
+                  <td class="col-period">
+                    <span class="period-chip">{{ entry.periodLabel }}</span>
+                  </td>
+                  <td class="col-count">{{ formatNumber(entry.transactionCount) }}</td>
+                  <td class="col-docs">{{ entry.distinctDocuments }}</td>
+                  <td class="col-amount">{{ formatCurrency(entry.totalDebit) }}</td>
+                  <td class="col-amount">{{ formatCurrency(entry.totalCredit) }}</td>
+                  <td class="col-amount" [class.negative-amount]="entry.netAmount < 0">
+                    {{ formatCurrency(entry.netAmount) }}
+                  </td>
+                  <td class="col-action">
+                    <button mat-icon-button matTooltip="Drill through to {{ entry.transactionCount }} source transactions"
+                            (click)="openDrill(entry); $event.stopPropagation()">
+                      <mat-icon>zoom_in</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              }
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (pagination.totalPages > 1) {
+      <mat-paginator
+        [length]="pagination.total"
+        [pageSize]="pagination.limit"
+        [pageIndex]="pagination.page - 1"
+        [pageSizeOptions]="[50, 100, 250, 500]"
+        (page)="onPageChange($event)"
+        showFirstLastButtons>
+      </mat-paginator>
+    }
+
+    <div class="total-row-count">
+      Showing {{ entries.length }} of {{ pagination.total }} rolled-up rows
+      @if (pagination.totalPages > 1) {
+        <span> (page {{ pagination.page }} of {{ pagination.totalPages }})</span>
+      }
+    </div>
+  }
+
+  @if (!loading && !error && entries.length === 0 && financialYearId) {
+    <div class="empty-state">
+      <mat-icon>receipt_long</mat-icon>
+      <h3>No GL Data Available</h3>
+      <p>No general ledger entries found for the selected filters. Sync data from the Data Sync tab first.</p>
+    </div>
+  }
+
+  @if (drillOpen) {
+    <div class="drill-overlay" (click)="closeDrill()">
+      <div class="drill-panel" (click)="$event.stopPropagation()">
+        <div class="drill-header">
+          <div>
+            <h3>Source Transactions</h3>
+            <p class="drill-subtitle">
+              {{ drillEntry?.accountCode }} - {{ drillEntry?.accountDescription }}
+              <span class="drill-period-chip">{{ drillEntry?.periodLabel }}</span>
+            </p>
+          </div>
+          <button mat-icon-button (click)="closeDrill()" aria-label="Close drill-through panel"><mat-icon>close</mat-icon></button>
+        </div>
+
+        <div class="drill-stats">
+          <span><strong>{{ formatNumber(drillTotal) }}</strong> transactions</span>
+          <span>Dr <strong>{{ formatCurrency(drillEntry?.totalDebit || 0) }}</strong></span>
+          <span>Cr <strong>{{ formatCurrency(drillEntry?.totalCredit || 0) }}</strong></span>
+          <span>Net <strong>{{ formatCurrency(drillEntry?.netAmount || 0) }}</strong></span>
+        </div>
+
+        @if (drillLoading) {
+          <div class="drill-loading">
+            <mat-spinner diameter="30"></mat-spinner>
+          </div>
+        }
+
+        @if (!drillLoading && drillData.length > 0) {
+          <div class="drill-table-container">
+            <table class="drill-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Doc #</th>
+                  <th>Description</th>
+                  <th>Reference</th>
+                  <th>Function</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of drillData; track d.id) {
+                  <tr>
+                    <td class="mono">{{ d.postingDate | date:'dd/MM/yyyy' }}</td>
+                    <td class="mono">{{ d.documentNumber }}</td>
+                    <td class="desc-cell">{{ d.transactionDescription }}</td>
+                    <td>{{ d.referenceNumber }}</td>
+                    <td>{{ d.scoaFunctionShortDesc }}</td>
+                    <td class="amount-cell">{{ d.glDebit ? formatCurrency(d.glDebit) : '' }}</td>
+                    <td class="amount-cell">{{ d.glCredit ? formatCurrency(d.glCredit) : '' }}</td>
+                    <td class="amount-cell" [class.negative-amount]="d.amount < 0">{{ formatCurrency(d.amount) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="drill-pagination">
+            <button mat-stroked-button [disabled]="drillPage <= 1" (click)="drillPageChange(-1)">
+              <mat-icon>chevron_left</mat-icon> Previous
+            </button>
+            <span>Page {{ drillPage }} of {{ (drillTotal / drillLimit | number:'1.0-0') || 1 }}</span>
+            <button mat-stroked-button [disabled]="drillPage * drillLimit >= drillTotal" (click)="drillPageChange(1)">
+              Next <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        }
+
+        @if (!drillLoading && drillData.length === 0) {
+          <div class="drill-empty">No source transactions found.</div>
+        }
+      </div>
+    </div>
+  }
+</div>

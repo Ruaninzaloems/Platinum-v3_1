@@ -1,0 +1,272 @@
+USE [EMS_George]
+GO
+/****** Object:  StoredProcedure [dbo].[Payroll_EmployeeSDLCalculation_Trial_sp]    Script Date: 3/18/2026 7:48:37 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ 
+ 
+/*
+Payroll_EmployeeSDLCalculation_Trial_sp
+	Author		:	FERDI BOTHA
+	Create date	:	08/06/2017
+	Description	:	Employee SDL Calculation
+	Update date	:	03/07/2017 - Updated Parameters & IRP5Code mappings & Updated the joins to the correct mappings
+	Modified    :   06/05/2019 - Ferdi Botha => Changed linkage to SCOA Financial Year
+*/
+ALTER procedure [dbo].[Payroll_EmployeeSDLCalculation_Trial_sp] @IRP5Income [Payroll_IRP5Income] readonly, @EmployeeID int, @PeriodID int, @CycleID int, @CycleModeID int, @StartDate datetime, @EndDate datetime, @Month int, @SCOAYear nvarchar(10), @TaxYear nvarchar(10), @Simulation bit
+as
+
+begin
+	
+	set nocount on;
+
+	begin try
+
+		declare @CycleTypeID int = (select isnull([CycleTypeID], 1) from [Const_Cycle] with(nolock) where ([Cycle_ID] = @CycleID)),
+				@AdhocTypeID int = (select isnull([AdhocTypeID], 0) from [Payroll_CyclePeriodDetails] with(nolock) where ([Period_ID] = @PeriodID))
+
+		declare @i int = 1,
+				@c int,
+				@Periods int = (case @CycleTypeID
+
+					/* MONTHS */
+					when 1 then 12
+
+					/* WEEKLY */
+					when 2 then 52
+
+					/* BI-WEEKLY */
+					when 3 then 26
+
+				end),
+				@CalculationType int,
+				@Age int,
+				@income decimal(18, 6),
+				@pension decimal(18, 6),
+				@pension_percentage decimal(18, 6) = (select top 1 [Percentage] from [Const_SARSRates] with(nolock) where ([IRP5Code] in(4001, 4003, 4006) and ((@StartDate between [StartDate] and [UntilDate]) or (@EndDate between [StartDate] and [UntilDate])))),
+				@pension_value decimal(18, 6) = (select top 1 [Maximum] from [Const_SARSRates] with(nolock) where ([IRP5Code] in(4001, 4003, 4006) and ((@StartDate between [StartDate] and [UntilDate]) or (@EndDate between [StartDate] and [UntilDate])))),
+				@ExcludeSDL bit = (select isnull([ExcludeForSDL], 0) from [Payroll_Municipality] with(nolock) where ([Enabled] = 1)),
+				@SDLPercentage decimal(18, 6) = (select top 1 [Percentage] from [Const_SARSRates] with(nolock) where ([IRP5Code] = 4142 and ((@StartDate between [StartDate] and [UntilDate]) or (@EndDate between [StartDate] and [UntilDate])))),
+				@LastEmployeeId int = -1;
+
+		declare @IRP5Code table (
+
+			[IRP5Code] int not null
+
+		)
+
+		declare @SDLCalculation table (
+
+			[ID] [int] identity(1, 1) not null,
+			[Periods] [int] not null,
+			[EmployeeID] [int] not null,
+			[CalculationType] int not null,
+			[Age] int not null,
+			[PayrollDefinationID] [int] not null,
+			[Amount] [decimal](18, 6) not null,
+			[Month] [nvarchar](10) not null,
+			[FinancialYear] [nvarchar](10) not null,
+			[PeriodID] [int] not null,
+			[TaxSavePurpose] [bit] not null default (0),
+			[SalaryHeadTitleAddendum] [nvarchar](200) null,
+			[VendorID] [int] null,
+			[TaxYear] [nvarchar](10) null
+
+		)
+
+		/* EMPLOYER SKILLS DEVELOPMENT LEVY (SDL) CONTRIBUTION [4142] */
+		insert into @IRP5Code([IRP5Code]) values(4142)
+
+		/* FORCE SDL TO READ FROM EMPLOYEE SUBTYPE CONFIGURATION */
+		if (not @ExcludeSDL = 0)
+
+			set @ExcludeSDL = 0
+
+		if (@ExcludeSDL = 0)
+		begin
+
+			insert into @SDLCalculation([Periods], [EmployeeID], [CalculationType], [Age], [PayrollDefinationID], [Amount], [Month], [FinancialYear], [PeriodID], [SalaryHeadTitleAddendum], [VendorID], [TaxYear])
+
+				select (
+
+					select isnull(max([PeriodInTaxYear]), @Periods)
+
+						from [Payroll_CyclePeriodDetails] with(nolock)
+
+						where ([CycleID] = @CycleID and [CycleModeID] = 1 and [Enabled] = 1 and [TaxYear] = @TaxYear)
+
+				), [EPD].[EmployeeID], (case
+
+						when [TaxCalculationType] is null then 1
+
+						when [TaxCalculationType] > 4 then 1
+
+						else [TaxCalculationType]
+
+					end), (floor(datediff(day, [DateOfBirth], getdate()) / (365.242199))), [EmployeePayrollDefinition_ID], cast(0 as decimal(18, 6)), @Month, @SCOAYear, @PeriodID, [SalaryHeadTitle], [VendorID], @TaxYear
+
+					from [Payroll_EmployeePayrollDefinition] as [EPD] with(nolock)
+
+						join [Payroll_SalaryHead] as [SH] with(nolock) on [SalaryHead_ID] = [EPD].[PayrollSalaryHeadID] and [SH].[Enabled] = 1
+
+						join [Payroll_GLItems] as [GL] with(nolock) on [SalaryHeadID] = [SalaryHead_ID] and [GL].[Enabled] = 1 and [GL].[FinYear] = @SCOAYear
+
+						join [Payroll_IRP5Code] as [IRP5] with(nolock) on [IRP5Code_ID] = [SH].[IRP5CodeId] and [IRP5].[Enabled] = 1
+
+						join [Payroll_Employee] as [PE] with(nolock) on [Employee_ID] = [EPD].[EmployeeID] and isnull([PE].[ExcludeSDL], 0) = 0 and [PE].[CycleID] = @CycleID
+
+						join [Payroll_EmployeeSubtypes] as [ES] with(nolock) on [EmployeeSubtype_ID] = [PE].[EmployeeSubtypeID] and [ES].[ExcludeSDL] = 0
+
+						join [Payroll_CyclePeriodDetails] as [CPD] with(nolock) on [CPD].[CycleID] = [PE].[CycleID] and [Period_ID] = @PeriodID and [CPD].[Enabled] = 1
+
+						join [Payroll_TrialRun_History_Employees] as [EP] with(nolock) on [EP].[Employee_ID] = [PE].[Employee_ID] and [EP].[Period_ID] = [CPD].[Period_ID] and [EP].[Cycle_ID] = [PE].[CycleID]
+
+						left outer join [Payroll_CyclePeriodAdhocSalaryHead] as [ACPD] with(nolock) on [PeriodID] = [CPD].[Period_ID] and [ACPD].[SalaryHeadID] = [SalaryHead_ID]
+
+					where ([EPD].[EmployeeID] = (case @EmployeeID when 0 then [EPD].[EmployeeID] else @EmployeeID end) and [EPD].[Enabled] = 1 and [TransactionTypeID] = 3 and
+
+						isnull([IRP5CertCode], [IRP5Code]) in(select [IRP5Code] from @IRP5Code) and
+
+						(case
+
+							when @CycleModeID = 1 then
+
+								case when isnull([CyclePeriodAdhocPayrollDefinition_ID], 0) = 0 then 1 else 0 end
+
+							when @CycleModeID = 2 then
+
+								case when isnull([CyclePeriodAdhocPayrollDefinition_ID], 0) = 0 then 0 else 1 end
+
+							else 0 end) = 1
+
+					)
+
+			select @c = count([ID]) from @SDLCalculation
+
+			while (@i <= @c)
+			begin
+
+				select @EmployeeID = [EmployeeID], @CalculationType = [CalculationType], @Age = [Age] from @SDLCalculation where ([ID] = @i)
+
+				/* CALCULATE TAXABLE INCOME */
+				  IF (@EmployeeID <> @LastEmployeeId)
+            BEGIN
+                /* 1) BASE TAXABLE INCOME FOR CURRENT PERIOD
+                      Types 01+02+03, taxable only, TxTypeID 1 & 4 */
+                SELECT @income =
+                    COALESCE(SUM(
+                        CAST(ISNULL(CAST(ETP.Amount AS DECIMAL(18, 6)), 0.0) AS DECIMAL(18, 6)) *
+                        (CAST(ETR.Taxable AS DECIMAL(18, 6)) / 100.0)
+                    ), 0.0)
+                FROM Payroll_EmployeeTrialPayslip AS ETP       WITH (NOLOCK)
+                JOIN Payroll_EmployeePayrollDefinition AS EPD  WITH (NOLOCK)
+                     ON EPD.EmployeePayrollDefinition_ID = ETP.PayrollDefinationID
+                    AND EPD.Enabled = 1
+                JOIN Payroll_SalaryHead AS SH                  WITH (NOLOCK)
+                     ON SH.SalaryHead_ID = EPD.PayrollSalaryHeadID
+                    AND SH.Enabled = 1
+                JOIN Payroll_IRP5Code AS IRP5                  WITH (NOLOCK)
+                     ON IRP5.IRP5Code_ID = SH.IRP5CodeId
+                    AND IRP5.Enabled = 1
+                JOIN @IRP5Income AS ETR
+                     ON ETR.IRP5Code = ISNULL(IRP5.IRP5CertCode, IRP5.IRP5Code)
+                    AND ETR.[Type]    IN (1, 2, 3)          -- 01 + 02 + 03
+                    AND ETR.Taxable   > 0                  -- taxable only
+                    AND ETR.StartDate <= @EndDate
+                    AND ETR.UntilDate >= @StartDate
+                JOIN Payroll_Employee AS PE                   WITH (NOLOCK)
+                     ON PE.Employee_ID = ETP.EmployeeID
+                    AND PE.CycleID = @CycleID
+                JOIN Payroll_CyclePeriodDetails AS CPD        WITH (NOLOCK)
+                     ON CPD.CycleID   = PE.CycleID
+                    AND CPD.Period_ID = ETP.PeriodID
+                    AND CPD.Enabled   = 1
+                JOIN Payroll_TrialRun_History_Employees AS EP WITH (NOLOCK)
+                     ON EP.Period_ID   = ETP.PeriodID
+                    AND EP.Employee_ID = ETP.EmployeeID
+                    AND EP.Cycle_ID    = PE.CycleID
+                LEFT JOIN Payroll_CyclePeriodAdhocSalaryHead AS ACPD WITH (NOLOCK)
+                     ON ACPD.PeriodID    = CPD.Period_ID
+                    AND ACPD.SalaryHeadID = SH.SalaryHead_ID
+                WHERE
+                    ETP.EmployeeID = @EmployeeID
+                    AND ETP.PeriodID = @PeriodID
+                    AND ETP.TaxSavePurpose = 0
+                    AND (
+                          CASE
+                             WHEN @CycleModeID = 1 THEN
+                                 CASE WHEN ISNULL(CyclePeriodAdhocPayrollDefinition_ID, 0) = 0 THEN 1 ELSE 0 END
+                             WHEN @CycleModeID = 2 THEN
+                                 CASE WHEN ISNULL(CyclePeriodAdhocPayrollDefinition_ID, 0) = 0 THEN 0 ELSE 1 END
+                             ELSE 0
+                          END
+                        ) = 1
+                    AND IRP5.TransactionTypeID IN (1, 4);   
+					END
+				/* ANNUALIZE INCOME */
+				set @income = @income * cast(@Periods as decimal(18, 6))
+
+				/* CALCULATE PENSION, PROVIDENT AND RETIREMENT FUND CONTRIBUTIONS */
+				select @pension = coalesce((select sum(isnull(cast([Amount] as decimal(18, 6)), cast(0 as decimal(18, 6))))
+
+																from [Payroll_EmployeeTrialPayslip] as [ETP] with(nolock)
+
+																	join [Payroll_EmployeePayrollDefinition] as [EPD] with(nolock) on [EmployeePayrollDefinition_ID] = [ETP].[PayrollDefinationID]
+
+																	join [Payroll_SalaryHead] as [SH] with(nolock) on [SalaryHead_ID] = [EPD].[PayrollSalaryHeadID]
+
+																	join [Payroll_IRP5Code] as [IRP5] with(nolock) on [IRP5Code_ID] = [SH].[IRP5CodeId]
+
+																where ([ETP].[EmployeeID] = @EmployeeID and [PeriodID] = @PeriodID and isnull([IRP5CertCode], [IRP5Code]) in(4001, 4002, 4003, 4004, 4006, 4007, 4026, 3817, 3867, 3825, 3875, 3828, 3878))), 0)
+
+				/* TAXABLE DEDUCTION FOR THOSE WHO HAVE PENSION, PROVIDENT OR RETIREMENT FUND CONTRIBUTIONS */
+				if (@pension > 0)
+				begin
+
+					/* ANNUALIZE PENSION */
+					set @pension = @pension * cast(@Periods as decimal(18, 6))
+
+					/* IF THE ANNUAL PENSION EXCEEDS 27.5% (OF THE TAXABLE INCOME) - THEN WE CAPPED THE PENSION TO 27.5% */
+					if (@pension > (@income * @pension_percentage))
+
+						set @pension = (@income * @pension_percentage)
+
+					/* IF THE ANNUAL PENSION STILL EXCEEDS THE MAXIMUM OF 350, 000 - THEN WE CAPPED THE PENSION TO 350, 000 */
+					if (@pension > @pension_value)
+
+						set @pension = @pension_value
+
+					set @income = @income - @pension
+
+				end
+
+				update @SDLCalculation set [Amount] = (@income * cast(@SDLPercentage as decimal(18, 6))) / cast(@Periods as decimal(18, 6)) where ([ID] = @i)
+
+				set @i = @i + 1
+
+			end
+
+			insert into [Payroll_EmployeeTrialPayslip]([EmployeeID], [PayrollDefinationID], [Amount], [Month], [FinancialYear], [PeriodID], [SalaryHeadTitleAddendum], [VendorID], [TaxYear], [Simulation])
+
+				select [EmployeeID], [PayrollDefinationID], [Amount], [Month], [FinancialYear], [PeriodID], [SalaryHeadTitleAddendum], [VendorID], [TaxYear], @Simulation from @SDLCalculation
+
+					where ([Amount] > 0)
+
+		end
+
+	end try
+
+	begin catch
+
+		insert into [Payroll_TrialErrors]([ValidationType], [PeriodID], [ErrorMessage], [StoredProcedure], [CapturedBy], [CapturedDate], [Simulation])
+
+			values('System', @PeriodID, '#' + cast(error_line() as nvarchar) + ' - ' + error_message(), error_procedure(), 1, getdate(), @Simulation)
+
+
+	end catch
+
+	set nocount off;
+
+end

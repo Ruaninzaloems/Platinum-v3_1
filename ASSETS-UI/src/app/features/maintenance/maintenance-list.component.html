@@ -1,0 +1,129 @@
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Maintenance Management</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Asset maintenance requests and schedules</p>
+  </div>
+  <button mat-flat-button style="background:#0f2b46;color:white" (click)="showNewForm = !showNewForm">
+    <mat-icon>{{showNewForm ? 'close' : 'add'}}</mat-icon> {{showNewForm ? 'Cancel' : 'New Request'}}
+  </button>
+</div>
+
+@if (showNewForm) {
+  <div class="card-container" style="margin-bottom:20px;border:2px solid #3b82f6">
+    <div style="padding:20px">
+      <h3 style="font-size:16px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#3b82f6">build</mat-icon> New Maintenance Request
+      </h3>
+      <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="detail-field">
+          <label>Asset ID *</label>
+          <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="newRequest.assetId" placeholder="e.g. AST-001" />
+        </div>
+        <div class="detail-field">
+          <label>Priority *</label>
+          <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="newRequest.priority">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="detail-field">
+          <label>Service Group</label>
+          <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="newRequest.serviceGroup">
+            <option value="Electrical">Electrical</option>
+            <option value="Plumbing">Plumbing</option>
+            <option value="Mechanical">Mechanical</option>
+            <option value="Civil Works">Civil Works</option>
+            <option value="HVAC">HVAC</option>
+            <option value="General">General</option>
+          </select>
+        </div>
+        <div class="detail-field" style="grid-column: span 2">
+          <label>Description *</label>
+          <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:60px" [(ngModel)]="newRequest.description" placeholder="Describe the maintenance issue..."></textarea>
+        </div>
+        <div class="detail-field">
+          <label>Estimated Cost (R)</label>
+          <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="newRequest.estimatedCost" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button mat-stroked-button (click)="showNewForm = false">Cancel</button>
+        <button mat-flat-button style="background:#0f2b46;color:white" (click)="submitRequest()">
+          <mat-icon>send</mat-icon> Submit Request
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-red"><mat-icon>priority_high</mat-icon></div>
+    <div><div class="kpi-label">Urgent</div><div class="kpi-value">{{urgentCount()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-amber"><mat-icon>pending</mat-icon></div>
+    <div><div class="kpi-label">Pending</div><div class="kpi-value">{{pendingCount()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-blue"><mat-icon>engineering</mat-icon></div>
+    <div><div class="kpi-label">In Progress</div><div class="kpi-value">{{inProgressCount()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-green"><mat-icon>check_circle</mat-icon></div>
+    <div><div class="kpi-label">Completed</div><div class="kpi-value">{{completedCount()}}</div></div>
+  </div>
+</div>
+
+@if (loading()) {
+  <div style="display:flex;justify-content:center;padding:60px"><mat-spinner diameter="40"></mat-spinner></div>
+} @else {
+  <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px;background:white">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Request No</th>
+          <th>Asset</th>
+          <th>Description</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Service Group</th>
+          <th>Est. Cost</th>
+          <th>Assigned To</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of items(); track item.id) {
+          <tr>
+            <td class="ref-cell">{{item.requestNumber}}</td>
+            <td><span class="mscoa-tag">{{item.assetId}}</span></td>
+            <td class="desc-cell">{{item.description}}</td>
+            <td><span [class]="getPriorityClass(item.priority)">{{item.priority}}</span></td>
+            <td><span [class]="getStatusClass(item.status)">{{item.status}}</span></td>
+            <td style="font-size:12px">{{item.serviceGroup}}</td>
+            <td class="value-cell">R {{item.estimatedCost | number:'1.0-0'}}</td>
+            <td style="font-size:12px;color:#64748b">{{item.assignedTo}}</td>
+            <td style="font-size:12px;color:#94a3b8">{{item.requestDate}}</td>
+            <td>
+              @if (item.status === 'Pending') {
+                <button mat-icon-button style="color:#3b82f6" (click)="assignRequest(item)"><mat-icon style="font-size:18px">person_add</mat-icon></button>
+              }
+              @if (pendingComplete()?.id === item.id) {
+                <div style="display:flex;gap:4px">
+                  <button mat-stroked-button style="font-size:11px;padding:2px 6px;min-height:26px" (click)="pendingComplete.set(null)">No</button>
+                  <button mat-flat-button style="background:#10b981;color:white;font-size:11px;padding:2px 6px;min-height:26px" (click)="confirmComplete()">Complete</button>
+                </div>
+              } @else if (item.status === 'In Progress') {
+                <button mat-icon-button style="color:#10b981" (click)="completeRequest(item)"><mat-icon style="font-size:18px">check_circle</mat-icon></button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

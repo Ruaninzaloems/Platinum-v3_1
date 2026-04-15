@@ -1,0 +1,888 @@
+HR/Payroll
+Manage Overtime
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page
+
+Payroll
+
+Manage Overtime
+
+Version 1.0
+04 November 2019
+
+SebataEMS
+Copyright © 2014 - Sebata Municipal Solutions (Pty) Ltd.
+All rights reserved. All information contained in this document is confidential and proprietary to
+Sebata Municipal Solutions (Pty) Ltd. No part of this document may be photocopied or reproduced
+in any manner without the prior written consent of Sebata Municipal Solutions (Pty) Ltd.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 2 -of 29
+
+Payroll
+
+Manage Overtime
+
+Table of Contents
+1. MANAGE OVERTIME ............................................................................................................. - 4 2. PRE - REQUISITES .................................................................................................................. - 5 3. PROCESS FLOW FOR MANAGE OVERTIME .............................................................................. - 6 4. RULES AND VALIDATIONS FOR MANAGING OVERTIME .......................................................... - 7 5. CAPTURE OVERTIME DETAILS ................................................................................................ - 8 5.1 Role and Permission for Capturing Overtime Details................................................................. - 8 5.2 Capture Overtime .................................................................................................................... - 8 6. MANAGE OVERTIME STATUS ............................................................................................... - 15 6.1 Manage Overtime Status ....................................................................................................... - 15 7. GENERATE OVERTIME REPORT ............................................................................................ - 18 8. CONFIGURATION SETTINGS FOR MANAGING OVERTIME ...................................................... - 21 8.1 Salary Transactions Settings ........................................................................................................ - 21 9. GLOSSARY .......................................................................................................................... - 28 10. NOTES ................................................................................................................................ - 29 -
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 3 -of 29
+
+Payroll
+
+Manage Overtime
+
+1. MANAGE OVERTIME
+This manual includes the following processes:
+Manage Overtime 6.3.2
+6.3.2.1
+
+6.3.2.2
+
+6.3.2.3
+
+Capture Overtime
+Details
+
+Manage Overtime Status
+
+Generate Overtime Report
+
+1. Capture Overtime Details
+2. Manage Overtime Status
+3. Generate Overtime Report
+Manage Overtime is a step-by-step manual process on the Sebata EMS System whereby the user
+will be guided by the system.
+At any stage the creation process can be stopped or cancelled.
+
+Icon identifies the role player (Capturer)
+Icon identifies the role player (Approval)
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 4 -of 29
+
+Payroll
+
+Manage Overtime
+
+2. PRE - REQUISITES
+The following must be in place to manage overtime:
+1.
+
+Salary transactions with Method of Calculation setup must be completed.
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 5 -of 29
+
+Payroll
+
+Manage Overtime
+
+3. PROCESS FLOW FOR MANAGE OVERTIME
+Process Summary:
+Capture Overtime Details
+1.
+
+Go To: EMS → Payroll → Transactions→ Overtime
+
+2.
+
+To add new Overtime, click “Add New”, continue the next screen.
+
+3.
+
+Capture all Overtime Information on the Overtime screen
+
+4.
+
+Click Submit
+END OF PROCESS
+Manage Overtime Status
+
+1.
+
+Go To: Payroll→Transactions→ Approve
+
+2.
+
+Select all transactions by ticking the box at the top
+
+3.
+
+Click Approve or decline
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 6 -of 29
+
+Payroll
+
+Manage Overtime
+
+4. RULES AND VALIDATIONS FOR MANAGING OVERTIME
+The following Rules and Validations Apply:
+1.
+
+Permission rights to Manage Overtime should be set up on the system.
+
+2.
+
+All compulsory fields * must be completed.
+
+3.
+
+The system will notify the capturer of any outstanding information needed to complete the
+“Manage Overtime” process.
+
+4.
+
+Missing fields will be indicated by a rules and validation information pop-up.
+
+“Add New” function button
+
+“Add New” information on System.
+
+“Submit” function button
+
+Save information on system.
+
+“Cancel” function button
+
+To return to the Previous Page.
+
+“Edit” function button
+
+Edit information on System.
+
+“Next” function button
+
+Navigate user to the next tab.
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 7 -of 29
+
+Payroll
+
+Manage Overtime
+
+5. CAPTURE OVERTIME DETAILS
+Capture Overtime
+Details
+
+Access
+
+Manage Overtime
+Status
+
+Generate
+Overtime Report
+
+Capturer
+
+Specific Outcomes:
+➢ Successfully Capture Overtime Details
+
+5.1 Role and Permission for Capturing Overtime Details
+By adding the following permission to the user’s profile, the user will be able to capture/edit
+overtime details.
+
+5.2 Capture Overtime
+Follow the menu below to capture Overtime:
+Payroll
+
+Transactions
+
+Overtime
+
+In this section, overtime transactions per employee can be captured and modified. The rate for
+overtime (Overtime @1.5 or Overtime @2.0), overtime date and hours must be completed.
+Overtime pay is the amount of overtime paid to each employee in a pay period.
+Normal Overtime pay is calculated: Hourly pay rate x 1.5 x overtime hours worked as per the
+Method of Calculation formula that was captured on the Salary Transaction. As soon as
+overtime is captured it must be submitted to the manager for approval.
+When the Submit button is clicked the system update the status of the transaction to Await
+Approval, then the approver need to approve the transaction to display on the Pay slip view.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 8 -of 29
+
+Payroll
+
+Validation of Trial Run
+
+Manage Overtime
+
+If an employee has unapproved overtime transactions the trial
+run for the cycle will fail. All captured overtime transactions
+must be approved for the Trial and Final run to succeed (This
+validation will also cause a pop-up message on the Employee
+Details page and the Pay slip View page as these two pages
+trigger a Trial run).
+
+Validation on the overtime transaction date-transactions older
+than two months will be rejected by the system and printed on
+the Transaction Date Exception report that is generated by the
+system during the trial run. The above two validations are also
+applicable to Claim transactions
+
+Click “Payroll” in the primary navigation bar.
+Select “Transactions” in the secondary navigation bar, select “Overtime” and the overtime
+screen will populate.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 9 -of 29
+
+Payroll
+
+Manage Overtime
+
+Click “Add New”
+
+Complete all the required fields marked in red star and click on “Submit”
+Step
+
+Field
+
+SEBATA_Version_1.0_2019
+
+Description
+
+Copyright © Sebata Municipal Solutions
+
+Page - 10 -of 29
+
+Payroll
+
+Manage Overtime
+
+1.
+
+Employee Number*
+
+Enter Employee Number in the employee number field,
+then the Id number will automatically populate
+
+2.
+
+Full Name*
+
+Auto-populates (If employee number is selected and if
+Full name is selected the employee number and Last
+name will populate)
+
+3.
+
+Last Name*
+
+Auto-populates (If employee number is selected or if Full
+name is selected the employee number and Last name will
+populate)
+
+4.
+
+Salary Transactions*
+
+Select Salary Transactions from the drop-down list
+
+5.
+
+Overtime Date*
+
+Enter the Overtime date in the Overtime field
+
+6.
+
+Overtime Hours*
+
+Enter Overtime hours in the Overtime field
+
+7.
+
+Submit
+
+Click “Submit”
+
+The below screen will populate to indicate that the the overtime was successfully submitted.
+
+Click “Ok”
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 11 -of 29
+
+Payroll
+
+Manage Overtime
+
+5.3 Modify Overtime
+Follow the menu below to modify Overtime:
+Payroll
+
+Transactions
+
+Overtime
+
+In this section, if the user has already submitted the overtime but it has not yet approved and realizes
+that he needs to make date or hours changes. Those changes will be made in this section. User can edit
+approved transactions as well, when approved transaction is edited the status of the transaction will
+change from approved to Await approval, the approver will have to re-approve all edited transactions.
+
+The user will not be able to delete or edit transitions that was included in the Final Run. An option to
+retrieve overtime that was paid to an employee do exist. This allow the user to recover overtime
+payments that was paid by mistake to an employee and at the same time correct his/her IRP5
+information. This will reflect negative earning on the pay slip.
+
+Click “Payroll” in the primary navigation bar.
+Select “Transactions” in the secondary navigation bar, select “Overtime” and the overtime
+screen will populate.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 12 -of 29
+
+Payroll
+
+Manage Overtime
+
+Enter employee number in the Employee Number field
+Click “Search”
+
+Click on the line that needs to be modified.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 13 -of 29
+
+Payroll
+
+Manage Overtime
+
+Click on “Overtime Hours” and make changes
+Click “Submit”
+
+Click “Ok”
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 14 -of 29
+
+Payroll
+
+Manage Overtime
+
+6. MANAGE OVERTIME STATUS
+Capture
+Overtime
+Details
+
+Access
+
+Manage
+Overtime
+Status
+
+Generate
+Overtime
+Report
+
+Capturer
+
+6.1 Manage Overtime Status
+Follow the menu below to manage overtime status:
+Payroll
+
+Transactions
+
+Approve
+
+Specific Outcomes:
+➢ Successfully manage overtime status
+In this section, the status of overtime is managed by either approving the overtime or rejecting
+the overtime. When rejecting overtime, a reason for rejection is required to be populated.
+Once overtime is rejected, the user can go edit the transaction then send it for approval again.
+For overtime transaction to appear on the payslip, it also needs to be approved.
+
+Click “Payroll” in the primary navigation bar.
+Select “Transactions” in the secondary navigation bar,
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 15 -of 29
+
+Payroll
+
+Manage Overtime
+
+Select “Approve” and approval screen will populate.
+
+In this section, payroll transactions are approved or rejected. A reason for rejecting the payroll
+transactions must be provided.
+Select all transactions by ticking the “Select all” tick-box at the top of lines or select the line
+item you want to approve.
+Click “Approve”.
+
+Click “Ok”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 16 -of 29
+
+Payroll
+
+Manage Overtime
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 17 -of 29
+
+Payroll
+
+Manage Overtime
+
+7. GENERATE OVERTIME REPORT
+
+Capture
+Overtime
+Details
+
+Generate
+Overtime
+Report
+
+Manage
+Overtime
+Status
+
+The below menu is used to select and generate the overtime Report:
+Payroll
+
+Reports
+
+Employee
+
+Employee
+Detail
+
+Specific Outcomes:
+➢ Successfully generate overtime report.
+
+Select “Reports” from the sub-menu
+Select “Transactions” under Reports menu
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 18 -of 29
+
+Payroll
+
+Manage Overtime
+
+Step
+
+Field
+
+Description
+
+1.
+
+From Date*
+
+Capture date from the From Date field
+
+2.
+
+To Date*
+
+Capture date from the To Date field
+
+4.
+
+Description*
+
+Select “Overtime” from the drop-down list
+
+5.
+
+Submit
+
+Click on “Submit” button
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 19 -of 29
+
+Payroll
+
+Manage Overtime
+
+The Report will populate for analysis
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 20 -of 29
+
+Payroll
+
+Manage Overtime
+
+8. CONFIGURATION SETTINGS FOR MANAGING OVERTIME
+For more Detailed Information – refer to HR/Payroll Configuration Manual
+Access
+
+System Administrator
+
+8.1 Salary Transactions Settings
+This section is extremely important as all earnings, company contributions, deductions and
+Fringe benefits must have a Salary Transaction.
+Different Method of calculation can be setup for on one Salary transaction per Condition of
+Service, Employee Type and Employee subtype. Overtime will also have a method of
+calculation.
+The user must link the salary transaction to the applicable IRP5 Code to ensure PAYE calculates
+correctly.
+Calculation method means the system will do calculations based on the Method of Calculation.
+The Method of Calculation tab will only be available for Salary Transactions marked as System
+Calculate.
+Salary transaction setup is important, because the formula for overtime needs to be setup
+correctly so that employees can be able to capture overtime. The formula used for overtime
+will populate.
+
+Click “Salary Transaction” from the Payroll menu.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 21 -of 29
+
+Payroll
+
+Manage Overtime
+
+Click “Add New”
+
+Step
+
+Field
+
+Description
+
+1.
+
+Start Date*
+
+Capture date from the Start Date field.
+
+2.
+
+Transaction Type*
+
+Select Transaction Type from the drop-down list.
+
+3.
+
+Title*
+
+Capture Title from the Title field.
+
+4.
+
+End Date*
+
+Capture end date from the End Date field.
+
+5.
+
+Calculation Method*
+
+Select Calculation Method from the drop-down list, means
+system will calculate. Two selections System Calculate or
+User Input Value. Required System Calculate will activate
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 22 -of 29
+
+Payroll
+
+Manage Overtime
+
+Method of Calculation tab and User Input Value required,
+Method of Calculation tab will be greyed out.
+6.
+
+Next
+
+Click “Next”
+
+Step
+
+Field
+
+Description
+
+1.
+
+Salary Control Project*
+
+Select salary Control Project from the drop-down list.
+
+2.
+
+Salary Control SCOA Debit Select Control SCOA Debit Item from the drop-down list.
+Item*
+
+3.
+
+Salary Control SCOA Credit Select Control SCOA Credit Item from the drop-down list.
+Item *
+
+4.
+
+Municipal Staff*
+
+Select Municipal Staff from the drop-down list.
+
+5.
+
+Post Retirement*
+
+Select Post Retirement from the drop-down list.
+
+6.
+
+Next
+
+Click “Next”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 23 -of 29
+
+Payroll
+
+Manage Overtime
+
+Select SARS Code from the drop-down list.
+Click “Next”
+
+SARS Code
+
+Once SARS Code is selected the Description field, IRP5 field and
+Taxable Percentage field will populate with information.
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 24 -of 29
+
+Payroll
+
+Manage Overtime
+
+System will ask if you wish to capture method of calculation as per the screen below. If the System
+Calculate was selected the Method of Calculation tab can be populated.
+
+Click “Yes”
+
+The screen will populate to indicate that salary Transaction was successfully saved. System will
+move you to method of calculation tab
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 25 -of 29
+
+Payroll
+
+Manage Overtime
+
+Step
+
+Field
+
+Description
+
+1.
+
+Start Date*
+
+Capture date from the Start Date field
+
+2.
+
+End Date*
+
+Capture date from the End Date field
+
+3.
+
+Condition of Service
+
+Select Condition of Service from the drop-down list-Not a
+compulsory field will apply to all if none is selected.
+
+4.
+
+Employee Type
+
+Select Employee Type from the drop-down list-Not a
+compulsory field will apply if none is selected.
+
+5.
+
+Employee Subtype
+
+Select Employee Subtype from the drop-down list. -Not a
+compulsory field will apply if none is selected.
+
+6.
+
+Formula*
+
+Capture formula from the Formula field and click “Insert”
+
+7.
+
+Submit
+
+Click “Submit”
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 26 -of 29
+
+Payroll
+
+Method of Calculation
+
+Manage Overtime
+
+Ensure that the Overtime formula is setup, for the system
+to calculate the overtime hours captured correct.
+
+Notes:
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 27 -of 29
+
+Payroll
+
+Manage Overtime
+
+9. GLOSSARY
+Authorisation / Approval
+
+The power or right to make decisions.
+
+Refine Search
+
+By using multiple “Search Options”, a more specific search can
+be done on the System.
+
+Validation
+
+To confirm that correct information is entered to continue
+with the Process.
+
+Configuration Settings
+
+Various reasons for use of parameters and initial settings for
+the System to apply these instructions.
+
+Compulsory Fields
+
+Field must be entered to continue with the process.
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 28 -of 29
+
+Payroll
+
+Manage Overtime
+
+10.NOTES
+
+-END OF PROCESS
+
+SEBATA_Version_1.0_2019
+
+Copyright © Sebata Municipal Solutions
+
+Page - 29 -of 29
+
+

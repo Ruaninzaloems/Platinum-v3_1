@@ -1,0 +1,13 @@
+{
+  "/idp-app/api": {
+    "target": "http://127.0.0.1:8008",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/idp-app/api": "/api" }
+  },
+  "/swagger": {
+    "target": "http://127.0.0.1:8008",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

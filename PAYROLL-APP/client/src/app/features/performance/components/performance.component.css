@@ -1,0 +1,4 @@
+:host { display: block; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state h3 { margin: 12px 0 4px; }
+.empty-state p { font-size: 13px; }

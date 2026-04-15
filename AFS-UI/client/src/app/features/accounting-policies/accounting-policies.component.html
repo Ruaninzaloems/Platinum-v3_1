@@ -1,0 +1,222 @@
+<div class="policies-container">
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <mat-icon class="title-icon">policy</mat-icon>
+        Accounting Policies
+      </h1>
+      <p class="page-subtitle">Manage standardised GRAP-compliant accounting policies for AFS</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="openAddPolicyDialog()">
+        <mat-icon>add</mat-icon>
+        Add Custom Policy
+      </button>
+      <button mat-stroked-button (click)="toggleReorderMode()"
+              [class.active-btn]="reorderMode"
+              [matTooltip]="canReorder ? (reorderMode ? 'Exit reorder mode' : 'Drag to reorder') : 'All policies must be Draft, no filters active'">
+        <mat-icon>{{ reorderMode ? 'check' : 'swap_vert' }}</mat-icon>
+        {{ reorderMode ? 'Done Reordering' : 'Reorder' }}
+      </button>
+      <button mat-stroked-button (click)="seedDefaults()" [disabled]="loading">
+        <mat-icon>auto_fix_high</mat-icon>
+        Seed Defaults
+      </button>
+      <button mat-stroked-button (click)="submitAllForReview()" [disabled]="loading || policies.length === 0">
+        <mat-icon>send</mat-icon>
+        Submit All for Review
+      </button>
+    </div>
+  </div>
+
+  <div class="filters-bar">
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Filter by Policy Area</mat-label>
+      <mat-select [(ngModel)]="filterArea" (ngModelChange)="applyFilters()">
+        <mat-option value="">All Areas</mat-option>
+        @for (area of policyAreas; track area) {
+          <mat-option [value]="area">{{ area }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Filter by Status</mat-label>
+      <mat-select [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+        <mat-option value="">All Statuses</mat-option>
+        <mat-option value="draft">Draft</mat-option>
+        <mat-option value="under_review">Under Review</mat-option>
+        <mat-option value="approved">Approved</mat-option>
+        <mat-option value="published">Published</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <button mat-stroked-button (click)="toggleArchived()" class="archive-toggle-btn">
+      <mat-icon>{{ showArchived ? 'visibility_off' : 'visibility' }}</mat-icon>
+      {{ showArchived ? 'Hide Archived' : 'Show Archived' }}
+    </button>
+    <span class="filter-spacer"></span>
+    <span class="policy-count">{{ filteredPolicies.length }} of {{ policies.length }} policies</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading accounting policies...</p>
+    </div>
+  } @else if (policies.length === 0) {
+    <div class="empty-state">
+      <mat-icon class="empty-icon">policy</mat-icon>
+      <h3>No Accounting Policies</h3>
+      <p>Click "Seed Defaults" to populate standard GRAP-compliant accounting policies, or add a custom policy.</p>
+      <div class="empty-actions">
+        <button mat-flat-button class="btn-primary" (click)="seedDefaults()">
+          <mat-icon>auto_fix_high</mat-icon>
+          Seed Default Policies
+        </button>
+        <button mat-stroked-button (click)="openAddPolicyDialog()">
+          <mat-icon>add</mat-icon>
+          Add Custom Policy
+        </button>
+      </div>
+    </div>
+  } @else {
+    <div cdkDropList
+         [cdkDropListDisabled]="!reorderMode"
+         (cdkDropListDropped)="onDrop($event)"
+         class="policy-list">
+      @for (policy of filteredPolicies; track policy.id) {
+        <div class="policy-card"
+             [class.inactive]="!policy.isActive"
+             [class.archived]="policy.isArchived"
+             [class.custom-policy]="policy.isCustom"
+             [cdkDragDisabled]="!reorderMode"
+             cdkDrag>
+          @if (reorderMode) {
+            <div class="drag-handle" cdkDragHandle>
+              <mat-icon>drag_indicator</mat-icon>
+            </div>
+          }
+          <div class="policy-header">
+            <div class="policy-header-left">
+              <span class="paragraph-code">{{ policy.paragraphCode }}</span>
+              <span class="policy-title">{{ policy.title }}</span>
+              @if (policy.grapReference) {
+                <span class="grap-ref">({{ policy.grapReference }})</span>
+              }
+              @if (policy.isMandatory) {
+                <span class="mandatory-badge">Mandatory</span>
+              }
+              @if (policy.isCustom) {
+                <span class="custom-badge">Custom</span>
+              }
+              @if (policy.isArchived) {
+                <span class="archived-badge">Archived</span>
+              }
+            </div>
+            <div class="policy-header-right">
+              <span class="status-chip" [class]="'status-' + policy.approvalStatus">
+                {{ formatStatus(policy.approvalStatus) }}
+              </span>
+              @if (!policy.isArchived) {
+                <mat-slide-toggle
+                  [checked]="policy.isActive"
+                  [disabled]="policy.isMandatory || (policy.isActive && policy.approvalStatus !== 'draft')"
+                  (change)="togglePolicy(policy)"
+                  [matTooltip]="policy.isMandatory ? 'Mandatory policy cannot be disabled' : (policy.isActive && policy.approvalStatus !== 'draft') ? 'Can only deactivate in Draft status' : (policy.isActive ? 'Deactivate policy' : 'Activate policy')">
+                </mat-slide-toggle>
+              }
+              <button mat-icon-button (click)="toggleExpand(policy.id)" matTooltip="Expand/collapse">
+                <mat-icon>{{ expandedIds.has(policy.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          @if (expandedIds.has(policy.id)) {
+            <div class="policy-body">
+              <div class="policy-meta">
+                <span class="meta-item"><strong>Area:</strong> {{ policy.policyArea }}</span>
+                @if (policy.afsSpecimenReference) {
+                  <span class="meta-item"><strong>Specimen Ref:</strong> {{ policy.afsSpecimenReference }}</span>
+                }
+                @if (policy.contentFormat === 'html') {
+                  <span class="meta-item"><strong>Format:</strong> Rich Text</span>
+                }
+                @if (policy.lastEditedBy) {
+                  <span class="meta-item"><strong>Last edited:</strong> {{ policy.lastEditedAt | date:'medium' }}</span>
+                }
+              </div>
+
+              @if (editingId === policy.id) {
+                <div class="edit-area">
+                  <quill-editor
+                    [(ngModel)]="editText"
+                    [modules]="quillModules"
+                    [formats]="quillFormats"
+                    [styles]="{ 'min-height': '200px' }"
+                    placeholder="Edit policy text..."
+                    (onEditorCreated)="onEditorCreated($event)">
+                  </quill-editor>
+                  <div class="edit-actions">
+                    <button mat-stroked-button (click)="cancelEdit()">Cancel</button>
+                    @if (!policy.isCustom) {
+                      <button mat-stroked-button (click)="revertToDefault(policy)">Revert to Default</button>
+                    }
+                    <button mat-flat-button class="btn-primary" (click)="saveEdit(policy)">Save Changes</button>
+                  </div>
+                </div>
+              } @else {
+                @if (isHtmlContent(policy)) {
+                  <div class="policy-text policy-html" [innerHTML]="getPolicyDisplayText(policy)"></div>
+                } @else {
+                  <div class="policy-text">{{ getPolicyDisplayText(policy) }}</div>
+                }
+                @if (policy.editedText && !policy.isCustom) {
+                  <div class="edited-indicator">
+                    <mat-icon>edit</mat-icon> Text has been customised
+                  </div>
+                }
+              }
+
+              <div class="policy-actions">
+                @if (editingId !== policy.id && policy.isEditable && !policy.isArchived && policy.approvalStatus === 'draft') {
+                  <button mat-stroked-button (click)="startEdit(policy)">
+                    <mat-icon>edit</mat-icon> Edit Text
+                  </button>
+                }
+                @if (!policy.isArchived) {
+                  <button mat-stroked-button [matMenuTriggerFor]="statusMenu">
+                    <mat-icon>swap_horiz</mat-icon> Change Status
+                  </button>
+                  <mat-menu #statusMenu="matMenu">
+                    <button mat-menu-item (click)="changeStatus(policy, 'draft')">
+                      <mat-icon>edit_note</mat-icon> Draft
+                    </button>
+                    <button mat-menu-item (click)="changeStatus(policy, 'under_review')">
+                      <mat-icon>rate_review</mat-icon> Under Review
+                    </button>
+                    <button mat-menu-item (click)="changeStatus(policy, 'approved')">
+                      <mat-icon>check_circle</mat-icon> Approved
+                    </button>
+                    <button mat-menu-item (click)="changeStatus(policy, 'published')">
+                      <mat-icon>publish</mat-icon> Published
+                    </button>
+                  </mat-menu>
+                }
+                @if (policy.isCustom && !policy.isArchived && policy.approvalStatus === 'draft') {
+                  <button mat-stroked-button class="archive-btn" (click)="archivePolicy(policy)"
+                          matTooltip="Archive this custom policy">
+                    <mat-icon>archive</mat-icon> Archive
+                  </button>
+                }
+                @if (policy.isArchived) {
+                  <button mat-stroked-button (click)="unarchivePolicy(policy)">
+                    <mat-icon>unarchive</mat-icon> Restore
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

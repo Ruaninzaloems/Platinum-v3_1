@@ -1,0 +1,612 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading benefits...</div>
+} @else {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Benefits</h1>
+      <p class="page-subtitle">Manage medical aid schemes, pension funds and EMS vendors</p>
+    </div>
+  </div>
+
+  <div class="stat-cards">
+    <div class="stat-card" style="border-left-color: #0f2b46">
+      <div class="stat-value">{{ schemes.length }}</div>
+      <div class="stat-label">Medical Aid Schemes</div>
+    </div>
+    <div class="stat-card" style="border-left-color: #2e7d32">
+      <div class="stat-value">{{ funds.length }}</div>
+      <div class="stat-label">Retirement Funds</div>
+    </div>
+    <div class="stat-card" style="border-left-color: #c9a84c">
+      <div class="stat-value">{{ employees.length }}</div>
+      <div class="stat-label">Total Employees</div>
+    </div>
+  </div>
+
+  <div class="detail-tabs">
+    @for (tab of tabs; track tab.id) {
+      <button class="detail-tab" [class.active]="activeTab === tab.id" (click)="setTab(tab.id)">
+        <app-icon [name]="tab.icon" [size]="14"></app-icon> {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  @if (activeTab === 'retirement') {
+    <div class="data-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>Fund Name</th>
+            <th>Type</th>
+            <th>Administrator</th>
+            <th style="text-align:right">Employee %</th>
+            <th style="text-align:right">Employer %</th>
+            <th>Tax Deductible</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (funds.length === 0) {
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No retirement funds configured</td></tr>
+          }
+          @for (r of funds; track r.id) {
+            <tr>
+              <td><strong>{{ r.name }}</strong></td>
+              <td>{{ r.fund_type }}</td>
+              <td>{{ vendorName(r.vendor_id) }}</td>
+              <td style="text-align:right">{{ r.employee_contribution_rate }}%</td>
+              <td style="text-align:right">{{ r.employer_contribution_rate }}%</td>
+              <td>
+                @if (r.tax_deductible) {
+                  <span class="status-badge status-approved">Yes</span>
+                } @else {
+                  <span class="status-badge status-rejected">No</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (activeTab === 'group-life') {
+    @if (groupLifeLoading) {
+      <div class="loading"><div class="spinner"></div>Loading group life benefits...</div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Benefit Name</th>
+              <th>Type</th>
+              <th>Provider</th>
+              <th>Policy Number</th>
+              <th style="text-align:right">Cover Multiple</th>
+              <th style="text-align:right">Employee %</th>
+              <th style="text-align:right">Employer %</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (groupLifeBenefits.length === 0) {
+              <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No group life benefits configured</td></tr>
+            }
+            @for (b of groupLifeBenefits; track b.id) {
+              <tr>
+                <td><strong>{{ b.benefit_name || '-' }}</strong></td>
+                <td>{{ b.benefit_type || '-' }}</td>
+                <td>{{ b.provider || '-' }}</td>
+                <td>{{ b.policy_number || '-' }}</td>
+                <td style="text-align:right">{{ b.cover_multiple || '-' }}x</td>
+                <td style="text-align:right">{{ b.employee_contribution_pct || 0 }}%</td>
+                <td style="text-align:right">{{ b.employer_contribution_pct || 0 }}%</td>
+                <td>
+                  @if (b.is_active) {
+                    <span class="status-badge status-approved">Active</span>
+                  } @else {
+                    <span class="status-badge status-rejected">Inactive</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'employee-benefits') {
+    <div class="toolbar">
+      <div class="toolbar-search" style="max-width:400px">
+        <select class="form-control" style="width:100%" [(ngModel)]="selectedEmployee" (ngModelChange)="onEmployeeSelect()">
+          <option value="">-- Select Employee --</option>
+          @for (emp of employees; track emp.id) {
+            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+          }
+        </select>
+      </div>
+      <button class="btn btn-primary" (click)="openEnrolMedical()">Enrol Medical Aid</button>
+      <button class="btn btn-primary" (click)="openEnrolRetirement()">Enrol Retirement Fund</button>
+      <button class="btn btn-primary" (click)="openEnrolGroupLife()">Enrol Group Life</button>
+    </div>
+
+    @if (!selectedEmployee) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="user" [size]="32"></app-icon></div>
+        <div class="empty-title">Select an Employee</div>
+        <div class="empty-desc">Choose an employee above to view and manage their benefits</div>
+      </div>
+    } @else if (employeeBenefitsLoading) {
+      <div class="loading"><div class="spinner"></div>Loading benefits...</div>
+    } @else {
+      @if (costSplit) {
+        <h3 style="margin:16px 0 12px;font-size:16px">Cost Split Summary - {{ getEmployeeName() }}</h3>
+        <div class="info-grid" style="margin-bottom:24px">
+          <div class="info-item"><div class="info-label">Total Employee Cost</div><div class="info-value">{{ formatCurrency(costSplit.totals?.employee_cost || 0) }}</div></div>
+          <div class="info-item"><div class="info-label">Total Employer Cost</div><div class="info-value">{{ formatCurrency(costSplit.totals?.employer_cost || 0) }}</div></div>
+          <div class="info-item"><div class="info-label">Grand Total</div><div class="info-value">{{ formatCurrency(costSplit.totals?.total_cost || 0) }}</div></div>
+        </div>
+      }
+
+      <h3 style="margin:16px 0 12px;font-size:16px">Medical Aid - {{ getEmployeeName() }}</h3>
+      <div class="data-grid" style="margin-bottom:24px">
+        <table>
+          <thead><tr><th>Scheme</th><th>Type</th><th>Membership #</th><th>Join Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            @if (employeeMedical.length === 0) {
+              <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No medical aid enrolments</td></tr>
+            }
+            @for (m of employeeMedical; track m.id) {
+              <tr>
+                <td><strong>{{ m.scheme_name }}</strong></td>
+                <td>{{ m.scheme_type || '-' }}</td>
+                <td>{{ m.membership_number || '-' }}</td>
+                <td>{{ m.join_date ? m.join_date.split('T')[0] : '-' }}</td>
+                <td>
+                  @if (m.is_current) {
+                    <span class="status-badge status-approved">Current</span>
+                  } @else {
+                    <span class="status-badge status-rejected">Previous</span>
+                  }
+                </td>
+                <td>
+                  <div class="action-bar">
+                    <button class="action-btn" (click)="viewDependants(m.id)">Dependants</button>
+                    <button class="action-btn" (click)="openAddDependant(m.id)">+ Add Dep.</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (dependantsMembershipId) {
+        @if (dependantsLoading) {
+          <div class="loading"><div class="spinner"></div>Loading dependants...</div>
+        } @else {
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px;margin-bottom:16px">
+            <h4 style="margin:0 0 12px;font-size:14px">Dependants (Membership #{{ dependantsMembershipId }})</h4>
+            <div class="data-grid">
+              <table>
+                <thead><tr><th>Name</th><th>Type</th><th>ID Number</th><th>Date of Birth</th><th>Gender</th><th>Employer Contrib</th><th>Start Date</th></tr></thead>
+                <tbody>
+                  @if (dependants.length === 0) {
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No dependants registered</td></tr>
+                  }
+                  @for (d of dependants; track $index) {
+                    <tr>
+                      <td>{{ d.first_name }} {{ d.surname }}</td>
+                      <td>{{ d.dependant_type }}</td>
+                      <td>{{ d.id_number || '-' }}</td>
+                      <td>{{ d.date_of_birth ? d.date_of_birth.split('T')[0] : '-' }}</td>
+                      <td>{{ d.gender || '-' }}</td>
+                      <td>
+                        @if (d.employer_contributes) {
+                          <span class="status-badge status-approved">Yes</span>
+                        } @else {
+                          <span class="status-badge status-rejected">No</span>
+                        }
+                      </td>
+                      <td>{{ d.start_date ? d.start_date.split('T')[0] : '-' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      <h3 style="margin:16px 0 12px;font-size:16px">Retirement Funds - {{ getEmployeeName() }}</h3>
+      <div class="data-grid" style="margin-bottom:24px">
+        <table>
+          <thead><tr><th>Fund</th><th>Type</th><th>Fund #</th><th>Join Date</th><th style="text-align:right">Employee Amt</th><th style="text-align:right">Employer Amt</th><th>Status</th></tr></thead>
+          <tbody>
+            @if (employeeRetirement.length === 0) {
+              <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No retirement fund memberships</td></tr>
+            }
+            @for (r of employeeRetirement; track r.id) {
+              <tr>
+                <td><strong>{{ r.fund_name }}</strong></td>
+                <td>{{ r.fund_type }}</td>
+                <td>{{ r.fund_number || '-' }}</td>
+                <td>{{ r.join_date ? r.join_date.split('T')[0] : '-' }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.employee_amount) }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.employer_amount) }}</td>
+                <td>
+                  @if (r.is_current) {
+                    <span class="status-badge status-approved">Current</span>
+                  } @else {
+                    <span class="status-badge status-rejected">Previous</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin:16px 0 12px;font-size:16px">Group Life Benefits - {{ getEmployeeName() }}</h3>
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Benefit</th><th>Type</th><th>Provider</th><th style="text-align:right">Cover Amount</th><th style="text-align:right">Employee Contrib</th><th style="text-align:right">Employer Contrib</th><th>Start Date</th></tr></thead>
+          <tbody>
+            @if (employeeGroupLife.length === 0) {
+              <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No group life enrolments</td></tr>
+            }
+            @for (g of employeeGroupLife; track $index) {
+              <tr>
+                <td><strong>{{ g.benefit_name || '-' }}</strong></td>
+                <td>{{ g.benefit_type || '-' }}</td>
+                <td>{{ g.provider || '-' }}</td>
+                <td style="text-align:right">{{ formatCurrency(g.cover_amount || 0) }}</td>
+                <td style="text-align:right">{{ formatCurrency(g.employee_contribution || 0) }}</td>
+                <td style="text-align:right">{{ formatCurrency(g.employer_contribution || 0) }}</td>
+                <td>{{ g.start_date ? g.start_date.split('T')[0] : '-' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'rateTables') {
+    <div class="toolbar">
+      <div class="toolbar-search" style="max-width:400px">
+        <select class="form-control" style="width:100%" [(ngModel)]="selectedRateScheme" (ngModelChange)="onRateSchemeChange()">
+          <option value="">-- Select Scheme --</option>
+          @for (s of schemes; track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (rateTablesLoading) {
+      <div class="loading"><div class="spinner"></div>Loading rate tables...</div>
+    } @else if (!selectedRateScheme) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="layers" [size]="32"></app-icon></div>
+        <div class="empty-title">Select a Scheme</div>
+        <div class="empty-desc">Choose a scheme above to view its rate tables</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Plan Name</th><th style="text-align:right">Member Rate</th><th style="text-align:right">Adult Dep. Rate</th><th style="text-align:right">Child Dep. Rate</th><th>Effective Date</th></tr></thead>
+          <tbody>
+            @if (rateTables.length === 0) {
+              <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No rate tables found</td></tr>
+            }
+            @for (r of rateTables; track $index) {
+              <tr>
+                <td><strong>{{ r.plan_name || '-' }}</strong></td>
+                <td style="text-align:right">{{ formatCurrency(r.member_rate) }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.adult_dependant_rate) }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.child_dependant_rate) }}</td>
+                <td>{{ r.effective_date ? r.effective_date.split('T')[0] : '-' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'lifeEvents') {
+    <div class="toolbar">
+      <div class="toolbar-search" style="max-width:400px">
+        <select class="form-control" style="width:100%" [(ngModel)]="selectedLifeEventEmployee" (ngModelChange)="onLifeEventEmployeeChange()">
+          <option value="">-- Select Employee --</option>
+          @for (emp of employees; track emp.id) {
+            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (lifeEventsLoading) {
+      <div class="loading"><div class="spinner"></div>Loading life events...</div>
+    } @else if (!selectedLifeEventEmployee) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="calendar" [size]="32"></app-icon></div>
+        <div class="empty-title">Select an Employee</div>
+        <div class="empty-desc">Choose an employee above to view their life events</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Event Type</th><th>Event Date</th><th>Notes</th><th>Recorded On</th></tr></thead>
+          <tbody>
+            @if (lifeEvents.length === 0) {
+              <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No life events found</td></tr>
+            }
+            @for (ev of lifeEvents; track $index) {
+              <tr>
+                <td><span class="badge badge-info">{{ ev.event_type || '-' }}</span></td>
+                <td>{{ ev.event_date ? ev.event_date.split('T')[0] : '-' }}</td>
+                <td>{{ ev.notes || '-' }}</td>
+                <td>{{ ev.created_at ? ev.created_at.split('T')[0] : '-' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'costProjection') {
+    <div class="toolbar">
+      <div class="toolbar-search" style="max-width:400px">
+        <select class="form-control" style="width:100%" [(ngModel)]="projectionEmployee">
+          <option value="">-- Select Employee --</option>
+          @for (emp of employees; track emp.id) {
+            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:16px;margin:16px 0">
+      <div class="form-group"><label>Projection Months</label><input type="number" class="form-control" [(ngModel)]="projectionMonths" min="1" max="60"></div>
+      <div class="form-group"><label>Salary Increase %</label><input type="number" class="form-control" [(ngModel)]="projSalaryIncrease" step="0.01" min="0"></div>
+      <div class="form-group"><label>New Salary (R)</label><input type="number" class="form-control" [(ngModel)]="projNewSalary" step="0.01" min="0"></div>
+      <div class="form-group"><label>Medical Change (R)</label><input type="number" class="form-control" [(ngModel)]="projMedicalChange" step="0.01"></div>
+      <div class="form-group"><label>Retirement Change (R)</label><input type="number" class="form-control" [(ngModel)]="projRetirementChange" step="0.01"></div>
+    </div>
+    <button class="btn btn-primary" (click)="projectCost()"><app-icon name="trendingUp" [size]="14"></app-icon> Project Cost</button>
+
+    @if (projectionLoading) {
+      <div class="loading" style="margin-top:16px"><div class="spinner"></div>Calculating projection...</div>
+    } @else if (projectionResult) {
+      <div class="data-grid" style="margin-top:16px">
+        <table>
+          <thead><tr><th>Component</th><th style="text-align:right">Current</th><th style="text-align:right">Projected</th><th style="text-align:right">Difference</th><th style="text-align:right">Change %</th></tr></thead>
+          <tbody>
+            @for (row of getProjectionRows(); track row.label) {
+              <tr>
+                <td><strong>{{ row.label }}</strong></td>
+                <td style="text-align:right">{{ formatCurrency(row.current) }}</td>
+                <td style="text-align:right">{{ formatCurrency(row.projected) }}</td>
+                <td style="text-align:right" [style.color]="getDiff(row.current, row.projected) > 0 ? 'var(--danger)' : getDiff(row.current, row.projected) < 0 ? 'var(--success)' : ''">
+                  {{ getDiff(row.current, row.projected) >= 0 ? '+' : '' }}{{ formatCurrency(getDiff(row.current, row.projected)) }}
+                </td>
+                <td style="text-align:right" [style.color]="getDiff(row.current, row.projected) > 0 ? 'var(--danger)' : getDiff(row.current, row.projected) < 0 ? 'var(--success)' : ''">
+                  {{ getDiff(row.current, row.projected) >= 0 ? '+' : '' }}{{ getDiffPct(row.current, row.projected) }}%
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state" style="margin-top:16px">
+        <div class="empty-icon"><app-icon name="trendingUp" [size]="32"></app-icon></div>
+        <div class="empty-title">Cost Projection</div>
+        <div class="empty-desc">Select an employee and enter projected changes, then click Project Cost</div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'reports') {
+    <div class="toolbar">
+      <button class="btn btn-primary" (click)="loadSchemeSummary()"><app-icon name="fileText" [size]="14"></app-icon> Scheme Summary</button>
+      <div class="toolbar-search" style="max-width:400px;margin-left:16px">
+        <select class="form-control" style="width:100%" [(ngModel)]="selectedReportEmployee">
+          <option value="">-- Select Employee --</option>
+          @for (emp of employees; track emp.id) {
+            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+          }
+        </select>
+      </div>
+      <button class="btn btn-primary" (click)="loadEmployeeSummaryReport()"><app-icon name="user" [size]="14"></app-icon> Employee Summary</button>
+    </div>
+
+    @if (reportsLoading) {
+      <div class="loading"><div class="spinner"></div>Loading report...</div>
+    } @else if (reportsContent && reportsContent.type === 'scheme') {
+      <h3 style="margin:16px 0 12px;font-size:16px"><app-icon name="heart" [size]="16"></app-icon> Medical Aid Schemes Summary</h3>
+      <div class="data-grid" style="margin-bottom:24px">
+        <table>
+          <thead><tr><th>Scheme Name</th><th>Type</th><th>Administrator</th><th style="text-align:right">Members</th><th style="text-align:right">Total Contributions</th></tr></thead>
+          <tbody>
+            @for (m of reportsContent.data.medical_schemes || []; track $index) {
+              <tr>
+                <td><strong>{{ m.name || '-' }}</strong></td>
+                <td>{{ m.scheme_type || '-' }}</td>
+                <td>{{ m.administrator || '-' }}</td>
+                <td style="text-align:right">{{ m.member_count || 0 }}</td>
+                <td style="text-align:right">{{ formatCurrency(m.total_contributions || 0) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <h3 style="margin:16px 0 12px;font-size:16px"><app-icon name="shield" [size]="16"></app-icon> Retirement Funds Summary</h3>
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Fund Name</th><th>Type</th><th>Administrator</th><th style="text-align:right">Members</th><th style="text-align:right">Total Contributions</th></tr></thead>
+          <tbody>
+            @for (r of reportsContent.data.retirement_funds || []; track $index) {
+              <tr>
+                <td><strong>{{ r.name || '-' }}</strong></td>
+                <td>{{ r.fund_type || '-' }}</td>
+                <td>{{ vendorName(r.vendor_id) }}</td>
+                <td style="text-align:right">{{ r.member_count || 0 }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.total_contributions || 0) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (reportsContent && reportsContent.type === 'employee') {
+      <h3 style="margin:16px 0 12px;font-size:16px"><app-icon name="user" [size]="16"></app-icon> Benefits Summary - {{ reportsContent.data.employee?.first_name }} {{ reportsContent.data.employee?.surname }}</h3>
+      <h4 style="margin:12px 0 8px;font-size:14px">Medical Aid</h4>
+      <div class="data-grid" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Scheme</th><th>Membership #</th><th>Join Date</th><th>Status</th></tr></thead>
+          <tbody>
+            @for (m of reportsContent.data.medical || []; track $index) {
+              <tr>
+                <td>{{ m.scheme_name || '-' }}</td>
+                <td>{{ m.membership_number || '-' }}</td>
+                <td>{{ m.join_date ? m.join_date.split('T')[0] : '-' }}</td>
+                <td>
+                  @if (m.is_current) { <span class="status-badge status-approved">Current</span> }
+                  @else { <span class="status-badge status-rejected">Previous</span> }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <h4 style="margin:12px 0 8px;font-size:14px">Retirement Funds</h4>
+      <div class="data-grid" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Fund</th><th>Fund #</th><th style="text-align:right">Employee Amt</th><th style="text-align:right">Employer Amt</th><th>Status</th></tr></thead>
+          <tbody>
+            @for (r of reportsContent.data.retirement || []; track $index) {
+              <tr>
+                <td>{{ r.fund_name || '-' }}</td>
+                <td>{{ r.fund_number || '-' }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.employee_amount || 0) }}</td>
+                <td style="text-align:right">{{ formatCurrency(r.employer_amount || 0) }}</td>
+                <td>
+                  @if (r.is_current) { <span class="status-badge status-approved">Current</span> }
+                  @else { <span class="status-badge status-rejected">Previous</span> }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="fileText" [size]="32"></app-icon></div>
+        <div class="empty-title">Benefits Reports</div>
+        <div class="empty-desc">Click Scheme Summary or select an employee for Employee Summary</div>
+      </div>
+    }
+  }
+}
+
+@if (showEnrolMedicalModal) {
+  <div class="modal-overlay visible" (click)="showEnrolMedicalModal = false">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Enrol on Medical Aid</h3><button class="modal-close" (click)="showEnrolMedicalModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full-width"><label>Medical Aid Scheme <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="medEnrol.scheme_id">
+              <option value="">-- Select --</option>
+              @for (s of schemes; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Membership Number</label><input class="form-control" [(ngModel)]="medEnrol.membership_number" placeholder="e.g. MED-001234"></div>
+          <div class="form-group"><label>Join Date <span class="required">*</span></label><app-date-input [(ngModel)]="medEnrol.join_date"></app-date-input></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showEnrolMedicalModal = false">Cancel</button><button class="btn btn-primary" (click)="submitMedicalEnrolment()">Enrol</button></div>
+    </div>
+  </div>
+}
+
+@if (showEnrolRetirementModal) {
+  <div class="modal-overlay visible" (click)="showEnrolRetirementModal = false">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Enrol on Retirement Fund</h3><button class="modal-close" (click)="showEnrolRetirementModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full-width"><label>Retirement Fund <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="retEnrol.fund_type_id">
+              <option value="">-- Select --</option>
+              @for (f of funds; track f.id) { <option [value]="f.id">{{ f.name }} ({{ f.fund_type }})</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Fund/Member Number</label><input class="form-control" [(ngModel)]="retEnrol.fund_number" placeholder="e.g. RF-001234"></div>
+          <div class="form-group"><label>Join Date <span class="required">*</span></label><app-date-input [(ngModel)]="retEnrol.join_date"></app-date-input></div>
+          <div class="form-group"><label>Employee Amount (R)</label><input class="form-control" type="number" [(ngModel)]="retEnrol.employee_amount" step="0.01" min="0"></div>
+          <div class="form-group"><label>Employer Amount (R)</label><input class="form-control" type="number" [(ngModel)]="retEnrol.employer_amount" step="0.01" min="0"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showEnrolRetirementModal = false">Cancel</button><button class="btn btn-primary" (click)="submitRetirementEnrolment()">Enrol</button></div>
+    </div>
+  </div>
+}
+
+@if (showEnrolGroupLifeModal) {
+  <div class="modal-overlay visible" (click)="showEnrolGroupLifeModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Enrol on Group Life Benefit</h3><button class="modal-close" (click)="showEnrolGroupLifeModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full-width"><label>Benefit <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="glEnrol.benefit_id">
+              <option value="">-- Select --</option>
+              @for (b of glBenefitOptions; track b.id) { <option [value]="b.id">{{ b.benefit_name }} ({{ b.provider }})</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Cover Amount (R)</label><input class="form-control" type="number" [(ngModel)]="glEnrol.cover_amount" step="0.01" min="0"></div>
+          <div class="form-group"><label>Employee Contribution (R)</label><input class="form-control" type="number" [(ngModel)]="glEnrol.employee_contribution" step="0.01" min="0"></div>
+          <div class="form-group"><label>Employer Contribution (R)</label><input class="form-control" type="number" [(ngModel)]="glEnrol.employer_contribution" step="0.01" min="0"></div>
+          <div class="form-group"><label>Start Date <span class="required">*</span></label><app-date-input [(ngModel)]="glEnrol.start_date"></app-date-input></div>
+          <div class="form-group"><label>Beneficiary Name</label><input class="form-control" [(ngModel)]="glEnrol.beneficiary_name" placeholder="Full name"></div>
+          <div class="form-group"><label>Beneficiary ID</label><input class="form-control" [(ngModel)]="glEnrol.beneficiary_id_number" maxlength="13" placeholder="SA ID"></div>
+          <div class="form-group"><label>Beneficiary Relationship</label>
+            <select class="form-control" [(ngModel)]="glEnrol.beneficiary_relationship">
+              <option value="">-- Select --</option>
+              <option value="SPOUSE">Spouse</option><option value="CHILD">Child</option><option value="PARENT">Parent</option><option value="SIBLING">Sibling</option><option value="OTHER">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showEnrolGroupLifeModal = false">Cancel</button><button class="btn btn-primary" (click)="submitGroupLifeEnrolment()">Enrol</button></div>
+    </div>
+  </div>
+}
+
+@if (showAddDependantModal) {
+  <div class="modal-overlay visible" (click)="showAddDependantModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Add Dependant</h3><button class="modal-close" (click)="showAddDependantModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>First Name <span class="required">*</span></label><input class="form-control" [(ngModel)]="newDependant.first_name"></div>
+          <div class="form-group"><label>Surname <span class="required">*</span></label><input class="form-control" [(ngModel)]="newDependant.surname"></div>
+          <div class="form-group"><label>ID Number</label><input class="form-control" [(ngModel)]="newDependant.id_number" maxlength="13" placeholder="SA ID"></div>
+          <div class="form-group"><label>Date of Birth</label><app-date-input [(ngModel)]="newDependant.date_of_birth"></app-date-input></div>
+          <div class="form-group"><label>Gender</label>
+            <select class="form-control" [(ngModel)]="newDependant.gender"><option value="MALE">Male</option><option value="FEMALE">Female</option></select>
+          </div>
+          <div class="form-group"><label>Dependant Type <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newDependant.dependant_type">
+              <option value="SPOUSE">Spouse</option><option value="CHILD">Child</option><option value="ADULT">Adult Dependant</option><option value="STUDENT">Student Dependant</option><option value="DISABLED">Disabled Dependant</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Start Date <span class="required">*</span></label><app-date-input [(ngModel)]="newDependant.start_date"></app-date-input></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showAddDependantModal = false">Cancel</button><button class="btn btn-primary" (click)="submitAddDependant()">Add Dependant</button></div>
+    </div>
+  </div>
+}
+

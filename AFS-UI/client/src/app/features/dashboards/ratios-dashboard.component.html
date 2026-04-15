@@ -1,0 +1,148 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load financial ratios</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Financial Ratios</h1>
+        <p class="subtitle">NT-Mandated Municipal Financial Health Indicators</p>
+      </div>
+      <div class="page-actions">
+        <mat-form-field appearance="outline" class="period-filter-field">
+          <mat-label>Reporting Period</mat-label>
+          <mat-select [(ngModel)]="selectedPeriod" (selectionChange)="onPeriodChange()">
+            @for (p of periodOptions; track p.value) {
+              <mat-option [value]="p.value">{{ p.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh ratio calculations">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="score-section">
+      <div class="score-gauge">
+        <app-gauge-chart [value]="data.overallScore" label="Overall Financial Health"
+          [thresholds]="[{value: 40, color: '#ef5350'}, {value: 70, color: '#f59e0b'}, {value: 100, color: '#4caf50'}]">
+        </app-gauge-chart>
+      </div>
+      <div class="score-kpis">
+        <app-kpi-tile title="Total Ratios" [value]="data.totalRatios" icon="functions" color="info"></app-kpi-tile>
+        <app-kpi-tile title="Within Norm" [value]="data.green" icon="check_circle" color="success"></app-kpi-tile>
+        <app-kpi-tile title="Marginal" [value]="data.amber" icon="warning" color="warning"></app-kpi-tile>
+        <app-kpi-tile title="Outside Norm" [value]="data.red" icon="cancel" color="danger"></app-kpi-tile>
+      </div>
+    </div>
+
+    <div class="ems-enriched-banner" *ngIf="emsEnriched">
+      <mat-icon>verified</mat-icon>
+      <span class="ems-enriched-text">EMS-Enriched</span>
+      <span class="ems-enriched-desc">Ratios calculated using real EMS data (payroll, assets, billing, budget) instead of keyword matching on trial balance descriptions.</span>
+    </div>
+    <div class="ems-enriched-banner not-enriched" *ngIf="!emsEnriched && !loading">
+      <mat-icon>info_outline</mat-icon>
+      <span class="ems-enriched-text">Standard Calculation</span>
+      <span class="ems-enriched-desc">Ratios based on trial balance keyword matching. Connect EMS for more accurate data.</span>
+    </div>
+
+    <div class="section-title">
+      <mat-icon>category</mat-icon> Ratio Categories
+    </div>
+    <div class="categories-grid">
+      @for (cat of data.categories; track cat.name) {
+        <mat-card class="category-card">
+          <div class="cat-header">
+            <span class="cat-name">{{ cat.name }}</span>
+            <div class="cat-summary">
+              @if (cat.green > 0) {
+                <span class="cat-dot green">{{ cat.green }}</span>
+              }
+              @if (cat.amber > 0) {
+                <span class="cat-dot amber">{{ cat.amber }}</span>
+              }
+              @if (cat.red > 0) {
+                <span class="cat-dot red">{{ cat.red }}</span>
+              }
+            </div>
+          </div>
+          <div class="cat-ratios">
+            @for (ratio of cat.ratios; track ratio.id) {
+              <div class="ratio-mini-card" [matTooltip]="ratio.description">
+                <div class="ratio-mini-header">
+                  <app-traffic-light [status]="ratio.status === 'grey' ? 'amber' : ratio.status"></app-traffic-light>
+                  <span class="ratio-mini-name">{{ ratio.name }}</span>
+                </div>
+                <div class="ratio-mini-value">{{ ratio.displayValue }}</div>
+                <div class="ratio-mini-norm">Norm: {{ ratio.norm }}</div>
+                @if (ratio.value !== null) {
+                  <app-sparkline [data]="getPlaceholderTrend(ratio.value)" [color]="getStatusColor(ratio.status)" [height]="24"></app-sparkline>
+                }
+              </div>
+            }
+          </div>
+        </mat-card>
+      }
+    </div>
+
+    <div class="section-title">
+      <mat-icon>table_chart</mat-icon> All Ratios — Detail Table
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Ratio Name</th>
+            <th>Category</th>
+            <th>Formula</th>
+            <th>Value</th>
+            <th>Norm / Benchmark</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ratio of data.ratios; track ratio.id) {
+            <tr [matTooltip]="ratio.description">
+              <td>{{ ratio.id }}</td>
+              <td class="ratio-name-cell">{{ ratio.name }}</td>
+              <td><span class="chip chip-blue">{{ ratio.category }}</span></td>
+              <td class="formula-cell">{{ ratio.formula }}</td>
+              <td class="value-cell">
+                <span [class]="'ratio-value status-text-' + ratio.status">{{ ratio.displayValue }}</span>
+              </td>
+              <td class="norm-cell">{{ ratio.norm }}</td>
+              <td>
+                <span class="rag-badge" [class]="'rag-' + ratio.status">
+                  {{ ratio.status === 'green' ? 'Within Norm' : ratio.status === 'amber' ? 'Marginal' : ratio.status === 'red' ? 'Outside Norm' : 'No Data' }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

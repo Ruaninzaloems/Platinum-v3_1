@@ -1,0 +1,343 @@
+@if (!compilationContextLoading() && !hasCompilationContext()) {
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+    <mat-icon style="font-size:64px;width:64px;height:64px;color:#9e9e9e;margin-bottom:16px">playlist_add_check</mat-icon>
+    <h2 style="margin:0 0 8px;color:#424242">No Active Compilation</h2>
+    <p style="color:#757575;margin:0 0 24px;max-width:400px">Select or create a compilation before making adjustments.</p>
+    <button mat-flat-button color="primary" (click)="goToCompilations()">
+      <mat-icon>arrow_forward</mat-icon> Go to Compilations
+    </button>
+  </div>
+} @else {
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Adjustments</h1>
+      <div class="subtitle">Journal adjustments and corrections</div>
+    </div>
+    <div class="page-actions">
+      <button mat-flat-button class="btn-primary" (click)="showCreateForm.set(true)" matTooltip="Create a new journal adjustment entry">
+        <mat-icon>add</mat-icon>
+        New Adjustment
+      </button>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="kpi-card" matTooltip="Total number of adjustments across all statuses">
+      <div class="kpi-label">Total</div>
+      <div class="kpi-value">{{ adjustments().length }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Adjustments still being drafted and not yet submitted">
+      <div class="kpi-label">Draft</div>
+      <div class="kpi-value">{{ countByStatus('draft') }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Adjustments submitted and awaiting reviewer approval">
+      <div class="kpi-label">Pending Review</div>
+      <div class="kpi-value">{{ countByStatus('pending_review') }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Adjustments approved and posted to the general ledger">
+      <div class="kpi-label">Posted</div>
+      <div class="kpi-value">{{ countByStatus('posted') }}</div>
+    </div>
+  </div>
+
+  @if (showCreateForm()) {
+    <div class="detail-card" style="margin-bottom: 24px;">
+      <div class="card-title">
+        <mat-icon>add_circle</mat-icon>
+        Create New Adjustment
+      </div>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Description</mat-label>
+          <input matInput [(ngModel)]="newAdjustment.description">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Type</mat-label>
+          <mat-select [(ngModel)]="newAdjustment.adjustmentType">
+            <mat-option value="pre-audit">Pre-Audit</mat-option>
+            <mat-option value="audit">Audit</mat-option>
+            <mat-option value="post-audit">Post-Audit</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Effective Date</mat-label>
+          <input matInput [matDatepicker]="picker" [(ngModel)]="newAdjustment.effectiveDate">
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <strong>Journal Lines</strong>
+          <button mat-stroked-button (click)="addLine()" matTooltip="Add a new debit/credit journal line">
+            <mat-icon>add</mat-icon> Add Line
+          </button>
+        </div>
+        <table class="data-table" style="margin-bottom: 12px;">
+          <thead>
+            <tr>
+              <th matTooltip="General Ledger account code for the journal line">GL Account Code</th>
+              <th matTooltip="PPID — Project/Programme Item ID">PPID</th>
+              <th matTooltip="Description of the journal entry line">Description</th>
+              <th matTooltip="Debit amount in ZAR — must balance with credits">Debit Amount</th>
+              <th matTooltip="Credit amount in ZAR — must balance with debits">Credit Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of newLines; track $index) {
+              <tr>
+                <td>
+                  <div style="position: relative;">
+                    <input matInput
+                      [value]="line.glAccountCode"
+                      (input)="onScoaSearch($event, $index)"
+                      placeholder="Search SCOA item..."
+                      matTooltip="Search for mSCOA item by code or description"
+                      [matAutocomplete]="scoaAuto"
+                      (focus)="onScoaSearch($event, $index)"
+                      style="border: 1px solid var(--platinum-border); border-radius: 6px; padding: 6px 8px; width: 200px;">
+                    <mat-autocomplete #scoaAuto="matAutocomplete" (optionSelected)="onScoaSelected($event, $index)">
+                      @for (item of scoaResults(); track item.itemCode) {
+                        <mat-option [value]="item.itemCode">
+                          <span style="font-weight: 600; font-size: 12px;">{{ item.itemCode }}</span>
+                          <span style="font-size: 11px; color: #666; margin-left: 8px;">{{ item.shortDescription }}</span>
+                          <span style="font-size: 10px; color: #999; margin-left: 4px;">[{{ item.segment }}]</span>
+                        </mat-option>
+                      }
+                    </mat-autocomplete>
+                    @if (line.scoaShortDesc) {
+                      <div class="scoa-segment-info">
+                        {{ line.scoaShortDesc }}
+                        @if (line.scoaSegment) {
+                          <span class="segment-tag">{{ line.scoaSegment }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div style="position: relative;">
+                    <input matInput
+                      [value]="line.ppid || ''"
+                      (input)="onPpidSearch($event, $index)"
+                      placeholder="Search PPID..."
+                      matTooltip="Search for Project/Programme Item ID"
+                      [matAutocomplete]="ppidAuto"
+                      (focus)="onPpidSearch($event, $index)"
+                      style="border: 1px solid var(--platinum-border); border-radius: 6px; padding: 6px 8px; width: 140px;">
+                    <mat-autocomplete #ppidAuto="matAutocomplete" (optionSelected)="onPpidSelected($event, $index)">
+                      @for (item of ppidResults(); track item.ppid) {
+                        <mat-option [value]="item.ppid">
+                          <span style="font-weight: 600; font-size: 12px;">{{ item.ppid }}</span>
+                          <span style="font-size: 11px; color: #666; margin-left: 8px;">{{ item.projectName || item.description }}</span>
+                        </mat-option>
+                      }
+                    </mat-autocomplete>
+                    @if (line.ppidDesc) {
+                      <div class="scoa-segment-info">{{ line.ppidDesc }}</div>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <input matInput [(ngModel)]="line.description" placeholder="Description" matTooltip="Describe the purpose of this journal line" style="border: 1px solid var(--platinum-border); border-radius: 6px; padding: 6px 8px; width: 100%;">
+                </td>
+                <td>
+                  <input matInput type="number" [(ngModel)]="line.debitAmount" placeholder="0.00" matTooltip="Enter debit amount in ZAR" style="border: 1px solid var(--platinum-border); border-radius: 6px; padding: 6px 8px; width: 120px; font-family: 'SF Mono', ui-monospace, monospace; text-align: right;">
+                </td>
+                <td>
+                  <input matInput type="number" [(ngModel)]="line.creditAmount" placeholder="0.00" matTooltip="Enter credit amount in ZAR" style="border: 1px solid var(--platinum-border); border-radius: 6px; padding: 6px 8px; width: 120px; font-family: 'SF Mono', ui-monospace, monospace; text-align: right;">
+                </td>
+                <td>
+                  <button mat-icon-button color="warn" (click)="removeLine($index)" [disabled]="newLines.length <= 2" matTooltip="Remove this journal line">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <div class="running-totals" [class.balanced]="isNewBalanced()" [class.unbalanced]="!isNewBalanced()">
+          <span>Total Debit: <strong class="amount">{{ calcDebitTotal() | number:'1.2-2' }}</strong></span>
+          <span>Total Credit: <strong class="amount">{{ calcCreditTotal() | number:'1.2-2' }}</strong></span>
+          <span>
+            @if (isNewBalanced()) {
+              <mat-icon style="color: var(--platinum-success); vertical-align: middle;">check_circle</mat-icon> Balanced
+            } @else {
+              <mat-icon style="color: var(--platinum-danger); vertical-align: middle;">cancel</mat-icon> Unbalanced ({{ calcDebitTotal() - calcCreditTotal() | number:'1.2-2' }})
+            }
+          </span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <button mat-stroked-button (click)="showCreateForm.set(false)" matTooltip="Discard this adjustment and close the form">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="createAdjustment()" [disabled]="!isNewBalanced() || !newAdjustment.description" matTooltip="Save this balanced adjustment entry">
+          Create Adjustment
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (selectedAdjustment()) {
+    <div class="detail-card" style="margin-bottom: 24px;">
+      <div class="card-title">
+        <mat-icon>visibility</mat-icon>
+        {{ selectedAdjustment()!.reference }} — {{ selectedAdjustment()!.description }}
+        <span class="status-badge" [class]="selectedAdjustment()!.status.toLowerCase().replace(' ', '_')" matTooltip="Current workflow status of this adjustment">{{ selectedAdjustment()!.status }}</span>
+      </div>
+
+      @if (selectedAdjustment()!.lines?.length) {
+        <table class="data-table" style="margin-bottom: 16px;">
+          <thead>
+            <tr>
+              <th matTooltip="General Ledger account code">GL Account</th>
+              <th matTooltip="Line item description">Description</th>
+              <th class="amount-col" matTooltip="Debit amount in ZAR">Debit</th>
+              <th class="amount-col" matTooltip="Credit amount in ZAR">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of selectedAdjustment()!.lines; track line.id) {
+              <tr>
+                <td>
+                  <span class="mscoa-tag">{{ line.glAccountCode }}</span>
+                  @if (line.mscoaSegment || line.scoaItemCode || line.scoaFundCode || line.scoaFunctionCode || line.scoaProjectCode || line.scoaRegionCode) {
+                    <div class="scoa-segment-info">
+                      @if (line.scoaItemCode) { <span class="segment-tag">Item: {{ line.scoaItemCode }}</span> }
+                      @if (line.scoaFundCode) { <span class="segment-tag">Fund: {{ line.scoaFundCode }}</span> }
+                      @if (line.scoaFunctionCode) { <span class="segment-tag">Func: {{ line.scoaFunctionCode }}</span> }
+                      @if (line.scoaProjectCode) { <span class="segment-tag">Proj: {{ line.scoaProjectCode }}</span> }
+                      @if (line.scoaRegionCode) { <span class="segment-tag">Reg: {{ line.scoaRegionCode }}</span> }
+                      @if (line.mscoaSegment) { <span class="segment-tag">{{ line.mscoaSegment }}</span> }
+                    </div>
+                  }
+                </td>
+                <td>
+                  {{ line.description || line.glAccountName }}
+                  @if (line.ppid) {
+                    <div style="font-size: 11px; color: var(--platinum-text-muted); margin-top: 2px;">PPID: {{ line.ppid }}</div>
+                  }
+                </td>
+                <td class="amount-col">{{ line.debitAmount | number:'1.2-2' }}</td>
+                <td class="amount-col">{{ line.creditAmount | number:'1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
+      @if (impactPreview()) {
+        <div class="ai-insight-card" style="margin-bottom: 16px;">
+          <div class="ai-header">
+            <mat-icon matTooltip="AI-generated impact analysis">analytics</mat-icon>
+            Impact Preview — Affected AFS Figures
+          </div>
+          <div class="ai-body">
+            <pre style="font-size: 12px; white-space: pre-wrap;">{{ impactPreview() | json }}</pre>
+          </div>
+        </div>
+      }
+
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--platinum-border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--platinum-navy);">
+            <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">attach_file</mat-icon>
+            Supporting Documents ({{ adjDocuments().length }})
+          </h4>
+          <div style="display: flex; gap: 8px;">
+            <button mat-stroked-button (click)="uploadDocForAdj(selectedAdjustment()!.id)" matTooltip="Upload supporting documentation">
+              <mat-icon>cloud_upload</mat-icon> Upload
+            </button>
+            <button mat-stroked-button (click)="linkDocToAdj(selectedAdjustment()!.id)" matTooltip="Link existing document">
+              <mat-icon>link</mat-icon> Link Existing
+            </button>
+          </div>
+        </div>
+        @if (adjDocuments().length > 0) {
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            @for (doc of adjDocuments(); track doc.id) {
+              <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--platinum-surface); border: 1px solid var(--platinum-border); border-radius: 8px;">
+                <mat-icon style="color: var(--platinum-text-muted);">insert_drive_file</mat-icon>
+                <div style="flex: 1;">
+                  <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
+                  <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
+                </div>
+                <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc.id)">
+                  <mat-icon>download</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+        } @else {
+          <div style="text-align: center; padding: 16px; color: var(--platinum-text-muted); font-size: 13px;">No supporting documents attached.</div>
+        }
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <button mat-stroked-button (click)="selectedAdjustment.set(null)" matTooltip="Close adjustment detail view">Close</button>
+        @if (selectedAdjustment()!.status === 'draft') {
+          <button mat-flat-button class="btn-primary" (click)="submitAdjustment(selectedAdjustment()!.id)" matTooltip="Submit this adjustment for review">Submit</button>
+        }
+        @if (selectedAdjustment()!.status === 'pending_review') {
+          <button mat-flat-button class="btn-success" (click)="approveAdjustment(selectedAdjustment()!.id)" matTooltip="Approve this adjustment for posting">Approve</button>
+          <button mat-flat-button class="btn-danger" (click)="rejectAdjustment(selectedAdjustment()!.id)" matTooltip="Reject this adjustment and return to draft">Reject</button>
+        }
+        @if (selectedAdjustment()!.status === 'approved') {
+          <button mat-flat-button class="btn-gold" (click)="postAdjustment(selectedAdjustment()!.id)" matTooltip="Post this adjustment to the general ledger">Post</button>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="detail-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th matTooltip="Unique adjustment reference number">Reference</th>
+          <th matTooltip="Adjustment description">Description</th>
+          <th matTooltip="Adjustment type: Pre-Audit, Audit, or Post-Audit">Type</th>
+          <th matTooltip="Current workflow status">Status</th>
+          <th class="amount-col" matTooltip="Sum of all debit amounts in ZAR">Total Debit</th>
+          <th class="amount-col" matTooltip="Sum of all credit amounts in ZAR">Total Credit</th>
+          <th matTooltip="Whether debits and credits are balanced">Balanced</th>
+          <th matTooltip="User who created this adjustment">Prepared By</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (adj of adjustments(); track adj.id) {
+          <tr style="cursor: pointer;" (click)="selectAdjustment(adj)">
+            <td><strong>{{ adj.reference }}</strong></td>
+            <td>{{ adj.description }}</td>
+            <td>
+              <span class="type-badge" [class]="adj.adjustmentType" matTooltip="Adjustment type: {{ adj.adjustmentType }}">{{ adj.adjustmentType }}</span>
+            </td>
+            <td>
+              <span class="status-badge" [class]="adj.status.toLowerCase().replace(' ', '_')" matTooltip="Status: {{ adj.status }}">{{ adj.status }}</span>
+            </td>
+            <td class="amount-col">{{ adj.totalDebit | number:'1.2-2' }}</td>
+            <td class="amount-col">{{ adj.totalCredit | number:'1.2-2' }}</td>
+            <td style="text-align: center;">
+              @if (adj.isBalanced) {
+                <mat-icon style="color: var(--platinum-success); font-size: 20px;" matTooltip="Debits and credits are balanced">check_circle</mat-icon>
+              } @else {
+                <mat-icon style="color: var(--platinum-danger); font-size: 20px;" matTooltip="Debits and credits are not balanced">cancel</mat-icon>
+              }
+            </td>
+            <td>{{ adj.preparedBy }}</td>
+          </tr>
+        }
+        @if (adjustments().length === 0) {
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+              No adjustments found. Click "New Adjustment" to create one.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+}

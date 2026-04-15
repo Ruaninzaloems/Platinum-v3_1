@@ -1,0 +1,5 @@
+﻿AssetConfig_MeasurementType_ID,Name,Default,Enabled,CreatedByID,CreatedDate,ModifiedByID,ModiefiedDate,NoDepreciation
+1,Cost Module,1,1,1,2019-06-28 15:41:38.773,NULL,NULL,NULL
+2,Revaluation Module,1,1,1,2019-06-28 15:41:38.780,NULL,NULL,NULL
+3,Fair Value Module,1,1,1,2019-06-28 15:41:38.783,NULL,NULL,1
+4,Leased Assets,1,1,1,2019-06-28 15:41:38.787,NULL,NULL,NULL

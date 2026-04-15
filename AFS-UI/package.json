@@ -1,0 +1,31 @@
+{
+  "name": "platinum-afs",
+  "version": "1.0.0",
+  "description": "Platinum AFS - Annual Financial Statements Builder & Audit Collaboration Platform",
+  "private": true,
+  "scripts": {
+    "start": "concurrently --kill-others \"npm run start:server\" \"npm run start:client\"",
+    "start:server": "cd server && npm run start:dev",
+    "start:client": "cd client && npx ng serve --configuration development",
+    "build": "cd client && npx ng build --configuration production",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.2.0",
+    "@types/node": "^22.13.11",
+    "@types/nodemailer": "^7.0.11",
+    "drizzle-zod": "^0.8.3",
+    "exceljs": "^4.4.0",
+    "nodemailer": "^8.0.2",
+    "openai": "^6.26.0",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
+    "pdfkit": "^0.17.2",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6",
+    "zod-validation-error": "^5.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

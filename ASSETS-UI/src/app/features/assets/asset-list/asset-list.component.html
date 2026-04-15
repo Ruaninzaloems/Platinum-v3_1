@@ -1,0 +1,895 @@
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div>
+        <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Asset Register</h1>
+        <p style="font-size:14px;color:#64748b;margin:0">{{total()}} assets · {{getMunicipalityName()}} · FY {{getCurrentFinYear()}} Period {{getCurrentPeriod()}}</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button mat-stroked-button style="border-color:#e2e8f0" (click)="exportToExcel()">
+          <mat-icon>download</mat-icon> Export Excel
+        </button>
+        <button mat-stroked-button style="border-color:#e2e8f0" (click)="loadAssets()"><mat-icon>refresh</mat-icon> Refresh</button>
+        <button mat-flat-button style="background:#0f2b46;color:white" (click)="showNewAssetForm = !showNewAssetForm">
+          <mat-icon>{{showNewAssetForm ? 'close' : 'add'}}</mat-icon> {{showNewAssetForm ? 'Cancel' : 'New Asset'}}
+        </button>
+      </div>
+    </div>
+
+    @if (showNewAssetForm) {
+      <div class="card-container" style="margin-bottom:20px;border:2px solid #3b82f6">
+        <div style="padding:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:600;color:#1e293b;margin:0;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#3b82f6">add_circle</mat-icon> Register New Asset
+            </h3>
+            <div style="display:flex;gap:4px">
+              @for (s of formSteps; track s.key) {
+                <button (click)="formStep = s.key"
+                  [style.background]="formStep === s.key ? '#0f2b46' : '#f1f5f9'"
+                  [style.color]="formStep === s.key ? 'white' : '#64748b'"
+                  style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid #e2e8f0;cursor:pointer;white-space:nowrap">
+                  {{s.label}}
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (formStep === 'details') {
+            <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Asset Classification
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+              <div class="detail-field" style="grid-column:1/3">
+                <label>Description *</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.description" placeholder="Enter asset description" />
+              </div>
+            </div>
+
+            <div style="margin:12px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Classification Hierarchy
+              <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px">Select Type first, then Category, then Sub Category</span>
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Asset Type *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.typeId" (ngModelChange)="onTypeChange($event)">
+                  <option [ngValue]="0">Select type...</option>
+                  @for (t of assetTypes(); track t.assetTypeId) { <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Category *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.categoryId" (ngModelChange)="onCategoryChange($event)" [disabled]="!na.typeId">
+                  <option [ngValue]="0">Select category...</option>
+                  @for (c of filteredCategories(); track c.assetCategoryId) { <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Sub Category</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.subCategoryId" (ngModelChange)="onSubCategoryChange($event)" [disabled]="!na.categoryId">
+                  <option [ngValue]="0">Select sub category...</option>
+                  @for (sc of filteredSubCategories(); track sc.assetSubCategoryId) { <option [ngValue]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option> }
+                </select>
+              </div>
+            </div>
+
+            <div class="detail-grid" style="grid-template-columns:1fr;margin-top:8px">
+              <div class="detail-field">
+                <label>Asset Class * <span style="font-size:11px;color:#94a3b8;font-weight:400">(selecting a class will auto-fill Useful Life, Depreciation Method, Status and other linked fields)</span></label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.assetClassId" (ngModelChange)="onClassChange($event)" [disabled]="!na.typeId || !na.categoryId">
+                  <option [ngValue]="0">{{getClassPlaceholder()}}</option>
+                  @for (cls of filteredClasses(); track cls.assetClass_ID) {
+                    <option [ngValue]="cls.assetClass_ID">{{cls.assetClassDesc}} ({{cls.usefulLifeInMonths}} months)</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            @if (noClassMessage()) {
+              <div style="margin:8px 0;padding:10px 14px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#d97706;font-size:18px">warning</mat-icon>
+                <span style="font-size:13px;color:#92400e">{{noClassMessage()}}</span>
+                <a routerLink="/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
+              </div>
+            }
+
+            <div style="margin:12px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Valuation & Status
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Measurement Type *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.measurementTypeId">
+                  <option [ngValue]="0">Select...</option>
+                  @for (mt of measurementTypes(); track mt.measurementTypeId) { <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Asset Status *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.assetStatusId">
+                  <option [ngValue]="0">Select...</option>
+                  @for (s of assetStatuses(); track s.assetStatusId) { <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Depreciation Method</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.depreciationMethod">
+                  <option value="">Select...</option>
+                  @for (dm of depreciationMethods(); track dm.assetDepreciationMethod_ID) { <option [value]="dm.assetDepreciationMethodDesc">{{dm.assetDepreciationMethodDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Financial Status</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.financialStatus">
+                  <option value="">Select...</option>
+                  <option value="Addition">Addition</option>
+                  <option value="Carrying Value zero">Carrying Value zero</option>
+                  <option value="Disposed Asset">Disposed Asset</option>
+                  <option value="Donated Asset">Donated Asset</option>
+                  <option value="Existing Asset Register">Existing Asset Register</option>
+                  <option value="Impaired Asset">Impaired Asset</option>
+                  <option value="Write-off">Write-off</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin:12px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              CIDMS Component &amp; Infrastructure
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>CIDMS Classification *</label>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  @if (na.cidmsSubComponentTypeId || na.cidmsComponentType || na.cidmsAccountingGroup || na.cidmsAssetType) {
+                    <span style="font-size:12px;color:#1e293b;padding:5px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      {{ na.cidmsComponentType || na.cidmsAssetType || na.cidmsAssetGroupType || na.cidmsAssetClass || na.cidmsSubAccountingGroup || na.cidmsAccountingGroup || ('ID: ' + na.cidmsSubComponentTypeId) }}
+                    </span>
+                    <button type="button" (click)="na.cidmsSubComponentTypeId = 0; na.cidmsComponentTypeId = 0; na.cidmsAccountingGroupId = 0; na.cidmsSubAccountingGroupId = 0; na.cidmsClassId = 0; na.cidmsGroupTypeId = 0; na.cidmsAssetTypeId = 0; na.cidmsComponentType = ''; na.cidmsAccountingGroup = ''; na.cidmsSubAccountingGroup = ''; na.cidmsAssetClass = ''; na.cidmsAssetGroupType = ''; na.cidmsAssetType = ''" style="flex-shrink:0;padding:4px 8px;border:1px solid #fca5a5;border-radius:6px;background:#fff;color:#dc2626;font-size:12px;cursor:pointer">Clear</button>
+                  }
+                  @if (!na.cidmsSubComponentTypeId && !na.cidmsComponentType && !na.cidmsAccountingGroup && !na.cidmsAssetType) {
+                    <span style="font-size:12px;color:#94a3b8;padding:5px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;flex:1">— Not selected —</span>
+                  }
+                  <button type="button" (click)="showNewCidmsPicker.set(true)" style="flex-shrink:0;padding:5px 12px;border:1px solid #0f2b46;border-radius:6px;background:#0f2b46;color:#fff;font-size:12px;cursor:pointer">Select</button>
+                </div>
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Component Type (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsComponentType" readonly />
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Accounting Group (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsAccountingGroup" readonly />
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Sub Accounting Group (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsSubAccountingGroup" readonly />
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Asset Class (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsAssetClass" readonly />
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Group Type (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsAssetGroupType" readonly />
+              </div>
+              <div class="detail-field">
+                <label>CIDMS Asset Type (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.cidmsAssetType" readonly />
+              </div>
+              <div class="detail-field">
+                <label>Infrastructure / Non-Infrastructure (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="na.infrastructureType" readonly />
+              </div>
+              <div class="detail-field">
+                <label>Parent Asset ID</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.parentAssetId" placeholder="Parent asset ID if component" />
+              </div>
+              <div class="detail-field">
+                <label>Cash / Non-Cash Generating</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.cashGenerating">
+                  <option value="">Select...</option>
+                  <option value="Yes">Yes - Cash Generating</option>
+                  <option value="No">No - Non-Cash Generating</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Basic Municipal Services</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.basicMunicipalityService">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">Yes</option>
+                  <option [ngValue]="2">No</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Nature of Addition</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.natureOfAddition">
+                  <option value="">Select...</option>
+                  <option value="Purchase">Purchase</option>
+                  <option value="Donation">Donation</option>
+                  <option value="Transfer from WIP">Transfer from WIP</option>
+                  <option value="Transfer from Inventory">Transfer from Inventory</option>
+                  <option value="Construction">Construction</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Barcode</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.barcode" placeholder="Barcode / tag number" />
+              </div>
+              <div class="detail-field">
+                <label>Old Barcode</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.oldBarcode" placeholder="Previous barcode" />
+              </div>
+            </div>
+
+            <div style="margin:12px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Dimensions &amp; Physical
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>UOM</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.uomId">
+                  <option [ngValue]="0">Select...</option>
+                  @for (u of unitOfIssues(); track u.unitOfIssueId) { <option [ngValue]="u.unitOfIssueId">{{u.unitOfIssueDesc}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Quantity</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.quantity" />
+              </div>
+              <div class="detail-field">
+                <label>Dim 1</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.dim1" />
+              </div>
+              <div class="detail-field">
+                <label>Dim 2</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.dim2" />
+              </div>
+              <div class="detail-field">
+                <label>Dim 3</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.dim3" />
+              </div>
+              <div class="detail-field">
+                <label>Dimension Quantity</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.dimensionQuantity" />
+              </div>
+              <div class="detail-field">
+                <label>Construction Material</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.constructionMaterial" />
+              </div>
+              <div class="detail-field">
+                <label>Diameter</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.diameter" />
+              </div>
+              <div class="detail-field">
+                <label>Capacity</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.capacity" />
+              </div>
+            </div>
+          }
+
+          @if (formStep === 'financial') {
+            <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Acquisition & Cost
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Acquisition / Purchase Cost (R) *</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.acquisitionCost" />
+              </div>
+              <div class="detail-field">
+                <label>Residual Value (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.residualValue" />
+              </div>
+              <div class="detail-field">
+                <label>Current Replacement Cost (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.currentReplacementCost" />
+              </div>
+              <div class="detail-field">
+                <label>Nature of Addition</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.natureOfAddition">
+                  <option value="">Select...</option>
+                  <option value="Purchase">Purchase</option>
+                  <option value="Donation">Donation</option>
+                  <option value="Transfer from WIP">Transfer from WIP</option>
+                  <option value="Transfer from Inventory">Transfer from Inventory</option>
+                  <option value="Construction">Construction</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Funding Sources
+            </div>
+            @if (createStagedFundingRows.length > 0) {
+              <div style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+                @for (row of createStagedFundingRows; track row.fundingSourceId; let idx = $index) {
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e2e8f0" [style.background]="idx % 2 === 0 ? '#f8fafc' : 'white'">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <mat-icon style="font-size:16px;color:#3b82f6">account_balance</mat-icon>
+                      <span style="font-size:13px;color:#1e293b">{{row.fundingSourceDesc}}</span>
+                      @if (row.amount) { <span style="font-size:12px;color:#64748b">(R {{row.amount | number:'1.2-2'}})</span> }
+                    </div>
+                    <button (click)="removeCreateStagedFunding(idx)" style="background:none;border:none;cursor:pointer;color:#ef4444;display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 8px;border-radius:4px">
+                      <mat-icon style="font-size:14px">remove_circle</mat-icon> Remove
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select style="flex:2;min-width:180px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="createNewFundingSourceId" (ngModelChange)="createNewFundingSourceId=$event">
+                <option [ngValue]="null">Select funding source to add...</option>
+                @for (fs of getCreateAvailableFundingSources(); track fs.fundingSourceId) { <option [ngValue]="fs.fundingSourceId">{{fs.fundingSourceDesc}}</option> }
+              </select>
+              <input type="number" step="0.01" min="0" placeholder="Amount (R) — optional" [(ngModel)]="createNewFundingAmount" style="flex:1;min-width:140px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" />
+              <button (click)="addCreateStagedFunding()" [disabled]="!createNewFundingSourceId" style="padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap">
+                <mat-icon style="font-size:16px">add</mat-icon> Add
+              </button>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Depreciation, Impairment &amp; Revaluation
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Accumulated Depreciation Closing Balance (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" value="0" readonly />
+              </div>
+              <div class="detail-field">
+                <label>Depreciation - Current Year (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.depreciationCurrentYear" />
+              </div>
+              <div class="detail-field">
+                <label>Depreciation Offset (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.depreciationOffset" />
+              </div>
+              <div class="detail-field">
+                <label>Deemed Cost (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.deemedCost" />
+              </div>
+              <div class="detail-field">
+                <label>Accumulated Impairment Closing Balance (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" value="0" readonly />
+              </div>
+              <div class="detail-field">
+                <label>Impairment - Current Year (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.impairmentCurrentYear" />
+              </div>
+              <div class="detail-field">
+                <label>Impairment Date</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.impairmentDate" />
+              </div>
+              <div class="detail-field">
+                <label>Reversal of Impairment Loss (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.impairmentReversalAmount" />
+              </div>
+              <div class="detail-field">
+                <label>Revaluation Date</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.revaluationDate" />
+              </div>
+              <div class="detail-field">
+                <label>Movement in Revaluation Reserve (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.movementInRevaluationReserve" />
+              </div>
+              <div class="detail-field">
+                <label>Revaluation - Current Year (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.revaluationValue" />
+              </div>
+              <div class="detail-field">
+                <label>Revaluation Reserve Closing Balance (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.revaluationReserveClosingBalance" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Replacement Cost &amp; Maintenance
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Current Replacement Cost (CRC) (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.currentReplacementCost" />
+              </div>
+              <div class="detail-field">
+                <label>Depreciated Replacement Cost (DRC) (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.depreciatedReplacementCost" />
+              </div>
+              <div class="detail-field">
+                <label>Annualised Maintenance % of CRC</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.annualisedMaintenanceCrc" />
+              </div>
+              <div class="detail-field">
+                <label>Annual Maintenance Budget Need (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.annualMaintenanceBudgetNeed" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Useful Life &amp; Key Dates
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Useful Life (Total Months) *</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.usefulLifeMonths" min="0" />
+              </div>
+              <div class="detail-field">
+                <label>Remaining Useful Life (Months)</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.remainingUsefulLifeMonths" min="0" />
+              </div>
+              <div class="detail-field">
+                <label>Condition *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.condition">
+                  <option value="Very Good">Very Good</option>
+                  <option value="Good">Good</option>
+                  <option value="Fair">Fair</option>
+                  <option value="Poor">Poor</option>
+                  <option value="Very Poor">Very Poor</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Acquisition Date *</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.acquisitionDate" />
+              </div>
+              <div class="detail-field">
+                <label>Commissioning Date</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.commissioningDate" />
+              </div>
+              <div class="detail-field">
+                <label>In Service / Ready for Use Date</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.inServiceDate" />
+              </div>
+              <div class="detail-field">
+                <label>Verification Date</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.verificationDate" />
+              </div>
+              <div class="detail-field">
+                <label>Verification Done By</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.verificationDoneById" (ngModelChange)="na.verificationDoneById=$event">
+                  <option [ngValue]="0">Select employee...</option>
+                  @for (e of newEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Year Constructed</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.yearConstructed" min="1900" max="2030" />
+              </div>
+              <div class="detail-field">
+                <label>Forecast Replacement Year</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.forecastReplacementYear" min="2020" max="2100" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Insurance &amp; Warranty
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Insurance Cover</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.insuranceCover">
+                  <option value="">Select...</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Insured Amount (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.insuredAmount" />
+              </div>
+              <div class="detail-field">
+                <label>Insurance Policy No</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.insurancePolicyNo" />
+              </div>
+              <div class="detail-field">
+                <label>Warranty</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.warranty">
+                  <option value="">Select...</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+            </div>
+          }
+
+          @if (formStep === 'ownership') {
+            <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Asset Ownership
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Department *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.departmentId" (ngModelChange)="onNewDepartmentChange($event)">
+                  <option [ngValue]="0">Select department...</option>
+                  @for (d of departments(); track d.id) { <option [ngValue]="d.id">{{d.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Division</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.divisionId" (ngModelChange)="na.divisionId=$event" [disabled]="!na.departmentId">
+                  <option [ngValue]="0">{{na.departmentId ? 'Select division...' : 'Select department first...'}}</option>
+                  @for (dv of newFilteredDivisions(); track dv.id) { <option [ngValue]="dv.id">{{dv.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Custodian *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.custodianId" (ngModelChange)="onNewCustodianChange($event)">
+                  <option [ngValue]="0">Select employee...</option>
+                  @for (e of newEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Custodian ID Number (auto)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b;font-family:monospace" [value]="na.custodianIdNumber" readonly placeholder="Auto-filled from custodian" />
+              </div>
+              <div class="detail-field">
+                <label>Asset Ownership Name</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.assetOwnership" placeholder="e.g. Mnquma Local Municipality" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Identification &amp; Serial Numbers
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Serial Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.serialNumber" placeholder="Serial number" />
+              </div>
+              <div class="detail-field">
+                <label>Registration Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.registrationNumber" placeholder="Vehicle/equipment reg" />
+              </div>
+              <div class="detail-field">
+                <label>Unit Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.unitNumber" placeholder="Unit number" />
+              </div>
+              <div class="detail-field">
+                <label>Make</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.make" placeholder="Manufacturer" />
+              </div>
+              <div class="detail-field">
+                <label>Model</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.model" placeholder="Model name/number" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Donor Information
+            </div>
+            <div style="margin-bottom:8px;padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:12px;color:#166534">
+              Complete this section only if the asset was donated (Financial Status = Donated Asset).
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Donor Name</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.donorName" placeholder="Donor organisation / person" />
+              </div>
+              <div class="detail-field">
+                <label>Donor Registration Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.donorRegNumber" placeholder="Company / entity reg number" />
+              </div>
+              <div class="detail-field">
+                <label>Date Donated</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.dateDonated" />
+              </div>
+            </div>
+
+          }
+
+          @if (formStep === 'location') {
+            <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Asset Location
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Town *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.townId" (ngModelChange)="onNewTownChange($event)">
+                  <option [ngValue]="0">Select town...</option>
+                  @for (t of newTowns(); track t.id) { <option [ngValue]="t.id">{{t.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Suburb</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.suburbId" (ngModelChange)="onNewSuburbChange($event)" [disabled]="!na.townId">
+                  <option [ngValue]="0">Select suburb...</option>
+                  @for (s of newSuburbs(); track s.id) { <option [ngValue]="s.id">{{s.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Ward</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.wardId" (ngModelChange)="na.wardId=$event">
+                  <option [ngValue]="0">Select ward...</option>
+                  @for (w of newWards(); track w.id) { <option [ngValue]="w.id">{{w.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Street Address</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.streetId" (ngModelChange)="onNewStreetChange($event)" [disabled]="!na.suburbId">
+                  <option [ngValue]="0">Select street...</option>
+                  @for (st of newStreets(); track st.id) { <option [ngValue]="st.id">{{st.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Building</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.buildingId" (ngModelChange)="onNewBuildingChange($event)">
+                  <option [ngValue]="0">Select building...</option>
+                  @for (b of newBuildings(); track b.id) { <option [ngValue]="b.id">{{b.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Floor Area</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.floorId" (ngModelChange)="onNewFloorChange($event)" [disabled]="!na.buildingId">
+                  <option [ngValue]="0">Select floor...</option>
+                  @for (f of newFloors(); track f.id) { <option [ngValue]="f.id">{{f.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Room Number</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.roomId" (ngModelChange)="na.roomId=$event" [disabled]="!na.floorId">
+                  <option [ngValue]="0">Select room...</option>
+                  @for (r of newRooms(); track r.id) { <option [ngValue]="r.id">{{r.description}}</option> }
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Latitude</label>
+                <input type="number" step="0.000001" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.latitude" placeholder="-31.xxxx" />
+              </div>
+              <div class="detail-field">
+                <label>Longitude</label>
+                <input type="number" step="0.000001" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.longitude" placeholder="28.xxxx" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Property / Land Details
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>SG Key (SGNumberChange_ID)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.sgKey" placeholder="Surveyor General key" />
+              </div>
+              <div class="detail-field">
+                <label>Deed Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.deedNumber" placeholder="Title deed number" />
+              </div>
+              <div class="detail-field">
+                <label>Erf / Farm Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.erfNumber" placeholder="Erf or farm number" />
+              </div>
+              <div class="detail-field">
+                <label>Portion Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.portionNumber" placeholder="Portion number" />
+              </div>
+              <div class="detail-field">
+                <label>Erf Size (m²)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.erfSize" placeholder="Size in square meters" />
+              </div>
+              <div class="detail-field">
+                <label>GIS Feature</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.gisFeature" placeholder="GIS feature identifier" />
+              </div>
+              <div class="detail-field">
+                <label>Well Known Text (WKT)</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.wellKnownText" placeholder="POLYGON or POINT WKT" />
+              </div>
+              <div class="detail-field">
+                <label>Location Description</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.locationDescription" placeholder="Free-text location description" />
+              </div>
+              <div class="detail-field">
+                <label>Room Responsible Person</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.roomResponsiblePerson" placeholder="Person responsible for room" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Supplier &amp; Invoice
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Supplier Name</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.supplierName" placeholder="Supplier / vendor name" />
+              </div>
+              <div class="detail-field">
+                <label>Supplier Code</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.supplierCode" placeholder="Supplier code" />
+              </div>
+              <div class="detail-field">
+                <label>Invoice Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.invoiceNo" placeholder="Invoice number" />
+              </div>
+              <div class="detail-field">
+                <label>Payment Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.paymentNo" placeholder="Payment / cheque number" />
+              </div>
+              <div class="detail-field">
+                <label>Funding Source Number</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.fundingSourceNumber" placeholder="Funding source / grant number" />
+              </div>
+              <div class="detail-field">
+                <label>Funding Description</label>
+                <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.fundingDescription" placeholder="Funding description" />
+              </div>
+            </div>
+
+            <div style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:6px">
+              Condition Grading (CIDMS)
+            </div>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Criticality Grade</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.criticalityGrade">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">1 - Very Low</option>
+                  <option [ngValue]="2">2 - Low</option>
+                  <option [ngValue]="3">3 - Medium</option>
+                  <option [ngValue]="4">4 - High</option>
+                  <option [ngValue]="5">5 - Very High</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Performance Grade</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.performanceGrade">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">1 - Very Poor</option>
+                  <option [ngValue]="2">2 - Poor</option>
+                  <option [ngValue]="3">3 - Fair</option>
+                  <option [ngValue]="4">4 - Good</option>
+                  <option [ngValue]="5">5 - Very Good</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Utilisation Grade</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.utilisationGrade">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">1 - Not Used</option>
+                  <option [ngValue]="2">2 - Under-utilised</option>
+                  <option [ngValue]="3">3 - Adequately Used</option>
+                  <option [ngValue]="4">4 - Over-utilised</option>
+                  <option [ngValue]="5">5 - Max Utilisation</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Infrastructure Health Grade</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.infrastructureHealthGrade">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">1 - Very Poor</option>
+                  <option [ngValue]="2">2 - Poor</option>
+                  <option [ngValue]="3">3 - Fair</option>
+                  <option [ngValue]="4">4 - Good</option>
+                  <option [ngValue]="5">5 - Very Good</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Risk</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.risk">
+                  <option [ngValue]="0">Select...</option>
+                  <option [ngValue]="1">Very Low</option>
+                  <option [ngValue]="2">Low</option>
+                  <option [ngValue]="3">Medium</option>
+                  <option [ngValue]="4">High</option>
+                  <option [ngValue]="5">Very High</option>
+                </select>
+              </div>
+            </div>
+
+          }
+
+          <div style="display:flex;gap:8px;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+            <div style="font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:4px">
+              <mat-icon style="font-size:14px">info</mat-icon> Fields marked with * are mandatory
+            </div>
+            <div style="display:flex;gap:8px">
+              <button mat-stroked-button (click)="showNewAssetForm = false">Cancel</button>
+              @if (formStep !== 'details') {
+                <button mat-stroked-button (click)="prevStep()">
+                  <mat-icon>arrow_back</mat-icon> Previous
+                </button>
+              }
+              @if (formStep !== 'location') {
+                <button mat-flat-button style="background:#3b82f6;color:white" (click)="nextStep()">
+                  Next <mat-icon>arrow_forward</mat-icon>
+                </button>
+              }
+              @if (formStep === 'location') {
+                <button mat-flat-button style="background:#0f2b46;color:white" (click)="createAsset()">
+                  <mat-icon>save</mat-icon> Register Asset
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="filters-bar">
+      <div style="display:flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #e2e8f0;border-radius:6px;background:white;height:40px;width:200px">
+        <mat-icon style="font-size:18px;color:#94a3b8;line-height:18px;width:18px;height:18px">search</mat-icon>
+        <input style="border:none;outline:none;font-size:13px;color:#1e293b;background:transparent;width:100%" [(ngModel)]="search" (keyup.enter)="loadAssets()" placeholder="Search...">
+      </div>
+      <select style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#1e293b;background:white;cursor:pointer;width:140px;height:40px"
+        [(ngModel)]="filterTypeId" (ngModelChange)="onFilterTypeChange($event)">
+        <option [ngValue]="0">All Types</option>
+        @for (t of assetTypes(); track t.assetTypeId) { <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option> }
+      </select>
+      <select style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#1e293b;background:white;cursor:pointer;width:155px;height:40px"
+        [(ngModel)]="filterCategoryId" (ngModelChange)="onFilterCategoryChange($event)">
+        <option [ngValue]="0">All Categories</option>
+        @for (c of filterCategories(); track c.assetCategoryId) { <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option> }
+      </select>
+      <select style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#1e293b;background:white;cursor:pointer;width:155px;height:40px"
+        [(ngModel)]="filterSubCategoryId" (ngModelChange)="onFilterSubCategoryChange($event)">
+        <option [ngValue]="0">All Sub-Categories</option>
+        @for (s of filterSubCategories(); track s.assetSubCategoryId) { <option [ngValue]="s.assetSubCategoryId">{{s.assetSubCategoryDesc}}</option> }
+      </select>
+      @if (filterTypeId || filterCategoryId || filterSubCategoryId || search) {
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:12px" (click)="clearFilters()">
+          <mat-icon style="font-size:16px">clear</mat-icon> Clear
+        </button>
+      }
+    </div>
+
+    @if (loading()) {
+      <div style="display:flex;justify-content:center;padding:60px"><mat-spinner diameter="40"></mat-spinner></div>
+    } @else {
+      <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px;background:white">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Asset ID</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Sub Category</th>
+              <th>Condition</th>
+              <th>Cost Closing (R)</th>
+              <th>Carrying Amount (R)</th>
+              <th>Model</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (asset of assets(); track asset.assetId) {
+              <tr [routerLink]="['/assets', asset.assetId]" style="cursor:pointer">
+                <td class="ref-cell">{{asset.assetId}}</td>
+                <td class="desc-cell" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{asset.description}}</td>
+                <td style="font-size:12px;color:#475569">{{asset.assetTypeName}}</td>
+                <td style="font-size:12px">{{asset.categoryName}}</td>
+                <td style="font-size:12px;color:#64748b">{{asset.subCategoryName}}</td>
+                <td>
+                  <span style="display:inline-flex;align-items:center;gap:4px">
+                    <span [style.background]="getConditionColor(asset.condition)"
+                          style="width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+                    {{asset.condition}}
+                  </span>
+                </td>
+                <td class="value-cell">{{asset.costClosingBalance | number:'1.2-2'}}</td>
+                <td class="value-cell" style="font-weight:600">{{asset.carryingAmount | number:'1.2-2'}}</td>
+                <td style="font-size:12px;color:#475569">{{asset.measurementType}}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8">No assets found matching your criteria</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <span style="font-size:13px;color:#64748b">
+          Showing {{showingFrom()}} - {{showingTo()}} of {{total()}}
+        </span>
+        <div style="display:flex;gap:4px;align-items:center">
+          <button mat-icon-button [disabled]="page() <= 1 || loading()" (click)="page.set(1); loadAssets()" title="First page"><mat-icon>first_page</mat-icon></button>
+          <button mat-icon-button [disabled]="page() <= 1 || loading()" (click)="page.set(page() - 1); loadAssets()"><mat-icon>chevron_left</mat-icon></button>
+          <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;padding:0 4px">
+            <input #pageInput type="number" min="1" [max]="totalPages()" [value]="page()" [disabled]="loading()"
+              (keydown.enter)="jumpToPage(pageInput.value)"
+              (blur)="jumpToPage(pageInput.value)"
+              style="width:56px;text-align:center;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;font-weight:500" />
+            <span style="color:#64748b">/ {{totalPages()}}</span>
+          </span>
+          <button mat-icon-button [disabled]="page() >= totalPages() || loading()" (click)="page.set(page() + 1); loadAssets()"><mat-icon>chevron_right</mat-icon></button>
+          <button mat-icon-button [disabled]="page() >= totalPages() || loading()" (click)="page.set(totalPages()); loadAssets()" title="Last page"><mat-icon>last_page</mat-icon></button>
+        </div>
+      </div>
+
+<app-cidms-picker [isOpen]="showNewCidmsPicker()" (selected)="onNewCidmsChainSelected($event)" (closed)="showNewCidmsPicker.set(false)"></app-cidms-picker>
+    }

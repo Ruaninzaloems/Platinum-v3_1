@@ -1,0 +1,692 @@
+<div class="preview-toolbar" id="preview-toolbar">
+  <div class="toolbar-left">
+    <button mat-icon-button (click)="goBack()" matTooltip="Back to compilation">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <span class="toolbar-title">AFS Preview</span>
+    <span class="version-badge" [class]="previewMode">
+      {{ previewMode === 'draft' ? 'DRAFT v' + (compilation?.draftVersion || 1) : 'FINAL v' + (compilation?.finalVersion || 1) }}
+    </span>
+  </div>
+  <div class="toolbar-right">
+    @if (presets.length > 0) {
+      <button mat-stroked-button [matMenuTriggerFor]="presetMenu" [disabled]="applyingPreset" matTooltip="Change AFS layout style preset">
+        <mat-icon>{{ applyingPreset ? 'hourglass_empty' : 'palette' }}</mat-icon>
+        {{ applyingPreset ? 'Applying...' : 'Style' }}
+      </button>
+      <mat-menu #presetMenu="matMenu">
+        @for (preset of presets; track preset.key) {
+          <button mat-menu-item (click)="applyPreset(preset.key)" [class.active-preset]="activePreset === preset.key">
+            <mat-icon>{{ activePreset === preset.key ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+            <span>{{ preset.label }}</span>
+          </button>
+        }
+      </mat-menu>
+    }
+    <button mat-stroked-button (click)="toggleMode()" matTooltip="Switch between draft and final preview">
+      <mat-icon>{{ previewMode === 'draft' ? 'verified' : 'edit_document' }}</mat-icon>
+      {{ previewMode === 'draft' ? 'View Final' : 'View Draft' }}
+    </button>
+    <button mat-stroked-button (click)="openIndex()" matTooltip="View section index and reorder">
+      <mat-icon>list</mat-icon> Index
+    </button>
+    <button mat-stroked-button (click)="printPreview()" matTooltip="Print this AFS preview">
+      <mat-icon>print</mat-icon> Print
+    </button>
+    <button mat-flat-button class="btn-primary" [matMenuTriggerFor]="exportMenu" [disabled]="exporting" matTooltip="Export AFS document">
+      <mat-icon>{{ exporting ? 'hourglass_empty' : 'download' }}</mat-icon> {{ exporting ? 'Exporting...' : 'Export' }}
+    </button>
+    <mat-menu #exportMenu="matMenu">
+      <button mat-menu-item (click)="startExport('pdf', 'draft')">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>Export Draft PDF</span>
+      </button>
+      <button mat-menu-item (click)="startExport('pdf', 'final')">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>Export Final PDF</span>
+      </button>
+      <button mat-menu-item (click)="startExport('docx', 'draft')">
+        <mat-icon>description</mat-icon>
+        <span>Export Draft Word</span>
+      </button>
+      <button mat-menu-item (click)="startExport('docx', 'final')">
+        <mat-icon>description</mat-icon>
+        <span>Export Final Word</span>
+      </button>
+    </mat-menu>
+  </div>
+</div>
+
+<div class="preview-container" id="afs-print-area" [ngStyle]="styleVars">
+  @if (loadError) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <h3>Failed to load AFS Preview</h3>
+      <p>{{ loadError }}</p>
+      <button mat-flat-button class="btn-primary" (click)="retry()">Try Again</button>
+    </div>
+  } @else if (loading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <h3>Preparing Annual Financial Statements...</h3>
+      <p>Loading compilation data</p>
+    </div>
+  } @else if (compilation) {
+    @if (isObUnresolved) {
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin:0 16px 16px;background:#fff3e0;border:1px solid #ffcc80;border-left:4px solid #e65100;border-radius:8px;position:relative;z-index:10">
+        <mat-icon style="color:#e65100">warning</mat-icon>
+        <div style="flex:1">
+          <strong style="color:#e65100">Opening Balance Continuity Not Confirmed</strong>
+          <span style="color:#bf360c;margin-left:8px">This preview is for review only. Final AFS output requires confirmed opening balance continuity.</span>
+        </div>
+      </div>
+    }
+    @if (previewMode === 'draft' && templateStyle.showWatermark) {
+      <div class="watermark-overlay" [style.opacity]="templateStyle.draftWatermarkOpacity">{{ templateStyle.draftWatermarkText }}</div>
+    }
+
+    <!-- COVER PAGE -->
+    <div class="afs-page cover-page" [class]="'afs-page cover-page cover-layout-' + templateStyle.coverLayout">
+      <div class="cover-border" [style.border-style]="templateStyle.showCoverBorder ? templateStyle.coverBorderStyle : 'none'">
+        <div class="cover-content">
+          <div class="cover-crest">
+            @if (templateStyle.logoPath) {
+              <img [src]="templateStyle.logoPath" alt="Municipality Logo"
+                   class="cover-logo-img"
+                   [style.max-height.px]="templateStyle.logoMaxHeight"
+                   [style.text-align]="templateStyle.logoPosition" />
+            } @else {
+              <div class="crest-icon">
+                <mat-icon style="font-size:56px;width:56px;height:56px" [style.color]="templateStyle.primaryColor">account_balance</mat-icon>
+              </div>
+            }
+            @if (templateStyle.secondaryLogoPath) {
+              <img [src]="templateStyle.secondaryLogoPath" alt="Secondary Logo"
+                   class="cover-secondary-logo-img"
+                   [style.max-height.px]="templateStyle.logoMaxHeight" />
+            }
+          </div>
+          <div class="cover-muni-name">{{ (genInfo?.municipalityName || 'MUNICIPALITY') | uppercase }}</div>
+          <div class="cover-tagline">{{ genInfo?.slogan || '' }}</div>
+          <div class="cover-divider"></div>
+          <div class="cover-type-label">{{ previewMode === 'draft' ? 'DRAFT' : 'AUDITED' }}</div>
+          <h1 class="cover-title">{{ templateStyle.coverSubtitleText?.toUpperCase() || 'ANNUAL FINANCIAL STATEMENTS' }}</h1>
+          <div class="cover-template-label">{{ templateLabel }}</div>
+          <div class="cover-year">FOR THE YEAR ENDED {{ fyEndDate }}</div>
+          <div class="cover-bottom">
+            <div class="cover-details">
+              <div>{{ genInfo?.registeredOffice || '' }}</div>
+              <div>{{ genInfo?.telephone ? 'Tel: ' + genInfo.telephone : '' }}{{ genInfo?.website ? ' | ' + genInfo.website : '' }}</div>
+            </div>
+            <div class="cover-auditor">{{ genInfo?.auditor || 'Auditor-General of South Africa' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE OF CONTENTS (hidden when preset has its own Index block) -->
+    @if (!orderedBlocks.includes('index')) {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        <h2 class="section-heading">TABLE OF CONTENTS</h2>
+        <table class="toc-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Content</th>
+              <th style="text-align:right;width:60px">Page</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>General Information</td><td class="toc-pg">1</td></tr>
+            @if (abbreviations.length > 0) {
+              <tr><td>Abbreviations</td><td class="toc-pg">2</td></tr>
+            }
+            @if (accountingPolicies.length > 0) {
+              <tr><td>Accounting Policies</td><td class="toc-pg">{{ abbreviations.length > 0 ? 3 : 2 }}</td></tr>
+            }
+            <tr><td>Accounting Officer's Responsibilities and Approval</td><td class="toc-pg">{{ (abbreviations.length > 0 ? 3 : 2) + (accountingPolicies.length > 0 ? 1 : 0) }}</td></tr>
+            @for (section of activeSections; track section.id; let i = $index) {
+              <tr><td>{{ section.title }}</td><td class="toc-pg">{{ i + (abbreviations.length > 0 ? 4 : 3) }}</td></tr>
+            }
+            <tr><td>Notes to the Annual Financial Statements</td><td class="toc-pg">{{ activeSections.length + (abbreviations.length > 0 ? 4 : 3) }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    <!-- PRESET-DRIVEN SECTION ORDER -->
+    @for (block of orderedBlocks; track block) {
+
+    @if (block === 'general_info') {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        <h2 class="section-heading">GENERAL INFORMATION</h2>
+        <table class="info-table">
+          <tbody>
+            @if (genInfo?.legalStatus) {
+              <tr><td class="info-key">Legal form of entity</td><td>{{ genInfo.legalStatus }} Municipality</td></tr>
+            }
+            @if (genInfo?.municipalityName) {
+              <tr><td class="info-key">Municipality name</td><td>{{ genInfo.municipalityName }}</td></tr>
+            }
+            @if (genInfo?.demarcationCode) {
+              <tr><td class="info-key">Demarcation code</td><td>{{ genInfo.demarcationCode }}</td></tr>
+            }
+            @if (genInfo?.legislation) {
+              <tr><td class="info-key">Legislation</td><td>{{ genInfo.legislation }}</td></tr>
+            }
+            @if (genInfo?.accountingOfficer) {
+              <tr><td class="info-key">Accounting Officer</td><td>{{ genInfo.accountingOfficer }}</td></tr>
+            }
+            @if (genInfo?.cfo) {
+              <tr><td class="info-key">Chief Financial Officer (CFO)</td><td>{{ genInfo.cfo }}</td></tr>
+            }
+            @if (genInfo?.registeredOffice) {
+              <tr><td class="info-key">Registered office</td><td>{{ genInfo.registeredOffice }}</td></tr>
+            }
+            @if (genInfo?.postalAddress) {
+              <tr><td class="info-key">Postal address</td><td>{{ genInfo.postalAddress }}</td></tr>
+            }
+            @if (genInfo?.telephone) {
+              <tr><td class="info-key">Telephone</td><td>{{ genInfo.telephone }}</td></tr>
+            }
+            @if (genInfo?.fax) {
+              <tr><td class="info-key">Fax</td><td>{{ genInfo.fax }}</td></tr>
+            }
+            @if (genInfo?.email) {
+              <tr><td class="info-key">Email</td><td>{{ genInfo.email }}</td></tr>
+            }
+            @if (genInfo?.website) {
+              <tr><td class="info-key">Website</td><td>{{ genInfo.website }}</td></tr>
+            }
+            @if (genInfo?.auditor) {
+              <tr><td class="info-key">External auditors</td><td>{{ genInfo.auditor }}</td></tr>
+            }
+            @if (genInfo?.auditorAddress) {
+              <tr><td class="info-key">Auditor address</td><td>{{ genInfo.auditorAddress }}</td></tr>
+            }
+            @if (genInfo?.banker) {
+              <tr><td class="info-key">Bankers</td><td>{{ genInfo.banker }}</td></tr>
+            }
+            @if (genInfo?.bankerAddress) {
+              <tr><td class="info-key">Banker address</td><td>{{ genInfo.bankerAddress }}</td></tr>
+            }
+            @if (genInfo?.province) {
+              <tr><td class="info-key">Province</td><td>{{ genInfo.province }}</td></tr>
+            }
+            @if (genInfo?.country) {
+              <tr><td class="info-key">Country</td><td>{{ genInfo.country }}</td></tr>
+            }
+          </tbody>
+        </table>
+
+        @if (genInfo?.mayoralCommittee?.length) {
+          <h3 class="gi-sub-heading">Members of the Mayoral Committee</h3>
+          <table class="info-table">
+            <thead><tr><th class="info-key">Name</th><th>Portfolio</th></tr></thead>
+            <tbody>
+              @for (m of genInfo.mayoralCommittee; track $index) {
+                <tr><td class="info-key">{{ m.name }}</td><td>{{ m.portfolio }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (genInfo?.executiveManagement?.length) {
+          <h3 class="gi-sub-heading">Executive Management</h3>
+          <table class="info-table">
+            <thead><tr><th class="info-key">Name</th><th>Position</th></tr></thead>
+            <tbody>
+              @for (m of genInfo.executiveManagement; track $index) {
+                <tr><td class="info-key">{{ m.name }}</td><td>{{ m.position }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (genInfo?.auditCommittee?.length) {
+          <h3 class="gi-sub-heading">Audit Committee</h3>
+          <table class="info-table">
+            <thead><tr><th class="info-key">Name</th><th>Position</th></tr></thead>
+            <tbody>
+              @for (m of genInfo.auditCommittee; track $index) {
+                <tr><td class="info-key">{{ m.name }}</td><td>{{ m.position }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (genInfo?.councilMembers?.length) {
+          <h3 class="gi-sub-heading">Council Members</h3>
+          <table class="info-table">
+            <thead><tr><th class="info-key">Name</th><th>Ward</th></tr></thead>
+            <tbody>
+              @for (m of genInfo.councilMembers; track $index) {
+                <tr><td class="info-key">{{ m.name }}</td><td>{{ m.ward }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    @if (block === 'abbreviations' && abbreviations.length > 0) {
+      <div class="afs-page">
+        <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+          @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+            <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+          }
+          <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+          <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+        </div>
+        <div class="page-body">
+          <h2 class="section-heading">ABBREVIATIONS</h2>
+          <table class="info-table">
+            <thead>
+              <tr>
+                <th [style]="'text-align:left;font-size:11px;font-weight:700;padding:8px 10px;color:' + templateStyle.primaryColor + ';border-bottom:2px solid ' + templateStyle.primaryColor">Abbreviation</th>
+                <th [style]="'text-align:left;font-size:11px;font-weight:700;padding:8px 10px;color:' + templateStyle.primaryColor + ';border-bottom:2px solid ' + templateStyle.primaryColor">Full Form</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (abbr of abbreviations; track abbr.id) {
+                <tr>
+                  <td class="info-key">{{ abbr.abbreviation }}</td>
+                  <td>{{ abbr.fullForm }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <p class="body-text" style="margin-top:16px;font-style:italic;color:#999">* The list is not exhaustive</p>
+        </div>
+        <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+          <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+          <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+          @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+            <span class="page-number">Page</span>
+          }
+        </div>
+      </div>
+    }
+
+    @if (block === 'policies' && accountingPolicies.length > 0) {
+      <div class="afs-page">
+        <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+          @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+            <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+          }
+          <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+          <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+        </div>
+        <div class="page-body">
+          <h2 class="section-heading">ACCOUNTING POLICIES</h2>
+          @for (group of groupedPolicies; track group.area) {
+            <h3 class="policy-area-heading">{{ group.area }}</h3>
+            @for (policy of group.policies; track policy.id) {
+              <div class="policy-block">
+                <h4 class="policy-title-heading">{{ policy.title }}
+                  @if (policy.grapReference) {
+                    <span class="grap-tag">({{ policy.grapReference }})</span>
+                  }
+                </h4>
+                <p class="body-text">{{ policy.editedText || policy.defaultText }}</p>
+              </div>
+            }
+          }
+        </div>
+        <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+          <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+          <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+          @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+            <span class="page-number">Page</span>
+          }
+        </div>
+      </div>
+    }
+
+    @if (block === 'reporting_entity_mandate' || block === 'mandate_approval') {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        @if (block === 'reporting_entity_mandate') {
+          <h2 class="section-heading">REPORTING ENTITY'S MANDATE</h2>
+          <p class="body-text">The {{ genInfo?.municipalityName || 'Municipality' }} is a local government institution established in terms of the Local Government: Municipal Structures Act 117 of 1998.</p>
+          <p class="body-text">The municipality's mandate is to provide democratic and accountable government for local communities; to ensure the provision of services to communities in a sustainable manner; to promote social and economic development; to promote a safe and healthy environment; and to encourage the involvement of communities and community organisations in matters of local government.</p>
+        } @else {
+          <h2 class="section-heading">ACCOUNTING OFFICER'S RESPONSIBILITIES AND APPROVAL</h2>
+          @if (genInfo?.aoResponsibilitiesContent) {
+            <div class="body-text" style="white-space:pre-line">{{ genInfo.aoResponsibilitiesContent }}</div>
+          } @else {
+            <p class="body-text">The Accounting Officer is required by the Municipal Finance Management Act (Act 56 of 2003), to maintain adequate accounting records and is responsible for the content and integrity of the annual financial statements and related financial information included in this report.</p>
+            <p class="body-text">The annual financial statements set out in terms of Section 126(1) of the Municipal Finance Management Act (Act 56 of 2003), which have been prepared on the going concern basis, were approved by the Accounting Officer.</p>
+          }
+          <div class="signature-block">
+            <div class="sig-line">_________________________</div>
+            <div class="sig-title">{{ genInfo?.accountingOfficer || 'Municipal Manager' }}</div>
+            <div class="sig-org">{{ genInfo?.municipalityName || 'Municipality' }}</div>
+          </div>
+        }
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    @if (block === 'ao_report') {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        <h2 class="section-heading">ACCOUNTING OFFICER'S REPORT</h2>
+        @if (genInfo?.aoReportContent) {
+          <div class="body-text" style="white-space:pre-line">{{ genInfo.aoReportContent }}</div>
+        } @else {
+          <p class="body-text">The Accounting Officer's Report has not yet been captured. Please add it in General Information.</p>
+        }
+        <div class="signature-block" style="margin-top:24px">
+          <div class="sig-line">_________________________</div>
+          <div class="sig-title">{{ genInfo?.accountingOfficer || 'Municipal Manager' }}</div>
+          <div class="sig-org">{{ genInfo?.municipalityName || 'Municipality' }}</div>
+        </div>
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    @if (block === 'index') {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        <h2 class="section-heading">INDEX</h2>
+        <table class="toc-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Content</th>
+              <th style="text-align:right;width:60px">Page</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (section of activeSections; track section.id; let i = $index) {
+              <tr><td>{{ section.title }}</td><td class="toc-pg">{{ i + 1 }}</td></tr>
+            }
+            <tr><td>Notes to the Annual Financial Statements</td><td class="toc-pg">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    @if (block === 'annexures') {
+    <div class="afs-page">
+      <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+        @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+          <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+        }
+        <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+        <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+      </div>
+      <div class="page-body">
+        <h2 class="section-heading">ANNEXURES</h2>
+        <p class="body-text">The following annexures do not form part of the annual financial statements and are included as additional information.</p>
+      </div>
+      <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+        <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+        <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+        @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+          <span class="page-number">Page</span>
+        }
+      </div>
+    </div>
+    }
+
+    @if (block === 'statements') {
+    @for (section of activeSections; track section.id) {
+      @if (section.lineItems && section.lineItems.length > 0) {
+        <div class="afs-page">
+          <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+            @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+              <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+            }
+            <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+            <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+          </div>
+          <div class="page-body">
+            <h2 class="section-heading">{{ section.title | uppercase }}</h2>
+            <div class="stmt-sub">as at {{ fyEndDate }}</div>
+
+            <table class="fin-table">
+              <thead>
+                <tr class="fin-header">
+                  <th class="col-label"></th>
+                  <th class="col-note">Note</th>
+                  <th class="col-amount">{{ currentYearLabel }}</th>
+                  <th class="col-amount">{{ priorYearLabel }}</th>
+                </tr>
+                <tr class="fin-unit-row">
+                  <td></td>
+                  <td></td>
+                  <td class="col-amount">R'000</td>
+                  <td class="col-amount">R'000</td>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of section.lineItems; track item.templateLineItem.id) {
+                  @if (item.templateLineItem.lineType === 'spacer') {
+                    <tr class="spacer-row"><td colspan="4">&nbsp;</td></tr>
+                  } @else if (item.templateLineItem.lineType === 'header') {
+                    <tr class="header-row">
+                      <td class="col-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 20)">
+                        {{ item.templateLineItem.label }}
+                      </td>
+                      <td></td><td></td><td></td>
+                    </tr>
+                  } @else {
+                    <tr [class.total-row]="item.templateLineItem.isTotal"
+                        [class.subtotal-row]="item.templateLineItem.isSubTotal"
+                        [class.data-row]="!item.templateLineItem.isTotal && !item.templateLineItem.isSubTotal">
+                      <td class="col-label"
+                          [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 20)"
+                          [class.bold]="item.templateLineItem.isBold || item.templateLineItem.isTotal">
+                        {{ item.templateLineItem.label }}
+                      </td>
+                      <td class="col-note">
+                        @if (item.templateLineItem.noteReference) {
+                          <a class="note-link" (click)="scrollToNote(item.templateLineItem.noteReference)">
+                            {{ item.templateLineItem.noteReference }}
+                          </a>
+                        }
+                      </td>
+                      <td class="col-amount" [class.bold]="item.templateLineItem.isTotal">
+                        @if (item.glBreakdown?.length) {
+                          <span class="drillable-amount" (click)="openDrillThrough(item)" matTooltip="Click to drill through to GL detail">{{ formatAmount(item.currentYearAmount) }}</span>
+                        } @else {
+                          {{ formatAmount(item.currentYearAmount) }}
+                        }
+                      </td>
+                      <td class="col-amount" [class.bold]="item.templateLineItem.isTotal">
+                        {{ formatAmount(item.priorYearAmount) }}
+                        @if (item.currentYearAmount && !item.priorYearAmount && item.templateLineItem.lineType === 'data') {
+                          <span class="py-missing-indicator" matTooltip="Prior year comparative not available">*</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+            <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+            <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+            @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+              <span class="page-number">Page</span>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    }
+
+    @if (block === 'notes' && notes.length > 0) {
+      <div class="afs-page" id="notes-section">
+        <div class="page-header-bar" [class.header-with-logo]="templateStyle.headerLayout === 'with-logo'" [class.header-minimal]="templateStyle.headerLayout === 'minimal'">
+          @if (templateStyle.headerLayout === 'with-logo' && templateStyle.logoPath) {
+            <img [src]="templateStyle.logoPath" class="header-logo" [style.max-height.px]="30" />
+          }
+          <span class="header-muni">{{ templateStyle.headerLeftText || genInfo?.municipalityName || 'MUNICIPALITY' }}</span>
+          <span class="header-desc">{{ templateStyle.headerRightText || ('Annual Financial Statements for the year ended ' + fyEndDate) }}</span>
+        </div>
+        <div class="page-body">
+          <h2 class="section-heading">NOTES TO THE ANNUAL FINANCIAL STATEMENTS</h2>
+
+          @for (note of activeNotes; track note.lineItemId) {
+            <div class="note-block" [id]="'note-' + (note.noteData?.noteNumber || '')">
+              <h3 class="note-heading">
+                @if (note.noteData?.noteNumber) {
+                  {{ note.noteData.noteNumber }}.
+                }
+                {{ note.noteData?.title || note.label }}
+                @if (note.noteData?.grapReference) {
+                  <span class="grap-tag">({{ note.noteData.grapReference }})</span>
+                }
+              </h3>
+              @if (note.noteData?.accountingPolicy) {
+                <div class="note-policy-block">
+                  <div class="note-policy-label">Accounting Policy</div>
+                  <p class="note-policy-text">{{ note.noteData.accountingPolicy }}</p>
+                </div>
+              }
+              @if (note.noteData?.disclosure) {
+                <p class="body-text">{{ note.noteData.disclosure }}</p>
+              }
+              @if (note.noteData?.currentYearAmount || note.currentYearAmount || note.noteData?.priorYearAmount || note.priorYearAmount) {
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left"></th>
+                      <th class="col-amount">{{ currentYearLabel }}</th>
+                      <th class="col-amount">{{ priorYearLabel }}</th>
+                    </tr>
+                    <tr class="fin-unit-row">
+                      <td></td>
+                      <td class="col-amount">R'000</td>
+                      <td class="col-amount">R'000</td>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{{ note.noteData?.title || note.label }}</td>
+                      <td class="col-amount">
+                        @if (note.glBreakdown?.length) {
+                          <span class="drillable-amount" (click)="openDrillThrough(note)" matTooltip="Click to drill through to GL detail">{{ formatAmount(note.noteData?.currentYearAmount ?? note.currentYearAmount) }}</span>
+                        } @else {
+                          {{ formatAmount(note.noteData?.currentYearAmount ?? note.currentYearAmount) }}
+                        }
+                      </td>
+                      <td class="col-amount">
+                        {{ formatAmount(note.noteData?.priorYearAmount ?? note.priorYearAmount) }}
+                        @if ((note.noteData?.currentYearAmount ?? note.currentYearAmount) && !(note.noteData?.priorYearAmount ?? note.priorYearAmount)) {
+                          <span class="py-missing-indicator" matTooltip="Prior year comparative not available">*</span>
+                        }
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              }
+              @if (note.noteData?.varianceExplanation) {
+                <p class="body-text" style="margin-top:8px">{{ note.noteData.varianceExplanation }}</p>
+              }
+            </div>
+          }
+        </div>
+        <div class="page-footer-bar" [class.footer-minimal]="templateStyle.footerLayout === 'minimal'">
+          <span>{{ templateStyle.footerLeftText || ('Annual Financial Statements ' + currentYearLabel) }}</span>
+          <span>{{ templateStyle.footerRightText || genInfo?.municipalityName || 'Municipality' }}</span>
+          @if (templateStyle.showPageNumbers && templateStyle.footerLayout === 'with-page-numbers') {
+            <span class="page-number">Page</span>
+          }
+        </div>
+      </div>
+    }
+
+    }
+  }
+</div>
+
+<app-drill-through-panel
+  [open]="drillPanelOpen"
+  [glEntries]="drillPanelEntries"
+  [lineItemLabel]="drillPanelLabel"
+  [priorYearLabel]="priorYearLabel"
+  [financialYearId]="compilation?.financialYear?.id || ''"
+  [compilationId]="compilation?.id || ''"
+  [periodFrom]="compilation?.periodFrom || ''"
+  [periodTo]="compilation?.periodTo || ''"
+  (closed)="drillPanelOpen = false">
+</app-drill-through-panel>

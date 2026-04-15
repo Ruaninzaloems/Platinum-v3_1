@@ -1,0 +1,227 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Pay Points</h1>
+      <p class="page-subtitle">Manage payment points and cash payment locations</p>
+    </div>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ payPoints.length }}</span>
+      <span class="summary-label">Total Pay Points</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ inactiveCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search pay points..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+      <span class="result-count">{{ filteredPayPoints.length }} results</span>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()">
+      <app-icon name="plus" [size]="16"></app-icon> Add Pay Point
+    </button>
+  </div>
+
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th class="col-id">ID</th>
+            <th class="col-code">Code</th>
+            <th class="col-desc">Description</th>
+            <th class="col-location">Location</th>
+            <th class="col-depts">Departments</th>
+            <th class="col-status">Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (pp of pagedPayPoints; track pp.id) {
+            <tr (click)="openDetail(pp)">
+              <td><span class="id-badge">{{ pp.id }}</span></td>
+              <td><span class="code-badge">{{ pp.code }}</span></td>
+              <td><span class="title-text">{{ pp.name }}</span></td>
+              <td>{{ pp.location || '—' }}</td>
+              <td><span class="dept-count-badge">{{ pp.department_count || 0 }}</span></td>
+              <td>
+                <span class="status-pill" [class.status-active]="pp.enabled" [class.status-inactive]="!pp.enabled">
+                  {{ pp.enabled ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm" (click)="openDetail(pp); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteFromList(pp); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </td>
+            </tr>
+          }
+          @if (filteredPayPoints.length === 0 && !loading) {
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8;">No pay points found</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (filteredPayPoints.length > limit) {
+      <div class="table-footer">
+        <app-pagination [total]="filteredPayPoints.length" [page]="page" [limit]="limit" (pageChange)="page = $event; cdr.detectChanges()"></app-pagination>
+      </div>
+    }
+  </div>
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list">
+        <app-icon name="arrow-left" [size]="14"></app-icon> Back
+      </button>
+      <div class="detail-title-block">
+        <h2 style="margin:0;font-size:18px;color:#0f2b46;">{{ pageTitle }}</h2>
+        <div class="detail-meta">
+          @if (mode !== 'create' && payPoint.id) {
+            <span class="id-badge">PP #{{ payPoint.id }}</span>
+          }
+          @if (mode !== 'create' && payPoint.code) {
+            <span class="code-badge">Code: {{ payPoint.code }}</span>
+          }
+          @if (mode !== 'create') {
+            <span class="status-pill" [class.status-active]="payPoint.enabled" [class.status-inactive]="!payPoint.enabled">
+              {{ payPoint.enabled ? 'Active' : 'Inactive' }}
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (mode === 'view') {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span style="font-size:12px;color:#94a3b8;">{{ currentIndex + 1 }} / {{ payPoints.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= payPoints.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="enterEdit()">
+          <app-icon name="edit" [size]="14"></app-icon> Edit
+        </button>
+      }
+      @if (mode === 'edit' || mode === 'create') {
+        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary btn-sm" (click)="save()">
+          <app-icon name="check" [size]="14"></app-icon> {{ mode === 'create' ? 'Create' : 'Save Changes' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'details'" (click)="activeTab = 'details'; cdr.detectChanges()">Pay Point Details</button>
+    <button class="tab-btn" [class.active]="activeTab === 'departments'" (click)="switchToDepartments()" [disabled]="mode === 'create'">Linked Departments</button>
+  </div>
+
+  @if (activeTab === 'details') {
+    <div class="list-card detail-card">
+      <div class="section-title">Pay Point Information</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">PAY POINT CODE <span class="required">*</span></label>
+          @if (isEditable) {
+            <input type="text" class="form-control" [(ngModel)]="payPoint.code" placeholder="Enter pay point code">
+          } @else {
+            <div class="field-value">{{ payPoint.code || '—' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">DESCRIPTION <span class="required">*</span></label>
+          @if (isEditable) {
+            <input type="text" class="form-control" [(ngModel)]="payPoint.name" placeholder="Enter description">
+          } @else {
+            <div class="field-value">{{ payPoint.name || '—' }}</div>
+          }
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">PAY POINT ADDRESS</label>
+          @if (isEditable) {
+            <input type="text" class="form-control" [(ngModel)]="payPoint.address" placeholder="Enter address">
+          } @else {
+            <div class="field-value">{{ payPoint.address || '—' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">PAY POINT LOCATION</label>
+          @if (isEditable) {
+            <input type="text" class="form-control" [(ngModel)]="payPoint.location" placeholder="Enter location">
+          } @else {
+            <div class="field-value">{{ payPoint.location || '—' }}</div>
+          }
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="payPoint.enabled" [disabled]="!isEditable"> Enabled
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'departments') {
+    <div class="list-card detail-card">
+      <div class="section-title">Linked Departments</div>
+
+      <div class="dept-link-row">
+        <div class="form-group">
+          <label class="form-label">ADD DEPARTMENT</label>
+          <select class="form-control" [(ngModel)]="selectedDepartmentId">
+            <option value="">— Select Department —</option>
+            @for (d of availableDepartments; track d.id) {
+              <option [value]="d.id">{{ d.code ? d.code + ' — ' : '' }}{{ d.name }}</option>
+            }
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" [disabled]="!selectedDepartmentId" (click)="linkDepartment()" style="margin-bottom: 16px;">
+          <app-icon name="plus" [size]="14"></app-icon> Link
+        </button>
+      </div>
+
+      <div class="dept-link-table">
+        <table class="jp-table">
+          <thead>
+            <tr>
+              <th>Department Code</th>
+              <th>Department Name</th>
+              <th style="width:80px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (link of linkedDepartments; track link.id) {
+              <tr>
+                <td><span class="code-badge">{{ link.department_code || '—' }}</span></td>
+                <td>{{ link.department_name }}</td>
+                <td>
+                  <button class="btn btn-sm" (click)="unlinkDepartment(link)" title="Remove"><app-icon name="trash" [size]="12"></app-icon></button>
+                </td>
+              </tr>
+            }
+            @if (linkedDepartments.length === 0) {
+              <tr><td colspan="3" class="empty-state">No departments linked to this pay point</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+}

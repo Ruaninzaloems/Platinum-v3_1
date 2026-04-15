@@ -1,0 +1,188 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Trade Unions</h1>
+      <p class="page-subtitle">Manage trade union representatives, creditors and contribution rules</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="14"></app-icon> Add Trade Union</button>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ unions.length }}</span>
+      <span class="summary-label">Total Unions</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ unions.length - activeCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="14"></app-icon>
+      <input class="search-input" placeholder="Search by representative or creditor..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterUnions()">
+    </div>
+    <span class="result-count">{{ filteredUnions.length }} of {{ unions.length }} unions</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading trade unions...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredUnions.length === 0) {
+        <div class="empty-state"><h3>No trade unions found</h3><p>{{ unions.length === 0 ? 'Click "Add Trade Union" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th class="col-name">Trade Union Representative</th>
+                <th class="col-vendor">Creditor</th>
+                <th class="col-type">Contribution Type</th>
+                <th class="col-value">Contribution Value</th>
+                <th class="col-max">Maximum Value</th>
+                <th class="col-status">Status</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (u of filteredUnions; track u.id; let i = $index) {
+                <tr (click)="openDetail(u, i)">
+                  <td class="col-name"><span class="title-text">{{ u.representative }}</span></td>
+                  <td class="col-vendor">{{ vendorName(u.vendor_id) }}</td>
+                  <td class="col-type"><span class="type-pill">{{ u.contribution_type }}</span></td>
+                  <td class="col-value" style="text-align:right">{{ u.contribution_type === '%' ? (u.contribution_value || 0) + '%' : formatCurrency(u.contribution_value) }}</td>
+                  <td class="col-max" style="text-align:right">{{ formatCurrency(u.maximum_value) }}</td>
+                  <td class="col-status"><app-status-badge [status]="u.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(u, i); $event.stopPropagation()" title="View"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(u, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (union.id) {
+          <div class="detail-meta">
+            <span class="text-muted">ID: {{ union.id }}</span>
+            <app-status-badge [status]="union.enabled ? 'Active' : 'Inactive'"></app-status-badge>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (union.id) {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ unions.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= unions.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+      }
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="section-title">Trade Union Representative</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Trade Union Representative <span class="required">*</span></label>
+        @if (isEditable) {
+          <input class="form-control" [(ngModel)]="union.representative" placeholder="Enter a trade union representative">
+        } @else {
+          <div class="field-value">{{ union.representative || '-' }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Creditors <span class="required">*</span></label>
+        @if (isEditable) {
+          <select class="form-control" [(ngModel)]="union.vendor_id">
+            <option value="">-- Select --</option>
+            @for (v of vendors; track v.id) {
+              <option [value]="v.id">{{ v.name }}</option>
+            }
+          </select>
+        } @else {
+          <div class="field-value">{{ vendorName(union.vendor_id) }}</div>
+        }
+      </div>
+      <div class="form-group form-group-full">
+        <label>Contribution Type</label>
+        @if (isEditable) {
+          <div class="radio-row">
+            <label class="radio-label">
+              <input type="radio" name="contributionType" value="%" [(ngModel)]="union.contribution_type"> %
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="contributionType" value="Fixed" [(ngModel)]="union.contribution_type"> Fixed
+            </label>
+          </div>
+        } @else {
+          <div class="field-value">{{ union.contribution_type }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Contribution Value {{ union.contribution_type === '%' ? '%' : 'R' }} <span class="required">*</span></label>
+        @if (isEditable) {
+          <div class="input-with-suffix">
+            <input class="form-control" type="number" [(ngModel)]="union.contribution_value" step="0.01" min="0">
+            <span class="input-suffix">{{ union.contribution_type === '%' ? '%' : 'R' }}</span>
+          </div>
+        } @else {
+          <div class="field-value">{{ union.contribution_type === '%' ? (union.contribution_value || 0) + '%' : formatCurrency(union.contribution_value) }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Maximum Value R</label>
+        @if (isEditable) {
+          <div class="input-with-suffix">
+            <input class="form-control" type="number" [(ngModel)]="union.maximum_value" step="0.01" min="0">
+            <span class="input-suffix">R</span>
+          </div>
+        } @else {
+          <div class="field-value">{{ formatCurrency(union.maximum_value) }}</div>
+        }
+      </div>
+      <div class="form-group">
+        <label>Enabled</label>
+        @if (isEditable) {
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="union.enabled">
+            </label>
+          </div>
+        } @else {
+          <div class="field-value">
+            <span class="tag" [class]="union.enabled ? 'tag-yes' : 'tag-no'">{{ union.enabled ? 'Yes' : 'No' }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}

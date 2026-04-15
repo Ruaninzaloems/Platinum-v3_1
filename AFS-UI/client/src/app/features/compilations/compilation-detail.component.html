@@ -1,0 +1,1705 @@
+<div class="page-container">
+  @if (pageLoading) {
+    <div class="page-load-overlay">
+      <div class="page-load-content">
+        <button mat-icon-button (click)="goBack()" class="page-load-back" matTooltip="Back to Compilations">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <mat-icon class="page-load-icon">description</mat-icon>
+        <h2 class="page-load-title">{{ compilation?.name || 'Loading Compilation...' }}</h2>
+        <div class="page-load-subtitle">Compilation Detail</div>
+        <div class="page-load-progress-container">
+          <mat-progress-bar mode="determinate" [value]="loadProgress" color="primary"></mat-progress-bar>
+          <div class="page-load-progress-info">
+            <span class="page-load-stage">{{ loadStage }}</span>
+            <span class="page-load-percent">{{ loadProgress }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  @if (calculating) {
+    <div class="calc-overlay">
+      <div class="calc-overlay-content">
+        <mat-icon class="calc-icon">calculate</mat-icon>
+        <h3>Calculating Financial Statements</h3>
+        <div class="calc-progress-container">
+          <mat-progress-bar mode="determinate" [value]="calcProgress" color="primary"></mat-progress-bar>
+          <div class="calc-progress-info">
+            <span class="calc-stage">{{ calcStage }}</span>
+            <span class="calc-percent">{{ calcProgress }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button mat-icon-button (click)="goBack()" matTooltip="Back to Compilations list">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <h1>{{ compilation?.name || 'Loading...' }}</h1>
+        <div class="subtitle">Compilation Detail</div>
+      </div>
+    </div>
+    <div class="page-actions">
+      @if (calculating) {
+        <button mat-flat-button class="btn-primary" disabled>
+          <mat-icon>hourglass_empty</mat-icon> Calculating...
+        </button>
+      }
+      @if (compilation?.lastCalculatedAt) {
+        <button mat-flat-button style="background:#1a5276;color:white" (click)="openPreview()" matTooltip="Preview AFS document in professional print-ready format">
+          <mat-icon>preview</mat-icon> Preview Template
+        </button>
+        <button mat-stroked-button (click)="openSectionIndex()" matTooltip="View and reorder AFS sections">
+          <mat-icon>toc</mat-icon> Section Index
+        </button>
+      }
+      @if (compilation?.sections?.length) {
+        <button mat-stroked-button [matMenuTriggerFor]="exportDocMenu" [disabled]="exportingDoc" matTooltip="Export AFS as PDF or Word document">
+          <mat-icon>{{ exportingDoc ? 'hourglass_empty' : 'file_download' }}</mat-icon> {{ exportingDoc ? 'Exporting...' : 'Export AFS' }}
+        </button>
+        <mat-menu #exportDocMenu="matMenu">
+          <button mat-menu-item (click)="startDocExport('pdf')">
+            <mat-icon>picture_as_pdf</mat-icon> <span>Export PDF</span>
+          </button>
+          <button mat-menu-item (click)="startDocExport('docx')">
+            <mat-icon>description</mat-icon> <span>Export Word</span>
+          </button>
+        </mat-menu>
+        <button mat-stroked-button (click)="exportToExcel()" matTooltip="Download compilation data as an Excel workbook with one sheet per section">
+          <mat-icon>grid_on</mat-icon> Excel
+        </button>
+        <button mat-stroked-button (click)="exportToCsv()" matTooltip="Download compilation data as a CSV file for quick analysis">
+          <mat-icon>download</mat-icon> CSV
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (showPostCalculateBanner && compilation?.lastCalculatedAt) {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px">
+      <mat-icon style="color:#2e7d32">check_circle</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#2e7d32">Calculation Complete</strong>
+        <span style="color:#1b5e20;margin-left:8px">Financial statements have been generated successfully.</span>
+      </div>
+      <button mat-stroked-button color="primary" (click)="openPreview(); showPostCalculateBanner = false">
+        <mat-icon>preview</mat-icon> Preview AFS
+      </button>
+      <button mat-icon-button (click)="showPostCalculateBanner = false" matTooltip="Dismiss">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  @if (calcError) {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#fce4ec;border:1px solid #ef9a9a;border-radius:8px">
+      <mat-icon style="color:#c62828">error</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#c62828">Calculation Failed</strong>
+        <span style="color:#b71c1c;margin-left:8px">{{ calcError }}</span>
+      </div>
+      <button mat-icon-button (click)="calcError = null" matTooltip="Dismiss">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  @if (landingState === 'NO_TB_DATA') {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#fce4ec;border:1px solid #ef9a9a;border-radius:8px">
+      <mat-icon style="color:#c62828">warning</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#c62828">No Trial Balance Data</strong>
+        <span style="color:#b71c1c;margin-left:8px">Import a committed trial balance before proceeding.</span>
+      </div>
+      <button mat-raised-button color="warn" (click)="goToTbImport()">
+        <mat-icon>upload_file</mat-icon> Import TB
+      </button>
+    </div>
+  }
+
+  @if (landingState === 'NO_MAPPINGS') {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+      <mat-icon style="color:#e65100">rule</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#e65100">No Mapping Rules</strong>
+        <span style="color:#bf360c;margin-left:8px">Set up SCOA-to-disclosure mappings to enable calculation.</span>
+      </div>
+      <button mat-raised-button color="primary" (click)="goToMappingWorkbench()">
+        <mat-icon>account_tree</mat-icon> Set Up Mappings
+      </button>
+    </div>
+  }
+
+  @if (landingState === 'READY_TO_CALCULATE') {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#e3f2fd;border:1px solid #90caf9;border-radius:8px">
+      <mat-icon style="color:#1565c0">autorenew</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#1565c0">Auto-Calculating</strong>
+        <span style="color:#0d47a1;margin-left:8px">Trial balance and mappings are in place. Financial statements are being generated automatically.</span>
+      </div>
+      <button mat-stroked-button (click)="goToMappingWorkbench()">
+        <mat-icon>account_tree</mat-icon> Edit Mappings
+      </button>
+    </div>
+  }
+
+  @if (landingState === 'INTEGRITY_PENDING_OR_FAILING') {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px">
+      <mat-icon style="color:#f57f17">report_problem</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#f57f17">Integrity Checks Required</strong>
+        <span style="color:#e65100;margin-left:8px">Run or review integrity checks before submitting for review.</span>
+      </div>
+      <button mat-raised-button style="background:#f57f17;color:white" (click)="goToIntegrity()">
+        <mat-icon>verified_user</mat-icon> Run Integrity Checks
+      </button>
+    </div>
+  }
+
+  @if (landingState === 'READY_FOR_REVIEW' && !showPostCalculateBanner) {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#e3f2fd;border:1px solid #90caf9;border-radius:8px">
+      <mat-icon style="color:#1565c0">rate_review</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#1565c0">Ready for Review</strong>
+        <span style="color:#0d47a1;margin-left:8px">Calculation and integrity checks passed. Submit this compilation for review when ready.</span>
+      </div>
+      <button mat-raised-button color="primary" (click)="submitForReview()" [disabled]="statusTransitioning">
+        <mat-icon>send</mat-icon> Submit for Review
+      </button>
+    </div>
+  }
+
+  @if (compilation) {
+    <div class="workflow-stepper">
+      @for (step of workflowSteps; track step.label; let i = $index) {
+        <div class="step" [class.active]="step.label === formatStatus(compilation.status)" [class.completed]="isStepCompleted(i)" matTooltip="Workflow step {{ i + 1 }}: {{ step.label }}">
+          <span class="step-number">{{ i + 1 }}</span>
+          {{ step.label }}
+        </div>
+      }
+    </div>
+
+    @if (isLocked) {
+      <div style="background:#e8eaf6;border:1px solid #7986cb;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#283593">lock</mat-icon>
+        <div>
+          <strong style="color:#283593">Audited & Locked</strong>
+          <span style="color:#5c6bc0;margin-left:8px">This compilation is locked for audit. Recalculation and adjustments are blocked.</span>
+        </div>
+      </div>
+    }
+
+    @if (compilation.hasMaterialException) {
+      <div style="background:#fff8e1;border:2px solid #ff8f00;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px">
+        <mat-icon style="color:#ff8f00;margin-top:2px">report_problem</mat-icon>
+        <div>
+          <strong style="color:#e65100">Material Exception</strong>
+          <span style="color:#e65100;margin-left:8px">
+            This compilation contains material exceptions originating from {{ compilation.materialExceptionSource || 'override governance' }}.
+            All exported outputs (PDF, Word, Excel, iXBRL, governance packs) will carry the material exception disclosure.
+          </span>
+        </div>
+      </div>
+    }
+
+    @if (!isLocked && compilation.lastCalculatedAt) {
+      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
+        @if (compilation.status === 'draft') {
+          <button mat-raised-button color="primary" (click)="submitForReview()" [disabled]="statusTransitioning">
+            <mat-icon>send</mat-icon> Submit for Review
+          </button>
+        }
+        @if (compilation.status === 'in_review') {
+          <button mat-raised-button color="primary" (click)="approveCompilation()" [disabled]="statusTransitioning">
+            <mat-icon>check_circle</mat-icon> Approve
+          </button>
+        }
+        @if (compilation.status === 'approved') {
+          <button mat-raised-button style="background:#1a5276;color:white" (click)="publishCompilation()" [disabled]="statusTransitioning">
+            <mat-icon>publish</mat-icon> Publish
+          </button>
+        }
+        @if (statusTransitioning) {
+          <mat-spinner diameter="20"></mat-spinner>
+        }
+      </div>
+    }
+
+    <div class="info-bar">
+      <div class="info-item" matTooltip="Reporting framework for this compilation — immutable after creation">
+        <span class="info-label">Reporting Framework</span>
+        <span class="info-value">{{ reportingFramework }}</span>
+      </div>
+      <div class="info-item" matTooltip="AFS template used for this compilation">
+        <span class="info-label">Template</span>
+        <span class="info-value">{{ compilation.template?.name || '—' }}</span>
+      </div>
+      <div class="info-item" matTooltip="Financial year period for this compilation">
+        <span class="info-label">Financial Year</span>
+        <span class="info-value">{{ compilation.financialYear?.label || '—' }}</span>
+      </div>
+      <div class="info-item" matTooltip="Current workflow status of this compilation">
+        <span class="info-label">Status</span>
+        <span class="status-badge" [ngClass]="compilation.status" matTooltip="Status: {{ formatStatus(compilation.status) }}">{{ formatStatus(compilation.status) }}</span>
+        @if (compilation.hasMaterialException) {
+          <span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:#ff8f00;color:white" matTooltip="Material exceptions exist — all outputs carry exception disclosure">MATERIAL EXCEPTION</span>
+        }
+      </div>
+      <div class="info-item" matTooltip="Percentage of line items with populated data values">
+        <span class="info-label">Completeness</span>
+        <div class="completeness-bar">
+          <mat-progress-bar mode="determinate" [value]="compilation.completenessPercentage" style="width:100px"></mat-progress-bar>
+          <span style="font-size:13px;font-weight:600">{{ compilation.completenessPercentage || 0 }}%</span>
+        </div>
+      </div>
+      <div class="info-item" matTooltip="Number of GL account mapping rules linked to this compilation">
+        <span class="info-label">Mappings</span>
+        <span class="info-value">{{ compilation.mappingCount ?? 0 }}</span>
+      </div>
+      @if (compilation.lastCalculatedAt) {
+        <div class="info-item" matTooltip="Last time financial amounts were calculated from GL data">
+          <span class="info-label">Last Calculated</span>
+          <span class="info-value">{{ compilation.lastCalculatedAt | date:'short' }}</span>
+        </div>
+      }
+      @if (compilation.calculationSummary?.priorYearCoverage) {
+        <div class="info-item" matTooltip="Percentage of line items with prior year comparative data populated">
+          <span class="info-label">Prior Year Coverage</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <mat-progress-bar mode="determinate" [value]="compilation.calculationSummary.priorYearCoverage.coveragePercent" style="width:80px" [class]="compilation.calculationSummary.priorYearCoverage.coveragePercent >= 80 ? '' : 'warn-bar'"></mat-progress-bar>
+            <span style="font-size:13px;font-weight:600">{{ compilation.calculationSummary.priorYearCoverage.coveragePercent }}%</span>
+            @if (compilation.calculationSummary.priorYearCoverage.linesMissingPriorYear > 0) {
+              <mat-icon class="prior-year-missing" matTooltip="{{ compilation.calculationSummary.priorYearCoverage.linesMissingPriorYear }} line items have current year data but no prior year comparative">warning</mat-icon>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="readiness-summary">
+      <div class="readiness-header">
+        <mat-icon style="font-size:18px;width:18px;height:18px;color:#1a5276">assignment_turned_in</mat-icon>
+        <span style="font-weight:600;font-size:14px">AFS Readiness Summary</span>
+        <span class="vs-chip" [class]="readinessStages.every(s => s.status === 'complete') ? 'vs-pass' : readinessStages.some(s => s.status === 'blocked') ? 'vs-fail' : 'vs-warn'">
+          {{ readinessStages.filter(s => s.status === 'complete').length }}/{{ readinessStages.length }} complete
+        </span>
+      </div>
+      <div class="readiness-stages">
+        @for (stage of readinessStages; track stage.label; let i = $index) {
+          <div class="readiness-stage" [class]="'rs-' + stage.status">
+            <div class="rs-number">{{ i + 1 }}</div>
+            <mat-icon class="rs-icon">{{ stage.icon }}</mat-icon>
+            <div class="rs-content">
+              <span class="rs-label">{{ stage.label }}</span>
+              <span class="rs-detail">{{ stage.detail }}</span>
+            </div>
+            @if (stage.status === 'complete') {
+              <mat-icon class="rs-status-icon" style="color:#16a34a">check_circle</mat-icon>
+            } @else if (stage.status === 'blocked') {
+              <mat-icon class="rs-status-icon" style="color:#dc2626">cancel</mat-icon>
+            } @else if (stage.status === 'partial') {
+              <mat-icon class="rs-status-icon" style="color:#d97706">warning</mat-icon>
+            } @else if (stage.status === 'loading') {
+              <mat-spinner diameter="16"></mat-spinner>
+            } @else {
+              <mat-icon class="rs-status-icon" style="color:#94a3b8">radio_button_unchecked</mat-icon>
+            }
+            @if (stage.action && stage.route) {
+              <button mat-stroked-button class="rs-action" (click)="navigateTo(stage.route)">{{ stage.action }}</button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (validationErrors.length > 0) {
+      <div class="validation-summary">
+        <div class="validation-summary-header">
+          <mat-icon style="font-size:18px;width:18px;height:18px;color:#3b82f6">rule</mat-icon>
+          <span style="font-weight:600;font-size:14px">Validation Results</span>
+          <span class="vs-chip vs-pass">{{ validationPassCount }} passed</span>
+          @if (validationFailCount > 0) {
+            <span class="vs-chip vs-fail">{{ validationFailCount }} failed</span>
+          }
+          @if (validationWarnCount > 0) {
+            <span class="vs-chip vs-warn">{{ validationWarnCount }} warnings</span>
+          }
+        </div>
+        @if (validationFailCount > 0 || validationWarnCount > 0) {
+          <div class="validation-issues">
+            @for (ve of validationErrors; track ve.ruleId) {
+              @if (ve.status !== 'pass') {
+                <div class="ve-row" [class]="'ve-' + ve.status">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">
+                    {{ ve.status === 'fail' ? 'cancel' : 'warning' }}
+                  </mat-icon>
+                  <span style="font-weight:500">{{ ve.ruleName }}</span>
+                  <span style="color:var(--platinum-text-muted);font-size:12px">{{ ve.message }}</span>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <mat-tab-group class="sticky-tab-group">
+      <mat-tab label="Preamble">
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;background:#f1f5f9;padding:6px 12px;border-radius:6px;border-left:3px solid #1a5276">
+              <mat-icon style="font-size:16px;width:16px;height:16px;color:#1a5276">info</mat-icon>
+              <span>Content is managed in <strong>General Information</strong>. This view is read-only.</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button mat-stroked-button (click)="preambleFormatMode = !preambleFormatMode" [class.mat-primary]="preambleFormatMode" matTooltip="Toggle formatting controls for print preview">
+                <mat-icon>format_size</mat-icon>
+                Formatting
+              </button>
+              <button mat-stroked-button (click)="printPreamblePreview()" matTooltip="Open print preview of preamble pages">
+                <mat-icon>print</mat-icon>
+                Print Preview
+              </button>
+            </div>
+          </div>
+
+          @if (preambleFormatMode) {
+            <div class="fmt-panel">
+              <div class="fmt-group">
+                <div class="fmt-group-header">
+                  <mat-icon class="fmt-group-icon">text_fields</mat-icon>
+                  <span>Typography</span>
+                </div>
+                <div class="fmt-row">
+                  <div class="fmt-field">
+                    <label class="fmt-label">Title Size</label>
+                    <div class="fmt-slider-row">
+                      <mat-slider min="14" max="48" step="2" discrete class="fmt-slider">
+                        <input matSliderThumb [(ngModel)]="preambleFormatting.titleFontSize">
+                      </mat-slider>
+                      <span class="fmt-size-badge">{{ preambleFormatting.titleFontSize }}px · {{ titleSizeLabel }}</span>
+                    </div>
+                  </div>
+                  <div class="fmt-field">
+                    <label class="fmt-label">Body Size</label>
+                    <div class="fmt-slider-row">
+                      <mat-slider min="9" max="20" step="1" discrete class="fmt-slider">
+                        <input matSliderThumb [(ngModel)]="preambleFormatting.bodyFontSize">
+                      </mat-slider>
+                      <span class="fmt-size-badge">{{ preambleFormatting.bodyFontSize }}px · {{ bodySizeLabel }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fmt-group">
+                <div class="fmt-group-header">
+                  <mat-icon class="fmt-group-icon">image</mat-icon>
+                  <span>Logo Size</span>
+                </div>
+                <div class="fmt-row">
+                  <mat-button-toggle-group [value]="logoSizePreset" (change)="onLogoSizePresetChange($event.value)" class="fmt-logo-presets">
+                    <mat-button-toggle value="small">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">photo_size_select_small</mat-icon> Small
+                    </mat-button-toggle>
+                    <mat-button-toggle value="medium">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">photo_size_select_large</mat-icon> Medium
+                    </mat-button-toggle>
+                    <mat-button-toggle value="large">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">panorama</mat-icon> Large
+                    </mat-button-toggle>
+                    <mat-button-toggle value="custom">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">tune</mat-icon> Custom
+                    </mat-button-toggle>
+                  </mat-button-toggle-group>
+                </div>
+                @if (logoSizePreset === 'custom') {
+                  <div class="fmt-row" style="margin-top:8px">
+                    <div class="fmt-field">
+                      <label class="fmt-label">Width</label>
+                      <div class="fmt-slider-row">
+                        <mat-slider min="40" max="400" step="10" discrete class="fmt-slider">
+                          <input matSliderThumb [ngModel]="preambleFormatting.logoWidth" (ngModelChange)="onLogoWidthChange($event)">
+                        </mat-slider>
+                        <span class="fmt-size-badge">{{ preambleFormatting.logoWidth }}px</span>
+                      </div>
+                    </div>
+                    <button mat-icon-button (click)="toggleAspectLock()" [matTooltip]="logoAspectLocked ? 'Aspect ratio locked — unlock to resize independently' : 'Aspect ratio unlocked — lock to maintain proportions'" class="fmt-lock-btn">
+                      <mat-icon>{{ logoAspectLocked ? 'lock' : 'lock_open' }}</mat-icon>
+                    </button>
+                    <div class="fmt-field">
+                      <label class="fmt-label">Height</label>
+                      <div class="fmt-slider-row">
+                        <mat-slider min="40" max="400" step="10" discrete class="fmt-slider">
+                          <input matSliderThumb [ngModel]="preambleFormatting.logoHeight" (ngModelChange)="onLogoHeightChange($event)">
+                        </mat-slider>
+                        <span class="fmt-size-badge">{{ preambleFormatting.logoHeight }}px</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="fmt-group">
+                <div class="fmt-group-header">
+                  <mat-icon class="fmt-group-icon">checklist</mat-icon>
+                  <span>Sections to Print</span>
+                </div>
+                <div class="fmt-sections-grid">
+                  <mat-checkbox [(ngModel)]="printSections['coverPage']" color="primary">Cover Page</mat-checkbox>
+                  <mat-checkbox [(ngModel)]="printSections['index']" color="primary">Index</mat-checkbox>
+                  <mat-checkbox [(ngModel)]="printSections['generalInfo']" color="primary">General Information</mat-checkbox>
+                  <mat-checkbox [(ngModel)]="printSections['abbreviations']" color="primary">Abbreviations</mat-checkbox>
+                  <mat-checkbox [(ngModel)]="printSections['aoResponsibilities']" color="primary">AO Responsibilities</mat-checkbox>
+                  <mat-checkbox [(ngModel)]="printSections['aoReport']" color="primary">AO Report</mat-checkbox>
+                </div>
+              </div>
+
+              <div class="fmt-actions">
+                <button mat-stroked-button (click)="resetPreambleFormatting()" class="fmt-action-btn">
+                  <mat-icon>restart_alt</mat-icon> Reset Defaults
+                </button>
+                <button mat-flat-button color="primary" (click)="savePreambleFormatting()" class="fmt-action-btn">
+                  <mat-icon>save</mat-icon> Save Settings
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (generalInfoLoading) {
+            <div style="text-align:center;padding:48px"><mat-spinner diameter="40"></mat-spinner></div>
+          } @else if (!generalInfo) {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>info</mat-icon>
+              <h3>No general information captured</h3>
+              <p>Navigate to the General Information menu to capture municipality details before they can appear here.</p>
+            </div>
+          } @else {
+            <div class="nt-preamble-container" id="preamble-print-area" [style.font-size.px]="preambleFormatting.bodyFontSize">
+
+              <mat-expansion-panel [expanded]="true" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">auto_stories</mat-icon>
+                    Cover Page
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="nt-cover-page">
+                  @if (giLogoUrl) {
+                    <img [src]="giLogoUrl" alt="Municipality Logo" class="nt-cover-logo" [style.max-width.px]="preambleFormatting.logoWidth" [style.max-height.px]="preambleFormatting.logoHeight">
+                  }
+                  <h1 class="nt-cover-name" [style.font-size.px]="preambleFormatting.titleFontSize">{{ generalInfo.municipalityName || 'Municipality Name' }}</h1>
+                  <h2 class="nt-cover-subtitle" [style.font-size.px]="preambleFormatting.titleFontSize * 0.72">Annual Financial Statements</h2>
+                  <h3 class="nt-cover-period">for the year ended {{ generalInfo.reportingPeriodEnd | date:'dd MMMM yyyy' }}</h3>
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel [expanded]="false" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">list_alt</mat-icon>
+                    Index
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="nt-gi-content">
+                  <h2 class="nt-section-title">Index</h2>
+                  <table class="nt-gi-table">
+                    <thead>
+                      <tr>
+                        <th style="text-align:left;padding:8px;font-size:13px;font-weight:700;color:#1a5276;border-bottom:2px solid #1a5276">Content</th>
+                        <th style="text-align:right;width:60px;padding:8px;font-size:13px;font-weight:700;color:#1a5276;border-bottom:2px solid #1a5276">Page</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td class="nt-gi-label">General Information</td><td class="nt-gi-value" style="text-align:right">1</td></tr>
+                      <tr><td class="nt-gi-label">Abbreviations</td><td class="nt-gi-value" style="text-align:right">2</td></tr>
+                      <tr><td class="nt-gi-label">Accounting Officer's Responsibilities and Approval</td><td class="nt-gi-value" style="text-align:right">3</td></tr>
+                      <tr><td class="nt-gi-label">Accounting Officer's Report</td><td class="nt-gi-value" style="text-align:right">4</td></tr>
+                      @for (section of financialStatementSections; track section.id; let i = $index) {
+                        <tr><td class="nt-gi-label">{{ section.title }}</td><td class="nt-gi-value" style="text-align:right">{{ i + 5 }}</td></tr>
+                      }
+                      <tr><td class="nt-gi-label">Notes to the Annual Financial Statements</td><td class="nt-gi-value" style="text-align:right">—</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel [expanded]="true" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">description</mat-icon>
+                    General Information
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="nt-gi-content">
+                  <h2 class="nt-section-title">General Information</h2>
+
+                  <table class="nt-gi-table">
+                    <tbody>
+                      <tr class="nt-gi-section-header"><td colspan="3">Details</td></tr>
+                      <tr>
+                        <td class="nt-gi-label">Country of incorporation and domicile</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.country || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Legal form of entity</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.legalStatus || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Nature of business and principal activities</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.natureOfBusiness || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Municipal Category</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.municipalCategory || '—' }}</td>
+                      </tr>
+
+                      <tr class="nt-gi-section-header"><td colspan="3">Legislation governing the municipality's operations</td></tr>
+                      <tr>
+                        <td class="nt-gi-label">Legislation</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value"><div class="nt-gi-multiline">{{ generalInfo.legislation || '—' }}</div></td>
+                      </tr>
+
+                      <tr class="nt-gi-section-header"><td colspan="3">Executive / Mayoral Committee</td></tr>
+                    </tbody>
+                  </table>
+
+                  @if (generalInfo.mayoralCommittee?.length > 0) {
+                    <table class="nt-governance-table">
+                      <thead>
+                        <tr>
+                          <th>Portfolio</th>
+                          <th>Councillor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (member of generalInfo.mayoralCommittee; track $index) {
+                          <tr>
+                            <td>{{ member.position || '—' }}</td>
+                            <td>{{ member.name || '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="nt-gi-empty-note">No mayoral committee members captured.</p>
+                  }
+
+                  <table class="nt-gi-table">
+                    <tbody>
+                      <tr class="nt-gi-section-header"><td colspan="3">Council Members</td></tr>
+                    </tbody>
+                  </table>
+                  @if (generalInfo.councilMembers?.length > 0) {
+                    <table class="nt-governance-table">
+                      <thead>
+                        <tr>
+                          <th>Nr</th>
+                          <th>Surname</th>
+                          <th>Ward</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (member of generalInfo.councilMembers; track $index) {
+                          <tr>
+                            <td>{{ $index + 1 }}</td>
+                            <td>{{ member.name || '—' }}</td>
+                            <td>{{ member.ward || '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="nt-gi-empty-note">No council members captured.</p>
+                  }
+
+                  <table class="nt-gi-table">
+                    <tbody>
+                      <tr class="nt-gi-section-header"><td colspan="3">Executive Management</td></tr>
+                    </tbody>
+                  </table>
+                  @if (generalInfo.executiveManagement?.length > 0) {
+                    <table class="nt-governance-table">
+                      <thead>
+                        <tr>
+                          <th>Position</th>
+                          <th>Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (member of generalInfo.executiveManagement; track $index) {
+                          <tr>
+                            <td>{{ member.position || '—' }}</td>
+                            <td>{{ member.name || '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="nt-gi-empty-note">No executive management members captured.</p>
+                  }
+
+                  <table class="nt-gi-table">
+                    <tbody>
+                      <tr class="nt-gi-section-header"><td colspan="3">Members of the Audit Committee</td></tr>
+                    </tbody>
+                  </table>
+                  @if (generalInfo.auditCommittee?.length > 0) {
+                    <table class="nt-governance-table">
+                      <thead>
+                        <tr>
+                          <th>Role</th>
+                          <th>Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (member of generalInfo.auditCommittee; track $index) {
+                          <tr>
+                            <td>{{ member.position || '—' }}</td>
+                            <td>{{ member.name || '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="nt-gi-empty-note">No audit committee members captured.</p>
+                  }
+
+                  <table class="nt-gi-table">
+                    <tbody>
+                      <tr class="nt-gi-section-header"><td colspan="3">Administrative Details</td></tr>
+                      <tr>
+                        <td class="nt-gi-label">Grading of local authority</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.grading || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Demarcation Code</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.demarcationCode || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Registered office</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value"><div class="nt-gi-multiline">{{ generalInfo.registeredOffice || '—' }}</div></td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Postal address</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value"><div class="nt-gi-multiline">{{ generalInfo.postalAddress || '—' }}</div></td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Telephone Number</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.telephone || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Fax Number</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.fax || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">E-mail address</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.email || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Municipal Website</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.website || '—' }}</td>
+                      </tr>
+
+                      <tr class="nt-gi-section-header"><td colspan="3">Professional Advisors</td></tr>
+                      <tr>
+                        <td class="nt-gi-label">Bankers</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.banker || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Auditors</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.auditor || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Attorneys / Legal representative</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.attorneys || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Accounting Officer</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.accountingOfficer || '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="nt-gi-label">Chief Financial Officer</td>
+                        <td class="nt-gi-colon">:</td>
+                        <td class="nt-gi-value">{{ generalInfo.cfo || '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel [expanded]="false" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">short_text</mat-icon>
+                    Abbreviations
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="nt-gi-content">
+                  <h2 class="nt-section-title">Abbreviations</h2>
+                  @if (abbreviations.length > 0) {
+                    <table class="nt-gi-table">
+                      <thead>
+                        <tr>
+                          <th style="text-align:left;padding:8px;font-size:13px;font-weight:700;color:#1a5276;border-bottom:2px solid #1a5276;width:140px">Abbreviation</th>
+                          <th style="text-align:left;padding:8px;font-size:13px;font-weight:700;color:#1a5276;border-bottom:2px solid #1a5276">Definition</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (abbr of abbreviations; track abbr.id) {
+                          <tr>
+                            <td class="nt-gi-label" style="font-weight:600">{{ abbr.abbreviation }}</td>
+                            <td class="nt-gi-value">{{ abbr.definition }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="nt-gi-empty-note">No abbreviations captured. Add them in General Information.</p>
+                  }
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel [expanded]="false" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">gavel</mat-icon>
+                    Accounting Officer's Responsibilities and Approval
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="ao-report-content" style="padding:16px 20px">
+                  <h2 class="nt-section-title">Accounting Officer's Responsibilities and Approval</h2>
+                  @if (generalInfo.aoResponsibilitiesContent) {
+                    <div class="nt-gi-multiline" style="font-size:13px;line-height:1.8;color:#1e293b">{{ generalInfo.aoResponsibilitiesContent }}</div>
+                  } @else {
+                    <p class="nt-gi-empty-note">No AO Responsibilities content captured. Add it in General Information.</p>
+                  }
+                  <div style="margin-top:24px">
+                    <div style="width:200px;border-top:1px solid #1e293b;padding-top:4px;font-size:12px;color:#475569">
+                      {{ generalInfo.accountingOfficer || 'Accounting Officer' }}
+                    </div>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel [expanded]="false" style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">summarize</mat-icon>
+                    Accounting Officer's Report
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="ao-report-content" style="padding:16px 20px">
+                  <h2 class="nt-section-title">Accounting Officer's Report</h2>
+                  @if (generalInfo.aoReportContent) {
+                    <div class="nt-gi-multiline" style="font-size:13px;line-height:1.8;color:#1e293b">{{ generalInfo.aoReportContent }}</div>
+                  } @else {
+                    <p class="nt-gi-empty-note">No AO Report content captured. Add it in General Information.</p>
+                  }
+                  <div style="margin-top:24px">
+                    <div style="width:200px;border-top:1px solid #1e293b;padding-top:4px;font-size:12px;color:#475569">
+                      {{ generalInfo.accountingOfficer || 'Accounting Officer' }}
+                    </div>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+
+            </div>
+          }
+
+          @for (section of preambleNonGiSections; track section.id) {
+            <mat-expansion-panel [expanded]="false" style="margin-bottom:8px">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">description</mat-icon>
+                  {{ section.title }}
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <div class="narrative-section-content">
+                @if (section.title === 'Abbreviations') {
+                  <dl class="abbreviation-list">
+                    @for (item of section.lineItems; track item.templateLineItem.id) {
+                      @if (item.templateLineItem.lineType === 'header') {
+                        <dt class="abbr-header">{{ item.templateLineItem.label }}</dt>
+                      } @else if (item.templateLineItem.lineType !== 'spacer') {
+                        <div class="abbr-entry">
+                          <dt class="abbr-term">{{ item.templateLineItem.code || item.templateLineItem.label }}</dt>
+                          <dd class="abbr-definition">{{ item.templateLineItem.label }}</dd>
+                        </div>
+                      }
+                    }
+                  </dl>
+                } @else if (section.title?.startsWith('Accounting Officer')) {
+                  <div class="ao-report-content">
+                    @for (item of section.lineItems; track item.templateLineItem.id) {
+                      @if (item.templateLineItem.lineType === 'header') {
+                        <h4 class="ao-heading">{{ item.templateLineItem.label }}</h4>
+                      } @else if (item.templateLineItem.lineType === 'spacer') {
+                        <div style="height:12px"></div>
+                      } @else {
+                        <p class="ao-text" [class.ao-bold]="item.templateLineItem.isBold || item.templateLineItem.isTotal"
+                           [style.padding-left.px]="(item.templateLineItem.indentLevel * 16)">{{ item.templateLineItem.label }}</p>
+                      }
+                    }
+                  </div>
+                } @else {
+                  @for (item of section.lineItems; track item.templateLineItem.id) {
+                    @if (item.templateLineItem.lineType === 'header') {
+                      <h4 class="narrative-heading" [style.padding-left.px]="(item.templateLineItem.indentLevel * 16)">{{ item.templateLineItem.label }}</h4>
+                    } @else if (item.templateLineItem.lineType === 'spacer') {
+                      <div style="height:12px"></div>
+                    } @else {
+                      <p class="narrative-text" [class.narrative-bold]="item.templateLineItem.isBold || item.templateLineItem.isTotal"
+                         [style.padding-left.px]="(item.templateLineItem.indentLevel * 16)">{{ item.narrativeText || item.noteText || item.templateLineItem.label }}</p>
+                    }
+                  }
+                }
+              </div>
+            </mat-expansion-panel>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Financial Statements">
+        <div class="fs-section-nav">
+          @for (section of financialStatementSections; track section.id) {
+            <a class="fs-nav-link" (click)="scrollToSection(section.id)">{{ getSectionAbbrev(section.title) }}</a>
+          }
+          @if (mainNotesSections.length > 0) {
+            <a class="fs-nav-link" (click)="scrollToSection('notes-divider')">Notes</a>
+          }
+          <span style="flex:1"></span>
+          <button mat-stroked-button (click)="showBudgetVariance = !showBudgetVariance" class="fs-nav-toggle">
+            <mat-icon>{{ showBudgetVariance ? 'visibility_off' : 'visibility' }}</mat-icon>
+            {{ showBudgetVariance ? 'Hide' : 'Show' }} Budget & Variance
+          </button>
+        </div>
+        @for (section of financialStatementSections; track section.id) {
+          <mat-expansion-panel [expanded]="true" style="margin-bottom:6px" class="nt-note-panel" [attr.id]="'section-' + section.id">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                {{ section.title }}
+                <span class="nt-note-item-count">{{ section.lineItems?.length || 0 }} items</span>
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <table class="nt-note-table">
+              <thead>
+                <tr class="nt-note-group-header">
+                  <th class="nt-note-label-col" style="text-align:left">Description</th>
+                  <th style="width:50px;text-align:center">Note</th>
+                  <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                  <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                  @if (showBudgetVariance) {
+                    <th class="nt-note-amount-col">Budget</th>
+                    <th class="nt-note-amount-col">Variance</th>
+                    <th class="nt-note-amount-col" style="width:8%">Var %</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of section.lineItems; track item.templateLineItem.id) {
+                  <tr class="nt-note-row"
+                      [class.nt-note-bold]="item.templateLineItem.isBold"
+                      [class.nt-note-total]="item.templateLineItem.isTotal || item.templateLineItem.isSubTotal"
+                      [class.nt-note-header]="item.templateLineItem.lineType === 'header' || item.templateLineItem.lineType === 'sub_header'"
+                      [class.material-variance]="item.isMaterialVariance"
+                      [class.zero-amount-row]="isZeroRow(item)">
+                    <td class="nt-note-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 18)">
+                      {{ item.templateLineItem.label }}
+                      @if (isZeroRow(item)) {
+                        <span class="zero-badge" matTooltip="This line will not appear in the printed AFS">will not print</span>
+                      }
+                    </td>
+                    <td style="text-align:center;padding:4px 2px">
+                      @if (item.templateLineItem.noteReference) {
+                        <a class="fs-note-link" (click)="scrollToNote(item.templateLineItem.noteReference); $event.stopPropagation()">{{ item.templateLineItem.noteReference }}</a>
+                      }
+                    </td>
+                    @if (item.templateLineItem.lineType === 'header' || item.templateLineItem.lineType === 'sub_header' || item.templateLineItem.lineType === 'spacer') {
+                      <td [attr.colspan]="showBudgetVariance ? 5 : 2"></td>
+                    } @else {
+                      <td class="nt-note-amount">
+                        @if (item.overrideAmount != null) {
+                          <mat-icon style="font-size:13px;width:13px;height:13px;color:#e67e22;cursor:pointer;vertical-align:middle;margin-right:2px" [matTooltip]="'Override: ' + (item.overrideReason || 'No reason') + ' — click to reset'" (click)="resetOverride(item); $event.stopPropagation()">edit</mat-icon>
+                        }
+                        @if (item.glBreakdownCount) {
+                          <span class="amount drillable-amount" [class.negative]="item.currentYearAmount < 0" [class.overridden]="item.overrideAmount != null" (click)="openDrillThrough(item); $event.stopPropagation()">{{ formatAmount(item.currentYearAmount) }}</span>
+                        } @else {
+                          <span class="amount" [class.negative]="item.currentYearAmount < 0" [class.overridden]="item.overrideAmount != null">{{ formatAmount(item.currentYearAmount) }}</span>
+                        }
+                        @if (item.templateLineItem.lineType === 'detail') {
+                          <mat-icon style="font-size:13px;width:13px;height:13px;color:var(--platinum-text-secondary);cursor:pointer;opacity:0.5;vertical-align:middle;margin-left:2px" matTooltip="Override amount" (click)="openOverrideDialog(item); $event.stopPropagation()">tune</mat-icon>
+                        }
+                      </td>
+                      <td class="nt-note-amount">
+                        <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                      </td>
+                      @if (showBudgetVariance) {
+                        <td class="nt-note-amount">
+                          <span class="amount" [class.negative]="item.budgetAmount < 0">{{ formatAmount(item.budgetAmount) }}</span>
+                        </td>
+                        <td class="nt-note-amount">
+                          <span class="amount" [class.negative]="item.varianceAmount < 0" [class.positive]="item.varianceAmount > 0">{{ formatAmount(item.varianceAmount) }}</span>
+                        </td>
+                        <td class="nt-note-amount">
+                          <span class="amount" [class.negative]="item.variancePercentage < 0" [class.positive]="item.variancePercentage > 0">
+                            {{ item.variancePercentage != null ? (item.variancePercentage | number:'1.1-1') + '%' : '—' }}
+                          </span>
+                        </td>
+                      }
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </mat-expansion-panel>
+        }
+
+        @if (mainNotesSections.length > 0) {
+          <div class="nt-notes-divider" id="section-notes-divider">
+            <mat-icon>description</mat-icon>
+            <span>Notes to the Annual Financial Statements</span>
+            <span class="nt-notes-count">{{ mainNotesSections.length }} notes</span>
+          </div>
+        }
+
+        @for (section of mainNotesSections; track section.id) {
+          <mat-expansion-panel [expanded]="false" style="margin-bottom:6px" class="nt-note-panel" [attr.data-note-number]="section.noteNumber">
+            <mat-expansion-panel-header matTooltip="Note {{ section.noteNumber }} — click to expand">
+              <mat-panel-title>
+                @if (section.noteNumber) {
+                  <span class="mscoa-tag" style="margin-right:8px">Note {{ section.noteNumber }}</span>
+                }
+                {{ section.title }}
+                <span class="nt-note-item-count">{{ section.lineItems?.length || 0 }} items</span>
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            @if (isNtNoteLayout(section)) {
+              <table class="nt-note-table">
+                <thead>
+                  <tr class="nt-note-group-header">
+                    <th [attr.rowspan]="hasConsolidatedEntities ? 2 : null" class="nt-note-label-col">Description</th>
+                    @if (hasConsolidatedEntities) {
+                      <th colspan="2" class="nt-note-group-col">Economic Entity</th>
+                      <th colspan="2" class="nt-note-group-col nt-note-muni-group">Municipality</th>
+                    } @else {
+                      <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                      <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                    }
+                  </tr>
+                  @if (hasConsolidatedEntities) {
+                    <tr class="nt-note-sub-header">
+                      <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                      <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                      <th class="nt-note-amount-col nt-note-muni">{{ currentYearLabel }}</th>
+                      <th class="nt-note-amount-col nt-note-muni">{{ priorYearLabel }}</th>
+                    </tr>
+                  }
+                </thead>
+                <tbody>
+                  @for (item of section.lineItems; track item.templateLineItem.id) {
+                    <tr class="nt-note-row"
+                        [class.nt-note-bold]="item.templateLineItem.isBold"
+                        [class.nt-note-total]="item.templateLineItem.isTotal"
+                        [class.nt-note-subtotal]="item.templateLineItem.isSubTotal"
+                        [class.nt-note-header]="item.templateLineItem.lineType === 'header'"
+                        [class.zero-amount-row]="isZeroRow(item)">
+                      <td class="nt-note-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 18)">
+                        {{ item.templateLineItem.label }}
+                        @if (isZeroRow(item)) {
+                          <span class="zero-badge" matTooltip="This line will not appear in the printed AFS">will not print</span>
+                        }
+                      </td>
+                      @if (item.templateLineItem.lineType === 'header' || item.templateLineItem.lineType === 'spacer') {
+                        <td [attr.colspan]="hasConsolidatedEntities ? 4 : 2"></td>
+                      } @else {
+                        @if (hasConsolidatedEntities) {
+                          <td class="nt-note-amount">
+                            @if (item.glBreakdownCount) {
+                              <span class="amount drillable-amount" [class.negative]="item.currentYearAmount < 0" (click)="openDrillThrough(item); $event.stopPropagation()">{{ formatAmount(item.currentYearAmount) }}</span>
+                            } @else {
+                              <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                            }
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                          <td class="nt-note-amount nt-note-muni">
+                            <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                          </td>
+                          <td class="nt-note-amount nt-note-muni">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                        } @else {
+                          <td class="nt-note-amount">
+                            @if (item.glBreakdownCount) {
+                              <span class="amount drillable-amount" [class.negative]="item.currentYearAmount < 0" (click)="openDrillThrough(item); $event.stopPropagation()">{{ formatAmount(item.currentYearAmount) }}</span>
+                            } @else {
+                              <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                            }
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                        }
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <table class="data-table" style="width:100%">
+                <thead>
+                  <tr>
+                    <th style="min-width:250px">Label</th>
+                    <th class="amount-col">{{ currentYearLabel }}</th>
+                    <th class="amount-col">{{ priorYearLabel }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of section.lineItems; track item.templateLineItem.id) {
+                    <tr class="line-item-row"
+                        [class.bold-row]="item.templateLineItem.isBold"
+                        [class.total-row]="item.templateLineItem.isTotal || item.templateLineItem.isSubTotal">
+                      <td [style.padding-left.px]="16 + (item.templateLineItem.indentLevel * 20)">
+                        {{ item.templateLineItem.label }}
+                      </td>
+                      <td class="amount-col">
+                        @if (item.templateLineItem.lineType !== 'header' && item.templateLineItem.lineType !== 'spacer') {
+                          @if (item.glBreakdownCount) {
+                            <span class="amount drillable-amount" [class.negative]="item.currentYearAmount < 0" (click)="openDrillThrough(item); $event.stopPropagation()">{{ formatAmount(item.currentYearAmount) }}</span>
+                          } @else {
+                            <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                          }
+                        }
+                      </td>
+                      <td class="amount-col">
+                        @if (item.templateLineItem.lineType !== 'header' && item.templateLineItem.lineType !== 'spacer') {
+                          <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+
+            @let recon = getNoteReconciliation(section);
+            @if (recon) {
+              <table class="nt-note-table note-recon-table">
+                <tbody>
+                  <tr class="note-recon-row">
+                    <td class="nt-note-label-col note-recon-label">
+                      <mat-icon style="font-size:14px;width:14px;height:14px;color:#6b7280;vertical-align:middle;margin-right:4px">compare_arrows</mat-icon>
+                      Difference (Note {{ section.noteNumber }} total vs Face)
+                      <a class="note-recon-back-link" (click)="scrollToFaceSection(section.noteNumber || '')">
+                        <mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:middle">arrow_upward</mat-icon>
+                        Go to Statement
+                      </a>
+                    </td>
+                    <td class="nt-note-amount-col note-recon-amount" [class.recon-zero]="recon.difference === 0" [class.recon-mismatch]="recon.difference !== 0">
+                      {{ formatAmount(recon.difference) }}
+                    </td>
+                    <td class="nt-note-amount-col note-recon-amount" [class.recon-zero]="recon.differencePY === 0" [class.recon-mismatch]="recon.differencePY !== 0">
+                      {{ formatAmount(recon.differencePY) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            }
+
+            @for (subNote of getSubNotes(section.noteNumber || ''); track subNote.id) {
+              <div class="sub-note-section">
+                <h4 class="sub-note-title">{{ subNote.noteNumber }} &nbsp; {{ subNote.title }}</h4>
+
+                @if (hasConsolidatedEntities) {
+                  <h5 class="sub-note-entity-label">Economic Entity</h5>
+                  <table class="nt-note-table sub-note-table">
+                    <thead>
+                      <tr class="nt-note-group-header">
+                        <th class="nt-note-label-col">Description</th>
+                        <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                        <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of subNote.lineItems; track item.templateLineItem.id) {
+                        <tr class="nt-note-row"
+                            [class.nt-note-bold]="item.templateLineItem.isBold"
+                            [class.nt-note-total]="item.templateLineItem.isTotal">
+                          <td class="nt-note-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 18)">
+                            {{ item.templateLineItem.label }}
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+
+                  <h5 class="sub-note-entity-label sub-note-muni-label">{{ generalInfo?.municipalityName || 'Municipality' }}</h5>
+                  <table class="nt-note-table sub-note-table sub-note-muni-table">
+                    <thead>
+                      <tr class="nt-note-group-header">
+                        <th class="nt-note-label-col">Description</th>
+                        <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                        <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of subNote.lineItems; track item.templateLineItem.id) {
+                        <tr class="nt-note-row"
+                            [class.nt-note-bold]="item.templateLineItem.isBold"
+                            [class.nt-note-total]="item.templateLineItem.isTotal">
+                          <td class="nt-note-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 18)">
+                            {{ item.templateLineItem.label }}
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <table class="nt-note-table sub-note-table">
+                    <thead>
+                      <tr class="nt-note-group-header">
+                        <th class="nt-note-label-col">Description</th>
+                        <th class="nt-note-amount-col">{{ currentYearLabel }}</th>
+                        <th class="nt-note-amount-col">{{ priorYearLabel }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of subNote.lineItems; track item.templateLineItem.id) {
+                        <tr class="nt-note-row"
+                            [class.nt-note-bold]="item.templateLineItem.isBold"
+                            [class.nt-note-total]="item.templateLineItem.isTotal">
+                          <td class="nt-note-label" [style.padding-left.px]="12 + (item.templateLineItem.indentLevel * 18)">
+                            {{ item.templateLineItem.label }}
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.currentYearAmount < 0">{{ formatAmount(item.currentYearAmount) }}</span>
+                          </td>
+                          <td class="nt-note-amount">
+                            <span class="amount" [class.negative]="item.priorYearAmount < 0">{{ formatAmount(item.priorYearAmount) }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </div>
+            }
+          </mat-expansion-panel>
+        }
+
+        @if (financialStatementSections.length === 0 && notesSections.length === 0) {
+          <div class="empty-state" style="margin-top:24px" matTooltip="Financial statements will be generated automatically when trial balance data and mappings are available">
+            <mat-icon>table_chart</mat-icon>
+            <h3>No financial statement data</h3>
+            <p>Financial statements will be generated automatically after trial balance import and mapping</p>
+          </div>
+        }
+      </mat-tab>
+
+      <mat-tab label="Accounting Policies">
+        <div style="margin-top:16px">
+          @if (accountingPolicySections.length > 0) {
+            @for (section of accountingPolicySections; track section.id) {
+              <mat-expansion-panel [expanded]="true" style="margin-bottom:8px">
+                <mat-expansion-panel-header matTooltip="Expand or collapse this policy section">
+                  <mat-panel-title>
+                    <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:6px;color:var(--platinum-text-secondary)">policy</mat-icon>
+                    {{ section.title }}
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="policies-content">
+                  @for (item of section.lineItems; track item.templateLineItem.id) {
+                    @if (item.templateLineItem.lineType === 'header') {
+                      <h4 class="policy-group-heading" [style.padding-left.px]="(item.templateLineItem.indentLevel * 16)">{{ item.templateLineItem.label }}</h4>
+                    } @else if (item.templateLineItem.lineType === 'spacer') {
+                      <div style="height:8px"></div>
+                    } @else {
+                      <p class="policy-text" [class.policy-bold]="item.templateLineItem.isBold"
+                         [style.padding-left.px]="(item.templateLineItem.indentLevel * 16)">{{ item.templateLineItem.label }}</p>
+                    }
+                  }
+                </div>
+              </mat-expansion-panel>
+            }
+          } @else {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>policy</mat-icon>
+              <h3>No accounting policies</h3>
+              <p>Accounting policies will appear here after calculation. You can also manage them from the Accounting Policies module.</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Notes">
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;font-size:16px;font-weight:600;color:var(--platinum-text)">Disclosure Notes to the Financial Statements</h3>
+            <div style="display:flex;gap:8px">
+              <button mat-flat-button class="btn-primary" (click)="generateNotes()" [disabled]="generatingNotes" matTooltip="Use AI to auto-generate GRAP-compliant disclosure notes from the financial data">
+                <mat-icon>auto_awesome</mat-icon> {{ generatingNotes ? 'Generating...' : 'Generate Notes (AI)' }}
+              </button>
+              <button mat-stroked-button (click)="getAiInsights()" [disabled]="loadingInsights" matTooltip="Get AI-powered financial analysis and insights">
+                <mat-icon>insights</mat-icon> {{ loadingInsights ? 'Analysing...' : 'AI Insights' }}
+              </button>
+            </div>
+          </div>
+
+          @if (generatingNotes) {
+            <div style="text-align:center;padding:48px">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p style="margin-top:16px;color:var(--platinum-text-secondary)">AI is generating GRAP-compliant disclosure notes...</p>
+            </div>
+          }
+
+          @if (aiInsights) {
+            <mat-expansion-panel style="margin-bottom:16px;border:1px solid #e0e7ff;background:#f5f7ff">
+              <mat-expansion-panel-header>
+                <mat-panel-title><mat-icon style="margin-right:8px;color:#6366f1">insights</mat-icon> AI Financial Insights</mat-panel-title>
+              </mat-expansion-panel-header>
+              <div style="padding:8px 0">
+                <div style="margin-bottom:16px">
+                  <div style="font-weight:600;font-size:13px;color:var(--platinum-text-secondary);margin-bottom:4px">Overall Assessment</div>
+                  <div style="font-size:14px">{{ aiInsights.overallAssessment }}</div>
+                </div>
+                @if (aiInsights.keyFindings?.length) {
+                  <div style="margin-bottom:16px">
+                    <div style="font-weight:600;font-size:13px;color:var(--platinum-text-secondary);margin-bottom:4px">Key Findings</div>
+                    <ul style="margin:0;padding-left:20px">
+                      @for (finding of aiInsights.keyFindings; track $index) {
+                        <li style="font-size:14px;margin-bottom:4px">{{ finding }}</li>
+                      }
+                    </ul>
+                  </div>
+                }
+                @if (aiInsights.riskAreas?.length) {
+                  <div style="margin-bottom:16px">
+                    <div style="font-weight:600;font-size:13px;color:var(--platinum-text-secondary);margin-bottom:4px">Risk Areas</div>
+                    @for (risk of aiInsights.riskAreas; track $index) {
+                      <div style="padding:8px 12px;margin-bottom:6px;border-radius:6px;border:1px solid" [style.border-color]="risk.severity === 'high' ? '#ef4444' : risk.severity === 'medium' ? '#f59e0b' : '#22c55e'" [style.background]="risk.severity === 'high' ? '#fef2f2' : risk.severity === 'medium' ? '#fffbeb' : '#f0fdf4'">
+                        <span style="font-weight:600;font-size:12px;text-transform:uppercase">{{ risk.severity }}</span>
+                        <span style="margin-left:8px">{{ risk.area }}: {{ risk.detail }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (aiInsights.recommendations?.length) {
+                  <div>
+                    <div style="font-weight:600;font-size:13px;color:var(--platinum-text-secondary);margin-bottom:4px">Recommendations</div>
+                    <ul style="margin:0;padding-left:20px">
+                      @for (rec of aiInsights.recommendations; track $index) {
+                        <li style="font-size:14px;margin-bottom:4px">{{ rec }}</li>
+                      }
+                    </ul>
+                  </div>
+                }
+              </div>
+            </mat-expansion-panel>
+          }
+
+          @if (notes.length > 0) {
+            @for (note of notes; track note.lineItemId) {
+              <mat-expansion-panel style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    @if (note.noteData?.noteNumber) {
+                      <span class="mscoa-tag" style="margin-right:8px">Note {{ note.noteData.noteNumber }}</span>
+                    }
+                    {{ note.noteData?.title || note.label }}
+                    @if (note.noteData?.grapReference || note.grapReference) {
+                      <span style="margin-left:8px;font-size:11px;color:var(--platinum-text-secondary)">({{ note.noteData?.grapReference || note.grapReference }})</span>
+                    }
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div style="padding:8px 0">
+                  @if (note.noteData?.accountingPolicy) {
+                    <div style="margin-bottom:12px">
+                      <div style="font-weight:600;font-size:12px;color:var(--platinum-text-secondary);margin-bottom:4px">ACCOUNTING POLICY</div>
+                      <div style="font-size:13px;line-height:1.6;color:var(--platinum-text)">{{ note.noteData.accountingPolicy }}</div>
+                    </div>
+                  }
+                  @if (note.noteData?.disclosure) {
+                    <div style="margin-bottom:12px">
+                      <div style="font-weight:600;font-size:12px;color:var(--platinum-text-secondary);margin-bottom:4px">DISCLOSURE</div>
+                      <div style="font-size:13px;line-height:1.6;color:var(--platinum-text)">{{ note.noteData.disclosure }}</div>
+                    </div>
+                  }
+                  @if (note.noteData?.currentYearAmount || note.currentYearAmount || note.noteData?.priorYearAmount || note.priorYearAmount) {
+                    <div style="margin-bottom:12px;display:flex;gap:24px">
+                      <div>
+                        <span style="font-size:12px;color:var(--platinum-text-secondary)">{{ currentYearLabel }}</span>
+                        <div style="font-weight:600" [class.drillable-amount]="note.glBreakdown?.length" (click)="note.glBreakdown?.length ? openNoteDrillThrough(note.glBreakdown, note.label || note.noteData?.title || 'Note') : null">{{ formatAmount(note.noteData?.currentYearAmount ?? note.currentYearAmount) }}</div>
+                      </div>
+                      <div>
+                        <span style="font-size:12px;color:var(--platinum-text-secondary)">{{ priorYearLabel }}</span>
+                        <div style="font-weight:600">{{ formatAmount(note.noteData?.priorYearAmount ?? note.priorYearAmount) }}</div>
+                      </div>
+                    </div>
+                  }
+                  @if (note.noteData?.varianceExplanation) {
+                    <div style="margin-bottom:12px">
+                      <div style="font-weight:600;font-size:12px;color:var(--platinum-text-secondary);margin-bottom:4px">VARIANCE EXPLANATION</div>
+                      <div style="font-size:13px;line-height:1.6;color:var(--platinum-text)">{{ note.noteData.varianceExplanation }}</div>
+                    </div>
+                  }
+                  @if (note.noteData?.additionalDisclosures) {
+                    <div style="margin-bottom:12px">
+                      <div style="font-weight:600;font-size:12px;color:var(--platinum-text-secondary);margin-bottom:4px">ADDITIONAL DISCLOSURES</div>
+                      <div style="font-size:13px;line-height:1.6;color:var(--platinum-text)">{{ note.noteData.additionalDisclosures }}</div>
+                    </div>
+                  }
+                  <div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--platinum-border)">
+                    <button mat-stroked-button color="warn" (click)="deleteNote(note.lineItemId)" matTooltip="Remove this disclosure note">
+                      <mat-icon>delete</mat-icon> Delete
+                    </button>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            }
+          } @else if (!generatingNotes) {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>auto_awesome</mat-icon>
+              <h3>No disclosure notes yet</h3>
+              <p>Click "Generate Notes (AI)" to auto-generate GRAP-compliant disclosure notes from your financial data</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Generated Documents">
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;font-size:16px;font-weight:600;color:var(--platinum-text)">
+              <mat-icon style="vertical-align:middle;margin-right:8px;">folder_special</mat-icon>
+              AFS Documents ({{ compilationDocs.length }})
+            </h3>
+            <button mat-stroked-button (click)="uploadCompilationDoc()" matTooltip="Upload an AFS document (draft or final)">
+              <mat-icon>cloud_upload</mat-icon> Upload Document
+            </button>
+          </div>
+          @if (compilationDocs.length > 0) {
+            <div style="display:flex;flex-direction:column;gap:8px">
+              @for (doc of compilationDocs; track doc.id) {
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:white;border:1px solid var(--platinum-border);border-radius:8px">
+                  <mat-icon style="color:var(--platinum-text-muted);font-size:24px;width:24px;height:24px">
+                    {{ doc.documentType === 'afs_final' ? 'verified' : 'description' }}
+                  </mat-icon>
+                  <div style="flex:1">
+                    <div style="font-size:14px;font-weight:500">{{ doc.originalName || doc.fileName }}</div>
+                    <div style="font-size:12px;color:var(--platinum-text-muted);display:flex;gap:12px;margin-top:2px">
+                      <span class="status-badge" [class]="doc.documentType === 'afs_final' ? 'active' : 'draft'" style="font-size:10px">{{ doc.documentType === 'afs_final' ? 'Final' : 'Draft' }}</span>
+                      <span>{{ formatDocSize(doc.fileSize) }}</span>
+                      <span>{{ doc.createdAt | date:'medium' }}</span>
+                      @if (doc.lockedAt) {
+                        <span style="color:var(--platinum-warning)"><mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">lock</mat-icon> Locked</span>
+                      }
+                    </div>
+                  </div>
+                  <button mat-icon-button matTooltip="Download" (click)="downloadCompilationDoc(doc.id)">
+                    <mat-icon>download</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>description</mat-icon>
+              <h3>No generated documents yet</h3>
+              <p>AFS drafts and finals will appear here after export or upload</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Drill-Through">
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;font-size:16px;font-weight:600;color:var(--platinum-text)">
+              <mat-icon style="vertical-align:middle;margin-right:8px">account_tree</mat-icon>
+              GL Drill-Through — Line Item Breakdown
+            </h3>
+            <span style="font-size:12px;color:var(--platinum-text-secondary)">
+              {{ getDrillThroughItems().length }} line items with GL data
+            </span>
+          </div>
+          @if (getDrillThroughItems().length > 0) {
+            @for (dtItem of getDrillThroughItems(); track dtItem.lineItemId) {
+              <mat-expansion-panel style="margin-bottom:8px">
+                <mat-expansion-panel-header>
+                  <mat-panel-title style="font-size:13px">
+                    {{ dtItem.label }}
+                  </mat-panel-title>
+                  <mat-panel-description style="display:flex;gap:16px;align-items:center;justify-content:flex-end;font-size:12px">
+                    <span>{{ formatAmount(dtItem.amount) }}</span>
+                    <span style="color:var(--platinum-text-secondary)">{{ dtItem.glEntries.length }} GL accounts</span>
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
+                <table class="data-table" style="width:100%;font-size:12px">
+                  <thead>
+                    <tr>
+                      <th matTooltip="mSCOA account code">Account Code</th>
+                      <th matTooltip="GL account description">Account Name</th>
+                      <th class="amount-col" matTooltip="Current year amount">{{ currentYearLabel }}</th>
+                      <th class="amount-col" matTooltip="Prior year comparative">{{ priorYearLabel }}</th>
+                      <th class="amount-col" matTooltip="Budget amount">Budget</th>
+                      <th style="text-align:center" matTooltip="Number of TB entries">TB Entries</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (gl of dtItem.glEntries; track gl.accountCode) {
+                      <tr>
+                        <td><span class="mscoa-tag" matTooltip="mSCOA: {{ gl.accountCode }}">{{ gl.accountCode?.substring(0, 20) }}{{ gl.accountCode?.length > 20 ? '...' : '' }}</span></td>
+                        <td>{{ gl.accountName || '—' }}</td>
+                        <td class="amount-col">
+                          <span class="amount" [class.negative]="gl.amount < 0">{{ formatAmount(gl.amount) }}</span>
+                        </td>
+                        <td class="amount-col">
+                          <span class="amount" [class.negative]="gl.priorYearAmount < 0">{{ formatAmount(gl.priorYearAmount) }}</span>
+                        </td>
+                        <td class="amount-col">
+                          <span class="amount" [class.negative]="gl.budgetAmount < 0">{{ formatAmount(gl.budgetAmount) }}</span>
+                        </td>
+                        <td style="text-align:center">{{ gl.tbEntryCount || '—' }}</td>
+                      </tr>
+                    }
+                    <tr style="font-weight:700;border-top:2px solid var(--platinum-border)">
+                      <td colspan="2">Total</td>
+                      <td class="amount-col">
+                        <span class="amount" [class.negative]="dtItem.amount < 0">{{ formatAmount(dtItem.amount) }}</span>
+                      </td>
+                      <td class="amount-col">
+                        <span class="amount" [class.negative]="dtItem.priorYear < 0">{{ formatAmount(dtItem.priorYear) }}</span>
+                      </td>
+                      <td class="amount-col">
+                        <span class="amount" [class.negative]="dtItem.budget < 0">{{ formatAmount(dtItem.budget) }}</span>
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </mat-expansion-panel>
+            }
+          } @else {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>account_tree</mat-icon>
+              <h3>No GL drill-through data available</h3>
+              <p>GL breakdown will be available for each line item after financial statements are generated. You can also click on any amount in the Financial Statements tab for a quick drill-through.</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Prior Year Validation">
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0;font-size:16px;font-weight:600;color:var(--platinum-text)">
+              <mat-icon style="vertical-align:middle;margin-right:8px">compare_arrows</mat-icon>
+              Prior Year Comparative Validation
+            </h3>
+            <button mat-stroked-button (click)="loadPriorYearValidation()" [disabled]="loadingPYV" matTooltip="Refresh prior year validation data">
+              <mat-icon>refresh</mat-icon> {{ loadingPYV ? 'Loading...' : 'Refresh' }}
+            </button>
+          </div>
+
+          @if (priorYearValidation) {
+            <div class="pyv-summary-card">
+              <div class="pyv-stat">
+                <span class="pyv-stat-label">Overall Coverage</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="pyv-stat-value">{{ priorYearValidation.overallSummary.coveragePercent }}%</span>
+                  <span class="pyv-coverage-badge" [ngClass]="priorYearValidation.overallSummary.status">{{ priorYearValidation.overallSummary.status }}</span>
+                </div>
+              </div>
+              <div class="pyv-stat">
+                <span class="pyv-stat-label">Total Data Lines</span>
+                <span class="pyv-stat-value">{{ priorYearValidation.overallSummary.totalDataLines }}</span>
+              </div>
+              <div class="pyv-stat">
+                <span class="pyv-stat-label">With Prior Year</span>
+                <span class="pyv-stat-value" style="color:#16a34a">{{ priorYearValidation.overallSummary.linesWithPriorYear }}</span>
+              </div>
+              <div class="pyv-stat">
+                <span class="pyv-stat-label">Missing Prior Year</span>
+                <span class="pyv-stat-value" [style.color]="priorYearValidation.overallSummary.linesMissingPriorYear > 0 ? '#d97706' : '#16a34a'">{{ priorYearValidation.overallSummary.linesMissingPriorYear }}</span>
+              </div>
+            </div>
+
+            @if (priorYearValidation.statementCoverage.sections.length > 0) {
+              <h4 style="font-size:14px;font-weight:600;color:var(--platinum-navy);margin:16px 0 8px">Financial Statement Sections</h4>
+              @for (sec of priorYearValidation.statementCoverage.sections; track sec.sectionId) {
+                <div class="pyv-section">
+                  <div class="pyv-section-header">
+                    <span class="pyv-section-title">{{ sec.title }}</span>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div class="pyv-bar">
+                        <div class="pyv-bar-fill" [class.full]="sec.coveragePercent === 100" [class.partial]="sec.coveragePercent >= 50 && sec.coveragePercent < 100" [class.low]="sec.coveragePercent < 50" [style.width.%]="sec.coveragePercent"></div>
+                      </div>
+                      <span style="font-size:13px;font-weight:600;min-width:40px;text-align:right">{{ sec.coveragePercent }}%</span>
+                    </div>
+                  </div>
+                  <div style="font-size:12px;color:var(--platinum-text-secondary)">{{ sec.linesWithPriorYear }}/{{ sec.totalDataLines }} lines with prior year data</div>
+                  @if (sec.missingDetails.length > 0) {
+                    @for (m of sec.missingDetails; track m.lineItemId) {
+                      <div class="pyv-missing-item">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;color:#d97706">warning</mat-icon>
+                        <span>{{ m.label }}</span>
+                        <span style="margin-left:auto;font-size:12px;color:var(--platinum-text-secondary)">Current: {{ formatAmount(m.currentYearAmount) }}</span>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
+
+            @if (priorYearValidation.noteCoverage.sections.length > 0) {
+              <h4 style="font-size:14px;font-weight:600;color:var(--platinum-navy);margin:16px 0 8px">Disclosure Notes ({{ priorYearValidation.noteCoverage.totalNotes }})</h4>
+              <div style="display:flex;gap:12px;margin-bottom:8px;font-size:12px">
+                <span style="color:#16a34a;font-weight:600">{{ priorYearValidation.noteCoverage.notesWithFullCoverage }} full</span>
+                <span style="color:#d97706;font-weight:600">{{ priorYearValidation.noteCoverage.notesWithPartialCoverage }} partial</span>
+                <span style="color:#dc2626;font-weight:600">{{ priorYearValidation.noteCoverage.notesWithNoCoverage }} missing</span>
+              </div>
+              @for (sec of priorYearValidation.noteCoverage.sections; track sec.sectionId) {
+                <div class="pyv-section">
+                  <div class="pyv-section-header">
+                    <span class="pyv-section-title">
+                      @if (sec.noteNumber) { <span class="mscoa-tag" style="margin-right:6px">Note {{ sec.noteNumber }}</span> }
+                      {{ sec.title }}
+                    </span>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div class="pyv-bar">
+                        <div class="pyv-bar-fill" [class.full]="sec.coveragePercent === 100" [class.partial]="sec.coveragePercent >= 50 && sec.coveragePercent < 100" [class.low]="sec.coveragePercent < 50" [style.width.%]="sec.coveragePercent"></div>
+                      </div>
+                      <span style="font-size:13px;font-weight:600;min-width:40px;text-align:right">{{ sec.coveragePercent }}%</span>
+                    </div>
+                  </div>
+                  @if (sec.missingDetails.length > 0) {
+                    @for (m of sec.missingDetails; track m.lineItemId) {
+                      <div class="pyv-missing-item">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;color:#d97706">warning</mat-icon>
+                        <span>{{ m.label }}</span>
+                        <span style="margin-left:auto;font-size:12px;color:var(--platinum-text-secondary)">Current: {{ formatAmount(m.currentYearAmount) }}</span>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
+
+            @if (priorYearValidation.budgetCoverage.sections.length > 0) {
+              <h4 style="font-size:14px;font-weight:600;color:var(--platinum-navy);margin:16px 0 8px">Budget Comparison Sections</h4>
+              @for (sec of priorYearValidation.budgetCoverage.sections; track sec.sectionId) {
+                <div class="pyv-section">
+                  <div class="pyv-section-header">
+                    <span class="pyv-section-title">{{ sec.title }}</span>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div class="pyv-bar">
+                        <div class="pyv-bar-fill" [class.full]="sec.coveragePercent === 100" [class.partial]="sec.coveragePercent >= 50 && sec.coveragePercent < 100" [class.low]="sec.coveragePercent < 50" [style.width.%]="sec.coveragePercent"></div>
+                      </div>
+                      <span style="font-size:13px;font-weight:600;min-width:40px;text-align:right">{{ sec.coveragePercent }}%</span>
+                    </div>
+                  </div>
+                  @if (sec.missingDetails.length > 0) {
+                    @for (m of sec.missingDetails; track m.lineItemId) {
+                      <div class="pyv-missing-item">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;color:#d97706">warning</mat-icon>
+                        <span>{{ m.label }}</span>
+                        <span style="margin-left:auto;font-size:12px;color:var(--platinum-text-secondary)">Current: {{ formatAmount(m.currentYearAmount) }}</span>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
+          } @else {
+            <div class="empty-state" style="margin-top:24px">
+              <mat-icon>compare_arrows</mat-icon>
+              <h3>Prior Year Validation</h3>
+              <p>Click Refresh to check which line items are missing prior year comparative data</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Review Distribution">
+        <div class="tab-content">
+          <app-review-dashboard
+            [compilationId]="compilation?.id || ''"
+            [compilationName]="compilation?.name || ''">
+          </app-review-dashboard>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>
+
+<app-drill-through-panel
+  [open]="drillPanelOpen"
+  [glEntries]="drillPanelEntries"
+  [lineItemLabel]="drillPanelLabel"
+  [priorYearLabel]="priorYearLabel"
+  [financialYearId]="compilation?.financialYear?.id || ''"
+  [compilationId]="compilation?.id || ''"
+  [periodFrom]="compilation?.periodFrom || ''"
+  [periodTo]="compilation?.periodTo || ''"
+  (closed)="drillPanelOpen = false">
+</app-drill-through-panel>
+
+@if (overrideDialogItem) {
+  <div class="override-dialog-backdrop" (click)="cancelOverrideDialog()">
+    <div class="override-dialog" (click)="$event.stopPropagation()">
+      <h3 style="margin:0 0 12px">Override: {{ overrideDialogItem.templateLineItem.label }}</h3>
+      <p style="font-size:13px;color:var(--platinum-text-secondary);margin:0 0 16px">
+        Current calculated amount: <strong>{{ formatAmount(overrideDialogItem.currentYearAmount) }}</strong>
+      </p>
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Override Amount (R)</label>
+        <input type="number" [(ngModel)]="overrideDialogAmount" style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:14px;box-sizing:border-box" />
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Reason for Override</label>
+        <textarea [(ngModel)]="overrideDialogReason" rows="3" style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:14px;resize:vertical;box-sizing:border-box" placeholder="Provide justification for this override..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button mat-button (click)="cancelOverrideDialog()">Cancel</button>
+        <button mat-flat-button color="primary" (click)="submitOverride()" [disabled]="!overrideDialogReason">Apply Override</button>
+      </div>
+    </div>
+  </div>
+}

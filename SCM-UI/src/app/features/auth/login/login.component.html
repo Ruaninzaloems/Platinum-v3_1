@@ -1,0 +1,105 @@
+    <div class="login-container">
+      <div class="login-left">
+        <div class="brand-content">
+          <div class="logo-icon">
+            <mat-icon class="shield-icon">verified_user</mat-icon>
+          </div>
+          <h1>Platinum SCM Test</h1>
+          <p class="tagline">Supply Chain Management System</p>
+          <div class="divider"></div>
+          <p class="description">
+            Integrated procurement, compliance, and financial management
+            platform for South African local government.
+          </p>
+          <div class="features">
+            <div class="feature-item">
+              <mat-icon>check_circle</mat-icon>
+              <span>MFMA & SCM Regulation Compliant</span>
+            </div>
+            <div class="feature-item">
+              <mat-icon>check_circle</mat-icon>
+              <span>End-to-End Procurement Lifecycle</span>
+            </div>
+            <div class="feature-item">
+              <mat-icon>check_circle</mat-icon>
+              <span>Real-Time Audit Trail</span>
+            </div>
+            <div class="feature-item">
+              <mat-icon>check_circle</mat-icon>
+              <span>B-BBEE & Local Content Tracking</span>
+            </div>
+          </div>
+        </div>
+        <div class="footer-text">
+          &copy; 2026 Platinum ERP Solutions. All rights reserved.
+        </div>
+      </div>
+
+      <div class="login-right">
+        <div class="login-form-wrapper">
+          <h2>Sign In</h2>
+          <p class="subtitle">Enter your credentials to access the system</p>
+
+          @if (errorMessage()) {
+            <div class="error-banner">
+              <mat-icon>error_outline</mat-icon>
+              <span>{{ errorMessage() }}</span>
+            </div>
+          }
+
+          <form (ngSubmit)="onLogin()" class="login-form">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Username</mat-label>
+              <mat-icon matPrefix>person</mat-icon>
+              <input matInput
+                     [(ngModel)]="username"
+                     name="username"
+                     placeholder="Enter your username"
+                     required
+                     [disabled]="loading()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Password</mat-label>
+              <mat-icon matPrefix>lock</mat-icon>
+              <input matInput
+                     [type]="hidePassword() ? 'password' : 'text'"
+                     [(ngModel)]="password"
+                     name="password"
+                     placeholder="Enter your password"
+                     required
+                     [disabled]="loading()">
+              <button mat-icon-button matSuffix type="button"
+                      (click)="hidePassword.set(!hidePassword())">
+                <mat-icon>{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <button mat-flat-button
+                    class="login-button"
+                    type="submit"
+                    [disabled]="loading() || !username || !password">
+              @if (loading()) {
+                <span>Signing in...</span>
+              } @else {
+                <span>Sign In</span>
+              }
+            </button>
+          </form>
+
+          <div class="demo-credentials">
+            <p class="demo-title">
+              <mat-icon>info</mat-icon>
+              Demo Credentials
+            </p>
+            <div class="credentials-grid">
+              <div class="credential" (click)="fillCredentials('admin', 'admin123')">
+                <strong>System Admin</strong>
+                <span>admin</span>
+              </div>
+            </div>
+            <p class="demo-password">Password: <code>admin123</code></p>
+          </div>
+        </div>
+      </div>
+    </div>

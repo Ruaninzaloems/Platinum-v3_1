@@ -1,0 +1,2 @@
+PlatinumBudget.Api/Data/SeedSystemConstants.sql filter=lfs diff=lfs merge=lfs -text
+PlatinumBudget.Api/bin/Debug/net10.0/Data/SeedSystemConstants.sql filter=lfs diff=lfs merge=lfs -text

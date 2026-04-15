@@ -1,0 +1,589 @@
+    <div class="ifw-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.notification-error]="notificationError()">
+          <mat-icon>{{notificationError() ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'dashboard') {
+        <div class="tab-nav">
+          <button class="tab-btn active">Dashboard</button>
+          <button class="tab-btn" (click)="currentView.set('list')">Incident List</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="summary().total + ' total IFW incidents recorded'">
+            <mat-icon>warning_amber</mat-icon>
+            <span class="kpi-value">{{summary().total || 0}}</span>
+            <span class="kpi-label">Total Incidents</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="formatCurrency(summary().totalAmount?.amount || 0) + ' total exposure value'">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summary().totalAmount?.amount || 0)}}</span>
+            <span class="kpi-label">Total Amount</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="'#ef4444'" [matTooltip]="(summary().byType?.irregular || 0) + ' irregular expenditure incidents'">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value" style="color:#ef4444">{{summary().byType?.irregular || 0}}</span>
+            <span class="kpi-label">Irregular</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="'#f59e0b'" [matTooltip]="(summary().byType?.fruitless_wasteful || 0) + ' fruitless & wasteful incidents'">
+            <mat-icon>money_off</mat-icon>
+            <span class="kpi-value" style="color:#f59e0b">{{summary().byType?.fruitless_wasteful || 0}}</span>
+            <span class="kpi-label">Fruitless & Wasteful</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="'#8b5cf6'" [matTooltip]="(summary().byType?.unauthorized || 0) + ' unauthorized expenditure incidents'">
+            <mat-icon>block</mat-icon>
+            <span class="kpi-value" style="color:#8b5cf6">{{summary().byType?.unauthorized || 0}}</span>
+            <span class="kpi-label">Unauthorized</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="'#ef6c00'" [matTooltip]="(summary().byStatus?.under_investigation || 0) + ' incidents currently under investigation'">
+            <mat-icon>search</mat-icon>
+            <span class="kpi-value" style="color:#ef6c00">{{summary().byStatus?.under_investigation || 0}}</span>
+            <span class="kpi-label">Under Investigation</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="detail-card">
+            <h3><mat-icon>pie_chart</mat-icon> Status Pipeline</h3>
+            <div class="pipeline-bars">
+              <div class="pipeline-item">
+                <div class="pipeline-label">
+                  <span class="status-badge status-reported">Reported</span>
+                  <span class="pipeline-count">{{getStatusCount('reported')}}</span>
+                </div>
+                <div class="pipeline-bar"><div class="pipeline-fill" [style.width.%]="getStatusPercent('reported')" style="background:#94a3b8"></div></div>
+              </div>
+              <div class="pipeline-item">
+                <div class="pipeline-label">
+                  <span class="status-badge status-under_investigation">Under Investigation</span>
+                  <span class="pipeline-count">{{getStatusCount('under_investigation')}}</span>
+                </div>
+                <div class="pipeline-bar"><div class="pipeline-fill" [style.width.%]="getStatusPercent('under_investigation')" style="background:#ef6c00"></div></div>
+              </div>
+              <div class="pipeline-item">
+                <div class="pipeline-label">
+                  <span class="status-badge status-resolved">Resolved</span>
+                  <span class="pipeline-count">{{getStatusCount('resolved')}}</span>
+                </div>
+                <div class="pipeline-bar"><div class="pipeline-fill" [style.width.%]="getStatusPercent('resolved')" style="background:#2e7d32"></div></div>
+              </div>
+              <div class="pipeline-item">
+                <div class="pipeline-label">
+                  <span class="status-badge status-reported_to_council">Reported to Council</span>
+                  <span class="pipeline-count">{{getStatusCount('reported_to_council')}}</span>
+                </div>
+                <div class="pipeline-bar"><div class="pipeline-fill" [style.width.%]="getStatusPercent('reported_to_council')" style="background:#3b82f6"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>balance</mat-icon> Condonation Status</h3>
+            <div class="condonation-grid">
+              <div class="condonation-box condoned-box">
+                <mat-icon>check_circle</mat-icon>
+                <span class="condonation-value">{{summary().condoned || 0}}</span>
+                <span class="condonation-label">Condoned</span>
+              </div>
+              <div class="condonation-box uncondoned-box">
+                <mat-icon>pending</mat-icon>
+                <span class="condonation-value">{{summary().uncondoned || 0}}</span>
+                <span class="condonation-label">Uncondoned</span>
+              </div>
+            </div>
+            <div class="legislation-badges">
+              <span class="legislation-badge"><mat-icon>gavel</mat-icon> MFMA Section 32</span>
+              <span class="legislation-badge"><mat-icon>policy</mat-icon> MFMA Section 170</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-top:16px">
+          <div class="card-header-row">
+            <h3><mat-icon>history</mat-icon> Recent Incidents</h3>
+            <button mat-stroked-button (click)="currentView.set('list')">View All <mat-icon>arrow_forward</mat-icon></button>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Reference #</th>
+                  <th>Type</th>
+                  <th>Title</th>
+                  <th>Department</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Discovered</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of recentItems(); track item.id) {
+                  <tr class="data-row" (click)="viewItem(item)">
+                    <td class="ref-cell">{{item.referenceNumber}}</td>
+                    <td><span class="type-badge" [class]="'type-' + item.type">{{getTypeLabel(item.type)}}</span></td>
+                    <td>{{item.title}}</td>
+                    <td>{{item.department}}</td>
+                    <td class="value-cell">{{formatCurrency(item.amount?.amount || 0)}}</td>
+                    <td><span class="status-badge" [class]="'status-' + item.status">{{getStatusLabel(item.status)}}</span></td>
+                    <td>{{formatDate(item.discoveredDate)}}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="7" class="empty-state"><mat-icon>search_off</mat-icon><span>No incidents recorded</span></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="currentView.set('dashboard')">Dashboard</button>
+          <button class="tab-btn active">Incident List</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="summary().total + ' total IFW incidents'">
+            <mat-icon>warning_amber</mat-icon>
+            <span class="kpi-value">{{summary().total || 0}}</span>
+            <span class="kpi-label">Total Incidents</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="formatCurrency(summary().totalAmount?.amount || 0) + ' total value'">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summary().totalAmount?.amount || 0)}}</span>
+            <span class="kpi-label">Total Amount</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="'#ef6c00'" [matTooltip]="(summary().byStatus?.under_investigation || 0) + ' under investigation'">
+            <mat-icon>search</mat-icon>
+            <span class="kpi-value" style="color:#ef6c00">{{summary().byStatus?.under_investigation || 0}}</span>
+            <span class="kpi-label">Under Investigation</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().condoned || 0) + ' condoned / ' + (summary().uncondoned || 0) + ' uncondoned'">
+            <mat-icon>balance</mat-icon>
+            <span class="kpi-value">{{summary().condoned || 0}} / {{summary().uncondoned || 0}}</span>
+            <span class="kpi-label">Condoned / Uncondoned</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search incidents..." [(ngModel)]="searchQuery" (keyup.enter)="loadItems()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Type" [(ngModel)]="filterType" (selectionChange)="loadItems()">
+              <mat-option value="">All Types</mat-option>
+              <mat-option value="irregular">Irregular</mat-option>
+              <mat-option value="fruitless_wasteful">Fruitless & Wasteful</mat-option>
+              <mat-option value="unauthorized">Unauthorized</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadItems()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="reported">Reported</mat-option>
+              <mat-option value="under_investigation">Under Investigation</mat-option>
+              <mat-option value="resolved">Resolved</mat-option>
+              <mat-option value="reported_to_council">Reported to Council</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="loadItems()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments(); track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="openCreateForm()">
+            <mat-icon>add</mat-icon> New Incident
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference #</th>
+                <th>Type</th>
+                <th>Title</th>
+                <th>Department</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Discovered Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.id) {
+                <tr class="data-row" (click)="viewItem(item)">
+                  <td class="ref-cell">{{item.referenceNumber}}</td>
+                  <td><span class="type-badge" [class]="'type-' + item.type">{{getTypeLabel(item.type)}}</span></td>
+                  <td>{{item.title}}</td>
+                  <td>{{item.department}}</td>
+                  <td class="value-cell">{{formatCurrency(item.amount?.amount || 0)}}</td>
+                  <td><span class="status-badge" [class]="'status-' + item.status">{{getStatusLabel(item.status)}}</span></td>
+                  <td>{{formatDate(item.discoveredDate)}}</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #actionMenu="matMenu">
+                      <button mat-menu-item (click)="viewItem(item)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (item.status === 'reported') {
+                        <button mat-menu-item (click)="editItem(item)"><mat-icon>edit</mat-icon> Edit</button>
+                      }
+                      @if (item.status === 'reported') {
+                        <button mat-menu-item (click)="updateStatus(item.id, 'under_investigation')"><mat-icon>search</mat-icon> Start Investigation</button>
+                      }
+                      @if (item.status === 'under_investigation') {
+                        <button mat-menu-item (click)="updateStatus(item.id, 'resolved')"><mat-icon>check_circle</mat-icon> Mark Resolved</button>
+                        <button mat-menu-item (click)="updateStatus(item.id, 'reported_to_council')"><mat-icon>account_balance</mat-icon> Report to Council</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No incidents found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="page-info">Page {{currentPage()}} of {{totalPages()}}</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">{{currentPage()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'detail' && selectedItem()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedItem()!.referenceNumber}}</h2>
+            <div class="detail-meta">
+              <span class="type-badge" [class]="'type-' + selectedItem()!.type">{{getTypeLabel(selectedItem()!.type)}}</span>
+              <span class="status-badge" [class]="'status-' + selectedItem()!.status">{{getStatusLabel(selectedItem()!.status)}}</span>
+              @if (selectedItem()!.condoned) {
+                <span class="badge badge-success">Condoned</span>
+              }
+              <span class="legislation-badge-sm"><mat-icon>gavel</mat-icon> MFMA S32</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedItem()!.status === 'reported') {
+              <button mat-stroked-button (click)="editItem(selectedItem()!)"><mat-icon>edit</mat-icon> Edit</button>
+              <button mat-flat-button color="primary" (click)="updateStatus(selectedItem()!.id, 'under_investigation')"><mat-icon>search</mat-icon> Start Investigation</button>
+            }
+            @if (selectedItem()!.status === 'under_investigation') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="updateStatus(selectedItem()!.id, 'resolved')"><mat-icon>check_circle</mat-icon> Mark Resolved</button>
+              <button mat-flat-button color="primary" (click)="updateStatus(selectedItem()!.id, 'reported_to_council')"><mat-icon>account_balance</mat-icon> Report to Council</button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-2">
+              <h3><mat-icon>info</mat-icon> Incident Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Title</label>
+                  <span>{{selectedItem()!.title}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Type</label>
+                  <span class="type-badge" [class]="'type-' + selectedItem()!.type">{{getTypeLabel(selectedItem()!.type)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Department</label>
+                  <span>{{selectedItem()!.department}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Amount</label>
+                  <span class="value-cell">{{formatCurrencyFull(selectedItem()!.amount?.amount || 0)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Discovered Date</label>
+                  <span>{{formatDate(selectedItem()!.discoveredDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Reported Date</label>
+                  <span>{{formatDate(selectedItem()!.reportedDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Responsible Officer</label>
+                  <span>{{selectedItem()!.responsibleOfficer || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Condoned</label>
+                  <span>{{selectedItem()!.condoned ? 'Yes' : 'No'}}</span>
+                </div>
+              </div>
+              @if (selectedItem()!.description) {
+                <div class="detail-field" style="margin-top:16px">
+                  <label>Description</label>
+                  <span class="desc-text">{{selectedItem()!.description}}</span>
+                </div>
+              }
+              @if (selectedItem()!.notes) {
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Notes</label>
+                  <span class="desc-text">{{selectedItem()!.notes}}</span>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>link</mat-icon> Related Entity</h3>
+              @if (selectedItem()!.relatedEntity) {
+                <div class="related-entity-box">
+                  <div class="detail-field">
+                    <label>Type</label>
+                    <span>{{selectedItem()!.relatedEntity.type | titlecase}}</span>
+                  </div>
+                  <div class="detail-field" style="margin-top:12px">
+                    <label>Reference</label>
+                    <span class="ref-cell">{{selectedItem()!.relatedEntity.id}}</span>
+                  </div>
+                  <div class="detail-field" style="margin-top:12px">
+                    <label>Description</label>
+                    <span class="desc-text">{{selectedItem()!.relatedEntity.description}}</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="empty-text">No related entity linked</div>
+              }
+              <div class="legislation-badges" style="margin-top:16px">
+                <span class="legislation-badge"><mat-icon>gavel</mat-icon> MFMA Section 32</span>
+                <span class="legislation-badge"><mat-icon>policy</mat-icon> MFMA Section 170</span>
+              </div>
+            </div>
+          </div>
+
+          @if (selectedItem()!.investigationDetails) {
+            <div class="detail-card">
+              <h3><mat-icon>manage_search</mat-icon> Investigation Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Investigator</label>
+                  <span>{{selectedItem()!.investigationDetails.investigator || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Start Date</label>
+                  <span>{{formatDate(selectedItem()!.investigationDetails.startDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Expected Completion</label>
+                  <span>{{formatDate(selectedItem()!.investigationDetails.expectedCompletionDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Investigation Status</label>
+                  <span class="status-badge" [class]="selectedItem()!.investigationDetails.status === 'completed' ? 'status-resolved' : 'status-under_investigation'">{{selectedItem()!.investigationDetails.status | titlecase}}</span>
+                </div>
+              </div>
+              @if (selectedItem()!.investigationDetails.findings) {
+                <div class="detail-field" style="margin-top:16px">
+                  <label>Findings</label>
+                  <span class="desc-text">{{selectedItem()!.investigationDetails.findings}}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (selectedItem()!.recoveryAction) {
+            <div class="detail-card">
+              <h3><mat-icon>replay</mat-icon> Recovery Action</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Recovery Type</label>
+                  <span>{{selectedItem()!.recoveryAction.type | titlecase}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Amount</label>
+                  <span class="value-cell">{{formatCurrencyFull(selectedItem()!.recoveryAction.amount?.amount || 0)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Approved By</label>
+                  <span>{{selectedItem()!.recoveryAction.approvedBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Approved Date</label>
+                  <span>{{formatDate(selectedItem()!.recoveryAction.approvedDate)}}</span>
+                </div>
+              </div>
+              @if (selectedItem()!.recoveryAction.reason) {
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Reason</label>
+                  <span class="desc-text">{{selectedItem()!.recoveryAction.reason}}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="detail-cards-row">
+            @if (selectedItem()!.councilResolution) {
+              <div class="detail-card flex-1">
+                <h3><mat-icon>account_balance</mat-icon> Council Resolution</h3>
+                <div class="detail-field">
+                  <label>Resolution Number</label>
+                  <span class="ref-cell">{{selectedItem()!.councilResolution}}</span>
+                </div>
+              </div>
+            }
+
+            @if (selectedItem()!.disciplinaryAction) {
+              <div class="detail-card flex-1">
+                <h3><mat-icon>report_problem</mat-icon> Disciplinary Action</h3>
+                <div class="detail-field">
+                  <label>Action Taken</label>
+                  <span class="desc-text">{{selectedItem()!.disciplinaryAction}}</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>timeline</mat-icon> Status Workflow</h3>
+            <div class="workflow-pipeline">
+              <div class="state-node" [class.completed]="isStatusReached('reported')" [class.active]="selectedItem()!.status === 'reported'">
+                <mat-icon>flag</mat-icon>
+                <span class="state-label">Reported</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="isStatusReached('under_investigation')" [class.active]="selectedItem()!.status === 'under_investigation'">
+                <mat-icon>search</mat-icon>
+                <span class="state-label">Under Investigation</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="selectedItem()!.status === 'resolved'" [class.active]="selectedItem()!.status === 'resolved'">
+                <mat-icon>check_circle</mat-icon>
+                <span class="state-label">Resolved</span>
+              </div>
+              <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+              <div class="state-node" [class.completed]="selectedItem()!.status === 'reported_to_council'" [class.active]="selectedItem()!.status === 'reported_to_council'">
+                <mat-icon>account_balance</mat-icon>
+                <span class="state-label">Council</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'form') {
+        <div class="form-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>{{editMode() ? 'Edit Incident' : 'Report New Incident'}}</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>warning_amber</mat-icon> Incident Information</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Incident Type</mat-label>
+                <mat-select [(ngModel)]="formData.type" required>
+                  <mat-option value="irregular">Irregular Expenditure</mat-option>
+                  <mat-option value="fruitless_wasteful">Fruitless & Wasteful</mat-option>
+                  <mat-option value="unauthorized">Unauthorized Expenditure</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="formData.title" required placeholder="Brief title of the incident">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="formData.department" required>
+                  @for (dept of departments(); track dept) {
+                    <mat-option [value]="dept">{{dept}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Amount (R)</mat-label>
+                <input matInput type="number" [(ngModel)]="formData.amountValue" required min="0" placeholder="0.00">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Responsible Officer</mat-label>
+                <input matInput [(ngModel)]="formData.responsibleOfficer" placeholder="Officer ID or name">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Discovered Date</mat-label>
+                <input matInput [matDatepicker]="discoveredPicker" [(ngModel)]="formData.discoveredDate">
+                <mat-datepicker-toggle matIconSuffix [for]="discoveredPicker"></mat-datepicker-toggle>
+                <mat-datepicker #discoveredPicker></mat-datepicker>
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="form-field-full" style="margin-top:12px">
+              <mat-label>Description</mat-label>
+              <textarea matInput [(ngModel)]="formData.description" rows="4" required placeholder="Detailed description of the incident"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>link</mat-icon> Related Entity (Optional)</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Entity Type</mat-label>
+                <mat-select [(ngModel)]="formData.relatedEntityType">
+                  <mat-option value="">None</mat-option>
+                  <mat-option value="order">Order</mat-option>
+                  <mat-option value="invoice">Invoice</mat-option>
+                  <mat-option value="contract">Contract</mat-option>
+                  <mat-option value="budget">Budget</mat-option>
+                  <mat-option value="inventory">Inventory</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Entity Reference</mat-label>
+                <input matInput [(ngModel)]="formData.relatedEntityId" placeholder="e.g. PO-2024-0189">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="form-field-full" style="margin-top:8px">
+              <mat-label>Entity Description</mat-label>
+              <input matInput [(ngModel)]="formData.relatedEntityDescription" placeholder="Brief description of related entity">
+            </mat-form-field>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveItem()" [disabled]="saving() || !formData.type || !formData.title || !formData.description">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : (editMode() ? 'Update Incident' : 'Report Incident')}}
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

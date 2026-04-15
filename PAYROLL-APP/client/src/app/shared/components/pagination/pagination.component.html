@@ -1,0 +1,10 @@
+@if (total > limit) {
+  <div class="pagination">
+    <span class="pagination-info">Showing {{ startRecord }}-{{ endRecord }} of {{ total }}</span>
+    <div class="pagination-buttons">
+      <button class="btn btn-sm" [disabled]="page === 1" (click)="goToPage(page - 1)">Previous</button>
+      <span class="pagination-current">Page {{ page }} of {{ totalPages }}</span>
+      <button class="btn btn-sm" [disabled]="page === totalPages" (click)="goToPage(page + 1)">Next</button>
+    </div>
+  </div>
+}

@@ -1,0 +1,1154 @@
+    <div class="dashboard">
+      <div class="dashboard-header">
+        <div class="header-left">
+          <h1>SCM Dashboard</h1>
+          <div class="header-subtitle-row">
+            <p class="header-subtitle">Platinum SCM Module — {{ today | date:'d MMMM yyyy' }}</p>
+            <span class="period-badge">2025/2026 · Period 8 (Feb)</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button mat-stroked-button class="btn-refresh" (click)="loadData()" matTooltip="Refresh data">
+            <mat-icon>refresh</mat-icon>
+            Refresh
+          </button>
+          <button mat-flat-button class="btn-export">
+            <mat-icon>download</mat-icon>
+            Export Report
+          </button>
+        </div>
+      </div>
+
+      <div class="tab-strip">
+        <button class="tab-btn" [class.active]="activeTab() === 'executive'" (click)="switchTab('executive')">
+          <mat-icon>dashboard</mat-icon>
+          <span>Executive Overview</span>
+        </button>
+        @if (canViewCompliance()) {
+          <button class="tab-btn" [class.active]="activeTab() === 'compliance'" (click)="switchTab('compliance')">
+            <mat-icon>verified_user</mat-icon>
+            <span>Compliance & Risk</span>
+          </button>
+        }
+        <button class="tab-btn" [class.active]="activeTab() === 'operational'" (click)="switchTab('operational')">
+          <mat-icon>settings</mat-icon>
+          <span>Operations</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'control-tower'" (click)="switchTab('control-tower')">
+          <mat-icon>hub</mat-icon>
+          <span>Control Tower</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'invoices'" (click)="switchTab('invoices')">
+          <mat-icon>receipt_long</mat-icon>
+          <span>Invoice & Payments</span>
+        </button>
+      </div>
+
+      @if (loading()) {
+        <div class="loading-state">
+          <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+          <p>Loading dashboard data...</p>
+        </div>
+      } @else if (loadError()) {
+        <div class="error-state">
+          <mat-icon class="error-icon">error_outline</mat-icon>
+          <h3>Unable to load dashboard</h3>
+          <p>{{ loadError() }}</p>
+          <button mat-flat-button color="primary" (click)="loadData()">
+            <mat-icon>refresh</mat-icon>
+            Try Again
+          </button>
+        </div>
+      } @else {
+
+        @if (activeTab() === 'executive') {
+          @if (executiveData(); as exec) {
+            <div class="budget-strip">
+              <div class="bs-item">
+                <span class="bs-label">Total Budget</span>
+                <span class="bs-value">R 45.0M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Reserved</span>
+                <span class="bs-value bs-blue">R 5.2M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Committed</span>
+                <span class="bs-value bs-purple">R 8.5M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Accrued (GRN)</span>
+                <span class="bs-value bs-teal">R 3.1M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Invoiced</span>
+                <span class="bs-value bs-amber">R 12.4M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Paid</span>
+                <span class="bs-value bs-green">R 9.8M</span>
+              </div>
+              <div class="bs-divider"></div>
+              <div class="bs-item">
+                <span class="bs-label">Available</span>
+                <span class="bs-value bs-success">R 6.0M</span>
+              </div>
+            </div>
+
+            <div class="var-row">
+              <div class="var-tile" matTooltip="3 POs, 2 invoices, 1 contract past SLA">
+                <mat-icon class="var-icon danger-text">schedule</mat-icon>
+                <div class="var-content">
+                  <span class="var-label">Value Stuck > SLA</span>
+                  <span class="var-amount danger-text">R 1.2M</span>
+                  <span class="var-detail">6 items overdue</span>
+                </div>
+              </div>
+              <div class="var-tile" matTooltip="2 invoices missing tax clearance, 1 missing delivery note">
+                <mat-icon class="var-icon warning-text">folder_off</mat-icon>
+                <div class="var-content">
+                  <span class="var-label">Missing Documents</span>
+                  <span class="var-amount warning-text">R 890K</span>
+                  <span class="var-detail">3 items blocked</span>
+                </div>
+              </div>
+              <div class="var-tile" matTooltip="4 invoices on 3-way match hold, 2 with price variance">
+                <mat-icon class="var-icon amber-text">pause_circle</mat-icon>
+                <div class="var-content">
+                  <span class="var-label">Invoice Holds</span>
+                  <span class="var-amount amber-text">R 567K</span>
+                  <span class="var-detail">6 invoices on hold</span>
+                </div>
+              </div>
+              <div class="var-tile" matTooltip="72% of invoices auto-posted without manual intervention">
+                <mat-icon class="var-icon success-text">auto_mode</mat-icon>
+                <div class="var-content">
+                  <span class="var-label">Touchless Rate</span>
+                  <span class="var-amount success-text">72%</span>
+                  <span class="var-detail">auto-posted invoices</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="kpi-row">
+              @for (kpi of exec.kpiCards; track kpi.id) {
+                <div class="kpi-card clickable" (click)="onKpiClick(kpi)" [matTooltip]="getTooltipForKpi(kpi)">
+                  <div class="kpi-icon-wrap" [class]="getKpiIconColor(kpi.id)">
+                    <mat-icon>{{ getKpiIcon(kpi.id) }}</mat-icon>
+                  </div>
+                  <div class="kpi-content">
+                    <span class="kpi-label">{{ kpi.label }}</span>
+                    <span class="kpi-value">{{ formatCurrency(kpi.value) }}</span>
+                    @if (kpi.count) {
+                      <span class="kpi-count">{{ kpi.count }} {{ kpi.id }}</span>
+                    }
+                    @if (kpi.id === 'budget' && kpi.percentage != null) {
+                      <div class="kpi-budget-bar">
+                        <div class="budget-track">
+                          <div class="budget-fill" [style.width.%]="kpi.percentage"></div>
+                        </div>
+                        <span class="budget-text">{{ formatCompact(kpi.value) }} of {{ formatCompact(kpi.total || 0) }}</span>
+                      </div>
+                    } @else {
+                      <div class="kpi-change" [class]="kpi.trendDirection === 'up' ? 'positive' : 'negative'">
+                        <mat-icon>{{ kpi.trendDirection === 'up' ? 'trending_up' : 'trending_down' }}</mat-icon>
+                        <span>{{ kpi.trend > 0 ? '+' : '' }}{{ kpi.trend }}% from last month</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="card-container pipeline-card">
+              <div class="card-title-bar">
+                <h2>Procurement Lifecycle Pipeline</h2>
+              </div>
+              <div class="pipeline-flow">
+                @for (stage of exec.lifecyclePipeline; track stage.stage; let last = $last) {
+                  <div class="pipeline-stage clickable" (click)="onPipelineClick(stage)"
+                       [matTooltip]="'Avg: ' + stage.avgDays + ' days | Target: ' + stage.targetDays + ' days | Oldest: ' + getOldestItem(stage) + ' days'">
+                    <div class="stage-name">{{ stage.stage }}</div>
+                    <div class="stage-count">{{ stage.count }}</div>
+                    <div class="stage-bar" [class]="getStageStatus(stage)"></div>
+                  </div>
+                  @if (!last) {
+                    <div class="pipeline-arrow">
+                      <mat-icon>arrow_forward</mat-icon>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+
+            <div class="middle-row">
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Turnaround Times (Last 7 Days)</h2>
+                </div>
+                <div class="turnaround-chart">
+                  @for (metric of exec.turnaroundTimes; track metric.label) {
+                    <div class="bullet-row" [matTooltip]="'Target: ' + metric.target + ' days | Actual: ' + metric.actual + ' days | ' + getTurnaroundDelta(metric)">
+                      <span class="bullet-label">{{ metric.label }}</span>
+                      <div class="bullet-track">
+                        <div class="bullet-target-bg" [style.width.%]="100"></div>
+                        <div class="bullet-actual" [class]="getTurnaroundStatus(metric)" [style.width.%]="getBulletWidth(metric)"></div>
+                        <div class="bullet-target-line" [style.left.%]="getTargetLinePos(metric)"></div>
+                        <span class="bullet-value">{{ metric.actual }} days</span>
+                      </div>
+                      <span class="bullet-target-text">Target: {{ metric.target }}d</span>
+                    </div>
+                  }
+                  <div class="chart-legend">
+                    <div class="legend-item"><span class="legend-dot green-dot"></span><span>Within Target</span></div>
+                    <div class="legend-item"><span class="legend-dot amber-dot"></span><span>Near Target</span></div>
+                    <div class="legend-item"><span class="legend-dot red-dot"></span><span>Exceeding Target</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Compliance Score</h2>
+                </div>
+                <div class="compliance-score-section">
+                  <div class="score-ring clickable" (click)="drillThrough.navigate('/ifw-register')">
+                    <svg viewBox="0 0 120 120" class="ring-svg">
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="#f1f5f9" stroke-width="10"/>
+                      <circle cx="60" cy="60" r="52" fill="none"
+                              [attr.stroke]="getComplianceRingColor(exec.complianceScore.overall)"
+                              stroke-width="10"
+                              stroke-linecap="round"
+                              [attr.stroke-dasharray]="getComplianceDash(exec.complianceScore.overall)"
+                              transform="rotate(-90 60 60)"/>
+                    </svg>
+                    <div class="score-ring-text">
+                      <span class="score-value">{{ exec.complianceScore.overall | number:'1.1-1' }}%</span>
+                    </div>
+                  </div>
+                  <div class="compliance-components">
+                    @for (comp of exec.complianceScore.components; track comp.label) {
+                      <div class="comp-row" [matTooltip]="comp.detail">
+                        <div class="comp-info">
+                          <span class="comp-label">{{ comp.label }}</span>
+                          <span class="comp-weight">w: {{ comp.weight }}</span>
+                        </div>
+                        <div class="comp-bar-area">
+                          <div class="comp-bar-track">
+                            <div class="comp-bar-fill" [style.width.%]="comp.score" [class]="getCompBarColor(comp.score)"></div>
+                          </div>
+                          <span class="comp-score">{{ comp.score | number:'1.0-0' }}%</span>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            @if (aiInsights().length) {
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2><mat-icon class="inline-icon">auto_awesome</mat-icon> AI-Powered Insights</h2>
+                </div>
+                <div class="insights-grid">
+                  @for (insight of aiInsights(); track insight.id) {
+                    <div class="insight-card">
+                      <div class="insight-icon" [class]="'severity-' + insight.severity">
+                        <mat-icon>{{ insight.icon || 'lightbulb' }}</mat-icon>
+                      </div>
+                      <div class="insight-body">
+                        <div class="insight-title">{{ insight.title }}</div>
+                        <div class="insight-message">{{ insight.message }}</div>
+                        <div class="insight-footer">
+                          @if (insight.actionRoute) {
+                            <a class="insight-link" (click)="drillThrough.navigate(insight.actionRoute, insight.actionParams)">View Details →</a>
+                          }
+                          <span class="insight-time">{{ getRelativeTime(insight.timestamp) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2>Recent Activity</h2>
+                <a class="view-all-link" (click)="drillThrough.navigate('/audit-trail')">View All →</a>
+              </div>
+              <div class="activity-table-wrap">
+                <table class="activity-table">
+                  <thead>
+                    <tr>
+                      <th>DATE</th>
+                      <th>REFERENCE</th>
+                      <th>DESCRIPTION</th>
+                      <th>TYPE</th>
+                      <th>AMOUNT</th>
+                      <th>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of exec.recentTransactions; track item.ref) {
+                      <tr class="clickable" (click)="onTransactionClick(item)">
+                        <td class="cell-date">{{ item.date }}</td>
+                        <td class="cell-ref">{{ item.ref }}</td>
+                        <td class="cell-desc">{{ item.description }}</td>
+                        <td><span class="type-badge" [class]="item.typeClass">{{ item.type }}</span></td>
+                        <td class="cell-amount">{{ item.amount }}</td>
+                        <td><span class="status-badge-sm" [class]="item.statusClass">{{ item.status }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'compliance') {
+          @if (complianceData(); as comp) {
+            <div class="uifw-row">
+              <div class="uifw-card clickable" (click)="drillThrough.navigate('/ifw-register')"
+                   [matTooltip]="getUifwTooltip(comp.uifw.unauthorized)"
+                   [class]="getUifwColor(comp.uifw.unauthorized)">
+                <div class="uifw-icon-wrap danger-bg"><mat-icon>block</mat-icon></div>
+                <div class="uifw-label">Unauthorized</div>
+                <div class="uifw-amount">{{ formatCurrency(comp.uifw.unauthorized.amount) }}</div>
+                <div class="uifw-count">{{ comp.uifw.unauthorized.count }} incidents</div>
+                <div class="uifw-status">{{ comp.uifw.unauthorized.status }}</div>
+              </div>
+              <div class="uifw-card clickable" (click)="drillThrough.navigate('/ifw-register')"
+                   [matTooltip]="getUifwTooltip(comp.uifw.irregular)"
+                   [class]="getUifwColor(comp.uifw.irregular)">
+                <div class="uifw-icon-wrap warning-bg"><mat-icon>warning</mat-icon></div>
+                <div class="uifw-label">Irregular</div>
+                <div class="uifw-amount">{{ formatCurrency(comp.uifw.irregular.amount) }}</div>
+                <div class="uifw-count">{{ comp.uifw.irregular.count }} incidents</div>
+                <div class="uifw-status">{{ comp.uifw.irregular.status }}</div>
+              </div>
+              <div class="uifw-card clickable" (click)="drillThrough.navigate('/ifw-register')"
+                   [matTooltip]="getUifwTooltip(comp.uifw.fruitless)"
+                   [class]="getUifwColor(comp.uifw.fruitless)">
+                <div class="uifw-icon-wrap amber-bg"><mat-icon>money_off</mat-icon></div>
+                <div class="uifw-label">Fruitless & Wasteful</div>
+                <div class="uifw-amount">{{ formatCurrency(comp.uifw.fruitless.amount) }}</div>
+                <div class="uifw-count">{{ comp.uifw.fruitless.count }} incidents</div>
+                <div class="uifw-status">{{ comp.uifw.fruitless.status }}</div>
+              </div>
+              <div class="uifw-card clickable" (click)="drillThrough.navigate('/ifw-register')">
+                <div class="uifw-icon-wrap info-bg"><mat-icon>summarize</mat-icon></div>
+                <div class="uifw-label">Cumulative Unresolved</div>
+                <div class="uifw-amount">{{ formatCurrency(comp.uifw.cumulative.amount) }}</div>
+                <div class="uifw-count">{{ comp.uifw.cumulative.priorYears ? 'Includes prior years' : 'Current year only' }}</div>
+              </div>
+            </div>
+
+            <div class="compliance-grid">
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Regulatory Compliance Gates</h2>
+                </div>
+                <div class="gates-list">
+                  @for (gate of comp.complianceGates; track gate.regulation) {
+                    <div class="gate-row">
+                      <span class="gate-dot" [class]="'gate-' + gate.status"></span>
+                      <div class="gate-info">
+                        <div class="gate-regulation">{{ gate.regulation }}</div>
+                        <div class="gate-desc">{{ gate.description }}</div>
+                        <div class="gate-detail">{{ gate.detail }}</div>
+                      </div>
+                      @if (gate.actionRequired) {
+                        <span class="gate-action-badge">{{ gate.actionRequired }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Segregation of Duties</h2>
+                </div>
+                <div class="sod-list">
+                  @for (rule of comp.segregationOfDuties; track rule.rule) {
+                    <div class="sod-row">
+                      <mat-icon [class]="rule.status === 'clean' ? 'sod-ok' : 'sod-fail'">
+                        {{ rule.status === 'clean' ? 'check_circle' : 'cancel' }}
+                      </mat-icon>
+                      <div class="sod-info">
+                        <div class="sod-rule">{{ rule.rule }}</div>
+                        @if (rule.violations > 0) {
+                          <div class="sod-violation">{{ rule.violations }} violation{{ rule.violations > 1 ? 's' : '' }}{{ rule.detail ? ' — ' + rule.detail : '' }}</div>
+                        }
+                      </div>
+                      <span class="sod-count" [class.has-violations]="rule.violations > 0">{{ rule.violations }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">security</mat-icon> Fraud & Risk Indicators (AI-Powered)</h2>
+              </div>
+              <div class="fraud-grid">
+                @for (indicator of comp.fraudRiskIndicators; track indicator.indicator) {
+                  <div class="fraud-card">
+                    <span class="fraud-severity" [class]="'sev-' + indicator.severity">{{ indicator.severity }}</span>
+                    <div class="fraud-name">{{ indicator.indicator }}</div>
+                    <div class="fraud-detail">{{ indicator.detail }}</div>
+                    <div class="fraud-rec">{{ indicator.recommendation }}</div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">psychology</mat-icon> AI Compliance Insights</h2>
+                <span class="insight-time" style="font-size: 12px; color: var(--platinum-text-muted);">
+                  @if (complianceAiInsights().length > 0 && complianceAiInsights()[0].aiGenerated) {
+                    Powered by AI
+                  } @else {
+                    Rule-based analysis
+                  }
+                </span>
+              </div>
+              @if (complianceAiInsights().length > 0) {
+                <div class="insights-grid">
+                  @for (insight of complianceAiInsights(); track insight.id) {
+                    <div class="insight-card" [class.clickable]="insight.actionRoute" (click)="insight.actionRoute && drillThrough.navigate(insight.actionRoute, insight.actionParams)">
+                      <div class="insight-icon" [class]="'severity-' + insight.severity">
+                        <mat-icon>{{ insight.icon || 'gavel' }}</mat-icon>
+                      </div>
+                      <div class="insight-body">
+                        <div class="insight-title">{{ insight.title }}</div>
+                        <div class="insight-message">{{ insight.message }}</div>
+                        @if (insight.legislationRef) {
+                          <div class="legislation-ref">
+                            <mat-icon class="leg-icon">menu_book</mat-icon>
+                            <span class="leg-text">{{ insight.legislationRef }}</span>
+                          </div>
+                        }
+                        @if (insight.recommendation) {
+                          <div class="insight-recommendation">{{ insight.recommendation }}</div>
+                        }
+                        <div class="insight-footer">
+                          @if (insight.actionRoute) {
+                            <span class="insight-link">View Details</span>
+                          } @else {
+                            <span></span>
+                          }
+                          @if (insight.confidence) {
+                            <span class="insight-confidence">{{ (insight.confidence * 100) | number:'1.0-0' }}% confidence</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="loading-state">
+                  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                  <p>Generating compliance insights...</p>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="loading-state">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p>Loading compliance data...</p>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'operational') {
+          @if (operationalData(); as ops) {
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2>My Action Items</h2>
+              </div>
+              <div class="workload-summary">
+                <div class="workload-mini"><span class="wl-count">{{ ops.myWorkload.pendingApprovals }}</span><span class="wl-label">Pending Approvals</span></div>
+                <div class="workload-mini"><span class="wl-count">{{ ops.myWorkload.myRequisitions }}</span><span class="wl-label">My Requisitions</span></div>
+                <div class="workload-mini"><span class="wl-count">{{ ops.myWorkload.grnToProcess }}</span><span class="wl-label">GRN to Process</span></div>
+                <div class="workload-mini"><span class="wl-count">{{ ops.myWorkload.invoicesToMatch }}</span><span class="wl-label">Invoices to Match</span></div>
+              </div>
+              <mat-divider></mat-divider>
+              <div class="workload-items">
+                @for (item of ops.myWorkload.items; track item.ref) {
+                  <div class="workload-row clickable" (click)="onWorkloadItemClick(item)">
+                    <mat-icon class="wl-type-icon">{{ getWorkloadIcon(item.type) }}</mat-icon>
+                    <div class="wl-item-info">
+                      <span class="wl-ref">{{ item.ref }}</span>
+                      <span class="wl-title">{{ item.title }}</span>
+                    </div>
+                    <span class="wl-days">{{ item.days }}d waiting</span>
+                    <span class="priority-badge" [class]="'priority-' + item.priority">{{ item.priority }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="ops-grid">
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Process Bottlenecks</h2>
+                </div>
+                <div class="bottleneck-list">
+                  @for (b of ops.bottlenecks; track b.stage) {
+                    <div class="bottleneck-row clickable" (click)="onBottleneckClick(b)">
+                      <div class="bn-severity-bar" [class]="'bn-' + b.severity"></div>
+                      <div class="bn-info">
+                        <div class="bn-stage">{{ b.stage }}</div>
+                        <div class="bn-meta">{{ b.itemCount }} items · {{ b.avgDays }} days <span class="bn-target">(target: {{ b.targetDays }} days)</span></div>
+                        <div class="bn-bar-track">
+                          <div class="bn-bar-fill" [class]="'bn-' + b.severity" [style.width.%]="getBottleneckWidth(b)"></div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2>Supplier Performance</h2>
+                </div>
+                <div class="supplier-split">
+                  <div class="supplier-half">
+                    <div class="supplier-half-header green-accent">Top 5</div>
+                    @for (s of ops.supplierScorecard.top5; track s.name) {
+                      <div class="supplier-row">
+                        <span class="sup-name">{{ s.name }}</span>
+                        <span class="sup-score" [class]="getScoreColor(s.score)">{{ s.score }}%</span>
+                        <span class="sup-metric">{{ s.delivery }}%</span>
+                        <span class="sup-metric">{{ s.quality }}%</span>
+                        <span class="sup-bbbee">Lvl {{ s.bbbeeLevel }}</span>
+                      </div>
+                    }
+                  </div>
+                  <div class="supplier-half">
+                    <div class="supplier-half-header red-accent">Bottom 5</div>
+                    @for (s of ops.supplierScorecard.bottom5; track s.name) {
+                      <div class="supplier-row">
+                        <span class="sup-name">{{ s.name }}</span>
+                        <span class="sup-score" [class]="getScoreColor(s.score)">{{ s.score }}%</span>
+                        <span class="sup-metric">{{ s.delivery }}%</span>
+                        <span class="sup-metric">{{ s.quality }}%</span>
+                        <span class="sup-bbbee">Lvl {{ s.bbbeeLevel }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2>Budget Commitment by Vote</h2>
+              </div>
+              <div class="budget-list">
+                @for (vote of ops.budgetCommitments; track vote.vote) {
+                  <div class="budget-row">
+                    <span class="budget-vote">{{ vote.vote }}</span>
+                    <div class="budget-bar-area">
+                      <div class="budget-stacked-track">
+                        <div class="budget-actual" [class]="getBudgetColor(vote.utilisation)" [style.width.%]="getActualPct(vote)"></div>
+                        <div class="budget-committed" [style.width.%]="getCommittedPct(vote)" [style.left.%]="getActualPct(vote)"></div>
+                      </div>
+                      <div class="budget-row-text">
+                        <span>{{ formatCompact(vote.actual + vote.committed) }} of {{ formatCompact(vote.budget) }}</span>
+                        <span [class]="vote.available < 0 ? 'negative-amount' : ''"> ({{ vote.utilisation | number:'1.1-1' }}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2>Spend Analytics</h2>
+              </div>
+              <div class="spend-grid">
+                <div class="spend-half">
+                  <h3 class="spend-subtitle">By Category</h3>
+                  @for (cat of ops.spendAnalytics.byCategory; track cat.category) {
+                    <div class="spend-bar-row">
+                      <span class="spend-bar-label">{{ cat.category }}</span>
+                      <div class="spend-bar-track">
+                        <div class="spend-bar-fill info-fill" [style.width.%]="cat.percentage"></div>
+                      </div>
+                      <span class="spend-bar-val">{{ cat.percentage }}% · {{ formatCompact(cat.amount) }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="spend-half">
+                  <h3 class="spend-subtitle">B-BBEE Transformation</h3>
+                  @for (lvl of ops.spendAnalytics.byBbbeeLevel; track lvl.level) {
+                    <div class="spend-bar-row">
+                      <span class="spend-bar-label">{{ lvl.level }}</span>
+                      <div class="spend-bar-track">
+                        <div class="spend-bar-fill teal-fill" [style.width.%]="lvl.percentage"></div>
+                      </div>
+                      <span class="spend-bar-val">{{ lvl.percentage }}% · {{ formatCompact(lvl.amount) }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="local-national-bar">
+                <h3 class="spend-subtitle">Local vs National</h3>
+                <div class="ln-track">
+                  <div class="ln-local" [style.width.%]="ops.spendAnalytics.localVsNational.local">
+                    Local {{ ops.spendAnalytics.localVsNational.local }}%
+                  </div>
+                  <div class="ln-national" [style.width.%]="ops.spendAnalytics.localVsNational.national">
+                    National {{ ops.spendAnalytics.localVsNational.national }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">psychology</mat-icon> AI Operational Insights</h2>
+                <span class="insight-time" style="font-size: 12px; color: var(--platinum-text-muted);">
+                  @if (operationalAiInsights().length > 0 && operationalAiInsights()[0].aiGenerated) {
+                    Powered by AI
+                  } @else {
+                    Rule-based analysis
+                  }
+                </span>
+              </div>
+              @if (operationalAiInsights().length > 0) {
+                <div class="insights-grid">
+                  @for (insight of operationalAiInsights(); track insight.id) {
+                    <div class="insight-card" [class.clickable]="insight.actionRoute" (click)="insight.actionRoute && drillThrough.navigate(insight.actionRoute, insight.actionParams)">
+                      <div class="insight-icon" [class]="'severity-' + insight.severity">
+                        <mat-icon>{{ insight.icon || 'speed' }}</mat-icon>
+                      </div>
+                      <div class="insight-body">
+                        <div class="insight-title">{{ insight.title }}</div>
+                        <div class="insight-message">{{ insight.message }}</div>
+                        @if (insight.legislationRef) {
+                          <div class="legislation-ref">
+                            <mat-icon class="leg-icon">menu_book</mat-icon>
+                            <span class="leg-text">{{ insight.legislationRef }}</span>
+                          </div>
+                        }
+                        @if (insight.recommendation) {
+                          <div class="insight-recommendation">{{ insight.recommendation }}</div>
+                        }
+                        @if (insight.impact) {
+                          <div class="insight-impact">
+                            <mat-icon class="impact-icon">trending_up</mat-icon>
+                            <span>{{ insight.impact }}</span>
+                          </div>
+                        }
+                        <div class="insight-footer">
+                          @if (insight.actionRoute) {
+                            <span class="insight-link">View Details</span>
+                          } @else {
+                            <span></span>
+                          }
+                          @if (insight.confidence) {
+                            <span class="insight-confidence">{{ (insight.confidence * 100) | number:'1.0-0' }}% confidence</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="loading-state">
+                  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                  <p>Generating operational insights...</p>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="loading-state">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p>Loading operational data...</p>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'control-tower') {
+          @if (controlTowerData(); as ct) {
+            <div class="attention-tiles-row">
+              @for (tile of ct.attentionTiles; track tile.stage) {
+                <div class="attention-tile clickable" (click)="drillThrough.navigate(tile.route)"
+                     [matTooltip]="'Oldest: ' + tile.oldestAge + ' days | SLA Breaches: ' + tile.slaBreaches">
+                  <div class="at-header">
+                    <span class="at-stage">{{ tile.stage }}</span>
+                    <span class="at-trend" [class]="'trend-' + tile.trend">
+                      <mat-icon>{{ tile.trend === 'up' ? 'trending_up' : tile.trend === 'down' ? 'trending_down' : 'trending_flat' }}</mat-icon>
+                    </span>
+                  </div>
+                  <div class="at-count">{{ tile.count }}</div>
+                  <div class="at-value">{{ formatCurrency(tile.value) }}</div>
+                  <div class="at-footer">
+                    <span class="at-age">Oldest: {{ tile.oldestAge }}d</span>
+                    @if (tile.slaBreaches > 0) {
+                      <span class="at-breach">{{ tile.slaBreaches }} SLA</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="ct-grid">
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2><mat-icon class="inline-icon">grid_on</mat-icon> Aging Heatmap</h2>
+                </div>
+                <div class="heatmap-wrap">
+                  <table class="heatmap-table">
+                    <thead>
+                      <tr>
+                        <th class="hm-stage-header">Stage</th>
+                        @for (bucket of ct.agingHeatmap.buckets; track bucket) {
+                          <th class="hm-bucket-header">{{ bucket }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (stage of ct.agingHeatmap.stages; track stage; let i = $index) {
+                        <tr>
+                          <td class="hm-stage-cell">{{ stage }}</td>
+                          @for (val of ct.agingHeatmap.data[i]; track $index; let j = $index) {
+                            <td class="hm-cell" [class]="getHeatmapColor(val, j)">
+                              <span class="hm-value">{{ val }}</span>
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2><mat-icon class="inline-icon">speed</mat-icon> Bottleneck Funnel</h2>
+                </div>
+                <div class="funnel-wrap">
+                  @for (fs of ct.bottleneckFunnel; track fs.stage) {
+                    <div class="funnel-row" [matTooltip]="'Over SLA: ' + fs.overSla + ' items | Value stuck: ' + formatCurrency(fs.valueStuck)">
+                      <span class="funnel-stage">{{ fs.stage }}</span>
+                      <div class="funnel-bar-area">
+                        <div class="funnel-bar-track">
+                          <div class="funnel-bar-fill" [class]="getFunnelColor(fs)" [style.width.%]="getFunnelWidth(fs)"></div>
+                        </div>
+                        <span class="funnel-days">{{ fs.avgDaysInStage }}d <span class="funnel-target">/ {{ fs.targetDays }}d</span></span>
+                      </div>
+                      <div class="funnel-metrics">
+                        <span class="funnel-count">{{ fs.count }}</span>
+                        <span class="funnel-val">{{ formatCompact(fs.value) }}</span>
+                        @if (fs.overSla > 0) {
+                          <span class="funnel-sla-badge">{{ fs.overSla }} over</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">person_search</mat-icon> Who Is Blocking What</h2>
+              </div>
+              <div class="blocking-table-wrap">
+                <table class="blocking-table">
+                  <thead>
+                    <tr>
+                      <th>USER</th>
+                      <th>ROLE</th>
+                      <th>STAGE</th>
+                      <th>ITEMS</th>
+                      <th>VALUE</th>
+                      <th>AVG AGE</th>
+                      <th>OLDEST</th>
+                      <th>SLA</th>
+                      <th>ESCALATED</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (entry of ct.blockingLeaderboard; track entry.user) {
+                      <tr [class.has-escalation]="entry.escalated">
+                        <td class="bl-user">{{ entry.user }}</td>
+                        <td class="bl-role">{{ entry.role }}</td>
+                        <td>{{ entry.stage }}</td>
+                        <td class="bl-items">{{ entry.itemsPending }}</td>
+                        <td class="bl-value">{{ formatCompact(entry.totalValue) }}</td>
+                        <td>{{ entry.avgAge }}d</td>
+                        <td [class]="entry.oldestAge > 10 ? 'bl-danger' : entry.oldestAge > 5 ? 'bl-warning' : ''">{{ entry.oldestAge }}d</td>
+                        <td>
+                          @if (entry.slaBreaches > 0) {
+                            <span class="sla-breach-badge">{{ entry.slaBreaches }}</span>
+                          } @else {
+                            <span class="sla-ok">0</span>
+                          }
+                        </td>
+                        <td>
+                          @if (entry.escalated) {
+                            <mat-icon class="escalated-icon">warning</mat-icon>
+                          } @else {
+                            <span class="no-esc">—</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">notifications_active</mat-icon> Escalation Panel</h2>
+              </div>
+              <div class="escalation-list">
+                @for (esc of ct.escalationPanel; track esc.id) {
+                  <div class="escalation-row" [class]="'esc-level-' + esc.escalationLevel">
+                    <div class="esc-level-bar" [class]="'esc-bar-' + esc.escalationLevel"></div>
+                    <div class="esc-info">
+                      <div class="esc-header">
+                        <span class="esc-ref">{{ esc.ref }}</span>
+                        <span class="esc-level-badge" [class]="'esc-badge-' + esc.escalationLevel">{{ esc.escalationLevel }}</span>
+                        <span class="esc-status-badge" [class]="'esc-status-' + esc.status">{{ esc.status }}</span>
+                      </div>
+                      <div class="esc-desc">{{ esc.description }}</div>
+                      <div class="esc-meta">
+                        <span>{{ esc.stage }}</span>
+                        <span>{{ esc.daysOverSla }} days over SLA</span>
+                        <span>{{ formatCurrency(esc.value) }}</span>
+                        <span>→ {{ esc.escalatedTo }}</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">psychology</mat-icon> AI Control Tower Insights</h2>
+                <span class="insight-time" style="font-size: 12px; color: var(--platinum-text-muted);">
+                  @if (controlTowerAiInsights().length > 0 && controlTowerAiInsights()[0].aiGenerated) {
+                    Powered by AI
+                  } @else {
+                    Rule-based analysis
+                  }
+                </span>
+              </div>
+              @if (controlTowerAiInsights().length > 0) {
+                <div class="insights-grid">
+                  @for (insight of controlTowerAiInsights(); track insight.id) {
+                    <div class="insight-card" [class.clickable]="insight.actionRoute" (click)="insight.actionRoute && drillThrough.navigate(insight.actionRoute, insight.actionParams)">
+                      <div class="insight-icon" [class]="'severity-' + insight.severity">
+                        <mat-icon>{{ insight.icon || 'timer' }}</mat-icon>
+                      </div>
+                      <div class="insight-body">
+                        <div class="insight-title">{{ insight.title }}</div>
+                        <div class="insight-message">{{ insight.message }}</div>
+                        @if (insight.legislationRef) {
+                          <div class="legislation-ref">
+                            <mat-icon class="leg-icon">menu_book</mat-icon>
+                            <span class="leg-text">{{ insight.legislationRef }}</span>
+                          </div>
+                        }
+                        @if (insight.recommendation) {
+                          <div class="insight-recommendation">{{ insight.recommendation }}</div>
+                        }
+                        <div class="insight-footer">
+                          @if (insight.actionRoute) {
+                            <span class="insight-link">View Details</span>
+                          } @else {
+                            <span></span>
+                          }
+                          @if (insight.confidence) {
+                            <span class="insight-confidence">{{ (insight.confidence * 100) | number:'1.0-0' }}% confidence</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="loading-state">
+                  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                  <p>Generating control tower insights...</p>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="loading-state">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p>Loading control tower data...</p>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'invoices') {
+          @if (invoiceSummary() && paymentSummary() && mfmaData() && invoicePipeline() && touchlessData(); as inv) {
+            <div class="invoice-kpi-row">
+              <div class="kpi-card clickable">
+                <div class="kpi-icon-wrap icon-purple">
+                  <mat-icon>receipt_long</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Total Invoices</span>
+                  <span class="kpi-value">{{ invoiceSummary().totalCount || 0 }}</span>
+                  <span class="kpi-count">{{ formatCurrency(invoiceSummary().totalValue || 0) }}</span>
+                </div>
+              </div>
+              <div class="kpi-card clickable" [class]="mfmaData().complianceRate > 90 ? 'kpi-green' : mfmaData().complianceRate >= 80 ? 'kpi-amber' : 'kpi-red'">
+                <div class="kpi-icon-wrap" [class]="mfmaData().complianceRate > 90 ? 'icon-green' : mfmaData().complianceRate >= 80 ? 'icon-amber' : 'icon-red'">
+                  <mat-icon>verified</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">MFMA Compliance</span>
+                  <span class="kpi-value">{{ mfmaData().complianceRate | number:'1.1-1' }}%</span>
+                  <span class="kpi-count" [class]="mfmaData().complianceRate > 90 ? 'success-text' : mfmaData().complianceRate >= 80 ? 'warning-text' : 'danger-text'">Compliant</span>
+                </div>
+              </div>
+              <div class="kpi-card clickable">
+                <div class="kpi-icon-wrap icon-amber">
+                  <mat-icon>pending_actions</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Pending Approval</span>
+                  <span class="kpi-value">{{ invoiceSummary().pendingCount || 0 }}</span>
+                  <span class="kpi-count">{{ formatCurrency(invoiceSummary().pendingValue || 0) }}</span>
+                </div>
+              </div>
+              <div class="kpi-card clickable" [class]="invoiceSummary().exceptionCount > 0 ? 'kpi-red' : 'kpi-green'">
+                <div class="kpi-icon-wrap" [class]="invoiceSummary().exceptionCount > 0 ? 'icon-red' : 'icon-green'">
+                  <mat-icon>error</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Match Exceptions</span>
+                  <span class="kpi-value">{{ invoiceSummary().exceptionCount || 0 }}</span>
+                  <span class="kpi-count" [class]="invoiceSummary().exceptionCount > 0 ? 'danger-text' : 'success-text'">{{ invoiceSummary().exceptionCount > 0 ? 'Issues' : 'Clear' }}</span>
+                </div>
+              </div>
+              <div class="kpi-card clickable">
+                <div class="kpi-icon-wrap icon-teal">
+                  <mat-icon>auto_mode</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Touchless Rate</span>
+                  <span class="kpi-value">{{ touchlessData().rate | number:'1.1-1' }}%</span>
+                  <span class="kpi-count">Auto-posted</span>
+                </div>
+              </div>
+              <div class="kpi-card clickable">
+                <div class="kpi-icon-wrap icon-blue">
+                  <mat-icon>schedule</mat-icon>
+                </div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Avg Days to Payment</span>
+                  <span class="kpi-value">{{ paymentSummary().avgDaysToPayment || 0 }}</span>
+                  <span class="kpi-count">days</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="invoice-grid">
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2><mat-icon class="inline-icon">verified_user</mat-icon> MFMA Section 65 Compliance</h2>
+                </div>
+                <div class="mfma-content">
+                  <div class="mfma-bar-section">
+                    <div class="mfma-rate-label">
+                      <span>Compliance Rate</span>
+                      <span class="mfma-rate-value" [class]="mfmaData().complianceRate > 90 ? 'success-text' : mfmaData().complianceRate >= 80 ? 'warning-text' : 'danger-text'">{{ mfmaData().complianceRate | number:'1.1-1' }}%</span>
+                    </div>
+                    <div class="mfma-bar-track">
+                      <div class="mfma-bar-fill" [style.width.%]="mfmaData().complianceRate" [class]="mfmaData().complianceRate > 90 ? 'fill-green' : mfmaData().complianceRate >= 80 ? 'fill-amber' : 'fill-red'"></div>
+                    </div>
+                  </div>
+                  
+                  <div class="mfma-aging-buckets">
+                    <div class="aging-bucket">
+                      <span class="bucket-label">Current</span>
+                      <span class="bucket-amount">{{ formatCurrency(mfmaData().buckets?.current || 0) }}</span>
+                      <span class="bucket-count">{{ mfmaData().bucketCounts?.current || 0 }} invoices</span>
+                    </div>
+                    <div class="aging-bucket">
+                      <span class="bucket-label">30 Days</span>
+                      <span class="bucket-amount">{{ formatCurrency(mfmaData().buckets?.days30 || 0) }}</span>
+                      <span class="bucket-count">{{ mfmaData().bucketCounts?.days30 || 0 }} invoices</span>
+                    </div>
+                    <div class="aging-bucket">
+                      <span class="bucket-label">60 Days</span>
+                      <span class="bucket-amount">{{ formatCurrency(mfmaData().buckets?.days60 || 0) }}</span>
+                      <span class="bucket-count">{{ mfmaData().bucketCounts?.days60 || 0 }} invoices</span>
+                    </div>
+                    <div class="aging-bucket">
+                      <span class="bucket-label">90 Days</span>
+                      <span class="bucket-amount">{{ formatCurrency(mfmaData().buckets?.days90 || 0) }}</span>
+                      <span class="bucket-count">{{ mfmaData().bucketCounts?.days90 || 0 }} invoices</span>
+                    </div>
+                    <div class="aging-bucket">
+                      <span class="bucket-label">120+ Days</span>
+                      <span class="bucket-amount">{{ formatCurrency(mfmaData().buckets?.days120plus || 0) }}</span>
+                      <span class="bucket-count">{{ mfmaData().bucketCounts?.days120plus || 0 }} invoices</span>
+                    </div>
+                  </div>
+
+                  <div class="mfma-summary">
+                    <div class="summary-item">
+                      <span class="summary-label">Breaches</span>
+                      <span class="summary-value danger-text">{{ mfmaData().breachCount || 0 }}</span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">At Risk</span>
+                      <span class="summary-value warning-text">{{ mfmaData().atRiskCount || 0 }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-container">
+                <div class="card-title-bar">
+                  <h2><mat-icon class="inline-icon">show_chart</mat-icon> Payment Pipeline</h2>
+                </div>
+                <div class="pipeline-flow invoice-pipeline">
+                  <div class="invoice-pipeline-stage">
+                    <div class="stage-name">Draft</div>
+                    <div class="stage-count">{{ invoicePipeline().draft?.count || 0 }}</div>
+                    <div class="stage-amount">{{ formatCompact(invoicePipeline().draft?.value || 0) }}</div>
+                  </div>
+                  <div class="pipeline-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                  <div class="invoice-pipeline-stage">
+                    <div class="stage-name">Pending Approval</div>
+                    <div class="stage-count">{{ invoicePipeline().pendingApproval?.count || 0 }}</div>
+                    <div class="stage-amount">{{ formatCompact(invoicePipeline().pendingApproval?.value || 0) }}</div>
+                  </div>
+                  <div class="pipeline-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                  <div class="invoice-pipeline-stage">
+                    <div class="stage-name">Approved</div>
+                    <div class="stage-count">{{ invoicePipeline().approved?.count || 0 }}</div>
+                    <div class="stage-amount">{{ formatCompact(invoicePipeline().approved?.value || 0) }}</div>
+                  </div>
+                  <div class="pipeline-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                  <div class="invoice-pipeline-stage">
+                    <div class="stage-name">EFT Generated</div>
+                    <div class="stage-count">{{ invoicePipeline().eftGenerated?.count || 0 }}</div>
+                    <div class="stage-amount">{{ formatCompact(invoicePipeline().eftGenerated?.value || 0) }}</div>
+                  </div>
+                  <div class="pipeline-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                  <div class="invoice-pipeline-stage">
+                    <div class="stage-name">Processed</div>
+                    <div class="stage-count">{{ invoicePipeline().processed?.count || 0 }}</div>
+                    <div class="stage-amount">{{ formatCompact(invoicePipeline().processed?.value || 0) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2>Quick Stats</h2>
+              </div>
+              <div class="quick-stats-grid">
+                <div class="quick-stat">
+                  <span class="stat-label">Total Paid</span>
+                  <span class="stat-value">{{ formatCurrency(paymentSummary().totalPaid || 0) }}</span>
+                </div>
+                <div class="quick-stat">
+                  <span class="stat-label">Total Pending</span>
+                  <span class="stat-value warning-text">{{ formatCurrency(paymentSummary().totalPending || 0) }}</span>
+                </div>
+                <div class="quick-stat">
+                  <span class="stat-label">Ready for Payment</span>
+                  <span class="stat-value">{{ paymentSummary().readyForPaymentCount || 0 }}</span>
+                </div>
+                <div class="quick-stat">
+                  <span class="stat-label">EFT Files Generated</span>
+                  <span class="stat-value">{{ paymentSummary().eftFilesGenerated || 0 }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-container">
+              <div class="card-title-bar">
+                <h2><mat-icon class="inline-icon">psychology</mat-icon> AI Invoice & Payment Insights</h2>
+                <span class="insight-time" style="font-size: 12px; color: var(--platinum-text-muted);">
+                  @if (invoicePaymentAiInsights().length > 0 && invoicePaymentAiInsights()[0].aiGenerated) {
+                    Powered by AI
+                  } @else {
+                    Rule-based analysis
+                  }
+                </span>
+              </div>
+              @if (invoicePaymentAiInsights().length > 0) {
+                <div class="insights-grid">
+                  @for (insight of invoicePaymentAiInsights(); track insight.id) {
+                    <div class="insight-card" [class.clickable]="insight.actionRoute" (click)="insight.actionRoute && drillThrough.navigate(insight.actionRoute, insight.actionParams)">
+                      <div class="insight-icon" [class]="'severity-' + insight.severity">
+                        <mat-icon>{{ insight.icon || 'payments' }}</mat-icon>
+                      </div>
+                      <div class="insight-body">
+                        <div class="insight-title">{{ insight.title }}</div>
+                        <div class="insight-message">{{ insight.message }}</div>
+                        @if (insight.legislationRef) {
+                          <div class="legislation-ref">
+                            <mat-icon class="leg-icon">menu_book</mat-icon>
+                            <span class="leg-text">{{ insight.legislationRef }}</span>
+                          </div>
+                        }
+                        @if (insight.recommendation) {
+                          <div class="insight-recommendation">{{ insight.recommendation }}</div>
+                        }
+                        @if (insight.financialImpact) {
+                          <div class="insight-impact">
+                            <mat-icon class="impact-icon">attach_money</mat-icon>
+                            <span>{{ insight.financialImpact }}</span>
+                          </div>
+                        }
+                        <div class="insight-footer">
+                          @if (insight.actionRoute) {
+                            <span class="insight-link">View Details</span>
+                          } @else {
+                            <span></span>
+                          }
+                          @if (insight.confidence) {
+                            <span class="insight-confidence">{{ (insight.confidence * 100) | number:'1.0-0' }}% confidence</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="loading-state">
+                  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                  <p>Generating invoice & payment insights...</p>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="loading-state">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p>Loading invoice & payment data...</p>
+            </div>
+          }
+        }
+      }
+    </div>

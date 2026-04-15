@@ -1,0 +1,13 @@
+{
+  "/afs-app/api": {
+    "target": "http://localhost:3004",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/afs-app/api": "/api" }
+  },
+  "/api": {
+    "target": "http://localhost:3004",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

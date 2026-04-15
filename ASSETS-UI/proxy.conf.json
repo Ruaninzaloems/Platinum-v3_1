@@ -1,0 +1,137 @@
+{
+  "/api": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/ASSETS-API": {
+    "target": "http://localhost:3001",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/ASSETS-API": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/SCM-API": {
+    "target": "https://rep-scm-api.azurewebsites.net",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/SCM-API": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/scm-app/api": {
+    "target": "https://rep-scm-api.azurewebsites.net",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/scm-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/scm-app": {
+    "target": "http://localhost:4200",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/pos-app/api": {
+    "target": "http://localhost:3003",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/pos-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/pos-app": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/payroll-app/api": {
+    "target": "http://localhost:6000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/payroll-app/api": "/api/v1" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/payroll-app": {
+    "target": "http://localhost:8099",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/idp-app/api": {
+    "target": "http://localhost:8008",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/idp-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/idp-app": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/insights-app/api": {
+    "target": "http://localhost:6800",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/insights-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/insights-app": {
+    "target": "http://localhost:18156",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/budget-app/api": {
+    "target": "http://localhost:3001",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/budget-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/budget-app": {
+    "target": "http://localhost:4201",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/afs-app/api": {
+    "target": "http://localhost:3004",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/afs-app/api": "/api" },
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  },
+  "/afs-app": {
+    "target": "http://localhost:8000",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "timeout": 600000,
+    "proxyTimeout": 600000
+  }
+}

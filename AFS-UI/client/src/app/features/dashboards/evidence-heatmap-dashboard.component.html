@@ -1,0 +1,74 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load evidence heatmap</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Evidence Heatmap</h1>
+        <p class="subtitle">AFS section evidence coverage and gaps</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh evidence heatmap">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Sections" [value]="data.totalSections" icon="view_module" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Covered" [value]="data.coveredSections" icon="check_circle" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Gaps" [value]="data.gapSections" icon="warning" [color]="data.gapSections > 0 ? 'danger' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="Coverage" [value]="data.coveragePercent + '%'" icon="pie_chart" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Total Evidence" [value]="data.totalEvidence" icon="description" color="info"></app-kpi-tile>
+    </div>
+
+    <div class="section-title">
+      <mat-icon>grid_view</mat-icon> Section Coverage Heatmap
+    </div>
+    <div class="heatmap-grid">
+      @for (section of data.sections; track section.id) {
+        <div class="heatmap-card" [class]="getCardClass(section)"
+          [matTooltip]="section.name + ': ' + section.evidenceCount + ' evidence items'">
+          <div class="heatmap-icon">
+            <mat-icon>{{ section.evidenceCount > 0 ? 'check_circle' : 'cancel' }}</mat-icon>
+          </div>
+          <div class="heatmap-name">{{ section.name }}</div>
+          <div class="heatmap-count">{{ section.evidenceCount }} items</div>
+        </div>
+      }
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-dot covered"></span> Covered (evidence attached)
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot partial"></span> Partial (limited evidence)
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot gap"></span> Gap (no evidence)
+      </div>
+    </div>
+  </div>
+}

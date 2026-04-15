@@ -1,0 +1,363 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Rules Engine</h1>
+      <div class="subtitle">Validation rules for data integrity, NT compliance, and submission readiness</div>
+    </div>
+    <div class="page-actions">
+      <button mat-stroked-button class="btn-refresh" (click)="loadRules()" matTooltip="Reload all rules from server">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="openCreateForm()" matTooltip="Create a new custom validation rule">
+        <mat-icon>add</mat-icon> Create Rule
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi-tile kpi-blue">
+      <span class="kpi-value">{{ rules().length }}</span>
+      <span class="kpi-label">Total Rules</span>
+    </div>
+    <div class="kpi-tile kpi-green">
+      <span class="kpi-value">{{ activeCount() }}</span>
+      <span class="kpi-label">Active</span>
+    </div>
+    <div class="kpi-tile kpi-amber">
+      <span class="kpi-value">{{ systemCount() }}</span>
+      <span class="kpi-label">System Rules</span>
+    </div>
+    <div class="kpi-tile kpi-purple">
+      <span class="kpi-value">{{ customCount() }}</span>
+      <span class="kpi-label">Custom Rules</span>
+    </div>
+  </div>
+
+  <div class="run-panel detail-card" style="margin-bottom: 16px;">
+    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <mat-icon style="color: #3b82f6;">play_circle</mat-icon>
+        <strong style="font-size: 14px;">Run Rules</strong>
+      </div>
+      <mat-form-field appearance="outline" style="width: 220px;">
+        <mat-label>Financial Year</mat-label>
+        <mat-select [(ngModel)]="runFinancialYearId">
+          @for (fy of financialYears(); track fy.id) {
+            <mat-option [value]="fy.id">{{ fy.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width: 200px;">
+        <mat-label>Context</mat-label>
+        <mat-select [(ngModel)]="runContext">
+          @for (ctx of contexts; track ctx.value) {
+            <mat-option [value]="ctx.value">{{ ctx.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width: 120px;">
+        <mat-label>Period</mat-label>
+        <mat-select [(ngModel)]="runPeriod">
+          <mat-option [value]="null">All</mat-option>
+          @for (m of months; track m) {
+            <mat-option [value]="m">{{ m }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-flat-button class="btn-primary" (click)="runRules()" [disabled]="running() || !runFinancialYearId || !runContext" matTooltip="Execute all active rules matching the selected context">
+        <mat-icon>{{ running() ? 'hourglass_empty' : 'play_arrow' }}</mat-icon>
+        {{ running() ? 'Running...' : 'Execute' }}
+      </button>
+    </div>
+
+    @if (runResults().length > 0) {
+      <div style="margin-top: 16px;">
+        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+          <span class="chip chip-green">
+            <mat-icon style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;">check_circle</mat-icon>
+            {{ runResultCounts().pass }} Passed
+          </span>
+          <span class="chip chip-red">
+            <mat-icon style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;">cancel</mat-icon>
+            {{ runResultCounts().fail }} Failed
+          </span>
+          <span class="chip chip-amber">
+            <mat-icon style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;">warning</mat-icon>
+            {{ runResultCounts().warning }} Warnings
+          </span>
+          <span class="chip chip-blue">
+            <mat-icon style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;">skip_next</mat-icon>
+            {{ runResultCounts().skipped }} Skipped
+          </span>
+        </div>
+        <div style="max-height: 300px; overflow-y: auto;">
+          @for (result of runResults(); track result.id) {
+            <div class="alert-row" [ngClass]="{
+              'alert-success': result.status === 'pass',
+              'alert-danger': result.status === 'fail',
+              'alert-warning': result.status === 'warning'
+            }" style="cursor: pointer;" (click)="toggleResultExpand(result.id)">
+              <mat-icon style="font-size: 18px; width: 18px; height: 18px;">
+                {{ result.status === 'pass' ? 'check_circle' : result.status === 'fail' ? 'cancel' : result.status === 'warning' ? 'warning' : 'skip_next' }}
+              </mat-icon>
+              <span style="font-weight: 600; min-width: 200px;">{{ result.rule?.code || result.ruleId }}</span>
+              <span style="flex: 1;">{{ result.message }}</span>
+              <span class="status-badge" [ngClass]="result.status">{{ result.status }}</span>
+            </div>
+            @if (expandedResults().has(result.id) && result.details) {
+              <div style="padding: 8px 16px 8px 44px; font-size: 12px; color: #64748b; background: #f8fafc; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 8px;">
+                <pre style="white-space: pre-wrap; margin: 0; font-family: 'SF Mono', monospace; font-size: 11px;">{{ result.details | json }}</pre>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="tab-nav">
+    @for (cat of categories; track cat.value) {
+      <button class="tab-btn" [class.active]="filterCategory === cat.value" (click)="filterCategory = cat.value">
+        {{ cat.label }}
+        @if (cat.value && getCategoryCount(cat.value) > 0) {
+          <span style="font-size: 10px; background: #e2e8f0; color: #475569; border-radius: 10px; padding: 1px 6px; margin-left: 4px;">
+            {{ getCategoryCount(cat.value) }}
+          </span>
+        }
+      </button>
+    }
+  </div>
+
+  <div class="filters-bar">
+    <mat-form-field appearance="outline" style="width: 250px; margin: 0;">
+      <mat-label>Search rules</mat-label>
+      <input matInput [(ngModel)]="searchTerm" placeholder="Code, name, or description..." (ngModelChange)="applyFilters()">
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="width: 160px; margin: 0;">
+      <mat-label>Severity</mat-label>
+      <mat-select [(ngModel)]="filterSeverity" (ngModelChange)="applyFilters()">
+        <mat-option value="">All</mat-option>
+        @for (s of severities; track s.value) {
+          <mat-option [value]="s.value">{{ s.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="width: 160px; margin: 0;">
+      <mat-label>Status</mat-label>
+      <mat-select [(ngModel)]="filterActive" (ngModelChange)="applyFilters()">
+        <mat-option value="">All</mat-option>
+        <mat-option value="true">Active</mat-option>
+        <mat-option value="false">Inactive</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="width: 160px; margin: 0;">
+      <mat-label>Type</mat-label>
+      <mat-select [(ngModel)]="filterType" (ngModelChange)="applyFilters()">
+        <mat-option value="">All</mat-option>
+        @for (t of ruleTypes; track t.value) {
+          <mat-option [value]="t.value">{{ t.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (showCreateForm()) {
+    <div class="detail-card" style="margin-bottom: 16px; border-left: 4px solid #3b82f6;">
+      <div class="card-title">
+        <mat-icon>{{ editingRule() ? 'edit' : 'add_circle' }}</mat-icon>
+        {{ editingRule() ? 'Edit Rule' : 'Create Custom Rule' }}
+      </div>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Code</mat-label>
+          <input matInput [(ngModel)]="formRule.code" [disabled]="editingRule()?.isSystemRule === true" placeholder="e.g. CUSTOM_MY_CHECK">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Name</mat-label>
+          <input matInput [(ngModel)]="formRule.name" [disabled]="editingRule()?.isSystemRule === true">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Category</mat-label>
+          <mat-select [(ngModel)]="formRule.category" [disabled]="editingRule()?.isSystemRule === true">
+            @for (cat of categories; track cat.value) {
+              @if (cat.value) {
+                <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+              }
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Rule Type</mat-label>
+          <mat-select [(ngModel)]="formRule.ruleType" [disabled]="editingRule()?.isSystemRule === true">
+            @for (t of ruleTypes; track t.value) {
+              <mat-option [value]="t.value">{{ t.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Severity</mat-label>
+          <mat-select [(ngModel)]="formRule.severity">
+            @for (s of severities; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <div>
+          <label style="font-size: 12px; font-weight: 500; color: #64748b; display: block; margin-bottom: 8px;">Applies To</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            @for (ctx of contexts; track ctx.value) {
+              <mat-checkbox [checked]="formRule.appliesTo.includes(ctx.value)" (change)="toggleAppliesTo(ctx.value)">
+                {{ ctx.label }}
+              </mat-checkbox>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top: 16px;">
+        <mat-form-field appearance="outline" class="form-field-full">
+          <mat-label>Description</mat-label>
+          <textarea matInput [(ngModel)]="formRule.description" rows="2" [disabled]="editingRule()?.isSystemRule === true"></textarea>
+        </mat-form-field>
+      </div>
+      <div class="form-grid" style="margin-top: 8px;">
+        <mat-form-field appearance="outline" class="form-field-full">
+          <mat-label>Expression</mat-label>
+          <textarea matInput [(ngModel)]="formRule.expression" rows="3" [disabled]="editingRule()?.isSystemRule === true" placeholder="e.g. $tb.totalDebits == $tb.totalCredits" style="font-family: 'SF Mono', monospace; font-size: 12px;"></textarea>
+        </mat-form-field>
+      </div>
+      <div style="margin-top: 12px;">
+        <label style="font-size: 12px; font-weight: 500; color: #64748b; display: block; margin-bottom: 8px;">Parameters (JSON)</label>
+        <mat-form-field appearance="outline" class="form-field-full">
+          <mat-label>Parameters</mat-label>
+          <textarea matInput [(ngModel)]="formParametersJson" rows="3" placeholder='{"minRate": 0.90, "warningRate": 0.75}' style="font-family: 'SF Mono', monospace; font-size: 12px;"></textarea>
+        </mat-form-field>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <button mat-stroked-button (click)="cancelForm()" matTooltip="Cancel without saving">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="saveRule()" [disabled]="saving() || !formRule.code || !formRule.name" matTooltip="Save rule">
+          <mat-icon>save</mat-icon> {{ saving() ? 'Saving...' : (editingRule() ? 'Update Rule' : 'Create Rule') }}
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;" matTooltip="Toggle rule active/inactive">Active</th>
+          <th matTooltip="Unique rule identifier code">Code</th>
+          <th matTooltip="Human-readable rule name">Name</th>
+          <th matTooltip="Rule category grouping">Category</th>
+          <th matTooltip="Severity level of rule failure">Severity</th>
+          <th matTooltip="Whether this is a system or custom rule">Type</th>
+          <th matTooltip="Last time this rule was executed">Last Run</th>
+          <th matTooltip="Result of the last rule execution">Last Result</th>
+          <th matTooltip="Available actions for this rule">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (rule of filteredRules(); track rule.id) {
+          <tr>
+            <td>
+              <mat-slide-toggle [checked]="rule.isActive" (change)="toggleActive(rule)" matTooltip="Toggle rule active/inactive"></mat-slide-toggle>
+            </td>
+            <td class="ref-cell" style="font-size: 11px;">{{ rule.code }}</td>
+            <td>
+              <strong>{{ rule.name }}</strong>
+              @if (rule.description) {
+                <div style="font-size: 11px; color: #94a3b8; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ rule.description }}</div>
+              }
+            </td>
+            <td>
+              <span class="mscoa-tag">{{ formatCategory(rule.category) }}</span>
+            </td>
+            <td>
+              <span class="severity-chip" [ngClass]="'sev-' + rule.severity">{{ rule.severity }}</span>
+            </td>
+            <td>
+              <span class="mscoa-tag" [style.background]="rule.isSystemRule ? '#f3e8ff' : '#e0f2f1'" [style.color]="rule.isSystemRule ? '#7c3aed' : '#00695c'">
+                {{ rule.isSystemRule ? 'System' : 'Custom' }}
+              </span>
+            </td>
+            <td class="date-cell">{{ rule.lastRunAt ? (rule.lastRunAt | date:'short') : '—' }}</td>
+            <td>
+              @if (rule.lastResult) {
+                <span class="status-badge" [ngClass]="rule.lastResult['status'] || 'skipped'">
+                  {{ rule.lastResult['status'] || 'N/A' }}
+                </span>
+              } @else {
+                <span style="color: #94a3b8; font-size: 12px;">Not run</span>
+              }
+            </td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button mat-icon-button matTooltip="Edit rule" (click)="editRule(rule)" style="width: 32px; height: 32px;">
+                  <mat-icon style="font-size: 18px;">edit</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="View result history" (click)="viewHistory(rule)" style="width: 32px; height: 32px;">
+                  <mat-icon style="font-size: 18px;">history</mat-icon>
+                </button>
+                @if (!rule.isSystemRule) {
+                  <button mat-icon-button matTooltip="Delete custom rule" (click)="deleteRule(rule)" style="width: 32px; height: 32px; color: #ef5350;">
+                    <mat-icon style="font-size: 18px;">delete</mat-icon>
+                  </button>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+        @if (filteredRules().length === 0) {
+          <tr>
+            <td colspan="9" style="text-align: center; padding: 40px; color: #64748b;">
+              <mat-icon style="font-size: 40px; width: 40px; height: 40px; color: #cbd5e1;">rule</mat-icon>
+              <div style="margin-top: 8px;">No rules found matching the current filters.</div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (historyRule()) {
+    <div class="detail-card" style="margin-top: 16px; border-left: 4px solid #8b5cf6;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <div class="card-title" style="margin-bottom: 0;">
+          <mat-icon>history</mat-icon>
+          Result History — {{ historyRule()!.code }}
+        </div>
+        <button mat-icon-button (click)="historyRule.set(null)" matTooltip="Close history panel">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      @if (historyResults().length > 0) {
+        <div style="max-height: 300px; overflow-y: auto;">
+          @for (result of historyResults(); track result.id) {
+            <div class="alert-row" [ngClass]="{
+              'alert-success': result.status === 'pass',
+              'alert-danger': result.status === 'fail',
+              'alert-warning': result.status === 'warning'
+            }" style="cursor: pointer;" (click)="toggleResultExpand(result.id)">
+              <mat-icon style="font-size: 16px; width: 16px; height: 16px;">
+                {{ result.status === 'pass' ? 'check_circle' : result.status === 'fail' ? 'cancel' : 'warning' }}
+              </mat-icon>
+              <span class="date-cell">{{ result.runAt | date:'medium' }}</span>
+              <span style="flex: 1;">{{ result.message }}</span>
+              <span class="status-badge" [ngClass]="result.status">{{ result.status }}</span>
+            </div>
+            @if (expandedResults().has(result.id) && result.details) {
+              <div style="padding: 8px 16px 8px 36px; font-size: 12px; color: #64748b; background: #f8fafc; border-radius: 0 0 8px 8px; margin-top: -8px; margin-bottom: 8px;">
+                <pre style="white-space: pre-wrap; margin: 0; font-family: 'SF Mono', monospace; font-size: 11px;">{{ result.details | json }}</pre>
+              </div>
+            }
+          }
+        </div>
+      } @else {
+        <div style="text-align: center; padding: 24px; color: #94a3b8;">
+          No result history available for this rule.
+        </div>
+      }
+    </div>
+  }
+</div>

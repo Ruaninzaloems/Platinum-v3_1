@@ -1,0 +1,523 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Variable Benefits & Travel</h1>
+      <p class="page-subtitle">Manage variable benefit hours, travel requirements, and standard rates (HRPB5, HRPB16, HRPB18, HRPB19, HRPB31, HRPB38, HRPB40, HRPB73, HRPB78, HRPB90)</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="calculateVariableBenefits()">
+        <mat-icon>calculate</mat-icon> Calculate Benefits
+      </button>
+      <button class="btn-primary" (click)="calculateTravelBudget()">
+        <mat-icon>flight</mat-icon> Calculate Travel
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'hours'" (click)="activeTab = 'hours'">
+      <mat-icon>schedule</mat-icon> Variable Hours
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">
+      <mat-icon>history</mat-icon> Hours History
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'travel'" (click)="activeTab = 'travel'">
+      <mat-icon>flight_takeoff</mat-icon> Travel Requirements
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'rates'" (click)="activeTab = 'rates'">
+      <mat-icon>price_check</mat-icon> Standard Rates
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'trends'" (click)="activeTab = 'trends'; loadTravelTrends()">
+      <mat-icon>trending_up</mat-icon> Travel Trends
+    </button>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab === 'hours'">
+    <div class="card-container">
+      <div class="card-title-bar">
+        <h2>Variable Benefit Hours by Department</h2>
+        <div class="card-actions">
+          <select [(ngModel)]="filterDepartment" (ngModelChange)="loadVariableBenefits()" class="filter-select">
+            <option value="">All Departments</option>
+            <option *ngFor="let d of departments" [value]="d">{{d}}</option>
+          </select>
+          <button class="btn-secondary" (click)="showHoursDialog = true; resetHoursForm()">
+            <mat-icon>add</mat-icon> Add Hours
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tariff-table-wrap" *ngIf="variableBenefits.length; else noHours">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Benefit Type</th>
+                <th class="text-right">Estimated Hours</th>
+                <th class="text-right">Avg Rate (R)</th>
+                <th class="text-right">Calculated Cost</th>
+                <th class="text-right">Historical Hours</th>
+                <th class="text-right">Historical Cost</th>
+                <th class="text-right">Variance %</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let vb of variableBenefits">
+                <td class="fw-600">{{vb.department || '—'}}</td>
+                <td>
+                  <span class="type-pill" [ngClass]="'benefit-' + vb.benefitType.toLowerCase()">{{vb.benefitType}}</span>
+                </td>
+                <td class="text-right mono">{{vb.estimatedHours | number:'1.0-0'}}</td>
+                <td class="text-right mono">R {{vb.averageRate | number:'1.2-2'}}</td>
+                <td class="text-right mono fw-600">R {{vb.calculatedCost | number:'1.2-2'}}</td>
+                <td class="text-right mono">{{vb.historicalHours ? (vb.historicalHours | number:'1.0-0') : '—'}}</td>
+                <td class="text-right mono">{{vb.historicalCost ? ('R ' + (vb.historicalCost | number:'1.2-2')) : '—'}}</td>
+                <td class="text-right">
+                  <span *ngIf="vb.variancePercent !== null" class="variance-badge" [ngClass]="vb.variancePercent! > 10 ? 'variance-high' : (vb.variancePercent! > 0 ? 'variance-medium' : 'variance-low')">
+                    {{vb.variancePercent | number:'1.1-1'}}%
+                  </span>
+                  <span *ngIf="vb.variancePercent === null" class="text-muted">—</span>
+                </td>
+                <td>
+                  <button class="btn-icon" (click)="editHours(vb)" title="Amend Hours">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="totals-row">
+                <td colspan="2" class="fw-600">Total</td>
+                <td class="text-right mono fw-600">{{getTotalEstimatedHours() | number:'1.0-0'}}</td>
+                <td></td>
+                <td class="text-right mono fw-600">R {{getTotalCalculatedCost() | number:'1.2-2'}}</td>
+                <td class="text-right mono">{{getTotalHistoricalHours() | number:'1.0-0'}}</td>
+                <td class="text-right mono">R {{getTotalHistoricalCost() | number:'1.2-2'}}</td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <ng-template #noHours>
+          <div class="empty-state">
+            <mat-icon>schedule</mat-icon>
+            <p>No variable benefit hours defined</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab === 'history'">
+    <div class="card-container">
+      <div class="card-title-bar">
+        <h2>Hours History</h2>
+        <select [(ngModel)]="historyDepartment" (ngModelChange)="loadHoursHistory()" class="filter-select">
+          <option value="">All Departments</option>
+          <option *ngFor="let d of departments" [value]="d">{{d}}</option>
+        </select>
+      </div>
+      <div class="card-body">
+        <div class="tariff-table-wrap" *ngIf="hoursHistory.length; else noHistory">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Benefit Type</th>
+                <th class="text-right">Estimated Hours</th>
+                <th class="text-right">Avg Rate (R)</th>
+                <th class="text-right">Calculated Cost</th>
+                <th class="text-right">Historical Hours</th>
+                <th class="text-right">Historical Cost</th>
+                <th class="text-right">Variance %</th>
+                <th>Financial Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let h of hoursHistory">
+                <td class="fw-600">{{h.department || '—'}}</td>
+                <td>
+                  <span class="type-pill" [ngClass]="'benefit-' + h.benefitType.toLowerCase()">{{h.benefitType}}</span>
+                </td>
+                <td class="text-right mono">{{h.estimatedHours | number:'1.0-0'}}</td>
+                <td class="text-right mono">R {{h.averageRate | number:'1.2-2'}}</td>
+                <td class="text-right mono fw-600">R {{h.calculatedCost | number:'1.2-2'}}</td>
+                <td class="text-right mono">{{h.historicalHours ? (h.historicalHours | number:'1.0-0') : '—'}}</td>
+                <td class="text-right mono">{{h.historicalCost ? ('R ' + (h.historicalCost | number:'1.2-2')) : '—'}}</td>
+                <td class="text-right">
+                  <span *ngIf="h.variancePercent !== null" class="variance-badge" [ngClass]="h.variancePercent! > 10 ? 'variance-high' : (h.variancePercent! > 0 ? 'variance-medium' : 'variance-low')">
+                    {{h.variancePercent | number:'1.1-1'}}%
+                  </span>
+                  <span *ngIf="h.variancePercent === null" class="text-muted">—</span>
+                </td>
+                <td class="mono">FY{{h.financialYearId}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noHistory>
+          <div class="empty-state">
+            <mat-icon>history</mat-icon>
+            <p>No historical hours data available</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab === 'travel'">
+    <div class="card-container">
+      <div class="card-title-bar">
+        <h2>Travel Requirements</h2>
+        <div class="card-actions">
+          <select [(ngModel)]="travelDepartment" (ngModelChange)="loadTravelRequirements()" class="filter-select">
+            <option value="">All Departments</option>
+            <option *ngFor="let d of departments" [value]="d">{{d}}</option>
+          </select>
+          <button class="btn-secondary" (click)="showTravelDialog = true; resetTravelForm()">
+            <mat-icon>add</mat-icon> Add Travel
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tariff-table-wrap" *ngIf="travelRequirements.length; else noTravel">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Destination</th>
+                <th>Purpose</th>
+                <th>Transport</th>
+                <th class="text-right">Officials</th>
+                <th class="text-right">Trips</th>
+                <th class="text-right">KMs</th>
+                <th class="text-right">Nights</th>
+                <th class="text-right">Est. Cost</th>
+                <th>Project Ref</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let tr of travelRequirements">
+                <td class="fw-600">{{tr.department || '—'}}</td>
+                <td>{{tr.destination || '—'}}</td>
+                <td>{{tr.purposeOfTravel || '—'}}</td>
+                <td><span class="type-pill">{{tr.transportMode}}</span></td>
+                <td class="text-right mono">{{tr.numberOfOfficials}}</td>
+                <td class="text-right mono">{{tr.numberOfTrips}}</td>
+                <td class="text-right mono">{{tr.estimatedKilometres | number:'1.0-0'}}</td>
+                <td class="text-right mono">{{tr.accommodationNights}}</td>
+                <td class="text-right mono fw-600">R {{tr.estimatedCost | number:'1.2-2'}}</td>
+                <td>
+                  <span *ngIf="tr.projectReference" class="contract-ref">{{tr.projectReference}}</span>
+                  <span *ngIf="!tr.projectReference" class="text-muted">—</span>
+                </td>
+                <td>
+                  <button class="btn-icon" title="View Details">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="totals-row">
+                <td colspan="8" class="fw-600">Total Travel Budget</td>
+                <td class="text-right mono fw-600">R {{getTotalTravelCost() | number:'1.2-2'}}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <ng-template #noTravel>
+          <div class="empty-state">
+            <mat-icon>flight_takeoff</mat-icon>
+            <p>No travel requirements defined</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab === 'rates'">
+    <div class="card-container">
+      <div class="card-title-bar">
+        <h2>Travel Standard Rates</h2>
+        <button class="btn-secondary" (click)="showRateDialog = true; resetRateForm()">
+          <mat-icon>add</mat-icon> Add Rate
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="tariff-table-wrap" *ngIf="standardRates.length; else noRates">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Rate Type</th>
+                <th>Classification</th>
+                <th>Employee Level</th>
+                <th class="text-right">Rate Amount (R)</th>
+                <th>Effective Date</th>
+                <th>Policy Reference</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rate of standardRates">
+                <td class="fw-600">{{rate.rateType}}</td>
+                <td>
+                  <span class="type-pill" [ngClass]="'class-' + rate.classification.toLowerCase()">{{rate.classification}}</span>
+                </td>
+                <td>{{rate.employeeLevel || '—'}}</td>
+                <td class="text-right mono fw-600">R {{rate.rateAmount | number:'1.2-2'}}</td>
+                <td class="mono">{{rate.effectiveDate | date:'yyyy-MM-dd'}}</td>
+                <td>
+                  <span *ngIf="rate.policyReference" class="contract-ref">{{rate.policyReference}}</span>
+                  <span *ngIf="!rate.policyReference" class="text-muted">—</span>
+                </td>
+                <td>
+                  <span class="status-badge" [ngClass]="rate.isActive ? 'status-approved' : 'status-draft'">
+                    {{rate.isActive ? 'Active' : 'Inactive'}}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noRates>
+          <div class="empty-state">
+            <mat-icon>price_check</mat-icon>
+            <p>No standard rates defined</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab === 'trends'">
+    <div class="card-container">
+      <div class="card-title-bar">
+        <h2>Travel Trends</h2>
+        <select [(ngModel)]="trendDepartment" (ngModelChange)="loadTravelTrends()" class="filter-select">
+          <option value="">All Departments</option>
+          <option *ngFor="let d of departments" [value]="d">{{d}}</option>
+        </select>
+      </div>
+      <div class="card-body">
+        <div class="tariff-table-wrap" *ngIf="travelTrends.length; else noTrends">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Destination</th>
+                <th>Department</th>
+                <th class="text-right">Trip Count</th>
+                <th class="text-right">Total Officials</th>
+                <th class="text-right">Total KMs</th>
+                <th class="text-right">Total Nights</th>
+                <th class="text-right">Avg Cost per Trip</th>
+                <th class="text-right">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let trend of travelTrends">
+                <td class="fw-600">{{trend.destination || '—'}}</td>
+                <td>{{trend.department || '—'}}</td>
+                <td class="text-right mono">{{trend.numberOfTrips}}</td>
+                <td class="text-right mono">{{trend.numberOfOfficials}}</td>
+                <td class="text-right mono">{{trend.estimatedKilometres | number:'1.0-0'}}</td>
+                <td class="text-right mono">{{trend.accommodationNights}}</td>
+                <td class="text-right mono">R {{(trend.estimatedCost / (trend.numberOfTrips || 1)) | number:'1.2-2'}}</td>
+                <td class="text-right mono fw-600">R {{trend.estimatedCost | number:'1.2-2'}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noTrends>
+          <div class="empty-state">
+            <mat-icon>trending_up</mat-icon>
+            <p>No travel trend data available</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showHoursDialog" (click)="showHoursDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>{{editingHours ? 'Amend' : 'Add'}} Variable Benefit Hours</h2>
+        <button class="btn-icon" (click)="showHoursDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="hoursForm.department" placeholder="e.g. Water & Sanitation">
+          </div>
+          <div class="form-group">
+            <label>Benefit Type</label>
+            <select [(ngModel)]="hoursForm.benefitType">
+              <option value="Overtime">Overtime</option>
+              <option value="Standby">Standby</option>
+              <option value="ShiftWork">Shift Work</option>
+              <option value="Acting">Acting</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estimated Hours</label>
+            <input type="number" [(ngModel)]="hoursForm.estimatedHours" step="1">
+          </div>
+          <div class="form-group">
+            <label>Average Rate (R)</label>
+            <input type="number" [(ngModel)]="hoursForm.averageRate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Historical Hours</label>
+            <input type="number" [(ngModel)]="hoursForm.historicalHours" step="1" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label>Historical Cost (R)</label>
+            <input type="number" [(ngModel)]="hoursForm.historicalCost" step="0.01" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showHoursDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveHours()" [disabled]="saving">
+          {{saving ? 'Saving...' : (editingHours ? 'Update' : 'Create')}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showTravelDialog" (click)="showTravelDialog = false">
+    <div class="dialog-panel dialog-wide" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>Add Travel Requirement</h2>
+        <button class="btn-icon" (click)="showTravelDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid form-grid-3">
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="travelForm.department" placeholder="e.g. Corporate Services">
+          </div>
+          <div class="form-group">
+            <label>Destination</label>
+            <input [(ngModel)]="travelForm.destination" placeholder="e.g. Pretoria">
+          </div>
+          <div class="form-group">
+            <label>Purpose of Travel</label>
+            <input [(ngModel)]="travelForm.purposeOfTravel" placeholder="e.g. Training">
+          </div>
+          <div class="form-group">
+            <label>Transport Mode</label>
+            <select [(ngModel)]="travelForm.transportMode">
+              <option value="Vehicle">Vehicle</option>
+              <option value="Flight">Flight</option>
+              <option value="Bus">Bus</option>
+              <option value="Train">Train</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Number of Officials</label>
+            <input type="number" [(ngModel)]="travelForm.numberOfOfficials" step="1">
+          </div>
+          <div class="form-group">
+            <label>Number of Trips</label>
+            <input type="number" [(ngModel)]="travelForm.numberOfTrips" step="1">
+          </div>
+          <div class="form-group">
+            <label>Estimated Kilometres</label>
+            <input type="number" [(ngModel)]="travelForm.estimatedKilometres" step="1">
+          </div>
+          <div class="form-group">
+            <label>Accommodation Nights</label>
+            <input type="number" [(ngModel)]="travelForm.accommodationNights" step="1">
+          </div>
+          <div class="form-group">
+            <label>Travel Duration (Days)</label>
+            <input type="number" [(ngModel)]="travelForm.travelDuration" step="1">
+          </div>
+          <div class="form-group">
+            <label>Project Reference</label>
+            <input [(ngModel)]="travelForm.projectReference" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showTravelDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveTravel()" [disabled]="saving">
+          {{saving ? 'Saving...' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" *ngIf="showRateDialog" (click)="showRateDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>Add Standard Rate</h2>
+        <button class="btn-icon" (click)="showRateDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Rate Type</label>
+            <select [(ngModel)]="rateForm.rateType">
+              <option value="Mileage">Mileage</option>
+              <option value="Accommodation">Accommodation</option>
+              <option value="Subsistence">Subsistence</option>
+              <option value="DailyAllowance">Daily Allowance</option>
+              <option value="Incidentals">Incidentals</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Classification</label>
+            <select [(ngModel)]="rateForm.classification">
+              <option value="Local">Local</option>
+              <option value="Provincial">Provincial</option>
+              <option value="National">National</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Employee Level</label>
+            <input [(ngModel)]="rateForm.employeeLevel" placeholder="e.g. Senior Management">
+          </div>
+          <div class="form-group">
+            <label>Rate Amount (R)</label>
+            <input type="number" [(ngModel)]="rateForm.rateAmount" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Effective Date</label>
+            <input type="date" [(ngModel)]="rateForm.effectiveDate">
+          </div>
+          <div class="form-group">
+            <label>Policy Reference</label>
+            <input [(ngModel)]="rateForm.policyReference" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showRateDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveRate()" [disabled]="saving">
+          {{saving ? 'Saving...' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

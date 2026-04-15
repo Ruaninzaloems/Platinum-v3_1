@@ -1,0 +1,286 @@
+    <div class="reports-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <div class="tab-nav">
+        <button class="tab-btn" [class.active]="currentTab() === 'catalog'" (click)="currentTab.set('catalog')">Report Catalog</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'scheduled'" (click)="switchTab('scheduled')">Scheduled Reports</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'history'" (click)="switchTab('history')">Download History</button>
+      </div>
+
+      <!-- ===================== REPORT CATALOG TAB ===================== -->
+      @if (currentTab() === 'catalog') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total reports available in catalog'">
+            <mat-icon>assessment</mat-icon>
+            <span class="kpi-value">{{allReports().length}}</span>
+            <span class="kpi-label">Total Reports</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="categories().length + ' report categories'">
+            <mat-icon>category</mat-icon>
+            <span class="kpi-value">{{categories().length}}</span>
+            <span class="kpi-label">Categories</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="downloadableReports().length + ' reports available for PDF download'">
+            <mat-icon>picture_as_pdf</mat-icon>
+            <span class="kpi-value">{{downloadableReports().length}}</span>
+            <span class="kpi-label">PDF Downloads</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="scheduledReports().length + ' active report schedules'">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{scheduledReports().length}}</span>
+            <span class="kpi-label">Scheduled</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="downloadHistory().length + ' reports generated this session'">
+            <mat-icon>download</mat-icon>
+            <span class="kpi-value">{{downloadHistory().length}}</span>
+            <span class="kpi-label">Downloads</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search reports..." [(ngModel)]="searchQuery" (input)="filterReports()">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Category" [(ngModel)]="filterCategory" (selectionChange)="filterReports()">
+              <mat-option value="">All Categories</mat-option>
+              @for (cat of categories(); track cat) {
+                <mat-option [value]="cat">{{getCategoryLabel(cat)}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+        </div>
+
+        @for (cat of filteredCategories(); track cat) {
+          <div class="category-section">
+            <div class="category-header">
+              <mat-icon class="category-icon">{{getCategoryIcon(cat)}}</mat-icon>
+              <h3>{{getCategoryLabel(cat)}}</h3>
+              <span class="category-count">{{getReportsForCategory(cat).length}} reports</span>
+            </div>
+            <div class="report-cards-grid">
+              @for (report of getReportsForCategory(cat); track report.id) {
+                <div class="report-card">
+                  <div class="report-card-header">
+                    <mat-icon class="format-icon" [matTooltip]="report.format === 'excel' ? 'Excel Format' : 'PDF Format'">
+                      {{report.format === 'excel' ? 'table_chart' : 'picture_as_pdf'}}
+                    </mat-icon>
+                    <span class="report-id">{{report.id}}</span>
+                  </div>
+                  <h4 class="report-name">{{report.name}}</h4>
+                  <p class="report-desc">{{report.description}}</p>
+                  <div class="report-card-footer">
+                    <span class="last-generated" [matTooltip]="'Last generated'">
+                      <mat-icon>history</mat-icon>
+                      {{report.lastGenerated ? formatDate(report.lastGenerated) : 'Never'}}
+                    </span>
+                    <div class="report-card-actions">
+                      @if (isDownloadable(report.id)) {
+                        <button mat-stroked-button class="btn-sm" (click)="downloadReport(report)" [matTooltip]="'Download PDF'">
+                          <mat-icon>download</mat-icon> Download
+                        </button>
+                      }
+                      <button mat-flat-button color="primary" class="btn-sm" (click)="generateReport(report)" [disabled]="generating() === report.id" [matTooltip]="'Generate report'">
+                        <mat-icon>{{generating() === report.id ? 'hourglass_empty' : 'play_arrow'}}</mat-icon>
+                        {{generating() === report.id ? 'Generating...' : 'Generate'}}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (filteredCategories().length === 0) {
+          <div class="empty-state-card">
+            <mat-icon>search_off</mat-icon>
+            <span>No reports found matching your criteria</span>
+          </div>
+        }
+      }
+
+      <!-- ===================== SCHEDULED REPORTS TAB ===================== -->
+      @if (currentTab() === 'scheduled') {
+        <div class="section-header">
+          <h3>Scheduled Reports</h3>
+          <button mat-flat-button color="primary" (click)="showScheduleForm.set(true)">
+            <mat-icon>add</mat-icon> New Schedule
+          </button>
+        </div>
+
+        @if (showScheduleForm()) {
+          <div class="detail-card schedule-form-card">
+            <h3><mat-icon>schedule</mat-icon> Create Report Schedule</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Report</mat-label>
+                <mat-select [(ngModel)]="scheduleForm.reportId">
+                  @for (report of allReports(); track report.id) {
+                    <mat-option [value]="report.id">{{report.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Frequency</mat-label>
+                <mat-select [(ngModel)]="scheduleForm.frequency">
+                  <mat-option value="daily">Daily</mat-option>
+                  <mat-option value="weekly">Weekly</mat-option>
+                  <mat-option value="monthly">Monthly</mat-option>
+                  <mat-option value="quarterly">Quarterly</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Recipients (comma-separated emails)</mat-label>
+                <input matInput [(ngModel)]="scheduleForm.recipientsRaw" placeholder="user@municipality.gov.za, other@municipality.gov.za">
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-stroked-button (click)="showScheduleForm.set(false)">
+                <mat-icon>close</mat-icon> Cancel
+              </button>
+              <button mat-flat-button color="primary" (click)="createSchedule()" [disabled]="!scheduleForm.reportId || !scheduleForm.frequency">
+                <mat-icon>save</mat-icon> Create Schedule
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Report</th>
+                <th>Frequency</th>
+                <th>Next Run</th>
+                <th>Recipients</th>
+                <th>Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (sched of scheduledReports(); track sched.id) {
+                <tr>
+                  <td class="ref-cell">{{sched.id}}</td>
+                  <td>{{getReportName(sched.reportId)}}</td>
+                  <td>
+                    <span class="frequency-badge" [class]="'freq-' + sched.frequency">{{sched.frequency | titlecase}}</span>
+                  </td>
+                  <td>{{formatDate(sched.nextRun)}}</td>
+                  <td>
+                    <div class="chips-cell">
+                      @for (r of sched.recipients; track r) {
+                        <span class="recipient-chip" [matTooltip]="r">{{getEmailUser(r)}}</span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <span class="status-badge" [class]="sched.active ? 'status-approved' : 'status-voided'">
+                      {{sched.active ? 'Active' : 'Inactive'}}
+                    </span>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty-state">
+                    <mat-icon>schedule</mat-icon>
+                    <span>No scheduled reports configured</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- ===================== DOWNLOAD HISTORY TAB ===================== -->
+      @if (currentTab() === 'history') {
+        <div class="section-header">
+          <h3>Download History</h3>
+          <span class="section-meta">{{downloadHistory().length}} reports generated</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Report</th>
+                <th>Format</th>
+                <th>Generated At</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of downloadHistory(); track item.generatedAt) {
+                <tr>
+                  <td>
+                    <div class="report-name-cell">
+                      <mat-icon class="format-icon-sm">{{item.format === 'excel' ? 'table_chart' : 'picture_as_pdf'}}</mat-icon>
+                      {{item.reportName}}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="format-badge">{{(item.format || 'pdf') | uppercase}}</span>
+                  </td>
+                  <td>{{formatDateTime(item.generatedAt)}}</td>
+                  <td><span class="status-badge status-approved">Generated</span></td>
+                  <td class="actions-cell">
+                    @if (item.downloadUrl) {
+                      <button mat-icon-button [matTooltip]="'Download'" (click)="openDownload(item.downloadUrl)">
+                        <mat-icon>download</mat-icon>
+                      </button>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty-state">
+                    <mat-icon>download</mat-icon>
+                    <span>No reports generated yet. Go to Report Catalog to generate reports.</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (downloadableReports().length > 0) {
+          <div class="detail-card" style="margin-top: 16px;">
+            <h3><mat-icon>picture_as_pdf</mat-icon> Available PDF Reports</h3>
+            <p class="section-desc">Pre-built PDF reports ready for immediate download.</p>
+            <div class="download-list">
+              @for (report of downloadableReports(); track report.id) {
+                <div class="download-item">
+                  <div class="download-info">
+                    <mat-icon class="dl-icon">description</mat-icon>
+                    <div>
+                      <span class="dl-name">{{report.name}}</span>
+                      <span class="dl-desc">{{report.description}}</span>
+                    </div>
+                  </div>
+                  <button mat-stroked-button class="btn-sm" (click)="downloadPdfReport(report.id)" [matTooltip]="'Download PDF'">
+                    <mat-icon>download</mat-icon> Download PDF
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

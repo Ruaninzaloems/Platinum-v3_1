@@ -1,0 +1,119 @@
+@if (isOpen) {
+  <div class="cidms-picker-overlay" (click)="cancel()"></div>
+  <div class="cidms-picker-modal">
+    <div class="cidms-picker-header">
+      <span class="cidms-picker-title">
+        <mat-icon style="vertical-align:middle;margin-right:6px;font-size:20px;width:20px;height:20px">account_tree</mat-icon>
+        Select CIDMS Classification
+      </span>
+      <button type="button" class="cidms-picker-close" (click)="cancel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="cidms-picker-search">
+      <mat-icon style="color:#94a3b8;font-size:18px;width:18px;height:18px;margin-right:8px;flex-shrink:0">search</mat-icon>
+      <input
+        type="text"
+        [ngModel]="filterText()"
+        (ngModelChange)="filterText.set($event)"
+        placeholder="Search across all levels..."
+        class="cidms-search-input"
+      />
+      @if (filterText()) {
+        <button type="button" class="cidms-search-clear" (click)="filterText.set('')">
+          <mat-icon style="font-size:16px;width:16px;height:16px">clear</mat-icon>
+        </button>
+      }
+    </div>
+
+    <div class="cidms-picker-body">
+      @if (loading()) {
+        <div class="cidms-picker-loading">
+          <mat-spinner diameter="36" style="margin:0 auto 12px"></mat-spinner>
+          <p style="color:#64748b;font-size:13px">Loading CIDMS hierarchy...</p>
+        </div>
+      }
+
+      @if (!loading() && isFiltering()) {
+        <div class="cidms-filter-results">
+          @if (filteredNodes().length === 0) {
+            <div class="cidms-empty">No results for "{{ filterText() }}"</div>
+          }
+          @for (node of filteredNodes(); track node.nodeKey) {
+            <div
+              class="cidms-filter-row"
+              [class.cidms-selected]="selectedNodeKey() === node.nodeKey"
+              (click)="onFilterRowClick(node)"
+              (dblclick)="onFilterRowClick(node)"
+            >
+              <span class="cidms-level-badge" [style.background]="getLevelBg(node.levelIdx)" [style.color]="getLevelColor(node.levelIdx)" [style.border-color]="getLevelColor(node.levelIdx)">
+                {{ getLevelLabel(node.levelIdx) }}
+              </span>
+              <span class="cidms-filter-desc">{{ getItemDesc(node.item, node.levelIdx) }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (!loading() && !isFiltering()) {
+        <div class="cidms-tree">
+          @if (visibleNodes().length === 0) {
+            <div class="cidms-empty">No CIDMS data available.</div>
+          }
+          @for (node of visibleNodes(); track node.nodeKey) {
+            <div
+              class="cidms-tree-row"
+              [class.cidms-selected]="selectedNodeKey() === node.nodeKey"
+              [class.cidms-non-leaf]="node.hasChildren"
+              [class.cidms-leaf]="node.isLeaf"
+              [style.padding-left.px]="24 + node.depth * 22"
+              (click)="onTreeRowClick(node)"
+              (dblclick)="onTreeRowDblClick(node)"
+            >
+              <span class="cidms-expand-btn" (click)="$event.stopPropagation(); node.hasChildren && toggleExpand(node.nodeKey)">
+                @if (node.hasChildren) {
+                  <mat-icon style="font-size:16px;width:16px;height:16px;transition:transform .15s" [style.transform]="node.isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'">chevron_right</mat-icon>
+                }
+                @if (!node.hasChildren) {
+                  <span style="width:16px;display:inline-block"></span>
+                }
+              </span>
+              <span class="cidms-level-dot" [style.background]="getLevelColor(node.levelIdx)"></span>
+              <span class="cidms-node-desc">{{ getItemDesc(node.item, node.levelIdx) }}</span>
+              @if (node.hasChildren) {
+                <span class="cidms-child-count">{{ node.childCount }}</span>
+              }
+              @if (node.isLeaf) {
+                <span class="cidms-leaf-badge">leaf</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (!loading() && selectedItem) {
+      <div class="cidms-picker-selection-preview">
+        <span style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Selected:</span>
+        <span class="cidms-level-badge" [style.background]="getLevelBg(selectedLevelIdx)" [style.color]="getLevelColor(selectedLevelIdx)" [style.border-color]="getLevelColor(selectedLevelIdx)">
+          {{ getLevelLabel(selectedLevelIdx) }}
+        </span>
+        <span style="font-size:13px;color:#1e293b;font-weight:500">{{ getItemDesc(selectedItem, selectedLevelIdx) }}</span>
+      </div>
+    }
+
+    <div class="cidms-picker-footer">
+      <button type="button" class="cidms-btn-cancel" (click)="cancel()">Cancel</button>
+      <button
+        type="button"
+        class="cidms-btn-confirm"
+        [disabled]="!selectedItem || !selectedIsLeaf"
+        (click)="confirmSelection()"
+      >
+        <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:4px">check</mat-icon>
+        Confirm Selection
+      </button>
+    </div>
+  </div>
+}

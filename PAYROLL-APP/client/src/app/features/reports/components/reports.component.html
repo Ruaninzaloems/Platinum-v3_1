@@ -1,0 +1,291 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Reports</h1>
+    <p class="page-subtitle">Generate statutory reports, payslips and data exports</p>
+  </div>
+</div>
+
+<div class="module-tabs">
+  <div class="detail-tab" [class.active]="activeTab === 'statutory'" (click)="switchTab('statutory')"><app-icon name="file" [size]="14"></app-icon> Statutory Reports</div>
+  <div class="detail-tab" [class.active]="activeTab === 'payslips'" (click)="switchTab('payslips')"><app-icon name="creditCard" [size]="14"></app-icon> Payslips</div>
+  <div class="detail-tab" [class.active]="activeTab === 'exports'" (click)="switchTab('exports')"><app-icon name="download" [size]="14"></app-icon> Data Exports</div>
+  <div class="detail-tab" [class.active]="activeTab === 'ee'" (click)="switchTab('ee')"><app-icon name="users" [size]="14"></app-icon> Employment Equity</div>
+  <div class="detail-tab" [class.active]="activeTab === 'tools'" (click)="switchTab('tools')"><app-icon name="settings" [size]="14"></app-icon> Tools</div>
+</div>
+
+@if (activeTab === 'statutory') {
+  <div class="form-grid" style="max-width:400px;margin-bottom:20px">
+    <div class="form-group">
+      <label>Tax Year</label>
+      <select class="form-control" [(ngModel)]="taxYear" (ngModelChange)="loadStatutorySummary()">
+        <option [ngValue]="2026">2026 (Mar 2025 - Feb 2026)</option>
+        <option [ngValue]="2025">2025 (Mar 2024 - Feb 2025)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Tax Period</label>
+      <select class="form-control" [(ngModel)]="taxPeriod">
+        @for (p of periods; track p) {
+          <option [ngValue]="p">Period {{ p }} - {{ periodMonths[p - 1] }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div class="section-header"><app-icon name="shield" [size]="16"></app-icon> SARS Statutory Reports</div>
+  <div class="summary-row" style="margin-bottom:20px">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadEMP201()">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="file" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EMP201</div><div class="summary-value">Monthly Declaration</div><div class="summary-sub">PAYE + UIF + SDL</div></div>
+    </div>
+    <div class="summary-card sc-green" style="cursor:pointer" (click)="downloadEMP501()">
+      <div class="summary-icon" style="background:var(--success-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EMP501</div><div class="summary-value">Annual Reconciliation</div><div class="summary-sub">Full tax year summary</div></div>
+    </div>
+    <div class="summary-card sc-orange" style="cursor:pointer" (click)="downloadReport('/reports/irp5/' + taxYear + '/1', 'IRP5')">
+      <div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="fileText" [size]="18"></app-icon></div>
+      <div><div class="summary-label">IRP5 / IT3(a)</div><div class="summary-value">Tax Certificates</div><div class="summary-sub">Per employee per year</div></div>
+    </div>
+    <div class="summary-card sc-purple" style="cursor:pointer" (click)="downloadEasyFile()">
+      <div class="summary-icon" style="background:var(--purple-bg)"><app-icon name="download" [size]="18"></app-icon></div>
+      <div><div class="summary-label">e&#64;syFile</div><div class="summary-value">SARS Export</div><div class="summary-sub">CSV for eFiling</div></div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:20px"><app-icon name="upload" [size]="16"></app-icon> Electronic Filing</div>
+  <div class="summary-row" style="margin-bottom:20px">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadIRP5Batch()">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="file" [size]="18"></app-icon></div>
+      <div><div class="summary-label">IRP5 Batch PDF</div><div class="summary-value">All Certificates</div><div class="summary-sub">Bulk PDF download</div></div>
+    </div>
+    <div class="summary-card sc-green" style="cursor:pointer" (click)="downloadIRP5Text()">
+      <div class="summary-icon" style="background:var(--success-bg)"><app-icon name="fileText" [size]="18"></app-icon></div>
+      <div><div class="summary-label">IRP5 Electronic Text</div><div class="summary-value">Text File</div><div class="summary-sub">SARS electronic format</div></div>
+    </div>
+    <div class="summary-card sc-orange" style="cursor:pointer" (click)="downloadEMP201Electronic()">
+      <div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="file" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EMP201 Electronic</div><div class="summary-value">Electronic Submission</div><div class="summary-sub">Monthly e-filing</div></div>
+    </div>
+    <div class="summary-card sc-purple" style="cursor:pointer" (click)="downloadEMP501Electronic()">
+      <div class="summary-icon" style="background:var(--purple-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EMP501 Electronic</div><div class="summary-value">Annual e-filing</div><div class="summary-sub">Electronic reconciliation</div></div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:20px"><app-icon name="shield" [size]="16"></app-icon> Compliance Reports</div>
+  <div class="summary-row" style="margin-bottom:20px">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadROE()">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="file" [size]="18"></app-icon></div>
+      <div><div class="summary-label">Return of Earnings</div><div class="summary-value">COIDA</div><div class="summary-sub">Annual earnings report</div></div>
+    </div>
+    <div class="summary-card sc-green" style="cursor:pointer" (click)="downloadSDL()">
+      <div class="summary-icon" style="background:var(--success-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+      <div><div class="summary-label">SDL Annual</div><div class="summary-value">LGSETA</div><div class="summary-sub">Skills levy report</div></div>
+    </div>
+    <div class="summary-card sc-orange" style="cursor:pointer" (click)="downloadWSP()">
+      <div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="download" [size]="18"></app-icon></div>
+      <div><div class="summary-label">WSP/ATR Export</div><div class="summary-value">Skills Plan</div><div class="summary-sub">Workplace skills plan</div></div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:24px"><app-icon name="upload" [size]="16"></app-icon> SARS Submission Workflow</div>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:20px">
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px 0">
+      <app-icon name="alertTriangle" [size]="14"></app-icon> <strong>SARS does not offer a direct API for submissions.</strong> The standard workflow uses the e&#64;syFile Employer CSV format.
+    </p>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px"><app-icon name="file" [size]="14"></app-icon> Step 1: Generate Reports</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:0">Generate EMP201 (monthly) or EMP501 (annual reconciliation) from payroll data above.</p>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px"><app-icon name="download" [size]="14"></app-icon> Step 2: Export e&#64;syFile CSV</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:0">Download the e&#64;syFile CSV with SARS-specified columns.</p>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px"><app-icon name="upload" [size]="14"></app-icon> Step 3: Upload to SARS</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:0">Import the CSV into SARS e&#64;syFile Employer software.</p>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px"><app-icon name="check" [size]="14"></app-icon> Step 4: Confirm Submission</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:0">Verify submission status on eFiling.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:24px"><app-icon name="barChart" [size]="16"></app-icon> Report Generation History</div>
+  @if (summaryLoading) {
+    <div class="loading"><div class="spinner"></div>Loading summary...</div>
+  } @else if (summary) {
+    <div class="stat-cards" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ formatCurrency(summary.paye) }}</div><div class="stat-label">Total PAYE (Year)</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--info)">{{ formatCurrency(summary.uif) }}</div><div class="stat-label">Total UIF (Year)</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--warning)">{{ formatCurrency(summary.sdl) }}</div><div class="stat-label">Total SDL (Year)</div></div>
+      <div class="stat-card"><div class="stat-value">{{ summary.employee_count || 0 }}</div><div class="stat-label">Employees Processed</div></div>
+    </div>
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Period</th><th style="text-align:right">PAYE</th><th style="text-align:right">UIF (EE+ER)</th><th style="text-align:right">SDL</th><th style="text-align:center">Employees</th><th style="text-align:center">Runs</th></tr></thead>
+        <tbody>
+          @for (p of summaryPeriods; track p.tax_period) {
+            <tr>
+              <td>Period {{ p.tax_period }}</td>
+              <td style="text-align:right">{{ formatCurrency(p.paye) }}</td>
+              <td style="text-align:right">{{ formatCurrency(p.uif) }}</td>
+              <td style="text-align:right">{{ formatCurrency(p.sdl) }}</td>
+              <td style="text-align:center">{{ p.employee_count || 0 }}</td>
+              <td style="text-align:center">{{ p.run_count || 0 }}</td>
+            </tr>
+          }
+          @if (summaryPeriods.length === 0) {
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No payroll data for this tax year</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div style="color:var(--text-muted);text-align:center;padding:16px">No report history available for this tax year.</div>
+  }
+}
+
+@if (activeTab === 'payslips') {
+  <div class="section-header"><app-icon name="creditCard" [size]="16"></app-icon> Payslip Generation</div>
+  <div style="margin-bottom:16px">
+    <div class="form-group" style="max-width:500px;margin-bottom:12px">
+      <label>Select Payroll Run</label>
+      <select class="form-control" [(ngModel)]="payslipRunId" (change)="onRunChange()">
+        <option value="">-- Select Run --</option>
+        @for (r of payrollRuns; track r.id) {
+          <option [value]="r.id">{{ r.cycle_name }} - Period {{ r.period_number }} ({{ r.run_type }}) [{{ r.status }}]</option>
+        }
+      </select>
+    </div>
+
+    @if (payslipRunId && runEmployees.length > 0) {
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <label style="font-weight:600;font-size:13px;margin:0">Employees ({{ selectedEmployeeIds.length }} of {{ filteredRunEmployees.length }} selected)</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" style="font-size:11px;padding:3px 8px" (click)="selectAllEmployees()">Select All</button>
+            <button class="btn btn-sm" style="font-size:11px;padding:3px 8px" (click)="deselectAllEmployees()">Deselect All</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <input class="form-control" style="flex:1;min-width:200px;max-width:300px;font-size:12px;padding:6px 10px"
+                 [(ngModel)]="empSearch" (ngModelChange)="filterEmployees()"
+                 placeholder="Search name, surname, code, ID...">
+          <select class="form-control" style="width:auto;min-width:160px;font-size:12px;padding:6px 8px"
+                  [(ngModel)]="empDivisionFilter" (change)="filterEmployees()">
+            <option value="">All Divisions</option>
+            @for (d of divisions; track d.id) {
+              <option [value]="d.id">{{ d.name }}</option>
+            }
+          </select>
+          <select class="form-control" style="width:auto;min-width:160px;font-size:12px;padding:6px 8px"
+                  [(ngModel)]="empPayPointFilter" (change)="filterEmployees()">
+            <option value="">All Pay Points</option>
+            @for (pp of payPoints; track pp.id) {
+              <option [value]="pp.id">{{ pp.name }}</option>
+            }
+          </select>
+        </div>
+        <div style="max-height:260px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff">
+          @if (filteredRunEmployees.length === 0) {
+            <div style="padding:16px;text-align:center;color:#999;font-size:13px">No employees match your filters</div>
+          }
+          @for (emp of filteredRunEmployees; track emp.id) {
+            <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px;margin:0"
+                   [style.background]="isEmployeeSelected(emp.id) ? '#f0f7ff' : '#fff'">
+              <input type="checkbox" [checked]="isEmployeeSelected(emp.id)" (change)="toggleEmployee(emp.id)" style="margin:0">
+              <span style="font-weight:600;min-width:70px">{{ emp.employee_code }}</span>
+              <span style="flex:1">{{ emp.surname }}, {{ emp.first_name }}</span>
+              @if (emp.pay_point_name) {
+                <span style="font-size:11px;color:#888;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ emp.pay_point_name }}</span>
+              }
+            </label>
+          }
+        </div>
+      </div>
+    } @else if (payslipRunId && runEmployeesLoading) {
+      <div style="padding:12px;color:#888;font-size:13px">Loading employees...</div>
+    } @else if (payslipRunId && runEmployees.length === 0 && !runEmployeesLoading) {
+      <div style="padding:12px;color:#999;font-size:13px">No employees found for this run.</div>
+    }
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-primary" [disabled]="!payslipRunId || selectedEmployeeIds.length === 0" (click)="downloadPayslip()"><app-icon name="download" [size]="14"></app-icon> Download Payslip</button>
+    <button class="btn" [disabled]="!payslipRunId" (click)="downloadPayslipBatch()"><app-icon name="file" [size]="14"></app-icon> Batch Payslips</button>
+    <button class="btn" [disabled]="!payslipRunId" (click)="downloadEFT()"><app-icon name="creditCard" [size]="14"></app-icon> Download EFT File</button>
+    <button class="btn" [disabled]="!payslipRunId" (click)="exportPayroll('excel')"><app-icon name="file" [size]="14"></app-icon> Export Excel</button>
+    <button class="btn" [disabled]="!payslipRunId" (click)="exportPayroll('csv')"><app-icon name="download" [size]="14"></app-icon> Export CSV</button>
+  </div>
+}
+
+@if (activeTab === 'exports') {
+  <div class="section-header"><app-icon name="download" [size]="16"></app-icon> Data Exports</div>
+  <div class="summary-row">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadEmployeeExport('excel')">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="users" [size]="18"></app-icon></div>
+      <div><div class="summary-label">Employee Register</div><div class="summary-value">Excel</div></div>
+    </div>
+    <div class="summary-card sc-green" style="cursor:pointer" (click)="downloadEmployeeExport('csv')">
+      <div class="summary-icon" style="background:var(--success-bg)"><app-icon name="users" [size]="18"></app-icon></div>
+      <div><div class="summary-label">Employee Register</div><div class="summary-value">CSV</div></div>
+    </div>
+  </div>
+  <div class="section-header" style="margin-top:20px"><app-icon name="file" [size]="16"></app-icon> Proof of Employment</div>
+  <div class="form-grid" style="max-width:400px;margin-bottom:12px">
+    <div class="form-group">
+      <label>Select Employee</label>
+      <select class="form-control" [(ngModel)]="letterEmployeeId">
+        <option value="">-- Select --</option>
+        @for (e of employees; track e.id) {
+          <option [value]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+        }
+      </select>
+    </div>
+  </div>
+  <button class="btn btn-primary" (click)="downloadEmploymentLetter()"><app-icon name="fileText" [size]="14"></app-icon> Generate Letter</button>
+}
+
+@if (activeTab === 'ee') {
+  <div class="section-header"><app-icon name="users" [size]="16"></app-icon> Employment Equity Reports</div>
+  <div class="form-grid" style="max-width:200px;margin-bottom:16px">
+    <div class="form-group">
+      <label>Report Year</label>
+      <select class="form-control" [(ngModel)]="eeYear">
+        <option [ngValue]="2026">2026</option>
+        <option [ngValue]="2025">2025</option>
+        <option [ngValue]="2024">2024</option>
+      </select>
+    </div>
+  </div>
+  <div class="summary-row">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadReport('/reports/ee-annual/' + eeYear, 'EE Annual Report')">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="fileText" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EE Annual Report</div><div class="summary-value">Full Report</div></div>
+    </div>
+    <div class="summary-card sc-green" style="cursor:pointer" (click)="downloadReport('/reports/eea2/' + eeYear, 'EEA2 Workforce Profile')">
+      <div class="summary-icon" style="background:var(--success-bg)"><app-icon name="users" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EEA2</div><div class="summary-value">Workforce Profile</div></div>
+    </div>
+    <div class="summary-card sc-orange" style="cursor:pointer" (click)="downloadReport('/reports/eea4/' + eeYear, 'EEA4 Income Differentials')">
+      <div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+      <div><div class="summary-label">EEA4</div><div class="summary-value">Income Differentials</div></div>
+    </div>
+  </div>
+}
+
+@if (activeTab === 'tools') {
+  <div class="section-header"><app-icon name="settings" [size]="16"></app-icon> Report Tools</div>
+  <div class="summary-row">
+    <div class="summary-card sc-blue" style="cursor:pointer" (click)="downloadReport('/reports/uif-ui19/' + taxYear + '/' + taxPeriod, 'UIF UI-19')">
+      <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="file" [size]="18"></app-icon></div>
+      <div><div class="summary-label">UIF UI-19</div><div class="summary-value">UIF Declaration</div><div class="summary-sub">Monthly UIF return</div></div>
+    </div>
+    <div class="summary-card sc-orange" style="cursor:pointer" (click)="downloadReport('/reports/mfma-s66', 'MFMA S66')">
+      <div class="summary-icon" style="background:var(--warning-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+      <div><div class="summary-label">MFMA S66</div><div class="summary-value">Municipal Report</div><div class="summary-sub">Section 66 personnel</div></div>
+    </div>
+  </div>
+}

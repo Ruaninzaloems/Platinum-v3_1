@@ -1,0 +1,103 @@
+<button class="copilot-fab" (click)="togglePanel()" matTooltip="AI Finance Copilot" [class.active]="isOpen()">
+  <mat-icon>{{ isOpen() ? 'close' : 'smart_toy' }}</mat-icon>
+</button>
+
+@if (isOpen()) {
+  <div class="copilot-overlay" (click)="togglePanel()"></div>
+  <div class="copilot-panel">
+    <div class="copilot-header">
+      <div class="header-left">
+        <mat-icon class="header-icon">smart_toy</mat-icon>
+        <div class="header-text">
+          <span class="header-title">AI Finance Copilot</span>
+          <span class="header-subtitle">Municipal finance expert</span>
+        </div>
+      </div>
+      <button class="close-btn" (click)="togglePanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="copilot-messages" #messagesContainer>
+      @if (messages().length === 0) {
+        <div class="welcome-section">
+          <div class="welcome-icon">
+            <mat-icon>auto_awesome</mat-icon>
+          </div>
+          <h3 class="welcome-title">How can I help?</h3>
+          <p class="welcome-text">Ask me about your municipality's financial position, audit risks, compliance, or AFS preparation.</p>
+          <div class="suggested-questions">
+            @for (q of suggestedQuestions; track q) {
+              <button class="suggestion-chip" (click)="askQuestion(q)">{{ q }}</button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (msg of messages(); track $index) {
+        <div class="message" [class.user-message]="msg.role === 'user'" [class.assistant-message]="msg.role === 'assistant'">
+          @if (msg.role === 'assistant') {
+            <div class="message-avatar assistant-avatar">
+              <mat-icon>smart_toy</mat-icon>
+            </div>
+          }
+          <div class="message-bubble" [class.user-bubble]="msg.role === 'user'" [class.assistant-bubble]="msg.role === 'assistant'">
+            <div class="message-content" [innerHTML]="formatContent(msg.content)"></div>
+            @if (msg.references && msg.references.length > 0) {
+              <div class="message-references">
+                @for (ref of msg.references; track ref.label) {
+                  <button class="ref-link" (click)="navigateToRef(ref)">
+                    <mat-icon class="ref-icon">link</mat-icon>
+                    {{ ref.label }}
+                  </button>
+                }
+              </div>
+            }
+            @if (msg.suggestedQuestions && msg.suggestedQuestions.length > 0) {
+              <div class="followup-questions">
+                @for (q of msg.suggestedQuestions; track q) {
+                  <button class="followup-chip" (click)="askQuestion(q)">{{ q }}</button>
+                }
+              </div>
+            }
+            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+          </div>
+          @if (msg.role === 'user') {
+            <div class="message-avatar user-avatar">
+              <mat-icon>person</mat-icon>
+            </div>
+          }
+        </div>
+      }
+
+      @if (isLoading()) {
+        <div class="message assistant-message">
+          <div class="message-avatar assistant-avatar">
+            <mat-icon>smart_toy</mat-icon>
+          </div>
+          <div class="message-bubble assistant-bubble">
+            <div class="typing-indicator">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="copilot-input">
+      <input
+        type="text"
+        class="chat-input"
+        placeholder="Ask a financial question..."
+        [(ngModel)]="inputText"
+        (keydown.enter)="sendMessage()"
+        [disabled]="isLoading()"
+      />
+      <button class="send-btn" (click)="sendMessage()" [disabled]="!inputText.trim() || isLoading()">
+        <mat-icon>send</mat-icon>
+      </button>
+    </div>
+  </div>
+}

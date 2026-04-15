@@ -1,0 +1,15 @@
+<div class="gauge-container">
+  <svg [attr.viewBox]="'0 0 200 120'" class="gauge-svg">
+    <path [attr.d]="arcPath()" fill="none" stroke="#e2e8f0" [attr.stroke-width]="strokeWidth()" stroke-linecap="round" />
+    <path [attr.d]="arcPath()" fill="none" [attr.stroke]="gaugeColor()" [attr.stroke-width]="strokeWidth()"
+          stroke-linecap="round"
+          [attr.stroke-dasharray]="arcLength()"
+          [attr.stroke-dashoffset]="dashOffset()" />
+  </svg>
+  <div class="gauge-center-text">
+    <span class="gauge-value" [style.color]="gaugeColor()">{{ clampedValue() }}%</span>
+    @if (label()) {
+      <span class="gauge-label">{{ label() }}</span>
+    }
+  </div>
+</div>

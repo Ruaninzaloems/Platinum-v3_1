@@ -1,0 +1,119 @@
+USE [EMS_George]
+GO
+
+/****** Object:  StoredProcedure [dbo].[Payroll_EmployeeUnionFeesCalculation_Trial_sp]    Script Date: 3/18/2026 9:27:46 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+/*
+	Author		:	FERDI BOTHA
+	Create date	:	06/03/2017
+	Description	:	Calculates Employees Union Deductions
+	Update date	:	10/04/2017 - added the ability to distinguish between a single (employee payslip), batch trial and adhoc trial runs
+	Update date	:	10/05/2017 - Changed the mappings for Method of Calculation
+	Update date	:	27/06/2017 - Updated Parameters & IRP5Code mappings
+	Update date	:	30/06/2017 - Updated the joins to the correct mappings
+*/
+create procedure [dbo].[Payroll_EmployeeUnionFeesCalculation_Trial_sp] @EmployeeID int, @PeriodID int, @CycleID int, @CycleModeID int, @StartDate datetime, @EndDate datetime, @Month int, @SCOAYear nvarchar(10), @TaxYear nvarchar(10), @Simulation bit
+as
+
+begin
+
+	set nocount on;
+
+	begin try
+
+		insert into [Payroll_EmployeeTrialPayslip]([EmployeeID], [PayrollDefinationID], [Amount], [Month], [FinancialYear], [PeriodID], [VendorID], [SalaryHeadTitleAddendum], [TaxYear], [ReferenceNo], [Simulation])
+
+			select [EmployeeID], [EmployeePayrollDefinition_ID], ((cast(
+
+					case when isnull([ContributionType], 0) = 1 then
+
+						case when ((cast([FixedSalary] as decimal(18, 6)) * isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6)))) / cast(100 as decimal(18, 6))) > isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) then isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) else ((cast([FixedSalary] as decimal(18, 6)) * isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6)))) / cast(100 as decimal(18, 6))) end
+
+					else
+
+						case when isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) > isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) then isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) else isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) end
+
+					end
+
+				as decimal(18, 6)) * cast([Percentage] as decimal(18, 6))) / cast(100 as decimal(18, 6))), @Month, @SCOAYear, @PeriodID, [VendorID], [UnionRepresentatives], @TaxYear, [UnionRepresentatives],  @Simulation
+
+				from ([Payroll_EmployeeUnion] as [eu] with(nolock)
+
+					join [Const_UnionRepresentatives] as [cu] with(nolock) on [UnionRepresentatives_ID] = [eu].[UnionRepresentativesID] and [cu].[Enabled] = 1)
+
+					join [Cons_Vendor] as [ven] with(nolock) on [Vendor_ID] = [cu].[VendorID]
+
+					join (
+
+						select distinct [EPD].[EmployeeID], isnull([FixedSalary], 0) as [FixedSalary], [EmployeePayrollDefinition_ID], [Percentage]
+
+							from [Payroll_EmployeePayrollDefinition] as [EPD] with(nolock)
+
+								join [Payroll_SalaryHead] as [SH] with(nolock) on [SalaryHead_ID] = [EPD].[PayrollSalaryHeadID] and [SH].[Enabled] = 1
+
+								join [Payroll_IRP5Code] as [IRP5] with(nolock) on [IRP5Code_ID] = [SH].[IRP5CodeId] and [IRP5].[Enabled] = 1
+
+								join [Payroll_Employee] as [PE] with(nolock) on [Employee_ID] = [EPD].[EmployeeID] and [PE].[CycleID] = @CycleID
+
+								join [Payroll_CyclePeriodDetails] as [CPD] with(nolock) on [CPD].[CycleID] = [PE].[CycleID] and [Period_ID] = @PeriodID and [CPD].[Enabled] = 1
+
+								join [Payroll_TrialRun_History_Employees] as [EP] with(nolock) on [EP].[Employee_ID] = [PE].[Employee_ID] and [EP].[Period_ID] = [CPD].[Period_ID] and [EP].[Cycle_ID] = [PE].[CycleID]
+
+								left outer join [Payroll_CyclePeriodAdhocSalaryHead] as [ACPD] with(nolock) on [PeriodID] = [CPD].[Period_ID] and [ACPD].[SalaryHeadID] = [SalaryHead_ID]
+
+							where ([EPD].[EmployeeID] = (case @EmployeeID when 0 then [EPD].[EmployeeID] else @EmployeeID end) and [EPD].[Enabled] = 1 and [TransactionTypeID] = 2 and
+
+								[SalaryHead_ID] = 9 and
+
+								(case
+
+									when @CycleModeID = 1 then
+
+										case when isnull([CyclePeriodAdhocPayrollDefinition_ID], 0) = 0 then 1 else 0 end
+
+									when @CycleModeID = 2 then
+
+										case when isnull([CyclePeriodAdhocPayrollDefinition_ID], 0) = 0 then 0 else 1 end
+
+									else 0 end) = 1
+
+							)
+
+				) as [emp] on [emp].[EmployeeID] = [eu].[EmpID]
+
+					where ([eu].[Enabled] = 1 and [eu].[StartDate] <= @EndDate and isnull([eu].[EndDate], @StartDate) >= @StartDate and ((cast(
+
+					case when isnull([ContributionType], 0) = 1 then
+
+						case when ((cast([FixedSalary] as decimal(18, 6)) * isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6)))) / cast(100 as decimal(18, 6))) > isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) then isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) else ((cast([FixedSalary] as decimal(18, 6)) * isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6)))) / cast(100 as decimal(18, 6))) end
+
+					else
+
+						case when isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) > isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) then isnull(cast([ContributionMaxValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) else isnull(cast([ContributionValue] as decimal(18, 6)), cast(0 as decimal(18, 6))) end
+
+					end
+
+				as decimal(18, 6)) * cast([Percentage] as decimal(18, 6))) / cast(100 as decimal(18, 6))) > 0)
+
+	end try
+
+	begin catch
+
+		insert into [Payroll_TrialErrors]([ValidationType], [PeriodID], [ErrorMessage], [StoredProcedure], [CapturedBy], [CapturedDate], [Simulation])
+
+			values('System', @PeriodID, '#' + cast(error_line() as nvarchar) + ' - ' + error_message(), error_procedure(), 1, getdate(), @Simulation)
+
+	end catch
+
+	set nocount off;
+
+end
+GO
+
+

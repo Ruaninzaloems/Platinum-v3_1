@@ -1,0 +1,544 @@
+<div class="page-container">
+  <div class="page-header-bar">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+      </div>
+      <div>
+        <h1 class="page-title" data-testid="text-page-title">Payment Processing</h1>
+        <p class="page-subtitle">Third party payment import and reconciliation</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-item" [class.active]="pageTab() === 'third-party'" (click)="pageTab.set('third-party')" data-testid="tab-third-party">
+      Third Party Import
+    </button>
+    <button class="tab-item" [class.active]="pageTab() === 'generic-import'" (click)="pageTab.set('generic-import')" data-testid="tab-generic-import">
+      Generic Import
+    </button>
+  </div>
+
+  <div class="content-area">
+    @if (pageTab() === 'third-party') {
+      @if (step() === 'import') {
+        <div class="import-card">
+          <div class="card-header">
+            <h2>Import Third Party Payment File</h2>
+          </div>
+          <div class="card-body">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Third Party Type <span class="required">*</span></label>
+                <select class="form-select" [ngModel]="selectedTypeId()" (ngModelChange)="selectedTypeId.set($event)" data-testid="select-type">
+                  <option value="">Select type...</option>
+                  @for (t of thirdPartyTypes(); track t.id) {
+                    <option [value]="t.id">{{ t.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Payment Reference</label>
+                <input class="form-input" placeholder="Optional reference" [ngModel]="paymentRef()" (ngModelChange)="paymentRef.set($event)" data-testid="input-payment-ref" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Upload File <span class="required">*</span></label>
+              <input type="file" class="form-input" accept=".csv,.txt,.xls,.xlsx" (change)="onFileChange($event)" data-testid="input-file" />
+              @if (file()) {
+                <span class="file-info">Selected: {{ file()!.name }} ({{ (file()!.size / 1024).toFixed(1) }} KB)</span>
+              }
+            </div>
+
+            @if (processResult()) {
+              <div class="alert" [class.alert-success]="processResult()!.success" [class.alert-error]="!processResult()!.success" data-testid="text-process-result">
+                {{ processResult()!.message }}
+              </div>
+            }
+
+            <div class="form-actions">
+              <button class="btn-primary" (click)="handleImport()" [disabled]="isProcessing() || !selectedTypeId() || !file()" data-testid="button-import">
+                @if (isProcessing()) { <span class="spinner spinner-sm"></span> } Import &amp; Process
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (step() === 'transactions') {
+        <div class="transactions-header">
+          <div class="txn-header-left">
+            <button class="btn-outline" (click)="requestResetImport()" data-testid="button-back">&larr; Back</button>
+            <h2>Transaction Review</h2>
+            <span class="txn-total">{{ transactions().length }} transactions &middot; {{ formatCurrency(totalImportAmount()) }}</span>
+          </div>
+          <div class="txn-header-right">
+            <button class="btn-outline" (click)="handleValidate()" [disabled]="validating()" data-testid="button-validate">
+              @if (validating()) { <span class="spinner spinner-sm"></span> } Validate
+            </button>
+            <button class="btn-primary" (click)="requestCommit()" [disabled]="committing()" data-testid="button-commit">
+              @if (committing()) { <span class="spinner spinner-sm"></span> } Commit {{ matchCounts().ready }} Payment(s)
+            </button>
+          </div>
+        </div>
+
+        @if (loadingTxns()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>{{ loadProgress().step }}</p>
+            @if (loadProgress().percent > 0) {
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="loadProgress().percent"></div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="filter-tabs">
+            <button class="filter-tab" [class.active]="activeFilter() === 'all'" (click)="activeFilter.set('all')" data-testid="filter-all">
+              All ({{ matchCounts().all }})
+            </button>
+            <button class="filter-tab" [class.active]="activeFilter() === 'auto-matched'" (click)="activeFilter.set('auto-matched')" data-testid="filter-auto-matched">
+              Auto-Matched ({{ matchCounts().autoMatched }})
+            </button>
+            <button class="filter-tab" [class.active]="activeFilter() === 'needs-review'" (click)="activeFilter.set('needs-review')" data-testid="filter-needs-review">
+              Needs Review ({{ matchCounts().needsReview }})
+            </button>
+            <button class="filter-tab" [class.active]="activeFilter() === 'unmatched'" (click)="activeFilter.set('unmatched')" data-testid="filter-unmatched">
+              Unmatched ({{ matchCounts().unmatched }})
+            </button>
+            <button class="filter-tab" [class.active]="activeFilter() === 'ready'" (click)="activeFilter.set('ready')" data-testid="filter-ready">
+              Ready ({{ matchCounts().ready }})
+            </button>
+          </div>
+
+          @if (validationResult()) {
+            <div class="alert" [class.alert-success]="validationResult().isValid || validationResult().isSuccess" [class.alert-error]="!(validationResult().isValid || validationResult().isSuccess)">
+              {{ validationResult().message || (validationResult().isValid ? 'Validation passed' : 'Validation failed') }}
+            </div>
+          }
+
+          @if (commitResult()?.error) {
+            <div class="alert alert-error" data-testid="text-commit-error">
+              {{ commitResult().message }}
+            </div>
+          }
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Imported Account</th>
+                  <th>Resolved Account</th>
+                  <th>Owner</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (txn of filteredTransactions(); track txn.index) {
+                  <tr [attr.data-testid]="'row-txn-' + txn.index">
+                    <td>{{ txn.index + 1 }}</td>
+                    <td class="font-mono">{{ txn.importedAccountNumber || '-' }}</td>
+                    <td class="font-mono">
+                      @if (editingIdx() === txn.index) {
+                        <input class="form-input form-input-sm" [ngModel]="editAccountNo()" (ngModelChange)="editAccountNo.set($event)" />
+                      } @else {
+                        {{ txn.resolvedAccountNumber || '-' }}
+                      }
+                    </td>
+                    <td>{{ txn.ownerName || '-' }}</td>
+                    <td class="amount-cell">{{ formatCurrency(txn.amount) }}</td>
+                    <td><span class="badge" [ngClass]="getMatchBadgeClass(txn.matchStatus)">{{ txn.matchStatus }}</span></td>
+                    <td class="message-cell">{{ txn.validationMessage || txn.comment || '-' }}</td>
+                    <td>
+                      @if (editingIdx() === txn.index) {
+                        <div class="action-buttons">
+                          <button class="btn-primary btn-sm" (click)="saveEdit()" [disabled]="savingEdit()" [attr.data-testid]="'button-save-edit-' + txn.index">Save</button>
+                          <button class="btn-outline btn-sm" (click)="cancelEdit()" [attr.data-testid]="'button-cancel-edit-' + txn.index">Cancel</button>
+                        </div>
+                      } @else {
+                        <div class="action-buttons">
+                          <button class="btn-outline btn-sm" (click)="startEdit(txn)" title="Edit" [attr.data-testid]="'button-edit-' + txn.index">&#9998;</button>
+                          <button class="btn-outline btn-sm" (click)="openSearch(txn.index)" title="Search" [attr.data-testid]="'button-search-' + txn.index">&#128269;</button>
+                          @if (txn.resolvedAccountId) {
+                            <button class="btn-outline btn-sm btn-text-danger" (click)="clearLink(txn.index)" title="Clear" [attr.data-testid]="'button-clear-' + txn.index">&#10005;</button>
+                          }
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      @if (step() === 'committed') {
+        <div class="committed-card">
+          <div class="committed-content">
+            <div class="committed-icon">&#10003;</div>
+            <h2>Payments Committed Successfully</h2>
+            <p>{{ transactions().length }} transactions totaling {{ formatCurrency(totalImportAmount()) }} have been committed.</p>
+            <button class="btn-primary" (click)="resetImport()" data-testid="button-new-import">Start New Import</button>
+          </div>
+        </div>
+      }
+    }
+
+    @if (pageTab() === 'generic-import') {
+      <div class="steps-bar">
+        <div class="step-dot" [class.active]="giStep() === 'upload'" [class.completed]="giStep() !== 'upload'">1</div>
+        <div class="step-line" [class.active]="giStep() !== 'upload'"></div>
+        <div class="step-dot" [class.active]="giStep() === 'preview'" [class.completed]="giStep() === 'processing' || giStep() === 'results'">2</div>
+        <div class="step-line" [class.active]="giStep() === 'processing' || giStep() === 'results'"></div>
+        <div class="step-dot" [class.active]="giStep() === 'processing'" [class.completed]="giStep() === 'results'">3</div>
+        <div class="step-line" [class.active]="giStep() === 'results'"></div>
+        <div class="step-dot" [class.active]="giStep() === 'results'">4</div>
+      </div>
+
+      @if (giStep() === 'upload') {
+        <div class="import-card">
+          <div class="card-header">
+            <h2>Generic CSV Import</h2>
+          </div>
+          <div class="card-body">
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">Payment Reference</label>
+                <input class="form-input" placeholder="e.g. Batch-2026-03" [ngModel]="giPaymentRef()" (ngModelChange)="giPaymentRef.set($event)" data-testid="input-gi-payment-ref" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Payment Type</label>
+                <select class="form-select" [ngModel]="giPaymentTypeId()" (ngModelChange)="giPaymentTypeId.set($event)" data-testid="select-gi-payment-type">
+                  <option value="1">Cash</option>
+                  <option value="2">Cheque</option>
+                  <option value="3">Credit Card</option>
+                  <option value="4">Debit Order</option>
+                  <option value="5">EFT</option>
+                  <option value="6">Postal Order</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cash Office</label>
+                <select class="form-select" [ngModel]="giSelectedCashOfficeId()" (ngModelChange)="giSelectedCashOfficeId.set($event)" data-testid="select-gi-cash-office">
+                  @if (giLoadingCashOffices()) {
+                    <option value="">Loading...</option>
+                  } @else {
+                    <option value="">Select cash office...</option>
+                    @for (o of giCashOffices(); track o.id) {
+                      <option [value]="o.id">{{ o.name }}</option>
+                    }
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Upload CSV File <span class="required">*</span></label>
+              <div class="drop-zone" [class.drag-over]="giDragOver()" (dragover)="onGiDragOver($event)" (dragleave)="onGiDragLeave()" (drop)="onGiDrop($event)" (click)="giFileInput.click()">
+                <input #giFileInput type="file" accept=".csv" style="display:none" (change)="onGiFileChange($event)" data-testid="input-gi-file" />
+                @if (giFile()) {
+                  <div class="drop-zone-icon">&#128196;</div>
+                  <div class="drop-zone-text"><strong>{{ giFile()!.name }}</strong> ({{ (giFile()!.size / 1024).toFixed(1) }} KB)</div>
+                } @else {
+                  <div class="drop-zone-icon">&#128228;</div>
+                  <div class="drop-zone-text">Drop CSV file here or <strong>click to browse</strong></div>
+                  <div class="drop-zone-text" style="font-size:0.75rem; margin-top:0.25rem">Format: AccountNumber, Amount (one per line)</div>
+                }
+              </div>
+            </div>
+
+            @if (giError()) {
+              <div class="alert alert-error">{{ giError() }}</div>
+            }
+
+            @if (giValidationProgress()) {
+              <div class="gi-validation-progress" data-testid="gi-validation-progress">
+                <div class="gi-progress-label">
+                  <span class="spinner spinner-sm"></span>
+                  <span>{{ giValidationProgress()!.detail }}</span>
+                </div>
+                <div class="gi-progress-bar-outer">
+                  <div class="gi-progress-bar-fill" [style.width.%]="giValidationProgress()!.percent"></div>
+                </div>
+                <div class="gi-progress-pct">{{ giValidationProgress()!.percent }}%</div>
+              </div>
+            }
+
+            <div class="form-actions">
+              <button class="btn-primary" (click)="handleGiPreview()" [disabled]="giPreviewLoading() || !giFile()" data-testid="button-gi-preview">
+                @if (giPreviewLoading()) { <span class="spinner spinner-sm"></span> } Preview &amp; Validate
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (giStep() === 'preview') {
+        <div class="preview-stats">
+          <div class="stat-card">
+            <div class="stat-value">{{ giPreviewRows().length }}</div>
+            <div class="stat-label">Total Rows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value status-valid">{{ giPreviewRows().filter(r => r.isValid).length }}</div>
+            <div class="stat-label">Valid</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value status-invalid">{{ giPreviewRows().filter(r => !r.isValid).length }}</div>
+            <div class="stat-label">Invalid</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ formatCurrency(giPreviewTotal()) }}</div>
+            <div class="stat-label">Total Amount</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Account Number</th>
+                <th>Amount</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of giPreviewRows(); track row.rowNum) {
+                <tr [attr.data-testid]="'row-gi-preview-' + row.rowNum">
+                  <td>{{ row.rowNum }}</td>
+                  <td class="font-mono">{{ row.accountNumber }}</td>
+                  <td class="amount-cell">{{ formatCurrency(row.amount) }}</td>
+                  <td>{{ row.ownerName || '-' }}</td>
+                  <td>
+                    @if (row.validationStatus === 'valid') {
+                      <span class="badge badge-success">Valid</span>
+                    } @else if (row.validationStatus === 'invalid') {
+                      <span class="badge badge-danger">Invalid</span>
+                    } @else {
+                      <span class="badge badge-warning">Unverified</span>
+                    }
+                  </td>
+                  <td class="message-cell">{{ row.validationMsg || '-' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-actions" style="margin-top:1rem">
+          <button class="btn-outline" (click)="requestGiBack()" data-testid="button-gi-back">&larr; Back</button>
+          <button class="btn-primary" (click)="requestGiSubmit()" [disabled]="giSubmitting() || giPreviewRows().filter(r => r.isValid).length === 0" data-testid="button-gi-submit">
+            @if (giSubmitting()) { <span class="spinner spinner-sm"></span> } Submit {{ giPreviewRows().filter(r => r.isValid).length }} Valid Rows
+          </button>
+        </div>
+      }
+
+      @if (giStep() === 'processing') {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>{{ giStatus()?.message || 'Processing allocations...' }}</p>
+          @if (giStatus()?.percent > 0) {
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="giStatus()?.percent || 0"></div>
+            </div>
+          }
+          <p style="font-size:0.8125rem; color:var(--pos-text-muted)">Job ID: {{ giJobId() }}</p>
+        </div>
+      }
+
+      @if (giStep() === 'results') {
+        <div class="preview-stats">
+          <div class="stat-card">
+            <div class="stat-value status-valid">{{ giResults().length }}</div>
+            <div class="stat-label">Successful</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value status-invalid">{{ giErrors().length }}</div>
+            <div class="stat-label">Failed</div>
+          </div>
+        </div>
+
+        @if (giResults().length > 0) {
+          <h3 style="font-size:0.9375rem; font-weight:600; color:var(--platinum-primary); margin-bottom:0.5rem">Successful Allocations</h3>
+          <div class="table-container" style="margin-bottom:1rem">
+            <table>
+              <thead><tr><th>Account</th><th>Name</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (r of giResults(); track $index) {
+                  <tr [attr.data-testid]="'row-gi-result-' + $index">
+                    <td class="font-mono">{{ r.accountNo || '-' }}</td>
+                    <td>{{ r.accountName || '-' }}</td>
+                    <td class="amount-cell">{{ formatCurrency(r.allocatedAmount || 0) }}</td>
+                    <td><span class="badge badge-success">{{ r.status || 'Allocated' }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (giErrors().length > 0) {
+          <h3 style="font-size:0.9375rem; font-weight:600; color:#991B1B; margin-bottom:0.5rem">Failed Allocations</h3>
+          <div class="table-container" style="margin-bottom:1rem">
+            <table>
+              <thead><tr><th>Account</th><th>Amount</th><th>Error</th></tr></thead>
+              <tbody>
+                @for (r of giErrors(); track $index) {
+                  <tr [attr.data-testid]="'row-gi-error-' + $index">
+                    <td class="font-mono">{{ r.accountNo || '-' }}</td>
+                    <td class="amount-cell">{{ formatCurrency(r.allocatedAmount || 0) }}</td>
+                    <td style="color:#991B1B">{{ r.errorMessage || r.status || '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <div class="form-actions">
+          <button class="btn-primary" (click)="resetGi()" data-testid="button-gi-new">Start New Import</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (searchOpen()) {
+    <div class="dialog-overlay" (click)="searchOpen.set(false)">
+      <div class="dialog-content dialog-lg" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <h2>Account Search</h2>
+          <button class="btn-close" (click)="searchOpen.set(false)" data-testid="button-close-search">&times;</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Account Number</label>
+              <input class="form-input" [ngModel]="searchAccountNo()" (ngModelChange)="searchAccountNo.set($event)" data-testid="input-search-account-no" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input class="form-input" [ngModel]="searchName()" (ngModelChange)="searchName.set($event)" data-testid="input-search-name" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" (click)="handleAccountSearch()" [disabled]="searching()" data-testid="button-search-accounts">
+              @if (searching()) { <span class="spinner spinner-sm"></span> } Search
+            </button>
+          </div>
+
+          @if (searchResults().length > 0) {
+            <div class="table-container" style="margin-top:1rem">
+              <table>
+                <thead><tr><th>Account</th><th>Owner</th><th>Address</th><th>Actions</th></tr></thead>
+                <tbody>
+                  @for (r of searchResults(); track $index) {
+                    <tr [attr.data-testid]="'row-search-result-' + $index">
+                      <td class="font-mono">{{ r.accountNumber || r.accountNo || '-' }}</td>
+                      <td>{{ r.ownerName || r.name || '-' }}</td>
+                      <td>{{ r.propertyAddress || r.address || '-' }}</td>
+                      <td><button class="btn-primary btn-sm" (click)="selectSearchResult(r)" [attr.data-testid]="'button-select-' + $index">Select</button></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else if (!searching() && (searchAccountNo() || searchName())) {
+            <div class="empty-search-state" data-testid="text-no-search-results">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <p class="empty-search-title">No accounts found</p>
+              <p class="empty-search-hint">Try a different account number, name, or check for typos.</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showCommitConfirm()) {
+    <div class="confirm-overlay" (click)="cancelCommit()">
+      <div class="confirm-dialog" (click)="$event.stopPropagation()" data-testid="dialog-commit-confirm">
+        <div class="confirm-icon confirm-icon-primary">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3 class="confirm-title">Commit Payments</h3>
+        <p class="confirm-message">You are about to commit <strong>{{ matchCounts().ready }} payment(s)</strong> totalling <strong>{{ formatCurrency(totalImportAmount()) }}</strong> to the ledger.</p>
+        <p class="confirm-message confirm-warning-text">This action cannot be undone.</p>
+        <div class="confirm-actions">
+          <button class="btn-outline" (click)="cancelCommit()" data-testid="button-cancel-commit">Cancel</button>
+          <button class="btn-primary" (click)="confirmCommit()" data-testid="button-confirm-commit">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Yes, Commit Payments
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showResetConfirm()) {
+    <div class="confirm-overlay" (click)="cancelResetImport()">
+      <div class="confirm-dialog" (click)="$event.stopPropagation()" data-testid="dialog-reset-confirm">
+        <div class="confirm-icon confirm-icon-warning">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 class="confirm-title">Discard Review?</h3>
+        <p class="confirm-message">You have {{ transactions().length }} transaction(s) in review. Going back will discard all matching and editing work.</p>
+        <div class="confirm-actions">
+          <button class="btn-outline" (click)="cancelResetImport()" data-testid="button-cancel-reset">Stay</button>
+          <button class="btn-danger-solid" (click)="confirmResetImport()" data-testid="button-confirm-reset">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Discard &amp; Go Back
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showGiSubmitConfirm()) {
+    <div class="confirm-overlay" (click)="cancelGiSubmit()">
+      <div class="confirm-dialog" (click)="$event.stopPropagation()" data-testid="dialog-gi-submit-confirm">
+        <div class="confirm-icon confirm-icon-primary">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3 class="confirm-title">Submit Import</h3>
+        <p class="confirm-message">You are about to submit <strong>{{ giPreviewRows().filter(r => r.isValid).length }} valid payment(s)</strong> totalling <strong>{{ formatCurrency(giPreviewTotal()) }}</strong> for processing.</p>
+        <p class="confirm-message confirm-warning-text">This action cannot be undone.</p>
+        <div class="confirm-actions">
+          <button class="btn-outline" (click)="cancelGiSubmit()" data-testid="button-cancel-gi-submit">Cancel</button>
+          <button class="btn-primary" (click)="confirmGiSubmit()" data-testid="button-confirm-gi-submit">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Yes, Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showGiBackConfirm()) {
+    <div class="confirm-overlay" (click)="cancelGiBack()">
+      <div class="confirm-dialog" (click)="$event.stopPropagation()" data-testid="dialog-gi-back-confirm">
+        <div class="confirm-icon confirm-icon-warning">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 class="confirm-title">Discard Preview?</h3>
+        <p class="confirm-message">You have {{ giPreviewRows().length }} validated row(s) ready for submission. Going back will discard this preview.</p>
+        <div class="confirm-actions">
+          <button class="btn-outline" (click)="cancelGiBack()" data-testid="button-cancel-gi-back">Stay</button>
+          <button class="btn-danger-solid" (click)="confirmGiBack()" data-testid="button-confirm-gi-back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Discard &amp; Go Back
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

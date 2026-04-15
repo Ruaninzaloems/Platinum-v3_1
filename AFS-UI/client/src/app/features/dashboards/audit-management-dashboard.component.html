@@ -1,0 +1,235 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div class="kpi-strip">
+      @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="skeleton" style="height:100px;border-radius:12px;flex:1;min-width:150px"></div>
+      }
+    </div>
+    <div class="dashboard-grid">
+      <div class="skeleton" style="height:320px;border-radius:12px"></div>
+      <div class="skeleton" style="height:320px;border-radius:12px"></div>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="error-container" style="text-align:center;padding:80px 24px">
+    <mat-icon style="font-size:48px;width:48px;height:48px;color:var(--platinum-danger)">error_outline</mat-icon>
+    <h3 style="margin:16px 0 8px">Unable to load dashboard</h3>
+    <p style="color:var(--platinum-text-muted);margin-bottom:16px">{{ error }}</p>
+    <button mat-flat-button color="primary" (click)="loadData()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Audit Management</h1>
+        <p class="subtitle">
+          AGSA Control Centre
+          @if (data.financialYear) {
+            <span class="fy-badge">{{ data.financialYear.label }}</span>
+          }
+        </p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile
+        title="Total Findings"
+        [value]="data.kpis.totalFindings"
+        icon="flag"
+        [color]="data.kpis.totalFindings > 0 ? 'danger' : 'success'"
+        subtitle="Audit findings raised">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Open RFIs"
+        [value]="data.kpis.openRfis"
+        icon="question_answer"
+        [color]="data.kpis.openRfis > 0 ? 'warning' : 'success'"
+        subtitle="Awaiting response">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Overdue RFIs"
+        [value]="data.kpis.overdueRfis"
+        icon="schedule"
+        [color]="data.kpis.overdueRfis > 0 ? 'danger' : 'success'"
+        subtitle="Past due date">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Evidence Uploaded"
+        [value]="data.kpis.evidenceCount"
+        icon="folder_special"
+        color="info"
+        subtitle="Documents in vault">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="WP Completion"
+        [value]="data.kpis.wpCompletion + '%'"
+        icon="assignment_turned_in"
+        [color]="data.kpis.wpCompletion >= 80 ? 'success' : data.kpis.wpCompletion >= 50 ? 'warning' : 'danger'"
+        subtitle="Working papers done">
+      </app-kpi-tile>
+      <app-kpi-tile
+        title="Compliance Score"
+        [value]="data.complianceScore + '%'"
+        icon="verified"
+        [color]="data.complianceScore >= 80 ? 'success' : data.complianceScore >= 50 ? 'warning' : 'danger'"
+        subtitle="Overall compliance">
+      </app-kpi-tile>
+    </div>
+
+    <div class="dashboard-grid">
+      <mat-card class="detail-card wide-card">
+        <div class="card-title">
+          <mat-icon>bar_chart</mat-icon> Audit Progress
+        </div>
+        <div class="audit-progress-row">
+          <div class="chart-section">
+            <h4>Findings by Severity</h4>
+            <div class="severity-bars">
+              @for (bar of findingsSeverityBars; track bar.label) {
+                <div class="severity-bar-row">
+                  <span class="sev-label">{{ bar.label }}</span>
+                  <div class="sev-bar-track">
+                    <div class="sev-bar-fill" [style.width.%]="bar.percentage" [style.background]="bar.color"></div>
+                  </div>
+                  <span class="sev-count">{{ bar.count }}</span>
+                </div>
+              }
+            </div>
+
+            <h4 style="margin-top:20px">RFI Status</h4>
+            <div class="donut-container">
+              <svg viewBox="0 0 120 120" class="donut-chart">
+                @for (slice of rfiStatusSlices; track slice.label) {
+                  <circle
+                    cx="60" cy="60" r="45"
+                    fill="none"
+                    [attr.stroke]="slice.color"
+                    stroke-width="20"
+                    [attr.stroke-dasharray]="slice.percentage * 2.827 + ' ' + (282.7 - slice.percentage * 2.827)"
+                    [attr.stroke-dashoffset]="-(slice.offset * 2.827)"
+                    [attr.transform]="'rotate(-90, 60, 60)'" />
+                }
+                <text x="60" y="56" text-anchor="middle" class="donut-center-text">{{ totalRfis }}</text>
+                <text x="60" y="70" text-anchor="middle" class="donut-center-label">RFIs</text>
+              </svg>
+              <div class="donut-legend">
+                @for (slice of rfiStatusSlices; track slice.label) {
+                  <div class="legend-item">
+                    <span class="legend-dot" [style.background]="slice.color"></span>
+                    <span class="legend-label">{{ slice.label }}</span>
+                    <span class="legend-value">{{ slice.count }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="gauge-section">
+            <div class="gauge-pair">
+              <div class="gauge-item">
+                <app-gauge-chart [value]="data.complianceScore" label="Compliance"></app-gauge-chart>
+              </div>
+              <div class="gauge-item">
+                <app-gauge-chart [value]="auditReadiness" label="Audit Readiness"></app-gauge-chart>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="dashboard-grid">
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>grid_on</mat-icon> Audit Risk Heatmap
+        </div>
+        <div class="risk-heatmap">
+          @for (area of riskAreas; track area.area) {
+            <div class="risk-row">
+              <span class="risk-area-name">{{ area.area }}</span>
+              <app-traffic-light [status]="area.risk" [label]="getRiskLabel(area.risk)"></app-traffic-light>
+              <span class="risk-details">{{ area.details }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>history</mat-icon> Recent Audit Activity
+        </div>
+        @if (data.recentActivity.length === 0) {
+          <p class="empty-text">No recent audit activity</p>
+        } @else {
+          <div class="activity-feed">
+            @for (activity of data.recentActivity.slice(0, 10); track activity.date) {
+              <div class="activity-feed-item">
+                <div class="activity-feed-icon" [class]="'icon-' + getActivityType(activity.type)">
+                  <mat-icon>{{ getActivityIcon(activity.type) }}</mat-icon>
+                </div>
+                <div class="activity-feed-content">
+                  <span class="activity-feed-text">{{ activity.action }}</span>
+                  <span class="activity-feed-date">{{ activity.date | date:'short' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+    </div>
+
+    <mat-card class="detail-card">
+      <div class="card-title">
+        <mat-icon>warning</mat-icon> Outstanding Actions
+      </div>
+      @if (outstandingActions.length === 0) {
+        <p class="empty-text">No outstanding actions — all items are on track</p>
+      } @else {
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Reference</th>
+                <th>Description</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Due / Raised</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of outstandingActions; track item.reference) {
+                <tr>
+                  <td>
+                    <span class="type-badge" [class]="'type-' + item.type">{{ item.type }}</span>
+                  </td>
+                  <td class="ref-cell">{{ item.reference }}</td>
+                  <td class="desc-cell">{{ item.description }}</td>
+                  <td>
+                    <span class="priority-badge" [class]="item.priority">{{ item.priority }}</span>
+                  </td>
+                  <td>
+                    <span class="status-badge" [class]="item.status">{{ item.status | titlecase }}</span>
+                  </td>
+                  <td class="date-cell">{{ item.date | date:'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </mat-card>
+  </div>
+}

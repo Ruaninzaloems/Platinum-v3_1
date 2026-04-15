@@ -1,0 +1,16 @@
+﻿0,Scheduled
+1,Rescheduled
+2,Immediate
+3,Paused
+4,Schedule Cancelled
+5,Recalculation Scheduled
+6,Validated
+7,Validation Failed
+8,Schedule Approved (Waiting for Run)
+9,Schedule Declined
+10,In Progress
+11,Run Complete (Waiting for Approval)
+12,Posted to GL (Run Approved)
+13,Run Declined
+14,Submitted for Approval
+15,Nothing to Process

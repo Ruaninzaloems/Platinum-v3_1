@@ -1,0 +1,10 @@
+﻿FinStatusID,FinancialStatusDesc,Default,Enabled,CreatedByID,CreatedDate,ModifiedByID,ModiefiedDate
+1,EAR (Existing Asset Register),1,1,1,2019-06-28 15:40:29.233,NULL,NULL
+2,Carry Value Zero,1,1,1,2019-06-28 15:40:29.233,NULL,NULL
+3,Addition,1,1,1,2019-06-28 15:40:29.233,NULL,NULL
+4,Disposed Asset,1,1,1,2019-06-28 15:40:29.233,NULL,NULL
+5,Write Off,1,1,1,2019-06-28 15:40:29.233,NULL,NULL
+6,Donated Asset,1,1,1,2019-07-03 20:27:21.780,NULL,NULL
+7,Impaired Asset,1,1,1,2019-07-03 20:27:21.787,NULL,NULL
+8,WIP,1,1,1,2021-08-10 18:40:26.957,NULL,NULL
+9,Newly Found Asset,1,1,1,2024-08-19 15:41:23.177,NULL,NULL

@@ -1,0 +1,113 @@
+namespace Sebata.AssetBulkUploadService
+{
+    public static class Static_Dictionaries
+    {
+        public static IDictionary<string, string> CashGenerating
+            = new Dictionary<string, string>()
+            { {"Cash Generating","0"},
+              {"Non-Cash Generating","1"}
+            };
+
+        public static IDictionary<string, string> Risk
+           = new Dictionary<string, string>()
+           {  {"Very Low","0"},
+              {"Low","1"},
+              {"Medium","2"},
+              {"High","3"},
+              {"Very High","4" }
+           };
+    }
+    class Constant_Dictionaries
+    {
+        public enum NatureOfAddition
+        {
+            [Description("New")]
+            New = 0,
+            [Description("Existing - Renewal")]
+            ExistingReplacement = 1,
+            [Description("Existing - Upgrade")]
+            ExistingUpgrade = 2
+        }
+        public enum InfrastructureNonInfrastructure
+        {
+            Infrastructure = 0,
+            NonInfrastructure = 1
+
+        }
+        public enum ConsequenceOfFailure
+        {
+            [Description("Insignificant")]
+            Insignificant = 0,
+            [Description("Minor")]
+            Minor = 1,
+            [Description("Moderate")]
+            Moderate = 2,
+            [Description("Catastrophic")]
+            Catastrophic = 3
+        }
+        public enum Risk
+        {
+            [Description("Very Low")]
+            VeryLow = 0,
+            [Description("Low")]
+            Low = 1,
+            [Description("Medium")]
+            Medium = 2,
+            [Description("High")]
+            High = 3,
+            [Description("Very High")]
+            VeryHigh = 4
+        }
+
+        public enum CashGenerating
+        {
+            [Description("Cash Generating")]
+            Cash = 0,
+            [Description("Non-Cash Generating")]
+            Non = 1
+        }
+
+        public enum FinancialStatus
+        {
+            [Description("Carrying Value zero")]
+            CarryingZero = 0,
+            [Description("Disposed")]
+            Disposed = 1,
+            [Description("Write-off")]
+            WriteOff = 2,
+            [Description("Addition")]
+            Addition = 3,
+            [Description("Existing Asset Register")]
+            Existing = 4,
+            [Description("Donation")]
+            Donation = 5
+
+        }
+        public enum Warranteed
+        {
+            [Description("Yes")]
+            Yes = 1,
+            [Description("No")]
+            No = 0
+        }
+        public enum Insured
+        {
+            [Description("Yes")]
+            Yes = 1,
+            [Description("No")]
+            No = 0
+        }
+    }
+    public static class EnumExtensions
+    {
+        public static string GetDescription(this Enum value)
+        {
+            FieldInfo fi = value.GetType().GetField(value.ToString());
+
+            DescriptionAttribute[] attributes =
+                (DescriptionAttribute[])fi.GetCustomAttributes(typeof(DescriptionAttribute), false);
+
+            return (attributes.Length > 0) ? attributes[0].Description : value.ToString();
+        }
+    }
+}

@@ -1,0 +1,181 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load governance packs</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Governance Packs Dashboard</h1>
+        <p class="subtitle">Audit Committee &amp; Council Pack Overview — {{ data.compilationLabel }}</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh governance packs">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Findings" [value]="data.totalFindings" icon="flag" color="warning"></app-kpi-tile>
+      <app-kpi-tile title="Total Adjustments" [value]="data.totalAdjustments" icon="edit_note" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Total RFIs" [value]="data.totalRfis" icon="mail" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Evidence Items" [value]="data.totalEvidence" icon="attach_file" color="success"></app-kpi-tile>
+    </div>
+
+    <div class="packs-grid">
+      <mat-card class="pack-card">
+        <div class="pack-header">
+          <mat-icon class="pack-icon audit">groups</mat-icon>
+          <div>
+            <h2 class="pack-title">Audit Committee Pack</h2>
+            <p class="pack-sub">Prepared for Audit Committee review</p>
+          </div>
+        </div>
+        <mat-divider></mat-divider>
+        <div class="pack-section">
+          <div class="pack-section-title">Executive Summary</div>
+          <p class="pack-section-text">{{ data.auditCommitteePack.executiveSummary }}</p>
+        </div>
+        <div class="pack-metrics">
+          <div class="pack-metric">
+            <mat-icon>flag</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.auditCommitteePack.keyFindingsCount }}</span>
+              <span class="metric-label">Key Findings</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>edit_note</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.auditCommitteePack.adjustmentsCount }}</span>
+              <span class="metric-label">Adjustments</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>mail</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.auditCommitteePack.rfiCount }}</span>
+              <span class="metric-label">RFIs</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>attach_file</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.auditCommitteePack.evidenceCount }}</span>
+              <span class="metric-label">Evidence</span>
+            </div>
+          </div>
+        </div>
+        <div class="pack-summaries">
+          <div class="summary-item">
+            <span class="summary-label">Adjustments:</span>
+            <span class="summary-text">{{ data.auditCommitteePack.adjustmentsSummary }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">RFI Status:</span>
+            <span class="summary-text">{{ data.auditCommitteePack.rfiSummary }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Evidence:</span>
+            <span class="summary-text">{{ data.auditCommitteePack.evidenceSummary }}</span>
+          </div>
+        </div>
+        <div class="pack-actions">
+          <button mat-flat-button color="primary" matTooltip="Download Audit Committee Pack">
+            <mat-icon>download</mat-icon> Download Pack
+          </button>
+          <button mat-stroked-button matTooltip="Preview Audit Committee Pack">
+            <mat-icon>visibility</mat-icon> Preview
+          </button>
+        </div>
+      </mat-card>
+
+      <mat-card class="pack-card">
+        <div class="pack-header">
+          <mat-icon class="pack-icon council">account_balance</mat-icon>
+          <div>
+            <h2 class="pack-title">Council Pack</h2>
+            <p class="pack-sub">Prepared for Council presentation</p>
+          </div>
+        </div>
+        <mat-divider></mat-divider>
+        <div class="pack-section">
+          <div class="pack-section-title">Executive Summary</div>
+          <p class="pack-section-text">{{ data.councilPack.executiveSummary }}</p>
+        </div>
+        <div class="pack-metrics">
+          <div class="pack-metric">
+            <mat-icon>flag</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.councilPack.keyFindingsCount }}</span>
+              <span class="metric-label">Key Findings</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>edit_note</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.councilPack.adjustmentsCount }}</span>
+              <span class="metric-label">Adjustments</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>mail</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.councilPack.rfiCount }}</span>
+              <span class="metric-label">RFIs</span>
+            </div>
+          </div>
+          <div class="pack-metric">
+            <mat-icon>attach_file</mat-icon>
+            <div>
+              <span class="metric-value">{{ data.councilPack.evidenceCount }}</span>
+              <span class="metric-label">Evidence</span>
+            </div>
+          </div>
+        </div>
+        <div class="pack-summaries">
+          <div class="summary-item">
+            <span class="summary-label">Adjustments:</span>
+            <span class="summary-text">{{ data.councilPack.adjustmentsSummary }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">RFI Status:</span>
+            <span class="summary-text">{{ data.councilPack.rfiSummary }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Evidence:</span>
+            <span class="summary-text">{{ data.councilPack.evidenceSummary }}</span>
+          </div>
+        </div>
+        <div class="pack-actions">
+          <button mat-flat-button color="primary" matTooltip="Download Council Pack">
+            <mat-icon>download</mat-icon> Download Pack
+          </button>
+          <button mat-stroked-button matTooltip="Preview Council Pack">
+            <mat-icon>visibility</mat-icon> Preview
+          </button>
+        </div>
+      </mat-card>
+    </div>
+  </div>
+}

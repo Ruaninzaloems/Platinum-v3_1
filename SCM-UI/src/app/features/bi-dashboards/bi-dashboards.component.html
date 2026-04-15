@@ -1,0 +1,543 @@
+    <div class="bi-page">
+
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+          <button mat-icon-button (click)="notification.set('')"><mat-icon>close</mat-icon></button>
+        </div>
+      }
+
+      <div class="tab-nav">
+        <button class="tab-btn" [class.active]="currentTab() === 'executive'" (click)="switchTab('executive')">Executive Overview</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'spend'" (click)="switchTab('spend')">Spend Analysis</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'procurement'" (click)="switchTab('procurement')">Procurement Pipeline</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'compliance'" (click)="switchTab('compliance')">Compliance & Risk</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'supplier'" (click)="switchTab('supplier')">Supplier Intelligence</button>
+      </div>
+
+      @if (currentTab() === 'executive') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total procurement spend year-to-date'" (click)="drillTo('/payments')">
+            <mat-icon class="kpi-icon" style="color:#1565c0">account_balance_wallet</mat-icon>
+            <span class="kpi-value">{{formatCurrency(execData().totalSpend)}}</span>
+            <span class="kpi-label">Total Spend YTD</span>
+            <span class="kpi-detail">{{execData().totalOrders}} orders</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Budget allocated vs utilised'" (click)="drillTo('/demand')">
+            <mat-icon class="kpi-icon" style="color:#2e7d32">pie_chart</mat-icon>
+            <span class="kpi-value">{{execData().budgetUtilisation}}%</span>
+            <span class="kpi-label">Budget Utilisation</span>
+            <span class="kpi-detail">{{formatCurrency(execData().budgetUsed)}} of {{formatCurrency(execData().totalBudget)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Active open tenders'" (click)="drillTo('/tenders')">
+            <mat-icon class="kpi-icon" style="color:#6a1b9a">gavel</mat-icon>
+            <span class="kpi-value">{{execData().openTenders}}</span>
+            <span class="kpi-label">Open Tenders</span>
+            <span class="kpi-detail">{{formatCurrency(execData().tenderValue)}} value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Active contracts under management'" (click)="drillTo('/contracts')">
+            <mat-icon class="kpi-icon" style="color:#ef6c00">handshake</mat-icon>
+            <span class="kpi-value">{{execData().activeContracts}}</span>
+            <span class="kpi-label">Active Contracts</span>
+            <span class="kpi-detail">{{execData().expiringContracts}} expiring soon</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Overall compliance score — MFMA s112, SCM Regulations'" (click)="drillTo('/ifw-register')">
+            <mat-icon class="kpi-icon" style="color:#c62828">verified_user</mat-icon>
+            <span class="kpi-value">{{execData().complianceScore}}%</span>
+            <span class="kpi-label">Compliance Score</span>
+            <span class="kpi-detail">{{execData().ifwCount}} IFW items</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Invoices paid within 30 days per MFMA s65(2)(e)'" (click)="drillTo('/invoices')">
+            <mat-icon class="kpi-icon" style="color:#00838f">timer</mat-icon>
+            <span class="kpi-value">{{execData().paymentCompliance}}%</span>
+            <span class="kpi-label">30-Day Payment</span>
+            <span class="kpi-detail">MFMA s65(2)(e)</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Monthly Spend Trend</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s71 — Monthly budget statements'">MFMA s71</span>
+            </div>
+            <canvas id="execSpendTrendChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Spend by Department</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s66 — Expenditure per vote'">MFMA s66</span>
+            </div>
+            <canvas id="execDeptSpendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Procurement Lifecycle Pipeline</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 12 — Procurement processes'">SCM Reg 12</span>
+            </div>
+            <canvas id="execPipelineChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>B-BBEE Spend Distribution</h3>
+              <span class="legislation-badge" [matTooltip]="'PPPFA s2 — Preferential procurement'">PPPFA s2</span>
+            </div>
+            <canvas id="execBbbeeChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-header">
+            <h3><mat-icon>trending_up</mat-icon> Key Performance Indicators</h3>
+            <span class="legislation-badge" [matTooltip]="'MFMA s62(1)(d) — Effective financial management'">MFMA s62</span>
+          </div>
+          <div class="kpi-detail-grid">
+            @for (kpi of kpiIndicators(); track kpi.label) {
+              <div class="kpi-detail-card" [matTooltip]="kpi.tooltip">
+                <div class="kpi-detail-top">
+                  <span class="kpi-detail-label">{{kpi.label}}</span>
+                  <span class="kpi-detail-trend" [class]="kpi.trend > 0 ? 'trend-up' : 'trend-down'">
+                    <mat-icon>{{kpi.trend > 0 ? 'trending_up' : 'trending_down'}}</mat-icon>
+                    {{kpi.trend > 0 ? '+' : ''}}{{kpi.trend}}%
+                  </span>
+                </div>
+                <span class="kpi-detail-value">{{kpi.value}}</span>
+                <mat-progress-bar mode="determinate" [value]="kpi.progress" [color]="kpi.progress >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+                <span class="kpi-detail-target">Target: {{kpi.target}}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (currentTab() === 'spend') {
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Financial Year</mat-label>
+            <mat-select [(ngModel)]="spendFilters.financialYear" (selectionChange)="loadSpendData()">
+              <mat-option value="2025/2026">2025/2026</mat-option>
+              <mat-option value="2024/2025">2024/2025</mat-option>
+              <mat-option value="2023/2024">2023/2024</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Department</mat-label>
+            <mat-select [(ngModel)]="spendFilters.department" (selectionChange)="loadSpendData()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments(); track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Procurement Method</mat-label>
+            <mat-select [(ngModel)]="spendFilters.method" (selectionChange)="loadSpendData()">
+              <mat-option value="">All Methods</mat-option>
+              <mat-option value="petty_cash">Petty Cash (&lt;R2,000)</mat-option>
+              <mat-option value="three_quotes">3 Quotes (R2k-R200k)</mat-option>
+              <mat-option value="competitive_bid">Competitive Bidding (&gt;R200k)</mat-option>
+              <mat-option value="deviation">Deviation/Emergency</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-stroked-button (click)="resetSpendFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Reset
+          </button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total procurement spend for selected period'">
+            <mat-icon class="kpi-icon" style="color:#1565c0">payments</mat-icon>
+            <span class="kpi-value">{{formatCurrency(spendData().totalSpend)}}</span>
+            <span class="kpi-label">Total Spend</span>
+            <span class="kpi-detail">{{spendData().orderCount}} transactions</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average order value'">
+            <mat-icon class="kpi-icon" style="color:#2e7d32">calculate</mat-icon>
+            <span class="kpi-value">{{formatCurrency(spendData().avgOrderValue)}}</span>
+            <span class="kpi-label">Avg Order Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Percentage spent on B-BBEE Level 1-3 suppliers'">
+            <mat-icon class="kpi-icon" style="color:#6a1b9a">diversity_3</mat-icon>
+            <span class="kpi-value">{{spendData().bbbeeSpendPct}}%</span>
+            <span class="kpi-label">B-BBEE L1-3 Spend</span>
+            <span class="kpi-detail">PPPFA target: 80%</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Local content spend percentage per DTI requirements'">
+            <mat-icon class="kpi-icon" style="color:#ef6c00">flag</mat-icon>
+            <span class="kpi-value">{{spendData().localContentPct}}%</span>
+            <span class="kpi-label">Local Content</span>
+            <span class="kpi-detail">DTI Designated Sectors</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Monthly Spend vs Budget</h3>
+              <span class="legislation-badge">MFMA s71</span>
+            </div>
+            <canvas id="spendVsBudgetChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Spend by Method</h3>
+              <span class="legislation-badge">SCM Reg 12</span>
+            </div>
+            <canvas id="spendByMethodChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Department Spend Breakdown</h3>
+              <span class="legislation-badge">MFMA s66</span>
+            </div>
+            <canvas id="spendByDeptChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>B-BBEE Spend by Level</h3>
+              <span class="legislation-badge">PPPFA s2</span>
+            </div>
+            <canvas id="spendByBbbeeChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-header">
+            <h3><mat-icon>table_chart</mat-icon> Top 10 Spend Categories</h3>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Spend</th>
+                  <th>Orders</th>
+                  <th>Avg Value</th>
+                  <th>% of Total</th>
+                  <th>Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (cat of spendCategories(); track cat.category) {
+                  <tr>
+                    <td class="ref-cell">{{cat.category}}</td>
+                    <td [matTooltip]="formatCurrencyFull(cat.spend)">{{formatCurrency(cat.spend)}}</td>
+                    <td>{{cat.orders}}</td>
+                    <td>{{formatCurrency(cat.avgValue)}}</td>
+                    <td>
+                      <div class="pct-bar-cell">
+                        <div class="pct-bar" [style.width.%]="cat.pctOfTotal"></div>
+                        <span>{{cat.pctOfTotal}}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="trend-badge" [class]="cat.trend > 0 ? 'trend-up' : 'trend-down'">
+                        {{cat.trend > 0 ? '+' : ''}}{{cat.trend}}%
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (currentTab() === 'procurement') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Open requisitions awaiting processing'" (click)="drillTo('/requisitions')">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">description</mat-icon>
+            <span class="kpi-value">{{pipeData().openReqs}}</span>
+            <span class="kpi-label">Open Requisitions</span>
+            <span class="kpi-detail">{{formatCurrency(pipeData().openReqValue)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Active purchase orders'" (click)="drillTo('/orders')">
+            <mat-icon class="kpi-icon" style="color:#10b981">shopping_cart</mat-icon>
+            <span class="kpi-value">{{pipeData().activeOrders}}</span>
+            <span class="kpi-label">Active Orders</span>
+            <span class="kpi-detail">{{formatCurrency(pipeData().activeOrderValue)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average cycle time from requisition to payment'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">schedule</mat-icon>
+            <span class="kpi-value">{{pipeData().avgCycleTime}}</span>
+            <span class="kpi-label">Avg Cycle Days</span>
+            <span class="kpi-detail">Target: 45 days</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'GRN processing rate'" (click)="drillTo('/grn')">
+            <mat-icon class="kpi-icon" style="color:#7c3aed">local_shipping</mat-icon>
+            <span class="kpi-value">{{pipeData().grnRate}}%</span>
+            <span class="kpi-label">GRN Rate</span>
+            <span class="kpi-detail">{{pipeData().pendingGrn}} pending</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Three-way match success rate'" (click)="drillTo('/invoices')">
+            <mat-icon class="kpi-icon" style="color:#059669">check_circle</mat-icon>
+            <span class="kpi-value">{{pipeData().matchRate}}%</span>
+            <span class="kpi-label">3-Way Match</span>
+            <span class="kpi-detail">SCM Reg 38</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Procurement Funnel</h3>
+              <span class="legislation-badge">SCM Reg 12-42</span>
+            </div>
+            <canvas id="procFunnelChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Turnaround Time Analysis</h3>
+              <span class="legislation-badge">NT Practice Note 8</span>
+            </div>
+            <canvas id="procTurnaroundChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Orders Aging</h3>
+              <span class="legislation-badge">MFMA s65</span>
+            </div>
+            <canvas id="procAgingChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Monthly Volume Trend</h3>
+            </div>
+            <canvas id="procVolumeTrendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-header">
+            <h3><mat-icon>warning</mat-icon> Bottleneck Analysis</h3>
+            <span class="legislation-badge">SCM Reg 12(3)</span>
+          </div>
+          <div class="bottleneck-grid">
+            @for (bn of bottlenecks(); track bn.stage) {
+              <div class="bottleneck-card" [class]="'severity-' + bn.severity">
+                <div class="bn-header">
+                  <mat-icon>{{bn.icon}}</mat-icon>
+                  <span class="bn-stage">{{bn.stage}}</span>
+                  <span class="severity-badge" [class]="'sev-' + bn.severity">{{bn.severity | uppercase}}</span>
+                </div>
+                <span class="bn-count">{{bn.count}} items stuck</span>
+                <span class="bn-detail">Avg {{bn.avgDays}} days (Target: {{bn.targetDays}})</span>
+                <mat-progress-bar mode="determinate" [value]="(bn.avgDays / bn.targetDays) * 100" [color]="bn.avgDays > bn.targetDays ? 'warn' : 'primary'"></mat-progress-bar>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (currentTab() === 'compliance') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Overall SCM compliance score'">
+            <mat-icon class="kpi-icon" style="color:#2e7d32">verified_user</mat-icon>
+            <span class="kpi-value">{{compData().overallScore}}%</span>
+            <span class="kpi-label">Overall Compliance</span>
+            <span class="kpi-detail">MFMA Chapter 11</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Irregular, Fruitless & Wasteful expenditure items'" (click)="drillTo('/ifw-register')">
+            <mat-icon class="kpi-icon" style="color:#c62828">report_problem</mat-icon>
+            <span class="kpi-value">{{compData().ifwCount}}</span>
+            <span class="kpi-label">IFW Items</span>
+            <span class="kpi-detail">{{formatCurrency(compData().ifwValue)}}</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Approved deviations from normal procurement process'">
+            <mat-icon class="kpi-icon" style="color:#ef6c00">alt_route</mat-icon>
+            <span class="kpi-value">{{compData().deviations}}</span>
+            <span class="kpi-label">Deviations</span>
+            <span class="kpi-detail">SCM Reg 36</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Supplier tax clearance validity rate'">
+            <mat-icon class="kpi-icon" style="color:#1565c0">fact_check</mat-icon>
+            <span class="kpi-value">{{compData().taxComplianceRate}}%</span>
+            <span class="kpi-label">Tax Clearance Valid</span>
+            <span class="kpi-detail">SARS TCC</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'CSD verification status current'">
+            <mat-icon class="kpi-icon" style="color:#6a1b9a">cloud_done</mat-icon>
+            <span class="kpi-value">{{compData().csdVerified}}%</span>
+            <span class="kpi-label">CSD Verified</span>
+            <span class="kpi-detail">NT Instruction 4A</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Compliance Components</h3>
+              <span class="legislation-badge">MFMA s112</span>
+            </div>
+            <canvas id="compComponentsChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>IFW Trend</h3>
+              <span class="legislation-badge">MFMA s32</span>
+            </div>
+            <canvas id="compIfwTrendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Deviation Analysis</h3>
+              <span class="legislation-badge">SCM Reg 36</span>
+            </div>
+            <canvas id="compDeviationChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Audit Findings Trend</h3>
+              <span class="legislation-badge">MFMA s131</span>
+            </div>
+            <canvas id="compAuditChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-header">
+            <h3><mat-icon>security</mat-icon> Compliance Checklist</h3>
+          </div>
+          <div class="checklist-grid">
+            @for (item of complianceChecklist(); track item.label) {
+              <div class="checklist-item" [class]="item.status === 'pass' ? 'check-pass' : item.status === 'warn' ? 'check-warn' : 'check-fail'">
+                <mat-icon>{{item.status === 'pass' ? 'check_circle' : item.status === 'warn' ? 'warning' : 'cancel'}}</mat-icon>
+                <div class="check-info">
+                  <span class="check-label">{{item.label}}</span>
+                  <span class="check-ref">{{item.reference}}</span>
+                </div>
+                <span class="check-score">{{item.score}}%</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (currentTab() === 'supplier') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total registered and active suppliers'" (click)="drillTo('/suppliers')">
+            <mat-icon class="kpi-icon" style="color:#1565c0">business</mat-icon>
+            <span class="kpi-value">{{suppData().totalSuppliers}}</span>
+            <span class="kpi-label">Active Suppliers</span>
+            <span class="kpi-detail">{{suppData().newThisYear}} new this year</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Average supplier performance score'" (click)="drillTo('/supplier-performance')">
+            <mat-icon class="kpi-icon" style="color:#2e7d32">speed</mat-icon>
+            <span class="kpi-value">{{suppData().avgPerformance}}</span>
+            <span class="kpi-label">Avg Performance</span>
+            <span class="kpi-detail">Scale: 1-5</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'B-BBEE Level 1-2 supplier percentage'">
+            <mat-icon class="kpi-icon" style="color:#6a1b9a">diversity_3</mat-icon>
+            <span class="kpi-value">{{suppData().bbbeeL1L2Pct}}%</span>
+            <span class="kpi-label">B-BBEE L1-2</span>
+            <span class="kpi-detail">PPPFA compliance</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Supplier concentration risk — top 5 suppliers share'">
+            <mat-icon class="kpi-icon" style="color:#ef6c00">warning_amber</mat-icon>
+            <span class="kpi-value">{{suppData().concentrationRisk}}%</span>
+            <span class="kpi-label">Top 5 Concentration</span>
+            <span class="kpi-detail">Target: &lt;40%</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Suppliers with expired documents'">
+            <mat-icon class="kpi-icon" style="color:#c62828">assignment_late</mat-icon>
+            <span class="kpi-value">{{suppData().expiredDocs}}</span>
+            <span class="kpi-label">Expired Docs</span>
+            <span class="kpi-detail">Require renewal</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Supplier B-BBEE Distribution</h3>
+              <span class="legislation-badge">PPPFA s2</span>
+            </div>
+            <canvas id="suppBbbeeDistChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Spend Concentration</h3>
+              <span class="legislation-badge">SCM Reg 17(a)</span>
+            </div>
+            <canvas id="suppConcentrationChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Performance Distribution</h3>
+            </div>
+            <canvas id="suppPerformanceChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Supplier Onboarding Trend</h3>
+            </div>
+            <canvas id="suppOnboardingChart"></canvas>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-header">
+            <h3><mat-icon>leaderboard</mat-icon> Top Suppliers by Spend</h3>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Supplier</th>
+                  <th>B-BBEE</th>
+                  <th>Total Spend</th>
+                  <th>Orders</th>
+                  <th>Performance</th>
+                  <th>Share %</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of topSuppliers(); track s.name) {
+                  <tr>
+                    <td class="ref-cell">{{s.name}}</td>
+                    <td><span class="bbbee-badge" [class]="'bbbee-' + s.level">Level {{s.level}}</span></td>
+                    <td [matTooltip]="formatCurrencyFull(s.spend)">{{formatCurrency(s.spend)}}</td>
+                    <td>{{s.orders}}</td>
+                    <td>
+                      <div class="perf-cell">
+                        <mat-icon [style.color]="s.score >= 4 ? '#2e7d32' : s.score >= 3 ? '#f59e0b' : '#c62828'" style="font-size:16px;width:16px;height:16px;">star</mat-icon>
+                        {{s.score.toFixed(1)}}
+                      </div>
+                    </td>
+                    <td>
+                      <div class="pct-bar-cell">
+                        <div class="pct-bar" [style.width.%]="s.share"></div>
+                        <span>{{s.share}}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

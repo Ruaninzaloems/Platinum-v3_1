@@ -1,0 +1,22 @@
+﻿Employee Type,Employee Subtype,Exclude UIF,Exclude SDL,Enable Bonus,Start Date,End Date
+Municipal Staff,5 Day Permanent ,No,No,Yes,01/01/1900,31/12/9999
+Senior Management,Senior Managers (Excl Municipal Manager),No,No,Yes,01/01/1900,31/12/9999
+Ward Councillors,Councillor,Yes,No,No,01/01/1900,31/12/9999
+Post-Retirement,Continued member,Yes,Yes,No,01/01/1900,31/12/9999
+Municipal Staff,6 Day Permanent,No,No,Yes,01/01/1900,31/12/9999
+Municipal Staff,Intern,No,No,No,01/01/1900,31/12/9999
+Municipal Staff,EPWP,No,No,No,01/01/1900,31/12/9999
+Municipal Staff,Temporary 5 day,No,No,No,01/01/1900,31/12/9999
+Municipal Staff,Temporary 6 day,No,No,No,01/01/1900,31/12/9999
+Municipal Staff,Half Day (5/8),No,No,No,01/01/1900,31/12/9999
+Senior Management,Municipal Manager,No,No,Yes,01/01/1900,31/12/9999
+Ward Councillors,Executive Mayor,Yes,No,No,01/01/1900,31/12/9999
+Ward Councillors,Deputy Mayor,Yes,No,No,01/01/1900,31/12/9999
+Ward Councillors,Speaker,Yes,No,No,01/01/1900,31/12/9999
+Ward Councillors,Chief Whip,Yes,No,No,01/01/1900,31/12/9999
+Ward Councillors,EXCO/Mayoral Committee,Yes,No,No,01/01/1900,31/12/9999
+Ward Councillors,Section 79 Committee,Yes,No,No,01/01/1900,31/12/9999
+Municipal Staff,Casuals,No,No,No,01/01/1900,31/12/9999
+Municipal Staff,Ward Committee Members,Yes,Yes,No,01/01/1900,31/12/9999
+Municipal Staff,Soup Kitchen,Yes,Yes,No,01/01/1900,31/12/9999
+Municipal Staff,GIPTN,Yes,Yes,No,01/03/2025,31/12/9999
