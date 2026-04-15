@@ -1,0 +1,31 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "bundler",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@platinumv3/shared/auth": ["libs/shared/auth/src/index.ts"],
+      "@platinumv3/shared/core": ["libs/shared/core/src/index.ts"],
+      "@platinumv3/shared/ui": ["libs/shared/ui/src/index.ts"],
+      "@platinumv3/afs": ["libs/afs/src/index.ts"],
+      "@platinumv3/assets": ["libs/assets/src/index.ts"],
+      "@platinumv3/budget": ["libs/budget/src/index.ts"],
+      "@platinumv3/idp": ["libs/idp/src/index.ts"],
+      "@platinumv3/payroll": ["libs/payroll/src/index.ts"],
+      "@platinumv3/pos": ["libs/pos/src/index.ts"],
+      "@platinumv3/scm": ["libs/scm/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

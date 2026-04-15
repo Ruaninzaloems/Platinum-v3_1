@@ -1,0 +1,27 @@
+import { Component } from '@angular/core';
+  import { CommonModule } from '@angular/common';
+  import { MatIconModule } from '@angular/material/icon';
+
+  @Component({
+    selector: 'lib-afs-landing',
+    standalone: true,
+    imports: [CommonModule, MatIconModule],
+    template: `
+      <div class="module-landing">
+        <div class="module-header">
+          <mat-icon class="module-icon">description</mat-icon>
+          <h2>Annual Financial Statements</h2>
+          <p>Module loaded successfully. Components are being migrated.</p>
+        </div>
+      </div>
+    `,
+    styles: [`
+      .module-landing { padding: 2rem; }
+      .module-header { text-align: center; padding: 4rem 2rem; }
+      .module-icon { font-size: 64px; width: 64px; height: 64px; color: #1a237e; margin-bottom: 1rem; }
+      h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+      p { color: #64748b; }
+    `]
+  })
+  export class AfsLandingComponent {}
+  

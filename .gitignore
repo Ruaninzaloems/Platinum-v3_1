@@ -143,3 +143,7 @@ ASSETS-PSQL-API/obj/
 *.suo
 *.userosscache
 *.sln.docstates
+
+
+.nx/cache
+.nx/workspace-data
