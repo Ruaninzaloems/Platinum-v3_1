@@ -1,0 +1,101 @@
+:host { display: block; }
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.error-container {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 400px; gap: 12px; color: var(--platinum-text-secondary);
+}
+.error-icon { font-size: 48px; width: 48px; height: 48px; color: var(--platinum-danger); }
+
+.fy-badge {
+  display: inline-block; padding: 2px 10px; background: var(--platinum-info-light);
+  color: var(--platinum-info); border-radius: 20px; font-size: 12px; font-weight: 600;
+  margin-left: 8px;
+}
+
+.kpi-strip {
+  display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+}
+
+.dashboard-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+}
+
+.completeness-cell {
+  display: flex; align-items: center; justify-content: center;
+}
+
+.wp-list, .disclosure-list {
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;
+}
+
+.wp-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-radius: 8px; background: var(--platinum-surface);
+  cursor: pointer; transition: background 0.15s;
+}
+.wp-item:hover { background: var(--platinum-surface-alt); }
+
+.disclosure-item {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 12px; border-radius: 8px; background: var(--platinum-surface);
+}
+.disclosure-msg {
+  font-size: 12px; color: var(--platinum-text-secondary); margin-left: 20px;
+}
+
+.wp-summary {
+  display: flex; align-items: center; gap: 12px; padding-top: 12px;
+  border-top: 1px solid var(--platinum-border);
+}
+.wp-summary-label {
+  font-size: 12px; font-weight: 600; color: var(--platinum-text-secondary);
+  white-space: nowrap;
+}
+.wp-summary-value {
+  font-size: 14px; font-weight: 700; color: var(--platinum-text);
+  white-space: nowrap;
+}
+
+.empty-mini {
+  display: flex; align-items: center; gap: 8px; padding: 24px 16px;
+  color: var(--platinum-success); font-size: 13px; font-weight: 500;
+}
+.empty-mini mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+.workload-chart {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.workload-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.workload-name {
+  font-size: 13px; font-weight: 500; color: var(--platinum-text);
+  min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.workload-bar-track {
+  flex: 1; height: 24px; background: var(--platinum-surface-alt);
+  border-radius: 6px; overflow: hidden;
+}
+.workload-bar-fill {
+  height: 100%; border-radius: 6px; transition: width 0.5s ease;
+  min-width: 4px;
+}
+.workload-count {
+  font-size: 14px; font-weight: 700; color: var(--platinum-text);
+  min-width: 30px; text-align: right;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .kpi-strip { flex-direction: column; }
+}
+
+.period-filter-field { max-width: 220px; font-size: 13px; }
+.period-filter-field .mat-mdc-select { font-size: 13px; }

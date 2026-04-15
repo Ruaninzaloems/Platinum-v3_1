@@ -1,0 +1,80 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Lead Times</h1>
+      <p class="page-subtitle">Manage maintenance lead time definitions</p>
+    </div>
+    <div class="header-actions">
+      <button mat-flat-button class="btn-primary" (click)="openAdd()">
+        <mat-icon>add</mat-icon> Add Lead Time
+      </button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Lead Time</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Description *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.maintenanceDesc" placeholder="e.g. Standard - Within 14 Days">
+        </div>
+        <div class="form-field form-field-narrow">
+          <label>Lead Days *</label>
+          <input type="number" class="form-input" [(ngModel)]="formData.leadTimeDays" min="1" placeholder="Number of days">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.maintenanceDesc || !formData.leadTimeDays">
+          {{editingId() ? 'Update' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Lead Time</th>
+            <th>Lead Days</th>
+            <th>Status</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.leadTimeId) {
+            <tr>
+              <td class="id-cell">{{item.leadTimeId}}</td>
+              <td class="desc-cell">{{item.maintenanceDesc}} ({{item.leadTimeDays}} days)</td>
+              <td class="days-cell">{{item.leadTimeDays}}</td>
+              <td>
+                <span class="status-badge" [class.active]="item.enabled">
+                  {{item.enabled ? 'Active' : 'Inactive'}}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="openEdit(item)" matTooltip="Edit">
+                  <mat-icon class="action-icon edit">edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="toggleEnabled(item)" [matTooltip]="item.enabled ? 'Disable' : 'Enable'">
+                  <mat-icon class="action-icon" [class.enable]="!item.enabled" [class.disable]="item.enabled">
+                    {{item.enabled ? 'toggle_on' : 'toggle_off'}}
+                  </mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No lead times found</div>
+      }
+    </div>
+  }
+</div>

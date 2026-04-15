@@ -1,0 +1,141 @@
+:host { display: block; }
+
+.code-badge {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-weight: 500;
+}
+.title-text {
+  font-weight: 600;
+  color: #0f2b46;
+}
+
+.item-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e7ff;
+  color: #3730a3;
+  min-width: 24px;
+  height: 22px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 6px;
+}
+.item-count-zero {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.type-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.add-heads-section {
+  margin-bottom: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.heads-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+  justify-content: center;
+}
+
+.heads-checklist {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+}
+
+.head-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+  margin: 0;
+  font-weight: normal;
+}
+.head-check-item:last-child {
+  border-bottom: none;
+}
+.head-check-item:hover {
+  background: #f0f7ff;
+}
+.head-check-item.checked {
+  background: #eff6ff;
+}
+.head-check-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.head-check-name {
+  flex: 1;
+  font-size: 13px;
+  color: #1e293b;
+}
+.head-check-code {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.items-footer {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
+}

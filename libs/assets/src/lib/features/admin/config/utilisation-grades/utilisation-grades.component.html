@@ -1,0 +1,123 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Utilisation Grades</h1>
+      <p class="page-subtitle">Manage asset utilisation grade classifications</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="openImport()">
+        <mat-icon>upload_file</mat-icon> Import from Excel
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="openAdd()">
+        <mat-icon>add</mat-icon> Add Utilisation Grade
+      </button>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Utilisation Grade</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Utilisation Grade *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.utilisationGradeDesc" placeholder="Enter utilisation grade description">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.utilisationGradeDesc">
+          {{editingId() ? 'Update' : 'Create'}}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Utilisation Grade Description</th>
+            <th>Status</th>
+            <th>Date Captured</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.utilisationGrade_ID) {
+            <tr>
+              <td class="id-cell">{{item.utilisationGrade_ID}}</td>
+              <td class="desc-cell">{{item.utilisationGradeDesc}}</td>
+              <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
+              <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="openEdit(item)" matTooltip="Edit">
+                  <mat-icon class="action-icon edit">edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="confirmDelete(item)" matTooltip="Delete">
+                  <mat-icon class="action-icon delete">delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) {
+        <div class="empty-state">No utilisation grades found</div>
+      }
+    </div>
+  }
+
+  @if (showImport()) {
+    <div class="modal-overlay" (click)="closeImport()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Import Utilisation Grades from Excel</h3>
+          <button mat-icon-button (click)="closeImport()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="modal-body">
+          <button mat-stroked-button (click)="downloadTemplate()" class="template-btn">
+            <mat-icon>download</mat-icon> Download Template
+          </button>
+          <div class="upload-area" (click)="fileInput.click()">
+            <input #fileInput type="file" accept=".xlsx,.xls" style="display:none" (change)="onImportFileSelected($event)">
+            <mat-icon class="upload-icon">cloud_upload</mat-icon>
+            @if (importFile()) {
+              <span>{{importFile()!.name}}</span>
+            } @else {
+              <span>Click to select .xlsx file</span>
+            }
+          </div>
+          @if (importSuccess()) {
+            <div class="import-success">
+              <mat-icon>check_circle</mat-icon> {{importSuccess()}}
+            </div>
+          }
+          @if (importErrors().length > 0) {
+            <div class="import-errors">
+              <h4>Import Errors</h4>
+              <div class="error-list">
+                @for (err of importErrors(); track err.row) {
+                  <div class="error-row">
+                    <span class="error-row-num">Row {{err.row}}</span>
+                    <span class="error-col">{{err.column}}</span>
+                    <span class="error-msg">{{err.message}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button mat-stroked-button (click)="closeImport()">Cancel</button>
+          <button mat-flat-button class="btn-primary" (click)="doImport()" [disabled]="!importFile() || importing()">
+            {{importing() ? 'Importing...' : 'Import'}}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

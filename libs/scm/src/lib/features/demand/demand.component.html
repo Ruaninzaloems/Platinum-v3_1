@@ -1,0 +1,1369 @@
+    <div class="demand-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- TAB NAVIGATION -->
+      @if (currentView() !== 'plan-detail') {
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="currentView() === 'dashboard'" (click)="switchView('dashboard')">
+            <mat-icon>dashboard</mat-icon> Dashboard
+          </button>
+          <button class="tab-btn" [class.active]="currentView() === 'plans'" (click)="switchView('plans')">
+            <mat-icon>assignment</mat-icon> Demand Plans
+          </button>
+          <button class="tab-btn" [class.active]="currentView() === 'needs'" (click)="switchView('needs')">
+            <mat-icon>fact_check</mat-icon> Needs Register
+          </button>
+          <button class="tab-btn" [class.active]="currentView() === 'procurement'" (click)="switchView('procurement')">
+            <mat-icon>calendar_month</mat-icon> Annual Procurement Plan
+          </button>
+          <button class="tab-btn" [class.active]="currentView() === 'analytics'" (click)="switchView('analytics')">
+            <mat-icon>analytics</mat-icon> AI Analytics
+          </button>
+        </div>
+      }
+
+      <!-- ===================== DASHBOARD VIEW ===================== -->
+      @if (currentView() === 'dashboard') {
+        <div class="kpi-grid">
+          <div class="kpi-tile" [matTooltip]="'Total demand plans across all departments. Value: ' + formatRandFull(dashboard()?.kpis?.totalDemandValue || 0)">
+            <div class="kpi-icon" style="background: #eff6ff; color: #3b82f6;">
+              <mat-icon>assignment</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Total Demand Plans</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.totalPlans || 0}}</span>
+              <span class="kpi-sub">{{formatRand(dashboard()?.kpis?.totalDemandValue || 0)}}</span>
+            </div>
+            <div class="kpi-trend up">
+              <mat-icon>trending_up</mat-icon>
+              <span>+12%</span>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Percentage of demand covered by approved budget. Gap: ' + formatRandFull(dashboard()?.kpis?.budgetGap || 0)">
+            <div class="kpi-icon" style="background: #f0fdf4; color: #16a34a;">
+              <mat-icon>account_balance_wallet</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Budget Coverage</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.budgetCoverage || 0}}%</span>
+              <span class="kpi-sub">Gap: {{formatRand(dashboard()?.kpis?.budgetGap || 0)}}</span>
+            </div>
+            <div class="kpi-trend" [class.up]="(dashboard()?.kpis?.budgetCoverage || 0) >= 80" [class.down]="(dashboard()?.kpis?.budgetCoverage || 0) < 80">
+              <mat-icon>{{(dashboard()?.kpis?.budgetCoverage || 0) >= 80 ? 'trending_up' : 'trending_down'}}</mat-icon>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Average compliance score across all demand plans. Target: 95%'">
+            <div class="kpi-icon" style="background: #fefce8; color: #ca8a04;">
+              <mat-icon>verified</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Compliance Score</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.avgComplianceScore || 0}}%</span>
+              <span class="kpi-sub">Target: 95%</span>
+            </div>
+            <div class="kpi-trend" [class.up]="(dashboard()?.kpis?.avgComplianceScore || 0) >= 90" [class.down]="(dashboard()?.kpis?.avgComplianceScore || 0) < 90">
+              <mat-icon>{{(dashboard()?.kpis?.avgComplianceScore || 0) >= 90 ? 'check_circle' : 'warning'}}</mat-icon>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Demand items linked to requisitions: ' + (dashboard()?.kpis?.linkedItems || 0) + ' of ' + (dashboard()?.kpis?.totalItems || 0)">
+            <div class="kpi-icon" style="background: #f3e8ff; color: #7c3aed;">
+              <mat-icon>sync_alt</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Conversion Rate</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.conversionRate || 0}}%</span>
+              <span class="kpi-sub">{{dashboard()?.kpis?.linkedItems || 0}}/{{dashboard()?.kpis?.totalItems || 0}} items</span>
+            </div>
+            <div class="kpi-trend up">
+              <mat-icon>trending_up</mat-icon>
+              <span>+8%</span>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Needs assessments completed vs total. ' + (dashboard()?.kpis?.needsCompleted || 0) + ' completed out of ' + (dashboard()?.kpis?.needsTotal || 0)">
+            <div class="kpi-icon" style="background: #ecfdf5; color: #059669;">
+              <mat-icon>fact_check</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Needs Assessments</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.needsCompleted || 0}}/{{dashboard()?.kpis?.needsTotal || 0}}</span>
+              <span class="kpi-sub">{{needsCompletionPct()}}% complete</span>
+            </div>
+            <div class="kpi-trend up">
+              <mat-icon>check_circle</mat-icon>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Specifications approved and ready for procurement: ' + (dashboard()?.kpis?.specsApproved || 0) + ' of ' + (dashboard()?.kpis?.specsTotal || 0)">
+            <div class="kpi-icon" style="background: #fff7ed; color: #ea580c;">
+              <mat-icon>description</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Specifications Ready</span>
+              <span class="kpi-value">{{dashboard()?.kpis?.specsApproved || 0}}/{{dashboard()?.kpis?.specsTotal || 0}}</span>
+              <span class="kpi-sub">{{specsReadyPct()}}% approved</span>
+            </div>
+            <div class="kpi-trend" [class.up]="specsReadyPct() >= 70">
+              <mat-icon>description</mat-icon>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Estimated savings through demand aggregation across departments'">
+            <div class="kpi-icon" style="background: #fdf2f8; color: #db2777;">
+              <mat-icon>savings</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Aggregation Savings</span>
+              <span class="kpi-value">{{formatRand(dashboard()?.kpis?.aggregationSavings || 0)}}</span>
+              <span class="kpi-sub">{{dashboard()?.kpis?.aggregationCount || 0}} groups</span>
+            </div>
+            <div class="kpi-trend up">
+              <mat-icon>trending_up</mat-icon>
+              <span>+15%</span>
+            </div>
+          </div>
+
+          <div class="kpi-tile" [matTooltip]="'Items overdue for processing or exceeding target timelines'" [style.border-left-color]="(dashboard()?.kpis?.overdueItems || 0) > 0 ? '#dc2626' : '#16a34a'">
+            <div class="kpi-icon" style="background: #fef2f2; color: #dc2626;">
+              <mat-icon>schedule</mat-icon>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Overdue Items</span>
+              <span class="kpi-value" [style.color]="(dashboard()?.kpis?.overdueItems || 0) > 0 ? '#dc2626' : '#16a34a'">{{dashboard()?.kpis?.overdueItems || 0}}</span>
+              <span class="kpi-sub">Requires attention</span>
+            </div>
+            <div class="kpi-trend down" *ngIf="(dashboard()?.kpis?.overdueItems || 0) > 0">
+              <mat-icon>warning</mat-icon>
+            </div>
+          </div>
+        </div>
+
+        <div class="legislation-strip">
+          <mat-icon style="font-size: 14px; width: 14px; height: 14px; color: #94a3b8;">menu_book</mat-icon>
+          <span>MFMA s112 · SCM Reg 12(5) · NT SCM Instruction Note 2 of 2021 · Preferential Procurement Regulations 2022</span>
+        </div>
+
+        <!-- DEPARTMENT BREAKDOWN TABLE -->
+        <div class="section-card">
+          <div class="section-header">
+            <h3>
+              <mat-icon style="color: #3b82f6;">business</mat-icon>
+              Department Breakdown
+            </h3>
+            <span class="leg-badge">MFMA s112, SCM Reg 12(5)</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th [matTooltip]="'Number of demand plans per department'">Plans</th>
+                  <th [matTooltip]="'Total demand value in Rand'">Value</th>
+                  <th [matTooltip]="'Number of individual items'">Items</th>
+                  <th [matTooltip]="'Average compliance score for the department'">Compliance</th>
+                  <th [matTooltip]="'Budget utilisation percentage'">Budget Util.</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (dept of dashboard()?.departmentBreakdown || []; track dept.department) {
+                  <tr>
+                    <td class="dept-name-cell">{{dept.department}}</td>
+                    <td [matTooltip]="dept.plans + ' demand plans'">{{dept.plans}}</td>
+                    <td [matTooltip]="formatRandFull(dept.value)" class="value-cell">{{formatRand(dept.value)}}</td>
+                    <td [matTooltip]="dept.items + ' line items'">{{dept.items}}</td>
+                    <td [matTooltip]="'Compliance score: ' + dept.complianceScore + '%'">
+                      <div class="compliance-bar">
+                        <div class="compliance-fill" [style.width.%]="dept.complianceScore" [style.background]="dept.complianceScore >= 90 ? '#16a34a' : dept.complianceScore >= 70 ? '#ca8a04' : '#dc2626'"></div>
+                        <span>{{dept.complianceScore}}%</span>
+                      </div>
+                    </td>
+                    <td [matTooltip]="'Budget utilisation: ' + dept.budgetUtilisation + '%'">
+                      <div class="compliance-bar">
+                        <div class="compliance-fill" [style.width.%]="dept.budgetUtilisation" [style.background]="dept.budgetUtilisation > 90 ? '#dc2626' : dept.budgetUtilisation > 70 ? '#ca8a04' : '#3b82f6'"></div>
+                        <span>{{dept.budgetUtilisation}}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="status-dot" [style.background]="dept.complianceScore >= 90 ? '#16a34a' : '#ca8a04'"></span>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="7" class="empty-text">No department data available</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STATUS DISTRIBUTION + RISK SUMMARY ROW -->
+        <div class="dashboard-grid-2col">
+          <div class="section-card">
+            <div class="section-header">
+              <h3>
+                <mat-icon style="color: #8b5cf6;">donut_large</mat-icon>
+                Status Distribution
+              </h3>
+              <span class="leg-badge">SCM Reg 12(1)</span>
+            </div>
+            <div class="status-cards">
+              @for (status of dashboard()?.statusDistribution || []; track status.status) {
+                <div class="status-card" [matTooltip]="status.count + ' plans worth ' + formatRandFull(status.value) + ' (' + status.percentage + '%)'">
+                  <div class="status-card-header">
+                    <span class="status-badge-sm" [style.background]="getStatusColor(status.status).bg" [style.color]="getStatusColor(status.status).text">{{status.status | titlecase}}</span>
+                    <span class="status-pct">{{status.percentage}}%</span>
+                  </div>
+                  <div class="status-card-value">{{status.count}}</div>
+                  <div class="status-card-amount">{{formatRand(status.value)}}</div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-header">
+              <h3>
+                <mat-icon style="color: #dc2626;">shield</mat-icon>
+                Risk Summary
+              </h3>
+              <span class="leg-badge">MFMA s171, NT Practice Note 8</span>
+            </div>
+            <div class="risk-cards">
+              <div class="risk-card risk-high" [matTooltip]="'High risk items requiring immediate attention'">
+                <mat-icon>error</mat-icon>
+                <div class="risk-body">
+                  <span class="risk-level">High Risk</span>
+                  <span class="risk-count">{{dashboard()?.riskSummary?.high || 0}}</span>
+                </div>
+              </div>
+              <div class="risk-card risk-medium" [matTooltip]="'Medium risk items requiring monitoring'">
+                <mat-icon>warning</mat-icon>
+                <div class="risk-body">
+                  <span class="risk-level">Medium Risk</span>
+                  <span class="risk-count">{{dashboard()?.riskSummary?.medium || 0}}</span>
+                </div>
+              </div>
+              <div class="risk-card risk-low" [matTooltip]="'Low risk items proceeding normally'">
+                <mat-icon>check_circle</mat-icon>
+                <div class="risk-body">
+                  <span class="risk-level">Low Risk</span>
+                  <span class="risk-count">{{dashboard()?.riskSummary?.low || 0}}</span>
+                </div>
+              </div>
+            </div>
+
+            @if (dashboard()?.legislativeCompliance) {
+              <div class="compliance-summary">
+                <div class="compliance-item" [matTooltip]="'IDP alignment score across all demand plans'">
+                  <span class="comp-label">IDP Alignment</span>
+                  <span class="comp-value" [style.color]="(dashboard()?.legislativeCompliance?.idpAlignment || 0) >= 80 ? '#16a34a' : '#ca8a04'">{{dashboard()?.legislativeCompliance?.idpAlignment || 0}}%</span>
+                </div>
+                <div class="compliance-item" [matTooltip]="'Budget coverage compliance per MFMA requirements'">
+                  <span class="comp-label">Budget Coverage</span>
+                  <span class="comp-value" [style.color]="(dashboard()?.legislativeCompliance?.budgetCoverage || 0) >= 80 ? '#16a34a' : '#ca8a04'">{{dashboard()?.legislativeCompliance?.budgetCoverage || 0}}%</span>
+                </div>
+                <div class="compliance-item" [matTooltip]="'Specification readiness for procurement execution'">
+                  <span class="comp-label">Spec Readiness</span>
+                  <span class="comp-value" [style.color]="(dashboard()?.legislativeCompliance?.specReadiness || 0) >= 80 ? '#16a34a' : '#ca8a04'">{{dashboard()?.legislativeCompliance?.specReadiness || 0}}%</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- CATEGORY & METHOD BREAKDOWN -->
+        <div class="dashboard-grid-2col">
+          <div class="section-card">
+            <div class="section-header">
+              <h3>
+                <mat-icon style="color: #f59e0b;">category</mat-icon>
+                Category Breakdown
+              </h3>
+              <span class="leg-badge">SCM Reg 28</span>
+            </div>
+            @for (cat of dashboard()?.categoryBreakdown || []; track cat.category) {
+              <div class="cat-row" [matTooltip]="cat.count + ' items worth ' + formatRandFull(cat.value) + ' (' + cat.percentage + '%)'">
+                <div class="cat-info">
+                  <span class="cat-name">{{cat.category | titlecase}}</span>
+                  <span class="cat-count">{{cat.count}} items</span>
+                </div>
+                <div class="cat-bar-track">
+                  <div class="cat-bar-fill" [style.width.%]="cat.percentage" [style.background]="getCategoryColor(cat.category)"></div>
+                </div>
+                <div class="cat-values">
+                  <span class="cat-value">{{formatRand(cat.value)}}</span>
+                  <span class="cat-pct">{{cat.percentage}}%</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="section-card">
+            <div class="section-header">
+              <h3>
+                <mat-icon style="color: #06b6d4;">route</mat-icon>
+                Procurement Method Distribution
+              </h3>
+              <span class="leg-badge">SCM Reg 12(1)(d), NT Instruction 2/2021</span>
+            </div>
+            @for (method of dashboard()?.procurementMethodBreakdown || []; track method.method) {
+              <div class="cat-row" [matTooltip]="method.count + ' items worth ' + formatRandFull(method.value) + ' (' + method.percentage + '%)'">
+                <div class="cat-info">
+                  <span class="cat-name">{{method.method}}</span>
+                  <span class="cat-count">{{method.count}} items</span>
+                </div>
+                <div class="cat-bar-track">
+                  <div class="cat-bar-fill" [style.width.%]="method.percentage" style="background: #3b82f6;"></div>
+                </div>
+                <div class="cat-values">
+                  <span class="cat-value">{{formatRand(method.value)}}</span>
+                  <span class="cat-pct">{{method.percentage}}%</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ===================== DEMAND PLANS VIEW ===================== -->
+      @if (currentView() === 'plans') {
+        <div class="filter-bar">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search plans...</mat-label>
+            <input matInput [(ngModel)]="searchQuery" (keyup.enter)="loadPlans()" placeholder="Reference, title, department...">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Status</mat-label>
+            <mat-select [(ngModel)]="filterStatus" (selectionChange)="loadPlans()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="submitted">Submitted</mat-option>
+              <mat-option value="reviewed">Reviewed</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+              <mat-option value="rejected">Rejected</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Department</mat-label>
+            <mat-select [(ngModel)]="filterDepartment" (selectionChange)="loadPlans()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments; track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <button mat-stroked-button class="clear-btn" (click)="clearFilters()">
+            <mat-icon>clear</mat-icon> Clear
+          </button>
+          <div class="flex-spacer"></div>
+          <button mat-flat-button class="action-btn approve" (click)="openCreateForm()">
+            <mat-icon>add</mat-icon> New Demand Plan
+          </button>
+        </div>
+
+        @if (showCreateForm()) {
+          <div class="section-card create-form-card">
+            <div class="section-header">
+              <h3><mat-icon style="color: #3b82f6;">add_circle</mat-icon> New Demand Plan</h3>
+              <button mat-icon-button (click)="cancelCreate()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="create-form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="newPlan.title" placeholder="e.g. Infrastructure Capital Programme 2025/26">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="newPlan.departmentId">
+                  @for (dept of departmentOptions; track dept.id) {
+                    <mat-option [value]="dept.id">{{dept.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Financial Year</mat-label>
+                <mat-select [(ngModel)]="newPlan.financialYear">
+                  <mat-option value="2024/25">2024/25</mat-option>
+                  <mat-option value="2025/26">2025/26</mat-option>
+                  <mat-option value="2026/27">2026/27</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Vote</mat-label>
+                <input matInput [(ngModel)]="newPlan.vote" placeholder="e.g. Vote 8">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Total Budget (R)</mat-label>
+                <input matInput type="number" [(ngModel)]="newPlan.totalBudget" placeholder="0">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Priority</mat-label>
+                <mat-select [(ngModel)]="newPlan.priority">
+                  <mat-option value="Critical">Critical</mat-option>
+                  <mat-option value="High">High</mat-option>
+                  <mat-option value="Medium">Medium</mat-option>
+                  <mat-option value="Low">Low</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>IDP Reference</mat-label>
+                <input matInput [(ngModel)]="newPlan.idpReference" placeholder="e.g. IDP-2025-001">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>IDP Objective</mat-label>
+                <input matInput [(ngModel)]="newPlan.idpObjective" placeholder="Strategic objective">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>SDBIP Reference</mat-label>
+                <input matInput [(ngModel)]="newPlan.sdbipReference" placeholder="e.g. SDBIP-2025-IE-001">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>SDBIP Indicator</mat-label>
+                <input matInput [(ngModel)]="newPlan.sdbipIndicator" placeholder="e.g. KPI 4.1">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Description / Notes</mat-label>
+                <textarea matInput [(ngModel)]="newPlan.description" rows="2" placeholder="Describe the demand plan..."></textarea>
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-stroked-button (click)="cancelCreate()">Cancel</button>
+              <button mat-flat-button class="action-btn approve" (click)="savePlan()">
+                <mat-icon>save</mat-icon> Save as Draft
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="pipeline-strip">
+          @for (stage of planStages; track stage.key) {
+            <div class="pipe-tile" [class.active]="filterStatus === stage.key" (click)="filterByStatus(stage.key)" [matTooltip]="getPlanCountForStatus(stage.key) + ' plans in ' + stage.label + ' status'">
+              <mat-icon>{{stage.icon}}</mat-icon>
+              <span class="pipe-count">{{getPlanCountForStatus(stage.key)}}</span>
+              <span class="pipe-label">{{stage.label}}</span>
+            </div>
+          }
+        </div>
+
+        <div class="section-card">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Title</th>
+                  <th>Department</th>
+                  <th>Financial Year</th>
+                  <th [matTooltip]="'Total demand value'">Value</th>
+                  <th [matTooltip]="'Number of items'">Items</th>
+                  <th>Compliance</th>
+                  <th>Risk</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (plan of plans(); track plan.id) {
+                  <tr class="clickable-row" (click)="viewPlan(plan)">
+                    <td class="ref-cell">{{plan.referenceNumber}}</td>
+                    <td class="title-cell">{{plan.title}}</td>
+                    <td>{{plan.department}}</td>
+                    <td>{{plan.financialYear}}</td>
+                    <td class="value-cell" [matTooltip]="'Total demand: ' + formatRandFull(plan.totalDemand?.amount || 0) + ' | Budget: ' + formatRandFull(plan.totalBudget?.amount || 0)">{{formatRand(plan.totalDemand?.amount || 0)}}</td>
+                    <td [matTooltip]="(plan.items?.length || 0) + ' line items'">{{plan.items?.length || 0}}</td>
+                    <td [matTooltip]="'Compliance score: ' + plan.complianceScore + '%'">
+                      <div class="compliance-bar small">
+                        <div class="compliance-fill" [style.width.%]="plan.complianceScore" [style.background]="plan.complianceScore >= 90 ? '#16a34a' : plan.complianceScore >= 70 ? '#ca8a04' : '#dc2626'"></div>
+                        <span>{{plan.complianceScore}}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="risk-badge" [style.background]="getRiskColor(plan.riskLevel).bg" [style.color]="getRiskColor(plan.riskLevel).text">{{plan.riskLevel}}</span>
+                    </td>
+                    <td>
+                      <span class="status-badge" [style.background]="getStatusColor(plan.status).bg" [style.color]="getStatusColor(plan.status).text">{{plan.status | titlecase}}</span>
+                    </td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="planMenu" matTooltip="Actions">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #planMenu="matMenu">
+                        <button mat-menu-item (click)="viewPlan(plan)"><mat-icon>visibility</mat-icon> View Details</button>
+                        @if (plan.status === 'draft') {
+                          <button mat-menu-item (click)="submitPlan(plan.id)"><mat-icon>send</mat-icon> Submit</button>
+                        }
+                        @if (plan.status === 'submitted') {
+                          <button mat-menu-item (click)="reviewPlan(plan.id)"><mat-icon>rate_review</mat-icon> Review</button>
+                        }
+                        @if (plan.status === 'reviewed') {
+                          <button mat-menu-item (click)="approvePlan(plan.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                          <button mat-menu-item (click)="rejectPlan(plan.id)"><mat-icon>cancel</mat-icon> Reject</button>
+                        }
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="10" class="empty-text">No demand plans found</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (totalPages() > 1) {
+            <div class="pagination">
+              <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)" matTooltip="Previous page">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-info">Page {{currentPage()}} of {{totalPages()}}</span>
+              <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)" matTooltip="Next page">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== PLAN DETAIL VIEW ===================== -->
+      @if (currentView() === 'plan-detail' && selectedPlan()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToPlans()" matTooltip="Back to plans list">
+            <mat-icon>arrow_back</mat-icon>
+          </button>
+          <div class="detail-title-block">
+            <h2>{{selectedPlan()!.title}}</h2>
+            <span class="detail-ref">{{selectedPlan()!.referenceNumber}}</span>
+          </div>
+          <span class="status-badge lg" [style.background]="getStatusColor(selectedPlan()!.status).bg" [style.color]="getStatusColor(selectedPlan()!.status).text">{{selectedPlan()!.status | titlecase}}</span>
+          <div class="detail-compliance" [matTooltip]="'Plan compliance score: ' + selectedPlan()!.complianceScore + '%'">
+            <mat-icon [style.color]="selectedPlan()!.complianceScore >= 90 ? '#16a34a' : '#ca8a04'">verified</mat-icon>
+            <span>{{selectedPlan()!.complianceScore}}%</span>
+          </div>
+          <span class="risk-badge" [style.background]="getRiskColor(selectedPlan()!.riskLevel).bg" [style.color]="getRiskColor(selectedPlan()!.riskLevel).text">{{selectedPlan()!.riskLevel}} risk</span>
+          <div class="flex-spacer"></div>
+          <div class="detail-actions">
+            @if (selectedPlan()!.status === 'draft') {
+              <button mat-flat-button class="action-btn submit" (click)="submitPlan(selectedPlan()!.id)" matTooltip="Submit plan for review">
+                <mat-icon>send</mat-icon> Submit
+              </button>
+            }
+            @if (selectedPlan()!.status === 'submitted') {
+              <button mat-flat-button class="action-btn review" (click)="reviewPlan(selectedPlan()!.id)" matTooltip="Mark as reviewed">
+                <mat-icon>rate_review</mat-icon> Review
+              </button>
+            }
+            @if (selectedPlan()!.status === 'reviewed') {
+              <button mat-flat-button class="action-btn approve" (click)="approvePlan(selectedPlan()!.id)" matTooltip="Approve demand plan">
+                <mat-icon>check_circle</mat-icon> Approve
+              </button>
+              <button mat-flat-button class="action-btn reject" (click)="rejectPlan(selectedPlan()!.id)" matTooltip="Reject demand plan">
+                <mat-icon>cancel</mat-icon> Reject
+              </button>
+            }
+            @if (selectedPlan()!.status === 'approved' || selectedPlan()!.statusId === 4) {
+              <button mat-flat-button class="action-btn" style="background: #1565c0; color: white;" (click)="generateRequisitions(selectedPlan()!.id)" matTooltip="Generate requisitions from approved demand plan items">
+                <mat-icon>assignment</mat-icon> Generate Requisitions
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-tab-nav">
+          <button class="dtab" [class.active]="detailTab() === 'overview'" (click)="detailTab.set('overview')">Overview</button>
+          <button class="dtab" [class.active]="detailTab() === 'items'" (click)="detailTab.set('items')">Items ({{selectedPlan()!.items?.length || 0}})</button>
+          <button class="dtab" [class.active]="detailTab() === 'budget'" (click)="detailTab.set('budget')">Budget</button>
+          <button class="dtab" [class.active]="detailTab() === 'audit'" (click)="detailTab.set('audit')">Audit Trail</button>
+        </div>
+
+        <!-- OVERVIEW TAB -->
+        @if (detailTab() === 'overview') {
+          <div class="dashboard-grid-2col">
+            <div class="section-card">
+              <div class="section-header">
+                <h3><mat-icon style="color: #3b82f6;">info</mat-icon> Plan Information</h3>
+                <span class="leg-badge">MFMA s112</span>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-field"><label>Department</label><span>{{selectedPlan()!.department}}</span></div>
+                <div class="detail-field"><label>Department Code</label><span>{{selectedPlan()!.departmentCode}}</span></div>
+                <div class="detail-field"><label>Vote</label><span>{{selectedPlan()!.vote}}</span></div>
+                <div class="detail-field"><label>Financial Year</label><span>{{selectedPlan()!.financialYear}}</span></div>
+                <div class="detail-field"><label>IDP Reference</label><span>{{selectedPlan()!.idpReference}}</span></div>
+                <div class="detail-field"><label>IDP Objective</label><span>{{selectedPlan()!.idpObjective}}</span></div>
+                <div class="detail-field"><label>SDBIP Reference</label><span>{{selectedPlan()!.sdbipReference}}</span></div>
+                <div class="detail-field"><label>SDBIP Indicator</label><span>{{selectedPlan()!.sdbipIndicator}}</span></div>
+                <div class="detail-field"><label>Created By</label><span>{{selectedPlan()!.createdByName}}</span></div>
+                <div class="detail-field"><label>Created Date</label><span>{{formatDate(selectedPlan()!.createdDate)}}</span></div>
+                @if (selectedPlan()!.reviewedByName) {
+                  <div class="detail-field"><label>Reviewed By</label><span>{{selectedPlan()!.reviewedByName}}</span></div>
+                  <div class="detail-field"><label>Reviewed Date</label><span>{{formatDate(selectedPlan()!.reviewedDate)}}</span></div>
+                }
+                @if (selectedPlan()!.approvedByName) {
+                  <div class="detail-field"><label>Approved By</label><span>{{selectedPlan()!.approvedByName}}</span></div>
+                  <div class="detail-field"><label>Approved Date</label><span>{{formatDate(selectedPlan()!.approvedDate)}}</span></div>
+                }
+              </div>
+              @if (selectedPlan()!.notes) {
+                <div class="notes-section">
+                  <label>Notes</label>
+                  <p>{{selectedPlan()!.notes}}</p>
+                </div>
+              }
+            </div>
+
+            <div class="section-card">
+              <div class="section-header">
+                <h3><mat-icon style="color: #f59e0b;">pie_chart</mat-icon> Priority & Method Summary</h3>
+                <span class="leg-badge">SCM Reg 12(1)(d)</span>
+              </div>
+              <div class="summary-section">
+                <h4>Priority Breakdown</h4>
+                <div class="priority-cards">
+                  <div class="priority-card" [matTooltip]="'Critical priority items'" style="border-left: 3px solid #dc2626;">
+                    <span class="prio-label">Critical</span>
+                    <span class="prio-count">{{selectedPlan()!.priorityBreakdown?.critical || 0}}</span>
+                  </div>
+                  <div class="priority-card" [matTooltip]="'High priority items'" style="border-left: 3px solid #ea580c;">
+                    <span class="prio-label">High</span>
+                    <span class="prio-count">{{selectedPlan()!.priorityBreakdown?.high || 0}}</span>
+                  </div>
+                  <div class="priority-card" [matTooltip]="'Medium priority items'" style="border-left: 3px solid #ca8a04;">
+                    <span class="prio-label">Medium</span>
+                    <span class="prio-count">{{selectedPlan()!.priorityBreakdown?.medium || 0}}</span>
+                  </div>
+                  <div class="priority-card" [matTooltip]="'Low priority items'" style="border-left: 3px solid #16a34a;">
+                    <span class="prio-label">Low</span>
+                    <span class="prio-count">{{selectedPlan()!.priorityBreakdown?.low || 0}}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-section" style="margin-top: 16px;">
+                <h4>Procurement Methods</h4>
+                @for (method of getMethodKeys(); track method) {
+                  <div class="method-row" [matTooltip]="selectedPlan()!.procurementMethodSummary[method] + ' items using ' + method">
+                    <span class="method-name">{{method}}</span>
+                    <span class="method-count">{{selectedPlan()!.procurementMethodSummary[method]}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- ITEMS TAB -->
+        @if (detailTab() === 'items') {
+          <div class="section-card">
+            <div class="section-header">
+              <h3><mat-icon style="color: #3b82f6;">list_alt</mat-icon> Demand Plan Items</h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="leg-badge">MFMA s112, SCM Reg 12(5)</span>
+                @if (selectedPlan()!.status === 'draft') {
+                  <button mat-flat-button class="action-btn approve" style="height: 32px; font-size: 12px;" (click)="openAddItemForm()">
+                    <mat-icon style="font-size: 16px; width: 16px; height: 16px;">add</mat-icon> Add Item
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (showAddItemForm()) {
+              <div class="item-form-card">
+                <h4 style="margin: 0 0 12px; font-size: 13px; font-weight: 600;">{{editingItem() ? 'Edit' : 'Add'}} Line Item</h4>
+                <div class="create-form-grid">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Description</mat-label>
+                    <input matInput [(ngModel)]="newItem.description" placeholder="Item description">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Quantity</mat-label>
+                    <input matInput type="number" [(ngModel)]="newItem.quantity">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Unit of Measure</mat-label>
+                    <mat-select [(ngModel)]="newItem.unitOfMeasure">
+                      <mat-option value="Each">Each</mat-option>
+                      <mat-option value="Lot">Lot</mat-option>
+                      <mat-option value="Set">Set</mat-option>
+                      <mat-option value="Project">Project</mat-option>
+                      <mat-option value="Contract">Contract</mat-option>
+                      <mat-option value="m">Metre</mat-option>
+                      <mat-option value="km">Kilometre</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Unit Price (R)</mat-label>
+                    <input matInput type="number" [(ngModel)]="newItem.unitPrice">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Category</mat-label>
+                    <mat-select [(ngModel)]="newItem.category">
+                      <mat-option value="capital_works">Capital Works</mat-option>
+                      <mat-option value="services">Services</mat-option>
+                      <mat-option value="goods">Goods</mat-option>
+                      <mat-option value="maintenance">Maintenance</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Procurement Method</mat-label>
+                    <mat-select [(ngModel)]="newItem.procurementMethod">
+                      <mat-option value="Open Tender">Open Tender</mat-option>
+                      <mat-option value="RFQ">RFQ (Three Quotes)</mat-option>
+                      <mat-option value="Limited Bidding">Limited Bidding</mat-option>
+                      <mat-option value="Single Source">Single Source</mat-option>
+                      <mat-option value="Emergency">Emergency</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Priority</mat-label>
+                    <mat-select [(ngModel)]="newItem.priority">
+                      <mat-option value="Critical">Critical</mat-option>
+                      <mat-option value="High">High</mat-option>
+                      <mat-option value="Medium">Medium</mat-option>
+                      <mat-option value="Low">Low</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Delivery Quarter</mat-label>
+                    <mat-select [(ngModel)]="newItem.deliveryQuarter">
+                      <mat-option value="Q1">Q1</mat-option>
+                      <mat-option value="Q2">Q2</mat-option>
+                      <mat-option value="Q3">Q3</mat-option>
+                      <mat-option value="Q4">Q4</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="form-actions">
+                  <button mat-stroked-button (click)="cancelAddItem()">Cancel</button>
+                  <button mat-flat-button class="action-btn approve" (click)="saveItem()">
+                    <mat-icon>save</mat-icon> {{editingItem() ? 'Update' : 'Add'}} Item
+                  </button>
+                </div>
+              </div>
+            }
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Line#</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th [matTooltip]="'Estimated value in Rand'">Value</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th [matTooltip]="'Risk score 0-100'">Risk</th>
+                    @if (selectedPlan()!.status === 'draft') {
+                      <th>Actions</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of selectedPlan()!.items || []; track item.id) {
+                    <tr>
+                      <td>{{item.lineNumber}}</td>
+                      <td class="title-cell" [matTooltip]="item.description">{{item.description}}</td>
+                      <td>
+                        <span class="cat-badge" [style.background]="getCategoryColor(item.category) + '20'" [style.color]="getCategoryColor(item.category)">{{item.category | titlecase}}</span>
+                      </td>
+                      <td>
+                        <span class="priority-badge" [style.background]="getPriorityColor(item.priority).bg" [style.color]="getPriorityColor(item.priority).text">{{item.priority | titlecase}}</span>
+                      </td>
+                      <td class="value-cell" [matTooltip]="formatRandFull(item.estimatedValue?.amount || 0)">{{formatRand(item.estimatedValue?.amount || 0)}}</td>
+                      <td [matTooltip]="item.procurementMethod">{{item.procurementMethod}}</td>
+                      <td>
+                        <span class="status-badge" [style.background]="getStatusColor(item.status).bg" [style.color]="getStatusColor(item.status).text">{{item.status | titlecase}}</span>
+                      </td>
+                      <td [matTooltip]="'Risk score: ' + (item.riskScore || 0) + '/100'">
+                        <div class="risk-indicator">
+                          <div class="risk-bar-track">
+                            <div class="risk-bar-fill" [style.width.%]="item.riskScore || 0" [style.background]="(item.riskScore || 0) > 70 ? '#dc2626' : (item.riskScore || 0) > 40 ? '#ca8a04' : '#16a34a'"></div>
+                          </div>
+                          <span class="risk-score" [style.color]="(item.riskScore || 0) > 70 ? '#dc2626' : (item.riskScore || 0) > 40 ? '#ca8a04' : '#16a34a'">{{item.riskScore || 0}}</span>
+                        </div>
+                      </td>
+                      @if (selectedPlan()!.status === 'draft') {
+                        <td class="actions-cell">
+                          <button mat-icon-button matTooltip="Edit" (click)="editItem(item)"><mat-icon>edit</mat-icon></button>
+                          <button mat-icon-button matTooltip="Delete" (click)="deleteItem(item)"><mat-icon>delete</mat-icon></button>
+                        </td>
+                      }
+                    </tr>
+                  } @empty {
+                    <tr><td [attr.colspan]="selectedPlan()!.status === 'draft' ? 9 : 8" class="empty-text">No items in this plan. Click "Add Item" to add line items.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        <!-- BUDGET TAB -->
+        @if (detailTab() === 'budget') {
+          <div class="dashboard-grid-2col">
+            <div class="section-card">
+              <div class="section-header">
+                <h3><mat-icon style="color: #16a34a;">account_balance</mat-icon> Budget Analysis</h3>
+                <span class="leg-badge">MFMA s15, s28</span>
+              </div>
+              <div class="budget-summary">
+                <div class="budget-metric" [matTooltip]="'Total budget allocation: ' + formatRandFull(selectedPlan()!.totalBudget?.amount || 0)">
+                  <span class="bm-label">Total Budget</span>
+                  <span class="bm-value" style="color: #16a34a;">{{formatRand(selectedPlan()!.totalBudget?.amount || 0)}}</span>
+                </div>
+                <div class="budget-metric" [matTooltip]="'Total demand value: ' + formatRandFull(selectedPlan()!.totalDemand?.amount || 0)">
+                  <span class="bm-label">Total Demand</span>
+                  <span class="bm-value" style="color: #3b82f6;">{{formatRand(selectedPlan()!.totalDemand?.amount || 0)}}</span>
+                </div>
+                <div class="budget-metric" [matTooltip]="'Budget variance: ' + formatRandFull(selectedPlan()!.budgetVariance?.amount || 0)">
+                  <span class="bm-label">Variance</span>
+                  <span class="bm-value" [style.color]="(selectedPlan()!.budgetVariance?.amount || 0) >= 0 ? '#16a34a' : '#dc2626'">{{formatRand(selectedPlan()!.budgetVariance?.amount || 0)}}</span>
+                </div>
+                <div class="budget-metric" [matTooltip]="'Budget utilisation: ' + selectedPlan()!.budgetUtilisation + '%'">
+                  <span class="bm-label">Utilisation</span>
+                  <span class="bm-value" [style.color]="selectedPlan()!.budgetUtilisation > 90 ? '#dc2626' : '#3b82f6'">{{selectedPlan()!.budgetUtilisation}}%</span>
+                </div>
+              </div>
+
+              <div class="budget-bar-wrapper" style="margin-top: 16px;">
+                <div class="budget-progress-track">
+                  <div class="budget-progress-fill" [style.width.%]="Math.min(selectedPlan()!.budgetUtilisation, 100)" [style.background]="selectedPlan()!.budgetUtilisation > 90 ? '#dc2626' : selectedPlan()!.budgetUtilisation > 70 ? '#ca8a04' : '#3b82f6'"></div>
+                </div>
+                <div class="budget-labels">
+                  <span>0%</span>
+                  <span [style.color]="selectedPlan()!.budgetUtilisation > 90 ? '#dc2626' : '#3b82f6'">{{selectedPlan()!.budgetUtilisation}}% utilised</span>
+                  <span>100%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <div class="section-header">
+                <h3><mat-icon style="color: #8b5cf6;">calendar_month</mat-icon> Quarterly Spend Plan</h3>
+                <span class="leg-badge">MFMA s112(2)</span>
+              </div>
+              <div class="quarterly-grid">
+                @for (q of getQuarterKeys(); track q) {
+                  <div class="quarter-card" [matTooltip]="q + ': Planned ' + formatRandFull(selectedPlan()!.quarterlySpendPlan[q]?.planned || 0) + ' | Actual ' + formatRandFull(selectedPlan()!.quarterlySpendPlan[q]?.actual || 0)">
+                    <span class="q-label">{{q}}</span>
+                    <div class="q-values">
+                      <div class="q-row">
+                        <span class="q-type">Planned</span>
+                        <span class="q-amount">{{formatRand(selectedPlan()!.quarterlySpendPlan[q]?.planned || 0)}}</span>
+                      </div>
+                      <div class="q-row">
+                        <span class="q-type">Actual</span>
+                        <span class="q-amount" style="color: #16a34a;">{{formatRand(selectedPlan()!.quarterlySpendPlan[q]?.actual || 0)}}</span>
+                      </div>
+                      <div class="q-row">
+                        <span class="q-type">Committed</span>
+                        <span class="q-amount" style="color: #f59e0b;">{{formatRand(selectedPlan()!.quarterlySpendPlan[q]?.committed || 0)}}</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- AUDIT TRAIL TAB -->
+        @if (detailTab() === 'audit') {
+          <div class="section-card">
+            <div class="section-header">
+              <h3><mat-icon style="color: #8b5cf6;">history</mat-icon> Audit Trail</h3>
+              <span class="leg-badge">MFMA s171, s173</span>
+            </div>
+            <div class="audit-timeline">
+              @for (entry of selectedPlan()!.auditTrail || []; track $index) {
+                <div class="audit-entry">
+                  <div class="audit-dot" [style.background]="getAuditColor(entry.action)"></div>
+                  <div class="audit-line"></div>
+                  <div class="audit-content">
+                    <div class="audit-header">
+                      <span class="audit-action">{{entry.action}}</span>
+                      <span class="audit-date">{{formatDate(entry.date)}}</span>
+                    </div>
+                    <span class="audit-by">by {{entry.by}}</span>
+                    @if (entry.notes) {
+                      <p class="audit-notes">{{entry.notes}}</p>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="empty-text">No audit trail entries</p>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== NEEDS REGISTER VIEW ===================== -->
+      @if (currentView() === 'needs') {
+        <div class="filter-bar">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search needs assessments...</mat-label>
+            <input matInput [(ngModel)]="needsSearchQuery" (keyup.enter)="loadNeedsAssessments()" placeholder="Reference, title...">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Status</mat-label>
+            <mat-select [(ngModel)]="needsFilterStatus" (selectionChange)="loadNeedsAssessments()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="in_progress">In Progress</mat-option>
+              <mat-option value="completed">Completed</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Priority</mat-label>
+            <mat-select [(ngModel)]="needsFilterPriority" (selectionChange)="loadNeedsAssessments()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="critical">Critical</mat-option>
+              <mat-option value="high">High</mat-option>
+              <mat-option value="medium">Medium</mat-option>
+              <mat-option value="low">Low</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="flex-spacer"></div>
+          <button mat-flat-button class="action-btn approve" (click)="openCreateNeedForm()">
+            <mat-icon>add</mat-icon> New Assessment
+          </button>
+        </div>
+
+        @if (showCreateNeedForm()) {
+          <div class="section-card create-form-card">
+            <div class="section-header">
+              <h3><mat-icon style="color: #059669;">add_circle</mat-icon> New Needs Assessment</h3>
+              <button mat-icon-button (click)="cancelCreateNeed()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="create-form-grid">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Title</mat-label>
+                <input matInput [(ngModel)]="newNeed.title" placeholder="e.g. Road Rehabilitation Needs Assessment">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Department</mat-label>
+                <mat-select [(ngModel)]="newNeed.departmentId">
+                  @for (dept of departmentOptions; track dept.id) {
+                    <mat-option [value]="dept.id">{{dept.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Priority</mat-label>
+                <mat-select [(ngModel)]="newNeed.priority">
+                  <mat-option value="critical">Critical</mat-option>
+                  <mat-option value="high">High</mat-option>
+                  <mat-option value="medium">Medium</mat-option>
+                  <mat-option value="low">Low</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Category</mat-label>
+                <mat-select [(ngModel)]="newNeed.category">
+                  <mat-option value="capital_works">Capital Works</mat-option>
+                  <mat-option value="services">Services</mat-option>
+                  <mat-option value="goods">Goods</mat-option>
+                  <mat-option value="maintenance">Maintenance</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Estimated Cost (R)</mat-label>
+                <input matInput type="number" [(ngModel)]="newNeed.estimatedCost">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Justification</mat-label>
+                <textarea matInput [(ngModel)]="newNeed.justification" rows="2" placeholder="Why is this needed?"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Current Situation</mat-label>
+                <textarea matInput [(ngModel)]="newNeed.currentSituation" rows="2" placeholder="Describe the current state..."></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Proposed Solution</mat-label>
+                <textarea matInput [(ngModel)]="newNeed.proposedSolution" rows="2" placeholder="What is the proposed solution?"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Risk Factors</mat-label>
+                <input matInput [(ngModel)]="newNeed.riskFactors" placeholder="e.g. Budget constraints, weather delays">
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-stroked-button (click)="cancelCreateNeed()">Cancel</button>
+              <button mat-flat-button class="action-btn approve" (click)="saveNeed()">
+                <mat-icon>save</mat-icon> Save Assessment
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="section-card">
+          <div class="section-header">
+            <h3><mat-icon style="color: #059669;">fact_check</mat-icon> Needs Assessments Register</h3>
+            <span class="leg-badge">MFMA s112(2)(a), SCM Reg 12(5)</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Title</th>
+                  <th>Department</th>
+                  <th>Conducted By</th>
+                  <th>Date</th>
+                  <th>Priority</th>
+                  <th [matTooltip]="'Estimated cost in Rand'">Est. Cost</th>
+                  <th>Status</th>
+                  <th>Legislative Ref</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (need of filteredNeeds(); track need.id) {
+                  <tr class="clickable-row">
+                    <td class="ref-cell">{{need.referenceNumber}}</td>
+                    <td class="title-cell" [matTooltip]="need.description">{{need.title}}</td>
+                    <td>{{need.department}}</td>
+                    <td>{{need.conductedByName}}</td>
+                    <td>{{formatDate(need.conductedDate)}}</td>
+                    <td>
+                      <span class="priority-badge" [style.background]="getPriorityColor(need.priority).bg" [style.color]="getPriorityColor(need.priority).text">{{need.priority | titlecase}}</span>
+                    </td>
+                    <td class="value-cell" [matTooltip]="formatRandFull(need.estimatedCost?.amount || 0)">{{formatRand(need.estimatedCost?.amount || 0)}}</td>
+                    <td>
+                      <span class="status-badge" [style.background]="getStatusColor(need.status).bg" [style.color]="getStatusColor(need.status).text">{{need.status | titlecase}}</span>
+                    </td>
+                    <td>
+                      <span class="leg-badge-sm">{{need.legislativeRef}}</span>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty-text">No needs assessments found</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== PROCUREMENT PLAN VIEW ===================== -->
+      @if (currentView() === 'procurement') {
+        <div class="section-card">
+          <div class="section-header">
+            <h3><mat-icon style="color: #c9a84c;">calendar_month</mat-icon> Annual Procurement Plan</h3>
+            <span class="leg-badge">MFMA s112(2), SCM Reg 12(1)</span>
+          </div>
+
+          @if (procurementPlan()) {
+            <div class="procurement-header">
+              <div class="proc-meta">
+                <div class="proc-field">
+                  <label>Reference</label>
+                  <span>{{procurementPlan()!.referenceNumber}}</span>
+                </div>
+                <div class="proc-field">
+                  <label>Financial Year</label>
+                  <span>{{procurementPlan()!.financialYear}}</span>
+                </div>
+                <div class="proc-field">
+                  <label>Status</label>
+                  <span class="status-badge" [style.background]="getStatusColor(procurementPlan()!.status).bg" [style.color]="getStatusColor(procurementPlan()!.status).text">{{procurementPlan()!.status | titlecase}}</span>
+                </div>
+                <div class="proc-field">
+                  <label>Version</label>
+                  <span>v{{procurementPlan()!.version}}</span>
+                </div>
+                <div class="proc-field" [matTooltip]="'Total planned spend: ' + formatRandFull(procurementPlan()!.totalPlannedSpend?.amount || 0)">
+                  <label>Total Planned Spend</label>
+                  <span class="proc-value">{{formatRand(procurementPlan()!.totalPlannedSpend?.amount || 0)}}</span>
+                </div>
+                <div class="proc-field" [matTooltip]="'Total budget available: ' + formatRandFull(procurementPlan()!.totalBudgetAvailable?.amount || 0)">
+                  <label>Budget Available</label>
+                  <span class="proc-value" style="color: #16a34a;">{{formatRand(procurementPlan()!.totalBudgetAvailable?.amount || 0)}}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- QUARTERLY PIPELINE -->
+            <div class="quarterly-pipeline">
+              <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin: 16px 0 12px;">Quarterly Pipeline</h4>
+              <div class="q-pipeline-grid">
+                @for (q of getQPipelineKeys(); track q) {
+                  <div class="q-pipe-card" [matTooltip]="procurementPlan()!.quarterlyPipeline[q]?.items + ' items worth ' + formatRandFull(procurementPlan()!.quarterlyPipeline[q]?.value || 0)">
+                    <span class="qp-label">{{q}}</span>
+                    <span class="qp-items">{{procurementPlan()!.quarterlyPipeline[q]?.items || 0}} items</span>
+                    <span class="qp-value">{{formatRand(procurementPlan()!.quarterlyPipeline[q]?.value || 0)}}</span>
+                    <span class="qp-status" [style.color]="procurementPlan()!.quarterlyPipeline[q]?.status === 'on_track' ? '#16a34a' : '#ca8a04'">
+                      {{procurementPlan()!.quarterlyPipeline[q]?.status | titlecase}}
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- PROCUREMENT ITEMS TABLE -->
+            <div class="table-wrapper" style="margin-top: 16px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Method</th>
+                    <th>Category</th>
+                    <th>Target Quarter</th>
+                    <th [matTooltip]="'Estimated value in Rand'">Value</th>
+                    <th>Status</th>
+                    <th [matTooltip]="'Bidding document readiness'">Doc Ready</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of procurementPlan()!.items || []; track item.id) {
+                    <tr>
+                      <td class="title-cell">{{item.description}}</td>
+                      <td>{{item.procurementMethod}}</td>
+                      <td>{{item.category | titlecase}}</td>
+                      <td>{{item.targetQuarter}}</td>
+                      <td class="value-cell" [matTooltip]="formatRandFull(item.estimatedValue || 0)">{{formatRand(item.estimatedValue || 0)}}</td>
+                      <td>
+                        <span class="status-badge" [style.background]="getStatusColor(item.status).bg" [style.color]="getStatusColor(item.status).text">{{item.status | titlecase}}</span>
+                      </td>
+                      <td>
+                        <mat-icon [style.color]="item.biddingDocumentReady ? '#16a34a' : '#94a3b8'" [matTooltip]="item.biddingDocumentReady ? 'Document ready' : 'Document not ready'">
+                          {{item.biddingDocumentReady ? 'check_circle' : 'radio_button_unchecked'}}
+                        </mat-icon>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="7" class="empty-text">No procurement plan items</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- METHOD BREAKDOWN -->
+            @if (procurementPlan()!.methodBreakdown) {
+              <div style="margin-top: 16px;">
+                <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 12px;">Method Breakdown</h4>
+                <div class="method-breakdown-grid">
+                  @for (method of getMethodBreakdownKeys(); track method) {
+                    <div class="method-card" [matTooltip]="procurementPlan()!.methodBreakdown[method]?.count + ' items worth ' + formatRandFull(procurementPlan()!.methodBreakdown[method]?.value || 0)">
+                      <span class="mc-label">{{method}}</span>
+                      <span class="mc-count">{{procurementPlan()!.methodBreakdown[method]?.count || 0}}</span>
+                      <span class="mc-value">{{formatRand(procurementPlan()!.methodBreakdown[method]?.value || 0)}}</span>
+                      <span class="mc-pct">{{procurementPlan()!.methodBreakdown[method]?.percentage || 0}}%</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          } @else {
+            <div class="empty-state">
+              <mat-icon>calendar_month</mat-icon>
+              <p>Loading procurement plan data...</p>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== AI ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        @if (analytics()) {
+          <!-- ROW 1: Pipeline + Budget Alignment -->
+          <div class="chart-grid-2col">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #3b82f6;">filter_alt</mat-icon>
+                  Demand Pipeline Funnel
+                </h3>
+                <span class="leg-badge">MFMA s112, SCM Reg 12(5)</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="demandPipelineChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span>Total items in pipeline: {{getTotalPipelineItems()}}</span>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #10b981;">account_balance</mat-icon>
+                  Budget Alignment by Department
+                </h3>
+                <span class="leg-badge">MFMA s15, s28, SCM Reg 12(5)</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="budgetAlignmentChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span class="legend-dot" style="background: #3b82f6;"></span> Demand
+                <span class="legend-dot" style="background: #10b981;"></span> Budget
+                <span class="legend-dot" style="background: #f59e0b;"></span> Committed
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 2: Category Spend + Method Distribution -->
+          <div class="chart-grid-2col">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #f59e0b;">category</mat-icon>
+                  Category Spend Distribution
+                </h3>
+                <span class="leg-badge">SCM Reg 28, NT Practice Note 8</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="categorySpendChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                @for (cat of dashboard()?.categoryBreakdown || []; track cat.category) {
+                  <span class="chart-footer-item" [matTooltip]="formatRandFull(cat.value)">
+                    <span class="legend-dot" [style.background]="getCategoryColor(cat.category)"></span>
+                    {{cat.category | titlecase}}: {{cat.percentage}}%
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #8b5cf6;">pie_chart</mat-icon>
+                  Procurement Method Distribution
+                </h3>
+                <span class="leg-badge">SCM Reg 12(1)(d), NT Instruction 2/2021</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="methodDistributionChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                @for (method of dashboard()?.procurementMethodBreakdown || []; track method.method) {
+                  <span class="chart-footer-item" [matTooltip]="method.count + ' items'">
+                    {{method.method}}: {{method.percentage}}%
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 3: Quarterly Targets + IDP Alignment -->
+          <div class="chart-grid-2col">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #06b6d4;">show_chart</mat-icon>
+                  Quarterly Targets vs Actuals
+                </h3>
+                <span class="leg-badge">MFMA s112(2), SDBIP Compliance</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="quarterlyTargetsChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span class="legend-dot" style="background: #3b82f6;"></span> Planned
+                <span class="legend-dot" style="background: #10b981;"></span> Actual
+                <span class="legend-dot" style="background: #f59e0b;"></span> Committed
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #ec4899;">radar</mat-icon>
+                  IDP Alignment Score
+                </h3>
+                <span class="leg-badge">MSA s25, IDP Alignment</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="idpAlignmentChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span class="legend-dot" style="background: rgba(59,130,246,0.5);"></span> Actual Score
+                <span class="legend-dot" style="background: rgba(220,38,38,0.3);"></span> Target
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 4: Commodity Trends + Aggregation Savings -->
+          <div class="chart-grid-2col">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #14b8a6;">trending_up</mat-icon>
+                  Commodity Spend Trends (3-Year)
+                </h3>
+                <span class="leg-badge">SCM Reg 12(5), NT Instruction 4A</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="commodityTrendsChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span>Historical commodity spend analysis</span>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>
+                  <mat-icon style="color: #f97316;">savings</mat-icon>
+                  Aggregation Savings Analysis
+                </h3>
+                <span class="leg-badge">SCM Reg 12(3), NT Practice Note 8</span>
+              </div>
+              <div class="chart-body">
+                <canvas id="aggregationSavingsChart"></canvas>
+              </div>
+              <div class="chart-footer">
+                <span>Estimated savings through demand aggregation</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI INSIGHTS PANEL -->
+          @if (aiInsights()) {
+            <div class="section-card" style="margin-top: 16px;">
+              <div class="section-header">
+                <h3>
+                  <mat-icon style="color: #7c3aed;">psychology</mat-icon>
+                  AI Demand Insights
+                  <span class="ai-badge">Powered by AI</span>
+                </h3>
+                <span class="leg-badge">AI Analysis</span>
+              </div>
+              <div class="insights-grid">
+                @for (insight of aiInsights()?.insights || []; track $index) {
+                  <div class="insight-card" [style.border-left-color]="insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'" [matTooltip]="insight.recommendation || ''">
+                    <div class="insight-icon" [style.background]="insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'" [style.color]="insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'">
+                      <mat-icon>{{insight.icon || 'lightbulb'}}</mat-icon>
+                    </div>
+                    <div class="insight-body">
+                      <span class="insight-title">{{insight.title}}</span>
+                      <span class="insight-msg">{{insight.message}}</span>
+                      @if (insight.legislationRef) {
+                        <span class="leg-badge-sm">{{insight.legislationRef}}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="empty-state">
+            <mat-icon>analytics</mat-icon>
+            <p>Loading analytics data...</p>
+          </div>
+        }
+      }
+    </div>

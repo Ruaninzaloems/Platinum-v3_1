@@ -1,0 +1,101 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Conditions of Service</h1>
+    <p class="page-subtitle">Manage employment conditions of service</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ items.length }}</span>
+    <span class="summary-label">Total Conditions</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ activeCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ disabledCount }}</span>
+    <span class="summary-label">Disabled</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search conditions..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredItems.length }} results</span>
+  </div>
+  <button class="btn btn-primary" (click)="openModal()">
+    <app-icon name="plus" [size]="16"></app-icon> Add Condition
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr><th>Code</th><th>Name</th><th>Description</th><th>Status</th><th style="width:90px">Actions</th></tr>
+        </thead>
+        <tbody>
+          @if (filteredItems.length === 0) {
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">No conditions of service found</td></tr>
+          } @else {
+            @for (item of filteredItems; track item.id) {
+              <tr>
+                <td><code style="font-size:11px;background:var(--bg-light, #f8fafc);padding:2px 6px;border-radius:3px">{{ item.code }}</code></td>
+                <td style="font-weight:500">{{ item.name }}</td>
+                <td>{{ item.description || '-' }}</td>
+                <td>
+                  @if (item.enabled !== false) {
+                    <span class="badge badge-success">Active</span>
+                  } @else {
+                    <span class="badge badge-secondary">Disabled</span>
+                  }
+                </td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="action-btn" (click)="openModal(item)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                    <button class="action-btn danger" (click)="deleteItem(item)" title="Delete"><app-icon name="trash" [size]="14"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editItem.id ? 'Edit' : 'Add' }} Condition of Service</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group"><label>Code *</label><input class="form-control" [(ngModel)]="editItem.code" placeholder="e.g. PERM_FT" [readonly]="!!editItem.id"></div>
+          <div class="form-group"><label>Name *</label><input class="form-control" [(ngModel)]="editItem.name" placeholder="e.g. Permanent Full Time"></div>
+          <div class="form-group" style="grid-column:1/-1"><label>Description</label><input class="form-control" [(ngModel)]="editItem.description"></div>
+          @if (editItem.id) {
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" [(ngModel)]="editItem.enabled" style="width:auto"> Active
+              </label>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">{{ editItem.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}

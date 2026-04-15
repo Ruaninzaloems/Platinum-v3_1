@@ -1,0 +1,1743 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+<div class="page-content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ mode === 'create' ? 'New Employee' : (emp.first_name || '') + ' ' + (emp.surname || '') }}</h1>
+      <p class="page-subtitle">{{ mode === 'create' ? 'Create a new employee record' : 'ID: ' + emp.id + (emp.employee_code ? ' | Code: ' + emp.employee_code : '') }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn" routerLink="/employees"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="startEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">{{ saving ? 'Saving...' : 'Save' }}</button>
+      }
+    </div>
+  </div>
+
+  @if (error) { <div class="alert alert-danger">{{ error }}</div> }
+
+  @if (mode !== 'create') {
+    <div class="emp-profile-banner">
+      <div class="emp-profile-left">
+        <div class="emp-avatar-wrap">
+          @if (emp.photo_url) {
+            <img [src]="emp.photo_url" class="emp-avatar" alt="Photo">
+          } @else {
+            <div class="emp-avatar-placeholder">
+              <span>{{ (emp.first_name || emp.full_name || 'E')[0] }}{{ (emp.surname || '')[0] || '' }}</span>
+            </div>
+          }
+          @if (isEditable) {
+            <label class="emp-avatar-upload" title="Upload photo">
+              <app-icon name="camera" [size]="14"></app-icon>
+              <input type="file" accept="image/*" (change)="uploadPhoto($event)" style="display:none">
+            </label>
+          }
+        </div>
+        <div class="emp-profile-info">
+          <div class="emp-profile-name">{{ (emp.first_name || '') + ' ' + (emp.surname || '') }}</div>
+          <div class="emp-profile-position">{{ emp.position_code ? emp.position_code + ' - ' : '' }}{{ emp.position_title || 'No position assigned' }}</div>
+          <div class="emp-profile-meta">
+            <span class="emp-meta-chip">{{ emp.employee_code || '-' }}</span>
+            <span class="emp-meta-chip">{{ emp.department_name || lookupName(lookups.departments, emp.department_id) || 'No dept' }}</span>
+            @if (emp.division_name || emp.division_id) {
+              <span class="emp-meta-chip">{{ emp.division_name || lookupName(lookups.divisions, emp.division_id) }}</span>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="emp-profile-right">
+        <div class="emp-kpi">
+          <span class="emp-kpi-label">Employee Type</span>
+          <span class="emp-kpi-value">{{ emp.employee_type_name || '-' }}</span>
+        </div>
+        <div class="emp-kpi-divider"></div>
+        <div class="emp-kpi">
+          <span class="emp-kpi-label">Pay Structure</span>
+          <span class="emp-kpi-value">{{ payStructureType }}</span>
+        </div>
+        <div class="emp-kpi-divider"></div>
+        <div class="emp-kpi">
+          <span class="emp-kpi-label">Start Date</span>
+          <span class="emp-kpi-value">{{ formatDate(emp.joining_date) }}</span>
+        </div>
+        <div class="emp-kpi-divider"></div>
+        <div class="emp-kpi">
+          <span class="emp-kpi-label">Status</span>
+          <span class="emp-kpi-value">
+            @if (emp.end_date === '9999-12-31' || !emp.end_date || emp.end_date > todayStr) {
+              <span class="emp-status-badge active">Active</span>
+            } @else {
+              <span class="emp-status-badge terminated">Terminated</span>
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+  }
+
+  <div class="card detail-card emp-detail-main">
+    <div class="main-tabs">
+      <button class="main-tab" [class.active]="activeGroup === 'employee'" (click)="switchGroup('employee')">Employee</button>
+      <button class="main-tab" [class.active]="activeGroup === 'employment'" (click)="switchGroup('employment')">Employment</button>
+      @if (mode !== 'create') {
+        <button class="main-tab" [class.active]="activeGroup === 'payroll'" (click)="switchGroup('payroll')">Payroll</button>
+        <button class="main-tab" [class.active]="activeGroup === 'benefits'" (click)="switchGroup('benefits')">Benefits</button>
+      }
+    </div>
+    <div class="sub-tabs">
+      @if (activeGroup === 'employee') {
+        <button class="sub-tab" [class.active]="activeSubTab === 'personal'" (click)="activeSubTab = 'personal'; cdr.detectChanges()">Personal Details</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'contact'" (click)="activeSubTab = 'contact'; cdr.detectChanges()">Contact Details</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'address'" (click)="activeSubTab = 'address'; cdr.detectChanges()">Address Details</button>
+      } @else if (activeGroup === 'employment') {
+        <button class="sub-tab" [class.active]="activeSubTab === 'employment'" (click)="activeSubTab = 'employment'; cdr.detectChanges()">Employment Details</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'hours-rates'" (click)="activeSubTab = 'hours-rates'; cdr.detectChanges()">Hours &amp; Rates</button>
+      } @else if (activeGroup === 'payroll') {
+        <button class="sub-tab" [class.active]="activeSubTab === 'salary-transactions'" (click)="switchToSalaryTransactions()">Salary Transactions</button>
+      } @else if (activeGroup === 'benefits') {
+        <button class="sub-tab" [class.active]="activeSubTab === 'medical-aid'" (click)="switchToMedicalAid()">Medical Aid</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'retirement-funds'" (click)="switchToRetirementFunds()">Retirement Funds</button>
+        <button class="sub-tab" [class.active]="activeSubTab === 'unions'" (click)="switchToUnions()">Unions</button>
+      }
+    </div>
+
+    @if (activeSubTab === 'employment') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Employee Identification</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employee ID</label>
+              <div class="field-value">{{ emp.id || 'Auto-assigned on save' }}</div>
+            </div>
+            <div class="form-group">
+              <label>Employee Code</label>
+              @if (isEditable && mode === 'create' && emp.employee_create_type === 'Take-On Employee') {
+                <input class="form-control" [(ngModel)]="emp.employee_code" placeholder="Enter old system code">
+              } @else {
+                <div class="field-value">{{ emp.employee_code || 'Auto-generated' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employee Create Type</label>
+              @if (isEditable && mode === 'create') {
+                <select class="form-control" [(ngModel)]="emp.employee_create_type" (ngModelChange)="onCreateTypeChange()">
+                  <option value="New Employee">New Employee</option>
+                  <option value="Take-On Employee">Take-On Employee</option>
+                  <option value="Non-Employee">Non-Employee</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.employee_create_type || '-' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Organisational Placement</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Department</label>
+              @if (isEditable && mode === 'create') {
+                <select class="form-control" [(ngModel)]="emp.department_id" (ngModelChange)="onDepartmentChange()">
+                  <option [ngValue]="null">-- Select Department --</option>
+                  @for (d of lookups.departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.department_name || lookupName(lookups.departments, emp.department_id) }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Division</label>
+              @if (isEditable && mode === 'create') {
+                <select class="form-control" [(ngModel)]="emp.division_id" (ngModelChange)="onDivisionChange()">
+                  <option [ngValue]="null">-- Select Division --</option>
+                  @for (d of filteredDivisions; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.division_name || lookupName(lookups.divisions, emp.division_id) }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Position</label>
+              @if (isEditable && mode === 'create') {
+                <select class="form-control" [(ngModel)]="emp.position_id" (ngModelChange)="onPositionChange()">
+                  <option [ngValue]="null">-- Select Vacant Position --</option>
+                  @for (p of filteredPositions; track p.id) { <option [ngValue]="p.id">{{ p.position_code }} - {{ p.title }}{{ p.funded === false ? ' (Unfunded)' : '' }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.position_code ? emp.position_code + ' - ' : '' }}{{ emp.position_title || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Job Profile</label>
+              <div class="field-value derived">{{ emp.job_title || '-' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Classification</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employee Type</label>
+              <div class="field-value derived">{{ emp.employee_type_name || '-' }}</div>
+            </div>
+            <div class="form-group">
+              <label>Employee Subtype</label>
+              <div class="field-value derived">{{ emp.employee_subtype_name || '-' }}</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Condition of Service</label>
+              <div class="field-value derived">{{ emp.condition_of_service_name || '-' }}</div>
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Service Dates</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Date</label>
+              @if (isEditable) {
+                <input type="date" class="form-control" [(ngModel)]="emp.joining_date">
+              } @else {
+                <div class="field-value">{{ formatDate(emp.joining_date) }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              @if (isEditable) {
+                <input type="date" class="form-control" [(ngModel)]="emp.end_date">
+              } @else {
+                <div class="field-value">{{ emp.end_date === '9999-12-31' ? 'Open-ended' : formatDate(emp.end_date) }}</div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'personal') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Identification</div>
+          <div class="form-row form-row-3">
+            <div class="form-group">
+              <label>ID Number</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.id_number" (ngModelChange)="onIdNumberChange()" maxlength="13" placeholder="13-digit SA ID">
+              } @else {
+                <div class="field-value">{{ emp.id_number || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Passport Number</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.passport_number" placeholder="If no SA ID">
+              } @else {
+                <div class="field-value">{{ emp.passport_number || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              @if (emp.passport_number && !emp.id_number) {
+                <label>Passport Country</label>
+                @if (isEditable) {
+                  <input class="form-control" [(ngModel)]="emp.passport_country">
+                } @else {
+                  <div class="field-value">{{ emp.passport_country || '-' }}</div>
+                }
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Personal Information</div>
+          @if (emp.id && (mode === 'view' || mode === 'edit') && !emp.photo_url && isEditable) {
+            <div style="margin-bottom:8px">
+              <label class="btn btn-sm photo-upload-btn">
+                <app-icon name="camera" [size]="12"></app-icon> Upload Photo
+                <input type="file" accept="image/*" (change)="uploadPhoto($event)" style="display:none">
+              </label>
+            </div>
+          }
+          <div class="form-row form-row-4">
+            <div class="form-group">
+              <label>Title</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.title">
+                  <option value="">-- Select --</option>
+                  @for (t of lookups.titles; track t.id || t) { <option [value]="t.abbreviation || t">{{ t.abbreviation ? (t.abbreviation + ' - ' + t.name) : t }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.title || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Surname</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.surname">
+              } @else {
+                <div class="field-value">{{ emp.surname || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>First Name</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.first_name" (ngModelChange)="onNameChange()">
+              } @else {
+                <div class="field-value">{{ emp.first_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Second Name</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.second_name" (ngModelChange)="onNameChange()">
+              } @else {
+                <div class="field-value">{{ emp.second_name || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row form-row-4">
+            <div class="form-group">
+              <label>Nickname</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.nickname">
+              } @else {
+                <div class="field-value">{{ emp.nickname || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Initials</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.initials" maxlength="10">
+              } @else {
+                <div class="field-value">{{ emp.initials || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Date of Birth</label>
+              @if (isEditable && !dobLocked) {
+                <input type="date" class="form-control" [(ngModel)]="emp.date_of_birth">
+              } @else {
+                <div class="field-value">{{ formatDate(emp.date_of_birth) }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Demographics</div>
+          <div class="form-row form-row-3">
+            <div class="form-group">
+              <label>Age</label>
+              <div class="field-value derived">{{ calculatedAge !== null ? calculatedAge : '-' }}</div>
+            </div>
+            <div class="form-group">
+              <label>Gender</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.gender">
+                  <option value="">-- Select --</option>
+                  @for (g of lookups.genders; track g.id) { <option [value]="g.name">{{ g.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.gender || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Nature of Person</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.nature_of_person_code">
+                  <option value="">-- Select --</option>
+                  @for (n of lookups.nature_of_person_codes; track n.code) { <option [value]="n.code">{{ n.code }} - {{ n.description }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ getNopDescription(emp.nature_of_person_code) }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row form-row-3">
+            <div class="form-group">
+              <label>Marital Status</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.marital_status">
+                  <option value="">-- Select --</option>
+                  @for (m of lookups.marital_statuses; track m) { <option [value]="m">{{ m }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.marital_status || '-' }}</div>
+              }
+            </div>
+            @if (emp.marital_status === 'Married') {
+              <div class="form-group">
+                <label>Marital Date</label>
+                @if (isEditable) {
+                  <input type="date" class="form-control" [(ngModel)]="emp.marital_date">
+                } @else {
+                  <div class="field-value">{{ formatDate(emp.marital_date) }}</div>
+                }
+              </div>
+            }
+            <div class="form-group">
+              <label>Home Language</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.home_language">
+                  <option value="">-- Select --</option>
+                  @for (l of lookups.home_languages; track l) { <option [value]="l">{{ l }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.home_language || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row form-row-3">
+            <div class="form-group">
+              <label>Ethnic Group</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.ethnic_group">
+                  <option value="">-- Select --</option>
+                  @for (e of lookups.ethnic_groups; track e.id) { <option [value]="e.name">{{ e.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.ethnic_group || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Flags</label>
+              <div class="checkbox-row">
+                @if (isEditable) {
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.is_youth"> Youth</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.is_foreigner"> Foreigner</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.has_disability"> Disability</label>
+                } @else {
+                  @if (emp.is_youth) { <span class="tag tag-yes">Youth</span> }
+                  @if (emp.is_foreigner) { <span class="tag tag-yes">Foreigner</span> }
+                  @if (emp.has_disability) { <span class="tag tag-yes">Disability</span> }
+                  @if (!emp.is_youth && !emp.is_foreigner && !emp.has_disability) { <span class="field-value">None flagged</span> }
+                }
+              </div>
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'contact') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Contact Numbers</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cell Number</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.cell_number" placeholder="Required">
+              } @else {
+                <div class="field-value">{{ emp.cell_number || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Home Number</label>
+              @if (isEditable) {
+                <input class="form-control" [(ngModel)]="emp.home_number">
+              } @else {
+                <div class="field-value">{{ emp.home_number || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email Address</label>
+              @if (isEditable) {
+                <input class="form-control" type="email" [(ngModel)]="emp.email_address">
+              } @else {
+                <div class="field-value">{{ emp.email_address || '-' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Payroll &amp; Payslip</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Pay Point</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.pay_point_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (p of lookups.pay_points; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.pay_point_name || lookupName(lookups.pay_points, emp.pay_point_id) }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Payslip Preference</label>
+              @if (isEditable) {
+                <div class="checkbox-row">
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.payslip_pref_email"> Email</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.payslip_pref_sms"> SMS</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.payslip_pref_print"> Print</label>
+                </div>
+              } @else {
+                <div class="field-value">
+                  @if (emp.payslip_pref_email) { <span class="tag tag-yes">Email</span> }
+                  @if (emp.payslip_pref_sms) { <span class="tag tag-yes">SMS</span> }
+                  @if (emp.payslip_pref_print) { <span class="tag tag-yes">Print</span> }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'address') {
+      <div class="sub-tab-content">
+        <div class="address-columns">
+          <div class="address-col">
+            <div class="emp-section-heading">Physical Address</div>
+            <div class="form-group">
+              <label>Address Line 1</label>
+              @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_1"> } @else { <div class="field-value">{{ emp.physical_address_1 || '-' }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Address Line 2</label>
+              @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_2"> } @else { <div class="field-value">{{ emp.physical_address_2 || '-' }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Address Line 3</label>
+              @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_3"> } @else { <div class="field-value">{{ emp.physical_address_3 || '-' }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Address Line 4</label>
+              @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_4"> } @else { <div class="field-value">{{ emp.physical_address_4 || '-' }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Postal Code</label>
+              @if (isEditable) { <input class="form-control" [(ngModel)]="emp.physical_address_5" pattern="[0-9]*" inputmode="numeric" placeholder="Numeric postal code" (input)="onPostalCodeInput($event, 'physical')"> } @else { <div class="field-value">{{ emp.physical_address_5 || '-' }}</div> }
+            </div>
+          </div>
+
+          <div class="address-col">
+            <div class="emp-section-heading">
+              Postal Address
+              @if (isEditable) {
+                <label class="checkbox-label address-same-check"><input type="checkbox" [(ngModel)]="emp.postal_same_as_physical" (ngModelChange)="onPostalSameAsPhysical()"> Same as Physical</label>
+              }
+            </div>
+            @if (emp.postal_same_as_physical) {
+              <div class="field-value"><span class="tag tag-yes">Same as Physical Address</span></div>
+            } @else {
+              <div class="form-group">
+                <label>Address Line 1</label>
+                @if (isEditable) { <input class="form-control" [(ngModel)]="emp.postal_address_1"> } @else { <div class="field-value">{{ emp.postal_address_1 || '-' }}</div> }
+              </div>
+              <div class="form-group">
+                <label>Address Line 2</label>
+                @if (isEditable) { <input class="form-control" [(ngModel)]="emp.postal_address_2"> } @else { <div class="field-value">{{ emp.postal_address_2 || '-' }}</div> }
+              </div>
+              <div class="form-group">
+                <label>Address Line 3</label>
+                @if (isEditable) { <input class="form-control" [(ngModel)]="emp.postal_address_3"> } @else { <div class="field-value">{{ emp.postal_address_3 || '-' }}</div> }
+              </div>
+              <div class="form-group">
+                <label>Address Line 4</label>
+                @if (isEditable) { <input class="form-control" [(ngModel)]="emp.postal_address_4"> } @else { <div class="field-value">{{ emp.postal_address_4 || '-' }}</div> }
+              </div>
+              <div class="form-group">
+                <label>Postal Code</label>
+                @if (isEditable) { <input class="form-control" [(ngModel)]="emp.postal_address_5" pattern="[0-9]*" inputmode="numeric" placeholder="Numeric postal code" (input)="onPostalCodeInput($event, 'postal')"> } @else { <div class="field-value">{{ emp.postal_address_5 || '-' }}</div> }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'hours-rates') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Payroll &amp; Salary</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Payroll Cycle</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.payroll_cycle_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (c of payrollCycles; track c.id) {
+                    <option [ngValue]="c.id">{{ c.name }}</option>
+                  }
+                </select>
+              } @else {
+                <div class="field-value">{{ emp.payroll_cycle_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              @if (isUpperLimitEmployee) {
+                <label>Upper Limits</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="emp.upper_limit_value_type">
+                    <option [ngValue]="null">-- Select --</option>
+                    <option value="MINIMUM">Minimum ({{ emp.upper_limit_minimum | number:'1.2-2' }})</option>
+                    <option value="MIDPOINT">Midpoint ({{ emp.upper_limit_midpoint | number:'1.2-2' }})</option>
+                    <option value="MAXIMUM">Maximum ({{ emp.upper_limit_maximum | number:'1.2-2' }})</option>
+                  </select>
+                } @else {
+                  <div class="field-value">{{ emp.upper_limit_value_type || '-' }}</div>
+                }
+              } @else if (payStructureType !== 'Rate Based') {
+                <label>Task Grade</label>
+                <div class="field-value">{{ emp.grade_code ? emp.grade_code + ' - ' : '' }}{{ emp.grade_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              @if (isTaskGradeEmployee && gradeNotches.length > 0) {
+                <label>Notch</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="emp.current_notch" (ngModelChange)="onNotchChange()">
+                    <option [ngValue]="null">-- Select Notch --</option>
+                    @for (n of gradeNotches; track n.id) {
+                      <option [ngValue]="n.id">Notch {{ n.notch_number }} (R{{ n.min_salary | number:'1.2-2' }} - R{{ n.max_salary | number:'1.2-2' }})</option>
+                    }
+                  </select>
+                } @else {
+                  <div class="field-value">
+                    @if (selectedNotch) {
+                      Notch {{ selectedNotch.notch_number }} (R{{ selectedNotch.min_salary | number:'1.2-2' }} - R{{ selectedNotch.max_salary | number:'1.2-2' }})
+                    } @else {
+                      {{ emp.current_notch ? 'Notch ' + emp.current_notch : '-' }}
+                    }
+                  </div>
+                }
+              } @else if (isUpperLimitEmployee) {
+                <label>Monthly Package Target</label>
+                <div class="field-value emp-salary-highlight" style="font-weight:600">{{ monthlyFixedSalary | currencyZar }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            @if (!isUpperLimitEmployee && payStructureType !== 'Rate Based') {
+              <div class="form-group">
+                <label>Monthly Salary</label>
+                @if (isEditable && isTaskGradeEmployee && selectedNotch) {
+                  <input class="form-control" type="number" [(ngModel)]="emp.monthly_salary" (ngModelChange)="onMonthlySalaryChange()" step="0.01" [min]="selectedNotch.min_salary" [max]="selectedNotch.max_salary">
+                  @if (!notchSalaryValid) {
+                    <div class="notch-salary-hint error">Must be between R{{ selectedNotch.min_salary | number:'1.2-2' }} and R{{ selectedNotch.max_salary | number:'1.2-2' }}</div>
+                  }
+                } @else {
+                  <div class="field-value emp-salary-highlight">{{ monthlyRateBasis | currencyZar }}</div>
+                }
+              </div>
+            }
+            @if (payStructureType !== 'Rate Based') {
+              <div class="form-group">
+                <label>{{ isUpperLimitEmployee ? 'Total Package Target' : 'Annual Salary' }}</label>
+                <div class="field-value emp-salary-highlight">{{ annualSalary | currencyZar }}</div>
+              </div>
+            }
+            @if (isUpperLimitEmployee) {
+              <div class="form-group">
+                <label>Basic Salary</label>
+                <div class="field-value emp-salary-highlight" style="font-weight:600">{{ emp.monthly_salary ? (emp.monthly_salary | currencyZar) : '-' }}</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Working Hours &amp; Rates</div>
+          @if (payStructureType === 'Rate Based') {
+          <div class="form-row">
+            <div class="form-group">
+              <label>Salary Based On</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.salary_based_on" (ngModelChange)="recalcRateBasedSalaries()">
+                  <option value="CAPTURED_VALUE">Captured Value</option>
+                  <option value="RATE_PER_HOUR">Rate Per Hour</option>
+                  <option value="RATE_PER_DAY">Rate Per Day</option>
+                  <option value="FIXED_RATE">Fixed Rate</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ getSalaryBasedOnLabel(emp.salary_based_on) }}</div>
+              }
+            </div>
+            <div class="form-group" [class.wage-rate-prominent]="emp.salary_based_on === 'RATE_PER_HOUR' || emp.salary_based_on === 'RATE_PER_DAY' || emp.salary_based_on === 'FIXED_RATE'">
+              <label>{{ emp.salary_based_on === 'RATE_PER_HOUR' ? 'Hourly Rate' : emp.salary_based_on === 'RATE_PER_DAY' ? 'Daily Rate' : emp.salary_based_on === 'FIXED_RATE' ? 'Fixed Rate' : 'Rate' }}</label>
+              @if (isEditable && emp.salary_based_on !== 'CAPTURED_VALUE') {
+                <input class="form-control" type="number" [(ngModel)]="emp.wage_rate" (ngModelChange)="recalcRateBasedSalaries()" step="0.01" min="0">
+              } @else {
+                <div class="field-value">{{ emp.wage_rate | currencyZar }}</div>
+              }
+            </div>
+          </div>
+          }
+          <div class="form-row">
+            <div class="form-group">
+              <label>Working Hours Per Day</label>
+              @if (isEditable) {
+                <input class="form-control" type="number" [(ngModel)]="emp.working_hours_per_day" (ngModelChange)="recalcRateBasedSalaries()" step="0.01" min="0">
+              } @else {
+                <div class="field-value">{{ emp.working_hours_per_day | number:'1.2-2' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Working Days Per Week</label>
+              @if (isEditable) {
+                <input class="form-control" type="number" [(ngModel)]="emp.working_days_per_week" (ngModelChange)="recalcRateBasedSalaries()" step="0.1" min="0" max="7">
+              } @else {
+                <div class="field-value">{{ emp.working_days_per_week | number:'1.1-1' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Working Hours Per Month</label>
+              @if (isEditable) {
+                <input class="form-control" type="number" [(ngModel)]="emp.working_hours_per_month" (ngModelChange)="recalcRateBasedSalaries()" step="0.01" min="0">
+              } @else {
+                <div class="field-value">{{ emp.working_hours_per_month | number:'1.2-2' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Working Days Per Month</label>
+              @if (isEditable) {
+                <input class="form-control" type="number" [(ngModel)]="emp.working_days_per_month" (ngModelChange)="recalcRateBasedSalaries()" step="0.01" min="0">
+              } @else {
+                <div class="field-value">{{ emp.working_days_per_month | number:'1.2-2' }}</div>
+              }
+            </div>
+          </div>
+          <div class="hours-rates-computed-row">
+            <div class="computed-rate-card">
+              <span class="computed-rate-label">Rate Per Day</span>
+              <span class="computed-rate-value">{{ ratePerDay | currencyZar }}</span>
+            </div>
+            <div class="computed-rate-card">
+              <span class="computed-rate-label">Rate Per Week</span>
+              <span class="computed-rate-value">{{ ratePerWeek | currencyZar }}</span>
+            </div>
+            <div class="computed-rate-card">
+              <span class="computed-rate-label">Rate Per Hour</span>
+              <span class="computed-rate-value">{{ ratePerHour | currencyZar }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Tax &amp; Settings</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Method of Tax Calculation</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.tax_method">
+                  @for (tm of taxMethods; track tm.id) {
+                    <option [ngValue]="tm.id">{{ tm.name }}</option>
+                  }
+                </select>
+              } @else {
+                <div class="field-value">{{ getTaxMethodName(emp.tax_method) }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Shift</label>
+              <div class="field-value" style="color:var(--text-muted)">-</div>
+              <label style="margin-top:12px">Rotation</label>
+              <div class="field-value" style="color:var(--text-muted)">-</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="emp-flags-row">
+                @if (isEditable) {
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.exclude_uif"> Exclude UIF</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.exclude_sdl"> Exclude SDL</label>
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.allow_overtime"> Allow Overtime</label>
+                } @else {
+                  <span class="emp-flag-item">Exclude UIF: <strong>{{ emp.exclude_uif ? 'Yes' : 'No' }}</strong></span>
+                  <span class="emp-flag-item">Exclude SDL: <strong>{{ emp.exclude_sdl ? 'Yes' : 'No' }}</strong></span>
+                  <span class="emp-flag-item">Allow Overtime: <strong>{{ emp.allow_overtime ? 'Yes' : 'No' }}</strong></span>
+                }
+              </div>
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="emp-section-group">
+          <div class="emp-section-heading">Bonus Configuration</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="emp-flags-row">
+                @if (isEditable) {
+                  <label class="checkbox-label"><input type="checkbox" [(ngModel)]="emp.enable_bonus" (ngModelChange)="onEnableBonusChange()"> Enable Bonus</label>
+                } @else {
+                  <span class="emp-flag-item">Enable Bonus: <strong>{{ emp.enable_bonus ? 'Yes' : 'No' }}</strong></span>
+                }
+              </div>
+              @if (emp.subtype_enable_bonus !== undefined && emp.subtype_enable_bonus !== null) {
+                <div class="bonus-default-hint">Default from Employee Sub Type: {{ emp.subtype_enable_bonus ? 'Yes' : 'No' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+          @if (emp.enable_bonus) {
+          <div class="form-row">
+            <div class="form-group">
+              <label>Annual Bonus Tax Preference</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bonus_tax_preference">
+                  @for (bp of bonusTaxPreferences; track bp.id) {
+                    <option [ngValue]="bp.id">{{ bp.name }}</option>
+                  }
+                </select>
+              } @else {
+                <div class="field-value">{{ getBonusTaxPrefName(emp.bonus_tax_preference) }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Bonus Period</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bonus_period">
+                  <option [ngValue]="null">-- Select --</option>
+                  <option value="SPECIFIC_MONTH">Specific Calendar Month</option>
+                  <option value="ANNIVERSARY">Employee Anniversary</option>
+                  <option value="SAME_MONTH">All Employees on same month</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ getBonusPeriodName(emp.bonus_period) }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Bonus Month</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="emp.bonus_month">
+                  <option [ngValue]="null">-- Select --</option>
+                  <option [ngValue]="1">January</option>
+                  <option [ngValue]="2">February</option>
+                  <option [ngValue]="3">March</option>
+                  <option [ngValue]="4">April</option>
+                  <option [ngValue]="5">May</option>
+                  <option [ngValue]="6">June</option>
+                  <option [ngValue]="7">July</option>
+                  <option [ngValue]="8">August</option>
+                  <option [ngValue]="9">September</option>
+                  <option [ngValue]="10">October</option>
+                  <option [ngValue]="11">November</option>
+                  <option [ngValue]="12">December</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ getMonthName(emp.bonus_month) }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Bonus Amount</label>
+              @if (isEditable) {
+                <input class="form-control" type="number" [(ngModel)]="emp.bonus_amount" step="0.01">
+              } @else {
+                <div class="field-value">{{ emp.bonus_amount ? (emp.bonus_amount | number:'1.2-2') : '-' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'salary-transactions') {
+      <div class="sub-tab-content">
+        @if (salaryTxnsLoading) {
+          <div class="st-loading"><div class="spinner"></div>Loading salary transactions...</div>
+        } @else {
+          <div class="st-header">
+            <div class="st-group-info">
+              <label class="st-group-label">Salary Transaction Group</label>
+              @if (inheritedGroup?.group_name) {
+                <span class="st-group-name">{{ inheritedGroup.group_name }}</span>
+              } @else {
+                <span class="st-group-none">No group linked (Position → Job Profile → Group chain incomplete)</span>
+              }
+            </div>
+            <button class="btn btn-primary btn-sm" (click)="openSalaryTxnModal()">
+              <app-icon name="plus" [size]="14"></app-icon> Add Salary Transaction
+            </button>
+          </div>
+
+          @if (mergedTxns.length === 0) {
+            <div class="st-empty">No salary transactions assigned. Link a Salary Transaction Group to the Job Profile, or add transactions directly.</div>
+          } @else {
+            @for (group of groupedTxns; track group.type) {
+              <div class="st-type-group">
+                <div class="st-type-header">
+                  <span class="st-type-dot" [style.background]="group.color"></span>
+                  <span class="st-type-label">{{ group.label }}</span>
+                  <span class="st-type-count">{{ group.items.length }}</span>
+                </div>
+                <div class="st-table-wrap">
+                  <table class="st-table">
+                    <thead>
+                      <tr>
+                        <th>IRP5 Code</th>
+                        <th>Salary Transaction</th>
+                        <th>Method</th>
+                        <th style="text-align:center">Taxable</th>
+                        <th style="text-align:right">Taxable %</th>
+                        <th style="text-align:right">Amount</th>
+                        <th style="text-align:right">Percentage</th>
+                        <th style="text-align:center">In Package</th>
+                        <th>Source</th>
+                        <th style="width:80px">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (t of group.items; track t.salary_head_id) {
+                        <tr>
+                          <td><span class="st-irp5">{{ t.irp5_code || '-' }}</span></td>
+                          <td><span class="st-txn-name">{{ t.name }}</span> <span class="st-code">({{ t.code }})</span></td>
+                          <td><span class="st-method">{{ t.calculation_method === 'PERCENTAGE_OF_BASIC' ? '% of Basic' : t.calculation_method === 'SYSTEM_CALCULATE' ? 'System' : 'Fixed' }}</span></td>
+                          <td style="text-align:center">
+                            @if (t.taxable) {
+                              <span class="st-flag st-yes">Yes</span>
+                            } @else {
+                              <span class="st-flag st-no">No</span>
+                            }
+                          </td>
+                          <td style="text-align:right">{{ t.taxable ? '100.00' : '0.00' }}</td>
+                          <td style="text-align:right">
+                            @if (t.amount && +t.amount > 0) {
+                              {{ t.amount | currencyZar }}
+                            } @else {
+                              <span style="color:#94a3b8">-</span>
+                            }
+                          </td>
+                          <td style="text-align:right">
+                            @if (t.percentage && +t.percentage > 0) {
+                              {{ t.percentage }}%
+                            } @else {
+                              <span style="color:#94a3b8">-</span>
+                            }
+                          </td>
+                          <td style="text-align:center">
+                            @if (t.included_in_package === false) {
+                              <span class="st-flag st-no">No</span>
+                            } @else {
+                              <span class="st-flag st-yes">Yes</span>
+                            }
+                          </td>
+                          <td>
+                            @if (t.source === 'inherited') {
+                              <span class="st-source-badge st-inherited">Inherited</span>
+                            } @else {
+                              <span class="st-source-badge st-employee">Employee</span>
+                            }
+                          </td>
+                          <td>
+                            @if (t.source === 'employee') {
+                              <button class="btn btn-sm" (click)="deleteSalaryTxn(t)" title="Remove"><app-icon name="trash" [size]="12"></app-icon></button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          }
+
+          <div class="st-summary">
+            <span>{{ mergedTxns.length }} salary transaction(s)</span>
+            <span class="st-summary-sep">|</span>
+            <span>{{ (inheritedGroup?.items || []).length }} inherited</span>
+            <span class="st-summary-sep">|</span>
+            <span>{{ employeeTxns.length }} employee-specific</span>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeSubTab === 'medical-aid') {
+      <div class="sub-tab-content">
+        @if (medAidLoading) {
+          <div class="st-loading"><div class="spinner"></div>Loading medical aid...</div>
+        } @else {
+          <div class="ma-inner-tabs">
+            <button class="ma-inner-tab" [class.active]="medAidInnerTab === 'scheme'" (click)="medAidInnerTab = 'scheme'; cdr.detectChanges()">Scheme</button>
+            <button class="ma-inner-tab" [class.active]="medAidInnerTab === 'extra-transactions'" (click)="medAidInnerTab = 'extra-transactions'; cdr.detectChanges()" [disabled]="!currentMembership">Extra Transactions</button>
+            <button class="ma-inner-tab" [class.active]="medAidInnerTab === 'dependants'" (click)="medAidInnerTab = 'dependants'; cdr.detectChanges()" [disabled]="!currentMembership">Dependants</button>
+          </div>
+
+          @if (medAidInnerTab === 'scheme') {
+            <div class="ma-section">
+              <div class="st-header">
+                <div class="st-group-info">
+                  <label class="st-group-label">Medical Aid Scheme</label>
+                  @if (currentMembership) {
+                    <span class="st-group-name">{{ currentMembership.scheme_name }}</span>
+                  } @else {
+                    <span class="st-group-none">No medical aid scheme linked</span>
+                  }
+                </div>
+                <div style="display:flex; gap:8px">
+                  @if (currentMembership) {
+                    <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', currentMembership)">
+                      <app-icon name="edit" [size]="12"></app-icon> Edit
+                    </button>
+                  }
+                  <button class="btn btn-sm btn-primary" (click)="openMedAidSchemeModal('create')">
+                    <app-icon name="plus" [size]="12"></app-icon> Add Scheme
+                  </button>
+                </div>
+              </div>
+
+              @if (currentMembership) {
+                <div class="ma-detail-grid">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Fund</label>
+                      <div class="field-value">{{ currentMembership.scheme_name }}</div>
+                    </div>
+                    <div class="form-group">
+                      <label>Plan</label>
+                      <div class="field-value">{{ currentMembership.contribution_plan || currentMembership.scheme_type || '-' }}</div>
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Reference Number</label>
+                      <div class="field-value">{{ currentMembership.membership_number || '-' }}</div>
+                    </div>
+                    <div class="form-group">
+                      <label>Join Date</label>
+                      <div class="field-value">{{ formatDate(currentMembership.join_date) }}</div>
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Termination Date</label>
+                      <div class="field-value">{{ formatDate(currentMembership.termination_date) }}</div>
+                    </div>
+                    <div class="form-group"></div>
+                  </div>
+                </div>
+              }
+
+              @if (medAidMemberships.length > 0) {
+                <div style="margin-top:20px">
+                  <label class="st-group-label">Membership History</label>
+                  <div class="st-table-wrap" style="margin-top:8px">
+                    <table class="st-table">
+                      <thead>
+                        <tr>
+                          <th>Join Date</th>
+                          <th>Termination Date</th>
+                          <th>Fund</th>
+                          <th>Plan</th>
+                          <th>Reference No.</th>
+                          <th style="text-align:right">Member</th>
+                          <th style="text-align:right">Adult</th>
+                          <th style="text-align:right">Child</th>
+                          <th style="text-align:center">Current</th>
+                          <th style="width:80px">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (m of medAidMemberships; track m.id) {
+                          <tr [class.ma-active-row]="m.is_current" [class.ma-selected-row]="currentMembership?.id === m.id" (click)="selectMembership(m)" style="cursor:pointer">
+                            <td>{{ formatDate(m.join_date) }}</td>
+                            <td>{{ formatDate(m.termination_date) }}</td>
+                            <td>{{ m.scheme_name }}</td>
+                            <td>{{ m.contribution_plan || m.scheme_type || '-' }}</td>
+                            <td>{{ m.membership_number || '-' }}</td>
+                            <td style="text-align:right">{{ m.main_member_contribution | currencyZar }}</td>
+                            <td style="text-align:right">{{ m.adult_dependant_contribution | currencyZar }}</td>
+                            <td style="text-align:right">{{ m.child_dependant_contribution | currencyZar }}</td>
+                            <td style="text-align:center">
+                              @if (m.is_current) {
+                                <span class="st-flag st-yes">Yes</span>
+                              } @else {
+                                <span class="st-flag st-no">No</span>
+                              }
+                            </td>
+                            <td>
+                              <div style="display:flex; gap:4px">
+                                <button class="btn btn-sm" (click)="openMedAidSchemeModal('edit', m); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                                <button class="btn btn-sm" (click)="deleteMembership(m); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (medAidInnerTab === 'extra-transactions' && currentMembership) {
+            <div class="ma-section">
+              <div class="st-header">
+                <div class="st-group-info">
+                  <label class="st-group-label">Extra Transactions for</label>
+                  <span class="st-group-name" style="font-size:13px">{{ currentMembership.scheme_name }}</span>
+                </div>
+                <button class="btn btn-sm btn-primary" (click)="openExtraTxnModal('create')">
+                  <app-icon name="plus" [size]="12"></app-icon> Add Extra Transaction
+                </button>
+              </div>
+              @if (currentMembership.extra_transactions?.length > 0) {
+                <div class="st-table-wrap">
+                  <table class="st-table">
+                    <thead>
+                      <tr>
+                        <th>Contribution Type</th>
+                        <th style="text-align:right">Amount</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th style="text-align:center">Employer Contribute</th>
+                        <th style="width:80px">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (et of currentMembership.extra_transactions; track et.id) {
+                        <tr>
+                          <td>{{ et.contribution_type === 'LATE_JOINER_FEE' ? 'Late Joiner Fee' : et.contribution_type === 'ARREAR_CONTRIBUTION' ? 'Arrear Contribution' : 'Other' }}</td>
+                          <td style="text-align:right">{{ et.amount | currencyZar }}</td>
+                          <td>{{ formatDate(et.start_date) }}</td>
+                          <td>{{ formatDate(et.end_date) }}</td>
+                          <td style="text-align:center">
+                            @if (et.employer_contributes) {
+                              <span class="st-flag st-yes">Yes</span>
+                            } @else {
+                              <span class="st-flag st-no">No</span>
+                            }
+                          </td>
+                          <td>
+                            <div style="display:flex; gap:4px">
+                              <button class="btn btn-sm" (click)="openExtraTxnModal('edit', et)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="deleteExtraTxn(et)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="st-empty">No extra transactions added yet.</div>
+              }
+            </div>
+          }
+
+          @if (medAidInnerTab === 'dependants' && currentMembership) {
+            <div class="ma-section">
+              <div class="st-header">
+                <div class="st-group-info">
+                  <label class="st-group-label">Dependants for</label>
+                  <span class="st-group-name" style="font-size:13px">{{ currentMembership.scheme_name }}</span>
+                </div>
+                <button class="btn btn-sm btn-primary" (click)="openDependantModal('create')">
+                  <app-icon name="plus" [size]="12"></app-icon> Add Dependant
+                </button>
+              </div>
+              @if (currentMembership.dependants?.length > 0) {
+                <div class="st-table-wrap">
+                  <table class="st-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Surname</th>
+                        <th>ID Number</th>
+                        <th>Date of Birth</th>
+                        <th>Gender</th>
+                        <th>Type</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th style="text-align:center">Employer</th>
+                        <th style="text-align:center">Student</th>
+                        <th style="text-align:center">Disabled</th>
+                        <th style="width:80px">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (dep of currentMembership.dependants; track dep.id) {
+                        <tr>
+                          <td>{{ dep.first_name }}</td>
+                          <td>{{ dep.surname }}</td>
+                          <td>{{ dep.id_number || '-' }}</td>
+                          <td>{{ formatDate(dep.date_of_birth) }}</td>
+                          <td>{{ dep.gender || '-' }}</td>
+                          <td>{{ dep.dependant_type === 'CHILD' ? 'Child' : 'Adult' }}</td>
+                          <td>{{ formatDate(dep.start_date) }}</td>
+                          <td>{{ formatDate(dep.end_date) }}</td>
+                          <td style="text-align:center">
+                            @if (dep.employer_contributes) {
+                              <span class="st-flag st-yes">Yes</span>
+                            } @else {
+                              <span class="st-flag st-no">No</span>
+                            }
+                          </td>
+                          <td style="text-align:center">
+                            @if (dep.student_dependant) {
+                              <span class="st-flag st-yes">Yes</span>
+                            } @else {
+                              <span class="st-flag st-no">No</span>
+                            }
+                          </td>
+                          <td style="text-align:center">
+                            @if (dep.disabled_dependant) {
+                              <span class="st-flag st-yes">Yes</span>
+                            } @else {
+                              <span class="st-flag st-no">No</span>
+                            }
+                          </td>
+                          <td>
+                            <div style="display:flex; gap:4px">
+                              <button class="btn btn-sm" (click)="openDependantModal('edit', dep)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                              <button class="btn btn-sm" (click)="deleteDependant(dep)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="st-empty">No dependants added yet.</div>
+              }
+            </div>
+          }
+        }
+      </div>
+    }
+
+    @if (activeSubTab === 'retirement-funds') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          <div class="ret-inner-tabs">
+            <button class="ret-tab" [class.active]="retInnerTab === 'pension'" (click)="retInnerTab = 'pension'; cdr.detectChanges()">Pension</button>
+            <button class="ret-tab" [class.active]="retInnerTab === 'provident'" (click)="retInnerTab = 'provident'; cdr.detectChanges()">Provident</button>
+            <button class="ret-tab" [class.active]="retInnerTab === 'retirement'" (click)="retInnerTab = 'retirement'; cdr.detectChanges()">Retirement</button>
+          </div>
+
+          @if (retFundsLoading) {
+            <div class="loading" style="padding: 20px; text-align:center; color:#64748b;">Loading retirement funds...</div>
+          } @else {
+            <div class="ret-form-section">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Private / Non Private</label>
+                  <div class="radio-row">
+                    <label class="radio-label"><input type="radio" [checked]="editRetFund.is_private === true" (change)="editRetFund.is_private = true"> Private</label>
+                    <label class="radio-label"><input type="radio" [checked]="editRetFund.is_private !== true" (change)="editRetFund.is_private = false"> Non Private</label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ retInnerTab === 'pension' ? 'Pension' : retInnerTab === 'provident' ? 'Provident' : 'Retirement' }} Fund Number</label>
+                  <input class="form-control" [(ngModel)]="editRetFund.fund_number" placeholder="Enter fund number">
+                </div>
+              </div>
+              @if (retInnerTab === 'provident' || retInnerTab === 'retirement') {
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Is Current</label>
+                    <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editRetFund.is_current"></label>
+                  </div>
+                </div>
+              }
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Fund <span class="required">*</span></label>
+                  <select class="form-control" [(ngModel)]="editRetFund.vendor_id" (ngModelChange)="onRetFundAdminChange()">
+                    <option value="">-- Select --</option>
+                    @for (a of retAdminsForCurrentTab; track a.vendor_id) {
+                      <option [value]="a.vendor_id">{{ a.vendor_name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Join Date <span class="required">*</span></label>
+                  <input type="date" class="form-control" [(ngModel)]="editRetFund.join_date">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Plan</label>
+                  <select class="form-control" [(ngModel)]="editRetFund.fund_type_id" (ngModelChange)="onRetFundPlanChange()">
+                    <option value="">-- Select --</option>
+                    @for (p of retPlansForSelectedAdmin; track p.id) {
+                      <option [value]="p.id">{{ p.plan_name || p.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Termination Date <span class="required">*</span></label>
+                  <input type="date" class="form-control" [(ngModel)]="editRetFund.termination_date">
+                </div>
+              </div>
+              @if (retInnerTab === 'retirement') {
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Employee Contribution <span class="required">*</span></label>
+                    <input class="form-control" type="number" [(ngModel)]="editRetFund.employee_amount" step="0.01" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label>Employer Contribution <span class="required">*</span></label>
+                    <input class="form-control" type="number" [(ngModel)]="editRetFund.employer_amount" step="0.01" min="0">
+                  </div>
+                </div>
+              }
+              <div class="ret-action-row">
+                <button class="btn btn-sm" (click)="retFundMode = 'create'; saveRetFund()"><app-icon name="plus" [size]="12"></app-icon> Add</button>
+                <button class="btn btn-sm" (click)="editRetFund = { vendor_id: '', fund_type_id: '' }; retPlansForSelectedAdmin = []; cdr.detectChanges()">Cancel</button>
+              </div>
+            </div>
+
+            <div class="st-table-wrap" style="margin-top: 12px;">
+              <table class="st-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Join Date</th>
+                    <th>Termination Date</th>
+                    <th>Fund</th>
+                    <th>Plan</th>
+                    <th>Reference No.</th>
+                    <th>Private Fund</th>
+                    <th style="text-align:right">Amount</th>
+                    <th style="width: 100px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (retFundsForCurrentTab.length === 0) {
+                    <tr><td colspan="9" style="text-align:center; padding:16px; color:#94a3b8;">No records to display.</td></tr>
+                  }
+                  @for (rf of retFundsForCurrentTab; track rf.id) {
+                    <tr>
+                      <td><span class="status-pill" [class.active]="retFundStatus(rf) === 'Active'" [class.terminated]="retFundStatus(rf) === 'Terminated'">{{ retFundStatus(rf) }}</span></td>
+                      <td>{{ formatDate(rf.join_date) }}</td>
+                      <td>{{ formatDate(rf.termination_date) }}</td>
+                      <td>{{ rf.fund_name }}</td>
+                      <td>{{ rf.plan_name || rf.fund_plan_name || '-' }}</td>
+                      <td>{{ rf.fund_number || '-' }}</td>
+                      <td>{{ rf.is_private ? 'Yes' : 'No' }}</td>
+                      <td style="text-align:right">{{ (rf.employee_amount || 0) + (rf.employer_amount || 0) | number:'1.2-2' }}</td>
+                      <td>
+                        <div style="display:flex; gap:4px;">
+                          <button class="btn btn-sm" (click)="openRetFundModal('edit', rf)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="deleteRetFund(rf)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeSubTab === 'unions') {
+      <div class="sub-tab-content">
+        <div class="emp-section-group">
+          @if (unionLoading) {
+            <div class="loading" style="padding: 20px; text-align:center; color:#64748b;">Loading unions...</div>
+          } @else {
+            <div class="ret-form-section">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Union <span class="required">*</span></label>
+                  <select class="form-control" [(ngModel)]="editUnion.trade_union_id">
+                    <option value="">-- Select --</option>
+                    @for (u of availableUnions; track u.id) {
+                      <option [value]="u.id">{{ u.representative }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Join Date <span class="required">*</span></label>
+                  <input type="date" class="form-control" [(ngModel)]="editUnion.join_date">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Termination Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="editUnion.termination_date">
+                </div>
+                <div class="form-group"></div>
+              </div>
+              <div class="ret-action-row">
+                <button class="btn btn-sm" (click)="saveUnion()"><app-icon [name]="editingUnionId ? 'check' : 'plus'" [size]="12"></app-icon> {{ editingUnionId ? 'Update' : 'Add' }}</button>
+                <button class="btn btn-sm" (click)="cancelUnionEdit()">Cancel</button>
+              </div>
+            </div>
+
+            <div class="st-table-wrap" style="margin-top: 12px;">
+              <table class="st-table">
+                <thead>
+                  <tr>
+                    <th>Union</th>
+                    <th>Joined Date</th>
+                    <th>Termination Date</th>
+                    <th>Contribution Type</th>
+                    <th>Value</th>
+                    <th>Maximum</th>
+                    <th>Status</th>
+                    <th style="width: 80px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (employeeUnions.length === 0) {
+                    <tr><td colspan="8" style="text-align:center; padding:16px; color:#94a3b8;">No union memberships.</td></tr>
+                  }
+                  @for (um of employeeUnions; track um.id) {
+                    <tr>
+                      <td><span class="st-txn-name">{{ um.union_name }}</span></td>
+                      <td>{{ formatDate(um.join_date) }}</td>
+                      <td>{{ formatDate(um.termination_date) }}</td>
+                      <td>{{ um.contribution_type === '%' ? 'Percentage' : 'Fixed' }}</td>
+                      <td>{{ um.contribution_type === '%' ? um.contribution_value + '%' : (um.contribution_value | number:'1.2-2') }}</td>
+                      <td>{{ um.maximum_value > 0 ? (um.maximum_value | number:'1.2-2') : '-' }}</td>
+                      <td><span class="status-pill" [class.active]="unionStatus(um) === 'Active'" [class.terminated]="unionStatus(um) === 'Terminated'">{{ unionStatus(um) }}</span></td>
+                      <td>
+                        <div style="display:flex; gap:4px;">
+                          <button class="btn btn-sm" (click)="startEditUnion(um)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                          <button class="btn btn-sm" (click)="deleteUnion(um)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>
+}
+
+@if (showRetFundModal) {
+  <div class="modal-overlay visible" (click)="showRetFundModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ retFundMode === 'edit' ? 'Edit' : 'Add' }} {{ retInnerTab === 'pension' ? 'Pension' : retInnerTab === 'provident' ? 'Provident' : 'Retirement' }} Fund</h3>
+        <button class="modal-close" (click)="showRetFundModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fund <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="editRetFund.vendor_id" (ngModelChange)="onRetFundAdminChange()">
+              <option value="">-- Select --</option>
+              @for (a of retAdminsForCurrentTab; track a.vendor_id) {
+                <option [value]="a.vendor_id">{{ a.vendor_name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Plan</label>
+            <select class="form-control" [(ngModel)]="editRetFund.fund_type_id" (ngModelChange)="onRetFundPlanChange()">
+              <option value="">-- Select --</option>
+              @for (p of retPlansForSelectedAdmin; track p.id) {
+                <option [value]="p.id">{{ p.plan_name || p.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fund Number</label>
+            <input class="form-control" [(ngModel)]="editRetFund.fund_number" placeholder="Fund reference number">
+          </div>
+          <div class="form-group">
+            <label>Private</label>
+            <div class="radio-row">
+              <label class="radio-label"><input type="radio" [checked]="editRetFund.is_private === true" (change)="editRetFund.is_private = true"> Private</label>
+              <label class="radio-label"><input type="radio" [checked]="editRetFund.is_private !== true" (change)="editRetFund.is_private = false"> Non Private</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Join Date <span class="required">*</span></label>
+            <input type="date" class="form-control" [(ngModel)]="editRetFund.join_date">
+          </div>
+          <div class="form-group">
+            <label>Termination Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editRetFund.termination_date">
+          </div>
+        </div>
+        @if (retInnerTab === 'retirement') {
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employee Contribution</label>
+              <input class="form-control" type="number" [(ngModel)]="editRetFund.employee_amount" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+              <label>Employer Contribution</label>
+              <input class="form-control" type="number" [(ngModel)]="editRetFund.employer_amount" step="0.01" min="0">
+            </div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showRetFundModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveRetFund()">{{ retFundMode === 'edit' ? 'Update' : 'Add' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showSalaryTxnModal) {
+  <div class="modal-overlay visible" (click)="showSalaryTxnModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Salary Transaction</h3>
+        <button class="modal-close" (click)="showSalaryTxnModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Type</label>
+          <select class="form-control" [(ngModel)]="selectedTxnType" (ngModelChange)="onTxnTypeChange()">
+            <option value="">-- Select Type --</option>
+            <option value="EARNING">Earning</option>
+            <option value="DEDUCTION">Deduction</option>
+            <option value="COMPANY_CONTRIBUTION">Company Contribution</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label>Salary Head</label>
+          <select class="form-control" [(ngModel)]="editSalaryTxn.salary_head_id" [disabled]="!selectedTxnType">
+            <option [ngValue]="null">-- Select Head --</option>
+            @for (h of filteredModalHeads; track h.id) {
+              <option [ngValue]="h.id">{{ h.code }} - {{ h.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Amount (Fixed)</label>
+            <input class="form-control" type="number" [(ngModel)]="editSalaryTxn.amount" step="0.01" min="0">
+          </div>
+          <div class="form-group">
+            <label>Percentage (%)</label>
+            <input class="form-control" type="number" [(ngModel)]="editSalaryTxn.percentage" step="0.01" min="0" max="100">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editSalaryTxn.start_date">
+          </div>
+          <div class="form-group">
+            <label>End Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editSalaryTxn.end_date">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showSalaryTxnModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveSalaryTxn()">Save</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showMedAidSchemeModal) {
+  <div class="modal-overlay visible" (click)="showMedAidSchemeModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ medAidSchemeMode === 'edit' ? 'Edit' : 'Add' }} Medical Aid Scheme</h3>
+        <button class="modal-close" (click)="showMedAidSchemeModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Medical Aid Fund *</label>
+            <select class="form-control" [(ngModel)]="selectedFund" (ngModelChange)="onFundChange()">
+              <option value="">-- Select Fund --</option>
+              @for (f of medAidFunds; track f) {
+                <option [value]="f">{{ f }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Medical Aid Contribution Plan *</label>
+            <select class="form-control" [(ngModel)]="editMedAidScheme.scheme_id" [disabled]="!selectedFund">
+              <option [ngValue]="null">-- Select Plan --</option>
+              @for (p of filteredPlans; track p.id) {
+                <option [ngValue]="p.id">{{ p.contribution_plan || p.scheme_type || p.code }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label>Medical Aid Reference Number</label>
+          <input class="form-control" [(ngModel)]="editMedAidScheme.membership_number" placeholder="Membership number">
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Join Date *</label>
+            <input type="date" class="form-control" [(ngModel)]="editMedAidScheme.join_date">
+          </div>
+          <div class="form-group">
+            <label>Termination Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editMedAidScheme.termination_date">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showMedAidSchemeModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveMedAidScheme()">{{ medAidSchemeMode === 'edit' ? 'Update' : 'Save' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showDependantModal) {
+  <div class="modal-overlay visible" (click)="showDependantModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ dependantMode === 'edit' ? 'Edit' : 'Add' }} Dependant</h3>
+        <button class="modal-close" (click)="showDependantModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input class="form-control" [(ngModel)]="editDependant.first_name">
+          </div>
+          <div class="form-group">
+            <label>Surname *</label>
+            <input class="form-control" [(ngModel)]="editDependant.surname">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>ID Number</label>
+            <input class="form-control" [(ngModel)]="editDependant.id_number" maxlength="13">
+          </div>
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" class="form-control" [(ngModel)]="editDependant.date_of_birth">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Gender</label>
+            <select class="form-control" [(ngModel)]="editDependant.gender">
+              <option value="">-- Select --</option>
+              @for (g of lookups.genders; track g.id) { <option [value]="g.name">{{ g.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Dependant Type *</label>
+            <select class="form-control" [(ngModel)]="editDependant.dependant_type">
+              <option value="ADULT">Adult Dependant</option>
+              <option value="CHILD">Child Dependant</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editDependant.start_date">
+          </div>
+          <div class="form-group">
+            <label>Termination Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editDependant.end_date">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editDependant.employer_contributes"> Employer Contribute</label>
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editDependant.student_dependant"> Student Dependant</label>
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editDependant.disabled_dependant"> Disabled Dependant</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showDependantModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveDependant()">{{ dependantMode === 'edit' ? 'Update' : 'Save' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showExtraTxnModal) {
+  <div class="modal-overlay visible" (click)="showExtraTxnModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ extraTxnMode === 'edit' ? 'Edit' : 'Add' }} Extra Transaction</h3>
+        <button class="modal-close" (click)="showExtraTxnModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contribution Type *</label>
+            <select class="form-control" [(ngModel)]="editExtraTxn.contribution_type">
+              <option value="LATE_JOINER_FEE">Late Joiner Fee</option>
+              <option value="ARREAR_CONTRIBUTION">Arrear Contribution</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Amount *</label>
+            <input class="form-control" type="number" [(ngModel)]="editExtraTxn.amount" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editExtraTxn.start_date">
+          </div>
+          <div class="form-group">
+            <label>End Date</label>
+            <input type="date" class="form-control" [(ngModel)]="editExtraTxn.end_date">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editExtraTxn.employer_contributes"> Employer Contribute</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showExtraTxnModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveExtraTxn()">{{ extraTxnMode === 'edit' ? 'Update' : 'Save' }}</button>
+      </div>
+    </div>
+  </div>
+}

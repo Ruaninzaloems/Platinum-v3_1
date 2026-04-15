@@ -1,0 +1,132 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load compliance data</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Compliance Dashboard</h1>
+        <p class="subtitle">GRAP Compliance, Evidence Completeness &amp; Audit Responsiveness</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh compliance data">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="score-section">
+      <div class="score-gauge">
+        <app-gauge-chart [value]="data.overallScore" label="Overall Compliance"
+          [thresholds]="[{value: 40, color: '#ef5350'}, {value: 70, color: '#f59e0b'}, {value: 100, color: '#4caf50'}]">
+        </app-gauge-chart>
+      </div>
+      <div class="score-kpis">
+        <app-kpi-tile title="Evidence Coverage" [value]="data.evidenceCoverage + '%'" icon="folder_open"
+          [color]="data.evidenceCoverage >= 80 ? 'success' : data.evidenceCoverage >= 50 ? 'warning' : 'danger'"></app-kpi-tile>
+        <app-kpi-tile title="Exception Resolution" [value]="data.exceptionResolution + '%'" icon="rule"
+          [color]="data.exceptionResolution >= 80 ? 'success' : data.exceptionResolution >= 50 ? 'warning' : 'danger'"></app-kpi-tile>
+        <app-kpi-tile title="RFI SLA Compliance" [value]="data.rfiSlaCompliance + '%'" icon="schedule"
+          [color]="data.rfiSlaCompliance >= 80 ? 'success' : data.rfiSlaCompliance >= 50 ? 'warning' : 'danger'"></app-kpi-tile>
+      </div>
+    </div>
+
+    <div class="sections-grid">
+      <mat-card class="section-card">
+        <div class="card-title">
+          <mat-icon>gavel</mat-icon> GRAP Compliance
+          <span class="card-count">{{ data.resolvedExceptions }}/{{ data.totalExceptions }} resolved</span>
+        </div>
+        <div class="progress-row">
+          <span class="progress-label">Exception Resolution</span>
+          <mat-progress-bar mode="determinate" [value]="data.exceptionResolution"
+            [color]="data.exceptionResolution >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+          <span class="progress-pct">{{ data.exceptionResolution }}%</span>
+        </div>
+        @if (data.grapExceptions.length > 0) {
+          <div class="mini-table">
+            @for (ex of data.grapExceptions.slice(0, 5); track ex.id) {
+              <div class="mini-row">
+                <span class="mini-ref">{{ ex.reference }}</span>
+                <span class="mini-desc" [matTooltip]="ex.description">{{ ex.grapStandard }}</span>
+                <span class="status-badge" [class]="ex.status">{{ ex.status }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <div class="card-title">
+          <mat-icon>inventory_2</mat-icon> Evidence Completeness
+          <span class="card-count">{{ data.totalEvidenceUploaded }}/{{ data.totalEvidenceRequired }} items</span>
+        </div>
+        <div class="progress-row">
+          <span class="progress-label">Overall Coverage</span>
+          <mat-progress-bar mode="determinate" [value]="data.evidenceCoverage"
+            [color]="data.evidenceCoverage >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+          <span class="progress-pct">{{ data.evidenceCoverage }}%</span>
+        </div>
+        @if (data.evidenceItems.length > 0) {
+          <div class="evidence-list">
+            @for (item of data.evidenceItems; track item.section) {
+              <div class="evidence-row">
+                <span class="evidence-section">{{ item.section }}</span>
+                <div class="evidence-bar-wrap">
+                  <mat-progress-bar mode="determinate" [value]="item.coverage"></mat-progress-bar>
+                </div>
+                <span class="evidence-pct" [class.complete]="item.coverage >= 100">{{ item.coverage }}%</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <div class="card-title">
+          <mat-icon>quickreply</mat-icon> Audit Responsiveness
+          <span class="card-count">{{ data.rfisWithinSla }}/{{ data.totalRfis }} within SLA</span>
+        </div>
+        <div class="progress-row">
+          <span class="progress-label">SLA Compliance</span>
+          <mat-progress-bar mode="determinate" [value]="data.rfiSlaCompliance"
+            [color]="data.rfiSlaCompliance >= 80 ? 'primary' : 'warn'"></mat-progress-bar>
+          <span class="progress-pct">{{ data.rfiSlaCompliance }}%</span>
+        </div>
+        @if (data.rfiItems.length > 0) {
+          <div class="mini-table">
+            @for (rfi of data.rfiItems.slice(0, 5); track rfi.id) {
+              <div class="mini-row">
+                <span class="mini-ref">{{ rfi.reference }}</span>
+                <span class="mini-desc">{{ rfi.daysOpen }} days open</span>
+                <span class="sla-badge" [class.within]="rfi.withinSla" [class.breached]="!rfi.withinSla">
+                  {{ rfi.withinSla ? 'Within SLA' : 'SLA Breached' }}
+                </span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card>
+    </div>
+  </div>
+}

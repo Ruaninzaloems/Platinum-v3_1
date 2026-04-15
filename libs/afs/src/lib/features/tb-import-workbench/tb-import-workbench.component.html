@@ -1,0 +1,895 @@
+<div class="workbench-container">
+  @if (!compilationContextLoading && !hasCompilationContext) {
+    <div class="no-compilation-panel">
+      <mat-icon class="panel-icon">playlist_add_check</mat-icon>
+      <h2>No Active Compilation</h2>
+      <p>No active compilation exists for the selected financial year. Create or activate a compilation before importing trial balance data.</p>
+      <button mat-flat-button color="primary" (click)="goToCompilations()">
+        <mat-icon>arrow_forward</mat-icon> Go to Compilations
+      </button>
+    </div>
+  } @else {
+  <div class="workbench-header">
+    <h2><mat-icon>table_chart</mat-icon> TB Import Workbench</h2>
+    <div class="header-actions">
+      @if (batchId && currentStep < 5) {
+        <button mat-stroked-button color="warn" (click)="abandonBatch()">
+          <mat-icon>cancel</mat-icon> Abandon Import
+        </button>
+      }
+      @if (currentStep === 5) {
+        <button mat-raised-button color="primary" (click)="resetWorkbench()">
+          <mat-icon>add</mat-icon> New Import
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (loading) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <div class="step-indicators">
+    @for (step of [0,1,2,3,4,5]; track step) {
+      <div class="step-indicator"
+           [class.active]="currentStep === step"
+           [class.completed]="currentStep > step"
+           [class.clickable]="canNavigateToStep(step)"
+           (click)="navigateToStep(step)"
+           [matTooltip]="canNavigateToStep(step) ? 'Go back to ' + stepLabels[step] : ''">
+        <div class="step-number">
+          @if (currentStep > step) {
+            <mat-icon class="step-done-icon">check</mat-icon>
+          } @else {
+            {{ step + 1 }}
+          }
+        </div>
+        <div class="step-label">{{ stepLabels[step] }}</div>
+        @if (step < 5) {
+          <div class="step-connector" [class.filled]="currentStep > step"></div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Step 0: Upload -->
+  @if (currentStep === 0) {
+    <mat-card class="step-card">
+      <mat-card-header>
+        <mat-card-title>Step 1: Upload TB File</mat-card-title>
+        <mat-card-subtitle>Upload a CSV or Excel file containing your Trial Balance data</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <!-- Compilation Context Banner -->
+        @if (selectedCompilation) {
+          <div class="compilation-banner">
+            <div class="banner-title">
+              <mat-icon>assignment</mat-icon>
+              <span>Target Compilation</span>
+            </div>
+            <div class="banner-fields">
+              <div class="banner-field">
+                <span class="field-label">Compilation</span>
+                <span class="field-value">{{ selectedCompilation.name }}</span>
+              </div>
+              <div class="banner-field">
+                <span class="field-label">Financial Year</span>
+                <span class="field-value">{{ selectedCompilation.financialYear?.label || selectedCompilation.financialYearId }}</span>
+              </div>
+              <div class="banner-field">
+                <span class="field-label">Template</span>
+                <span class="field-value">{{ selectedCompilation.template?.name || selectedCompilation.templateId || '—' }}</span>
+              </div>
+              <div class="banner-field">
+                <span class="field-label">Status</span>
+                <span class="field-value">
+                  <span class="status-chip" [class]="'status-' + selectedCompilation.status">{{ selectedCompilation.status }}</span>
+                </span>
+              </div>
+              <div class="banner-field">
+                <span class="field-label">Last Updated</span>
+                <span class="field-value">{{ selectedCompilation.updatedAt | date:'medium' }}</span>
+              </div>
+            </div>
+            <div class="banner-note">
+              This upload will be bound to the compilation shown above. To import against a different compilation, navigate to Compilations and select the correct one.
+            </div>
+          </div>
+        }
+
+        @if (multipleCompilations && !compilationId) {
+          <div class="compilation-selector">
+            <mat-icon class="selector-icon">info</mat-icon>
+            <div>
+              <p><strong>Multiple active compilations found.</strong> Select one before uploading.</p>
+              <mat-form-field appearance="outline">
+                <mat-label>Select Compilation</mat-label>
+                <mat-select (selectionChange)="onCompilationSelected($event.value)">
+                  @for (c of compilations; track c.id) {
+                    <mat-option [value]="c.id">{{ c.name }} ({{ c.status }})</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+        }
+
+        <!-- Error Panel -->
+        @if (errorPanel) {
+          <div class="error-panel" [class.panel-error]="errorPanel.type === 'error'" [class.panel-warning]="errorPanel.type === 'warning'" [class.panel-info]="errorPanel.type === 'info'">
+            <div class="panel-header">
+              <mat-icon>{{ errorPanel.type === 'error' ? 'error' : errorPanel.type === 'warning' ? 'warning' : 'info' }}</mat-icon>
+              <span class="panel-title">{{ errorPanel.title }}</span>
+              @if (errorPanel.dismissible) {
+                <button mat-icon-button class="dismiss-btn" (click)="dismissError()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </div>
+            <p class="panel-message">{{ errorPanel.message }}</p>
+            @if (errorPanel.actions?.length) {
+              <div class="panel-actions">
+                @for (action of errorPanel.actions; track action.label) {
+                  <button mat-stroked-button (click)="action.callback()">
+                    @if (action.icon) { <mat-icon>{{ action.icon }}</mat-icon> }
+                    {{ action.label }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Stuck Batch Banner -->
+        @if (stuckBatch) {
+          <div class="stuck-batch-banner">
+            <div class="stuck-header">
+              <mat-icon>warning</mat-icon>
+              <strong>An in-progress import is blocking new uploads for {{ getPeriodLabel(periodType) }}</strong>
+            </div>
+            <div class="stuck-details">
+              <div class="stuck-field"><span class="label">File:</span> {{ stuckBatch.sourceFileName }}</div>
+              <div class="stuck-field"><span class="label">Status:</span> <span class="status-chip" [class]="'status-' + stuckBatch.status">{{ stuckBatch.status }}</span></div>
+              <div class="stuck-field"><span class="label">Uploaded by:</span> {{ stuckBatch.importedBy }}</div>
+              <div class="stuck-field"><span class="label">Date:</span> {{ stuckBatch.createdAt | date:'short' }}</div>
+              <div class="stuck-field"><span class="label">Rows parsed:</span> {{ stuckBatch.totalRows }}</div>
+            </div>
+            <div class="stuck-actions">
+              <button mat-raised-button color="primary" (click)="resumeStuckBatch()">
+                <mat-icon>play_arrow</mat-icon> Resume Import
+              </button>
+              <button mat-stroked-button color="warn" (click)="abandonStuckBatch()">
+                <mat-icon>delete_forever</mat-icon> Abandon & Start Fresh
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (!stuckBatch) {
+          <div class="upload-section">
+            <div class="upload-options">
+              <mat-form-field appearance="outline">
+                <mat-label>Period Type</mat-label>
+                <mat-select [(ngModel)]="periodType" (selectionChange)="onPeriodTypeChanged()">
+                  <mat-option value="current_year">Current Year</mat-option>
+                  <mat-option value="prior_year_1">Prior Year 1</mat-option>
+                  <mat-option value="prior_year_2">Prior Year 2</mat-option>
+                  <mat-option value="prior_year_3">Prior Year 3</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <!-- Upload Progress -->
+            @if (uploading) {
+              <div class="upload-progress">
+                @if (uploadPhase === 'uploading' && uploadProgress > 0) {
+                  <mat-progress-bar mode="determinate" [value]="uploadProgress"></mat-progress-bar>
+                } @else {
+                  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                }
+                <div class="progress-info">
+                  <mat-icon class="spinning-icon">sync</mat-icon>
+                  <div class="progress-text">
+                    @if (uploadPhase === 'uploading') {
+                      <strong>Uploading file{{ uploadProgress > 0 ? ' — ' + uploadProgress + '%' : '' }}...</strong>
+                    } @else {
+                      <strong>Parsing and processing rows — please wait...</strong>
+                    }
+                    @if (selectedFileInfo) {
+                      <span class="file-info">{{ selectedFileInfo.name }} ({{ selectedFileInfo.size }})</span>
+                    }
+                  </div>
+                  <span class="elapsed-time">Elapsed: {{ uploadElapsedFormatted }}</span>
+                </div>
+              </div>
+            }
+
+            <!-- Confirm Dialog -->
+            @if (showConfirmDialog && selectedFileInfo) {
+              <div class="confirm-dialog">
+                <div class="confirm-header">
+                  <mat-icon>help_outline</mat-icon>
+                  <strong>Confirm Upload Target</strong>
+                </div>
+                <p>You are about to upload <strong>{{ selectedFileInfo.name }}</strong> ({{ selectedFileInfo.size }}) to:</p>
+                <ul class="confirm-list">
+                  <li><strong>Compilation:</strong> {{ selectedCompilation?.name || '—' }}</li>
+                  <li><strong>Financial Year:</strong> {{ selectedCompilation?.financialYear?.label || selectedCompilation?.financialYearId || '—' }}</li>
+                  <li><strong>Period:</strong> {{ getPeriodLabel(periodType) }}</li>
+                </ul>
+                <div class="confirm-actions">
+                  <button mat-stroked-button (click)="cancelUpload()">Cancel</button>
+                  <button mat-raised-button color="primary" (click)="confirmAndUpload()">
+                    <mat-icon>cloud_upload</mat-icon> Confirm & Upload
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (!uploading && !showConfirmDialog) {
+              <div class="upload-dropzone" [class.disabled]="!compilationResolved" (click)="compilationResolved ? fileInput.click() : null">
+                <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                <p>Click to select a CSV or Excel file</p>
+                <p class="hint">Maximum file size: 50MB</p>
+                @if (!compilationResolved) {
+                  <p class="hint warn-hint">Select a compilation above before uploading</p>
+                }
+                <input #fileInput type="file" accept=".csv,.xlsx,.xls" (change)="onFileSelected($event)" hidden [disabled]="!compilationResolved" />
+              </div>
+            }
+
+            @if (selectedFileInfo && !uploading && !showConfirmDialog) {
+              <div class="selected-file-info">
+                <mat-icon>description</mat-icon>
+                <span>Selected: {{ selectedFileInfo.name }} ({{ selectedFileInfo.size }})</span>
+              </div>
+            }
+          </div>
+        }
+
+        @if (batchHistory.length > 0) {
+          <h3 class="section-title">Import History</h3>
+          <div class="history-table-wrapper">
+            <table mat-table [dataSource]="batchHistory" class="full-width-table">
+              <ng-container matColumnDef="sourceFileName">
+                <th mat-header-cell *matHeaderCellDef>File</th>
+                <td mat-cell *matCellDef="let b">{{ b.sourceFileName || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="compilationName">
+                <th mat-header-cell *matHeaderCellDef>Compilation</th>
+                <td mat-cell *matCellDef="let b">{{ b.compilationName || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let b">
+                  <span class="status-chip" [class]="'status-' + b.status" [class.abandoned-row]="b.status === 'abandoned'">{{ b.status }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="totalRows">
+                <th mat-header-cell *matHeaderCellDef>Rows</th>
+                <td mat-cell *matCellDef="let b">{{ b.totalRows }}</td>
+              </ng-container>
+              <ng-container matColumnDef="periodType">
+                <th mat-header-cell *matHeaderCellDef>Period</th>
+                <td mat-cell *matCellDef="let b">{{ getPeriodLabel(b.periodType || 'current_year') }}</td>
+              </ng-container>
+              <ng-container matColumnDef="identityMode">
+                <th mat-header-cell *matHeaderCellDef>Identity</th>
+                <td mat-cell *matCellDef="let b">
+                  <span [class.warn-text]="b.identityMode === 'description_fallback'">{{ b.identityMode || '—' }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="importedBy">
+                <th mat-header-cell *matHeaderCellDef>Uploaded By</th>
+                <td mat-cell *matCellDef="let b">{{ b.importedBy || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="createdAt">
+                <th mat-header-cell *matHeaderCellDef>Date</th>
+                <td mat-cell *matCellDef="let b">{{ b.createdAt | date:'short' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="abandoned">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let b">
+                  @if (b.status === 'abandoned') {
+                    <mat-icon class="abandon-icon" [matTooltip]="b.abandonMetadata?.abandonReason || 'Abandoned'">block</mat-icon>
+                  }
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="action">
+                <th mat-header-cell *matHeaderCellDef>Action</th>
+                <td mat-cell *matCellDef="let b">
+                  @if (getBatchAction(b)) {
+                    <button mat-stroked-button class="action-btn" (click)="onBatchAction(b); $event.stopPropagation()">
+                      {{ getBatchAction(b) }}
+                    </button>
+                  }
+                </td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="['sourceFileName','compilationName','status','totalRows','periodType','identityMode','importedBy','createdAt','abandoned','action']"></tr>
+              <tr mat-row *matRowDef="let row; columns: ['sourceFileName','compilationName','status','totalRows','periodType','identityMode','importedBy','createdAt','abandoned','action']"
+                  [class.abandoned-history-row]="row.status === 'abandoned'"
+                  (click)="viewBatch(row.id)" class="clickable-row"></tr>
+            </table>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- Step 1: Preview & Header Confirmation -->
+  @if (currentStep === 1) {
+    <mat-card class="step-card">
+      <mat-card-header>
+        <mat-card-title>Step 2: Preview & Confirm Header</mat-card-title>
+        <mat-card-subtitle>Review the detected header row and row classifications</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (successBanner) {
+          <div class="success-banner">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ successBanner }}</span>
+          </div>
+        }
+
+        <!-- TB Summary -->
+        @if (selectedCompilation) {
+          <div class="tb-summary-banner">
+            <span><strong>Compilation:</strong> {{ selectedCompilation.name }}</span>
+            <span><strong>Period:</strong> {{ getPeriodLabel(periodType) }}</span>
+          </div>
+        }
+
+        <div class="preview-summary">
+          <div class="stat-card">
+            <div class="stat-value">{{ uploadResult?.totalRows }}</div>
+            <div class="stat-label">Total Rows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ uploadResult?.classifications?.candidate_detail || 0 }}</div>
+            <div class="stat-label">Detail Rows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ uploadResult?.classifications?.candidate_total || 0 }}</div>
+            <div class="stat-label">Total Rows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ uploadResult?.classifications?.blank || 0 }}</div>
+            <div class="stat-label">Blank</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ uploadResult?.classifications?.ignored || 0 }}</div>
+            <div class="stat-label">Ignored</div>
+          </div>
+        </div>
+
+        <div class="header-detection">
+          <p><strong>Detected Header Row:</strong> Row {{ uploadResult?.detectedHeaderRow }}
+            (Confidence: {{ uploadResult?.headerConfidence | number:'1.0-0' }}%)
+          </p>
+
+          <mat-form-field appearance="outline" class="header-row-select">
+            <mat-label>Select Header Row</mat-label>
+            <mat-select [(ngModel)]="selectedHeaderRow" (selectionChange)="onHeaderRowChanged()">
+              @for (pr of previewRows; track pr.lineNumber) {
+                <mat-option [value]="pr.lineNumber">
+                  Row {{ pr.lineNumber }}: {{ pr.cells.slice(0, 4).join(' | ') }}{{ pr.cells.length > 4 ? ' ...' : '' }}
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>Choose which row contains the column headers</mat-hint>
+          </mat-form-field>
+
+          <p><strong>Selected Headers:</strong></p>
+          <div class="header-chips">
+            @for (h of headers; track $index) {
+              <span class="header-chip">{{ h || '(empty)' }}</span>
+            }
+          </div>
+        </div>
+
+        @if (selectedHeaderRow > 1) {
+          <div class="exclusion-banner">
+            <mat-icon>info</mat-icon>
+            <span>
+              <strong>{{ selectedHeaderRow - 1 }} row{{ selectedHeaderRow - 1 > 1 ? 's' : '' }}</strong>
+              above the header (rows 1–{{ selectedHeaderRow - 1 }}) will be <strong>excluded</strong> from the import.
+            </span>
+          </div>
+        }
+
+        @if (previewRows.length > 0) {
+          <div class="preview-table-wrapper">
+            <table class="preview-table">
+              <tbody>
+                @for (pr of previewRows; track pr.lineNumber) {
+                  <tr [class.header-row-highlight]="pr.lineNumber === selectedHeaderRow"
+                      [class.ignored-row]="pr.lineNumber < selectedHeaderRow"
+                      [class.data-row]="pr.lineNumber > selectedHeaderRow">
+                    <td class="row-num-cell">{{ pr.lineNumber }}</td>
+                    <td class="row-status-cell">
+                      @if (pr.lineNumber < selectedHeaderRow) {
+                        <span class="row-status-badge excluded">EXCLUDED</span>
+                      } @else if (pr.lineNumber === selectedHeaderRow) {
+                        <span class="row-status-badge header">HEADER</span>
+                      } @else {
+                        <span class="row-status-badge data">DATA</span>
+                      }
+                    </td>
+                    @for (cell of pr.cells; track $index) {
+                      <td>{{ cell || '' }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </mat-card-content>
+      <mat-card-actions class="step-card-actions">
+        <button mat-stroked-button (click)="navigateToStep(0)" [disabled]="!canNavigateToStep(0)">
+          <mat-icon>arrow_back</mat-icon> Back to Upload
+        </button>
+        <button mat-raised-button color="primary" (click)="confirmHeader()" [disabled]="loading">
+          <mat-icon>check</mat-icon> Confirm Header & Continue
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+
+  <!-- Step 2: Column Mapping -->
+  @if (currentStep === 2) {
+    <mat-card class="step-card">
+      <mat-card-header>
+        <mat-card-title>Step 3: Column Mapping</mat-card-title>
+        <mat-card-subtitle>Map source columns to target fields and select import mode</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="mapping-controls">
+          <mat-form-field appearance="outline">
+            <mat-label>Import Mode</mat-label>
+            <mat-select [(ngModel)]="importMode" (selectionChange)="onImportModeChanged()">
+              <mat-option value="signed_balance">Mode A: Signed Balance</mat-option>
+              <mat-option value="debit_credit">Mode B: Debit/Credit</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          @if (importMode === 'signed_balance') {
+            <mat-form-field appearance="outline">
+              <mat-label>Sign Convention</mat-label>
+              <mat-select [(ngModel)]="signConvention">
+                <mat-option value="positive_debit">Positive = Debit Balance (default)</mat-option>
+                <mat-option value="positive_credit">Positive = Credit Balance</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
+        </div>
+
+        <h3 class="section-title">Field Mappings</h3>
+        <div class="mapping-table-header">
+          <span class="mth-field">Target Field</span>
+          <span class="mth-source">Source Column</span>
+          <span class="mth-conf"></span>
+          <span class="mth-sample">Row 1 Sample</span>
+          <span class="mth-sample">Row 2 Sample</span>
+        </div>
+        @for (category of ['identity', 'descriptive', 'amount', 'optional']; track category) {
+          <mat-expansion-panel [expanded]="category !== 'optional'" class="mapping-panel">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <span class="category-label" [class]="'cat-' + category">{{ category | titlecase }} Fields</span>
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="mapping-grid">
+              @for (s of mappingSuggestions; track s.targetField) {
+                @if (s.category === category) {
+                  <div class="mapping-row" [class.required]="s.required">
+                    <div class="field-info">
+                      <span class="field-name" [matTooltip]="fieldDescriptions[s.targetField] || ''">{{ s.targetField }}</span>
+                      @if (s.required) {
+                        <span class="required-badge">Required</span>
+                      }
+                      @if (fieldDescriptions[s.targetField]) {
+                        <mat-icon class="field-help-icon" [matTooltip]="fieldDescriptions[s.targetField]">help_outline</mat-icon>
+                      }
+                    </div>
+                    <mat-form-field appearance="outline" class="mapping-select">
+                      <mat-label>Source Column (type to search)</mat-label>
+                      <input matInput
+                             [value]="getMappingDisplayText(s.targetField)"
+                             (input)="onMappingFilterInput(s.targetField, $any($event.target).value)"
+                             (blur)="resetMappingFilterText(s.targetField)"
+                             [matAutocomplete]="auto"
+                             placeholder="Type column name..."
+                             autocomplete="off">
+                      @if (columnMapping[s.targetField]) {
+                        <button matSuffix mat-icon-button (click)="clearMapping(s.targetField); $event.stopPropagation()">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      }
+                      <mat-autocomplete #auto="matAutocomplete"
+                                         (optionSelected)="onMappingSelected(s.targetField, $event.option.value)">
+                        @for (item of getFilteredHeaders(s.targetField); track item.index) {
+                          <mat-option [value]="item.index">{{ item.label }}</mat-option>
+                        }
+                      </mat-autocomplete>
+                    </mat-form-field>
+                    <span class="confidence-slot">
+                      @if (columnMapping[s.targetField]?.confidence) {
+                        <span class="confidence-badge" [class.high]="columnMapping[s.targetField].confidence >= 80">
+                          {{ columnMapping[s.targetField].confidence }}%
+                        </span>
+                      }
+                    </span>
+                    <span class="sample-cell" [class.empty]="!cachedSampleValues[s.targetField]?.[0]">{{ cachedSampleValues[s.targetField]?.[0] || '—' }}</span>
+                    <span class="sample-cell" [class.empty]="!cachedSampleValues[s.targetField]?.[1]">{{ cachedSampleValues[s.targetField]?.[1] || '—' }}</span>
+                  </div>
+                }
+              }
+            </div>
+          </mat-expansion-panel>
+        }
+      </mat-card-content>
+      <mat-card-actions class="step-card-actions">
+        <button mat-stroked-button (click)="navigateToStep(1)">
+          <mat-icon>arrow_back</mat-icon> Back to Header
+        </button>
+        <button mat-raised-button color="primary" (click)="saveMapping()" [disabled]="loading">
+          <mat-icon>save</mat-icon> Save Mapping & Continue
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+
+  <!-- Step 3: Validation -->
+  @if (currentStep === 3) {
+    <mat-card class="step-card">
+      <mat-card-header>
+        <mat-card-title>Step 4: Normalization & Validation</mat-card-title>
+        <mat-card-subtitle>Normalize data and run validation rules</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (!normalizationResult && normValidatePhase === 'idle') {
+          <p>Click below to normalize the raw data according to your column mapping and run validation.</p>
+          <div class="step-actions-row">
+            <button mat-raised-button color="primary" (click)="runNormalizeAndValidate()" [disabled]="loading">
+              <mat-icon>play_arrow</mat-icon> Run Normalization & Validation
+            </button>
+            <button mat-stroked-button (click)="goBackToMapping()">
+              <mat-icon>arrow_back</mat-icon> Change Column Mapping
+            </button>
+          </div>
+        }
+
+        @if (normValidatePhase !== 'idle' && normValidatePhase !== 'complete') {
+          <div class="progress-panel">
+            <div class="progress-header">
+              <mat-icon class="spin-icon">sync</mat-icon>
+              <span class="progress-label">
+                @if (normValidatePhase === 'normalizing') {
+                  Normalizing rows...
+                } @else {
+                  Running validation rules...
+                }
+              </span>
+              <span class="progress-pct">{{ normValidateProgress | number:'1.0-0' }}%</span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="normValidateProgress"></mat-progress-bar>
+          </div>
+        }
+
+        @if (normalizationResult) {
+          <div class="norm-summary">
+            <div class="stat-card">
+              <div class="stat-value">{{ normalizationResult.totalCandidateRows }}</div>
+              <div class="stat-label">Candidate Rows</div>
+            </div>
+            <div class="stat-card success">
+              <div class="stat-value">{{ normalizationResult.normalizedCount }}</div>
+              <div class="stat-label">Normalized</div>
+            </div>
+            <div class="stat-card" [class.error]="normalizationResult.failedCount > 0">
+              <div class="stat-value">{{ normalizationResult.failedCount }}</div>
+              <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat-card" [class.error]="normalizationResult.failureRate > 2">
+              <div class="stat-value">{{ normalizationResult.failureRate | number:'1.1-1' }}%</div>
+              <div class="stat-label">Failure Rate</div>
+            </div>
+          </div>
+
+          @if (validationSummary?.identityModeWarning) {
+            <div class="identity-warning">
+              <mat-icon>warning</mat-icon>
+              <span>{{ validationSummary.identityModeWarning }}</span>
+              <span class="identity-mode-badge">Identity Mode: {{ identityModeLabel }}</span>
+            </div>
+          }
+
+          @if (candidateTotalRows.length > 0) {
+            <h3 class="section-title">Row Classification Review</h3>
+            <p class="review-hint">The following rows were auto-classified as totals and excluded from import. Confirm each or reclassify as detail to include them.</p>
+            <div class="classification-review-table-wrapper">
+              <table class="preview-table">
+                <thead>
+                  <tr>
+                    <th>Line</th>
+                    <th>Content</th>
+                    <th>Reason</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (tr of candidateTotalRows; track tr.id) {
+                    <tr>
+                      <td class="row-num-cell">{{ tr.sourceLineNumber }}</td>
+                      <td>{{ tr.cells?.join(' | ') }}</td>
+                      <td>{{ tr.classificationReason }}</td>
+                      <td class="action-cell">
+                        <button mat-stroked-button color="primary" (click)="reclassifyRow(tr.id, 'candidate_detail')">
+                          Include as Detail
+                        </button>
+                        <button mat-stroked-button (click)="reclassifyRow(tr.id, 'candidate_total')">
+                          Confirm Total
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <h3 class="section-title">Validation Results</h3>
+          <div class="validation-results">
+            @for (r of validationResults; track r.ruleId) {
+              <div class="validation-rule" [class]="'severity-' + r.severity + ' status-' + r.status">
+                <div class="rule-header">
+                  <span class="rule-id">{{ r.ruleId }}</span>
+                  <span class="rule-name">{{ r.ruleName }}</span>
+                  <span class="rule-status" [style.color]="getSeverityColor(r.severity, r.status)">
+                    {{ r.status | uppercase }}
+                  </span>
+                  @if (r.rowsAffected > 0) {
+                    <span class="rows-affected-badge">{{ r.rowsAffected }} rows</span>
+                  }
+                </div>
+                <p class="rule-message">{{ r.message }}</p>
+
+                @if (r.status !== 'pass' && r.rowsAffected > 0) {
+                  <button mat-stroked-button class="sample-toggle-btn" (click)="toggleSampleData(r.ruleId)">
+                    <mat-icon>{{ expandedRules[r.ruleId] ? 'expand_less' : 'expand_more' }}</mat-icon>
+                    {{ expandedRules[r.ruleId] ? 'Hide' : 'View' }} Sample Data
+                  </button>
+
+                  @if (expandedRules[r.ruleId]) {
+                    <div class="sample-data-panel">
+                      @if (sampleDataLoading[r.ruleId]) {
+                        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                      } @else if (sampleDataCache[r.ruleId]?.samples?.length > 0) {
+                        <div class="sample-table-wrapper">
+                          <table class="sample-table">
+                            <thead>
+                              <tr>
+                                @for (key of getSampleColumns(r.ruleId); track key) {
+                                  <th>{{ key }}</th>
+                                }
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (row of sampleDataCache[r.ruleId].samples; track $index) {
+                                <tr>
+                                  @for (key of getSampleColumns(r.ruleId); track key) {
+                                    <td>{{ row[key] }}</td>
+                                  }
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                        @if (sampleDataCache[r.ruleId].totalAffected > sampleDataCache[r.ruleId].samples.length) {
+                          <p class="sample-note">Showing {{ sampleDataCache[r.ruleId].samples.length }} of {{ sampleDataCache[r.ruleId].totalAffected }} affected rows</p>
+                        }
+                      } @else {
+                        <p class="sample-note">No sample data available for this rule.</p>
+                      }
+                    </div>
+                  }
+                }
+
+                @if (r.status === 'warning') {
+                  <div class="override-section">
+                    <button mat-stroked-button (click)="selectedWarningRuleId = r.ruleId" class="override-btn">
+                      Override Warning
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          @if (selectedWarningRuleId) {
+            <div class="override-form">
+              <h4>Override Warning: {{ selectedWarningRuleId }}</h4>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Reason for override</mat-label>
+                <textarea matInput [(ngModel)]="overrideReason" rows="3"></textarea>
+              </mat-form-field>
+              <button mat-raised-button color="accent" (click)="overrideWarning()" [disabled]="loading">
+                <mat-icon>check</mat-icon> Submit Override
+              </button>
+            </div>
+          }
+
+          @if (validationSummary?.overallStatus === 'validation_passed') {
+            <div class="step-actions">
+              <button mat-raised-button color="primary" (click)="setStep(4)">
+                <mat-icon>arrow_forward</mat-icon> Proceed to Commit
+              </button>
+            </div>
+          } @else if (validationSummary && validationSummary.hardFails === 0 && validationSummary.warnings > 0) {
+            <p class="override-hint">Override all warnings above to proceed to commit.</p>
+          }
+
+          <div class="step-actions-row bottom-actions">
+            <button mat-stroked-button (click)="runNormalizeAndValidate()" [disabled]="loading" class="rerun-btn">
+              <mat-icon>refresh</mat-icon> Re-run Validation
+            </button>
+            <button mat-stroked-button (click)="goBackToMapping()">
+              <mat-icon>arrow_back</mat-icon> Change Column Mapping
+            </button>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- Step 4: Commit Confirmation -->
+  @if (currentStep === 4) {
+    <mat-card class="step-card">
+      <mat-card-header>
+        <mat-card-title>Step 5: Commit Confirmation</mat-card-title>
+        <mat-card-subtitle>Review and commit validated data to Trial Balance entries</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="commit-summary">
+          <div class="summary-row">
+            <span class="label">Rows to Commit:</span>
+            <span class="value">{{ normalizationResult?.normalizedCount }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Import Mode:</span>
+            <span class="value">{{ importMode === 'signed_balance' ? 'Mode A: Signed Balance' : 'Mode B: Debit/Credit' }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Identity Mode:</span>
+            <span class="value" [class.warn-text]="mappingValidation?.identityMode === 'description_fallback'">{{ identityModeLabel }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="label">Period Type:</span>
+            <span class="value">{{ getPeriodLabel(periodType) }}</span>
+          </div>
+          @if (selectedCompilation) {
+            <div class="summary-row">
+              <span class="label">Compilation:</span>
+              <span class="value">{{ selectedCompilation.name }}</span>
+            </div>
+          }
+          <div class="summary-row">
+            <span class="label">Validation Status:</span>
+            <span class="value pass">Passed</span>
+          </div>
+          @if (validationSummary?.identityModeWarning) {
+            <div class="commit-warning">
+              <mat-icon>info</mat-icon>
+              <span>{{ validationSummary.identityModeWarning }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="commit-notice">
+          <mat-icon>warning</mat-icon>
+          <p>Committing will promote {{ normalizationResult?.normalizedCount }} validated rows to the Trial Balance.
+            Any previously committed batch for the same compilation and period type will be superseded.</p>
+        </div>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="primary" (click)="commitBatch()" [disabled]="loading">
+          <mat-icon>publish</mat-icon> Commit to Trial Balance
+        </button>
+        <button mat-stroked-button (click)="navigateToStep(3)">
+          <mat-icon>arrow_back</mat-icon> Back to Validation
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+
+  <!-- Step 5: Complete -->
+  @if (currentStep === 5) {
+    <mat-card class="step-card success-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>check_circle</mat-icon> Import Complete</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (commitResult) {
+          <div class="commit-result">
+            <div class="stat-card success">
+              <div class="stat-value">{{ commitResult.rowsCommitted }}</div>
+              <div class="stat-label">Rows Committed</div>
+            </div>
+            @if (commitResult.supersededBatchId) {
+              <div class="stat-card">
+                <div class="stat-value">Yes</div>
+                <div class="stat-label">Superseded Prior Batch</div>
+              </div>
+            }
+          </div>
+
+          @if (commitResult.controlSummary) {
+            <h3>Control Summary</h3>
+            <div class="control-summary">
+              <div class="summary-row">
+                <span class="label">Total Debit:</span>
+                <span class="value">R{{ commitResult.controlSummary.totals?.debit | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">Total Credit:</span>
+                <span class="value">R{{ commitResult.controlSummary.totals?.credit | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">Net Closing Balance:</span>
+                <span class="value">R{{ commitResult.controlSummary.balanceChecks?.netClosingBalance | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">With SCOA Item:</span>
+                <span class="value">{{ commitResult.controlSummary.identityCoverage?.withScoaItem }} / {{ commitResult.controlSummary.rowCount }}</span>
+              </div>
+            </div>
+          }
+        }
+      </mat-card-content>
+      <mat-card-actions style="display:flex;gap:12px;padding:16px">
+        <button mat-raised-button color="primary" (click)="goToMapping()">
+          <mat-icon>account_tree</mat-icon> Go to Mapping Workbench
+        </button>
+        <button mat-stroked-button (click)="resetWorkbench()">
+          <mat-icon>upload_file</mat-icon> Import Another Period
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+
+  <!-- Batch Detail View -->
+  @if (batchDetail) {
+    <mat-card class="step-card detail-card">
+      <mat-card-header>
+        <mat-card-title>Batch Detail: {{ batchDetail.batch?.sourceFileName }}</mat-card-title>
+        <mat-card-subtitle>Status: {{ batchDetail.batch?.status }} | Rows: {{ batchDetail.batch?.totalRows }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (batchDetail.batch?.identityMode === 'description_fallback') {
+          <div class="identity-warning">
+            <mat-icon>warning</mat-icon>
+            <span>This batch uses description as identity (weaker quality)</span>
+          </div>
+        }
+        @if (batchDetail.batch?.controlSummary) {
+          <h4>Control Summary</h4>
+          <pre class="json-pre">{{ batchDetail.batch.controlSummary | json }}</pre>
+        }
+        @if (batchDetail.validationResults?.length) {
+          <h4>Validation Results</h4>
+          @for (r of batchDetail.validationResults; track r.ruleId) {
+            <div class="validation-mini">
+              <span [style.color]="getSeverityColor(r.severity, r.status)">{{ r.ruleId }}</span>
+              <span>{{ r.ruleName }}: {{ r.status }}</span>
+            </div>
+          }
+        }
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-stroked-button (click)="batchDetail = null">Close</button>
+      </mat-card-actions>
+    </mat-card>
+  }
+  }
+</div>

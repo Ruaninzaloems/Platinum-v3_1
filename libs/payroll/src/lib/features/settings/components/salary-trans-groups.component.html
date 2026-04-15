@@ -1,0 +1,166 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Salary Trans Groups</h1>
+      <p class="page-subtitle">Manage salary transaction groupings and linked heads</p>
+    </div>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ groups.length }}</span>
+      <span class="summary-label">Total Groups</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number">{{ totalItems }}</span>
+      <span class="summary-label">Total Linked Heads</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search groups..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+      <span class="result-count">{{ filteredGroups.length }} results</span>
+    </div>
+    <button class="btn btn-primary" (click)="openModal()">
+      <app-icon name="plus" [size]="16"></app-icon> Add Group
+    </button>
+  </div>
+
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th style="width:60px">ID</th>
+            <th style="width:100px">Code</th>
+            <th>Name</th>
+            <th style="width:120px;text-align:center">Linked Heads</th>
+            <th>Description</th>
+            <th style="width:140px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filteredGroups.length === 0) {
+            <tr><td colspan="6" class="empty-state">No salary transaction groups found</td></tr>
+          } @else {
+            @for (g of filteredGroups; track g.id) {
+              <tr>
+                <td>{{ g.id }}</td>
+                <td><span class="code-badge">{{ g.code }}</span></td>
+                <td><span class="title-text">{{ g.name }}</span></td>
+                <td style="text-align:center">
+                  <span class="item-count-badge" [class.item-count-zero]="(g.item_count || 0) === 0">{{ g.item_count || 0 }}</span>
+                </td>
+                <td>{{ g.description || '-' }}</td>
+                <td>
+                  <div style="display:flex;gap:4px;flex-wrap:nowrap;">
+                    <button class="btn btn-sm" (click)="openItemsModal(g)" title="Manage Salary Heads"><app-icon name="layers" [size]="12"></app-icon></button>
+                    <button class="btn btn-sm" (click)="openModal(g)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                    <button class="btn btn-sm" (click)="deleteGroup(g)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editItem.id ? 'Edit: ' + editItem.name : 'Add Salary Transaction Group' }}</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group"><label>Code *</label><input class="form-control" [(ngModel)]="editItem.code" placeholder="e.g. PERM_EMP"></div>
+          <div class="form-group"><label>Name *</label><input class="form-control" [(ngModel)]="editItem.name" placeholder="e.g. Permanent Employees"></div>
+          <div class="form-group" style="grid-column:1/-1"><label>Description</label><textarea class="form-control" [(ngModel)]="editItem.description" rows="3"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">{{ editItem.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showItemsModal && manageGroup) {
+  <div class="modal-overlay visible" (click)="showItemsModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Manage: {{ manageGroup.name }}</h3>
+        <button class="modal-close" (click)="showItemsModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px">Salary Heads linked to this group will be auto-assigned to employees when linked to a Job Profile using this group.</p>
+        <div class="add-heads-section">
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">
+            <div class="form-group" style="width:200px;margin:0">
+              <label>Transaction Type</label>
+              <select class="form-control" [(ngModel)]="selectedTypeFilter" (ngModelChange)="onTypeFilterChange()">
+                <option value="">-- Select Type --</option>
+                @for (t of availableTypes; track t) {
+                  <option [value]="t">{{ getTypeLabel(t) }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;margin:0">
+              <label>Search</label>
+              <input class="form-control" placeholder="Type to filter salary heads..." [(ngModel)]="headSearchTerm" (input)="filterHeadsBySearch()" [disabled]="!selectedTypeFilter">
+            </div>
+            <button class="btn btn-primary btn-sm" [disabled]="selectedHeadIds.length === 0" (click)="addSelectedHeads()"><app-icon name="plus" [size]="13"></app-icon> Add ({{ selectedHeadIds.length }})</button>
+          </div>
+          @if (!selectedTypeFilter) {
+            <div class="heads-placeholder"><app-icon name="layers" [size]="16" color="#94a3b8"></app-icon> Select a transaction type to see available salary heads</div>
+          } @else if (filteredHeads.length === 0) {
+            <div class="heads-placeholder"><app-icon name="check" [size]="16" color="#22c55e"></app-icon> All salary heads of this type are already linked</div>
+          } @else {
+            <div class="heads-checklist">
+              @for (h of filteredHeads; track h.id) {
+                <label class="head-check-item" [class.checked]="isHeadSelected(h.id)">
+                  <input type="checkbox" [checked]="isHeadSelected(h.id)" (change)="toggleHead(h.id)">
+                  <span class="head-check-name">{{ h.name }}</span>
+                  <span class="head-check-code">{{ h.code }}</span>
+                </label>
+              }
+            </div>
+          }
+        </div>
+        <div class="list-card">
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead><tr><th>Salary Head</th><th style="width:140px">Category</th><th style="width:60px;text-align:center">Remove</th></tr></thead>
+              <tbody>
+                @if (groupItems.length === 0) {
+                  <tr><td colspan="3" class="empty-state">No salary heads linked yet</td></tr>
+                } @else {
+                  @for (i of groupItems; track i.id) {
+                    <tr>
+                      <td>{{ i.salary_head_name }}</td>
+                      <td><span class="type-pill" [style.background]="getTypeColor(i.transaction_type) + '15'" [style.color]="getTypeColor(i.transaction_type)">{{ getTypeLabel(i.transaction_type) }}</span></td>
+                      <td style="text-align:center"><button class="btn btn-sm" (click)="removeItem(i)" title="Remove"><app-icon name="x" [size]="12"></app-icon></button></td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="items-footer">{{ groupItems.length }} salary head(s) linked</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showItemsModal = false">Close</button>
+      </div>
+    </div>
+  </div>
+}

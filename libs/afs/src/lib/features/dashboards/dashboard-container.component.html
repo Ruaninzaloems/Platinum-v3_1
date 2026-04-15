@@ -1,0 +1,66 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <div class="header-left">
+      <h1 class="dashboard-title">AFS Dashboard</h1>
+      <p class="dashboard-meta">
+        Platinum AFS Module &mdash; {{ todayFormatted }}
+        <span class="period-chip">{{ currentPeriod() }}</span>
+      </p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button class="action-btn" (click)="onRefresh()" matTooltip="Refresh dashboard data">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+      <button mat-flat-button class="action-btn export-btn" matTooltip="Export current dashboard as PDF report">
+        <mat-icon>download</mat-icon> Export Report
+      </button>
+    </div>
+  </div>
+
+  <div class="tabs-bar">
+    <div class="tabs-scroll">
+      @for (group of tabGroups; track group.name) {
+        <div class="tab-group">
+          <span class="group-label">{{ group.name }}</span>
+          <div class="group-tabs">
+            @for (tab of group.tabs; track tab.key) {
+              <button class="tab-item" [class.active]="activeTab() === tab.key"
+                      (click)="activeTab.set(tab.key)"
+                      [matTooltip]="tab.label">
+                <mat-icon class="tab-icon">{{ tab.icon }}</mat-icon>
+                <span class="tab-label">{{ tab.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+        @if (!$last) {
+          <div class="group-divider"></div>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="tab-content">
+    @switch (activeTab()) {
+      @case ('overview') { <app-dashboard></app-dashboard> }
+      @case ('cfo') { <app-cfo-dashboard></app-cfo-dashboard> }
+      @case ('afs-control') { <app-afs-control-dashboard></app-afs-control-dashboard> }
+      @case ('ratios') { <app-ratios-dashboard></app-ratios-dashboard> }
+      @case ('rolled-up-gl') { <app-rolled-up-gl></app-rolled-up-gl> }
+      @case ('mfma') { <app-mfma-dashboard></app-mfma-dashboard> }
+      @case ('compliance') { <app-compliance-dashboard></app-compliance-dashboard> }
+      @case ('exceptions') { <app-exception-register-dashboard></app-exception-register-dashboard> }
+      @case ('mapping-audit') { <app-mapping-audit-dashboard></app-mapping-audit-dashboard> }
+      @case ('evidence') { <app-evidence-heatmap-dashboard></app-evidence-heatmap-dashboard> }
+      @case ('audit') { <app-audit-management-dashboard></app-audit-management-dashboard> }
+      @case ('findings') { <app-findings-dashboard></app-findings-dashboard> }
+      @case ('rfi') { <app-rfi-dashboard></app-rfi-dashboard> }
+      @case ('adjustments') { <app-adjustments-register-dashboard></app-adjustments-register-dashboard> }
+      @case ('audit-sampling') { <app-audit-sampling></app-audit-sampling> }
+      @case ('governance') { <app-governance-packs-dashboard></app-governance-packs-dashboard> }
+      @case ('gl-sync') { <app-gl-sync-dashboard></app-gl-sync-dashboard> }
+      @case ('fraud') { <app-fraud-detection-dashboard></app-fraud-detection-dashboard> }
+      @case ('rules-engine') { <app-validation-rules></app-validation-rules> }
+    }
+  </div>
+</div>

@@ -1,0 +1,836 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Document Management</h1>
+      <div class="subtitle">National Archives Act compliant document management system</div>
+    </div>
+    <div class="page-actions">
+      <button mat-stroked-button class="btn-refresh" (click)="refresh()" matTooltip="Refresh document list">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="openUploadDialog()" matTooltip="Upload a new document with classification">
+        <mat-icon>cloud_upload</mat-icon> Upload Document
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Strip -->
+  <div class="summary-strip">
+    <div class="kpi-card" matTooltip="Total documents in the system">
+      <div class="kpi-icon-wrap icon-blue"><mat-icon>folder</mat-icon></div>
+      <div>
+        <div class="kpi-label">Total Documents</div>
+        <div class="kpi-value">{{ stats()?.totalDocuments || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card" matTooltip="Total storage used">
+      <div class="kpi-icon-wrap icon-teal"><mat-icon>storage</mat-icon></div>
+      <div>
+        <div class="kpi-label">Total Size</div>
+        <div class="kpi-value">{{ formatSize(stats()?.totalSize || 0) }}</div>
+      </div>
+    </div>
+    <div class="kpi-card" matTooltip="Documents currently locked for immutability">
+      <div class="kpi-icon-wrap icon-amber"><mat-icon>lock</mat-icon></div>
+      <div>
+        <div class="kpi-label">Locked</div>
+        <div class="kpi-value">{{ stats()?.lockedCount || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card" matTooltip="Documents currently checked out">
+      <div class="kpi-icon-wrap icon-purple"><mat-icon>edit_note</mat-icon></div>
+      <div>
+        <div class="kpi-label">Checked Out</div>
+        <div class="kpi-value">{{ stats()?.checkedOutCount || 0 }}</div>
+      </div>
+    </div>
+    <div class="kpi-card" matTooltip="Documents approaching retention expiry">
+      <div class="kpi-icon-wrap icon-red"><mat-icon>schedule</mat-icon></div>
+      <div>
+        <div class="kpi-label">Approaching Expiry</div>
+        <div class="kpi-value">{{ stats()?.approachingExpiry || 0 }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav">
+    <button class="tab-btn" [class.active]="activeTab() === 'registry'" (click)="activeTab.set('registry')">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;">list_alt</mat-icon>
+      Document Registry
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'classifications'" (click)="activeTab.set('classifications'); loadClassifications()">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;">account_tree</mat-icon>
+      File Plan
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'retention'" (click)="activeTab.set('retention'); loadRetention()">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;">timer</mat-icon>
+      Retention Dashboard
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'source'" (click)="activeTab.set('source')">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;">link</mat-icon>
+      Source Documents
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'detail'" (click)="activeTab.set('detail')" [disabled]="!selectedDocument()">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;">info</mat-icon>
+      Document Detail
+    </button>
+  </div>
+
+  <!-- Registry Tab -->
+  @if (activeTab() === 'registry') {
+    <div class="filters-bar" style="margin-top: 0; border-radius: 0 0 12px 12px;">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex: 1; min-width: 200px;" matTooltip="Search by file name, description, or tags">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput placeholder="Search documents..." [(ngModel)]="searchQuery" (keyup.enter)="doSearch()">
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 150px;" matTooltip="Filter by document type">
+        <mat-label>Type</mat-label>
+        <mat-select [(ngModel)]="typeFilter" (ngModelChange)="doSearch()">
+          <mat-option value="">All Types</mat-option>
+          @for (dt of documentTypes; track dt.value) {
+            <mat-option [value]="dt.value">{{ dt.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 150px;" matTooltip="Filter by access level">
+        <mat-label>Access Level</mat-label>
+        <mat-select [(ngModel)]="accessFilter" (ngModelChange)="doSearch()">
+          <mat-option value="">All Levels</mat-option>
+          <mat-option value="public">Public</mat-option>
+          <mat-option value="internal">Internal</mat-option>
+          <mat-option value="confidential">Confidential</mat-option>
+          <mat-option value="restricted">Restricted</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 150px;" matTooltip="Filter by disposal status">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="disposalFilter" (ngModelChange)="doSearch()">
+          <mat-option value="">All Statuses</mat-option>
+          <mat-option value="active">Active</mat-option>
+          <mat-option value="pending_disposal">Pending Disposal</mat-option>
+          <mat-option value="disposed">Disposed</mat-option>
+          <mat-option value="archived">Archived</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button (click)="doSearch()" matTooltip="Apply search">
+        <mat-icon>search</mat-icon>
+      </button>
+    </div>
+
+    <!-- Bulk actions -->
+    @if (selectedIds().length > 0) {
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #eef6ff; border: 1px solid #93c5fd; border-radius: 8px; margin-bottom: 12px;">
+        <mat-icon style="color: #3b82f6;">check_box</mat-icon>
+        <span style="font-size: 13px; font-weight: 600; color: #1e40af;">{{ selectedIds().length }} selected</span>
+        <button mat-stroked-button style="font-size: 12px; height: 32px;" (click)="bulkClassify()" matTooltip="Apply classification to selected documents">
+          <mat-icon style="font-size: 16px; width: 16px; height: 16px;">label</mat-icon> Classify
+        </button>
+        <button mat-stroked-button style="font-size: 12px; height: 32px;" (click)="bulkDisposal()" matTooltip="Request disposal for selected documents">
+          <mat-icon style="font-size: 16px; width: 16px; height: 16px;">delete_sweep</mat-icon> Request Disposal
+        </button>
+        <button mat-stroked-button style="font-size: 12px; height: 32px;" (click)="clearSelection()">
+          <mat-icon style="font-size: 16px; width: 16px; height: 16px;">close</mat-icon> Clear
+        </button>
+      </div>
+    }
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" style="margin-bottom: 12px;"></mat-progress-bar>
+    }
+
+    @if (!loading() && documents().length === 0) {
+      <div class="empty-state">
+        <mat-icon>folder_open</mat-icon>
+        <h3>No documents found</h3>
+        <p>Upload documents or adjust your search filters.</p>
+      </div>
+    }
+
+    @if (documents().length > 0) {
+      <div class="detail-card" style="padding: 0; overflow: auto;">
+        <table class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th style="width: 40px;">
+                <mat-checkbox
+                  [checked]="allSelected()"
+                  [indeterminate]="someSelected() && !allSelected()"
+                  (change)="toggleAllSelection()"
+                ></mat-checkbox>
+              </th>
+              <th matTooltip="Original file name">File Name</th>
+              <th matTooltip="Document type classification">Type</th>
+              <th matTooltip="File plan classification code">Classification</th>
+              <th matTooltip="Retention period in years">Retention</th>
+              <th matTooltip="Current disposal status">Status</th>
+              <th matTooltip="Document access level">Access</th>
+              <th class="amount-col" matTooltip="File size">Size</th>
+              <th matTooltip="Document version number">Ver</th>
+              <th matTooltip="Lock / Checkout status">State</th>
+              <th matTooltip="Upload date">Date</th>
+              <th matTooltip="Actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (doc of documents(); track doc.id) {
+              <tr (click)="selectDocument(doc)">
+                <td (click)="$event.stopPropagation()">
+                  <mat-checkbox
+                    [checked]="isSelectedId(doc.id)"
+                    (change)="toggleSelection(doc.id)"
+                  ></mat-checkbox>
+                </td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <mat-icon style="font-size: 18px; width: 18px; height: 18px; color: var(--platinum-text-muted);">{{ getFileIcon(doc.mimeType) }}</mat-icon>
+                    <span style="font-weight: 500;">{{ doc.originalName || doc.fileName }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="chip chip-blue" style="font-size: 10px;">{{ formatDocType(doc.documentType) }}</span>
+                </td>
+                <td>
+                  @if (doc.classificationCode) {
+                    <span class="legislation-ref" style="font-size: 10px;">{{ doc.classificationCode }}</span>
+                  } @else {
+                    <span style="color: var(--platinum-text-muted);">—</span>
+                  }
+                </td>
+                <td>
+                  @if (doc.retentionPeriodYears) {
+                    <span>{{ doc.retentionPeriodYears }}y</span>
+                  } @else {
+                    <span style="color: var(--platinum-text-muted);">—</span>
+                  }
+                </td>
+                <td>
+                  <span class="status-badge" [ngClass]="doc.disposalStatus || 'active'">{{ doc.disposalStatus || 'active' }}</span>
+                </td>
+                <td>
+                  <span class="chip" [ngClass]="getAccessChipClass(doc.accessLevel)">{{ doc.accessLevel || 'internal' }}</span>
+                </td>
+                <td class="amount-col">{{ formatSize(doc.fileSize) }}</td>
+                <td style="text-align: center;">{{ doc.version || 1 }}</td>
+                <td>
+                  @if (doc.lockedAt) {
+                    <mat-icon style="font-size: 16px; width: 16px; height: 16px; color: #f59e0b;" matTooltip="Locked">lock</mat-icon>
+                  }
+                  @if (doc.checkoutBy) {
+                    <mat-icon style="font-size: 16px; width: 16px; height: 16px; color: #8b5cf6;" matTooltip="Checked out">edit_note</mat-icon>
+                  }
+                </td>
+                <td class="date-cell">{{ doc.createdAt | date:'shortDate' }}</td>
+                <td (click)="$event.stopPropagation()">
+                  <button mat-icon-button [matMenuTriggerFor]="actionMenu" matTooltip="Actions" style="width: 32px; height: 32px;">
+                    <mat-icon style="font-size: 18px;">more_vert</mat-icon>
+                  </button>
+                  <mat-menu #actionMenu="matMenu">
+                    <button mat-menu-item (click)="selectDocument(doc)">
+                      <mat-icon>info</mat-icon> <span>View Details</span>
+                    </button>
+                    <button mat-menu-item (click)="downloadDoc(doc.id)">
+                      <mat-icon>download</mat-icon> <span>Download</span>
+                    </button>
+                    <button mat-menu-item (click)="verifyDoc(doc.id)">
+                      <mat-icon>verified</mat-icon> <span>Verify Integrity</span>
+                    </button>
+                    @if (!doc.checkoutBy) {
+                      <button mat-menu-item (click)="checkoutDoc(doc.id)">
+                        <mat-icon>edit_note</mat-icon> <span>Check Out</span>
+                      </button>
+                    } @else {
+                      <button mat-menu-item (click)="checkinDoc(doc.id)">
+                        <mat-icon>task_alt</mat-icon> <span>Check In</span>
+                      </button>
+                    }
+                    @if (!doc.lockedAt) {
+                      <button mat-menu-item (click)="lockDoc(doc.id)">
+                        <mat-icon>lock</mat-icon> <span>Lock Document</span>
+                      </button>
+                    }
+                  </mat-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }} ({{ totalDocs() }} documents)</span>
+          <div style="display: flex; gap: 4px;">
+            <button mat-stroked-button [disabled]="currentPage() <= 1" (click)="goToPage(currentPage() - 1)">Previous</button>
+            <button mat-stroked-button [disabled]="currentPage() >= totalPages()" (click)="goToPage(currentPage() + 1)">Next</button>
+          </div>
+        </div>
+      }
+    }
+  }
+
+  <!-- File Plan / Classifications Tab -->
+  @if (activeTab() === 'classifications') {
+    <div class="detail-card" style="margin-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3><mat-icon>account_tree</mat-icon> File Plan Classifications</h3>
+      </div>
+
+      @if (classifications().length === 0) {
+        <div class="empty-state">
+          <mat-icon>category</mat-icon>
+          <h3>No classifications defined</h3>
+          <p>File plan classifications will be seeded automatically or can be created by an administrator.</p>
+        </div>
+      }
+
+      @if (classifications().length > 0) {
+        <table class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Label</th>
+              <th>Description</th>
+              <th>Retention</th>
+              <th>Disposal</th>
+              <th>Access</th>
+              <th>Document Types</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of classifications(); track c.id) {
+              <tr>
+                <td><span class="legislation-ref">{{ c.code }}</span></td>
+                <td style="font-weight: 500;">{{ c.label }}</td>
+                <td class="desc-cell">{{ c.description || '—' }}</td>
+                <td>
+                  @if (c.retentionPeriodYears) {
+                    <span class="chip chip-amber">{{ c.retentionPeriodYears }} years</span>
+                  } @else {
+                    <span class="chip chip-purple">Permanent</span>
+                  }
+                </td>
+                <td>{{ c.disposalAction || '—' }}</td>
+                <td>{{ c.defaultAccessLevel || '—' }}</td>
+                <td>
+                  @if (c.applicableDocumentTypes?.length) {
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                      @for (t of c.applicableDocumentTypes; track t) {
+                        <span class="chip chip-blue" style="font-size: 10px;">{{ t }}</span>
+                      }
+                    </div>
+                  } @else {
+                    All
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- Retention Dashboard Tab -->
+  @if (activeTab() === 'retention') {
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+      <!-- By Disposal Status -->
+      <div class="detail-card">
+        <h3><mat-icon>pie_chart</mat-icon> Documents by Status</h3>
+        @if (stats()) {
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            @for (entry of statusEntries(); track entry.key) {
+              <div class="comp-row">
+                <span class="status-badge" [ngClass]="entry.key">{{ entry.key }}</span>
+                <div class="comp-bar-track">
+                  <div class="comp-bar-fill" [ngClass]="getStatusBarClass(entry.key)" [style.width.%]="getStatusPercent(entry.value)"></div>
+                </div>
+                <span class="comp-score">{{ entry.value }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- By Document Type -->
+      <div class="detail-card">
+        <h3><mat-icon>category</mat-icon> Documents by Type</h3>
+        @if (stats()) {
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            @for (entry of typeEntries(); track entry.key) {
+              <div class="comp-row">
+                <span class="chip chip-blue" style="font-size: 10px; min-width: 100px;">{{ formatDocType(entry.key) }}</span>
+                <div class="comp-bar-track">
+                  <div class="comp-bar-fill comp-green" [style.width.%]="getTypePercent(entry.value)"></div>
+                </div>
+                <span class="comp-score">{{ entry.value }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- By Access Level -->
+      <div class="detail-card">
+        <h3><mat-icon>security</mat-icon> Documents by Access Level</h3>
+        @if (stats()) {
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            @for (entry of accessEntries(); track entry.key) {
+              <div class="comp-row">
+                <span class="chip" [ngClass]="getAccessChipClass(entry.key)" style="font-size: 10px; min-width: 80px;">{{ entry.key }}</span>
+                <div class="comp-bar-track">
+                  <div class="comp-bar-fill comp-amber" [style.width.%]="getAccessPercent(entry.value)"></div>
+                </div>
+                <span class="comp-score">{{ entry.value }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Approaching Expiry -->
+    <div class="detail-card" style="margin-top: 16px;">
+      <h3><mat-icon>warning_amber</mat-icon> Documents Approaching Retention Expiry</h3>
+      @if (retentionItems().length === 0) {
+        <div style="text-align: center; padding: 24px; color: var(--platinum-text-muted);">
+          <mat-icon style="font-size: 32px; width: 32px; height: 32px; margin-bottom: 8px;">check_circle</mat-icon>
+          <div>No documents approaching retention expiry</div>
+        </div>
+      }
+      @if (retentionItems().length > 0) {
+        <table class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>Classification</th>
+              <th>Retention</th>
+              <th>Expires</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of retentionItems(); track item.id) {
+              <tr>
+                <td>{{ item.originalName }}</td>
+                <td>{{ item.classificationLabel || '—' }}</td>
+                <td>{{ item.retentionPeriodYears ? item.retentionPeriodYears + 'y' : '—' }}</td>
+                <td class="date-cell">{{ item.retentionExpiresAt | date:'mediumDate' }}</td>
+                <td><span class="status-badge" [ngClass]="item.disposalStatus || 'active'">{{ item.disposalStatus || 'active' }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- Source Documents Tab -->
+  @if (activeTab() === 'source') {
+    <div class="detail-card" style="margin-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3><mat-icon>link</mat-icon> EMS Source Document Lookup</h3>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px;">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="flex: 1; min-width: 200px;">
+          <mat-label>Document Number</mat-label>
+          <input matInput placeholder="Enter EMS document number..." [(ngModel)]="sourceDocNumber">
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="min-width: 140px;">
+          <mat-label>Financial Year</mat-label>
+          <input matInput placeholder="e.g. 2024" [(ngModel)]="sourceDocFinYear">
+        </mat-form-field>
+        <button mat-flat-button class="btn-primary" (click)="lookupSourceDocuments()" [disabled]="!sourceDocNumber || sourceDocLoading()" style="height: 48px;">
+          <mat-icon>search</mat-icon> Lookup
+        </button>
+      </div>
+
+      @if (sourceDocLoading()) {
+        <mat-progress-bar mode="indeterminate" style="margin-bottom: 12px;"></mat-progress-bar>
+      }
+
+      @if (sourceDocResult() && !sourceDocLoading()) {
+        @if (!sourceDocResult()!.available) {
+          <div style="text-align: center; padding: 24px; color: var(--platinum-text-muted);">
+            <mat-icon style="font-size: 32px; width: 32px; height: 32px; margin-bottom: 8px;">cloud_off</mat-icon>
+            <div>{{ sourceDocResult()!.message || 'Source documents not available' }}</div>
+          </div>
+        }
+
+        @if (sourceDocResult()!.available && sourceDocResult()!.summary) {
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+            <div class="kpi-card" style="flex: 1; min-width: 120px;">
+              <div class="kpi-icon-wrap" [class.icon-green]="sourceDocResult()!.summary!.threeWayMatch" [class.icon-red]="!sourceDocResult()!.summary!.threeWayMatch">
+                <mat-icon>{{ sourceDocResult()!.summary!.threeWayMatch ? 'verified' : 'warning' }}</mat-icon>
+              </div>
+              <div>
+                <div class="kpi-label">3-Way Match</div>
+                <div class="kpi-value">{{ sourceDocResult()!.summary!.threeWayMatch ? 'Yes' : 'No' }}</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="flex: 1; min-width: 120px;">
+              <div class="kpi-icon-wrap icon-blue"><mat-icon>request_quote</mat-icon></div>
+              <div>
+                <div class="kpi-label">Requisitions</div>
+                <div class="kpi-value">{{ sourceDocResult()!.chain?.requisitions?.length || 0 }}</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="flex: 1; min-width: 120px;">
+              <div class="kpi-icon-wrap icon-teal"><mat-icon>local_shipping</mat-icon></div>
+              <div>
+                <div class="kpi-label">GRNs</div>
+                <div class="kpi-value">{{ sourceDocResult()!.chain?.grns?.length || 0 }}</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="flex: 1; min-width: 120px;">
+              <div class="kpi-icon-wrap icon-amber"><mat-icon>receipt</mat-icon></div>
+              <div>
+                <div class="kpi-label">Invoices</div>
+                <div class="kpi-value">{{ sourceDocResult()!.chain?.invoices?.length || 0 }}</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="flex: 1; min-width: 120px;">
+              <div class="kpi-icon-wrap icon-purple"><mat-icon>payments</mat-icon></div>
+              <div>
+                <div class="kpi-label">Payments</div>
+                <div class="kpi-value">{{ sourceDocResult()!.chain?.payments?.length || 0 }}</div>
+              </div>
+            </div>
+          </div>
+
+          @if (sourceDocResult()!.vendor?.vendor) {
+            <div class="detail-card" style="margin-bottom: 16px; background: #f8fafc;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">business</mat-icon> Vendor</h4>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Name</label>
+                  <span>{{ sourceDocResult()!.vendor!.vendor.VendorName || '—' }}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Registration No</label>
+                  <span>{{ sourceDocResult()!.vendor!.vendor.RegistrationNo || '—' }}</span>
+                </div>
+                <div class="detail-field">
+                  <label>VAT No</label>
+                  <span>{{ sourceDocResult()!.vendor!.vendor.VATNo || '—' }}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Contact</label>
+                  <span>{{ sourceDocResult()!.vendor!.vendor.ContactPerson || '—' }}</span>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.requisitions?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">request_quote</mat-icon> Requisitions</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Document No</th>
+                    <th>Description</th>
+                    <th class="amount-col">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (req of sourceDocResult()!.chain!.requisitions; track $index) {
+                    <tr>
+                      <td>{{ req.Requisition_ID || '—' }}</td>
+                      <td>{{ req.DocumentNo || '—' }}</td>
+                      <td>{{ req.Description || '—' }}</td>
+                      <td class="amount-col">{{ req.Amount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.grns?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">local_shipping</mat-icon> Goods Received Notes</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>GRN ID</th>
+                    <th>Document No</th>
+                    <th>Description</th>
+                    <th class="amount-col">Quantity</th>
+                    <th class="amount-col">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (grn of sourceDocResult()!.chain!.grns; track $index) {
+                    <tr>
+                      <td>{{ grn.GRN_ID || '—' }}</td>
+                      <td>{{ grn.DocumentNo || '—' }}</td>
+                      <td>{{ grn.LineDescription || '—' }}</td>
+                      <td class="amount-col">{{ grn.Quantity }}</td>
+                      <td class="amount-col">{{ grn.Amount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.invoices?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">receipt</mat-icon> Invoices</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Invoice ID</th>
+                    <th>Document No</th>
+                    <th>Description</th>
+                    <th class="amount-col">Amount</th>
+                    <th class="amount-col">VAT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (inv of sourceDocResult()!.chain!.invoices; track $index) {
+                    <tr>
+                      <td>{{ inv.Invoice_ID || '—' }}</td>
+                      <td>{{ inv.DocumentNo || '—' }}</td>
+                      <td>{{ inv.LineDescription || '—' }}</td>
+                      <td class="amount-col">{{ inv.Amount | number:'1.2-2' }}</td>
+                      <td class="amount-col">{{ inv.VATAmount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.payments?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">payments</mat-icon> Payments</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Payment ID</th>
+                    <th>Document No</th>
+                    <th>Batch No</th>
+                    <th class="amount-col">Allocated Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (pay of sourceDocResult()!.chain!.payments; track $index) {
+                    <tr>
+                      <td>{{ pay.Payment_ID || '—' }}</td>
+                      <td>{{ pay.DocumentNo || '—' }}</td>
+                      <td>{{ pay.BatchNo || '—' }}</td>
+                      <td class="amount-col">{{ pay.AllocatedAmount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.creditNotes?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">note</mat-icon> Credit Notes</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Credit Note ID</th>
+                    <th>Document No</th>
+                    <th>Description</th>
+                    <th class="amount-col">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (cn of sourceDocResult()!.chain!.creditNotes; track $index) {
+                    <tr>
+                      <td>{{ cn.CreditNote_ID || '—' }}</td>
+                      <td>{{ cn.DocumentNo || '—' }}</td>
+                      <td>{{ cn.LineDescription || '—' }}</td>
+                      <td class="amount-col">{{ cn.Amount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (sourceDocResult()!.chain?.cashbookEntries?.length) {
+            <div style="margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px;"><mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">account_balance</mat-icon> Cashbook Entries</h4>
+              <table class="data-table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Cashbook ID</th>
+                    <th>Document No</th>
+                    <th>Description</th>
+                    <th>Reference</th>
+                    <th class="amount-col">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (cb of sourceDocResult()!.chain!.cashbookEntries; track $index) {
+                    <tr>
+                      <td>{{ cb.Cashbook_ID || '—' }}</td>
+                      <td>{{ cb.DocumentNo || '—' }}</td>
+                      <td>{{ cb.Description || '—' }}</td>
+                      <td>{{ cb.ReferenceNo || '—' }}</td>
+                      <td class="amount-col">{{ cb.Amount | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      }
+
+      @if (!sourceDocResult() && !sourceDocLoading()) {
+        <div style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+          <mat-icon style="font-size: 48px; width: 48px; height: 48px; margin-bottom: 12px;">search</mat-icon>
+          <h3>Look up EMS Source Documents</h3>
+          <p>Enter a document number to trace the full SCM chain: Requisition → GRN → Invoice → Payment</p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Document Detail Tab -->
+  @if (activeTab() === 'detail' && selectedDocument()) {
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+      <!-- Metadata -->
+      <div class="detail-card">
+        <h3><mat-icon>description</mat-icon> Document Metadata</h3>
+        <div class="detail-grid">
+          <div class="detail-field">
+            <label>File Name</label>
+            <span>{{ selectedDocument()!.originalName || selectedDocument()!.fileName }}</span>
+          </div>
+          <div class="detail-field">
+            <label>MIME Type</label>
+            <span>{{ selectedDocument()!.mimeType }}</span>
+          </div>
+          <div class="detail-field">
+            <label>File Size</label>
+            <span>{{ formatSize(selectedDocument()!.fileSize) }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Document Type</label>
+            <span>{{ formatDocType(selectedDocument()!.documentType) }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Classification</label>
+            <span>{{ selectedDocument()!.classificationCode || '—' }} {{ selectedDocument()!.classificationLabel ? '— ' + selectedDocument()!.classificationLabel : '' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Access Level</label>
+            <span class="chip" [ngClass]="getAccessChipClass(selectedDocument()!.accessLevel)">{{ selectedDocument()!.accessLevel || 'internal' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Retention Period</label>
+            <span>{{ selectedDocument()!.retentionPeriodYears ? selectedDocument()!.retentionPeriodYears + ' years' : '—' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Retention Expires</label>
+            <span>{{ selectedDocument()!.retentionExpiresAt ? (selectedDocument()!.retentionExpiresAt | date:'mediumDate') : '—' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Disposal Action</label>
+            <span>{{ selectedDocument()!.disposalAction || '—' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Disposal Status</label>
+            <span class="status-badge" [ngClass]="selectedDocument()!.disposalStatus || 'active'">{{ selectedDocument()!.disposalStatus || 'active' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Archival Status</label>
+            <span>{{ selectedDocument()!.archivalStatus || 'current' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Storage Provider</label>
+            <span>{{ selectedDocument()!.storageProvider || 'local' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Version</label>
+            <span>{{ selectedDocument()!.version || 1 }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Uploaded By</label>
+            <span>{{ selectedDocument()!.uploadedBy }}</span>
+          </div>
+          <div class="detail-field">
+            <label>Created At</label>
+            <span>{{ selectedDocument()!.createdAt | date:'medium' }}</span>
+          </div>
+          <div class="detail-field">
+            <label>SHA-256 Hash</label>
+            <span style="font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; word-break: break-all;">{{ selectedDocument()!.sha256Hash || '—' }}</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
+          <button mat-stroked-button (click)="downloadDoc(selectedDocument()!.id)" matTooltip="Download document">
+            <mat-icon>download</mat-icon> Download
+          </button>
+          <button mat-stroked-button (click)="verifyDoc(selectedDocument()!.id)" matTooltip="Verify SHA-256 integrity">
+            <mat-icon>verified</mat-icon> Verify
+          </button>
+          @if (!selectedDocument()!.checkoutBy) {
+            <button mat-stroked-button (click)="checkoutDoc(selectedDocument()!.id)" matTooltip="Check out for editing">
+              <mat-icon>edit_note</mat-icon> Check Out
+            </button>
+          } @else {
+            <button mat-stroked-button (click)="checkinDoc(selectedDocument()!.id)" matTooltip="Check in document">
+              <mat-icon>task_alt</mat-icon> Check In
+            </button>
+          }
+          @if (!selectedDocument()!.lockedAt) {
+            <button mat-stroked-button (click)="lockDoc(selectedDocument()!.id)" matTooltip="Lock for immutability">
+              <mat-icon>lock</mat-icon> Lock
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Version History & Audit Trail -->
+      <div>
+        <div class="detail-card">
+          <h3><mat-icon>history</mat-icon> Version History</h3>
+          @if (versionHistory().length === 0) {
+            <div style="text-align: center; padding: 16px; color: var(--platinum-text-muted); font-size: 13px;">No version history available</div>
+          }
+          @for (ver of versionHistory(); track ver.id) {
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #eef6ff; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 12px; font-weight: 700; color: #3b82f6;">v{{ ver.version || 1 }}</span>
+              </div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 500;">{{ ver.originalName }}</div>
+                <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ ver.createdAt | date:'medium' }} — {{ formatSize(ver.fileSize) }}</div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>receipt_long</mat-icon> Audit Trail</h3>
+          @if (auditTrail().length === 0) {
+            <div style="text-align: center; padding: 16px; color: var(--platinum-text-muted); font-size: 13px;">No audit trail entries</div>
+          }
+          @for (entry of auditTrail(); track $index) {
+            <div style="display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px;">
+              <mat-icon style="font-size: 16px; width: 16px; height: 16px; color: var(--platinum-text-muted); margin-top: 2px;">circle</mat-icon>
+              <div>
+                <span style="font-weight: 500;">{{ entry.action || entry.type }}</span>
+                <span style="color: var(--platinum-text-muted);"> — {{ entry.performedBy || entry.userName }}</span>
+                <div style="color: var(--platinum-text-muted); font-size: 11px;">{{ entry.createdAt | date:'medium' }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

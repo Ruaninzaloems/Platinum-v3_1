@@ -1,0 +1,341 @@
+.ob-container {
+  padding: 24px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.ob-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ob-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a237e;
+  margin: 0;
+}
+
+.ob-subtitle {
+  font-size: 14px;
+  color: #757575;
+  margin-top: 4px;
+}
+
+.ob-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  background: #1a237e !important;
+  color: #fff !important;
+}
+
+.btn-confirm {
+  background: #2e7d32 !important;
+  color: #fff !important;
+}
+
+.ob-summary-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-left: 4px solid #9e9e9e;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.ob-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ob-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: 20px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.ob-confirmed-stamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #2e7d32;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ob-superseded-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: #e65100;
+}
+
+.ob-superseded-banner mat-icon {
+  color: #e65100;
+  margin-top: 2px;
+}
+
+.ob-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.ob-stat-item {
+  text-align: center;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.ob-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.ob-stat-label {
+  font-size: 12px;
+  color: #757575;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ob-progress-bar {
+  margin-top: 20px;
+}
+
+.ob-progress-label {
+  font-size: 13px;
+  color: #424242;
+  margin-bottom: 8px;
+}
+
+.ob-section-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.ob-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ob-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a237e;
+  margin: 0;
+}
+
+.ob-filter-row {
+  display: flex;
+  gap: 4px;
+}
+
+.ob-filter-row button.active {
+  background: #1a237e;
+  color: #fff;
+}
+
+.ob-table-wrap {
+  overflow-x: auto;
+}
+
+.ob-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ob-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #424242;
+  background: #fafafa;
+  border-bottom: 2px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.ob-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #212121;
+}
+
+.ob-table tr:hover {
+  background: #f5f5f5;
+}
+
+.ob-table tr.acknowledged {
+  background: #f1f8e9;
+}
+
+.ob-table tr.selected {
+  background: #e3f2fd;
+}
+
+.amount-col {
+  text-align: right;
+  font-family: 'Roboto Mono', monospace;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 12px;
+}
+
+.desc-col {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ob-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ob-type-badge.difference {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ob-type-badge.new_account {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.ob-type-badge.closed_account {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.ob-ack-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ob-ack-badge.acknowledged {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.ob-ack-badge.pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ob-reason-hint {
+  font-size: 11px;
+  color: #757575;
+  cursor: help;
+  text-decoration: underline dotted;
+}
+
+.ack-form-row td {
+  padding: 0 !important;
+  background: #e3f2fd;
+}
+
+.ack-form {
+  padding: 16px 24px;
+}
+
+.ack-form-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1a237e;
+  margin-bottom: 12px;
+}
+
+.ack-form-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ack-field {
+  min-width: 180px;
+}
+
+.ack-field-wide {
+  flex: 1;
+  min-width: 250px;
+}
+
+.ack-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 8px;
+}
+
+.ob-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px;
+}
+
+.ob-empty-state h2 {
+  margin: 16px 0 8px;
+  color: #424242;
+}
+
+.ob-empty-state p {
+  color: #757575;
+  max-width: 500px;
+  margin: 0 0 24px;
+}

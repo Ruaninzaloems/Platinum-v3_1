@@ -1,0 +1,163 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Audit Findings</h1>
+      <div class="subtitle">Track and resolve audit findings</div>
+    </div>
+    <div class="page-actions">
+      <button mat-flat-button class="btn-primary" (click)="openCreateDialog()" matTooltip="Record a new audit finding with severity and financial impact">
+        <mat-icon>add</mat-icon>
+        New Finding
+      </button>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="kpi-card" matTooltip="Total number of audit findings recorded">
+      <div class="kpi-label">Total</div>
+      <div class="kpi-value">{{ findings().length }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Findings classified as material misstatements">
+      <div class="kpi-label">Material</div>
+      <div class="kpi-value">{{ materialCount() }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Findings classified as significant deficiencies">
+      <div class="kpi-label">Significant</div>
+      <div class="kpi-value">{{ significantCount() }}</div>
+    </div>
+    <div class="kpi-card" matTooltip="Findings that have not yet been resolved or closed">
+      <div class="kpi-label">Unresolved</div>
+      <div class="kpi-value">{{ unresolvedCount() }}</div>
+    </div>
+  </div>
+
+  @if (findings().length === 0 && !loading()) {
+    <div class="empty-state">
+      <mat-icon>search_off</mat-icon>
+      <h3>No findings yet</h3>
+      <p>Create your first audit finding to get started.</p>
+    </div>
+  }
+
+  @if (findings().length > 0) {
+    <div class="detail-card" style="padding: 0; overflow: auto;">
+      <table class="data-table findings-table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th matTooltip="Unique finding reference number">Reference</th>
+            <th matTooltip="AGSA-assigned COMAF number">AGSA Ref</th>
+            <th matTooltip="Title describing the audit finding" class="title-col">Title</th>
+            <th matTooltip="Severity classification: Material, Significant, Minor, or Observation">Severity</th>
+            <th matTooltip="Current resolution status of the finding">Status</th>
+            <th matTooltip="Auditor who raised the finding">Raised By</th>
+            <th class="amount-col" matTooltip="Estimated financial impact in ZAR">Financial Impact</th>
+            <th matTooltip="Category classification of the finding">Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (finding of findings(); track finding.id) {
+            <tr style="cursor: pointer;" (click)="toggleExpand(finding.id)" matTooltip="Click to view evidence attachments">
+              <td style="font-weight: 600;">{{ finding.reference }}</td>
+              <td class="ext-ref-cell">{{ finding.externalReference || '—' }}</td>
+              <td class="title-col">{{ finding.title }}</td>
+              <td>
+                <span class="severity-badge" [class]="finding.severity.toLowerCase()" [matTooltip]="'Severity: ' + (finding.severity || 'Unclassified')">
+                  {{ finding.severity }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge" [ngClass]="(finding.status || '').toLowerCase().replace(' ', '_')" [matTooltip]="'Status: ' + (finding.status || 'Unknown')">
+                  {{ finding.status }}
+                </span>
+              </td>
+              <td>{{ finding.raisedBy }}</td>
+              <td class="amount-col" [matTooltip]="finding.financialImpact != null ? 'Financial impact: R' + finding.financialImpact : 'No financial impact estimated'">{{ finding.financialImpact != null ? (finding.financialImpact | currency:'ZAR':'symbol-narrow':'1.2-2') : '—' }}</td>
+              <td>
+                @if (finding.category) {
+                  <mat-chip-set>
+                    <mat-chip [matTooltip]="'Finding category: ' + finding.category">{{ finding.category }}</mat-chip>
+                  </mat-chip-set>
+                } @else {
+                  —
+                }
+              </td>
+            </tr>
+            @if (expandedId() === finding.id) {
+              <tr>
+                <td colspan="8" style="padding: 16px; background: var(--platinum-surface);">
+                  @if (finding.responses && finding.responses.length > 0) {
+                    <div style="margin-bottom: 16px;">
+                      <h4 style="margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--platinum-navy);">Response Thread</h4>
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        @for (resp of finding.responses; track resp.id) {
+                          <div style="padding: 12px; background: white; border: 1px solid var(--platinum-border); border-radius: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                              <span style="font-size: 13px; font-weight: 600; color: var(--platinum-navy);">{{ resp.respondedBy }}</span>
+                              <span class="status-badge" [class]="resp.responseType.toLowerCase()">{{ resp.responseType }}</span>
+                              @if (resp.reviewStatus === 'pending') {
+                                <span class="review-badge pending" matTooltip="This response is pending supervisor review">Pending Review</span>
+                              } @else if (resp.reviewStatus === 'approved') {
+                                <span class="review-badge approved" matTooltip="This response has been approved">Approved</span>
+                              } @else if (resp.reviewStatus === 'rejected') {
+                                <span class="review-badge rejected" matTooltip="This response has been rejected">Rejected</span>
+                              }
+                              <span style="font-size: 11px; color: var(--platinum-text-muted); margin-left: auto;">{{ resp.createdAt | date:'short' }}</span>
+                            </div>
+                            <div style="font-size: 13px; color: var(--platinum-text); line-height: 1.5;">{{ resp.content }}</div>
+                            @if (resp.reviewStatus === 'pending') {
+                              <div class="review-actions">
+                                <button mat-stroked-button color="primary" (click)="reviewResponse(finding.id, resp.id, 'approved'); $event.stopPropagation()">
+                                  <mat-icon>check_circle</mat-icon> Approve
+                                </button>
+                                <button mat-stroked-button color="warn" (click)="reviewResponse(finding.id, resp.id, 'rejected'); $event.stopPropagation()">
+                                  <mat-icon>cancel</mat-icon> Reject
+                                </button>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--platinum-navy);">
+                      <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">attach_file</mat-icon>
+                      Evidence Attachments ({{ findingDocuments().get(finding.id)?.length || 0 }})
+                    </h4>
+                    <div style="display: flex; gap: 8px;">
+                      <button mat-stroked-button (click)="uploadDocForFinding(finding.id); $event.stopPropagation()" matTooltip="Upload evidence for this finding">
+                        <mat-icon>cloud_upload</mat-icon> Upload
+                      </button>
+                      <button mat-stroked-button (click)="linkDocToFinding(finding.id); $event.stopPropagation()" matTooltip="Link existing document as evidence">
+                        <mat-icon>link</mat-icon> Link Existing
+                      </button>
+                    </div>
+                  </div>
+                  @if (findingDocuments().get(finding.id)?.length) {
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      @for (doc of findingDocuments().get(finding.id)!; track doc.id) {
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: white; border: 1px solid var(--platinum-border); border-radius: 8px;">
+                          <mat-icon style="color: var(--platinum-text-muted);">insert_drive_file</mat-icon>
+                          <div style="flex: 1;">
+                            <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
+                            <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
+                          </div>
+                          <button mat-icon-button matTooltip="Download" (click)="downloadDoc(doc.id); $event.stopPropagation()">
+                            <mat-icon>download</mat-icon>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div style="text-align: center; padding: 24px; color: var(--platinum-text-muted); font-size: 13px;">No evidence attachments yet.</div>
+                  }
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

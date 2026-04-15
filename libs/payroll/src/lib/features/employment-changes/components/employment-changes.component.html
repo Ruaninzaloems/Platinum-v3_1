@@ -1,0 +1,198 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Employment Change Reasons</h1>
+      <p class="page-subtitle">Manage reasons for employment status changes such as termination, promotion, transfer and appointment</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="14"></app-icon> Add Reason</button>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ reasons.length }}</span>
+      <span class="summary-label">Total Reasons</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ reasons.length - activeCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="14"></app-icon>
+      <input class="search-input" placeholder="Search by reason or change type..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterReasons()">
+    </div>
+    <span class="result-count">{{ filteredReasons.length }} of {{ reasons.length }} reasons</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading employment change reasons...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredReasons.length === 0) {
+        <div class="empty-state"><h3>No reasons found</h3><p>{{ reasons.length === 0 ? 'Click "Add Reason" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th class="col-type">Change Type</th>
+                <th class="col-reason">Reason</th>
+                <th class="col-status">Status</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of pagedReasons; track r.id; let i = $index) {
+                <tr (click)="openDetail(r, i)">
+                  <td class="col-type"><span class="type-pill">{{ r.type_description }}</span></td>
+                  <td class="col-reason"><span class="title-text">{{ r.reason_description }}</span></td>
+                  <td class="col-status"><app-status-badge [status]="r.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(r, i); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(r, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (totalPages > 1) {
+          <div class="pagination">
+            <button class="btn btn-sm" [disabled]="currentPage <= 1" (click)="goToPage(currentPage - 1)"><app-icon name="chevron-left" [size]="12"></app-icon></button>
+            <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button class="btn btn-sm" [disabled]="currentPage >= totalPages" (click)="goToPage(currentPage + 1)"><app-icon name="chevron-right" [size]="12"></app-icon></button>
+          </div>
+        }
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (reason.id) {
+          <div class="detail-meta">
+            <span class="text-muted">ID: {{ reason.id }}</span>
+            <app-status-badge [status]="reason.enabled ? 'Active' : 'Inactive'"></app-status-badge>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (reason.id) {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ reasons.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= reasons.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+      }
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-tabs">
+    <button class="tab" [class.active]="activeTab === 'details'" (click)="switchTab('details')">Reason Details</button>
+    @if (reason.id) {
+      <button class="tab" [class.active]="activeTab === 'history'" (click)="switchTab('history')">History</button>
+    }
+  </div>
+
+  @if (activeTab === 'details') {
+    <div class="detail-card">
+      <div class="section-title">Reason Details</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>EMPLOYMENT CHANGE TYPE <span class="required">*</span></label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="reason.employment_change_type_id">
+              <option [ngValue]="null">— Select Change Type —</option>
+              @for (ct of changeTypes; track ct.id) {
+                <option [ngValue]="ct.id">{{ ct.description }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value">{{ reason.type_description || '—' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>EMPLOYMENT CHANGE REASON <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" [(ngModel)]="reason.reason_description" placeholder="Enter change reason">
+          } @else {
+            <div class="field-value">{{ reason.reason_description || '—' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>ENABLED</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="reason.enabled">
+              </label>
+            </div>
+          } @else {
+            <div class="field-value">
+              <span class="tag" [class]="reason.enabled ? 'tag-yes' : 'tag-no'">{{ reason.enabled ? 'Yes' : 'No' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'history') {
+    <div class="detail-card">
+      <div class="section-title">Change History</div>
+      @if (historyLoading) {
+        <div class="loading">Loading history...</div>
+      } @else if (history.length === 0) {
+        <div class="empty-state"><p>No history records found</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Reason</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of history; track h.id) {
+                <tr>
+                  <td>{{ formatDate(h.changed_at) }}</td>
+                  <td><span class="type-pill" [class.pill-create]="h.change_type === 'CREATE'" [class.pill-update]="h.change_type === 'UPDATE'" [class.pill-delete]="h.change_type === 'DELETE'">{{ h.change_type }}</span></td>
+                  <td>{{ h.snapshot?.reason_description || '—' }}</td>
+                  <td>{{ getChangeTypeLabel(h.snapshot?.employment_change_type_id) }}</td>
+                  <td><app-status-badge [status]="h.snapshot?.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}

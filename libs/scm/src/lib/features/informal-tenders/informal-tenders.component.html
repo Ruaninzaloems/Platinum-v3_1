@@ -1,0 +1,1299 @@
+    <div class="ift-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <div class="nav-tabs">
+        <button class="nav-tab" [class.active]="mainView() === 'dashboard'" (click)="switchView('dashboard')">
+          <mat-icon>dashboard</mat-icon> Dashboard
+        </button>
+        <button class="nav-tab" [class.active]="mainView() === 'list'" (click)="switchView('list')">
+          <mat-icon>list_alt</mat-icon> IFT List
+        </button>
+        <button class="nav-tab" [class.active]="mainView() === 'create'" (click)="switchView('create')">
+          <mat-icon>add_circle</mat-icon> Create
+        </button>
+        <button class="nav-tab" [class.active]="mainView() === 'reports'" (click)="switchView('reports')">
+          <mat-icon>assessment</mat-icon> Reports
+        </button>
+      </div>
+
+      @if (mainView() === 'dashboard') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" matTooltip="Total informal tenders">
+            <mat-icon>folder</mat-icon>
+            <span class="kpi-value">{{summary().total || 0}}</span>
+            <span class="kpi-label">Total IFTs</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Currently published and open for quotes">
+            <mat-icon>campaign</mat-icon>
+            <span class="kpi-value">{{summary().published || 0}}</span>
+            <span class="kpi-label">Open</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Adjudicated and pending award">
+            <mat-icon>gavel</mat-icon>
+            <span class="kpi-value">{{summary().adjudicated || 0}}</span>
+            <span class="kpi-label">Pending Award</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Awarded and completed tenders">
+            <mat-icon>check_circle</mat-icon>
+            <span class="kpi-value">{{summary().awarded || 0}}</span>
+            <span class="kpi-label">Completed</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Total estimated value of all IFTs">
+            <mat-icon>payments</mat-icon>
+            <span class="kpi-value">{{formatCurrency(totalValue())}}</span>
+            <span class="kpi-label">Total Value</span>
+          </div>
+          <div class="kpi-tile" matTooltip="Average turnaround time in days">
+            <mat-icon>schedule</mat-icon>
+            <span class="kpi-value">{{avgTurnaround()}}</span>
+            <span class="kpi-label">Avg. Days</span>
+          </div>
+        </div>
+
+        <div class="pipeline-strip">
+          @for (step of pipelineSteps; track step.key) {
+            <div class="pipe-tile" [class.active]="dashboardFilter === step.key" (click)="filterDashboard(step.key)">
+              <mat-icon>{{step.icon}}</mat-icon>
+              <span class="pipe-count">{{getPipelineCount(step.key)}}</span>
+              <span class="pipe-label">{{step.label}}</span>
+            </div>
+          }
+        </div>
+
+        <div class="detail-cards-row">
+          <div class="detail-card flex-2">
+            <h3><mat-icon>history</mat-icon> Recent IFTs</h3>
+            <div class="tender-table-wrapper">
+              <table class="tender-table">
+                <thead>
+                  <tr>
+                    <th>IFT Number</th>
+                    <th>Description</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                    <th>Closing Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ift of recentIfts(); track ift.id) {
+                    <tr class="tender-row" (click)="viewIft(ift)">
+                      <td class="ref-cell" matTooltip="{{ift.informalTenderNumber}}">{{ift.informalTenderNumber}}</td>
+                      <td class="title-cell" matTooltip="{{ift.description}}">
+                        <span class="tender-title">{{ift.description}}</span>
+                      </td>
+                      <td class="value-cell" matTooltip="{{formatCurrencyFull(ift.estimatedValue?.amount)}}">{{formatCurrency(ift.estimatedValue?.amount)}}</td>
+                      <td><span class="status-badge" [class]="'status-' + ift.status">{{getStatusLabel(ift.status)}}</span></td>
+                      <td matTooltip="{{ift.closingDate}}">{{formatDate(ift.closingDate)}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state"><mat-icon>inbox</mat-icon><span>No recent IFTs</span></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="detail-card flex-1">
+            <h3><mat-icon>account_balance_wallet</mat-icon> Budget Summary</h3>
+            <div class="budget-summary">
+              <div class="budget-row">
+                <span class="budget-label">Draft IFTs</span>
+                <span class="budget-value" matTooltip="Number of draft tenders">{{summary().draft || 0}}</span>
+              </div>
+              <div class="budget-row">
+                <span class="budget-label">Published</span>
+                <span class="budget-value" matTooltip="Published tenders awaiting quotes">{{summary().published || 0}}</span>
+              </div>
+              <div class="budget-row">
+                <span class="budget-label">Adjudicated</span>
+                <span class="budget-value" matTooltip="Adjudicated and ready for award">{{summary().adjudicated || 0}}</span>
+              </div>
+              <div class="budget-row">
+                <span class="budget-label">Awarded/Completed</span>
+                <span class="budget-value" matTooltip="Successfully awarded tenders">{{summary().awarded || 0}}</span>
+              </div>
+              <div class="budget-row">
+                <span class="budget-label">Voided</span>
+                <span class="budget-value" style="color:#c62828" matTooltip="Voided tenders">{{summary().voided || 0}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="grid-column: 1 / -1;">
+          <h3><mat-icon>psychology</mat-icon> AI Informal Tender Insights
+            <span style="font-size: 11px; color: #94a3b8; margin-left: 8px; font-weight: 400;">
+              {{iftAiInsights().length > 0 && iftAiInsights()[0].aiGenerated ? 'Powered by AI' : 'Rule-based analysis'}}
+            </span>
+          </h3>
+          @if (iftAiInsights().length > 0) {
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              @for (insight of iftAiInsights(); track insight.id) {
+                <div style="display: flex; gap: 12px; padding: 14px; background: #f8fafc; border-radius: 10px; border-left: 3px solid {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}}; cursor: pointer;" [matTooltip]="insight.recommendation || ''">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: {{insight.severity === 'critical' ? '#fef2f2' : insight.severity === 'warning' ? '#fffbeb' : '#eff6ff'}}; color: {{insight.severity === 'critical' ? '#dc2626' : insight.severity === 'warning' ? '#f59e0b' : '#3b82f6'}};">
+                    <mat-icon>{{insight.icon || 'format_list_numbered'}}</mat-icon>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">{{insight.title}}</div>
+                    <div style="font-size: 12px; color: #64748b; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{insight.message}}</div>
+                    @if (insight.legislationRef) {
+                      <div style="display: inline-flex; align-items: center; gap: 4px; background: #f3e8ff; color: #7c3aed; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">
+                        <mat-icon style="font-size: 12px; width: 12px; height: 12px;">menu_book</mat-icon>
+                        {{insight.legislationRef}}
+                      </div>
+                    }
+                    @if (insight.recommendation) {
+                      <div style="font-size: 11px; color: #0d9488; background: #f0fdfa; padding: 4px 8px; border-radius: 4px; margin-top: 6px; line-height: 1.4;">{{insight.recommendation}}</div>
+                    }
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                      @if (insight.financialImpact) {
+                        <span style="font-size: 11px; color: #059669; font-weight: 500;">{{insight.financialImpact}}</span>
+                      } @else {
+                        <span></span>
+                      }
+                      @if (insight.confidence) {
+                        <span style="font-size: 10px; color: #94a3b8; font-style: italic;">{{(insight.confidence * 100).toFixed(0)}}% confidence</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div style="text-align: center; padding: 20px; color: #94a3b8;">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p style="margin-top: 8px;">Loading AI insights...</p>
+            </div>
+          }
+        </div>
+      }
+
+      @if (mainView() === 'list') {
+        <div class="pipeline-strip">
+          @for (step of pipelineSteps; track step.key) {
+            <div class="pipe-tile" [class.active]="filterStatus === step.key" (click)="filterByStatus(step.key)">
+              <mat-icon>{{step.icon}}</mat-icon>
+              <span class="pipe-count">{{getPipelineCount(step.key)}}</span>
+              <span class="pipe-label">{{step.label}}</span>
+            </div>
+          }
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search IFTs..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
+              <mat-option value="">All Statuses</mat-option>
+              @for (s of statuses; track s) {
+                <mat-option [value]="s">{{getStatusLabel(s)}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="applyFilters()">
+              <mat-option value="">All Departments</mat-option>
+              @for (dept of departments; track dept) {
+                <mat-option [value]="dept">{{dept}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="applyFilters()" matTooltip="Filter from closing date">
+            <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterFromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="applyFilters()" matTooltip="Filter to closing date">
+            <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+            <mat-datepicker #filterToPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Min Value</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMin" (change)="applyFilters()" placeholder="0" matTooltip="Minimum estimated value">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Max Value</mat-label>
+            <input matInput type="number" [(ngModel)]="filterValueMax" (change)="applyFilters()" placeholder="0" matTooltip="Maximum estimated value">
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()" matTooltip="Clear all filters">
+            <mat-icon>filter_alt_off</mat-icon> Clear All
+          </button>
+        </div>
+
+        <div class="tender-table-wrapper">
+          <table class="tender-table">
+            <thead>
+              <tr>
+                <th>IFT Number</th>
+                <th>Title</th>
+                <th>Department</th>
+                <th>Value</th>
+                <th>Status</th>
+                <th>Closing Date</th>
+                <th>Vendors</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ift of ifts(); track ift.id) {
+                <tr class="tender-row" (click)="viewIft(ift)">
+                  <td class="ref-cell" matTooltip="{{ift.informalTenderNumber}}">{{ift.informalTenderNumber}}</td>
+                  <td class="title-cell" matTooltip="{{ift.description}}">
+                    <span class="tender-title">{{ift.description}}</span>
+                    @if (ift.serviceContract) {
+                      <span class="badge badge-info">Service</span>
+                    }
+                  </td>
+                  <td matTooltip="{{ift.vendorProvince}}">{{ift.vendorProvince || '—'}}</td>
+                  <td class="value-cell" matTooltip="{{formatCurrencyFull(ift.estimatedValue?.amount)}}">{{formatCurrency(ift.estimatedValue?.amount)}}</td>
+                  <td><span class="status-badge" [class]="'status-' + ift.status">{{getStatusLabel(ift.status)}}</span></td>
+                  <td matTooltip="{{ift.closingDate}} {{ift.closingTime}}">
+                    {{formatDate(ift.closingDate)}}
+                    @if (getDaysRemaining(ift) !== null && getDaysRemaining(ift)! >= 0 && getDaysRemaining(ift)! <= 5) {
+                      <span class="badge badge-warning">{{getDaysRemaining(ift)}}d left</span>
+                    }
+                  </td>
+                  <td matTooltip="{{ift.rotationalVendorsInvited?.length || 0}} invited, {{ift.vendorResponses?.length || 0}} responded">
+                    <span class="bid-count">{{ift.rotationalVendorsInvited?.length || 0}}</span>
+                  </td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="actionMenu" matTooltip="Actions">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #actionMenu="matMenu">
+                      <button mat-menu-item (click)="viewIft(ift)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (ift.status === 'draft' || ift.status === 'saved') {
+                        <button mat-menu-item (click)="publishIft(ift)"><mat-icon>campaign</mat-icon> Publish</button>
+                      }
+                      @if (ift.status === 'published') {
+                        <button mat-menu-item (click)="closeIft(ift)"><mat-icon>lock</mat-icon> Close</button>
+                      }
+                      @if (ift.status === 'closed' || ift.status === 'published') {
+                        <button mat-menu-item (click)="viewIft(ift); detailTab.set('adjudication')"><mat-icon>gavel</mat-icon> Adjudicate</button>
+                      }
+                      @if (ift.status === 'adjudicated') {
+                        <button mat-menu-item (click)="awardIft(ift)"><mat-icon>emoji_events</mat-icon> Award</button>
+                      }
+                      @if (ift.status === 'awarded') {
+                        <button mat-menu-item (click)="approveIft(ift)"><mat-icon>verified</mat-icon> Approve</button>
+                      }
+                      @if (!['voided','completed','approved'].includes(ift.status)) {
+                        <button mat-menu-item (click)="voidIft(ift)"><mat-icon>cancel</mat-icon> Void</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No informal tenders found</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="page-info">Showing {{pageStart()}} - {{pageEnd()}} of {{totalIfts()}} IFTs</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)" matTooltip="Previous page">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">Page {{currentPage()}} of {{totalPages()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)" matTooltip="Next page">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (mainView() === 'create') {
+        <div class="create-form">
+          <div class="form-header">
+            <button mat-icon-button (click)="switchView('list')"><mat-icon>arrow_back</mat-icon></button>
+            <h2>Create Informal Tender</h2>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>description</mat-icon> IFT Details</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Description</mat-label>
+                <textarea matInput [(ngModel)]="iftForm.description" rows="3" placeholder="Enter IFT description" matTooltip="Description of goods/services required"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Requisition Number</mat-label>
+                <input matInput [(ngModel)]="iftForm.requisitionNumber" placeholder="REQ-2025-XXXX" matTooltip="Linked requisition reference">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Requisition ID</mat-label>
+                <input matInput [(ngModel)]="iftForm.requisitionId" placeholder="REQ-ID" matTooltip="System requisition ID">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Estimated Value (ZAR)</mat-label>
+                <input matInput type="number" [(ngModel)]="iftForm.estimatedValue" placeholder="0" matTooltip="R30,000 - R200,000 for informal tenders">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor Province</mat-label>
+                <mat-select [(ngModel)]="iftForm.vendorProvince" matTooltip="Province for vendor selection">
+                  <mat-option value="">Any Province</mat-option>
+                  @for (prov of provinces; track prov) {
+                    <mat-option [value]="prov">{{prov}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Vendor City</mat-label>
+                <input matInput [(ngModel)]="iftForm.vendorCity" placeholder="City" matTooltip="City for vendor selection">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Opening Date</mat-label>
+                <input matInput [matDatepicker]="openingPicker" [(ngModel)]="iftForm.openingDate" matTooltip="IFT opening date">
+                <mat-datepicker-toggle matIconSuffix [for]="openingPicker"></mat-datepicker-toggle>
+                <mat-datepicker #openingPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Closing Date</mat-label>
+                <input matInput [matDatepicker]="closingPicker" [(ngModel)]="iftForm.closingDate" matTooltip="Closing date for vendor responses">
+                <mat-datepicker-toggle matIconSuffix [for]="closingPicker"></mat-datepicker-toggle>
+                <mat-datepicker #closingPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Closing Time</mat-label>
+                <input matInput type="time" [(ngModel)]="iftForm.closingTime" matTooltip="Closing time">
+              </mat-form-field>
+
+              <div class="form-check-field">
+                <label matTooltip="Is this a service contract?">
+                  <input type="checkbox" [(ngModel)]="iftForm.serviceContract"> Service Contract
+                </label>
+              </div>
+
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="iftForm.comments" rows="2" placeholder="Additional comments" matTooltip="Any additional notes"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list</mat-icon> Line Items</h3>
+            @if (lineItems().length) {
+              <div class="tender-table-wrapper" style="margin-bottom:12px">
+                <table class="scoring-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Description</th>
+                      <th>Quantity</th>
+                      <th>Unit</th>
+                      <th>Est. Unit Price</th>
+                      <th>Total</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of lineItems(); track item.id; let i = $index) {
+                      <tr>
+                        <td>{{i + 1}}</td>
+                        <td matTooltip="{{item.description}}">{{item.description}}</td>
+                        <td matTooltip="{{item.quantity}}">{{item.quantity}}</td>
+                        <td matTooltip="{{item.unit}}">{{item.unit}}</td>
+                        <td class="value-cell" matTooltip="{{formatCurrencyFull(item.unitPrice)}}">{{formatCurrencyFull(item.unitPrice)}}</td>
+                        <td class="value-cell" matTooltip="{{formatCurrencyFull(item.quantity * item.unitPrice)}}">{{formatCurrencyFull(item.quantity * item.unitPrice)}}</td>
+                        <td>
+                          <button mat-icon-button color="warn" (click)="removeLineItem(item.id)" matTooltip="Remove line item">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                    <tr class="total-row">
+                      <td colspan="5" style="text-align:right"><strong>Total</strong></td>
+                      <td class="value-cell"><strong matTooltip="{{formatCurrencyFull(getLineItemsTotal())}}">{{formatCurrencyFull(getLineItemsTotal())}}</strong></td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <div class="boq-form-card">
+              <div class="form-grid">
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Item Description</mat-label>
+                  <input matInput [(ngModel)]="lineItemForm.description" placeholder="Line item description">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Quantity</mat-label>
+                  <input matInput type="number" [(ngModel)]="lineItemForm.quantity" placeholder="0">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Unit</mat-label>
+                  <mat-select [(ngModel)]="lineItemForm.unit">
+                    <mat-option value="each">Each</mat-option>
+                    <mat-option value="kg">Kg</mat-option>
+                    <mat-option value="litre">Litre</mat-option>
+                    <mat-option value="meter">Meter</mat-option>
+                    <mat-option value="sqm">Sqm</mat-option>
+                    <mat-option value="hour">Hour</mat-option>
+                    <mat-option value="day">Day</mat-option>
+                    <mat-option value="lot">Lot</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Est. Unit Price (ZAR)</mat-label>
+                  <input matInput type="number" [(ngModel)]="lineItemForm.unitPrice" placeholder="0.00">
+                </mat-form-field>
+              </div>
+              <div class="boq-form-actions">
+                <button mat-flat-button color="primary" (click)="addLineItem()" matTooltip="Add line item">
+                  <mat-icon>add</mat-icon> Add Line Item
+                </button>
+              </div>
+            </div>
+
+            @if (iftForm.estimatedValue) {
+              <div class="budget-indicator" [class.over-budget]="getLineItemsTotal() > iftForm.estimatedValue" [class.within-budget]="getLineItemsTotal() <= iftForm.estimatedValue">
+                <mat-icon>{{getLineItemsTotal() <= iftForm.estimatedValue ? 'check_circle' : 'warning'}}</mat-icon>
+                <span matTooltip="Line items total vs estimated value">
+                  Line items: {{formatCurrencyFull(getLineItemsTotal())}} / Budget: {{formatCurrencyFull(iftForm.estimatedValue)}}
+                  ({{getLineItemsTotal() <= iftForm.estimatedValue ? 'Within Budget' : 'Over Budget'}})
+                </span>
+              </div>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="switchView('list')" matTooltip="Cancel and go back">Cancel</button>
+            <button mat-stroked-button color="primary" (click)="saveIftDraft()" [disabled]="saving()" matTooltip="Save as draft">
+              <mat-icon>save</mat-icon> Save as Draft
+            </button>
+            <button mat-flat-button color="primary" (click)="saveIftDraft()" [disabled]="saving()" matTooltip="Submit informal tender">
+              <mat-icon>send</mat-icon> Submit
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (mainView() === 'detail' && selectedIft()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="switchView('list')" matTooltip="Back to list"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedIft()!.informalTenderNumber}} — {{selectedIft()!.description}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedIft()!.status">{{getStatusLabel(selectedIft()!.status)}}</span>
+              @if (selectedIft()!.serviceContract) {
+                <span class="badge badge-info">Service Contract</span>
+              }
+              <span class="dept-tag" matTooltip="Province">{{selectedIft()!.vendorProvince || 'Any Province'}}</span>
+            </div>
+          </div>
+          <div class="detail-value">
+            <span class="value-label">Estimated Value</span>
+            <span class="value-amount" matTooltip="{{formatCurrencyFull(selectedIft()!.estimatedValue?.amount)}}">{{formatCurrencyFull(selectedIft()!.estimatedValue?.amount)}}</span>
+          </div>
+          <div class="detail-actions">
+            @if (selectedIft()!.status === 'draft' || selectedIft()!.status === 'saved') {
+              <button mat-flat-button color="primary" (click)="publishIft(selectedIft()!)" [disabled]="saving()" matTooltip="Publish to vendors">
+                <mat-icon>campaign</mat-icon> Publish
+              </button>
+            }
+            @if (selectedIft()!.status === 'published') {
+              <button mat-flat-button color="primary" (click)="closeIft(selectedIft()!)" [disabled]="saving()" matTooltip="Close for responses">
+                <mat-icon>lock</mat-icon> Close
+              </button>
+            }
+            @if (selectedIft()!.status === 'adjudicated') {
+              <button mat-flat-button color="primary" (click)="awardIft(selectedIft()!)" [disabled]="saving()" matTooltip="Award to recommended vendor">
+                <mat-icon>emoji_events</mat-icon> Award
+              </button>
+            }
+            @if (selectedIft()!.status === 'awarded') {
+              <button mat-flat-button style="background:#1b5e20;color:white" (click)="approveIft(selectedIft()!)" [disabled]="saving()" matTooltip="Approve award">
+                <mat-icon>verified</mat-icon> Approve
+              </button>
+            }
+            @if (!['voided','completed','approved'].includes(selectedIft()!.status)) {
+              <button mat-stroked-button color="warn" (click)="voidIft(selectedIft()!)" [disabled]="saving()" matTooltip="Void this tender">
+                <mat-icon>cancel</mat-icon> Void
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="workflow-stepper">
+          @for (step of pipelineSteps; track step.key; let last = $last) {
+            <div class="step" [class.active]="isStepActive(step.key)" [class.completed]="isStepCompleted(step.key)" [class.current]="isStepCurrent(step.key)" (click)="selectDetailTabFromStep(step.key)">
+              <div class="step-indicator">
+                @if (isStepCompleted(step.key)) {
+                  <mat-icon>check_circle</mat-icon>
+                } @else if (isStepCurrent(step.key)) {
+                  <mat-icon>radio_button_checked</mat-icon>
+                } @else {
+                  <mat-icon>radio_button_unchecked</mat-icon>
+                }
+              </div>
+              <span class="step-label">{{step.label}}</span>
+            </div>
+            @if (!last) {
+              <div class="step-connector" [class.completed]="isStepCompleted(step.key)"></div>
+            }
+          }
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn" [class.active]="detailTab() === 'information'" (click)="detailTab.set('information')">Information</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'vendors'" (click)="detailTab.set('vendors')">Vendors ({{selectedIft()!.rotationalVendorsInvited?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'responses'" (click)="detailTab.set('responses')">Responses ({{selectedIft()!.vendorResponses?.length || 0}})</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'adjudication'" (click)="detailTab.set('adjudication')">Adjudication</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'documents'" (click)="detailTab.set('documents')">Documents</button>
+          <button class="tab-btn" [class.active]="detailTab() === 'history'" (click)="detailTab.set('history')">History</button>
+        </div>
+
+        @if (detailTab() === 'information') {
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>info</mat-icon> IFT Details</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>Description</label>
+                    <span class="desc-text" matTooltip="{{selectedIft()!.description}}">{{selectedIft()!.description}}</span>
+                  </div>
+                </div>
+                <div class="detail-grid" style="margin-top:16px">
+                  <div class="detail-field">
+                    <label>IFT Number</label>
+                    <span matTooltip="{{selectedIft()!.informalTenderNumber}}">{{selectedIft()!.informalTenderNumber}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Requisition</label>
+                    <span matTooltip="{{selectedIft()!.requisitionNumber}}">{{selectedIft()!.requisitionNumber}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Estimated Value</label>
+                    <span class="value-cell" matTooltip="{{formatCurrencyFull(selectedIft()!.estimatedValue?.amount)}}">{{formatCurrencyFull(selectedIft()!.estimatedValue?.amount)}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Province</label>
+                    <span matTooltip="{{selectedIft()!.vendorProvince}}">{{selectedIft()!.vendorProvince || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>City</label>
+                    <span matTooltip="{{selectedIft()!.vendorCity}}">{{selectedIft()!.vendorCity || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Service Contract</label>
+                    <span matTooltip="Service contract status">{{selectedIft()!.serviceContract ? 'Yes' : 'No'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Contact Person</label>
+                    <span matTooltip="{{selectedIft()!.contactPerson}}">{{selectedIft()!.contactPerson}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Assigned Buyer</label>
+                    <span matTooltip="{{selectedIft()!.assignedBuyer?.name || 'Not assigned'}}">{{selectedIft()!.assignedBuyer?.name || '—'}}</span>
+                  </div>
+                </div>
+                @if (selectedIft()!.comments) {
+                  <div style="margin-top:16px">
+                    <label style="font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:0.5px">Comments</label>
+                    <p class="spec-text" matTooltip="{{selectedIft()!.comments}}">{{selectedIft()!.comments}}</p>
+                  </div>
+                }
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>calendar_today</mat-icon> Key Dates</h3>
+                <div class="dates-list">
+                  <div class="date-item">
+                    <span class="date-label">Created</span>
+                    <span class="date-value" matTooltip="{{selectedIft()!.createdDate}}">{{formatDate(selectedIft()!.createdDate)}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">Opening</span>
+                    <span class="date-value" matTooltip="{{selectedIft()!.openingDate}}">{{formatDate(selectedIft()!.openingDate)}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">Closing</span>
+                    <span class="date-value" matTooltip="{{selectedIft()!.closingDate}} at {{selectedIft()!.closingTime}}">{{formatDate(selectedIft()!.closingDate)}} {{selectedIft()!.closingTime}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">Last Modified</span>
+                    <span class="date-value" matTooltip="{{selectedIft()!.lastModified}}">{{formatDate(selectedIft()!.lastModified)}}</span>
+                  </div>
+                  @if (selectedIft()!.adjudication) {
+                    <div class="date-item">
+                      <span class="date-label">Adjudicated</span>
+                      <span class="date-value" matTooltip="{{selectedIft()!.adjudication.adjudicatedDate}}">{{formatDate(selectedIft()!.adjudication.adjudicatedDate)}}</span>
+                    </div>
+                  }
+                  @if (selectedIft()!.award) {
+                    <div class="date-item">
+                      <span class="date-label">Awarded</span>
+                      <span class="date-value" matTooltip="{{selectedIft()!.award.awardedDate}}">{{formatDate(selectedIft()!.award.awardedDate)}}</span>
+                    </div>
+                  }
+                </div>
+
+                <h3 style="margin-top:20px"><mat-icon>account_balance_wallet</mat-icon> Budget Status</h3>
+                <div class="dates-list">
+                  <div class="date-item">
+                    <span class="date-label">Available</span>
+                    <span class="date-value" matTooltip="Budget available">{{formatCurrencyFull(selectedIft()!.budgetInfo?.budgetAvailable)}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">Reserved</span>
+                    <span class="date-value" matTooltip="Budget reserved">{{formatCurrencyFull(selectedIft()!.budgetInfo?.budgetReserved)}}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">Committed</span>
+                    <span class="date-value" matTooltip="Budget committed">{{formatCurrencyFull(selectedIft()!.budgetInfo?.budgetCommitted)}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            @if (selectedIft()!.award) {
+              <div class="detail-card">
+                <h3><mat-icon>emoji_events</mat-icon> Award Details</h3>
+                <div class="award-highlight">
+                  <div class="award-winner">
+                    <span class="award-label">Awarded To</span>
+                    <span class="award-name" matTooltip="{{selectedIft()!.award.awardedToName}}">{{selectedIft()!.award.awardedToName}}</span>
+                  </div>
+                  <div class="award-amount-section">
+                    <span class="award-label">Award Amount (Incl. VAT)</span>
+                    <span class="award-amount" matTooltip="{{formatCurrencyFull(selectedIft()!.award.awardAmountIncVat?.amount)}}">{{formatCurrencyFull(selectedIft()!.award.awardAmountIncVat?.amount)}}</span>
+                  </div>
+                  <div class="award-date-section">
+                    <span class="award-label">PO Number</span>
+                    <span class="award-date-val" matTooltip="{{selectedIft()!.award.poNumber}}">{{selectedIft()!.award.poNumber || '—'}}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'vendors') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>people</mat-icon> Vendor Selection</h3>
+              @if (selectedIft()!.status === 'draft' || selectedIft()!.status === 'saved') {
+                <div class="vendor-actions-bar">
+                  <button mat-flat-button color="primary" (click)="autoRotationalSelect()" [disabled]="saving()" matTooltip="Auto-select vendors from rotational database (minimum {{config()?.minimumQuotes || 3}})">
+                    <mat-icon>autorenew</mat-icon> Auto-Rotational Selection ({{config()?.minimumQuotes || 3}} vendors)
+                  </button>
+                  <div class="manual-vendor-search">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Search Vendor</mat-label>
+                      <input matInput [(ngModel)]="vendorSearchQuery" placeholder="Vendor name or ID" matTooltip="Search for vendors to add manually">
+                    </mat-form-field>
+                    <button mat-stroked-button (click)="searchVendors()" matTooltip="Search vendors">
+                      <mat-icon>search</mat-icon> Search
+                    </button>
+                  </div>
+                </div>
+
+                @if (vendorSearchResults().length) {
+                  <div class="tender-table-wrapper" style="margin-bottom:16px">
+                    <table class="scoring-table">
+                      <thead>
+                        <tr>
+                          <th>Vendor</th>
+                          <th>Status</th>
+                          <th>Province</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (vendor of vendorSearchResults(); track vendor.id) {
+                          <tr>
+                            <td matTooltip="{{vendor.name}}"><strong>{{vendor.name}}</strong></td>
+                            <td><span class="status-badge status-published" matTooltip="{{vendor.status}}">{{vendor.status}}</span></td>
+                            <td matTooltip="{{vendor.physicalAddress?.province || '—'}}">{{vendor.physicalAddress?.province || '—'}}</td>
+                            <td>
+                              <button mat-stroked-button color="primary" (click)="addVendorManually(vendor)" matTooltip="Add this vendor">
+                                <mat-icon>person_add</mat-icon> Add
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              }
+
+              <div class="compliance-indicator" [class.compliant]="(selectedIft()!.rotationalVendorsInvited?.length || 0) >= (config()?.minimumQuotes || 3)" [class.non-compliant]="(selectedIft()!.rotationalVendorsInvited?.length || 0) < (config()?.minimumQuotes || 3)">
+                <mat-icon>{{(selectedIft()!.rotationalVendorsInvited?.length || 0) >= (config()?.minimumQuotes || 3) ? 'check_circle' : 'warning'}}</mat-icon>
+                <span matTooltip="3-quote compliance status">
+                  {{selectedIft()!.rotationalVendorsInvited?.length || 0}} / {{config()?.minimumQuotes || 3}} vendors invited
+                  ({{(selectedIft()!.rotationalVendorsInvited?.length || 0) >= (config()?.minimumQuotes || 3) ? '3-Quote Compliant' : 'Below Minimum'}})
+                </span>
+              </div>
+
+              @if ((selectedIft()!.rotationalVendorsInvited?.length || 0) < (config()?.minimumQuotes || 3)) {
+                <div class="less-than-three-section">
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>Reason for fewer than 3 quotes</mat-label>
+                    <textarea matInput [(ngModel)]="lessThanThreeReason" rows="2" placeholder="Provide reason..." matTooltip="Required when fewer than 3 vendors are invited"></textarea>
+                  </mat-form-field>
+                </div>
+              }
+
+              @if (selectedIft()!.rotationalVendorsInvited?.length) {
+                <div class="tender-table-wrapper" style="margin-top:16px">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Vendor</th>
+                        <th>Invited Date</th>
+                        <th>Notification</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (vendor of selectedIft()!.rotationalVendorsInvited; track vendor.supplierId) {
+                        <tr>
+                          <td matTooltip="{{vendor.supplierName}}"><strong>{{vendor.supplierName}}</strong></td>
+                          <td matTooltip="{{vendor.invitedDate}}">{{formatDate(vendor.invitedDate)}}</td>
+                          <td>
+                            @if (vendor.notificationSent) {
+                              <span class="badge badge-success" matTooltip="Notification sent">Sent</span>
+                            } @else {
+                              <span class="badge" matTooltip="Notification pending">Pending</span>
+                            }
+                          </td>
+                          <td matTooltip="{{vendor.notificationMethod || 'N/A'}}">{{vendor.notificationMethod || '—'}}</td>
+                          <td>
+                            @if (getVendorResponseStatus(vendor.supplierId) === 'responded') {
+                              <span class="badge badge-success" matTooltip="Responded">Responded</span>
+                            } @else if (getVendorResponseStatus(vendor.supplierId) === 'no_response') {
+                              <span class="badge badge-warning" matTooltip="No response received">No Response</span>
+                            } @else {
+                              <span class="badge" matTooltip="Awaiting response">Awaiting</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'responses') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>receipt_long</mat-icon> Vendor Response Capture</h3>
+              @if (['published','closed'].includes(selectedIft()!.status)) {
+                <div class="boq-form-card">
+                  <div class="form-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Select Vendor</mat-label>
+                      <mat-select [(ngModel)]="responseForm.supplierId" matTooltip="Select responding vendor">
+                        @for (vendor of selectedIft()!.rotationalVendorsInvited; track vendor.supplierId) {
+                          <mat-option [value]="vendor.supplierId">{{vendor.supplierName}}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Cost Per Unit (ZAR)</mat-label>
+                      <input matInput type="number" [(ngModel)]="responseForm.costPerUnit" placeholder="0.00" matTooltip="Cost per unit">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Total Cost (ZAR)</mat-label>
+                      <input matInput type="number" [(ngModel)]="responseForm.totalCost" placeholder="0.00" matTooltip="Total cost excluding VAT">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Tax Amount (ZAR)</mat-label>
+                      <input matInput type="number" [(ngModel)]="responseForm.taxAmount" placeholder="0.00" matTooltip="VAT amount">
+                    </mat-form-field>
+                    <div class="form-check-field">
+                      <label matTooltip="Is this response compliant?">
+                        <input type="checkbox" [(ngModel)]="responseForm.compliant"> Compliant
+                      </label>
+                    </div>
+                    @if (!responseForm.compliant) {
+                      <mat-form-field appearance="outline">
+                        <mat-label>Non-Compliant Reason</mat-label>
+                        <input matInput [(ngModel)]="responseForm.nonCompliantReason" placeholder="Reason" matTooltip="Reason for non-compliance">
+                      </mat-form-field>
+                    }
+                  </div>
+                  <div class="boq-form-actions">
+                    <button mat-flat-button color="primary" (click)="recordVendorResponse()" [disabled]="saving() || !responseForm.supplierId" matTooltip="Record vendor response">
+                      <mat-icon>save</mat-icon> Record Response
+                    </button>
+                    <button mat-stroked-button color="warn" (click)="markNoResponse()" [disabled]="saving() || !responseForm.supplierId" matTooltip="Mark as no response">
+                      <mat-icon>block</mat-icon> Mark No Response
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>table_chart</mat-icon> Responses</h3>
+              @if (selectedIft()!.vendorResponses?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Vendor</th>
+                        <th>Total Quote</th>
+                        <th>Tax</th>
+                        <th>Total Incl. VAT</th>
+                        <th>Status</th>
+                        <th>Compliant</th>
+                        <th>Response Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (resp of selectedIft()!.vendorResponses; track resp.supplierId) {
+                        <tr [class.non-responsive-row]="!resp.compliant || resp.responseStatus === 'no_response'">
+                          <td matTooltip="{{resp.supplierName}}"><strong>{{resp.supplierName}}</strong></td>
+                          <td class="value-cell" matTooltip="{{formatCurrencyFull(resp.totalCost)}}">{{resp.totalCost != null ? formatCurrencyFull(resp.totalCost) : '—'}}</td>
+                          <td class="value-cell" matTooltip="{{formatCurrencyFull(resp.taxAmount)}}">{{resp.taxAmount != null ? formatCurrencyFull(resp.taxAmount) : '—'}}</td>
+                          <td class="value-cell" matTooltip="{{formatCurrencyFull(resp.totalIncVat)}}">{{resp.totalIncVat != null ? formatCurrencyFull(resp.totalIncVat) : '—'}}</td>
+                          <td>
+                            <span class="status-badge" [class]="resp.responseStatus === 'responded' ? 'status-published' : 'status-cancelled'" matTooltip="{{resp.responseStatus}}">
+                              {{resp.responseStatus === 'responded' ? 'Responded' : resp.responseStatus === 'no_response' ? 'No Response' : 'Declined'}}
+                            </span>
+                          </td>
+                          <td>
+                            @if (resp.compliant) {
+                              <span class="badge badge-success" matTooltip="Compliant">Yes</span>
+                            } @else {
+                              <span class="badge badge-danger" matTooltip="{{resp.nonCompliantReason}}">No</span>
+                            }
+                          </td>
+                          <td matTooltip="{{resp.responseDate}}">{{resp.responseDate ? formatDate(resp.responseDate) : '—'}}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="empty-text">No vendor responses recorded yet.</p>
+              }
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'adjudication') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>compare_arrows</mat-icon> Adjudication Matrix</h3>
+              @if (selectedIft()!.vendorResponses?.length) {
+                <div class="tender-table-wrapper">
+                  <table class="scoring-table">
+                    <thead>
+                      <tr>
+                        <th>Vendor</th>
+                        <th>Total Cost</th>
+                        <th>Tax</th>
+                        <th>Total Incl. VAT</th>
+                        <th>Compliant</th>
+                        <th>Status</th>
+                        <th>Recommended</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (resp of selectedIft()!.vendorResponses; track resp.supplierId) {
+                        <tr [class.rank-1]="isLowestCompliantBid(resp)" [class.non-responsive-row]="!resp.compliant || resp.responseStatus !== 'responded'">
+                          <td matTooltip="{{resp.supplierName}}"><strong>{{resp.supplierName}}</strong></td>
+                          <td class="value-cell" [style.color]="isLowestCompliantBid(resp) ? '#2e7d32' : '#1e293b'" [style.fontWeight]="isLowestCompliantBid(resp) ? '700' : '400'" matTooltip="{{formatCurrencyFull(resp.totalCost)}}">
+                            {{resp.totalCost != null ? formatCurrencyFull(resp.totalCost) : '—'}}
+                            @if (isLowestCompliantBid(resp)) {
+                              <mat-icon class="recommended-icon" matTooltip="Lowest compliant bid">arrow_downward</mat-icon>
+                            }
+                          </td>
+                          <td class="value-cell" matTooltip="{{formatCurrencyFull(resp.taxAmount)}}">{{resp.taxAmount != null ? formatCurrencyFull(resp.taxAmount) : '—'}}</td>
+                          <td class="value-cell" matTooltip="{{formatCurrencyFull(resp.totalIncVat)}}">{{resp.totalIncVat != null ? formatCurrencyFull(resp.totalIncVat) : '—'}}</td>
+                          <td>
+                            @if (resp.compliant) {
+                              <span class="badge badge-success" matTooltip="Compliant">Yes</span>
+                            } @else {
+                              <span class="badge badge-danger" matTooltip="{{resp.nonCompliantReason}}">No</span>
+                            }
+                          </td>
+                          <td matTooltip="{{resp.responseStatus}}">
+                            <span class="status-badge" [class]="resp.responseStatus === 'responded' ? 'status-published' : 'status-cancelled'">
+                              {{resp.responseStatus === 'responded' ? 'Responded' : 'No Response'}}
+                            </span>
+                          </td>
+                          <td>
+                            @if (adjudicationForm.recommendedVendor === resp.supplierId) {
+                              <mat-icon style="color:#2e7d32" matTooltip="Selected as recommended">check_circle</mat-icon>
+                            }
+                            @if (resp.compliant && resp.responseStatus === 'responded') {
+                              <button mat-icon-button (click)="adjudicationForm.recommendedVendor = resp.supplierId" matTooltip="Select as recommended vendor">
+                                <mat-icon>how_to_vote</mat-icon>
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                @for (vendor of getNoResponseVendors(); track vendor.supplierId) {
+                  <div class="no-response-vendor" matTooltip="Did not respond">
+                    <mat-icon style="color:#ef6c00">warning</mat-icon>
+                    <span>{{vendor.supplierName}} — No response received</span>
+                  </div>
+                }
+              } @else {
+                <p class="empty-text">No vendor responses to adjudicate.</p>
+              }
+            </div>
+
+            @if (selectedIft()!.adjudication) {
+              <div class="detail-card">
+                <h3><mat-icon>verified</mat-icon> Adjudication Result</h3>
+                <div class="award-highlight">
+                  <div class="award-winner">
+                    <span class="award-label">Recommended Vendor</span>
+                    <span class="award-name" matTooltip="{{selectedIft()!.adjudication.recommendedVendorName}}">{{selectedIft()!.adjudication.recommendedVendorName}}</span>
+                  </div>
+                  <div class="award-amount-section">
+                    <span class="award-label">Adjudicated By</span>
+                    <span class="award-date-val" matTooltip="{{selectedIft()!.adjudication.adjudicatedByName}}">{{selectedIft()!.adjudication.adjudicatedByName}}</span>
+                  </div>
+                  <div class="award-date-section">
+                    <span class="award-label">Date</span>
+                    <span class="award-date-val" matTooltip="{{selectedIft()!.adjudication.adjudicatedDate}}">{{formatDate(selectedIft()!.adjudication.adjudicatedDate)}}</span>
+                  </div>
+                </div>
+                @if (selectedIft()!.adjudication.adjudicationNotes) {
+                  <div style="margin-top:12px">
+                    <label style="font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase">Notes</label>
+                    <p class="spec-text" matTooltip="{{selectedIft()!.adjudication.adjudicationNotes}}">{{selectedIft()!.adjudication.adjudicationNotes}}</p>
+                  </div>
+                }
+                @if (selectedIft()!.adjudication.reasonForNotReceivingThreeQuotes) {
+                  <div style="margin-top:8px">
+                    <label style="font-size:11px;font-weight:500;color:#ef6c00;text-transform:uppercase">Reason for fewer than 3 quotes</label>
+                    <p class="spec-text" matTooltip="{{selectedIft()!.adjudication.reasonForNotReceivingThreeQuotes}}">{{selectedIft()!.adjudication.reasonForNotReceivingThreeQuotes}}</p>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (!selectedIft()!.adjudication && selectedIft()!.vendorResponses?.length) {
+              <div class="detail-card committee-actions-card">
+                <h3><mat-icon>gavel</mat-icon> Perform Adjudication</h3>
+
+                <div class="budget-indicator" [class.within-budget]="getLowestCompliantBidAmount() <= (selectedIft()!.budgetInfo?.budgetAvailable || 0)" [class.over-budget]="getLowestCompliantBidAmount() > (selectedIft()!.budgetInfo?.budgetAvailable || 0)">
+                  <mat-icon>{{getLowestCompliantBidAmount() <= (selectedIft()!.budgetInfo?.budgetAvailable || 0) ? 'check_circle' : 'warning'}}</mat-icon>
+                  <span matTooltip="Budget check result">
+                    Lowest bid: {{formatCurrencyFull(getLowestCompliantBidAmount())}} / Budget: {{formatCurrencyFull(selectedIft()!.budgetInfo?.budgetAvailable || 0)}}
+                    ({{getLowestCompliantBidAmount() <= (selectedIft()!.budgetInfo?.budgetAvailable || 0) ? 'Within Budget' : 'Over Budget'}})
+                  </span>
+                </div>
+
+                <div class="form-grid" style="margin-top:12px">
+                  <mat-form-field appearance="outline" class="form-field-full">
+                    <mat-label>Adjudication Notes</mat-label>
+                    <textarea matInput [(ngModel)]="adjudicationForm.notes" rows="3" placeholder="Justification and notes" matTooltip="Provide adjudication justification"></textarea>
+                  </mat-form-field>
+
+                  @if (getCompliantResponseCount() < (config()?.minimumQuotes || 3)) {
+                    <mat-form-field appearance="outline" class="form-field-full">
+                      <mat-label>Reason for fewer than 3 compliant quotes</mat-label>
+                      <textarea matInput [(ngModel)]="adjudicationForm.reasonForNotReceivingThreeQuotes" rows="2" placeholder="Required" matTooltip="Required when fewer than 3 compliant quotes"></textarea>
+                    </mat-form-field>
+                  }
+                </div>
+
+                <div class="committee-action-buttons">
+                  <button mat-flat-button color="primary" (click)="performAdjudication()" [disabled]="saving() || !adjudicationForm.recommendedVendor" matTooltip="Submit adjudication">
+                    <mat-icon>gavel</mat-icon> Adjudicate
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (detailTab() === 'documents') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>folder</mat-icon> Documents</h3>
+              @if (documents().length) {
+                <div class="doc-list">
+                  @for (doc of documents(); track doc.id) {
+                    <div class="doc-item">
+                      <mat-icon class="doc-icon">description</mat-icon>
+                      <div class="doc-info">
+                        <span class="doc-name" matTooltip="{{doc.name}}">{{doc.name}}</span>
+                        <span class="doc-meta" matTooltip="{{doc.type}}">
+                          <span class="badge" [style.background]="getDocTypeBadgeColor(doc.type)">{{formatDocType(doc.type)}}</span>
+                          {{formatDate(doc.uploadedDate || doc.date)}}
+                        </span>
+                      </div>
+                      <button mat-icon-button color="warn" (click)="deleteDocument(doc)" matTooltip="Delete document">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="empty-text">No documents uploaded yet.</p>
+              }
+
+              <div class="boq-form-card" style="margin-top:16px">
+                <h4 style="font-size:13px;font-weight:600;margin:0 0 12px">Upload Document</h4>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Type</mat-label>
+                    <mat-select [(ngModel)]="docForm.type" matTooltip="Select document type">
+                      <mat-option value="quotation">Quotation</mat-option>
+                      <mat-option value="specification">Specification</mat-option>
+                      <mat-option value="evaluation_report">Evaluation Report</mat-option>
+                      <mat-option value="award_letter">Award Letter</mat-option>
+                      <mat-option value="correspondence">Correspondence</mat-option>
+                      <mat-option value="other">Other</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Document Name</mat-label>
+                    <input matInput [(ngModel)]="docForm.name" placeholder="Document name" matTooltip="Enter document name">
+                  </mat-form-field>
+                </div>
+                <div class="boq-form-actions">
+                  <button mat-flat-button color="primary" (click)="uploadDocument()" [disabled]="saving() || !docForm.type || !docForm.name" matTooltip="Upload document">
+                    <mat-icon>upload</mat-icon> Upload
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (detailTab() === 'history') {
+          <div class="detail-content">
+            <div class="detail-card">
+              <h3><mat-icon>history</mat-icon> Audit Trail</h3>
+              <ul class="audit-list">
+                <li class="audit-item">
+                  <div class="audit-dot"></div>
+                  <div class="audit-content">
+                    <span class="audit-action" matTooltip="Created by {{selectedIft()!.createdByName}}">IFT Created</span>
+                    <span class="audit-detail">Created by {{selectedIft()!.createdByName}}</span>
+                    <span class="audit-date" matTooltip="{{selectedIft()!.createdDate}}">{{formatDate(selectedIft()!.createdDate)}}</span>
+                  </div>
+                </li>
+                @if (selectedIft()!.assignedBuyer) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#ef6c00"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Buyer assigned">Buyer Assigned</span>
+                      <span class="audit-detail">{{selectedIft()!.assignedBuyer.name}}</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.assignedBuyer.assignedDate}}">{{formatDate(selectedIft()!.assignedBuyer.assignedDate)}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.rotationalVendorsInvited?.length) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#1565c0"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Vendors invited">Vendors Invited</span>
+                      <span class="audit-detail">{{selectedIft()!.rotationalVendorsInvited.length}} vendors selected</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.rotationalVendorsInvited[0]?.invitedDate}}">{{formatDate(selectedIft()!.rotationalVendorsInvited[0]?.invitedDate)}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.status !== 'draft' && selectedIft()!.status !== 'saved') {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#2e7d32"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Published to vendors">Published</span>
+                      <span class="audit-detail">IFT published to vendors</span>
+                    </div>
+                  </li>
+                }
+                @for (resp of selectedIft()!.vendorResponses; track resp.supplierId) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#6a1b9a"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="{{resp.supplierName}}">Vendor Response: {{resp.supplierName}}</span>
+                      <span class="audit-detail">{{resp.responseStatus === 'responded' ? 'Quote: ' + formatCurrencyFull(resp.totalCost) : 'No response'}}</span>
+                      <span class="audit-date" matTooltip="{{resp.responseDate}}">{{resp.responseDate ? formatDate(resp.responseDate) : '—'}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.adjudication) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#00695c"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Adjudicated">Adjudicated</span>
+                      <span class="audit-detail">Recommended: {{selectedIft()!.adjudication.recommendedVendorName}} by {{selectedIft()!.adjudication.adjudicatedByName}}</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.adjudication.adjudicatedDate}}">{{formatDate(selectedIft()!.adjudication.adjudicatedDate)}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.award) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#1b5e20"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Awarded">Awarded</span>
+                      <span class="audit-detail">{{selectedIft()!.award.awardedToName}} — {{formatCurrencyFull(selectedIft()!.award.awardAmountIncVat?.amount)}} incl. VAT</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.award.awardedDate}}">{{formatDate(selectedIft()!.award.awardedDate)}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.approval) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#c9a84c"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Approval">{{selectedIft()!.approval.action | titlecase}}</span>
+                      <span class="audit-detail">By {{selectedIft()!.approval.supervisorName}} — {{selectedIft()!.approval.comments}}</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.approval.approvalDate}}">{{formatDate(selectedIft()!.approval.approvalDate)}}</span>
+                    </div>
+                  </li>
+                }
+                @if (selectedIft()!.voidInfo) {
+                  <li class="audit-item">
+                    <div class="audit-dot" style="background:#c62828"></div>
+                    <div class="audit-content">
+                      <span class="audit-action" matTooltip="Voided">Voided</span>
+                      <span class="audit-detail">{{selectedIft()!.voidInfo.voidReason}} — by {{selectedIft()!.voidInfo.voidedByName}}</span>
+                      <span class="audit-date" matTooltip="{{selectedIft()!.voidInfo.voidedDate}}">{{formatDate(selectedIft()!.voidInfo.voidedDate)}}</span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        }
+      }
+
+      @if (mainView() === 'reports') {
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>assessment</mat-icon> IFT Summary</h3>
+              <div class="report-summary">
+                <div class="report-stat">
+                  <span class="rs-label">Total</span>
+                  <span class="rs-value" matTooltip="Total IFTs">{{summary().total || 0}}</span>
+                </div>
+                <div class="report-stat">
+                  <span class="rs-label">Draft</span>
+                  <span class="rs-value" matTooltip="Draft IFTs">{{summary().draft || 0}}</span>
+                </div>
+                <div class="report-stat">
+                  <span class="rs-label">Published</span>
+                  <span class="rs-value" matTooltip="Published IFTs">{{summary().published || 0}}</span>
+                </div>
+                <div class="report-stat">
+                  <span class="rs-label">Adjudicated</span>
+                  <span class="rs-value" matTooltip="Adjudicated IFTs">{{summary().adjudicated || 0}}</span>
+                </div>
+                <div class="report-stat">
+                  <span class="rs-label">Awarded</span>
+                  <span class="rs-value" matTooltip="Awarded IFTs">{{summary().awarded || 0}}</span>
+                </div>
+                <div class="report-stat">
+                  <span class="rs-label">Voided</span>
+                  <span class="rs-value" style="color:#c62828" matTooltip="Voided IFTs">{{summary().voided || 0}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>warning</mat-icon> Exception Report</h3>
+            <div class="filters-bar" style="margin-bottom:16px">
+              <mat-form-field appearance="outline">
+                <mat-select placeholder="Status" [(ngModel)]="exceptionFilterStatus" (selectionChange)="loadExceptions()" matTooltip="Filter exceptions by status">
+                  <mat-option value="">All Statuses</mat-option>
+                  @for (s of statuses; track s) {
+                    <mat-option [value]="s">{{getStatusLabel(s)}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>From Date</mat-label>
+                <input matInput [matDatepicker]="exceptionFilterFromPicker" [(ngModel)]="exceptionFilterFrom" (dateChange)="loadExceptions()" matTooltip="Filter from date">
+                <mat-datepicker-toggle matIconSuffix [for]="exceptionFilterFromPicker"></mat-datepicker-toggle>
+                <mat-datepicker #exceptionFilterFromPicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>To Date</mat-label>
+                <input matInput [matDatepicker]="exceptionFilterToPicker" [(ngModel)]="exceptionFilterTo" (dateChange)="loadExceptions()" matTooltip="Filter to date">
+                <mat-datepicker-toggle matIconSuffix [for]="exceptionFilterToPicker"></mat-datepicker-toggle>
+                <mat-datepicker #exceptionFilterToPicker></mat-datepicker>
+              </mat-form-field>
+              <button mat-stroked-button (click)="loadExceptions()" matTooltip="Refresh exceptions">
+                <mat-icon>refresh</mat-icon> Refresh
+              </button>
+            </div>
+
+            @if (exceptions().length) {
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead>
+                    <tr>
+                      <th>IFT Number</th>
+                      <th>Description</th>
+                      <th>Exception Type</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (exc of exceptions(); track exc.tenderId) {
+                      <tr>
+                        <td class="ref-cell" matTooltip="{{exc.tenderNumber}}">{{exc.tenderNumber}}</td>
+                        <td matTooltip="{{exc.description}}">{{exc.description}}</td>
+                        <td><span class="badge badge-warning" matTooltip="{{exc.exceptionType}}">{{exc.exceptionType}}</span></td>
+                        <td matTooltip="{{exc.reason}}">{{exc.reason}}</td>
+                        <td><span class="status-badge" [class]="'status-' + exc.status" matTooltip="{{exc.status}}">{{getStatusLabel(exc.status)}}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <p class="empty-text">No exceptions found.</p>
+            }
+          </div>
+        </div>
+      }
+    </div>

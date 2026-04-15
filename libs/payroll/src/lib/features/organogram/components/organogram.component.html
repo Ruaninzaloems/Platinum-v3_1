@@ -1,0 +1,309 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Organogram</h1>
+    <p class="page-subtitle">Organisational structure and position hierarchy</p>
+  </div>
+</div>
+
+<div class="summary-row">
+  <div class="summary-card">
+    <div class="summary-icon" style="background: #e8f4fd;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f2b46" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="6" y="10" width="12" height="4" rx="1"/><rect x="10" y="17" width="4" height="4" rx="1"/></svg>
+    </div>
+    <div class="summary-content">
+      <div class="summary-value" style="color: #0f2b46;">{{ stats.total }}</div>
+      <div class="summary-label">TOTAL POSITIONS</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon" style="background: #dcfce7;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div class="summary-content">
+      <div class="summary-value" style="color: #16a34a;">{{ stats.filled }}</div>
+      <div class="summary-label">FILLED</div>
+      <div class="summary-bar">
+        <div class="summary-bar-fill" [style.width.%]="stats.fillRate" style="background: #16a34a;"></div>
+      </div>
+      <div class="summary-pct">{{ stats.fillRate }}%</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon" style="background: #fef3c7;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="summary-content">
+      <div class="summary-value" style="color: #d97706;">{{ stats.vacant }}</div>
+      <div class="summary-label">VACANT</div>
+      <div class="summary-bar">
+        <div class="summary-bar-fill" [style.width.%]="stats.total > 0 ? (stats.vacant / stats.total * 100) : 0" style="background: #d97706;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-icon" style="background: #dbeafe;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+    <div class="summary-content">
+      <div class="summary-value" style="color: #2563eb;">{{ stats.funded }}</div>
+      <div class="summary-label">FUNDED</div>
+      <div class="summary-bar">
+        <div class="summary-bar-fill" [style.width.%]="stats.fundedRate" style="background: #2563eb;"></div>
+      </div>
+      <div class="summary-pct">{{ stats.fundedRate }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+@if (!loading && flatList.length > 0) {
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">Position Status</h3>
+    </div>
+    <div class="chart-body donut-body">
+      <canvas #donutCanvas width="200" height="200" class="donut-canvas"></canvas>
+      <div class="donut-legend">
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #16a34a;"></span>
+          <span class="legend-label">Filled</span>
+          <span class="legend-val">{{ stats.filled }}</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #f59e0b;"></span>
+          <span class="legend-label">Vacant</span>
+          <span class="legend-val">{{ stats.vacant }}</span>
+        </div>
+        @if (stats.frozen > 0) {
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #ef4444;"></span>
+          <span class="legend-label">Frozen</span>
+          <span class="legend-val">{{ stats.frozen }}</span>
+        </div>
+        }
+        @if (stats.abolished > 0) {
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #9ca3af;"></span>
+          <span class="legend-label">Abolished</span>
+          <span class="legend-val">{{ stats.abolished }}</span>
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+  <div class="chart-card chart-card-wide">
+    <div class="chart-header">
+      <h3 class="chart-title">Department Breakdown</h3>
+      <span class="chart-subtitle">Top 8 departments by headcount</span>
+    </div>
+    <div class="chart-body">
+      <canvas #barCanvas width="460" height="220" class="bar-canvas"></canvas>
+      <div class="bar-legend">
+        <span class="legend-dot" style="background: #16a34a;"></span> <span class="legend-label-sm">Filled</span>
+        <span class="legend-dot" style="background: #f59e0b; margin-left: 12px;"></span> <span class="legend-label-sm">Vacant</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Department Cards -->
+<div class="dept-cards-section">
+  <h3 class="section-title">Departments Overview</h3>
+  <div class="dept-cards-grid">
+    @for (dept of deptStats.slice(0, 12); track dept.name) {
+    <div class="dept-card">
+      <div class="dept-card-header">
+        <div class="dept-card-name">{{ dept.name }}</div>
+        <div class="dept-card-total">{{ dept.total }}</div>
+      </div>
+      <div class="dept-progress-row">
+        <div class="dept-progress-bar">
+          <div class="dept-progress-fill" [style.width.%]="dept.fillRate"
+               [style.background]="dept.fillRate >= 80 ? '#16a34a' : dept.fillRate >= 50 ? '#f59e0b' : '#ef4444'"></div>
+        </div>
+        <span class="dept-fill-pct">{{ dept.fillRate }}%</span>
+      </div>
+      <div class="dept-card-stats">
+        <span class="dept-stat"><span class="dept-stat-dot" style="background:#16a34a;"></span> {{ dept.filled }} filled</span>
+        <span class="dept-stat"><span class="dept-stat-dot" style="background:#f59e0b;"></span> {{ dept.vacant }} vacant</span>
+        @if (dept.frozen > 0) {
+        <span class="dept-stat"><span class="dept-stat-dot" style="background:#ef4444;"></span> {{ dept.frozen }} frozen</span>
+        }
+      </div>
+    </div>
+    }
+  </div>
+</div>
+}
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab" [class.active]="activeTab === 'chart'" (click)="activeTab = 'chart'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="14"/><line x1="12" y1="12" x2="19" y2="14"/></svg>
+    Org Chart
+  </button>
+  <button class="tab" [class.active]="activeTab === 'list'" (click)="activeTab = 'list'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    List View
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading-container"><div class="spinner"></div> Loading organogram...</div>
+} @else if (activeTab === 'chart') {
+  <div class="card">
+    <div class="chart-toolbar">
+      <div class="chart-toolbar-left">
+        <select class="filter-select" [(ngModel)]="chartDeptFilter">
+          <option value="">All Departments</option>
+          @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
+        </select>
+      </div>
+      <div class="chart-toolbar-right">
+        <button class="btn-subtle" (click)="expandAll()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          Expand All
+        </button>
+        <button class="btn-subtle" (click)="collapseAll()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          Collapse All
+        </button>
+      </div>
+    </div>
+    @if (chartTree.length === 0) {
+      <div class="empty-state"><h3>No Positions</h3><p>No positions found in the organisational structure</p></div>
+    } @else {
+      <div class="org-visual-tree">
+        @for (node of chartTree; track node.id) {
+          <ng-container *ngTemplateOutlet="orgCard; context: { $implicit: node, level: 0 }"></ng-container>
+        }
+      </div>
+    }
+  </div>
+} @else if (activeTab === 'list') {
+  <div class="card">
+    <div class="list-toolbar">
+      <div class="list-toolbar-left">
+        <span class="list-count">{{ filteredList.length }} positions</span>
+      </div>
+      <div class="list-toolbar-right">
+        <div class="search-input-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" placeholder="Search positions..." [(ngModel)]="searchTerm">
+        </div>
+        <select class="filter-select" [(ngModel)]="filterDept">
+          <option value="">All Departments</option>
+          @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
+        </select>
+        <select class="filter-select" [(ngModel)]="filterStatus">
+          <option value="">All Statuses</option>
+          <option value="FILLED">Filled</option>
+          <option value="VACANT">Vacant</option>
+          <option value="FROZEN">Frozen</option>
+          <option value="ABOLISHED">Abolished</option>
+        </select>
+      </div>
+    </div>
+    @if (filteredList.length === 0) {
+      <div class="empty-state"><h3>No Results</h3><p>No positions match your search criteria</p></div>
+    } @else {
+      <table class="org-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Grade</th>
+            <th>HOD</th>
+            <th>Employee</th>
+            <th>Status</th>
+            <th>Funded</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of filteredList; track p.id) {
+            <tr>
+              <td><span class="code-badge">{{ p.position_code }}</span></td>
+              <td class="org-position-title">{{ p.title }}</td>
+              <td class="org-dept-name">{{ p.department_name || '-' }}</td>
+              <td><span class="grade-badge">{{ p.grade_code || '-' }}</span></td>
+              <td>@if (p.is_hod) { <span class="hod-badge">HOD</span> }</td>
+              <td>
+                @if (p.employee_name) {
+                  <div class="emp-cell">
+                    <div class="emp-avatar-sm" [style.background]="p.status === 'FILLED' ? '#dcfce7' : '#f1f5f9'" [style.color]="p.status === 'FILLED' ? '#16a34a' : '#94a3b8'">
+                      {{ getInitials(p.employee_name) }}
+                    </div>
+                    <span>{{ p.employee_name }}</span>
+                  </div>
+                } @else {
+                  <span class="text-muted">-</span>
+                }
+              </td>
+              <td>
+                <span class="status-pill" [style.background]="getStatusBg(p.status)" [style.color]="getStatusColor(p.status)">{{ p.status }}</span>
+              </td>
+              <td>
+                @if (p.funded) {
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                } @else {
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+}
+
+<!-- Org Chart Card Template -->
+<ng-template #orgCard let-node let-level="level">
+  <div class="org-node-wrapper" [class.org-root]="level === 0">
+    <div class="org-node-card" [class.org-hod]="node.is_hod"
+         [class.org-filled]="node.status === 'FILLED'"
+         [class.org-vacant]="node.status === 'VACANT'"
+         [class.org-frozen]="node.status === 'FROZEN'">
+      <div class="org-card-top">
+        <div class="org-card-avatar" [style.background]="getStatusBg(node.status)" [style.color]="getStatusColor(node.status)">
+          @if (node.employee_name) {
+            {{ getInitials(node.employee_name) }}
+          } @else {
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          }
+        </div>
+        <div class="org-card-info">
+          <div class="org-card-title">{{ node.title }}</div>
+          <div class="org-card-name">{{ node.employee_name || 'Vacant' }}</div>
+        </div>
+        <span class="status-dot" [style.background]="getStatusColor(node.status)"></span>
+      </div>
+      <div class="org-card-meta">
+        <span class="org-meta-item"><span class="code-badge-sm">{{ node.position_code }}</span></span>
+        @if (node.grade_code) { <span class="org-meta-item"><span class="grade-badge-sm">{{ node.grade_code }}</span></span> }
+        @if (node.department_name) { <span class="org-meta-dept">{{ node.department_name }}</span> }
+        @if (node.is_hod) { <span class="hod-badge">HOD</span> }
+      </div>
+    </div>
+
+    @if (node.children && node.children.length > 0) {
+      <button class="org-toggle-children" (click)="toggleNode(node)">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+          [style.transform]="node.expanded ? 'rotate(90deg)' : 'rotate(0)'" style="transition: transform 0.2s;">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+        {{ node.children.length }} report{{ node.children.length > 1 ? 's' : '' }}
+      </button>
+    }
+
+    @if (node.expanded && node.children && node.children.length > 0) {
+      <div class="org-children" [class.org-children-connected]="true">
+        @for (child of node.children; track child.id) {
+          <ng-container *ngTemplateOutlet="orgCard; context: { $implicit: child, level: level + 1 }"></ng-container>
+        }
+      </div>
+    }
+  </div>
+</ng-template>

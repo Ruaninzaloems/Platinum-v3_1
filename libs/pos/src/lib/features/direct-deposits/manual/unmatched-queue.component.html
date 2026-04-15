@@ -1,0 +1,923 @@
+<div class="page-container">
+  <div class="page-header-bar">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      </div>
+      <div>
+        <h1 class="page-title" data-testid="text-page-title">Direct Deposits</h1>
+        <p class="page-subtitle">Bank statement items awaiting allocation</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header" (click)="navigateToHistory()" data-testid="button-history">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        History
+      </button>
+      <button class="btn-header btn-header-accent" (click)="loadData()" [disabled]="loading()" data-testid="button-refresh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" [class.spinning]="loading()"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  @if (loading() && items().length === 0) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>{{ loadProgress() || 'Loading deposits from Platinum...' }}</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-state card">
+      <div class="error-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <p class="error-message" data-testid="text-error">{{ error() }}</p>
+      <button class="btn-primary" (click)="loadData()" data-testid="button-retry">Try Again</button>
+    </div>
+  } @else {
+    <div class="stats-row" data-testid="stats-summary">
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-blue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Total Deposits</span>
+          <span class="stat-value" data-testid="stat-total">{{ stats().total }}</span>
+          <span class="stat-sub">{{ formatCurrency(stats().totalAmount) }}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-green">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Allocated</span>
+          <span class="stat-value stat-value-green" data-testid="stat-allocated">{{ stats().allocated }}</span>
+          <span class="stat-sub">{{ formatCurrency(stats().allocatedAmount) }}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-amber">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Pending</span>
+          <span class="stat-value stat-value-amber" data-testid="stat-unallocated">{{ stats().unallocated }}</span>
+          <span class="stat-sub">{{ formatCurrency(stats().unallocatedAmount) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar" data-testid="card-filters">
+      <div class="toolbar-search">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" class="search-input" placeholder="Search by reference, note, amount, or ID..." [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)" data-testid="input-search" />
+        @if (searchQuery()) {
+          <button class="search-clear" (click)="onSearchChange('')" title="Clear search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        }
+      </div>
+      <div class="toolbar-filters">
+        <select class="filter-select" [ngModel]="statusFilter()" (ngModelChange)="onStatusFilterChange($event)" data-testid="select-status">
+          <option value="all">All Status</option>
+          <option value="unallocated">Unallocated</option>
+          <option value="allocated">Allocated</option>
+        </select>
+        <select class="filter-select" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange(+$event)" data-testid="select-page-size">
+          @for (size of pageSizeOptions; track size) {
+            <option [value]="size">{{ size }} per page</option>
+          }
+        </select>
+      </div>
+      @if (loading()) {
+        <div class="toolbar-loading">
+          <div class="spinner-sm"></div>
+          <span>Refreshing...</span>
+        </div>
+      }
+    </div>
+
+    @if (sortedItems().length === 0 && !loading()) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </div>
+        <p class="empty-title">No deposits found</p>
+        <p class="empty-desc">
+          @if (searchQuery() || statusFilter() !== 'all') {
+            Try adjusting your search or filters.
+          } @else {
+            No bank statement items available.
+          }
+        </p>
+      </div>
+    } @else {
+      <div class="grid-container dd-desktop-only" data-testid="table-deposits">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th class="col-checkbox">
+                <input type="checkbox" [checked]="isAllOnPageSelected()" (change)="selectAllItems()" data-testid="checkbox-select-all" />
+              </th>
+              <th class="col-sortable col-id" (click)="sort('posItem_ID')" data-testid="th-id">
+                <span>ID</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'posItem_ID'">{{ getSortIcon('posItem_ID') }}</span>
+              </th>
+              <th class="col-sortable col-date" (click)="sort('dateOfTransaction')" data-testid="th-date">
+                <span>Date</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'dateOfTransaction'">{{ getSortIcon('dateOfTransaction') }}</span>
+              </th>
+              <th class="col-sortable col-ref" (click)="sort('reference')" data-testid="th-reference">
+                <span>Reference</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'reference'">{{ getSortIcon('reference') }}</span>
+              </th>
+              <th class="col-sortable col-note" (click)="sort('note')" data-testid="th-note">
+                <span>Description</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'note'">{{ getSortIcon('note') }}</span>
+              </th>
+              <th class="col-sortable col-amount text-right" (click)="sort('amount')" data-testid="th-amount">
+                <span>Amount</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'amount'">{{ getSortIcon('amount') }}</span>
+              </th>
+              <th class="col-sortable col-status" (click)="sort('billingAllocated')" data-testid="th-status">
+                <span>Status</span>
+                <span class="sort-indicator" [class.active]="sortField() === 'billingAllocated'">{{ getSortIcon('billingAllocated') }}</span>
+              </th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of paginatedItems(); track item.posItem_ID) {
+              <tr class="data-row" [class.row-allocated]="item.billingAllocated" [class.row-selected]="isItemSelected(item.posItem_ID)" [class.row-expanded]="isInlineExpanded(item.posItem_ID)" (click)="selectItem(item)" [attr.data-testid]="'row-item-' + item.posItem_ID">
+                <td class="col-checkbox" (click)="toggleItemSelection(item.posItem_ID, $event)">
+                  <input type="checkbox" [checked]="isItemSelected(item.posItem_ID)" [attr.data-testid]="'checkbox-item-' + item.posItem_ID" />
+                </td>
+                <td class="cell-mono cell-id" [attr.data-testid]="'text-id-' + item.posItem_ID">{{ item.posItem_ID }}</td>
+                <td class="cell-date">{{ formatDate(item.dateOfTransaction) }}</td>
+                <td class="cell-ref">
+                  <span class="cell-truncate">{{ item.reference || '-' }}</span>
+                </td>
+                <td class="cell-note">
+                  <span class="cell-truncate">{{ item.note || '-' }}</span>
+                  @if (hasAccountClue(item) && !item.billingAllocated) {
+                    <span class="clue-badge" [title]="'Detected: ' + getClueTypeBadge(item)">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      {{ getClueTypeBadge(item) }}
+                    </span>
+                  }
+                </td>
+                <td class="cell-amount text-right" [attr.data-testid]="'text-amount-' + item.posItem_ID">{{ formatCurrency(item.amount) }}</td>
+                <td class="cell-status">
+                  @if (isItemAllocated(item)) {
+                    <span class="status-badge status-allocated" [attr.data-testid]="'badge-status-' + item.posItem_ID">Allocated</span>
+                  } @else {
+                    <span class="status-badge status-pending" [attr.data-testid]="'badge-status-' + item.posItem_ID">Pending</span>
+                  }
+                </td>
+                <td class="cell-actions" (click)="$event.stopPropagation()">
+                  @if (!isItemAllocated(item)) {
+                    <div class="action-group">
+                      @if (hasAccountClue(item)) {
+                        <button class="btn-auto" [class.btn-auto-active]="isInlineExpanded(item.posItem_ID)" (click)="autoAllocateItem(item)" [disabled]="isInlineLoading(item.posItem_ID)" title="Find matching accounts from description" [attr.data-testid]="'button-auto-' + item.posItem_ID">
+                          @if (isInlineLoading(item.posItem_ID)) {
+                            <div class="spinner-xs"></div>
+                            Searching...
+                          } @else if (isInlineExpanded(item.posItem_ID)) {
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+                            Hide
+                          } @else {
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            Quick
+                          }
+                        </button>
+                      }
+                      <button class="btn-allocate" (click)="navigateToAllocate(item)" [attr.data-testid]="'button-allocate-' + item.posItem_ID">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                        Allocate
+                      </button>
+                    </div>
+                  } @else {
+                    <span class="status-badge status-allocated" style="font-size:0.6875rem">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                      Done
+                    </span>
+                  }
+                </td>
+              </tr>
+              @if (isInlineExpanded(item.posItem_ID) && !isItemAllocated(item)) {
+                <tr class="suggestion-row">
+                  <td [attr.colspan]="8">
+                    <div class="inline-suggestions-panel">
+                      <div class="inline-suggestions-header">
+                        <div class="inline-suggestions-title">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                          <span>Suggested Matches</span>
+                          @if (getInlineSuggestions(item.posItem_ID).length > 0) {
+                            <span class="match-count-badge">{{ getInlineSuggestions(item.posItem_ID).length }}</span>
+                          }
+                        </div>
+                        <button class="btn-collapse" (click)="collapseInline(item.posItem_ID); $event.stopPropagation()" title="Close suggestions">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+
+                      @if (isInlineLoading(item.posItem_ID)) {
+                        <div class="inline-loading">
+                          <div class="spinner-sm"></div>
+                          <div class="inline-loading-text">
+                            <span>Searching for account matches...</span>
+                            @if (getInlineProgress(item.posItem_ID)) {
+                              <span class="match-progress-text">{{ getInlineProgress(item.posItem_ID) }}</span>
+                            }
+                          </div>
+                        </div>
+                      } @else if (getInlineSuggestions(item.posItem_ID).length === 0) {
+                        <div class="inline-empty">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                          <span>No matches found from the description. Use the <strong>Allocate</strong> button to search manually.</span>
+                        </div>
+                      } @else {
+                        <div class="inline-matches-grid">
+                          @for (match of getInlineSuggestions(item.posItem_ID); track match.accountId) {
+                            <div class="inline-match-card" [class.inline-match-high]="match.confidence >= 80" [class.inline-match-medium]="match.confidence >= 50 && match.confidence < 80" (click)="showAllocConfirm(item, match); $event.stopPropagation()" [attr.data-testid]="'inline-match-' + match.accountId">
+                              <div class="inline-match-left">
+                                <div class="inline-match-top-row">
+                                  <span class="match-type-icon" [title]="match.matchType">{{ getMatchTypeIcon(match.matchType) }}</span>
+                                  <span class="inline-match-acc">{{ match.accountNo }}</span>
+                                  <span class="confidence-badge" [ngClass]="getConfidenceBadgeClass(match.confidence)">{{ match.confidence }}%</span>
+                                  @if (match.matchSources && match.matchSources.length > 1) {
+                                    <span class="multi-source-badge" [title]="'Confirmed by: ' + match.matchSources.join(', ')">{{ match.matchSources.length }} sources</span>
+                                  }
+                                </div>
+                                <div class="inline-match-name">{{ match.name || 'Loading...' }}</div>
+                                <div class="inline-match-detail">{{ match.matchDetail }}</div>
+                                @if (match.bankStatementPrior && match.bankStatementPrior.length > 0) {
+                                  <div class="prior-alloc-badge">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                    Previously allocated {{ match.bankStatementPrior.length }}x — same description
+                                  </div>
+                                }
+                                @if (match.address) {
+                                  <div class="inline-match-address">{{ match.address }}{{ match.town ? ', ' + match.town : '' }}</div>
+                                }
+                                @if (match.erfNumber || match.sgNumber) {
+                                  <div class="inline-match-tags">
+                                    @if (match.erfNumber) { <span class="match-tag">ERF {{ match.erfNumber }}</span> }
+                                    @if (match.sgNumber) { <span class="match-tag">SG: {{ match.sgNumber }}</span> }
+                                  </div>
+                                }
+                              </div>
+                              <div class="inline-match-right">
+                                @if (match.outstandingAmount) {
+                                  <div class="inline-match-balance">{{ formatCurrency(match.outstandingAmount) }}</div>
+                                  <div class="inline-match-balance-label">Outstanding</div>
+                                }
+                                <button class="btn-select-match" (click)="showAllocConfirm(item, match); $event.stopPropagation()" [disabled]="quickAllocating()">
+                                  Select &amp; Allocate
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </div>
+                        <div class="inline-suggestions-footer">
+                          <span class="inline-footer-hint">Click a match above to allocate directly, or use Allocate for manual search</span>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="dd-mobile-cards dd-mobile-only">
+        <div class="dd-m-select-all">
+          <input type="checkbox" [checked]="isAllOnPageSelected()" (change)="selectAllItems()" data-testid="checkbox-select-all-mobile" />
+          <span class="dd-m-select-label">Select All</span>
+        </div>
+        @for (item of paginatedItems(); track item.posItem_ID) {
+          <div class="dd-m-card" [class.dd-m-allocated]="item.billingAllocated" [class.dd-m-selected]="isItemSelected(item.posItem_ID)" (click)="selectItem(item)" [attr.data-testid]="'dd-card-' + item.posItem_ID">
+            <div class="dd-m-row1">
+              <div class="dd-m-left">
+                <input type="checkbox" [checked]="isItemSelected(item.posItem_ID)" (click)="toggleItemSelection(item.posItem_ID, $event)" [attr.data-testid]="'checkbox-item-m-' + item.posItem_ID" />
+                <span class="dd-m-id">{{ item.posItem_ID }}</span>
+                <span class="dd-m-date">{{ formatDate(item.dateOfTransaction) }}</span>
+              </div>
+              <span class="dd-m-amount mono">{{ formatCurrency(item.amount) }}</span>
+            </div>
+            <div class="dd-m-row2">
+              @if (item.note) {
+                <span class="dd-m-note">{{ item.note }}</span>
+              }
+              @if (hasAccountClue(item) && !item.billingAllocated) {
+                <span class="clue-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  {{ getClueTypeBadge(item) }}
+                </span>
+              }
+            </div>
+            @if (item.reference) {
+              <div class="dd-m-ref">Ref: {{ item.reference }}</div>
+            }
+            <div class="dd-m-row3">
+              @if (isItemAllocated(item)) {
+                <span class="status-badge status-allocated">Allocated</span>
+              } @else {
+                <span class="status-badge status-pending">Pending</span>
+              }
+              <div class="dd-m-actions" (click)="$event.stopPropagation()">
+                @if (!isItemAllocated(item)) {
+                  @if (hasAccountClue(item)) {
+                    <button class="btn-auto" [class.btn-auto-active]="isInlineExpanded(item.posItem_ID)" (click)="autoAllocateItem(item)" [disabled]="isInlineLoading(item.posItem_ID)" [attr.data-testid]="'button-auto-m-' + item.posItem_ID">
+                      @if (isInlineLoading(item.posItem_ID)) {
+                        <div class="spinner-xs"></div>
+                      } @else {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        Quick
+                      }
+                    </button>
+                  }
+                  <button class="btn-allocate" (click)="navigateToAllocate(item)" [attr.data-testid]="'button-allocate-m-' + item.posItem_ID">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                    Allocate
+                  </button>
+                } @else {
+                  <span class="status-badge status-allocated" style="font-size:0.6875rem">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                    Done
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+          @if (isInlineExpanded(item.posItem_ID) && !isItemAllocated(item)) {
+            <div class="dd-m-suggestions">
+              <div class="inline-suggestions-panel">
+                <div class="inline-suggestions-header">
+                  <div class="inline-suggestions-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Suggested Matches</span>
+                    @if (getInlineSuggestions(item.posItem_ID).length > 0) {
+                      <span class="match-count-badge">{{ getInlineSuggestions(item.posItem_ID).length }}</span>
+                    }
+                  </div>
+                  <button class="btn-collapse" (click)="collapseInline(item.posItem_ID); $event.stopPropagation()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                @if (isInlineLoading(item.posItem_ID)) {
+                  <div class="inline-loading">
+                    <div class="spinner-sm"></div>
+                    <span>Searching for matches...</span>
+                  </div>
+                } @else if (getInlineSuggestions(item.posItem_ID).length === 0) {
+                  <div class="inline-empty">
+                    <span>No matches found. Use <strong>Allocate</strong> to search manually.</span>
+                  </div>
+                } @else {
+                  <div class="inline-matches-grid">
+                    @for (match of getInlineSuggestions(item.posItem_ID); track match.accountId) {
+                      <div class="inline-match-card" [class.inline-match-high]="match.confidence >= 80" [class.inline-match-medium]="match.confidence >= 50 && match.confidence < 80" (click)="showAllocConfirm(item, match); $event.stopPropagation()" [attr.data-testid]="'inline-match-m-' + match.accountId">
+                        <div class="inline-match-left">
+                          <div class="inline-match-top-row">
+                            <span class="inline-match-acc">{{ match.accountNo }}</span>
+                            <span class="confidence-badge" [ngClass]="getConfidenceBadgeClass(match.confidence)">{{ match.confidence }}%</span>
+                          </div>
+                          <div class="inline-match-name">{{ match.name || 'Loading...' }}</div>
+                          <div class="inline-match-detail">{{ match.matchDetail }}</div>
+                        </div>
+                        <div class="inline-match-right">
+                          <button class="btn-select-match" (click)="showAllocConfirm(item, match); $event.stopPropagation()" [disabled]="quickAllocating()">Select &amp; Allocate</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="pagination-bar">
+        <div class="pagination-info">
+          Showing {{ ((page() - 1) * pageSize()) + 1 }}–{{ Math.min(page() * pageSize(), sortedItems().length) }} of {{ sortedItems().length }}
+          @if (searchQuery() || statusFilter() !== 'all') {
+            <span class="pagination-filter-note">(filtered from {{ items().length }})</span>
+          }
+          @if (loadingMore()) {
+            <span class="loading-more-badge">
+              <span class="spinner-xs"></span>
+              {{ loadProgress() || 'Loading more...' }}
+            </span>
+          }
+        </div>
+        <div class="pagination-controls">
+          <button class="page-btn" [disabled]="page() === 1" (click)="changePage(page() - 1)" data-testid="button-prev-page">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          @for (p of pageNumbers(); track p) {
+            @if (p === '...') {
+              <span class="page-ellipsis">...</span>
+            } @else {
+              <button class="page-btn" [class.page-active]="p === page()" (click)="changePage(p)" [attr.data-testid]="'button-page-' + p">{{ p }}</button>
+            }
+          }
+          <button class="page-btn" [disabled]="page() === totalPages()" (click)="changePage(page() + 1)" data-testid="button-next-page">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    }
+  }
+
+  @if (detailOpen() && selectedItem()) {
+    <div class="dialog-overlay" (click)="closeDetail()">
+      <div class="dialog-panel dialog-panel-wide" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <div class="dialog-header-info">
+            <h3>Deposit #{{ selectedItem()!.posItem_ID }}</h3>
+            <span class="dialog-amount">{{ formatCurrency(selectedItem()!.amount) }}</span>
+          </div>
+          <button class="btn-dialog-close" (click)="closeDetail()" data-testid="button-close-detail">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="dialog-body">
+          @if (depositAllocDone()) {
+            <div class="alloc-complete-screen">
+              <div class="alloc-complete-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
+              </div>
+              <h3 class="alloc-complete-title">Allocation Complete</h3>
+              <p class="alloc-complete-desc">
+                Deposit #{{ selectedItem()!.posItem_ID }} has been successfully allocated.
+              </p>
+              <div class="alloc-complete-details">
+                <div class="alloc-complete-row">
+                  <span class="alloc-complete-label">Amount</span>
+                  <span class="alloc-complete-value mono bold">{{ formatCurrency(depositAllocDone()!.amount) }}</span>
+                </div>
+                <div class="alloc-complete-row">
+                  <span class="alloc-complete-label">Account</span>
+                  <span class="alloc-complete-value mono">{{ depositAllocDone()!.accountNo }}</span>
+                </div>
+                <div class="alloc-complete-row">
+                  <span class="alloc-complete-label">Name</span>
+                  <span class="alloc-complete-value">{{ depositAllocDone()!.name }}</span>
+                </div>
+              </div>
+              <div class="alloc-complete-actions">
+                <button class="btn-primary" (click)="closeDetail()" data-testid="button-return-to-list">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  Return to Deposit List
+                </button>
+              </div>
+            </div>
+          } @else {
+          <div class="detail-section">
+            <h4 class="detail-section-title">Transaction Details</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">POS Item ID</span>
+                <span class="detail-value mono">{{ selectedItem()!.posItem_ID }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Transaction Date</span>
+                <span class="detail-value">{{ formatDate(selectedItem()!.dateOfTransaction) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value mono bold">{{ formatCurrency(selectedItem()!.amount) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+                  @if (selectedItem()!.billingAllocated) {
+                    <span class="status-badge status-allocated">Allocated</span>
+                  } @else {
+                    <span class="status-badge status-pending">Pending</span>
+                  }
+                </span>
+              </div>
+            </div>
+            <div class="detail-full">
+              <span class="detail-label">Reference</span>
+              <span class="detail-value">{{ selectedItem()!.reference || '-' }}</span>
+            </div>
+            <div class="detail-full">
+              <span class="detail-label">Description / Note</span>
+              <span class="detail-value">{{ selectedItem()!.note || '-' }}</span>
+            </div>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">Date Captured</span>
+                <span class="detail-value">{{ formatDateTime(selectedItem()!.dateCaptured) }}</span>
+              </div>
+              @if (selectedItem()!.dateAllocated) {
+                <div class="detail-item">
+                  <span class="detail-label">Date Allocated</span>
+                  <span class="detail-value">{{ formatDateTime(selectedItem()!.dateAllocated) }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (parsedClues()) {
+            <div class="detail-section clues-section">
+              <h4 class="detail-section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Parsed Clues
+              </h4>
+              <div class="clues-grid">
+                @if (parsedClues()!.accountNumbers.length > 0) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">Account Numbers</span>
+                    <div class="clue-values">
+                      @for (acc of parsedClues()!.accountNumbers; track acc) {
+                        <span class="clue-tag clue-tag-blue">{{ acc }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (parsedClues()!.erfNumbers.length > 0) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">ERF Numbers</span>
+                    <div class="clue-values">
+                      @for (erf of parsedClues()!.erfNumbers; track erf.erf) {
+                        <span class="clue-tag clue-tag-green">ERF {{ erf.erf }}{{ erf.portion ? '/' + erf.portion : '' }}{{ erf.area ? ' ' + erf.area : '' }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (parsedClues()!.meterNumbers.length > 0) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">Meter Numbers</span>
+                    <div class="clue-values">
+                      @for (mtr of parsedClues()!.meterNumbers; track mtr) {
+                        <span class="clue-tag clue-tag-purple">{{ mtr }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (parsedClues()!.oldAccountCodes.length > 0) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">Old Account Codes</span>
+                    <div class="clue-values">
+                      @for (code of parsedClues()!.oldAccountCodes; track code) {
+                        <span class="clue-tag clue-tag-amber">{{ code }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (parsedClues()!.nameSearchTerms.length > 0) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">Name Terms</span>
+                    <div class="clue-values">
+                      @for (name of parsedClues()!.nameSearchTerms; track name) {
+                        <span class="clue-tag clue-tag-teal">{{ name }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (parsedClues()!.serviceType) {
+                  <div class="clue-item">
+                    <span class="clue-type-label">Service Type</span>
+                    <span class="clue-tag clue-tag-blue">{{ parsedClues()!.serviceType }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (!selectedItem()!.billingAllocated) {
+            <div class="detail-section">
+              <h4 class="detail-section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Suggested Matches
+                @if (suggestedMatches().length > 0) {
+                  <span class="match-count-badge">{{ suggestedMatches().length }}</span>
+                }
+              </h4>
+              @if (matchLoading()) {
+                <div class="matches-loading">
+                  <div class="spinner-sm"></div>
+                  <div class="match-loading-info">
+                    <span>Searching for account matches...</span>
+                    @if (matchProgress()) {
+                      <span class="match-progress-text">{{ matchProgress() }}</span>
+                    }
+                  </div>
+                </div>
+              } @else if (suggestedMatches().length === 0) {
+                <div class="matches-empty">
+                  <p>No automatic matches found from the description.</p>
+                  <p class="text-hint">Use the Allocate button below to search manually.</p>
+                </div>
+              } @else {
+                <div class="matches-list">
+                  @for (match of suggestedMatches(); track match.accountId) {
+                    <div class="match-card" [attr.data-testid]="'match-' + match.accountId">
+                      <div class="match-info">
+                        <div class="match-top">
+                          <span class="match-type-icon" [title]="match.matchType">{{ getMatchTypeIcon(match.matchType) }}</span>
+                          <span class="match-acc mono">{{ match.accountNo }}</span>
+                          <span class="confidence-badge" [ngClass]="getConfidenceBadgeClass(match.confidence)">{{ match.confidence }}%</span>
+                          @if (match.matchSources && match.matchSources.length > 1) {
+                            <span class="multi-source-badge" [title]="'Confirmed by: ' + match.matchSources.join(', ')">{{ match.matchSources.length }} sources</span>
+                          }
+                        </div>
+                        <div class="match-name">{{ match.name }}</div>
+                        <div class="match-detail">{{ match.matchDetail }}</div>
+                        @if (match.bankStatementPrior && match.bankStatementPrior.length > 0) {
+                          <div class="prior-alloc-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            Previously allocated {{ match.bankStatementPrior.length }}x — same description
+                          </div>
+                          <div class="prior-alloc-details">
+                            @for (prior of match.bankStatementPrior.slice(0, 3); track $index) {
+                              <div class="prior-alloc-line">
+                                <span class="mono">{{ prior.receiptNo }}</span>
+                                <span>{{ formatCurrency(prior.paidAmount) }}</span>
+                                <span>{{ formatDate(prior.date) }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                        @if (match.address) {
+                          <div class="match-address">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            {{ match.address }}{{ match.town ? ', ' + match.town : '' }}
+                          </div>
+                        }
+                        @if (match.erfNumber || match.sgNumber) {
+                          <div class="match-property-info">
+                            @if (match.sgNumber) {
+                              <span class="match-tag sg-tag">ERF {{ match.sgNumber }}</span>
+                            } @else if (match.erfNumber) {
+                              <span class="match-tag">ERF {{ match.erfNumber }}</span>
+                            }
+                            @if (match.suburb) {
+                              <span class="match-tag">{{ match.suburb }}</span>
+                            }
+                          </div>
+                        }
+                        @if (match.outstandingAmount) {
+                          <div class="match-outstanding">Outstanding: {{ formatCurrency(match.outstandingAmount) }}</div>
+                        }
+                        @if (match.matchReasoning && match.matchReasoning.length > 0) {
+                          <div class="match-reasoning">
+                            @for (reason of match.matchReasoning.slice(0, 3); track reason) {
+                              <div class="reasoning-item">{{ reason }}</div>
+                            }
+                          </div>
+                        }
+                      </div>
+                      @if ((quickAllocating() || quickAllocComplete() || quickAllocError()) && quickAllocMatchId() === match.accountId) {
+                        <div class="quick-alloc-progress">
+                          @if (quickAllocComplete()) {
+                            <div class="quick-alloc-done">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                              <span>{{ quickAllocStatus() }}</span>
+                            </div>
+                          } @else if (quickAllocError()) {
+                            <div class="quick-alloc-error">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                              <span>{{ quickAllocError() }}</span>
+                            </div>
+                            <button class="btn-outline btn-sm" style="margin-top:4px" (click)="quickAllocError.set(''); quickAllocMatchId.set(null)">Dismiss</button>
+                          } @else {
+                            <div class="quick-alloc-spinner">
+                              <div class="spinner-sm"></div>
+                              <span>{{ quickAllocStatus() }}</span>
+                            </div>
+                          }
+                        </div>
+                      } @else {
+                        <button class="btn-primary btn-sm" (click)="showAllocConfirm(selectedItem()!, match)" [disabled]="quickAllocating()" [attr.data-testid]="'button-allocate-match-' + match.accountId">
+                          Allocate
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="detail-section manual-search-section">
+              <h4 class="detail-section-title" (click)="manualSearchOpen.set(!manualSearchOpen())" style="cursor:pointer;user-select:none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Manual Account Search
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" [style.transform]="manualSearchOpen() ? 'rotate(180deg)' : 'rotate(0)'" style="transition:transform .2s;margin-left:auto"><polyline points="6 9 12 15 18 9"/></svg>
+              </h4>
+              @if (manualSearchOpen()) {
+                <div class="manual-search-form">
+                  <div class="ms-quick-row">
+                    <input type="text" class="ms-input ms-input-wide" [value]="msQuick()" (input)="msQuick.set($any($event.target).value); onMsInput()" placeholder="Type to search — account number, name, ID, phone..." data-testid="input-manual-search-quick">
+                    @if (msSearching()) { <div class="spinner-sm ms-spinner"></div> }
+                    <button class="btn-outline btn-sm" (click)="msAdvancedOpen.set(!msAdvancedOpen())" data-testid="button-toggle-advanced">
+                      {{ msAdvancedOpen() ? 'Simple' : 'Advanced' }}
+                    </button>
+                  </div>
+                  @if (msAdvancedOpen()) {
+                    <div class="ms-advanced-grid">
+                      <div class="ms-field">
+                        <label>Account Number</label>
+                        <input type="text" [value]="msAccountNo()" (input)="msAccountNo.set($any($event.target).value); onMsInput()" placeholder="e.g. 000000003698" data-testid="input-ms-account">
+                      </div>
+                      <div class="ms-field">
+                        <label>Name / Company</label>
+                        <input type="text" [value]="msName()" (input)="msName.set($any($event.target).value); onMsInput()" placeholder="Search by name" data-testid="input-ms-name">
+                      </div>
+                      <div class="ms-field">
+                        <label>ERF Number</label>
+                        <input type="text" [value]="msErf()" (input)="msErf.set($any($event.target).value); onMsInput()" placeholder="e.g. 13110" data-testid="input-ms-erf">
+                      </div>
+                      <div class="ms-field">
+                        <label>Meter Number</label>
+                        <input type="text" [value]="msMeter()" (input)="msMeter.set($any($event.target).value); onMsInput()" placeholder="Physical meter number" data-testid="input-ms-meter">
+                      </div>
+                      <div class="ms-field">
+                        <label>ID / Registration No.</label>
+                        <input type="text" [value]="msIdNumber()" (input)="msIdNumber.set($any($event.target).value); onMsInput()" placeholder="13 digit ID number" data-testid="input-ms-id">
+                      </div>
+                      <div class="ms-field">
+                        <label>Mobile Number</label>
+                        <input type="text" [value]="msMobile()" (input)="msMobile.set($any($event.target).value); onMsInput()" placeholder="0821234567" data-testid="input-ms-mobile">
+                      </div>
+                    </div>
+                    <div class="ms-actions">
+                      <button class="btn-outline btn-sm" (click)="clearManualSearch()" data-testid="button-clear-manual-search">Clear All</button>
+                    </div>
+                  }
+                </div>
+
+                @if (msResults().length > 0) {
+                  <div class="ms-results-header">
+                    <span>{{ msResults().length }} result{{ msResults().length === 1 ? '' : 's' }} found</span>
+                  </div>
+                  <div class="matches-list">
+                    @for (r of msResults(); track r.accountId) {
+                      <div class="match-card" [attr.data-testid]="'ms-result-' + r.accountId">
+                        <div class="match-info">
+                          <div class="match-top">
+                            <span class="match-type-icon" title="Manual search">🔍</span>
+                            <span class="match-acc mono">{{ r.accountNo }}</span>
+                            @if (r.statusDesc) {
+                              <span class="match-tag">{{ r.statusDesc }}</span>
+                            }
+                          </div>
+                          @if (r.name) {
+                            <div class="match-name">{{ r.name }}</div>
+                          } @else {
+                            <div class="match-name" style="color:#94a3b8;font-style:italic">Loading details...</div>
+                          }
+                          @if (r.address) {
+                            <div class="match-address">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                              {{ r.address }}{{ r.town ? ', ' + r.town : '' }}
+                            </div>
+                          }
+                          @if (r.sgNumber || r.erfNumber) {
+                            <div class="match-property-info">
+                              @if (r.sgNumber) {
+                                <span class="match-tag sg-tag">ERF {{ r.sgNumber }}</span>
+                              } @else if (r.erfNumber) {
+                                <span class="match-tag">ERF {{ r.erfNumber }}</span>
+                              }
+                            </div>
+                          }
+                          @if (r.outstandingAmount) {
+                            <div class="match-outstanding">Outstanding: {{ formatCurrency(r.outstandingAmount) }}</div>
+                          }
+                        </div>
+                        @if ((quickAllocating() || quickAllocComplete() || quickAllocError()) && quickAllocMatchId() === r.accountId) {
+                          <div class="quick-alloc-progress">
+                            @if (quickAllocComplete()) {
+                              <div class="quick-alloc-done">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                                <span>{{ quickAllocStatus() }}</span>
+                              </div>
+                            } @else if (quickAllocError()) {
+                              <div class="quick-alloc-error">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                <span>{{ quickAllocError() }}</span>
+                              </div>
+                              <button class="btn-outline btn-sm" style="margin-top:4px" (click)="quickAllocError.set(''); quickAllocMatchId.set(null)">Dismiss</button>
+                            } @else {
+                              <div class="quick-alloc-spinner">
+                                <div class="spinner-sm"></div>
+                                <span>{{ quickAllocStatus() }}</span>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <button class="btn-primary btn-sm" (click)="quickAllocate(selectedItem()!, r)" [disabled]="quickAllocating()" [attr.data-testid]="'button-ms-allocate-' + r.accountId">
+                            Allocate
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                } @else if (msSearched() && !msSearching()) {
+                  <div class="matches-empty">
+                    <p>No accounts found matching your search.</p>
+                  </div>
+                }
+              }
+            </div>
+
+            <div class="dialog-footer">
+              <button class="btn-outline" (click)="closeDetail()" data-testid="button-cancel-detail">Close</button>
+              <button class="btn-primary" (click)="navigateToAllocate(selectedItem()!)" data-testid="button-allocate-from-detail">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                Allocate This Deposit
+              </button>
+            </div>
+          }
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (pendingAllocConfirm()) {
+    <div class="alloc-confirm-overlay" (click)="cancelAllocConfirm()" data-testid="alloc-confirm-overlay">
+      <div class="alloc-confirm-dialog" (click)="$event.stopPropagation()" data-testid="alloc-confirm-dialog">
+        <div class="alloc-confirm-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+        </div>
+        <h3 class="alloc-confirm-title">Confirm Quick Allocation</h3>
+        <p class="alloc-confirm-desc">This will immediately process the allocation. No further steps required.</p>
+        <div class="alloc-confirm-details">
+          <div class="alloc-confirm-section-label">Deposit Details</div>
+          <div class="alloc-confirm-row">
+            <span class="alloc-confirm-label">Deposit Amount</span>
+            <span class="alloc-confirm-value mono bold alloc-confirm-amount">R {{ pendingAllocConfirm()!.item.amount | number:'1.2-2' }}</span>
+          </div>
+          @if (pendingAllocConfirm()!.item.dateOfTransaction) {
+            <div class="alloc-confirm-row">
+              <span class="alloc-confirm-label">Transaction Date</span>
+              <span class="alloc-confirm-value">{{ formatDate(pendingAllocConfirm()!.item.dateOfTransaction) }}</span>
+            </div>
+          }
+          <div class="alloc-confirm-row">
+            <span class="alloc-confirm-label">Description</span>
+            <span class="alloc-confirm-value">{{ pendingAllocConfirm()!.item.note || pendingAllocConfirm()!.item.reference || '-' }}</span>
+          </div>
+          @if (pendingAllocConfirm()!.item.posItem_ID) {
+            <div class="alloc-confirm-row">
+              <span class="alloc-confirm-label">POS Item ID</span>
+              <span class="alloc-confirm-value mono">{{ pendingAllocConfirm()!.item.posItem_ID }}</span>
+            </div>
+          }
+          <div class="alloc-confirm-divider"></div>
+          <div class="alloc-confirm-section-label">Allocate To</div>
+          <div class="alloc-confirm-row">
+            <span class="alloc-confirm-label">Account</span>
+            <span class="alloc-confirm-value mono alloc-confirm-acc">{{ pendingAllocConfirm()!.match.accountNo }}</span>
+          </div>
+          <div class="alloc-confirm-row">
+            <span class="alloc-confirm-label">Account Holder</span>
+            <span class="alloc-confirm-value">{{ pendingAllocConfirm()!.match.name }}</span>
+          </div>
+          @if (pendingAllocConfirm()!.match.address) {
+            <div class="alloc-confirm-row">
+              <span class="alloc-confirm-label">Address</span>
+              <span class="alloc-confirm-value">{{ pendingAllocConfirm()!.match.address }}{{ pendingAllocConfirm()!.match.town ? ', ' + pendingAllocConfirm()!.match.town : '' }}</span>
+            </div>
+          }
+          @if (pendingAllocConfirm()!.match.outstandingAmount) {
+            <div class="alloc-confirm-row">
+              <span class="alloc-confirm-label">Outstanding</span>
+              <span class="alloc-confirm-value mono">{{ formatCurrency(pendingAllocConfirm()!.match.outstandingAmount!) }}</span>
+            </div>
+          }
+          @if (pendingAllocConfirm()!.match.confidence) {
+            <div class="alloc-confirm-row">
+              <span class="alloc-confirm-label">Match Confidence</span>
+              <span class="confidence-badge" [ngClass]="getConfidenceBadgeClass(pendingAllocConfirm()!.match.confidence)">{{ pendingAllocConfirm()!.match.confidence }}%</span>
+            </div>
+          }
+          @if (pendingAllocConfirm()!.match.bankStatementPrior && pendingAllocConfirm()!.match.bankStatementPrior!.length > 0) {
+            <div class="alloc-confirm-prior">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Previously allocated {{ pendingAllocConfirm()!.match.bankStatementPrior!.length }}x to this account with same description
+            </div>
+          }
+        </div>
+        <div class="alloc-confirm-actions">
+          <button class="btn-outline" (click)="cancelAllocConfirm()" data-testid="button-cancel-alloc">Cancel</button>
+          <button class="btn-primary alloc-confirm-submit" (click)="confirmAndAllocate()" data-testid="button-confirm-alloc">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            Confirm &amp; Allocate Now
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

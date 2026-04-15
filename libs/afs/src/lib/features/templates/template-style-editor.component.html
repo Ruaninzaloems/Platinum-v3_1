@@ -1,0 +1,456 @@
+<div class="style-editor-container">
+  <div class="editor-header">
+    <div class="header-left">
+      <button mat-icon-button (click)="goBack()" matTooltip="Back to template">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <h1>Template Style Editor</h1>
+        <div class="subtitle">Customize the visual design of your AFS output</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="resetToDefaults()" matTooltip="Reset all styles to default values">
+        <mat-icon>restart_alt</mat-icon> Reset Defaults
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="saveStyle()" [disabled]="saving()" matTooltip="Save style configuration">
+        <mat-icon>save</mat-icon> {{ saving() ? 'Saving...' : 'Save Style' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="editor-body">
+    <div class="editor-panel">
+      <mat-tab-group animationDuration="200ms">
+
+        <mat-tab label="Logo & Branding">
+          <div class="tab-content">
+            <h3 class="section-title">Primary Logo</h3>
+            <div class="upload-zone" (click)="logoInput.click()" (dragover)="onDragOver($event)" (drop)="onDropLogo($event, 'primary')">
+              @if (style().logoPath) {
+                <img [src]="style().logoPath" class="logo-preview" [style.max-height.px]="style().logoMaxHeight" alt="Primary logo">
+              } @else {
+                <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                <span class="upload-text">Click or drag to upload logo</span>
+              }
+              <input #logoInput type="file" accept="image/*" hidden (change)="uploadLogo($event, 'primary')">
+            </div>
+            @if (style().logoPath) {
+              <button mat-stroked-button color="warn" (click)="removeLogo('primary')" class="remove-logo-btn">
+                <mat-icon>delete</mat-icon> Remove Logo
+              </button>
+            }
+            <div class="form-row">
+              <div class="form-group">
+                <label>Position</label>
+                <select [(ngModel)]="styleData.logoPosition" (ngModelChange)="onStyleChange()">
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Max Height: {{ style().logoMaxHeight }}px</label>
+                <input type="range" min="30" max="200" [(ngModel)]="styleData.logoMaxHeight" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+
+            <h3 class="section-title" style="margin-top:24px">Secondary Logo</h3>
+            <div class="upload-zone small-zone" (click)="secondaryLogoInput.click()" (dragover)="onDragOver($event)" (drop)="onDropLogo($event, 'secondary')">
+              @if (style().secondaryLogoPath) {
+                <img [src]="'/api/' + style().secondaryLogoPath" class="logo-preview" style="max-height:60px" alt="Secondary logo">
+              } @else {
+                <mat-icon class="upload-icon">add_photo_alternate</mat-icon>
+                <span class="upload-text">Optional secondary logo</span>
+              }
+              <input #secondaryLogoInput type="file" accept="image/*" hidden (change)="uploadLogo($event, 'secondary')">
+            </div>
+            @if (style().secondaryLogoPath) {
+              <button mat-stroked-button color="warn" (click)="removeLogo('secondary')" class="remove-logo-btn">
+                <mat-icon>delete</mat-icon> Remove
+              </button>
+            }
+            <div class="form-row">
+              <div class="form-group">
+                <label>Position</label>
+                <select [(ngModel)]="styleData.secondaryLogoPosition" (ngModelChange)="onStyleChange()">
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Colours">
+          <div class="tab-content">
+            <div class="preset-bar">
+              <span class="preset-label">Presets:</span>
+              @for (preset of presetNames; track preset) {
+                <button mat-stroked-button class="preset-btn" (click)="applyPreset(preset)" [matTooltip]="'Apply ' + preset + ' colour scheme'">
+                  {{ preset }}
+                </button>
+              }
+            </div>
+            <div class="color-grid">
+              <div class="color-item">
+                <label>Primary</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.primaryColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().primaryColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Secondary / Accent</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.secondaryColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().secondaryColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Header Background</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.headerBgColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().headerBgColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Header Text</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.headerTextColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().headerTextColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Footer Background</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.footerBgColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().footerBgColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Footer Text</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.footerTextColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().footerTextColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Table Borders</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.tableBorderColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().tableBorderColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Table Header BG</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.tableHeaderBgColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().tableHeaderBgColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Total Row BG</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.totalRowBgColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().totalRowBgColor }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Typography">
+          <div class="tab-content">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Body Font Family</label>
+                <select [(ngModel)]="styleData.fontFamily" (ngModelChange)="onStyleChange()">
+                  @for (f of fontOptions; track f) {
+                    <option [value]="f">{{ f }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Heading Font Family</label>
+                <select [(ngModel)]="styleData.headingFontFamily" (ngModelChange)="onStyleChange()">
+                  @for (f of fontOptions; track f) {
+                    <option [value]="f">{{ f }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Base Font Size: {{ style().baseFontSize }}pt</label>
+                <input type="range" min="8" max="14" [(ngModel)]="styleData.baseFontSize" (ngModelChange)="onStyleChange()">
+              </div>
+              <div class="form-group">
+                <label>Heading Font Size: {{ style().headingFontSize }}pt</label>
+                <input type="range" min="12" max="20" [(ngModel)]="styleData.headingFontSize" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Line Height: {{ style().lineHeight }}</label>
+                <input type="range" min="1.0" max="2.0" step="0.1" [(ngModel)]="styleData.lineHeight" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Cover Page">
+          <div class="tab-content">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Layout</label>
+                <div class="layout-options">
+                  @for (layout of coverLayouts; track layout.value) {
+                    <div class="layout-option" [class.selected]="style().coverLayout === layout.value" (click)="styleData.coverLayout = layout.value; onStyleChange()">
+                      <mat-icon>{{ layout.icon }}</mat-icon>
+                      <span>{{ layout.label }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="color-grid">
+              <div class="color-item">
+                <label>Cover Background</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.coverBgColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().coverBgColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Cover Text</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.coverTextColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().coverTextColor }}</span>
+                </div>
+              </div>
+              <div class="color-item">
+                <label>Cover Accent</label>
+                <div class="color-input-wrap">
+                  <input type="color" [(ngModel)]="styleData.coverAccentColor" (ngModelChange)="onStyleChange()">
+                  <span class="color-hex">{{ style().coverAccentColor }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="form-row" style="margin-top:16px">
+              <div class="form-group">
+                <mat-slide-toggle [(ngModel)]="styleData.showCoverBorder" (ngModelChange)="onStyleChange()">Show Border</mat-slide-toggle>
+              </div>
+              <div class="form-group">
+                <label>Border Style</label>
+                <select [(ngModel)]="styleData.coverBorderStyle" (ngModelChange)="onStyleChange()">
+                  <option value="solid">Solid</option>
+                  <option value="double">Double</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:1">
+                <label>Subtitle Text</label>
+                <input type="text" [(ngModel)]="styleData.coverSubtitleText" (ngModelChange)="onStyleChange()" class="text-input">
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Header & Footer">
+          <div class="tab-content">
+            <h3 class="section-title">Header</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Header Layout</label>
+                <select [(ngModel)]="styleData.headerLayout" (ngModelChange)="onStyleChange()">
+                  <option value="standard">Standard</option>
+                  <option value="with-logo">With Logo</option>
+                  <option value="minimal">Minimal</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Left Text Override</label>
+                <input type="text" [(ngModel)]="styleData.headerLeftText" (ngModelChange)="onStyleChange()" class="text-input" placeholder="Default: Municipality name">
+              </div>
+              <div class="form-group">
+                <label>Right Text Override</label>
+                <input type="text" [(ngModel)]="styleData.headerRightText" (ngModelChange)="onStyleChange()" class="text-input" placeholder="Default: AFS description">
+              </div>
+            </div>
+
+            <h3 class="section-title" style="margin-top:24px">Footer</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Footer Layout</label>
+                <select [(ngModel)]="styleData.footerLayout" (ngModelChange)="onStyleChange()">
+                  <option value="standard">Standard</option>
+                  <option value="with-page-numbers">With Page Numbers</option>
+                  <option value="minimal">Minimal</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <mat-slide-toggle [(ngModel)]="styleData.showPageNumbers" (ngModelChange)="onStyleChange()">Show Page Numbers</mat-slide-toggle>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Left Text Override</label>
+                <input type="text" [(ngModel)]="styleData.footerLeftText" (ngModelChange)="onStyleChange()" class="text-input" placeholder="Default: AFS year">
+              </div>
+              <div class="form-group">
+                <label>Right Text Override</label>
+                <input type="text" [(ngModel)]="styleData.footerRightText" (ngModelChange)="onStyleChange()" class="text-input" placeholder="Default: Municipality name">
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Watermark">
+          <div class="tab-content">
+            <div class="form-row">
+              <div class="form-group">
+                <mat-slide-toggle [(ngModel)]="styleData.showWatermark" (ngModelChange)="onStyleChange()">Show Watermark</mat-slide-toggle>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Watermark Text</label>
+                <input type="text" [(ngModel)]="styleData.draftWatermarkText" (ngModelChange)="onStyleChange()" class="text-input">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Opacity: {{ style().draftWatermarkOpacity }}</label>
+                <input type="range" min="0" max="0.2" step="0.01" [(ngModel)]="styleData.draftWatermarkOpacity" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Page Layout">
+          <div class="tab-content">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Top Margin: {{ style().pageMarginTop }}px</label>
+                <input type="range" min="10" max="80" [(ngModel)]="styleData.pageMarginTop" (ngModelChange)="onStyleChange()">
+              </div>
+              <div class="form-group">
+                <label>Bottom Margin: {{ style().pageMarginBottom }}px</label>
+                <input type="range" min="10" max="80" [(ngModel)]="styleData.pageMarginBottom" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Side Margins: {{ style().pageMarginSides }}px</label>
+                <input type="range" min="20" max="80" [(ngModel)]="styleData.pageMarginSides" (ngModelChange)="onStyleChange()">
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+      </mat-tab-group>
+    </div>
+
+    <div class="preview-panel">
+      <div class="preview-label">Live Preview</div>
+      <div class="preview-scroll">
+        <div class="mini-cover"
+             [style.background]="style().coverBgColor"
+             [style.color]="style().coverTextColor"
+             [style.font-family]="style().headingFontFamily"
+             [style.border]="style().showCoverBorder ? '3px ' + style().coverBorderStyle + ' ' + style().coverAccentColor : 'none'"
+             [style.text-align]="style().coverLayout === 'left-aligned' ? 'left' : 'center'"
+             [style.padding.px]="style().pageMarginSides">
+          @if (style().logoPath) {
+            <img [src]="style().logoPath" class="mini-logo" [style.max-height.px]="style().logoMaxHeight * 0.5" alt="Logo">
+          } @else {
+            <mat-icon class="mini-crest-icon" [style.color]="style().coverAccentColor">account_balance</mat-icon>
+          }
+          <div class="mini-cover-title" [style.font-size.pt]="style().headingFontSize * 0.7">MUNICIPALITY NAME</div>
+          <div class="mini-cover-divider" [style.background]="style().coverAccentColor"></div>
+          <div class="mini-cover-subtitle" [style.color]="style().coverAccentColor">{{ style().coverSubtitleText }}</div>
+        </div>
+
+        <div class="mini-page" [style.font-family]="style().fontFamily" [style.padding.px]="style().pageMarginSides * 0.5">
+          <div class="mini-header"
+               [style.background]="style().headerBgColor"
+               [style.color]="style().headerTextColor"
+               [style.padding-left.px]="style().pageMarginSides * 0.5"
+               [style.padding-right.px]="style().pageMarginSides * 0.5">
+            @if (style().headerLayout === 'with-logo' && style().logoPath) {
+              <img [src]="style().logoPath" class="mini-header-logo" alt="Logo">
+            }
+            <span>{{ style().headerLeftText || 'MUNICIPALITY' }}</span>
+            <span>{{ style().headerRightText || 'Annual Financial Statements' }}</span>
+          </div>
+
+          <div class="mini-body" [style.line-height]="style().lineHeight">
+            <div class="mini-section-heading"
+                 [style.font-family]="style().headingFontFamily"
+                 [style.font-size.pt]="style().headingFontSize * 0.6"
+                 [style.color]="style().primaryColor"
+                 [style.border-bottom-color]="style().primaryColor">
+              STATEMENT OF FINANCIAL POSITION
+            </div>
+
+            <table class="mini-table" [style.font-size.pt]="style().baseFontSize * 0.7" [style.border-color]="style().tableBorderColor">
+              <thead>
+                <tr [style.background]="style().tableHeaderBgColor">
+                  <th [style.border-color]="style().tableBorderColor">Item</th>
+                  <th [style.border-color]="style().tableBorderColor" style="text-align:right">2024/25</th>
+                  <th [style.border-color]="style().tableBorderColor" style="text-align:right">2023/24</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td [style.border-color]="style().tableBorderColor" [style.color]="style().primaryColor" style="font-weight:600">Current Assets</td>
+                  <td [style.border-color]="style().tableBorderColor"></td>
+                  <td [style.border-color]="style().tableBorderColor"></td>
+                </tr>
+                <tr>
+                  <td [style.border-color]="style().tableBorderColor" style="padding-left:16px">Cash and equivalents</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right">125,430</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right">118,250</td>
+                </tr>
+                <tr>
+                  <td [style.border-color]="style().tableBorderColor" style="padding-left:16px">Trade receivables</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right">89,120</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right">76,340</td>
+                </tr>
+                <tr [style.background]="style().totalRowBgColor" style="font-weight:700">
+                  <td [style.border-color]="style().tableBorderColor" [style.color]="style().primaryColor">Total Current Assets</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right" [style.color]="style().primaryColor">214,550</td>
+                  <td [style.border-color]="style().tableBorderColor" style="text-align:right" [style.color]="style().primaryColor">194,590</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mini-footer"
+               [style.background]="style().footerBgColor"
+               [style.color]="style().footerTextColor"
+               [style.padding-left.px]="style().pageMarginSides * 0.5"
+               [style.padding-right.px]="style().pageMarginSides * 0.5">
+            <span>{{ style().footerLeftText || 'Annual Financial Statements 2024/25' }}</span>
+            <span>
+              {{ style().footerRightText || 'Municipality' }}
+              @if (style().showPageNumbers) {
+                <span style="margin-left:8px">| Page 3</span>
+              }
+            </span>
+          </div>
+
+          @if (style().showWatermark) {
+            <div class="mini-watermark" [style.opacity]="style().draftWatermarkOpacity * 3">{{ style().draftWatermarkText }}</div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

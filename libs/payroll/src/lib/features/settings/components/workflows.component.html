@@ -1,0 +1,99 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Workflows</h1>
+    <p class="page-subtitle">Configure approval workflows and routing rules</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ workflows.length }}</span>
+    <span class="summary-label">Total Workflows</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ activeCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ inactiveCount }}</span>
+    <span class="summary-label">Inactive</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search workflows..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredWorkflows.length }} results</span>
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr><th>Name</th><th>Module</th><th>Approval Steps</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          @if (filteredWorkflows.length === 0) {
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">No workflow definitions found</td></tr>
+          } @else {
+            @for (w of filteredWorkflows; track w.id) {
+              <tr>
+                <td style="font-weight:500">{{ w.name || '-' }}</td>
+                <td><span class="badge badge-info">{{ w.module || '-' }}</span></td>
+                <td>
+                  @if (isStepsCustom(w)) {
+                    <span class="badge badge-warning">Custom</span>
+                  } @else {
+                    @for (step of getSteps(w); track $index) {
+                      <span class="badge badge-info" style="margin-right:4px">{{ $index + 1 }}. {{ getStepLabel(step) }}</span>
+                    }
+                  }
+                </td>
+                <td>
+                  @if (w.is_active !== false) {
+                    <span class="badge badge-success">Active</span>
+                  } @else {
+                    <span class="badge badge-danger">Inactive</span>
+                  }
+                </td>
+                <td><button class="action-btn" (click)="openEditModal(w)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Workflow: {{ editItem.name || 'Workflow' }}</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="activity" [size]="16"></app-icon> Workflow Details</div>
+          <div class="form-group"><label>Name</label><input class="form-control" [value]="editItem.name" readonly></div>
+          <div class="form-group"><label>Module</label><input class="form-control" [value]="editItem.module" readonly></div>
+        </div>
+        <div style="margin-top:12px">
+          <label style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px;display:flex;align-items:center;gap:6px"><app-icon name="fileText" [size]="14"></app-icon> Approval Steps (JSON)</label>
+          <textarea class="form-control" [(ngModel)]="stepsJson" style="font-family:monospace;font-size:12px;min-height:200px;resize:vertical"></textarea>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Each step should include: role/approver, name, and optional conditions</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">Update Workflow</button>
+      </div>
+    </div>
+  </div>
+}

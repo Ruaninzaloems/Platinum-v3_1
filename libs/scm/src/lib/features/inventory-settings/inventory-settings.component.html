@@ -1,0 +1,97 @@
+<div class="settings-container">
+  <div class="settings-header">
+    <div class="header-left">
+      <mat-icon class="header-icon">settings</mat-icon>
+      <div>
+        <h1>Inventory Settings</h1>
+        <p class="subtitle">Manage inventory configuration tables, constants and mappings</p>
+      </div>
+    </div>
+    <button mat-raised-button color="primary" (click)="openAdd()" *ngIf="!showForm()">
+      <mat-icon>add</mat-icon> Add New
+    </button>
+  </div>
+
+  @if (notification()) {
+    <div class="notification">{{ notification() }}</div>
+  }
+
+  <div class="settings-layout">
+    <div class="tab-sidebar">
+      @for (tab of tabs; track tab.key) {
+        <button class="tab-btn" [class.active]="activeTab() === tab.key" (click)="switchTab(tab.key)">
+          <mat-icon>{{ tab.icon }}</mat-icon>
+          <span>{{ tab.label }}</span>
+        </button>
+      }
+    </div>
+
+    <div class="tab-content">
+      @if (showForm()) {
+        <mat-card class="form-card">
+          <mat-card-header>
+            <mat-card-title>{{ editingItem() ? 'Edit' : 'Add' }} {{ getActiveTab().label }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="form-grid">
+              @for (field of getFormFields(); track field) {
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ field }}</mat-label>
+                  <input matInput [ngModel]="formData()[field]" (ngModelChange)="updateFormDataField(field, $event)" />
+                </mat-form-field>
+              }
+              <div class="toggle-field">
+                <mat-slide-toggle [ngModel]="formData()['enabled'] ?? true" (ngModelChange)="formData.update(d => ({...d, enabled: $event}))">Enabled</mat-slide-toggle>
+              </div>
+            </div>
+          </mat-card-content>
+          <mat-card-actions align="end">
+            <button mat-button (click)="cancelForm()">Cancel</button>
+            <button mat-raised-button color="primary" (click)="saveForm()">{{ editingItem() ? 'Update' : 'Create' }}</button>
+          </mat-card-actions>
+        </mat-card>
+      }
+
+      @if (loading()) {
+        <div class="loading-spinner">Loading...</div>
+      } @else {
+        <div class="table-wrapper">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                @for (col of getActiveTab().columns; track col.field) {
+                  <th>{{ col.header }}</th>
+                }
+                <th>Enabled</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track $index; let i = $index) {
+                <tr [class.disabled]="item.enabled === false">
+                  <td>{{ i + 1 }}</td>
+                  @for (col of getActiveTab().columns; track col.field) {
+                    <td>{{ getCellValue(item, col.field) }}</td>
+                  }
+                  <td>
+                    <mat-slide-toggle [checked]="item.enabled !== false" (change)="toggleEnabled(item)" color="primary"></mat-slide-toggle>
+                  </td>
+                  <td>
+                    <button mat-icon-button matTooltip="Edit" (click)="openEdit(item)">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="getActiveTab().columns.length + 3" class="empty-msg">No records found</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>

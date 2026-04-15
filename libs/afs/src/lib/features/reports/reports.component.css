@@ -1,0 +1,8 @@
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+  &:last-child { border-bottom: none; }
+  .danger { color: var(--platinum-danger); }
+}
+.negative { color: var(--platinum-danger); }
+.positive { color: var(--platinum-success); }

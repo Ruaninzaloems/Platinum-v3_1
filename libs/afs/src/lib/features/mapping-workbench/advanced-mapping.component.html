@@ -1,0 +1,409 @@
+<div class="advanced-mapping-container" [class.fullscreen-mode]="fullscreen || isNativeFullscreen">
+  <div class="mapping-action-bar">
+    <div class="selection-summary">
+      <mat-chip-set>
+        <mat-chip *ngIf="selectedRowIds.size > 0" highlighted color="primary">
+          <mat-icon matChipAvatar>list</mat-icon>
+          {{ selectedRowIds.size }} unmapped account(s) selected
+        </mat-chip>
+        <mat-chip *ngIf="selectedMappedRowIds.size > 0" highlighted color="warn">
+          <mat-icon matChipAvatar>link</mat-icon>
+          {{ selectedMappedRowIds.size }} mapped row(s) selected
+        </mat-chip>
+        <mat-chip *ngIf="selectedDisclosureId" highlighted color="accent">
+          <mat-icon matChipAvatar>account_tree</mat-icon>
+          {{ selectedDisclosureLabel }}
+        </mat-chip>
+      </mat-chip-set>
+    </div>
+    <div class="action-buttons">
+      <mat-form-field appearance="outline" class="reason-field" *ngIf="canAssign || canUnmap || canRemap">
+        <mat-label>Reason (optional)</mat-label>
+        <input matInput [(ngModel)]="assignReason" placeholder="Mapping reason...">
+      </mat-form-field>
+      <button mat-flat-button color="primary"
+              *ngIf="!isReadOnly && selectedRowIds.size > 0"
+              [disabled]="!canAssign || assigning"
+              (click)="assignMapping()"
+              matTooltip="Map selected unmapped accounts to chosen disclosure node">
+        <mat-icon>link</mat-icon>
+        {{ assigning ? 'Mapping...' : 'Map Selection' }}
+      </button>
+      <button mat-flat-button color="accent"
+              *ngIf="!isReadOnly && canRemap"
+              [disabled]="assigning || unmapping"
+              (click)="remapSelection()"
+              matTooltip="Move selected mapped rows to the chosen disclosure node">
+        <mat-icon>swap_horiz</mat-icon>
+        {{ assigning ? 'Remapping...' : 'Remap to ' + selectedDisclosureLabel }}
+      </button>
+      <button mat-flat-button color="warn"
+              *ngIf="!isReadOnly && selectedMappedRowIds.size > 0"
+              [disabled]="unmapping || assigning"
+              (click)="unmapSelection()"
+              matTooltip="Remove mapping from selected rows — they will return to the unmapped list">
+        <mat-icon>link_off</mat-icon>
+        {{ unmapping ? 'Unmapping...' : 'Unmap Selection' }}
+      </button>
+      <button mat-stroked-button (click)="clearSelection()"
+              *ngIf="selectedRowIds.size > 0 || selectedMappedRowIds.size > 0 || selectedDisclosureId"
+              matTooltip="Clear all selections">
+        <mat-icon>clear_all</mat-icon> Clear
+      </button>
+      <button mat-flat-button color="primary"
+              *ngIf="!isReadOnly"
+              [disabled]="autoMapping"
+              (click)="autoMapFromSixNine()"
+              matTooltip="Automatically map unmapped accounts using the mSCOA 6.9 reference table">
+        <mat-icon>auto_fix_high</mat-icon>
+        {{ autoMapping ? 'Auto-mapping...' : 'Auto-Map from 6.9' }}
+      </button>
+      <button mat-flat-button
+              *ngIf="!isReadOnly"
+              [disabled]="saving"
+              (click)="saveProgress()"
+              matTooltip="Refresh and sync all data — mapping changes are saved automatically on each action">
+        <mat-icon>save</mat-icon>
+        {{ saving ? 'Saving...' : 'Save' }}
+      </button>
+      <span class="auto-save-label" *ngIf="lastSavedAt">
+        <mat-icon class="save-check-icon">check_circle</mat-icon>
+        {{ lastSavedLabel }}
+      </span>
+      <button mat-stroked-button (click)="openFullscreen()"
+              *ngIf="!fullscreen && !isNativeFullscreen"
+              matTooltip="Expand to full screen">
+        <mat-icon>fullscreen</mat-icon> Full Screen
+      </button>
+      <button mat-stroked-button (click)="exitFullscreen()"
+              *ngIf="isNativeFullscreen"
+              matTooltip="Exit full screen (or press Escape)">
+        <mat-icon>fullscreen_exit</mat-icon> Exit Full Screen
+      </button>
+    </div>
+  </div>
+
+  <div class="split-panel">
+    <div class="panel left-panel" [style.flex]="'0 0 ' + leftPanelPercent + '%'">
+      <div class="panel-header">
+        <h3>
+          <mat-icon>warning_amber</mat-icon>
+          Unmapped Accounts
+          <span class="count-badge" *ngIf="unmappedTotal > 0 && !hideZeroBalance">({{ unmappedTotal }})</span>
+          <span class="count-badge" *ngIf="unmappedTotal > 0 && hideZeroBalance">({{ unmappedTotal }} of {{ unmappedTotalUnfiltered }})</span>
+        </h3>
+        <div class="header-controls">
+          <mat-slide-toggle
+            [(ngModel)]="hideZeroBalance"
+            (ngModelChange)="onHideZeroBalanceChange()"
+            matTooltip="Hide items with zero CY and PY amounts"
+            class="zero-balance-toggle">
+            Hide zero-balance
+          </mat-slide-toggle>
+        </div>
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Search accounts</mat-label>
+          <input matInput [(ngModel)]="unmappedSearch"
+                 (ngModelChange)="onUnmappedSearchChange()"
+                 placeholder="mSCOA code or description...">
+          <button *ngIf="unmappedSearch" matSuffix mat-icon-button (click)="clearUnmappedSearch()" matTooltip="Clear search">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-icon *ngIf="!unmappedSearch" matSuffix>search</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <mat-progress-bar *ngIf="unmappedLoading" mode="indeterminate"></mat-progress-bar>
+
+      <div class="panel-content">
+        <div *ngIf="!unmappedLoading && unmappedRows.length === 0" class="empty-state">
+          <mat-icon>check_circle</mat-icon>
+          <p>{{ unmappedSearch ? 'No matching unmapped accounts found.' : 'All accounts are mapped!' }}</p>
+        </div>
+
+        <div class="account-list" *ngIf="unmappedRows.length > 0">
+          <div class="list-header">
+            <mat-checkbox
+              [checked]="allRowsSelected"
+              [indeterminate]="someRowsSelected"
+              (change)="selectAllRows()"
+              [disabled]="isReadOnly"
+              class="select-all">
+              Select All
+            </mat-checkbox>
+            <span class="col-code resizable-col" [ngStyle]="colStyle('unmapped', 'code')">mSCOA Code<span class="col-resize-handle" (mousedown)="startColResize($event, 'unmapped', 'code')"></span></span>
+            <span class="col-desc resizable-col" [ngStyle]="colStyle('unmapped', 'desc')">Description<span class="col-resize-handle" (mousedown)="startColResize($event, 'unmapped', 'desc')"></span></span>
+            <span class="col-amount resizable-col" [ngStyle]="colStyle('unmapped', 'cyAmount')">CY Amount<span class="col-resize-handle" (mousedown)="startColResize($event, 'unmapped', 'cyAmount')"></span></span>
+            <span class="col-amount resizable-col" [ngStyle]="colStyle('unmapped', 'pyAmount')">PY Amount<span class="col-resize-handle" (mousedown)="startColResize($event, 'unmapped', 'pyAmount')"></span></span>
+          </div>
+
+          <div *ngFor="let row of unmappedRows"
+               class="account-row"
+               [class.selected]="isRowSelected(row.id)"
+               (click)="toggleRowSelection(row.id)">
+            <mat-checkbox
+              [checked]="isRowSelected(row.id)"
+              (change)="toggleRowSelection(row.id)"
+              (click)="$event.stopPropagation()"
+              [disabled]="isReadOnly"
+              class="row-checkbox">
+            </mat-checkbox>
+            <span class="col-code" [ngStyle]="colStyle('unmapped', 'code')" [matTooltip]="row.scoaItemCode">
+              {{ row.scoaItemCode | slice:0:20 }}
+            </span>
+            <span class="col-desc" [ngStyle]="colStyle('unmapped', 'desc')" [matTooltip]="row.sortDesc">
+              {{ row.sortDesc || row.mscoaLabel || '—' }}
+            </span>
+            <span class="col-amount" [ngStyle]="colStyle('unmapped', 'cyAmount')" [class.negative]="row.currentYearAmount < 0">
+              {{ formatAmount(row.currentYearAmount) }}
+            </span>
+            <span class="col-amount" [ngStyle]="colStyle('unmapped', 'pyAmount')" [class.negative]="row.priorYearAmount < 0">
+              {{ formatAmount(row.priorYearAmount) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pagination-bar" *ngIf="totalPages > 1">
+        <button mat-icon-button [disabled]="currentPage <= 1" (click)="goToPage(currentPage - 1)" matTooltip="Previous page">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <button *ngFor="let p of pageNumbers"
+                mat-button
+                [class.active-page]="p === currentPage"
+                (click)="goToPage(p)">
+          {{ p }}
+        </button>
+        <button mat-icon-button [disabled]="currentPage >= totalPages" (click)="goToPage(currentPage + 1)" matTooltip="Next page">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        <span class="page-info">Page {{ currentPage }} of {{ totalPages }} ({{ unmappedTotal }} items)</span>
+      </div>
+    </div>
+
+    <div class="panel-divider"
+         (mousedown)="startDragging($event)"
+         matTooltip="Drag to resize panels">
+      <mat-icon class="arrow-icon" *ngIf="canAssign">arrow_forward</mat-icon>
+      <mat-icon class="arrow-icon remap" *ngIf="canRemap && !canAssign">swap_horiz</mat-icon>
+      <mat-icon class="arrow-icon reverse" *ngIf="canUnmap && !canRemap && !canAssign">arrow_back</mat-icon>
+      <mat-icon class="arrow-icon dim" *ngIf="!canAssign && !canUnmap && !canRemap">compare_arrows</mat-icon>
+    </div>
+
+    <div class="panel right-panel" [style.flex]="'1 1 0'">
+      <div class="panel-header">
+        <h3>
+          <mat-icon>account_tree</mat-icon>
+          Disclosure Tree
+        </h3>
+        <div class="tree-controls">
+          <button mat-icon-button matTooltip="Expand All" (click)="expandAll()">
+            <mat-icon>unfold_more</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Collapse All" (click)="collapseAll()">
+            <mat-icon>unfold_less</mat-icon>
+          </button>
+        </div>
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Search disclosures & accounts</mat-label>
+          <input matInput [(ngModel)]="treeSearch"
+                 (ngModelChange)="onTreeSearchChange()"
+                 placeholder="Line label, code or account...">
+          <button *ngIf="treeSearch" matSuffix mat-icon-button (click)="clearTreeSearch()" matTooltip="Clear search">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-icon *ngIf="!treeSearch" matSuffix>search</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <mat-progress-bar *ngIf="treeLoading" mode="indeterminate"></mat-progress-bar>
+
+      <div class="panel-content">
+        <div *ngIf="!treeLoading && flatItems.length === 0" class="empty-state">
+          <mat-icon>folder_open</mat-icon>
+          <p>No disclosure data available for this run.</p>
+        </div>
+
+        <div class="tree-header" *ngIf="flatItems.length > 0">
+          <span class="col-tree-label resizable-col" [ngStyle]="colStyle('tree', 'label')">Disclosure Line<span class="col-resize-handle" (mousedown)="startColResize($event, 'tree', 'label')"></span></span>
+          <span class="col-tree-code resizable-col" [ngStyle]="colStyle('tree', 'code')">Code<span class="col-resize-handle" (mousedown)="startColResize($event, 'tree', 'code')"></span></span>
+          <span class="col-tree-amount resizable-col" [ngStyle]="colStyle('tree', 'cyBalance')">CY Balance<span class="col-resize-handle" (mousedown)="startColResize($event, 'tree', 'cyBalance')"></span></span>
+          <span class="col-tree-amount resizable-col" [ngStyle]="colStyle('tree', 'pyBalance')">PY Balance<span class="col-resize-handle" (mousedown)="startColResize($event, 'tree', 'pyBalance')"></span></span>
+          <span class="col-tree-count resizable-col" [ngStyle]="colStyle('tree', 'mapped')">Mapped<span class="col-resize-handle" (mousedown)="startColResize($event, 'tree', 'mapped')"></span></span>
+        </div>
+
+        <div class="tree-list" *ngIf="flatItems.length > 0">
+          <ng-container *ngFor="let item of flatItems">
+            <div *ngIf="item.type === 'disclosure'"
+                 class="tree-row"
+                 [class.selected]="isDisclosureSelected(item.node!)"
+                 [class.expandable]="item.node!.isExpandable || item.node!.mappedCount > 0"
+                 [class.leaf]="!item.node!.isExpandable && item.node!.mappedCount === 0"
+                 [class.level-1]="item.node!.level === 1"
+                 [class.level-2]="item.node!.level === 2"
+                 [class.level-3]="item.node!.level === 3"
+                 [class.level-4]="item.node!.level === 4"
+                 [class.level-deep]="item.node!.level >= 5"
+                 [class.has-mapped]="item.node!.mappedCount > 0"
+                 [class.showing-rows]="item.node!.showMappedRows"
+                 (click)="onDisclosureRowClick(item.node!)">
+              <span class="col-tree-label" [ngStyle]="colStyle('tree', 'label')" [style.paddingLeft]="getIndentPx(item.node!.level)">
+                <mat-icon class="expand-icon"
+                          *ngIf="item.node!.isExpandable"
+                          (click)="$event.stopPropagation(); toggleTreeNode(item.node!)">
+                  {{ item.node!.expanded ? 'expand_more' : 'chevron_right' }}
+                </mat-icon>
+                <mat-icon class="expand-icon mapped-expand"
+                          *ngIf="!item.node!.isExpandable && item.node!.mappedCount > 0"
+                          (click)="$event.stopPropagation(); toggleTreeNode(item.node!)">
+                  {{ item.node!.showMappedRows ? 'expand_more' : 'chevron_right' }}
+                </mat-icon>
+                <mat-icon class="leaf-icon" *ngIf="!item.node!.isExpandable && item.node!.mappedCount === 0">remove</mat-icon>
+                <span class="label-text">{{ item.node!.lineLabel }}</span>
+                <span class="note-detail-chip" *ngIf="item.node!.disclosureType === 'NoteDetail'">detail</span>
+                <span class="note-heading-summary" *ngIf="item.node!.noteHeadings?.length" [matTooltip]="'Note headings: ' + item.node!.noteHeadings!.length + ' group(s)'">
+                  <mat-icon class="heading-icon">notes</mat-icon>
+                </span>
+                <span class="statement-group-chip" *ngIf="item.node!.level === 1">
+                  {{ item.node!.statementGroup }}
+                </span>
+                <button *ngIf="item.node!.level >= 2 && !isReadOnly"
+                        mat-icon-button
+                        class="add-custom-btn"
+                        (click)="$event.stopPropagation(); openCustomL3Dialog(item.node!)"
+                        matTooltip="Add custom child item under this node">
+                  <mat-icon>add_circle_outline</mat-icon>
+                </button>
+                <button *ngIf="item.node!.level >= 3 && !isReadOnly && !autoMapping"
+                        mat-icon-button
+                        class="auto-map-node-btn"
+                        (click)="$event.stopPropagation(); autoMapFromSixNine(item.node!.disclosureId)"
+                        [matTooltip]="'Auto-map 6.9 for ' + item.node!.lineLabel">
+                  <mat-icon>auto_fix_high</mat-icon>
+                </button>
+              </span>
+              <span class="col-tree-code" [ngStyle]="colStyle('tree', 'code')">{{ item.node!.lineCode }}</span>
+              <span class="col-tree-amount" [ngStyle]="colStyle('tree', 'cyBalance')" [class.negative]="item.node!.balance < 0">
+                {{ item.node!.balance ? formatAmount(item.node!.balance) : '—' }}
+              </span>
+              <span class="col-tree-amount" [ngStyle]="colStyle('tree', 'pyBalance')" [class.negative]="item.node!.pyBalance < 0">
+                {{ item.node!.pyBalance ? formatAmount(item.node!.pyBalance) : '—' }}
+              </span>
+              <span class="col-tree-count" [ngStyle]="colStyle('tree', 'mapped')">
+                <button *ngIf="!item.node!.isExpandable && item.node!.mappedCount > 0"
+                        class="mapped-badge"
+                        [class.active]="item.node!.showMappedRows"
+                        [class.loading]="item.node!.mappedRowsLoading"
+                        (click)="toggleMappedRows(item.node!, $event)"
+                        [matTooltip]="item.node!.showMappedRows ? 'Hide linked SCOA items' : 'Show linked SCOA items'">
+                  {{ item.node!.mappedRowsLoading ? '...' : item.node!.mappedCount }}
+                  <mat-icon class="toggle-icon">{{ item.node!.showMappedRows ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </button>
+                <span *ngIf="item.node!.isExpandable && item.node!.mappedCount > 0"
+                      class="parent-mapped-count"
+                      matTooltip="Total mapped items across all children">
+                  {{ item.node!.mappedCount }}
+                </span>
+              </span>
+            </div>
+
+            <div *ngIf="item.type === 'mapped-row-header'"
+                 class="scoa-header-row"
+                 [style.paddingLeft]="getIndentPx(item.indentLevel + 1)">
+              <mat-checkbox
+                *ngIf="!isReadOnly"
+                [checked]="allMappedRowsSelectedForNode(item.parentNode!)"
+                [indeterminate]="someMappedRowsSelectedForNode(item.parentNode!)"
+                (change)="selectAllMappedRows(item.parentNode!)"
+                (click)="$event.stopPropagation()"
+                class="scoa-checkbox">
+              </mat-checkbox>
+              <mat-icon class="scoa-icon">subdirectory_arrow_right</mat-icon>
+              <span class="scoa-code resizable-col" [ngStyle]="colStyle('scoa', 'code')">Code<span class="col-resize-handle" (mousedown)="startColResize($event, 'scoa', 'code')"></span></span>
+              <span class="scoa-desc resizable-col" [ngStyle]="colStyle('scoa', 'desc')">Description<span class="col-resize-handle" (mousedown)="startColResize($event, 'scoa', 'desc')"></span></span>
+              <span class="scoa-amount resizable-col" [ngStyle]="colStyle('scoa', 'cyAmount')">CY Amount<span class="col-resize-handle" (mousedown)="startColResize($event, 'scoa', 'cyAmount')"></span></span>
+              <span class="scoa-amount resizable-col" [ngStyle]="colStyle('scoa', 'pyAmount')">PY Amount<span class="col-resize-handle" (mousedown)="startColResize($event, 'scoa', 'pyAmount')"></span></span>
+            </div>
+
+            <div *ngIf="item.type === 'mapped-row'"
+                 class="scoa-row"
+                 [class.scoa-selected]="isMappedRowSelected(item.row!.id)"
+                 [style.paddingLeft]="getIndentPx(item.indentLevel + 1)"
+                 (click)="toggleMappedRowSelection(item.row!, item.parentNode!)">
+              <mat-checkbox
+                *ngIf="!isReadOnly"
+                [checked]="isMappedRowSelected(item.row!.id)"
+                (change)="toggleMappedRowSelection(item.row!, item.parentNode!)"
+                (click)="$event.stopPropagation()"
+                class="scoa-checkbox">
+              </mat-checkbox>
+              <mat-icon class="scoa-icon">subdirectory_arrow_right</mat-icon>
+              <span class="scoa-code" [ngStyle]="colStyle('scoa', 'code')" [matTooltip]="item.row!.scoaItemCode">
+                {{ item.row!.scoaItemCode | slice:0:24 }}
+              </span>
+              <span class="scoa-desc" [ngStyle]="colStyle('scoa', 'desc')" [matTooltip]="item.row!.sortDesc">
+                {{ item.row!.sortDesc || item.row!.mscoaLabel || '—' }}
+              </span>
+              <span class="scoa-amount" [ngStyle]="colStyle('scoa', 'cyAmount')" [class.negative]="item.row!.currentYearAmount < 0">
+                {{ formatAmount(item.row!.currentYearAmount) }}
+              </span>
+              <span class="scoa-amount" [ngStyle]="colStyle('scoa', 'pyAmount')" [class.negative]="item.row!.priorYearAmount < 0">
+                {{ formatAmount(item.row!.priorYearAmount) }}
+              </span>
+              <span class="scoa-status">
+                <mat-icon class="status-icon" [class.matched]="item.row!.matchStatus === 'matched'"
+                          [class.manual]="item.row!.matchStatus === 'manually_mapped'"
+                          [matTooltip]="item.row!.matchStatus">
+                  {{ item.row!.matchStatus === 'matched' ? 'auto_fix_high' : 'person' }}
+                </mat-icon>
+              </span>
+            </div>
+
+            <div *ngIf="item.type === 'mapped-row-pagination'"
+                 class="mapped-rows-pagination"
+                 [style.paddingLeft]="getIndentPx(item.indentLevel + 1)">
+              <button mat-icon-button
+                      [disabled]="item.parentNode!.mappedRowsPage === 1 || item.parentNode!.mappedRowsLoading"
+                      (click)="loadMappedRowsPageNav(item.parentNode!, item.parentNode!.mappedRowsPage! - 1)">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-info">
+                Page {{ item.parentNode!.mappedRowsPage }} of {{ mappedRowsTotalPages(item.parentNode!) }}
+                ({{ item.parentNode!.mappedRowsTotal }} items)
+              </span>
+              <button mat-icon-button
+                      [disabled]="item.parentNode!.mappedRowsPage === mappedRowsTotalPages(item.parentNode!) || item.parentNode!.mappedRowsLoading"
+                      (click)="loadMappedRowsPageNav(item.parentNode!, item.parentNode!.mappedRowsPage! + 1)">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </ng-container>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="custom-l3-overlay" *ngIf="showCustomL3Dialog" (click)="cancelCustomL3()">
+    <div class="custom-l3-dialog" (click)="$event.stopPropagation()">
+      <h3>Add Custom Disclosure Item</h3>
+      <p class="dialog-subtitle">Under: <strong>{{ customL3ParentLabel }}</strong></p>
+      <mat-form-field appearance="outline" class="dialog-field">
+        <mat-label>Line Label</mat-label>
+        <input matInput [(ngModel)]="customL3Label" placeholder="e.g. Other receivables">
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="dialog-field">
+        <mat-label>Line Code (optional)</mat-label>
+        <input matInput [(ngModel)]="customL3Code" placeholder="Auto-generated if empty">
+      </mat-form-field>
+      <div class="dialog-actions">
+        <button mat-stroked-button (click)="cancelCustomL3()">Cancel</button>
+        <button mat-flat-button color="primary"
+                [disabled]="addingCustomL3 || !customL3Label.trim()"
+                (click)="addCustomL3()">
+          {{ addingCustomL3 ? 'Adding...' : 'Add Item' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

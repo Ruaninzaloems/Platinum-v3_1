@@ -1,0 +1,651 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1>Administration</h1>
+      <div class="subtitle">System management and configuration</div>
+    </div>
+    <div class="page-actions">
+      <button mat-flat-button class="btn-primary" (click)="navigateToRulesEngine()" matTooltip="Open the validation rules engine to view, edit, and run rules">
+        <mat-icon>rule</mat-icon> Rules Engine
+      </button>
+    </div>
+  </div>
+
+  <mat-tab-group animationDuration="200ms">
+    <mat-tab label="Users">
+      <div style="padding-top: 24px;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+          <button mat-flat-button class="btn-primary" (click)="showUserForm.set(true)" matTooltip="Create a new system user account">
+            <mat-icon>person_add</mat-icon> Create User
+          </button>
+        </div>
+
+        @if (showUserForm()) {
+          <div class="detail-card" style="margin-bottom: 16px;">
+            <div class="card-title"><mat-icon>person_add</mat-icon> Create New User</div>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>First Name</mat-label>
+                <input matInput [(ngModel)]="newUser.firstName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Last Name</mat-label>
+                <input matInput [(ngModel)]="newUser.lastName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Email</mat-label>
+                <input matInput type="email" [(ngModel)]="newUser.email">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Password</mat-label>
+                <input matInput type="password" [(ngModel)]="newUser.password">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Roles</mat-label>
+                <mat-select [(ngModel)]="newUser.roles" multiple>
+                  @for (role of roles(); track role.id) {
+                    <mat-option [value]="role.name">{{ role.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+              <button mat-stroked-button (click)="showUserForm.set(false)" matTooltip="Cancel user creation">Cancel</button>
+              <button mat-flat-button class="btn-primary" (click)="createUser()" [disabled]="!newUser.email || !newUser.firstName || !newUser.password || creatingUser()" matTooltip="Save and create the new user account">
+                @if (creatingUser()) {
+                  Creating...
+                } @else {
+                  Create User
+                }
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="detail-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th matTooltip="User's full name">Name</th>
+                <th matTooltip="User's email address and login identifier">Email</th>
+                <th matTooltip="Assigned system roles determining access permissions">Roles</th>
+                <th matTooltip="Whether the user account is active or disabled">Status</th>
+                <th matTooltip="Toggle user active status">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of users(); track user.id) {
+                <tr>
+                  <td><strong>{{ user.firstName }} {{ user.lastName }}</strong></td>
+                  <td>{{ user.email }}</td>
+                  <td>
+                    @for (role of user.roles; track role) {
+                      <mat-chip-option style="font-size: 11px; min-height: 24px;" disabled matTooltip="Role: {{ role }}">{{ role }}</mat-chip-option>
+                    }
+                  </td>
+                  <td>
+                    <span class="status-badge" [class]="user.isActive ? 'approved' : 'rejected'" matTooltip="User is currently {{ user.isActive ? 'active and can log in' : 'inactive and cannot log in' }}">
+                      {{ user.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td>
+                    <mat-slide-toggle [checked]="user.isActive" (change)="toggleUserActive(user.id)" matTooltip="Toggle user active/inactive status"></mat-slide-toggle>
+                  </td>
+                </tr>
+              }
+              @if (users().length === 0) {
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+                    No users found.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Roles">
+      <div style="padding-top: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+          @for (role of roles(); track role.id) {
+            <mat-card>
+              <mat-card-content>
+                <div class="card-title" matTooltip="System role with defined access permissions"><mat-icon>security</mat-icon> {{ role.name }}</div>
+                <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 12px;">{{ role.description }}</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                  @for (perm of role.permissions || []; track perm) {
+                    <span class="mscoa-tag">{{ perm }}</span>
+                  }
+                  @if (!role.permissions?.length) {
+                    <span style="font-size: 12px; color: var(--platinum-text-muted);">No permissions defined</span>
+                  }
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+          @if (roles().length === 0) {
+            <div class="empty-state">
+              <mat-icon>security</mat-icon>
+              <h3>No roles found</h3>
+            </div>
+          }
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Financial Years">
+      <div style="padding-top: 24px;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+          <button mat-flat-button class="btn-gold" (click)="seedFinancialYear()" [disabled]="seedingFY()" matTooltip="Populate default financial year periods">
+            <mat-icon>cloud_download</mat-icon>
+            {{ seedingFY() ? 'Seeding...' : 'Seed Financial Years' }}
+          </button>
+        </div>
+
+        <div class="detail-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th matTooltip="Financial year label (e.g. 2024/2025)">Label</th>
+                <th matTooltip="Financial year start date">Start Date</th>
+                <th matTooltip="Financial year end date">End Date</th>
+                <th matTooltip="Financial year status: Open, Closed, or Locked">Status</th>
+                <th matTooltip="Whether this is the currently active financial year">Current</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fy of financialYears(); track fy.id) {
+                <tr>
+                  <td><strong>{{ fy.label }}</strong></td>
+                  <td>{{ fy.startDate | date:'mediumDate' }}</td>
+                  <td>{{ fy.endDate | date:'mediumDate' }}</td>
+                  <td><span class="status-badge" [class]="fy.status.toLowerCase().replace(' ', '_')" matTooltip="Status: {{ fy.status }}">{{ fy.status }}</span></td>
+                  <td>
+                    @if (fy.isCurrent) {
+                      <mat-icon style="color: var(--platinum-success);" matTooltip="This is the current active financial year">check_circle</mat-icon>
+                    }
+                  </td>
+                </tr>
+              }
+              @if (financialYears().length === 0) {
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+                    No financial years found. Click "Seed Financial Years" to create them.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="System Config">
+      <div style="padding-top: 24px;">
+        <div class="detail-card">
+          <div class="card-title" matTooltip="Global system configuration key-value settings"><mat-icon>settings</mat-icon> System Configuration</div>
+
+          <div style="margin-bottom: 16px; display: flex; gap: 8px; align-items: flex-end;">
+            <mat-form-field appearance="outline" style="flex: 1;">
+              <mat-label>Key</mat-label>
+              <input matInput [(ngModel)]="newConfigKey">
+            </mat-form-field>
+            <mat-form-field appearance="outline" style="flex: 1;">
+              <mat-label>Value</mat-label>
+              <input matInput [(ngModel)]="newConfigValue">
+            </mat-form-field>
+            <button mat-flat-button class="btn-primary" (click)="saveConfig()" [disabled]="!newConfigKey" style="height: 56px;" matTooltip="Save this configuration key-value pair">
+              <mat-icon>save</mat-icon> Save
+            </button>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th matTooltip="Configuration setting identifier">Key</th>
+                <th matTooltip="Configuration setting value">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of configItems(); track item.key) {
+                <tr>
+                  <td><strong>{{ item.key }}</strong></td>
+                  <td>{{ item.value }}</td>
+                </tr>
+              }
+              @if (configItems().length === 0) {
+                <tr>
+                  <td colspan="2" style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">
+                    No configuration items found.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Email Settings">
+      <div style="padding-top: 24px;">
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div class="card-title" matTooltip="Configure outbound SMTP email server for notifications and alerts">
+            <mat-icon>email</mat-icon> Email Server Configuration
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 16px; background: var(--platinum-bg-surface, #f5f5f5); border-radius: 8px;">
+            <mat-slide-toggle
+              [checked]="emailConfig().enabled"
+              (change)="toggleEmailEnabled($event.checked)"
+              matTooltip="Enable or disable tenant-level SMTP email delivery">
+            </mat-slide-toggle>
+            <div>
+              <strong>Use Tenant SMTP Server</strong>
+              <p style="margin: 2px 0 0; font-size: 12px; color: var(--platinum-text-secondary);">
+                When enabled, emails will be sent using the configured SMTP server below. When disabled, the system falls back to global environment SMTP settings.
+              </p>
+            </div>
+            <span class="status-badge" [class]="emailConfig().enabled ? 'approved' : 'rejected'" style="margin-left: auto;">
+              {{ emailConfig().enabled ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>SMTP Host</mat-label>
+              <input matInput [(ngModel)]="emailSmtpHost" (ngModelChange)="markEmailDirty()" placeholder="smtp.office365.com" list="smtpHostPresets" matTooltip="SMTP server hostname — select a common provider or enter a custom host">
+              <mat-icon matSuffix>dns</mat-icon>
+              <datalist id="smtpHostPresets">
+                <option value="smtp.office365.com">Microsoft 365</option>
+                <option value="smtp.gmail.com">Gmail / Google Workspace</option>
+                <option value="smtp.sendgrid.net">SendGrid</option>
+                <option value="smtp.mailgun.org">Mailgun</option>
+                <option value="email-smtp.us-east-1.amazonaws.com">Amazon SES (US East)</option>
+                <option value="email-smtp.eu-west-1.amazonaws.com">Amazon SES (EU West)</option>
+                <option value="smtp.postmarkapp.com">Postmark</option>
+                <option value="in-v3.mailjet.com">Mailjet</option>
+              </datalist>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Port</mat-label>
+              <input matInput type="number" [(ngModel)]="emailPort" (ngModelChange)="markEmailDirty()" placeholder="587" matTooltip="SMTP server port (common: 25, 465, 587)">
+              <mat-icon matSuffix>settings_ethernet</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Encryption Method</mat-label>
+              <mat-select [(ngModel)]="emailEncryptionMethod" (ngModelChange)="onEmailEncryptionChange()" matTooltip="Transport security protocol">
+                <mat-option value="none">None</mat-option>
+                <mat-option value="tls">STARTTLS (Port 587)</mat-option>
+                <mat-option value="ssl">SSL/TLS (Port 465)</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Sender Address</mat-label>
+              <input matInput [(ngModel)]="emailSenderAddress" (ngModelChange)="markEmailDirty()" placeholder="noreply@municipality.gov.za" matTooltip="Email address used as the From address and SMTP login">
+              <mat-icon matSuffix>alternate_email</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ emailConfig().hasPassword ? 'Password (leave blank to keep current)' : 'Password' }}</mat-label>
+              <input matInput [type]="emailShowPassword() ? 'text' : 'password'" [(ngModel)]="emailPassword" (ngModelChange)="markEmailDirty()" [placeholder]="emailConfig().hasPassword ? '••••••••••••' : ''" matTooltip="SMTP authentication password">
+              <button mat-icon-button matSuffix (click)="emailShowPassword.set(!emailShowPassword())" matTooltip="Toggle password visibility" type="button">
+                <mat-icon>{{ emailShowPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+              @if (emailConfig().hasPassword && !emailPassword) {
+                <mat-hint>Password is saved. Enter a new value to change it.</mat-hint>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Display Name</mat-label>
+              <input matInput [(ngModel)]="emailDisplayedName" (ngModelChange)="markEmailDirty()" placeholder="Platinum AFS" matTooltip="Friendly sender name shown in recipient inboxes">
+              <mat-icon matSuffix>badge</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+            @if (emailDirty()) {
+              <button mat-stroked-button (click)="cancelEmailChanges()" matTooltip="Discard unsaved changes">
+                Cancel
+              </button>
+            }
+            <button mat-stroked-button (click)="testEmailConfig()" [disabled]="emailTesting() || !emailSmtpHost || !emailSenderAddress" matTooltip="Send a test email to your address to verify the configuration">
+              <mat-icon>send</mat-icon>
+              {{ emailTesting() ? 'Sending Test...' : 'Send Test Email' }}
+            </button>
+            <button mat-flat-button class="btn-primary" (click)="saveEmailConfig()" [disabled]="emailSaving() || !emailSmtpHost || !emailSenderAddress" matTooltip="Save email server configuration">
+              <mat-icon>save</mat-icon>
+              {{ emailSaving() ? 'Saving...' : 'Save Configuration' }}
+            </button>
+          </div>
+
+          @if (emailTestResult()) {
+            <div style="margin-top: 16px; padding: 12px 16px; border-radius: 8px;"
+                 [style.background]="emailTestResult()!.success ? 'var(--platinum-bg-success, #d4edda)' : 'var(--platinum-bg-danger, #f8d7da)'"
+                 [style.border-left]="emailTestResult()!.success ? '4px solid var(--platinum-success, #28a745)' : '4px solid var(--platinum-danger, #dc3545)'">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <mat-icon [style.color]="emailTestResult()!.success ? 'var(--platinum-success, #28a745)' : 'var(--platinum-danger, #dc3545)'">
+                  {{ emailTestResult()!.success ? 'check_circle' : 'error' }}
+                </mat-icon>
+                <span>{{ emailTestResult()!.message }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (emailConfig().lastTestedAt) {
+          <div class="detail-card">
+            <div class="card-title" matTooltip="Details of the most recent email configuration test">
+              <mat-icon>history</mat-icon> Last Test Result
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 12px;">
+              <div>
+                <div style="font-size: 12px; color: var(--platinum-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Status</div>
+                <span class="status-badge" [class]="emailConfig().lastTestStatus === 'success' ? 'approved' : 'rejected'" style="margin-top: 4px;">
+                  {{ emailConfig().lastTestStatus === 'success' ? 'Passed' : 'Failed' }}
+                </span>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: var(--platinum-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tested At</div>
+                <div style="margin-top: 4px;">{{ emailConfig().lastTestedAt | date:'medium' }}</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: var(--platinum-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tested By</div>
+                <div style="margin-top: 4px;">{{ emailConfig().lastTestedBy || '—' }}</div>
+              </div>
+              @if (emailConfig().lastTestStatus === 'failure' && emailConfig().lastTestErrorSummary) {
+                <div style="grid-column: 1 / -1;">
+                  <div style="font-size: 12px; color: var(--platinum-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Error Summary</div>
+                  <div style="margin-top: 4px; padding: 8px 12px; background: var(--platinum-bg-danger, #f8d7da); border-radius: 4px; font-size: 13px; color: var(--platinum-danger, #dc3545);">
+                    {{ emailConfig().lastTestErrorSummary }}
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="API Setup">
+      <div style="padding-top: 24px;">
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div class="card-title">
+            <mat-icon>api</mat-icon> Platinum API Configuration
+          </div>
+          <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 20px;">
+            Select the Platinum AFS API endpoint for this tenant. This determines which municipality's GL, trial balance, and budget data is used for compilations.
+          </p>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Select API</mat-label>
+              <mat-select [(ngModel)]="apiSelectedPreset" (selectionChange)="onApiPresetChange()">
+                @for (api of apiSetup().availableApis; track api.platinumApiUrl) {
+                  <mat-option [value]="api.platinumApiUrl">
+                    {{ api.label }}
+                  </mat-option>
+                }
+                <mat-option value="custom">Custom URL</mat-option>
+              </mat-select>
+              <mat-icon matSuffix>dns</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Platinum API URL</mat-label>
+              <input matInput [(ngModel)]="apiPlatinumUrl" placeholder="https://platinum-afs.azurewebsites.net"
+                     [readonly]="apiSelectedPreset !== 'custom'">
+              <mat-icon matSuffix>link</mat-icon>
+            </mat-form-field>
+          </div>
+
+          @if (apiPlatinumUrl) {
+            <div style="padding: 12px 16px; background: var(--platinum-bg-surface, #f5f5f5); border-radius: 8px; margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <mat-icon style="color: var(--platinum-navy, #1a5276); font-size: 18px; width: 18px; height: 18px;">info</mat-icon>
+                <strong style="font-size: 13px;">Active Endpoint</strong>
+              </div>
+              <div style="font-family: monospace; font-size: 13px; word-break: break-all; color: var(--platinum-text);">
+                {{ apiPlatinumUrl }}
+              </div>
+              <div style="font-size: 12px; color: var(--platinum-text-secondary); margin-top: 4px;">
+                Swagger: <a [href]="apiPlatinumUrl + '/index.html'" target="_blank" style="color: var(--platinum-navy, #1a5276);">{{ apiPlatinumUrl }}/index.html</a>
+              </div>
+            </div>
+          }
+
+          <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+            <button mat-stroked-button (click)="testApiConnection(apiPlatinumUrl, 'platinum')" [disabled]="apiTestingPlatinum() || !apiPlatinumUrl">
+              <mat-icon>wifi_tethering</mat-icon>
+              {{ apiTestingPlatinum() ? 'Testing...' : 'Test Connection' }}
+            </button>
+            <button mat-flat-button class="btn-primary" (click)="saveApiSetup()" [disabled]="apiSaving()">
+              <mat-icon>save</mat-icon>
+              {{ apiSaving() ? 'Saving...' : 'Save Configuration' }}
+            </button>
+          </div>
+
+          @if (apiTestResultPlatinum()) {
+            <div style="margin-top: 16px; padding: 12px 16px; border-radius: 8px;"
+                 [style.background]="apiTestResultPlatinum()!.success ? 'var(--platinum-bg-success, #d4edda)' : 'var(--platinum-bg-warning, #fff3cd)'"
+                 [style.border-left]="apiTestResultPlatinum()!.success ? '4px solid var(--platinum-success, #28a745)' : '4px solid var(--platinum-warning, #ffc107)'">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <mat-icon [style.color]="apiTestResultPlatinum()!.success ? 'var(--platinum-success, #28a745)' : 'var(--platinum-warning, #ffc107)'">
+                  {{ apiTestResultPlatinum()!.success ? 'check_circle' : 'error_outline' }}
+                </mat-icon>
+                <span>{{ apiTestResultPlatinum()!.message }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="detail-card">
+          <div class="card-title">
+            <mat-icon>hub</mat-icon> ART API Configuration
+          </div>
+          <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 20px;">
+            The ART (Analytics & Reporting Tool) API provides additional reporting, working papers, and findings capabilities.
+          </p>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>ART API URL</mat-label>
+              <input matInput [(ngModel)]="apiArtUrl" placeholder="https://platinum-art-api.azurewebsites.net">
+              <mat-icon matSuffix>link</mat-icon>
+            </mat-form-field>
+          </div>
+
+          @if (apiArtUrl) {
+            <div style="padding: 12px 16px; background: var(--platinum-bg-surface, #f5f5f5); border-radius: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <mat-icon style="color: var(--platinum-navy, #1a5276); font-size: 18px; width: 18px; height: 18px;">info</mat-icon>
+                <strong style="font-size: 13px;">ART Endpoint</strong>
+              </div>
+              <div style="font-family: monospace; font-size: 13px; word-break: break-all; color: var(--platinum-text);">
+                {{ apiArtUrl }}
+              </div>
+            </div>
+          }
+
+          <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+            <button mat-stroked-button (click)="testApiConnection(apiArtUrl, 'art')" [disabled]="apiTestingArt() || !apiArtUrl">
+              <mat-icon>wifi_tethering</mat-icon>
+              {{ apiTestingArt() ? 'Testing...' : 'Test ART Connection' }}
+            </button>
+          </div>
+
+          @if (apiTestResultArt()) {
+            <div style="margin-top: 16px; padding: 12px 16px; border-radius: 8px;"
+                 [style.background]="apiTestResultArt()!.success ? 'var(--platinum-bg-success, #d4edda)' : 'var(--platinum-bg-warning, #fff3cd)'"
+                 [style.border-left]="apiTestResultArt()!.success ? '4px solid var(--platinum-success, #28a745)' : '4px solid var(--platinum-warning, #ffc107)'">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <mat-icon [style.color]="apiTestResultArt()!.success ? 'var(--platinum-success, #28a745)' : 'var(--platinum-warning, #ffc107)'">
+                  {{ apiTestResultArt()!.success ? 'check_circle' : 'error_outline' }}
+                </mat-icon>
+                <span>{{ apiTestResultArt()!.message }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="SharePoint Integration">
+      <div style="padding-top: 24px;">
+        @if (!spConfig().environmentEnabled) {
+          <div class="detail-card" style="background: var(--platinum-bg-warning, #fff3cd); border-left: 4px solid var(--platinum-warning, #ffc107); margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <mat-icon style="color: var(--platinum-warning, #ffc107);">warning</mat-icon>
+              <div>
+                <strong>SharePoint Integration Disabled at Environment Level</strong>
+                <p style="margin: 4px 0 0; font-size: 13px; color: var(--platinum-text-secondary);">
+                  The SHAREPOINT_ENABLED environment variable is not set to "true". SharePoint integration is currently unavailable. Contact your system administrator to enable it.
+                </p>
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div class="card-title" matTooltip="Configure SharePoint Online integration for document storage">
+            <mat-icon>cloud</mat-icon> SharePoint Configuration
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 16px; background: var(--platinum-bg-surface, #f5f5f5); border-radius: 8px;">
+            <mat-slide-toggle
+              [checked]="spConfig().enabled"
+              (change)="toggleSharePoint($event.checked)"
+              [disabled]="!spConfig().environmentEnabled"
+              matTooltip="Toggle SharePoint for new document uploads">
+            </mat-slide-toggle>
+            <div>
+              <strong>Use SharePoint for new uploads</strong>
+              <p style="margin: 2px 0 0; font-size: 12px; color: var(--platinum-text-secondary);">
+                When enabled, new document uploads will be stored in SharePoint instead of local storage.
+              </p>
+            </div>
+            <span class="status-badge" [class]="spConfig().enabled && spConfig().environmentEnabled ? 'approved' : 'rejected'" style="margin-left: auto;">
+              {{ spConfig().enabled && spConfig().environmentEnabled ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>SharePoint Site URL</mat-label>
+              <input matInput [(ngModel)]="spSiteUrl" placeholder="https://yourtenant.sharepoint.com/sites/PlatinumAFS" matTooltip="Full URL of the SharePoint site">
+              <mat-icon matSuffix>link</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Document Library Name</mat-label>
+              <input matInput [(ngModel)]="spDocLibrary" placeholder="Platinum AFS Documents" matTooltip="Name of the SharePoint document library">
+              <mat-icon matSuffix>folder</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+            <button mat-stroked-button (click)="testSharePointConnection()" [disabled]="spTesting() || !spSiteUrl" matTooltip="Test the SharePoint connection">
+              <mat-icon>wifi_tethering</mat-icon>
+              {{ spTesting() ? 'Testing...' : 'Test Connection' }}
+            </button>
+            <button mat-flat-button class="btn-primary" (click)="saveSharePointConfig()" [disabled]="spSaving()" matTooltip="Save SharePoint configuration">
+              <mat-icon>save</mat-icon>
+              {{ spSaving() ? 'Saving...' : 'Save Configuration' }}
+            </button>
+          </div>
+
+          @if (spTestResult()) {
+            <div style="margin-top: 16px; padding: 12px 16px; border-radius: 8px;"
+                 [style.background]="spTestResult()!.success ? 'var(--platinum-bg-success, #d4edda)' : 'var(--platinum-bg-warning, #fff3cd)'"
+                 [style.border-left]="spTestResult()!.success ? '4px solid var(--platinum-success, #28a745)' : '4px solid var(--platinum-warning, #ffc107)'">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <mat-icon [style.color]="spTestResult()!.success ? 'var(--platinum-success, #28a745)' : 'var(--platinum-warning, #ffc107)'">
+                  {{ spTestResult()!.success ? 'check_circle' : 'info' }}
+                </mat-icon>
+                <span>{{ spTestResult()!.message }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div class="card-title" matTooltip="SharePoint folder structure mapping for document types">
+            <mat-icon>folder_open</mat-icon> Folder Structure Mapping
+          </div>
+          <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 16px;">
+            Maps document types to SharePoint folder paths. Use {{ '{' }}FinancialYear{{ '}' }} as a placeholder.
+          </p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th matTooltip="Document type identifier">Document Type</th>
+                <th matTooltip="SharePoint folder path template">Folder Path</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of spFolderEntries(); track entry.key) {
+                <tr>
+                  <td><strong>{{ entry.key }}</strong></td>
+                  <td style="font-family: monospace; font-size: 13px;">{{ entry.value }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div class="card-title" matTooltip="SharePoint metadata columns that will be created in the document library">
+            <mat-icon>view_column</mat-icon> Metadata Columns
+          </div>
+          <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 16px;">
+            These metadata columns will be created in the SharePoint document library to match DMS classification fields.
+          </p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th matTooltip="Column name in SharePoint">Column Name</th>
+                <th matTooltip="SharePoint column data type">Type</th>
+                <th matTooltip="Column description">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (col of spConfig().metadataColumns || []; track col.name) {
+                <tr>
+                  <td><strong>{{ col.name }}</strong></td>
+                  <td><span class="mscoa-tag">{{ col.type }}</span></td>
+                  <td style="font-size: 13px;">{{ col.description }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-card">
+          <div class="card-title" matTooltip="Migrate existing local files to SharePoint storage">
+            <mat-icon>swap_horiz</mat-icon> Migration Tool
+          </div>
+          <p style="font-size: 13px; color: var(--platinum-text-secondary); margin-bottom: 16px;">
+            Migrate existing locally stored documents to SharePoint. This operation will copy files to SharePoint and update document references. Original local files are preserved until migration is verified.
+          </p>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button mat-flat-button class="btn-gold"
+              (click)="migrateToSharePoint()"
+              [disabled]="spMigrating() || !spConfig().enabled || !spConfig().environmentEnabled"
+              matTooltip="Start migration of local files to SharePoint">
+              <mat-icon>cloud_upload</mat-icon>
+              {{ spMigrating() ? 'Migrating...' : 'Migrate Existing Files to SharePoint' }}
+            </button>
+          </div>
+
+          @if (spMigrationResult()) {
+            <div style="margin-top: 16px; padding: 12px 16px; border-radius: 8px; background: var(--platinum-bg-surface, #f5f5f5); border-left: 4px solid var(--platinum-primary, #1a237e);">
+              <p style="margin: 0;"><strong>Migration Result:</strong> <span [textContent]="spMigrationResult()?.message"></span></p>
+              <p style="margin: 4px 0 0; font-size: 13px;" [hidden]="spMigrationResult()?.totalLocalDocuments === undefined">Local documents found: <span [textContent]="spMigrationResult()?.totalLocalDocuments"></span> · Migrated: <span [textContent]="spMigrationResult()?.migrated"></span></p>
+            </div>
+          }
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

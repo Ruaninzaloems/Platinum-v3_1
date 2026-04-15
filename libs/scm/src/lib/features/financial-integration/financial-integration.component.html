@@ -1,0 +1,551 @@
+    <div class="fi-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <div class="page-header">
+        <div class="header-left">
+          <h1>Financial Integration</h1>
+          <p class="header-subtitle">GL Engine &middot; Budget Monitor &middot; mSCOA &middot; Period Close &middot; MFMA Reporting</p>
+        </div>
+        <div class="header-actions">
+          <button mat-stroked-button (click)="loadAll()" matTooltip="Refresh all data">
+            <mat-icon>refresh</mat-icon> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="tab-strip">
+        <button class="tab-btn" [class.active]="activeTab() === 'dashboard'" (click)="switchTab('dashboard')">
+          <mat-icon>dashboard</mat-icon><span>GL Dashboard</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'gl'" (click)="switchTab('gl')">
+          <mat-icon>menu_book</mat-icon><span>General Ledger</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'budget'" (click)="switchTab('budget')">
+          <mat-icon>account_balance_wallet</mat-icon><span>Budget Monitor</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'mscoa'" (click)="switchTab('mscoa')">
+          <mat-icon>grid_on</mat-icon><span>mSCOA Validator</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'period'" (click)="switchTab('period')">
+          <mat-icon>event_available</mat-icon><span>Period Close</span>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'mfma'" (click)="switchTab('mfma')">
+          <mat-icon>policy</mat-icon><span>MFMA Reports</span>
+        </button>
+      </div>
+
+      @if (loading()) {
+        <div class="loading-state">
+          <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+          <p>Loading financial data...</p>
+        </div>
+      } @else {
+
+        <!-- =================== GL DASHBOARD TAB =================== -->
+        @if (activeTab() === 'dashboard') {
+          <div class="kpi-strip">
+            <div class="kpi-tile" matTooltip="Total GL entries posted">
+              <mat-icon>menu_book</mat-icon>
+              <span class="kpi-value">{{dashboardData()?.totalGlEntries || 0}}</span>
+              <span class="kpi-label">GL Entries</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Entries posted today">
+              <mat-icon>today</mat-icon>
+              <span class="kpi-value">{{dashboardData()?.todayPostings || 0}}</span>
+              <span class="kpi-label">Today's Postings</span>
+            </div>
+            <div class="kpi-tile" [style.border-left-color]="(dashboardData()?.unreconciledCount || 0) > 0 ? '#ef6c00' : '#2e7d32'" matTooltip="Unreconciled cashbook entries">
+              <mat-icon>sync_problem</mat-icon>
+              <span class="kpi-value" [style.color]="(dashboardData()?.unreconciledCount || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{dashboardData()?.unreconciledCount || 0}}</span>
+              <span class="kpi-label">Unreconciled</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Current period status">
+              <mat-icon>calendar_month</mat-icon>
+              <span class="kpi-value kpi-text">{{dashboardData()?.currentPeriod || 'P9'}}</span>
+              <span class="kpi-label">Period</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Budget utilisation percentage">
+              <mat-icon>donut_large</mat-icon>
+              <span class="kpi-value">{{dashboardData()?.budgetUtilisation || 0}}%</span>
+              <span class="kpi-label">Budget Used</span>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="detail-card flex-2">
+              <h3><mat-icon>history</mat-icon> Recent Posting Log</h3>
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Action</th>
+                      <th>Module</th>
+                      <th>Source Ref</th>
+                      <th>Amount</th>
+                      <th>Journal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (log of postingLog(); track log.id) {
+                      <tr>
+                        <td>{{formatDateTime(log.timestamp)}}</td>
+                        <td><span class="status-badge" [class]="'status-' + log.action?.toLowerCase()">{{log.action}}</span></td>
+                        <td>{{log.module}}</td>
+                        <td class="ref-cell">{{log.sourceRef}}</td>
+                        <td class="value-cell">{{formatCurrency(log.amount || 0)}}</td>
+                        <td class="ref-cell">{{log.journalId ? 'JNL-' + log.journalId : '—'}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="6" class="empty-state"><mat-icon>info</mat-icon> No posting activity yet. GL postings appear here when transactions are approved.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>pie_chart</mat-icon> Posting Summary</h3>
+              <div class="summary-list">
+                @for (item of postingSummary(); track item.label) {
+                  <div class="summary-row">
+                    <span class="summary-label">{{item.label}}</span>
+                    <span class="summary-value">{{item.count}}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- =================== GENERAL LEDGER TAB =================== -->
+        @if (activeTab() === 'gl') {
+          <div class="view-toggle">
+            <button mat-stroked-button [class.active-toggle]="glView() === 'entries'" (click)="glView.set('entries')">
+              <mat-icon>list</mat-icon> GL Entries
+            </button>
+            <button mat-stroked-button [class.active-toggle]="glView() === 'trial-balance'" (click)="glView.set('trial-balance'); loadTrialBalance()">
+              <mat-icon>balance</mat-icon> Trial Balance
+            </button>
+          </div>
+
+          @if (glView() === 'entries') {
+            <div class="filters-bar">
+              <mat-form-field appearance="outline">
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput placeholder="Search by doc number..." [(ngModel)]="glSearchQuery" (keyup.enter)="loadGlEntries()">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-select placeholder="Source Module" [(ngModel)]="glFilterModule" (selectionChange)="loadGlEntries()">
+                  <mat-option value="">All Modules</mat-option>
+                  <mat-option value="orders">Orders</mat-option>
+                  <mat-option value="grn">GRN</mat-option>
+                  <mat-option value="invoices">Invoices</mat-option>
+                  <mat-option value="payments">Payments</mat-option>
+                  <mat-option value="inventory">Inventory</mat-option>
+                  <mat-option value="contracts">Contracts</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-stroked-button (click)="glSearchQuery=''; glFilterModule=''; loadGlEntries()">
+                <mat-icon>filter_alt_off</mat-icon> Clear
+              </button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Journal Ref</th>
+                    <th>Description</th>
+                    <th>Vote</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (entry of glEntries(); track entry.GenLedger_ID) {
+                    <tr (click)="viewGlEntry(entry)">
+                      <td>{{entry.GenLedger_ID}}</td>
+                      <td>{{formatDate(entry.PostingDate)}}</td>
+                      <td class="ref-cell">{{entry.NormalJournalID ? 'NJ-' + entry.NormalJournalID : entry.MultipleJournalID ? 'MJ-' + entry.MultipleJournalID : '—'}}</td>
+                      <td>{{entry.TransactionDetails}}</td>
+                      <td>{{entry.VoteID}}</td>
+                      <td class="value-cell">{{entry.Debit > 0 ? formatCurrency(entry.Debit) : '—'}}</td>
+                      <td class="value-cell">{{entry.Credit > 0 ? formatCurrency(entry.Credit) : '—'}}</td>
+                      <td><span class="status-badge status-info">{{entry._sourceModule || '—'}}</span></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="8" class="empty-state"><mat-icon>search_off</mat-icon> No GL entries found. Entries are created when transactions are approved.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <span class="page-info">Page {{glPage()}} of {{glTotalPages()}}</span>
+              <div class="page-buttons">
+                <button mat-icon-button [disabled]="glPage() <= 1" (click)="changeGlPage(glPage() - 1)"><mat-icon>chevron_left</mat-icon></button>
+                <span class="page-num">{{glPage()}}</span>
+                <button mat-icon-button [disabled]="glPage() >= glTotalPages()" (click)="changeGlPage(glPage() + 1)"><mat-icon>chevron_right</mat-icon></button>
+              </div>
+            </div>
+          }
+
+          @if (glView() === 'trial-balance') {
+            <div class="detail-card">
+              <h3><mat-icon>balance</mat-icon> Trial Balance — {{trialBalance()?.finYear || '2025/2026'}}</h3>
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Vote ID</th>
+                      <th>Account</th>
+                      <th>Total Debit</th>
+                      <th>Total Credit</th>
+                      <th>Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (acc of trialBalance()?.accounts || []; track acc.voteId) {
+                      <tr>
+                        <td>{{acc.voteId}}</td>
+                        <td>{{acc.voteName}}</td>
+                        <td class="value-cell">{{formatCurrency(acc.totalDebit)}}</td>
+                        <td class="value-cell">{{formatCurrency(acc.totalCredit)}}</td>
+                        <td class="value-cell" [style.color]="acc.balance >= 0 ? '#2e7d32' : '#c62828'">{{formatCurrency(Math.abs(acc.balance))}} {{acc.balance >= 0 ? 'Dr' : 'Cr'}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><mat-icon>info</mat-icon> No trial balance data available yet.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (trialBalance()?.totals) {
+                <div class="tb-totals">
+                  <div class="tb-total"><span>Total Debits:</span> <strong>{{formatCurrency(trialBalance()?.totals?.totalDebit || 0)}}</strong></div>
+                  <div class="tb-total"><span>Total Credits:</span> <strong>{{formatCurrency(trialBalance()?.totals?.totalCredit || 0)}}</strong></div>
+                  <div class="tb-total" [style.color]="trialBalance()?.totals?.isBalanced ? '#2e7d32' : '#c62828'">
+                    <mat-icon>{{trialBalance()?.totals?.isBalanced ? 'check_circle' : 'error'}}</mat-icon>
+                    <span>{{trialBalance()?.totals?.isBalanced ? 'Trial Balance is balanced' : 'IMBALANCE DETECTED'}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        <!-- =================== BUDGET MONITOR TAB =================== -->
+        @if (activeTab() === 'budget') {
+          @if (budgetSummary()) {
+            <div class="kpi-strip">
+              <div class="kpi-tile" matTooltip="Total approved budget">
+                <mat-icon>savings</mat-icon>
+                <span class="kpi-value">{{formatCurrencyShort(budgetSummary()?.summary?.totalBudget || 0)}}</span>
+                <span class="kpi-label">Total Budget</span>
+              </div>
+              <div class="kpi-tile" matTooltip="Amount consumed (actual expenditure)">
+                <mat-icon>receipt</mat-icon>
+                <span class="kpi-value">{{formatCurrencyShort(budgetSummary()?.summary?.totalConsumed || 0)}}</span>
+                <span class="kpi-label">Consumed</span>
+              </div>
+              <div class="kpi-tile" matTooltip="Amount committed (approved orders)">
+                <mat-icon>lock</mat-icon>
+                <span class="kpi-value">{{formatCurrencyShort(budgetSummary()?.summary?.totalCommitted || 0)}}</span>
+                <span class="kpi-label">Committed</span>
+              </div>
+              <div class="kpi-tile" matTooltip="Reserved for approved requisitions">
+                <mat-icon>bookmark</mat-icon>
+                <span class="kpi-value">{{formatCurrencyShort(budgetSummary()?.summary?.totalReserved || 0)}}</span>
+                <span class="kpi-label">Reserved</span>
+              </div>
+              <div class="kpi-tile" [style.border-left-color]="(budgetSummary()?.summary?.overallUtilisation || 0) > 90 ? '#c62828' : '#2e7d32'" matTooltip="Available budget remaining">
+                <mat-icon>account_balance</mat-icon>
+                <span class="kpi-value" [style.color]="(budgetSummary()?.summary?.overallUtilisation || 0) > 90 ? '#c62828' : '#2e7d32'">{{formatCurrencyShort(budgetSummary()?.summary?.totalAvailable || 0)}}</span>
+                <span class="kpi-label">Available</span>
+              </div>
+            </div>
+          }
+
+          <div class="budget-cards-grid">
+            @for (vote of budgetVotes(); track vote.voteId) {
+              <div class="budget-vote-card">
+                <div class="vote-header">
+                  <span class="vote-code">{{vote.vote}}</span>
+                  <span class="vote-util" [style.color]="vote.utilisationPercentage > 90 ? '#c62828' : vote.utilisationPercentage > 75 ? '#ef6c00' : '#2e7d32'">{{vote.utilisationPercentage}}%</span>
+                </div>
+                <div class="vote-desc">{{vote.voteDesc}}</div>
+                <mat-progress-bar [mode]="'determinate'" [value]="vote.utilisationPercentage" [color]="vote.utilisationPercentage > 90 ? 'warn' : 'primary'"></mat-progress-bar>
+                <div class="vote-breakdown">
+                  <div class="vb-row"><span>Original Budget</span><span>{{formatCurrency(vote.originalBudget)}}</span></div>
+                  <div class="vb-row"><span>Adjustment</span><span>{{formatCurrency(vote.adjustmentBudget)}}</span></div>
+                  <div class="vb-row"><span>Total Budget</span><strong>{{formatCurrency(vote.totalBudget)}}</strong></div>
+                  <div class="vb-row vb-reserved"><span>Reserved</span><span>{{formatCurrency(vote.reserved)}}</span></div>
+                  <div class="vb-row vb-committed"><span>Committed</span><span>{{formatCurrency(vote.committed)}}</span></div>
+                  <div class="vb-row vb-consumed"><span>Consumed</span><span>{{formatCurrency(vote.consumed)}}</span></div>
+                  <div class="vb-row vb-available"><span>Available</span><strong>{{formatCurrency(vote.available)}}</strong></div>
+                </div>
+              </div>
+            } @empty {
+              <div class="empty-state"><mat-icon>info</mat-icon> No vote balances loaded.</div>
+            }
+          </div>
+        }
+
+        <!-- =================== mSCOA VALIDATOR TAB =================== -->
+        @if (activeTab() === 'mscoa') {
+          <div class="detail-cards-row">
+            <div class="detail-card flex-1">
+              <h3><mat-icon>check_circle</mat-icon> mSCOA 7-Segment Validator</h3>
+              <div class="mscoa-form">
+                <mat-form-field appearance="outline">
+                  <mat-label>Function</mat-label>
+                  <mat-select [(ngModel)]="mscoaFunctionId">
+                    <mat-option [value]="null">-- Select --</mat-option>
+                    @for (f of mscoaFunctions(); track f.id) {
+                      <mat-option [value]="f.id">{{f.code}} — {{f.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Item</mat-label>
+                  <mat-select [(ngModel)]="mscoaItemId">
+                    <mat-option [value]="null">-- Select --</mat-option>
+                    @for (i of mscoaItems(); track i.id) {
+                      <mat-option [value]="i.id">{{i.code}} — {{i.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Fund</mat-label>
+                  <mat-select [(ngModel)]="mscoaFundId">
+                    <mat-option [value]="null">-- Select --</mat-option>
+                    @for (f of mscoaFunds(); track f.id) {
+                      <mat-option [value]="f.id">{{f.code}} — {{f.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Project</mat-label>
+                  <mat-select [(ngModel)]="mscoaProjectId">
+                    <mat-option [value]="null">-- Select (optional) --</mat-option>
+                    @for (p of mscoaProjects(); track p.id) {
+                      <mat-option [value]="p.id">{{p.code}} — {{p.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Region</mat-label>
+                  <mat-select [(ngModel)]="mscoaRegionId">
+                    <mat-option [value]="null">-- Select (optional) --</mat-option>
+                    @for (r of mscoaRegions(); track r.id) {
+                      <mat-option [value]="r.id">{{r.code}} — {{r.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Costing</mat-label>
+                  <mat-select [(ngModel)]="mscoaCostingId">
+                    <mat-option [value]="null">-- Select (optional) --</mat-option>
+                    @for (c of mscoaCostings(); track c.id) {
+                      <mat-option [value]="c.id">{{c.code}} — {{c.description}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <button mat-flat-button color="primary" (click)="validateMscoa()" style="margin-top:8px">
+                  <mat-icon>verified</mat-icon> Validate mSCOA
+                </button>
+              </div>
+
+              @if (mscoaResult()) {
+                <div class="mscoa-result" [class.mscoa-valid]="mscoaResult()?.valid" [class.mscoa-invalid]="!mscoaResult()?.valid">
+                  <div class="mscoa-result-header">
+                    <mat-icon>{{mscoaResult()?.valid ? 'check_circle' : 'error'}}</mat-icon>
+                    <span>{{mscoaResult()?.valid ? 'Valid mSCOA Segment' : 'Validation Failed'}}</span>
+                  </div>
+                  @if (mscoaResult()?.fullSegmentString) {
+                    <div class="mscoa-segment-string">{{mscoaResult()?.fullSegmentString}}</div>
+                  }
+                  @if (mscoaResult()?.errors?.length) {
+                    <div class="mscoa-errors">
+                      @for (err of mscoaResult()?.errors || []; track err.segment) {
+                        <div class="mscoa-error-item"><mat-icon>warning</mat-icon> {{err.segment}}: {{err.error}}</div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>inventory_2</mat-icon> Inventory-to-mSCOA Mappings</h3>
+              <div class="table-wrapper">
+                <table class="data-table compact">
+                  <thead>
+                    <tr>
+                      <th>Commodity</th>
+                      <th>Description</th>
+                      <th>Function</th>
+                      <th>Item</th>
+                      <th>Fund</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (m of inventoryMappings(); track m.id) {
+                      <tr>
+                        <td class="ref-cell">{{m.commodityCode}}</td>
+                        <td>{{m.commodityDescription}}</td>
+                        <td>{{m.mscoaFunctionId}}</td>
+                        <td>{{m.mscoaItemId}}</td>
+                        <td>{{m.mscoaFundId}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state">No mappings configured</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- =================== PERIOD CLOSE TAB =================== -->
+        @if (activeTab() === 'period') {
+          <div class="detail-cards-row">
+            <div class="detail-card flex-2">
+              <h3><mat-icon>checklist</mat-icon> Period Close Checklist — {{periodStatus()?.periodName || 'Current Period'}}</h3>
+              <div class="period-progress">
+                <div class="period-progress-info">
+                  <span>{{periodStatus()?.progress?.completed || 0}} / {{periodStatus()?.progress?.total || 0}} items completed</span>
+                  <span class="period-pct">{{periodStatus()?.progress?.percentage || 0}}%</span>
+                </div>
+                <mat-progress-bar mode="determinate" [value]="periodStatus()?.progress?.percentage || 0"></mat-progress-bar>
+              </div>
+
+              <div class="checklist-items">
+                @for (item of periodStatus()?.items || []; track item.id) {
+                  <div class="checklist-item" [class.checklist-complete]="item.isComplete" [class.checklist-mandatory]="item.isMandatory">
+                    <div class="checklist-left">
+                      <mat-icon>{{item.isComplete ? 'check_circle' : item.isMandatory ? 'radio_button_unchecked' : 'remove_circle_outline'}}</mat-icon>
+                      <div class="checklist-text">
+                        <span class="checklist-label">{{item.item}}</span>
+                        <span class="checklist-module">{{item.module}}</span>
+                      </div>
+                    </div>
+                    <div class="checklist-right">
+                      @if (item.isMandatory) {
+                        <span class="badge badge-warning">Mandatory</span>
+                      }
+                      @if (item.isComplete) {
+                        <span class="badge badge-success">Done</span>
+                      } @else {
+                        <button mat-stroked-button class="btn-sm" (click)="completeChecklistItem(item.id)">
+                          <mat-icon>check</mat-icon> Complete
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="period-actions">
+                <button mat-flat-button color="primary" [disabled]="!periodStatus()?.progress?.canClose" (click)="approvePeriodClose()" matTooltip="All mandatory items must be complete">
+                  <mat-icon>lock</mat-icon> Close Period
+                </button>
+              </div>
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>info</mat-icon> Period Status</h3>
+              <div class="period-info-card">
+                <div class="pi-row"><span>Financial Year</span><strong>{{periodStatus()?.finYear || '2025/2026'}}</strong></div>
+                <div class="pi-row"><span>Current Period</span><strong>{{periodStatus()?.periodName || '—'}}</strong></div>
+                <div class="pi-row"><span>Period Status</span>
+                  <span class="status-badge" [class]="'status-' + (periodStatus()?.periodStatus || 'unknown')">{{periodStatus()?.periodStatus || '—'}}</span>
+                </div>
+                <div class="pi-row"><span>Mandatory Items</span><strong>{{periodStatus()?.progress?.mandatoryCompleted || 0}} / {{periodStatus()?.progress?.mandatoryTotal || 0}}</strong></div>
+                <div class="pi-row"><span>Can Close</span>
+                  <mat-icon [style.color]="periodStatus()?.progress?.canClose ? '#2e7d32' : '#c62828'">{{periodStatus()?.progress?.canClose ? 'check_circle' : 'cancel'}}</mat-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- =================== MFMA REPORTS TAB =================== -->
+        @if (activeTab() === 'mfma') {
+          <div class="mfma-grid">
+            <div class="detail-card">
+              <h3><mat-icon>assessment</mat-icon> Section 71 — Monthly Budget Report</h3>
+              <p class="mfma-desc">MFMA Section 71 requires the accounting officer to submit a monthly budget statement to the Mayor and Provincial/National Treasury.</p>
+              <button mat-flat-button color="primary" (click)="loadMfmaReport('section71')">
+                <mat-icon>download</mat-icon> Generate Report
+              </button>
+              @if (mfmaSection71()) {
+                <div class="mfma-preview">
+                  <div class="mfma-row"><span>Reporting Period</span><strong>{{mfmaSection71()?.reportingPeriod || '—'}}</strong></div>
+                  <div class="mfma-row"><span>Original Budget</span><span>{{formatCurrency(mfmaSection71()?.originalBudget || 0)}}</span></div>
+                  <div class="mfma-row"><span>Adjustment Budget</span><span>{{formatCurrency(mfmaSection71()?.adjustmentBudget || 0)}}</span></div>
+                  <div class="mfma-row"><span>YTD Actual</span><strong>{{formatCurrency(mfmaSection71()?.ytdActual || 0)}}</strong></div>
+                  <div class="mfma-row"><span>Variance</span><span [style.color]="(mfmaSection71()?.variancePercentage || 0) > 10 ? '#c62828' : '#2e7d32'">{{mfmaSection71()?.variancePercentage || 0}}%</span></div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>trending_up</mat-icon> Section 52 — Performance Report</h3>
+              <p class="mfma-desc">Mid-year budget and performance assessment per MFMA Section 52.</p>
+              <button mat-flat-button color="primary" (click)="loadMfmaReport('section52')">
+                <mat-icon>download</mat-icon> Generate Report
+              </button>
+              @if (mfmaSection52()) {
+                <div class="mfma-preview">
+                  <div class="mfma-row"><span>Service Delivery Score</span><strong>{{mfmaSection52()?.serviceDeliveryScore || '—'}}%</strong></div>
+                  <div class="mfma-row"><span>Capital Programme</span><span>{{mfmaSection52()?.capitalProgramme || '—'}}%</span></div>
+                  <div class="mfma-row"><span>Revenue Collection</span><span>{{mfmaSection52()?.revenueCollection || '—'}}%</span></div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>timer</mat-icon> Section 65 — Payment Compliance</h3>
+              <p class="mfma-desc">All payments must be made within 30 days of receipt of a valid invoice per MFMA Section 65(2)(e).</p>
+              <button mat-flat-button color="primary" (click)="loadMfmaReport('section65')">
+                <mat-icon>download</mat-icon> Generate Report
+              </button>
+              @if (mfmaSection65()) {
+                <div class="mfma-preview">
+                  <div class="mfma-row"><span>Compliance Rate</span><strong [style.color]="(mfmaSection65()?.complianceRate || 0) >= 95 ? '#2e7d32' : '#c62828'">{{mfmaSection65()?.complianceRate || 0}}%</strong></div>
+                  <div class="mfma-row"><span>Total Invoices</span><span>{{mfmaSection65()?.totalInvoices || 0}}</span></div>
+                  <div class="mfma-row"><span>Paid Within 30 Days</span><span>{{mfmaSection65()?.paidWithin30Days || 0}}</span></div>
+                  <div class="mfma-row"><span>Overdue</span><span style="color:#c62828">{{mfmaSection65()?.overdue || 0}}</span></div>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>warning</mat-icon> Unauthorized & Irregular Expenditure</h3>
+              <p class="mfma-desc">Summary of unauthorized, irregular, fruitless and wasteful expenditure per MFMA.</p>
+              <button mat-flat-button color="primary" (click)="loadMfmaReport('unauthorized')">
+                <mat-icon>download</mat-icon> Generate Report
+              </button>
+              @if (mfmaUnauthorized()) {
+                <div class="mfma-preview">
+                  <div class="mfma-row"><span>Unauthorized</span><strong style="color:#c62828">{{formatCurrency(mfmaUnauthorized()?.unauthorizedAmount || 0)}}</strong></div>
+                  <div class="mfma-row"><span>Irregular</span><strong style="color:#ef6c00">{{formatCurrency(mfmaUnauthorized()?.irregularAmount || 0)}}</strong></div>
+                  <div class="mfma-row"><span>Fruitless & Wasteful</span><span>{{formatCurrency(mfmaUnauthorized()?.fruitlessAmount || 0)}}</span></div>
+                  <div class="mfma-row"><span>Total Cases</span><span>{{mfmaUnauthorized()?.totalCases || 0}}</span></div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>

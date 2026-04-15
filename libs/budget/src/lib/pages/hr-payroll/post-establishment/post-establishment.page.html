@@ -1,0 +1,470 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Post Establishment & Salary Structure</h1>
+      <p class="page-subtitle">Manage post establishment, organogram integration, salary structures & vacant post rankings (HRPB42, HRPB54, HRPB56, HRPB59, HRPB70, HRPB92, HRPB93)</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-outline" (click)="flagActivePosts()" [disabled]="flagging">
+        <mat-icon>flag</mat-icon> {{flagging ? 'Flagging...' : 'Flag Active Posts'}}
+      </button>
+      <button class="btn-primary" (click)="openCreatePost()">
+        <mat-icon>add</mat-icon> New Post
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-tabs">
+    <button [class.active]="activePanel === 'posts'" (click)="activePanel = 'posts'">
+      <mat-icon>badge</mat-icon> Post Establishment
+    </button>
+    <button [class.active]="activePanel === 'salary'" (click)="activePanel = 'salary'">
+      <mat-icon>account_tree</mat-icon> Salary Structure
+    </button>
+    <button [class.active]="activePanel === 'vacant'" (click)="activePanel = 'vacant'">
+      <mat-icon>person_search</mat-icon> Vacant Posts ({{vacantPosts.length}})
+    </button>
+  </div>
+
+  <!-- POST ESTABLISHMENT TABLE -->
+  <div class="card-container" *ngIf="activePanel === 'posts'">
+    <div class="card-title-bar">
+      <h2><mat-icon>list_alt</mat-icon> Post Establishment Register</h2>
+      <div class="filter-bar">
+        <select [(ngModel)]="filterDepartment" (ngModelChange)="applyFilter()">
+          <option value="">All Departments</option>
+          <option *ngFor="let d of departments" [value]="d">{{d}}</option>
+        </select>
+        <select [(ngModel)]="filterStatus" (ngModelChange)="applyFilter()">
+          <option value="">All Statuses</option>
+          <option value="Filled">Filled</option>
+          <option value="Vacant">Vacant</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" *ngIf="filteredPosts.length > 0">
+        <thead>
+          <tr>
+            <th>Post ID</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Level</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Funded</th>
+            <th class="text-right">Annual Cost</th>
+            <th>mSCOA</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of filteredPosts">
+            <td><span class="post-code">{{p.postCode}}</span></td>
+            <td class="fw-600">{{p.title}}</td>
+            <td>{{p.department || '—'}}</td>
+            <td>{{p.jobLevel || '—'}}</td>
+            <td><span class="type-pill">{{p.employmentType}}</span></td>
+            <td>
+              <span class="status-badge" [ngClass]="p.status === 'Filled' ? 'status-filled' : 'status-vacant'">
+                {{p.status}}
+              </span>
+            </td>
+            <td>
+              <span class="funded-badge" [ngClass]="p.isFunded ? 'funded-yes' : 'funded-no'">
+                {{p.isFunded ? 'Yes' : 'No'}}
+              </span>
+            </td>
+            <td class="text-right mono">{{formatCurrency(p.totalCostToMunicipality)}}</td>
+            <td>
+              <span class="mscoa-tag" *ngIf="p.scoaItemCode">{{p.scoaItemCode}}</span>
+              <span class="text-muted" *ngIf="!p.scoaItemCode">—</span>
+            </td>
+            <td class="action-cell">
+              <button class="btn-icon" (click)="editPost(p)" title="Edit">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button class="btn-icon" *ngIf="p.status === 'Vacant'" (click)="openRankDialog(p)" title="Rank">
+                <mat-icon>star_rate</mat-icon>
+              </button>
+              <button class="btn-icon" *ngIf="p.status === 'Vacant'" (click)="openStartDateDialog(p)" title="Set Start Date">
+                <mat-icon>event</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="filteredPosts.length === 0">
+        <mat-icon>badge</mat-icon>
+        <p>No posts found. Create a new post or adjust filters.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALARY STRUCTURE PANEL -->
+  <div class="card-container" *ngIf="activePanel === 'salary'">
+    <div class="card-title-bar">
+      <h2><mat-icon>account_tree</mat-icon> Salary Structure — Grade / Notch Table</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" *ngIf="salaryStructures.length > 0">
+        <thead>
+          <tr>
+            <th>Grade</th>
+            <th>Notch</th>
+            <th class="text-right">Annual Amount</th>
+            <th class="text-right">Hourly Rate</th>
+            <th>Bargaining Unit</th>
+            <th>Employee Category</th>
+            <th>Job Level</th>
+            <th>Effective Date</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of salaryStructures">
+            <td class="fw-600">Grade {{s.grade}}</td>
+            <td>Notch {{s.notch}}</td>
+            <td class="text-right mono">{{formatCurrency(s.annualAmount)}}</td>
+            <td class="text-right mono">{{s.hourlyRate ? ('R ' + (s.hourlyRate | number:'1.2-2')) : '—'}}</td>
+            <td>{{s.bargainingUnit || '—'}}</td>
+            <td>{{s.employeeCategory || '—'}}</td>
+            <td>{{s.jobLevel || '—'}}</td>
+            <td>{{s.effectiveDate | date:'dd MMM yyyy'}}</td>
+            <td>
+              <span class="status-badge" [ngClass]="s.isActive ? 'status-filled' : 'status-vacant'">
+                {{s.isActive ? 'Active' : 'Inactive'}}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="salaryStructures.length === 0">
+        <mat-icon>account_tree</mat-icon>
+        <p>No salary structures defined yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- VACANT POSTS DETAIL -->
+  <div class="card-container" *ngIf="activePanel === 'vacant'">
+    <div class="card-title-bar">
+      <h2><mat-icon>person_search</mat-icon> Vacant Posts — Ranked List</h2>
+      <span class="post-count">{{vacantPosts.length}} vacant posts</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" *ngIf="vacantPosts.length > 0">
+        <thead>
+          <tr>
+            <th>Post ID</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Level</th>
+            <th>Funded</th>
+            <th>Priority</th>
+            <th class="text-right">Ranking Score</th>
+            <th>Strategy</th>
+            <th>Planned Start</th>
+            <th class="text-right">Estimated Cost</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let v of vacantPosts">
+            <td><span class="post-code">{{v.postCode}}</span></td>
+            <td class="fw-600">{{v.title}}</td>
+            <td>{{v.department || '—'}}</td>
+            <td>{{v.jobLevel || '—'}}</td>
+            <td>
+              <span class="funded-badge" [ngClass]="v.isFunded ? 'funded-yes' : 'funded-no'">
+                {{v.isFunded ? 'Yes' : 'No'}}
+              </span>
+            </td>
+            <td>
+              <span class="priority-badge" [ngClass]="'priority-' + (v.priorityStatus || 'low').toLowerCase()">
+                {{v.priorityStatus || 'Unranked'}}
+              </span>
+            </td>
+            <td class="text-right mono">{{v.rankingScore}}</td>
+            <td>{{v.recruitmentStrategy || '—'}}</td>
+            <td>{{v.plannedStartDate ? (v.plannedStartDate | date:'dd MMM yyyy') : '—'}}</td>
+            <td class="text-right mono">{{formatCurrency(v.totalCostToMunicipality)}}</td>
+            <td class="action-cell">
+              <button class="btn-icon" (click)="openRankDialog(v)" title="Rank">
+                <mat-icon>star_rate</mat-icon>
+              </button>
+              <button class="btn-icon" (click)="openStartDateDialog(v)" title="Set Start Date">
+                <mat-icon>event</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="vacantPosts.length === 0">
+        <mat-icon>check_circle</mat-icon>
+        <p>No vacant posts found.</p>
+      </div>
+    </div>
+
+    <div class="unprioritised-section" *ngIf="unprioritisedPosts.length > 0">
+      <h3 class="section-title">
+        <mat-icon>warning</mat-icon> Unprioritised Vacancies ({{unprioritisedPosts.length}})
+      </h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Post ID</th>
+              <th>Title</th>
+              <th>Department</th>
+              <th>Level</th>
+              <th class="text-right">Estimated Cost</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let u of unprioritisedPosts">
+              <td><span class="post-code">{{u.postCode}}</span></td>
+              <td class="fw-600">{{u.title}}</td>
+              <td>{{u.department || '—'}}</td>
+              <td>{{u.jobLevel || '—'}}</td>
+              <td class="text-right mono">{{formatCurrency(u.totalCostToMunicipality)}}</td>
+              <td class="action-cell">
+                <button class="btn-icon" (click)="openRankDialog(u)" title="Rank">
+                  <mat-icon>star_rate</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORGANOGRAM SUMMARY -->
+  <div class="card-container dept-summary" *ngIf="summary && summary.byDepartment.length > 0">
+    <div class="card-title-bar">
+      <h2><mat-icon>corporate_fare</mat-icon> Organogram Summary by Department</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th class="text-right">Total Posts</th>
+            <th class="text-right">Filled</th>
+            <th class="text-right">Vacant</th>
+            <th class="text-right">Funded Vacancies</th>
+            <th class="text-right">Total Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of summary!.byDepartment">
+            <td class="fw-600">{{d.department}}</td>
+            <td class="text-right">{{d.totalPosts}}</td>
+            <td class="text-right">{{d.filledPosts}}</td>
+            <td class="text-right">{{d.vacantPosts}}</td>
+            <td class="text-right">{{d.fundedVacancies}}</td>
+            <td class="text-right mono">{{formatCurrency(d.totalCost)}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE/EDIT POST DIALOG -->
+<div class="dialog-overlay" *ngIf="showPostDialog" (click)="showPostDialog = false">
+  <div class="dialog-panel" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>{{editingPost ? 'Edit' : 'New'}} Post</h2>
+      <button class="btn-icon" (click)="showPostDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dialog-body">
+      <div class="form-section">
+        <h4>Basic Information</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Post Code</label>
+            <input [(ngModel)]="postForm.postCode" placeholder="e.g. POST-001" [disabled]="!!editingPost">
+          </div>
+          <div class="form-group">
+            <label>Title</label>
+            <input [(ngModel)]="postForm.title" placeholder="e.g. Senior Accountant">
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input [(ngModel)]="postForm.department" placeholder="e.g. Finance">
+          </div>
+          <div class="form-group">
+            <label>Job Level</label>
+            <input [(ngModel)]="postForm.jobLevel" placeholder="e.g. T12">
+          </div>
+          <div class="form-group">
+            <label>Salary Grade</label>
+            <input type="number" [(ngModel)]="postForm.salaryGrade">
+          </div>
+          <div class="form-group">
+            <label>Salary Notch</label>
+            <input type="number" [(ngModel)]="postForm.salaryNotch">
+          </div>
+          <div class="form-group">
+            <label>Employment Type</label>
+            <select [(ngModel)]="postForm.employmentType">
+              <option value="Permanent">Permanent</option>
+              <option value="Temporary">Temporary</option>
+              <option value="Contract">Contract</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select [(ngModel)]="postForm.status">
+              <option value="Filled">Filled</option>
+              <option value="Vacant">Vacant</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <h4>Funding & Priority</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Is Funded</label>
+            <select [(ngModel)]="postForm.isFunded">
+              <option [ngValue]="true">Yes</option>
+              <option [ngValue]="false">No</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Funding Source</label>
+            <input [(ngModel)]="postForm.fundingSource" placeholder="e.g. Own Revenue">
+          </div>
+          <div class="form-group">
+            <label>Priority Status</label>
+            <select [(ngModel)]="postForm.priorityStatus">
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Planned Start Date</label>
+            <input type="date" [(ngModel)]="postForm.plannedStartDate">
+          </div>
+          <div class="form-group">
+            <label>Bargaining Unit</label>
+            <input [(ngModel)]="postForm.bargainingUnit" placeholder="e.g. SAMWU">
+          </div>
+          <div class="form-group">
+            <label>Employee Category</label>
+            <input [(ngModel)]="postForm.employeeCategory" placeholder="e.g. Senior Management">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <h4>mSCOA Segments</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Item Code</label>
+            <input [(ngModel)]="postForm.scoaItemCode" placeholder="e.g. 3010">
+          </div>
+          <div class="form-group">
+            <label>Fund Code</label>
+            <input [(ngModel)]="postForm.scoaFundCode" placeholder="e.g. 1000">
+          </div>
+          <div class="form-group">
+            <label>Function Code</label>
+            <input [(ngModel)]="postForm.scoaFunctionCode" placeholder="e.g. 0160">
+          </div>
+          <div class="form-group">
+            <label>Region Code</label>
+            <input [(ngModel)]="postForm.scoaRegionCode">
+          </div>
+          <div class="form-group">
+            <label>Costing Code</label>
+            <input [(ngModel)]="postForm.scoaCostingCode">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-secondary" (click)="showPostDialog = false">Cancel</button>
+      <button class="btn-primary" (click)="savePost()" [disabled]="saving">
+        {{saving ? 'Saving...' : (editingPost ? 'Update' : 'Create')}}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- RANK VACANT POST DIALOG -->
+<div class="dialog-overlay" *ngIf="showRankDialog" (click)="showRankDialog = false">
+  <div class="dialog-panel dialog-sm" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>Rank Vacant Post</h2>
+      <button class="btn-icon" (click)="showRankDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dialog-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Ranking Score (0-100)</label>
+          <input type="number" [(ngModel)]="rankForm.rankingScore" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label>Priority Status</label>
+          <select [(ngModel)]="rankForm.priorityStatus">
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div class="form-group full-width">
+          <label>Recruitment Strategy</label>
+          <input [(ngModel)]="rankForm.recruitmentStrategy" placeholder="e.g. Internal promotion, External recruitment">
+        </div>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-secondary" (click)="showRankDialog = false">Cancel</button>
+      <button class="btn-primary" (click)="saveRanking()" [disabled]="saving">
+        {{saving ? 'Saving...' : 'Save Ranking'}}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SET START DATE DIALOG -->
+<div class="dialog-overlay" *ngIf="showStartDateDialog" (click)="showStartDateDialog = false">
+  <div class="dialog-panel dialog-sm" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>Set Planned Start Date</h2>
+      <button class="btn-icon" (click)="showStartDateDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dialog-body">
+      <div class="form-group">
+        <label>Planned Start Date</label>
+        <input type="date" [(ngModel)]="startDateForm.plannedStartDate">
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-secondary" (click)="showStartDateDialog = false">Cancel</button>
+      <button class="btn-primary" (click)="saveStartDate()" [disabled]="saving">
+        {{saving ? 'Saving...' : 'Save Date'}}
+      </button>
+    </div>
+  </div>
+</div>

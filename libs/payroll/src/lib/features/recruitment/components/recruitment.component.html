@@ -1,0 +1,358 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Recruitment</h1>
+    <p class="page-subtitle">Manage vacancies, applicants and onboarding workflows</p>
+  </div>
+</div>
+
+<div class="module-tabs">
+  <div class="detail-tab" [class.active]="activeTab === 'vacancies'" (click)="switchTab('vacancies')"><app-icon name="briefcase" [size]="14"></app-icon> Vacancies</div>
+  <div class="detail-tab" [class.active]="activeTab === 'organogram'" (click)="switchTab('organogram')"><app-icon name="grid" [size]="14"></app-icon> From Organogram</div>
+  <div class="detail-tab" [class.active]="activeTab === 'applicants'" (click)="switchTab('applicants')"><app-icon name="users" [size]="14"></app-icon> Applicants</div>
+  <div class="detail-tab" [class.active]="activeTab === 'interviews'" (click)="switchTab('interviews')"><app-icon name="calendar" [size]="14"></app-icon> Interview Scheduling</div>
+  <div class="detail-tab" [class.active]="activeTab === 'onboarding'" (click)="switchTab('onboarding')"><app-icon name="clipboard" [size]="14"></app-icon> Onboarding</div>
+  <div class="detail-tab" [class.active]="activeTab === 'pipeline'" (click)="switchTab('pipeline')"><app-icon name="barChart" [size]="14"></app-icon> Pipeline Dashboard</div>
+  <div class="detail-tab" [class.active]="activeTab === 'scoring'" (click)="switchTab('scoring')"><app-icon name="star" [size]="14"></app-icon> Scoring</div>
+  <div class="detail-tab" [class.active]="activeTab === 'probation'" (click)="switchTab('probation')"><app-icon name="alertTriangle" [size]="14"></app-icon> Probation Alerts</div>
+</div>
+
+@if (activeTab === 'vacancies') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="briefcase" [size]="16"></app-icon> Vacancies ({{ vacancies.length }})</div>
+    <button class="btn btn-primary" (click)="openAddVacancy()"><app-icon name="plus" [size]="14"></app-icon> Create Vacancy</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Requisition</th><th>Position</th><th>Department</th><th>Salary Range</th><th>Closing Date</th><th>Status</th><th style="text-align:center">Applicants</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (v of vacancies; track v.id) {
+          <tr>
+            <td><strong>{{ v.requisition_number }}</strong></td>
+            <td>{{ v.position_title || v.title || '-' }}</td>
+            <td>{{ v.department_name || '-' }}</td>
+            <td>{{ v.salary_range_min ? formatSalary(v.salary_range_min) + (v.salary_range_max ? ' - ' + formatSalary(v.salary_range_max) : '') : '-' }}</td>
+            <td>{{ formatDate(v.closing_date) }}</td>
+            <td><span class="status-badge" [ngClass]="getVacancyStatusClass(v.status)">{{ v.status }}</span></td>
+            <td style="text-align:center">{{ v.applicant_count || 0 }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editVacancy(v); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteVacancy(v); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (vacancies.length === 0) {
+          <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No vacancies</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'organogram') {
+  <div class="section-header"><app-icon name="grid" [size]="16"></app-icon> Vacancies from Organogram ({{ organogramVacancies.length }})</div>
+  <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#0c4a6e">
+    <app-icon name="alertTriangle" [size]="14"></app-icon> These are vacant positions in the staff establishment that do not yet have an active recruitment vacancy.
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Position Code</th><th>Title</th><th>Department</th><th>Division</th><th>Grade</th><th>Funded</th><th>HOD</th></tr></thead>
+      <tbody>
+        @for (p of organogramVacancies; track p.id) {
+          <tr>
+            <td><strong>{{ p.position_code }}</strong></td>
+            <td>{{ p.title || '-' }}</td>
+            <td>{{ p.department_name || '-' }}</td>
+            <td>{{ p.division_name || '-' }}</td>
+            <td>{{ p.grade_code || '-' }}</td>
+            <td>
+              @if (p.funded) { <span style="color:var(--success)"><app-icon name="check" [size]="12"></app-icon> Funded</span> }
+              @else { <span style="color:var(--danger)"><app-icon name="alertTriangle" [size]="12"></app-icon> Unfunded</span> }
+            </td>
+            <td>{{ p.is_hod ? 'HOD' : '-' }}</td>
+          </tr>
+        }
+        @if (organogramVacancies.length === 0) {
+          <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">All vacant positions have recruitment vacancies</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'applicants') {
+  <div class="section-header"><app-icon name="users" [size]="16"></app-icon> All Applicants ({{ applicants.length }})</div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Phone</th><th>Status</th><th>Applied</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (a of applicants; track a.id) {
+          <tr>
+            <td><strong>{{ a.first_name }} {{ a.surname }}</strong></td>
+            <td>{{ a.vacancy_title || a.position_title || '-' }}</td>
+            <td>{{ a.email || '-' }}</td>
+            <td>{{ a.phone || '-' }}</td>
+            <td><app-status-badge [status]="a.status"></app-status-badge></td>
+            <td>{{ formatDate(a.applied_date) }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editApplicant(a); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteApplicant(a); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (applicants.length === 0) {
+          <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No applicants</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'interviews') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="calendar" [size]="16"></app-icon> Interview Scheduling</div>
+    <button class="btn btn-primary" (click)="openScheduleInterview()"><app-icon name="plus" [size]="14"></app-icon> Schedule Interview</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Applicant</th><th>Position</th><th>Date</th><th>Time</th><th>Interviewer</th><th>Venue</th><th>Status</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (slot of interviews; track slot.id) {
+          <tr>
+            <td>{{ slot.applicant_name || (slot.first_name ? slot.first_name + ' ' + slot.surname : '-') }}</td>
+            <td>{{ slot.position_title || '-' }}</td>
+            <td>{{ formatDate(slot.interview_date) }}</td>
+            <td>{{ slot.interview_time || '-' }}</td>
+            <td>{{ slot.interviewer_name || '-' }}</td>
+            <td>{{ slot.venue || '-' }}</td>
+            <td><app-status-badge [status]="slot.status || 'SCHEDULED'"></app-status-badge></td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editInterview(slot); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteInterview(slot); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (interviews.length === 0) {
+          <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No interview slots scheduled</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'onboarding') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="clipboard" [size]="16"></app-icon> Onboarding Checklists</div>
+    <button class="btn btn-primary" (click)="openCreateOnboarding()"><app-icon name="plus" [size]="14"></app-icon> Create Checklist</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee</th><th>Start Date</th><th style="text-align:center">Progress</th><th>Completion</th><th>Status</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (cl of onboardingList; track cl.id) {
+          @let pct = getCompletionPct(cl);
+          <tr>
+            <td>{{ cl.employee_name || (cl.first_name ? cl.first_name + ' ' + cl.surname : '-') }}</td>
+            <td>{{ formatDate(cl.start_date) }}</td>
+            <td style="text-align:center">{{ cl.completed_items || 0 }}/{{ cl.total_items || 0 }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="background:#E2E8F0;border-radius:4px;height:8px;width:100px;flex-shrink:0">
+                  <div [style.background]="getCompletionColor(pct)" style="border-radius:4px;height:8px" [style.width.%]="pct"></div>
+                </div>
+                <span [style.color]="getCompletionColor(pct)" style="font-weight:600">{{ pct }}%</span>
+              </div>
+            </td>
+            <td><app-status-badge [status]="cl.status || 'IN_PROGRESS'"></app-status-badge></td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editOnboarding(cl); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteOnboarding(cl); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (onboardingList.length === 0) {
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No onboarding checklists</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'pipeline') {
+  <div class="section-header"><app-icon name="barChart" [size]="16"></app-icon> Recruitment Pipeline Dashboard</div>
+  <div class="stat-cards">
+    @for (s of pipelineStages; track s.key) {
+      <div class="stat-card">
+        <div class="stat-value" [style.color]="s.color">{{ pipeline[s.key] || 0 }}</div>
+        <div class="stat-label">{{ s.label }}</div>
+      </div>
+    }
+  </div>
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:16px">
+    <div style="font-weight:600;margin-bottom:16px;font-size:14px"><app-icon name="barChart" [size]="14"></app-icon> Pipeline Distribution</div>
+    @for (s of pipelineStages; track s.key) {
+      @let count = pipeline[s.key] || 0;
+      @let pct = getPipelinePct(s.key);
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:100px;font-size:13px;font-weight:500;color:var(--text)">{{ s.label }}</div>
+        <div style="flex:1;background:#E2E8F0;border-radius:6px;height:24px;overflow:hidden">
+          <div [style.background]="s.color" [style.width.%]="pct" style="height:100%;border-radius:6px;transition:width 0.3s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px" [style.min-width]="count > 0 ? '32px' : '0'">
+            @if (count > 0) { <span style="color:#fff;font-size:11px;font-weight:600">{{ count }}</span> }
+          </div>
+        </div>
+        <div style="width:40px;text-align:right;font-size:13px;color:var(--text-muted)">{{ pct }}%</div>
+      </div>
+    }
+  </div>
+}
+
+@if (activeTab === 'scoring') {
+  <div class="section-header"><app-icon name="star" [size]="16"></app-icon> Applicant Scoring</div>
+  <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#0c4a6e">
+    <app-icon name="alertTriangle" [size]="14"></app-icon> View and manage the scoring matrix for each applicant.
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Name</th><th>Position</th><th>Status</th><th>Score</th><th style="width: 100px;">Actions</th></tr></thead>
+      <tbody>
+        @for (a of applicants; track a.id) {
+          <tr>
+            <td><strong>{{ a.first_name }} {{ a.surname }}</strong></td>
+            <td>{{ a.vacancy_title || a.position_title || '-' }}</td>
+            <td><app-status-badge [status]="a.status"></app-status-badge></td>
+            <td>{{ a.score != null ? a.score : '-' }}</td>
+            <td>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn btn-sm" (click)="editApplicant(a); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                <button class="btn btn-sm" (click)="deleteApplicant(a); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (applicants.length === 0) {
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No applicants</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (activeTab === 'probation') {
+  <div class="section-header"><app-icon name="alertTriangle" [size]="16"></app-icon> Probation Period Alerts</div>
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#92400e">
+    <app-icon name="alertTriangle" [size]="14"></app-icon> Employees approaching the end of their probation period.
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee Code</th><th>Name</th><th>Department</th><th>Position</th><th>Probation End</th><th>Days Remaining</th><th>Urgency</th></tr></thead>
+      <tbody>
+        @for (e of probationAlerts; track e.id) {
+          <tr>
+            <td><strong>{{ e.employee_code || '-' }}</strong></td>
+            <td>{{ e.first_name || '' }} {{ e.surname || '' }}</td>
+            <td>{{ e.department_name || '-' }}</td>
+            <td>{{ e.position_title || '-' }}</td>
+            <td>{{ formatDate(e.probation_end_date) }}</td>
+            <td>
+              @if (e.days_remaining !== undefined) {
+                <span [style.color]="e.days_remaining <= 7 ? 'var(--danger)' : e.days_remaining <= 30 ? '#F59E0B' : 'var(--success)'" style="font-weight:600">{{ e.days_remaining }} days</span>
+              } @else { - }
+            </td>
+            <td>
+              @if (e.days_remaining !== undefined) {
+                <span class="status-badge" [ngClass]="e.days_remaining <= 7 ? 'status-failed' : e.days_remaining <= 30 ? 'status-pending' : 'status-approved'">{{ e.days_remaining <= 7 ? 'URGENT' : e.days_remaining <= 30 ? 'SOON' : 'OK' }}</span>
+              }
+            </td>
+          </tr>
+        }
+        @if (probationAlerts.length === 0) {
+          <tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No probation alerts</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (showVacancyModal) {
+  <div class="modal-overlay" (click)="showVacancyModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ editingVacancyId ? 'Edit Vacancy' : 'Create Vacancy' }}</h3><button class="modal-close" (click)="showVacancyModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Position</label>
+            <select class="form-control" [(ngModel)]="vacancyForm.position_id">
+              @for (p of positions; track p.id) { <option [ngValue]="p.id">{{ p.position_code }} - {{ p.title }}</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Department</label>
+            <select class="form-control" [(ngModel)]="vacancyForm.department_id">
+              <option value="">-</option>
+              @for (d of departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Closing Date</label><app-date-input [(ngModel)]="vacancyForm.closing_date"></app-date-input></div>
+          <div class="form-group"><label>Employment Type</label>
+            <select class="form-control" [(ngModel)]="vacancyForm.employment_type">
+              <option>PERMANENT</option><option>CONTRACT</option><option>FIXED_TERM</option><option>TEMPORARY</option><option>INTERNSHIP</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Requirements</label><textarea class="form-control" [(ngModel)]="vacancyForm.requirements"></textarea></div>
+        <div class="form-group"><label>Job Description</label><textarea class="form-control" [(ngModel)]="vacancyForm.duties"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showVacancyModal = false">Cancel</button><button class="btn btn-primary" (click)="saveVacancy()">{{ editingVacancyId ? 'Update' : 'Create' }}</button></div>
+    </div>
+  </div>
+}
+
+@if (showInterviewModal) {
+  <div class="modal-overlay" (click)="showInterviewModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ editingInterviewId ? 'Edit Interview' : 'Schedule Interview' }}</h3><button class="modal-close" (click)="showInterviewModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Applicant</label>
+          <select class="form-control" [(ngModel)]="interviewForm.applicant_id">
+            @for (a of applicants; track a.id) { <option [ngValue]="a.id">{{ a.first_name }} {{ a.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Interview Date</label><app-date-input [(ngModel)]="interviewForm.interview_date"></app-date-input></div>
+          <div class="form-group"><label>Interview Time</label><input class="form-control" [(ngModel)]="interviewForm.interview_time" placeholder="e.g. 09:00"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Interviewer Name</label><input class="form-control" [(ngModel)]="interviewForm.interviewer_name"></div>
+          <div class="form-group"><label>Venue</label><input class="form-control" [(ngModel)]="interviewForm.venue" placeholder="e.g. Boardroom 2"></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea class="form-control" [(ngModel)]="interviewForm.notes"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showInterviewModal = false">Cancel</button><button class="btn btn-primary" (click)="saveInterview()">{{ editingInterviewId ? 'Update' : 'Schedule' }}</button></div>
+    </div>
+  </div>
+}
+
+@if (showOnboardingModal) {
+  <div class="modal-overlay" (click)="showOnboardingModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>{{ editingOnboardingId ? 'Edit Onboarding Checklist' : 'Create Onboarding Checklist' }}</h3><button class="modal-close" (click)="showOnboardingModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="onboardingForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Start Date</label><app-date-input [(ngModel)]="onboardingForm.start_date"></app-date-input></div>
+        <div class="form-group"><label>Checklist Items (one per line)</label><textarea class="form-control" [(ngModel)]="onboardingForm.items" rows="6" placeholder="IT equipment setup&#10;Building access card&#10;Email account creation&#10;Policy handbook&#10;Introduction to team"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showOnboardingModal = false">Cancel</button><button class="btn btn-primary" (click)="saveOnboarding()">{{ editingOnboardingId ? 'Update' : 'Create' }}</button></div>
+    </div>
+  </div>
+}

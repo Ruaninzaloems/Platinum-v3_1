@@ -1,0 +1,206 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Disciplinary</h1>
+    <p class="page-subtitle">Manage disciplinary cases, grievances and progressive discipline</p>
+  </div>
+</div>
+
+<div class="module-tabs">
+  <div class="detail-tab" [class.active]="activeTab === 'cases'" (click)="switchTab('cases')"><app-icon name="shield" [size]="14"></app-icon> Disciplinary Cases</div>
+  <div class="detail-tab" [class.active]="activeTab === 'progression'" (click)="switchTab('progression')"><app-icon name="trendingUp" [size]="14"></app-icon> Progressive Discipline</div>
+  <div class="detail-tab" [class.active]="activeTab === 'grievances'" (click)="switchTab('grievances')"><app-icon name="alertTriangle" [size]="14"></app-icon> Grievances</div>
+</div>
+
+@if (activeTab === 'cases') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="shield" [size]="16"></app-icon> Disciplinary Cases ({{ cases.length }})</div>
+    <button class="btn btn-primary" (click)="openNewCase()"><app-icon name="plus" [size]="14"></app-icon> New Case</button>
+  </div>
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading...</div>
+  } @else {
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Case No.</th><th>Employee</th><th>Department</th><th>Charge</th><th>Offence Date</th><th>Hearing Date</th><th>Status</th><th>Outcome</th><th>Actions</th></tr></thead>
+        <tbody>
+          @for (c of cases; track c.id) {
+            <tr>
+              <td><strong>{{ c.case_number }}</strong></td>
+              <td>{{ c.first_name }} {{ c.surname }}</td>
+              <td>{{ c.department_name || '-' }}</td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.charge_description }}</td>
+              <td>{{ formatDate(c.offence_date) }}</td>
+              <td>{{ formatDate(c.hearing_date) }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(c.status)">{{ c.status }}</span></td>
+              <td>{{ c.outcome || '-' }}</td>
+              <td>
+                <button class="btn btn-sm" (click)="editCase(c)"><app-icon name="edit" [size]="12"></app-icon></button>
+              </td>
+            </tr>
+          }
+          @if (cases.length === 0) {
+            <tr><td colspan="9" style="text-align:center;color:var(--text-muted)">No disciplinary cases</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab === 'progression') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="trendingUp" [size]="16"></app-icon> Progressive Discipline</div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+    <select class="form-control" style="max-width:350px" [(ngModel)]="progressionEmployeeId">
+      <option [ngValue]="null">-- Select Employee --</option>
+      @for (e of employees; track e.id) {
+        <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+      }
+    </select>
+    <button class="btn btn-primary" (click)="loadProgression()"><app-icon name="search" [size]="14"></app-icon> View Timeline</button>
+  </div>
+  <div style="padding:16px;background:var(--bg-secondary);border-radius:8px">
+    @if (progressionSteps.length === 0 && !progressionEmployeeId) {
+      <div style="text-align:center;color:var(--text-muted);padding:40px"><app-icon name="trendingUp" [size]="32"></app-icon><br>Select an employee to view their progressive discipline timeline</div>
+    }
+    @for (step of ['VERBAL_WARNING', 'WRITTEN_WARNING', 'FINAL_WARNING', 'DISMISSAL']; track step; let last = $last) {
+      @let match = getProgressionMatch(step);
+      <div style="display:flex;gap:16px;position:relative;min-height:80px">
+        <div style="display:flex;flex-direction:column;align-items:center;width:32px;flex-shrink:0">
+          <div [style.background]="match ? 'var(--primary)' : 'var(--border-color)'" [style.color]="match ? '#fff' : 'var(--text-muted)'" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:1;flex-shrink:0">
+            <app-icon [name]="step === 'VERBAL_WARNING' ? 'messageCircle' : step === 'WRITTEN_WARNING' ? 'fileText' : step === 'FINAL_WARNING' ? 'alertTriangle' : 'xCircle'" [size]="14"></app-icon>
+          </div>
+          @if (!last) {
+            <div [style.background]="match ? 'var(--primary)' : 'var(--border-color)'" style="width:2px;flex:1;margin:4px 0"></div>
+          }
+        </div>
+        <div [style.padding-bottom]="last ? '0' : '20px'" style="flex:1">
+          <div [style.color]="match ? 'var(--text-primary)' : 'var(--text-muted)'" style="font-weight:600;font-size:14px">{{ step === 'VERBAL_WARNING' ? 'Verbal Warning' : step === 'WRITTEN_WARNING' ? 'Written Warning' : step === 'FINAL_WARNING' ? 'Final Warning' : 'Dismissal' }}</div>
+          @if (match) {
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{{ formatDate(match.date || match.offence_date) }}{{ match.case_number ? ' | Case: ' + match.case_number : '' }}</div>
+            <div style="margin-top:4px"><span class="badge badge-primary">{{ match.outcome || match.step_type || step }}</span></div>
+          } @else {
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">No record at this level</div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (activeTab === 'grievances') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="alertTriangle" [size]="16"></app-icon> Grievances ({{ grievances.length }})</div>
+    <button class="btn btn-primary" (click)="openNewGrievance()"><app-icon name="plus" [size]="14"></app-icon> File Grievance</button>
+  </div>
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading...</div>
+  } @else {
+    <div class="data-grid">
+      <table>
+        <thead><tr><th>Ref</th><th>Employee</th><th>Category</th><th>Description</th><th>Submitted</th><th>Status</th><th>SLA Deadline</th><th>SLA Status</th></tr></thead>
+        <tbody>
+          @for (g of grievances; track g.id) {
+            <tr>
+              <td><strong>{{ g.grievance_number }}</strong></td>
+              <td>{{ g.first_name }} {{ g.surname }}</td>
+              <td>{{ g.category || '-' }}</td>
+              <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.description }}</td>
+              <td>{{ formatDate(g.date_submitted) }}</td>
+              <td><app-status-badge [status]="g.status"></app-status-badge></td>
+              <td>{{ formatDate(g.sla_deadline) }}</td>
+              <td>
+                @if (g.sla_status) {
+                  <span class="badge" [ngClass]="{'badge-success': g.sla_status === 'ON_TIME', 'badge-warning': g.sla_status === 'WARNING', 'badge-danger': g.sla_status === 'OVERDUE'}">{{ g.sla_status }}</span>
+                } @else { - }
+              </td>
+            </tr>
+          }
+          @if (grievances.length === 0) {
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No grievances filed</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (showCaseModal) {
+  <div class="modal-overlay" (click)="showCaseModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Initiate Disciplinary Case</h3><button class="modal-close" (click)="showCaseModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="caseForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Charge Description</label><textarea class="form-control" [(ngModel)]="caseForm.charge_description"></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Date of Offence</label><app-date-input [(ngModel)]="caseForm.offence_date"></app-date-input></div>
+          <div class="form-group"><label>Hearing Date</label><app-date-input [(ngModel)]="caseForm.hearing_date"></app-date-input></div>
+        </div>
+        <div class="form-group"><label>Hearing Chairperson</label><input class="form-control" [(ngModel)]="caseForm.hearing_chairperson"></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showCaseModal = false">Cancel</button><button class="btn btn-danger" (click)="saveCase()">Initiate Case</button></div>
+    </div>
+  </div>
+}
+
+@if (showEditCaseModal) {
+  <div class="modal-overlay" (click)="showEditCaseModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Update Case {{ editCaseForm.case_number }}</h3><button class="modal-close" (click)="showEditCaseModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Status</label>
+            <select class="form-control" [(ngModel)]="editCaseForm.status">
+              <option>INITIATED</option><option>HEARING_SCHEDULED</option><option>HEARING_COMPLETED</option><option>APPEAL</option><option>CCMA</option><option>CLOSED</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Outcome</label>
+            <select class="form-control" [(ngModel)]="editCaseForm.outcome">
+              <option value="">-</option><option>VERBAL_WARNING</option><option>WRITTEN_WARNING</option><option>FINAL_WARNING</option><option>DISMISSAL</option><option>NOT_GUILTY</option><option>COUNSELLING</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Sanction Details</label><textarea class="form-control" [(ngModel)]="editCaseForm.sanction"></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Hearing Date</label><app-date-input [(ngModel)]="editCaseForm.hearing_date"></app-date-input></div>
+          <div class="form-group"><label>Chairperson</label><input class="form-control" [(ngModel)]="editCaseForm.hearing_chairperson"></div>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-color)">
+          <div class="section-header" style="margin-bottom:8px"><app-icon name="fileText" [size]="14"></app-icon> Document Generation</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" (click)="downloadDocument(editCaseForm.id, 'notice-to-attend')"><app-icon name="file" [size]="12"></app-icon> Notice to Attend</button>
+            <button class="btn btn-primary" (click)="downloadDocument(editCaseForm.id, 'outcome-letter')"><app-icon name="file" [size]="12"></app-icon> Outcome Letter</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showEditCaseModal = false">Cancel</button><button class="btn btn-primary" (click)="updateCase()">Update</button></div>
+    </div>
+  </div>
+}
+
+@if (showGrievanceModal) {
+  <div class="modal-overlay" (click)="showGrievanceModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>File Grievance</h3><button class="modal-close" (click)="showGrievanceModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="grievanceForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Category</label>
+          <select class="form-control" [(ngModel)]="grievanceForm.category">
+            <option>UNFAIR_TREATMENT</option><option>HARASSMENT</option><option>WORKING_CONDITIONS</option><option>SALARY_DISPUTE</option><option>POLICY_VIOLATION</option><option>OTHER</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Description</label><textarea class="form-control" [(ngModel)]="grievanceForm.description"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showGrievanceModal = false">Cancel</button><button class="btn btn-primary" (click)="saveGrievance()">Submit Grievance</button></div>
+    </div>
+  </div>
+}

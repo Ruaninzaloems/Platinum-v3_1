@@ -1,0 +1,82 @@
+<div class="abbreviations-container">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Abbreviations</h1>
+      <span class="record-count">{{ items().length }} abbreviations</span>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="seedDefaults()" [disabled]="loading()" matTooltip="Seed standard abbreviations (ASB, GRAP, MFMA, etc.)">
+        <mat-icon>auto_fix_high</mat-icon> Seed Defaults
+      </button>
+      <button mat-flat-button class="btn-primary" (click)="addRow()" matTooltip="Add a new abbreviation">
+        <mat-icon>add</mat-icon> Add Abbreviation
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading abbreviations...</p>
+    </div>
+  } @else {
+    <div class="table-wrapper">
+      <table class="abbr-table">
+        <thead>
+          <tr>
+            <th class="col-abbr">Abbreviation</th>
+            <th class="col-full">Full Form</th>
+            <th class="col-active">Active</th>
+            <th class="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.id ?? $index) {
+            <tr [class.inactive-row]="!item.isActive">
+              @if (item.isEditing) {
+                <td>
+                  <input class="inline-input" [(ngModel)]="item.abbreviation" placeholder="e.g. GRAP" />
+                </td>
+                <td>
+                  <input class="inline-input full-width" [(ngModel)]="item.fullForm" placeholder="e.g. Generally Recognised Accounting Practice" />
+                </td>
+                <td>
+                  <mat-slide-toggle [(ngModel)]="item.isActive" color="primary"></mat-slide-toggle>
+                </td>
+                <td class="actions-cell">
+                  <button mat-icon-button color="primary" (click)="saveItem(item)" matTooltip="Save">
+                    <mat-icon>check</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="cancelEdit(item)" matTooltip="Cancel">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </td>
+              } @else {
+                <td class="abbr-cell">{{ item.abbreviation }}</td>
+                <td>{{ item.fullForm }}</td>
+                <td>
+                  <mat-slide-toggle [checked]="item.isActive" (change)="toggleActive(item)" color="primary"></mat-slide-toggle>
+                </td>
+                <td class="actions-cell">
+                  <button mat-icon-button (click)="editItem(item)" matTooltip="Edit">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteItem(item)" matTooltip="Delete">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              }
+            </tr>
+          }
+          @if (items().length === 0) {
+            <tr>
+              <td colspan="4" class="empty-state">
+                No abbreviations found. Click "Seed Defaults" to add standard abbreviations.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

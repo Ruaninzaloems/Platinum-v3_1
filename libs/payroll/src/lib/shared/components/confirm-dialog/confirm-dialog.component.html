@@ -1,0 +1,14 @@
+@if (visible) {
+  <div class="confirm-overlay" (click)="cancel()">
+    <div class="confirm-box" (click)="$event.stopPropagation()">
+      <h4>{{ config.title }}</h4>
+      <p>{{ config.message }}</p>
+      <div class="confirm-actions">
+        <button class="btn" (click)="cancel()">Cancel</button>
+        <button class="btn" [class.btn-danger]="config.danger" [class.btn-primary]="!config.danger" (click)="confirm()">
+          {{ config.danger ? 'Delete' : 'Confirm' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

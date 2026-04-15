@@ -1,0 +1,23 @@
+:host { display: inline-flex; }
+.trend-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Inter', sans-serif;
+}
+.trend-value-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+.trend-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+.trend-change {
+  font-size: 12px;
+  font-weight: 500;
+}
+.trend-positive { color: var(--platinum-success); }
+.trend-negative { color: var(--platinum-danger); }
+.trend-neutral { color: var(--platinum-text-secondary); }

@@ -1,0 +1,158 @@
+<div class="disclosure-tree-panel">
+  <div class="panel-header">
+    <div class="header-row">
+      <div>
+        <span class="panel-title">Disclosure Tree</span>
+        <span class="panel-subtitle">AFS Structure</span>
+      </div>
+      <div class="header-actions">
+        <button mat-icon-button (click)="showSearch = !showSearch" matTooltip="Search sections and codes">
+          <mat-icon>search</mat-icon>
+        </button>
+        @if (editable) {
+          <button mat-icon-button
+            [class.edit-active]="editMode"
+            (click)="editMode = !editMode"
+            [matTooltip]="editMode ? 'Exit edit mode' : 'Edit template items'">
+            <mat-icon>{{ editMode ? 'check' : 'edit' }}</mat-icon>
+          </button>
+        }
+      </div>
+    </div>
+    @if (showSearch) {
+      <div class="search-bar">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input class="search-input" [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" placeholder="Search by section, code, or description...">
+        @if (searchQuery) {
+          <button mat-icon-button class="search-clear" (click)="searchQuery = ''; onSearchChange()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </div>
+      <div class="filter-toggles">
+        <label class="filter-toggle">
+          <input type="checkbox" [(ngModel)]="showInactive" (ngModelChange)="applyFilters()">
+          <span>Show inactive</span>
+        </label>
+        <select class="section-filter" [(ngModel)]="sectionTypeFilter" (ngModelChange)="applyFilters()">
+          <option value="">All section types</option>
+          <option value="statement">Statements</option>
+          <option value="front_matter">Front Matter</option>
+          <option value="policies">Accounting Policies</option>
+          <option value="disclosure">Disclosure Notes</option>
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (loading) {
+    <div class="tree-loading">
+      <mat-spinner diameter="28"></mat-spinner>
+    </div>
+  } @else if (filteredTreeData.length === 0) {
+    <div class="tree-empty">
+      <mat-icon>account_tree</mat-icon>
+      <span>No template selected</span>
+    </div>
+  } @else {
+    <div class="tree-container">
+      @for (node of filteredTreeData; track node.id) {
+        <ng-container *ngTemplateOutlet="sectionTpl; context: { $implicit: node, depth: 0 }"></ng-container>
+      }
+
+      @if (editMode) {
+        <div class="add-section-row">
+          @if (addingSectionFor === 'root') {
+            <div class="inline-add-form">
+              <input class="inline-input" [(ngModel)]="newSectionTitle" placeholder="Section title" (keydown.enter)="saveNewSection()" (keydown.escape)="cancelAddSection()">
+              <button mat-icon-button class="inline-btn save" (click)="saveNewSection()" [disabled]="!newSectionTitle.trim()" matTooltip="Save">
+                <mat-icon>check</mat-icon>
+              </button>
+              <button mat-icon-button class="inline-btn" (click)="cancelAddSection()" matTooltip="Cancel">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          } @else {
+            <button class="add-row-btn" (click)="startAddSection()">
+              <mat-icon>add</mat-icon> Add Section
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<ng-template #sectionTpl let-node let-depth="depth">
+  <div class="tree-section" [class.expanded]="expandedSections.has(node.id)" [class.inactive-section]="node.isActive === false">
+    <div class="tree-section-header" [style.paddingLeft.px]="12 + depth * 16" (click)="toggleSection(node.id)">
+      <mat-icon class="expand-icon">{{ expandedSections.has(node.id) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+      <span class="status-dot" [class]="'status-' + node.mappingStatus"
+        [matTooltip]="getStatusLabel(node.mappingStatus)">
+      </span>
+      <span class="section-title">{{ node.noteNumber ? node.noteNumber + '. ' : '' }}{{ node.title }}</span>
+      @if (node.disclosureType === 'NoteDetail') {
+        <span class="note-detail-tag">detail</span>
+      }
+      @if (node.isActive === false) {
+        <mat-icon class="inactive-icon" matTooltip="No trial balance data — inactive">visibility_off</mat-icon>
+      }
+      <span class="mapping-badge" *ngIf="node.totalLineItems > 0">{{ node.mappedLineItems }}/{{ node.totalLineItems }}</span>
+      @if (editMode) {
+        <button mat-icon-button class="inline-btn delete" (click)="deleteSection(node, $event)" matTooltip="Remove section">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      }
+    </div>
+
+    @if (expandedSections.has(node.id)) {
+      @for (li of node.lineItems; track li.id) {
+        <div class="tree-line-item"
+          [class.selected]="selectedLineItemId === li.id"
+          [class.is-total]="li.isTotal"
+          [class.is-bold]="li.isBold"
+          [class.inactive-item]="li.isActive === false"
+          [style.paddingLeft.px]="28 + (depth + 1) * 16 + li.indentLevel * 12"
+          (click)="selectLineItem(li, node)">
+          <span class="status-dot small" [class]="'status-' + li.mappingStatus"
+            [matTooltip]="getStatusLabel(li.mappingStatus)">
+          </span>
+          <span class="li-label">{{ li.label }}</span>
+          @if (li.sourceType) {
+            <span class="source-badge" [class]="'source-' + li.sourceType">{{ li.sourceType === 'tb' ? 'TB' : li.sourceType === 'manual' ? 'Manual' : 'Mixed' }}</span>
+          }
+          @if (li.mappingCount > 0) {
+            <span class="li-count">{{ li.mappingCount }}</span>
+          }
+          @if (editMode) {
+            <button mat-icon-button class="inline-btn delete small" (click)="deleteLineItem(li, node, $event)" matTooltip="Remove line item">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </div>
+      }
+
+      @if (editMode) {
+        @if (addingItemForSection === node.id) {
+          <div class="inline-add-form" [style.paddingLeft.px]="28 + (depth + 1) * 16">
+            <input class="inline-input" [(ngModel)]="newItemLabel" placeholder="Line item label" (keydown.enter)="saveNewLineItem(node)" (keydown.escape)="cancelAddItem()">
+            <button mat-icon-button class="inline-btn save" (click)="saveNewLineItem(node)" [disabled]="!newItemLabel.trim()" matTooltip="Save">
+              <mat-icon>check</mat-icon>
+            </button>
+            <button mat-icon-button class="inline-btn" (click)="cancelAddItem()" matTooltip="Cancel">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        } @else {
+          <button class="add-row-btn" [style.paddingLeft.px]="28 + (depth + 1) * 16" (click)="startAddItem(node.id)">
+            <mat-icon>add</mat-icon> Add Line Item
+          </button>
+        }
+      }
+
+      @for (child of node.children; track child.id) {
+        <ng-container *ngTemplateOutlet="sectionTpl; context: { $implicit: child, depth: depth + 1 }"></ng-container>
+      }
+    }
+  </div>
+</ng-template>

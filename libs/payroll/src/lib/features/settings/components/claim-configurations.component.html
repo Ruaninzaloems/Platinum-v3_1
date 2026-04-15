@@ -1,0 +1,171 @@
+@if (view === 'list') {
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ configurations.length }}</span>
+      <span class="summary-label">Total Configurations</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ travelCount }}</span>
+      <span class="summary-label">Travel</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ stCount }}</span>
+      <span class="summary-label">S & T</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search configurations..." [(ngModel)]="searchTerm" (input)="applyFilters()">
+      <span class="result-count">{{ filteredConfigurations.length }} results</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="form-control filter-select" [(ngModel)]="filterClaimType" (ngModelChange)="applyFilters()">
+        <option value="">All Claim Types</option>
+        @for (ct of claimTypes; track ct) {
+          <option [value]="ct">{{ ct }}</option>
+        }
+      </select>
+      <button class="btn btn-primary" (click)="openNew()">
+        <app-icon name="plus" [size]="16"></app-icon> Add Configuration
+      </button>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading...</div>
+  } @else {
+    <div class="list-card">
+      <div class="table-wrap">
+        <table class="jp-table">
+          <thead>
+            <tr>
+              <th>Claim Type</th>
+              <th>Subtype</th>
+              <th>Employee Type</th>
+              <th style="text-align:right">SARS Rate</th>
+              <th>Salary Transaction</th>
+              <th>Effective Date</th>
+              <th>End Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (filteredConfigurations.length === 0) {
+              <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">No claim configurations found</td></tr>
+            } @else {
+              @for (c of filteredConfigurations; track c.id) {
+                <tr class="clickable-row" (click)="openDetail(c)">
+                  <td style="font-weight:500">{{ c.claim_type }}</td>
+                  <td>{{ c.claim_subtype }}</td>
+                  <td>{{ c.employee_type_name || '-' }}</td>
+                  <td style="text-align:right">{{ getSarsRateDisplay(c) }}</td>
+                  <td>{{ c.salary_head_name || '-' }}</td>
+                  <td>{{ c.effective_date | dateSa }}</td>
+                  <td>{{ c.end_date ? (c.end_date | dateSa) : '-' }}</td>
+                  <td><button class="action-btn" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button></td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn" (click)="backToList()"><app-icon name="chevronLeft" [size]="14"></app-icon> Back</button>
+      <div>
+        <h4 style="margin:0;font-size:14px;font-weight:600;color:var(--text-primary)">{{ isNew ? 'Add Claim Configuration' : 'Edit Claim Configuration' }}</h4>
+        <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted)">{{ isNew ? '* ID to be generated' : 'ID: ' + editItem.id }}</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      @if (!isNew) {
+        <button class="btn btn-danger" (click)="deleteConfig()"><app-icon name="trash" [size]="14"></app-icon> Delete</button>
+      }
+      <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> {{ isNew ? 'Create' : 'Update' }}</button>
+    </div>
+  </div>
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="fileText" [size]="16"></app-icon> Claim Details</div>
+
+        <div class="form-group">
+          <label>Effective Date *</label>
+          <app-date-input [(ngModel)]="editItem.effective_date" (ngModelChange)="onEffectiveDateChange()"></app-date-input>
+        </div>
+
+        <div class="form-group">
+          <label>Claim Type *</label>
+          <select class="form-control" [(ngModel)]="editItem.claim_type" (ngModelChange)="onClaimTypeChange()">
+            <option value="">-- Select Claim Type --</option>
+            @for (ct of claimTypes; track ct) {
+              <option [value]="ct">{{ ct }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Claim Subtype *</label>
+          <select class="form-control" [(ngModel)]="editItem.claim_subtype" (ngModelChange)="onSubtypeChange()" [disabled]="!editItem.claim_type">
+            <option value="">-- Select Subtype --</option>
+            @for (st of availableSubtypes; track st) {
+              <option [value]="st">{{ st }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Claim Group</label>
+          <input class="form-control" [(ngModel)]="editItem.claim_group" placeholder="e.g. Group name">
+        </div>
+
+        <div class="form-group">
+          <label>Employee Type</label>
+          <select class="form-control" [(ngModel)]="editItem.employee_type_id">
+            <option [ngValue]="null">-- Select Employee Type --</option>
+            @for (et of employeeTypes; track et.id) {
+              <option [ngValue]="et.id">{{ et.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title"><app-icon name="dollar" [size]="16"></app-icon> Rate & Transaction</div>
+
+        <div class="form-group">
+          <label>End Date</label>
+          <app-date-input [(ngModel)]="editItem.end_date"></app-date-input>
+        </div>
+
+        <div class="form-group">
+          <label>Client Policy</label>
+          <input class="form-control" [(ngModel)]="editItem.client_policy" placeholder="e.g. Policy reference">
+        </div>
+
+        <div class="form-group">
+          <label>SARS Prescribed Rate</label>
+          <input class="form-control" [value]="getSarsRate()" readonly style="background:var(--bg-light);cursor:not-allowed" placeholder="Auto-populated from claim subtype">
+        </div>
+
+        <div class="form-group">
+          <label>Salary Transaction</label>
+          <select class="form-control" [(ngModel)]="editItem.salary_head_id">
+            <option [ngValue]="null">-- Select Salary Transaction --</option>
+            @for (sh of salaryHeads; track sh.id) {
+              <option [ngValue]="sh.id">{{ sh.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+}

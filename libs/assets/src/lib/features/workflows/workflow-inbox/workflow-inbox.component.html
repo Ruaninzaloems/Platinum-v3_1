@@ -1,0 +1,1841 @@
+@if (txVerifyOpen()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#f59e0b">verified</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Transaction Verification</span>
+      </div>
+      <div style="padding:20px 24px">
+        <p style="color:#475569;font-size:13px;margin:0 0 20px 0;line-height:1.6;border-left:3px solid #f59e0b;padding-left:12px;background:#fefce8;padding:10px 12px;border-radius:0 6px 6px 0">
+          Please verify that all transactions for FY <strong>{{txVerifyFinYear()}}</strong> Period <strong>{{txVerifyPeriod()}}</strong> have been completed and captured before approving the depreciation schedule. Check each transaction type below to confirm.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;transition:background 0.15s" [style.background]="txVerifyReval() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyReval() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyReval()" (change)="setTxVerifyReval($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Revaluation</span>
+            @if (txVerifyReval()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;transition:background 0.15s" [style.background]="txVerifyImp() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyImp() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyImp()" (change)="setTxVerifyImp($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Impairment</span>
+            @if (txVerifyImp()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;transition:background 0.15s" [style.background]="txVerifyReversal() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyReversal() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyReversal()" (change)="setTxVerifyReversal($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Impairment Reversal</span>
+            @if (txVerifyReversal()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;transition:background 0.15s" [style.background]="txVerifyDisposal() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyDisposal() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyDisposal()" (change)="setTxVerifyDisposal($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Disposal</span>
+            @if (txVerifyDisposal()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+        </div>
+        @if (txVerifyError()) {
+          <div style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">{{txVerifyError()}}</div>
+        }
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button mat-stroked-button (click)="closeTxVerify()" [disabled]="txVerifySubmitting()">Cancel</button>
+          <button mat-flat-button color="primary" (click)="submitTxVerify()" [disabled]="!txVerifyAllChecked() || txVerifySubmitting()">
+            @if (txVerifySubmitting()) { Processing... } @else { Apply }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (detailItemType() && (detailLoading() || detailItem())) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px"
+       (click)="closeDetail()">
+    <div style="background:white;border-radius:14px;max-width:760px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.25)"
+         (click)="$event.stopPropagation()">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #e2e8f0">
+        <div style="display:flex;align-items:center;gap:10px">
+          @if (detailItemType() === 'impairment') {
+            <mat-icon style="color:#ef4444">warning</mat-icon>
+            <span style="font-size:16px;font-weight:700;color:#1e293b">Impairment Detail</span>
+          } @else if (detailItemType() === 'reversal') {
+            <mat-icon style="color:#16a34a">restore</mat-icon>
+            <span style="font-size:16px;font-weight:700;color:#1e293b">Impairment Reversal Detail</span>
+          } @else if (detailItemType() === 'disposal') {
+            <mat-icon style="color:#f59e0b">delete_sweep</mat-icon>
+            <span style="font-size:16px;font-weight:700;color:#1e293b">Disposal Detail</span>
+          } @else {
+            <mat-icon style="color:#8b5cf6">auto_graph</mat-icon>
+            <span style="font-size:16px;font-weight:700;color:#1e293b">Revaluation Detail</span>
+          }
+        </div>
+        <button mat-icon-button (click)="closeDetail()"><mat-icon>close</mat-icon></button>
+      </div>
+
+      @if (detailLoading()) {
+        <div style="display:flex;justify-content:center;padding:48px">
+          <mat-spinner diameter="32"></mat-spinner>
+        </div>
+      } @else if (detailItem()) {
+
+        <div style="padding:20px 24px 24px">
+
+          <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:20px;background:#f8fafc">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <div style="background:#ef4444;border-radius:6px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <mat-icon style="color:white;font-size:18px">inventory_2</mat-icon>
+              </div>
+              <div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailField('asset.AssetRegisterItem_ID') || detailField('asset.assetRegisterItem_ID')}} — {{detailField('asset.Description') || detailField('asset.description') || '—'}}</div>
+                <div style="font-size:12px;color:#64748b">{{detailField('asset.AssetTypeName') || '—'}} · {{detailField('asset.CategoryName') || '—'}}</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;border-top:1px solid #e2e8f0;padding-top:12px">
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Asset Register ID</div>
+                <div style="font-size:13px;font-weight:600;color:#1e293b">{{detailField('asset.AssetRegisterItem_ID') || detailField('asset.assetRegisterItem_ID') || '—'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Asset Class</div>
+                <div style="font-size:13px;color:#1e293b">{{detailField('asset.AssetTypeName') || '—'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Category</div>
+                <div style="font-size:13px;color:#1e293b">{{detailField('asset.CategoryName') || detailField('asset.SubCategoryName') || '—'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Cost</div>
+                <div style="font-size:13px;font-weight:600;color:#1e293b">{{detailCurrency('asset.PurchaseAmount')}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Accumulated Depreciation</div>
+                <div style="font-size:13px;font-weight:600;color:#1e293b">{{detailCurrency('projected.accumulatedDepreciation')}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Carrying Amount (At Last Dep)</div>
+                <div style="font-size:13px;font-weight:600;color:#1e293b">{{detailCurrency('projected.carryingBeforeCatchUp') || detailCurrency('projected.carryingBeforeReval') || detailCurrency('projected.carryingAmount')}}</div>
+              </div>
+            </div>
+          </div>
+
+          @if (detailItemType() === 'impairment' || detailItemType() === 'reversal') {
+
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:12px">
+              {{detailItemType() === 'reversal' ? 'Reversal' : 'Impairment'}} Details
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Transaction Date</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.ImpairmentDate') || detailField('transaction.impairmentDate') | date:'yyyy-MM-dd'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Financial Year</div>
+                <div style="font-size:14px;color:#1e293b">{{detailField('transaction.FinYear') || detailField('transaction.finYear') || '—'}}</div>
+              </div>
+            </div>
+
+            @if (detailField('projected.catchUpDays')) {
+              <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
+                  Catch-up Depreciation
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Days</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailField('projected.catchUpDays')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Daily Rate</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.dailyRate')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Depreciation Amount</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.catchUpDep')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Carrying Before</div>
+                    <div style="font-size:13px;color:#78350f">{{detailCurrency('projected.carryingBeforeCatchUp')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Adjusted Carrying Amount</div>
+                    <div style="font-size:13px;font-weight:700;color:#0369a1">{{detailCurrency('projected.adjustedCarrying')}}</div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Adjusted Carrying Amount</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.adjustedCarrying')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Revaluation Reserve</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.revalReserve')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">{{detailItemType() === 'reversal' ? 'Reversal Amount' : 'Impairment Amount'}}</div>
+                <div style="font-size:15px;font-weight:700;color:#ef4444">{{detailCurrency('transaction.ImpairmentAmount') || detailCurrency('transaction.impairmentAmount')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">New Carrying Amount</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.newCarrying')}}</div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">From Revaluation Reserve</div>
+                <div style="font-size:18px;font-weight:700;color:#f59e0b">{{detailCurrency('projected.fromRevalReserve')}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Impairment Loss (To P&L)</div>
+                <div style="font-size:18px;font-weight:700;color:#ef4444">{{detailCurrency('projected.impairmentLossToP_L')}}</div>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:6px">Reason / Indicators of Impairment</div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;color:#334155;min-height:48px;line-height:1.6">
+                {{detailField('transaction.Reason') || detailField('transaction.reason') || '—'}}
+              </div>
+            </div>
+          }
+
+          @if (detailItemType() === 'disposal') {
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:12px">Disposal Details</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Disposal Date</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.DisposalDate') || detailField('transaction.disposalDate') | date:'yyyy-MM-dd'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Disposal Method</div>
+                <div style="font-size:14px;color:#1e293b">{{detailField('projected.disposalMethodName') || '—'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Financial Year</div>
+                <div style="font-size:14px;color:#1e293b">{{detailField('transaction.FinYear') || detailField('transaction.finYear') || '—'}}</div>
+              </div>
+            </div>
+
+            @if (detailField('projected.catchUpDays')) {
+              <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
+                  Catch-up Depreciation
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Days</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailField('projected.catchUpDays')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Daily Rate</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.dailyRate')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Depreciation Amount</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.catchUpDep')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Carrying Before</div>
+                    <div style="font-size:13px;color:#78350f">{{detailCurrency('projected.carryingBeforeCatchUp')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Adjusted Carrying Amount</div>
+                    <div style="font-size:13px;font-weight:700;color:#0369a1">{{detailCurrency('projected.adjustedCarrying')}}</div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Projected Carrying Amount</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.carryingAmount')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Sale Price</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.salePrice')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Profit / Loss on Disposal</div>
+                <div style="font-size:15px;font-weight:700" [style.color]="(detailField('projected.profitLoss') || 0) >= 0 ? '#16a34a' : '#ef4444'">{{detailCurrency('projected.profitLoss')}}</div>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:6px">Reason / Motivation</div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;color:#334155;min-height:48px;line-height:1.6">
+                {{detailField('transaction.Reason') || detailField('transaction.reason') || '—'}}
+              </div>
+            </div>
+          }
+
+          @if (detailItemType() === 'revaluation') {
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:12px">Revaluation Details</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Revaluation Date</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.RevalutionDate') || detailField('transaction.revalutionDate') | date:'yyyy-MM-dd'}}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Revaluation Model</div>
+                <div style="font-size:14px;color:#1e293b">
+                  @if (detailField('transaction.RevalModel') === 1 || detailField('transaction.revalModel') === 1) { Fair Value }
+                  @else if (detailField('transaction.RevalModel') === 2 || detailField('transaction.revalModel') === 2) { Cost To Sell }
+                  @else if (detailField('transaction.RevalModel') === 3 || detailField('transaction.revalModel') === 3) { Value In Use }
+                  @else { — }
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Carrying Before Reval</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.carryingBeforeReval')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Revaluation Amount</div>
+                <div style="font-size:15px;font-weight:700;color:#8b5cf6">{{detailCurrency('projected.revalAmt')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Fair Value (After)</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.fairValue')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Existing Reval Reserve</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.revalReserve')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Surplus to Reval Reserve</div>
+                <div style="font-size:15px;font-weight:700;color:#16a34a">{{detailCurrency('projected.surplusAmount')}}</div>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;padding:12px">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:3px">Depreciation Adjustment</div>
+                <div style="font-size:15px;font-weight:700;color:#1e293b">{{detailCurrency('projected.depAdj')}}</div>
+              </div>
+            </div>
+          }
+
+        </div>
+      }
+
+      <div style="padding:12px 24px 20px;display:flex;justify-content:flex-end;border-top:1px solid #e2e8f0">
+        <button mat-stroked-button (click)="closeDetail()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (rejectConfirmScheduleId() > 0) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#dc2626;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:white">warning</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Reject Depreciation Run</span>
+      </div>
+      <div style="padding:24px 28px">
+        <p style="color:#1e293b;font-size:14px;line-height:1.6;margin:0 0 8px 0">
+          Are you sure you want to reject this depreciation run?
+        </p>
+        <p style="color:#64748b;font-size:13px;line-height:1.5;margin:0 0 24px 0">
+          All pending depreciation entries and schedule items for this run will be permanently deleted. The schedule header will be reset so the period can be re-run.
+        </p>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button mat-stroked-button (click)="cancelRejectDepreciation()">Cancel</button>
+          <button mat-flat-button color="warn" (click)="confirmRejectDepreciation()">Yes, Reject Run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (depPosting()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#f59e0b">account_balance</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Depreciation Posting</span>
+      </div>
+      <div style="padding:24px 28px">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depPostStep() >= 2 ? '#16a34a' : depPostStep() === 1 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depPostStep() >= 1 ? 'white' : '#94a3b8'">
+                @if (depPostStep() >= 2) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 1 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 2 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depPostStep() === 1 ? '#2563eb' : depPostStep() >= 2 ? '#16a34a' : '#94a3b8'">
+                Checking mSCOA Configuration
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depPostStep() === 1 ? '#3b82f6' : depPostStep() >= 2 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() === 1) { Validating GL posting configuration for all asset groups... }
+                @else if (depPostStep() >= 2) { mSCOA configuration verified }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depPostStep() >= 3 ? '#16a34a' : depPostStep() === 2 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depPostStep() >= 2 ? 'white' : '#94a3b8'">
+                @if (depPostStep() >= 3) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 3 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depPostStep() === 2 ? '#2563eb' : depPostStep() >= 3 ? '#16a34a' : '#94a3b8'">
+                Submitting Journal Entries
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depPostStep() === 2 ? '#3b82f6' : depPostStep() >= 3 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() === 2) { Creating GL entries and posting depreciation journals... }
+                @else if (depPostStep() >= 3) { All journal entries posted }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depPostStep() >= 4 ? '#16a34a' : depPostStep() === 3 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depPostStep() >= 3 ? 'white' : '#94a3b8'">
+                @if (depPostStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 4 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depPostStep() === 3 ? '#2563eb' : depPostStep() >= 4 ? '#16a34a' : '#94a3b8'">
+                Updating Asset Register
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depPostStep() === 3 ? '#3b82f6' : depPostStep() >= 4 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() === 3) { Refreshing asset balances and carrying amounts... }
+                @else if (depPostStep() >= 4) { Asset register updated }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depPostStep() >= 5 ? '#16a34a' : depPostStep() === 4 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depPostStep() >= 4 ? 'white' : '#94a3b8'">
+                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 5 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px;flex:1">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depPostStep() === 4 ? '#2563eb' : depPostStep() >= 5 ? '#16a34a' : '#94a3b8'">
+                Rebuilding Asset Summaries
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depPostStep() === 4 ? '#3b82f6' : depPostStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() === 4) { Rebuilding transaction summaries for all affected assets... }
+                @else if (depPostStep() >= 5) { Transaction summaries rebuilt }
+                @else { Pending }
+              </div>
+              @if (depPostStep() === 4 && depRebuildProgress().total > 0) {
+                <div style="margin-top:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span style="font-size:11px;color:#64748b">{{depRebuildProgress().done}} of {{depRebuildProgress().total}} assets</span>
+                    <span style="font-size:11px;font-weight:700;color:#2563eb">{{((depRebuildProgress().done / depRebuildProgress().total) * 100) | number:'1.0-0'}}%</span>
+                  </div>
+                  <mat-progress-bar mode="determinate" [value]="(depRebuildProgress().done / depRebuildProgress().total) * 100"></mat-progress-bar>
+                </div>
+              }
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depPostStep() >= 5 ? '#16a34a' : '#e2e8f0'"
+                [style.color]="depPostStep() >= 5 ? 'white' : '#94a3b8'">
+                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 5 }
+              </div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depPostStep() >= 5 ? '#16a34a' : '#94a3b8'">Complete</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depPostStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() >= 5) { Depreciation successfully posted to the General Ledger }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+        </div>
+        @if (depPostStep() < 5) {
+          <div style="margin-top:24px">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+              <div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);animation:dep-progress-slide 1.4s ease-in-out infinite;width:40%"></div>
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-top:8px;text-align:center">This may take a moment for large asset registers. Please do not close this window.</div>
+          </div>
+        }
+        @if (depPostStep() >= 5) {
+          <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#16a34a">check_circle</mat-icon>
+            <span style="font-size:13px;color:#15803d;font-weight:500">Depreciation has been posted to the General Ledger</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (glValidationVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:12px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:700px;width:95%;max-height:80vh;overflow:auto">
+      <div style="padding:20px 24px;background:#fef2f2;border-bottom:1px solid #fecaca;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#dc2626;font-size:24px">error</mat-icon>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#991b1b">GL Posting Validation Failed</div>
+          <div style="font-size:13px;color:#b91c1c">{{glValidationTxnType()}} transaction cannot be posted — missing mSCOA configuration</div>
+        </div>
+      </div>
+      <div style="padding:20px 24px">
+        @for (asset of glValidationErrors(); track asset.assetRegisterItemId) {
+          <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+            <div style="padding:10px 14px;background:#f8fafc;font-size:13px;font-weight:600;color:#334155;border-bottom:1px solid #e5e7eb">
+              Asset #{{asset.assetRegisterItemId}} — {{asset.assetDescription}}
+            </div>
+            @for (leg of asset.legs; track $index) {
+              @if (!leg.valid) {
+                <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9">
+                  <div style="font-size:13px;font-weight:600;color:#b91c1c;margin-bottom:4px">
+                    <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle;color:#dc2626">close</mat-icon> {{leg.leg}} Leg @if (leg.scoaField) { — <span style="font-weight:500;color:#6b7280;font-style:italic">{{leg.scoaField}}</span>}
+                  </div>
+                  <div style="font-size:12px;color:#6b7280;padding-left:18px">
+                    Missing: {{getMissingFieldsText(leg.missingFields)}}
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        }
+        <div style="margin-top:8px;padding:12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#1e40af">
+          <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
+          Resolve the missing configuration under <strong>Administration &gt; mSCOA Configuration</strong> before proceeding.
+        </div>
+      </div>
+      <div style="padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end">
+        <button mat-stroked-button (click)="dismissGlValidation()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Workflow Inbox</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Pending approvals and workflow management</p>
+  </div>
+  <button mat-stroked-button style="border-color:#e2e8f0" (click)="loadData(); loadPendingItems()"><mat-icon>refresh</mat-icon> Refresh</button>
+</div>
+
+<div class="kpi-row" style="grid-template-columns:repeat(5,1fr)">
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-amber"><mat-icon>pending</mat-icon></div>
+    <div><div class="kpi-label">Pending Workflows</div><div class="kpi-value">{{stats()?.pending || 0}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-blue"><mat-icon>hourglass_top</mat-icon></div>
+    <div><div class="kpi-label">In Progress</div><div class="kpi-value">{{stats()?.in_progress || 0}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-purple" style="background:#f5f3ff !important"><mat-icon style="color:#8b5cf6">approval</mat-icon></div>
+    <div><div class="kpi-label">Transaction Approvals</div><div class="kpi-value">{{totalPendingApprovals()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-green"><mat-icon>check_circle</mat-icon></div>
+    <div><div class="kpi-label">Approved Today</div><div class="kpi-value">{{stats()?.approved_today || 0}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-red"><mat-icon>cancel</mat-icon></div>
+    <div><div class="kpi-label">Rejected Today</div><div class="kpi-value">{{stats()?.rejected_today || 0}}</div></div>
+  </div>
+</div>
+
+<mat-tab-group style="margin-bottom:24px" (selectedTabChange)="onTabChange($event)">
+  <mat-tab label="Transaction Approvals"></mat-tab>
+  <mat-tab label="Pending Workflows"></mat-tab>
+  <mat-tab label="All Workflows"></mat-tab>
+  <mat-tab label="Approved"></mat-tab>
+  <mat-tab label="Rejected"></mat-tab>
+</mat-tab-group>
+
+@if (activeTab() === 0) {
+  <div style="padding:4px 0">
+    @if (approveError()) {
+      <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-bottom:12px">{{approveError()}}</div>
+    }
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleDepSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#f59e0b">trending_down</mat-icon>
+            Depreciation Schedule Approvals
+            <span class="section-badge" style="background:#fef3c7;color:#92400e">{{pendingSchedules().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{depSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (depSectionExpanded()) {
+        @if (pendingSchedules().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending depreciation schedules</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>Schedule ID</th>
+                <th>Financial Year</th>
+                <th>Run Date</th>
+                <th class="value-cell">Total Assets</th>
+                <th class="value-cell">Total Depreciation</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (sch of pendingSchedules(); track sch.depreciationSchedule_ID) {
+                <tr>
+                  <td>{{sch.depreciationSchedule_ID}}</td>
+                  <td>{{sch.finYear}}</td>
+                  <td>{{sch.runDate ? (sch.runDate | date:'yyyy-MM-dd HH:mm') : '—'}}</td>
+                  <td class="value-cell">{{sch.totalAssets || 0}}</td>
+                  <td class="value-cell" style="font-weight:600;color:#f59e0b">{{formatCurrency(sch.totalDepreciation)}}</td>
+                  <td>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:500">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">hourglass_empty</mat-icon> Pending
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                      @if (approvalMethod() !== 'Automated') {
+                        @if (isApprovalVerified(sch)) {
+                          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:500">
+                            <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Verified
+                          </span>
+                          <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                            (click)="approveVerifiedDepSchedule(sch)"
+                            [disabled]="approvingId() > 0 || depPosting() || rejectingScheduleId() > 0">
+                            @if (approvingId() === sch.depreciationSchedule_ID || depPosting()) { Approving... } @else { Approve }
+                          </button>
+                        } @else {
+                          <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                            (click)="openTxVerifyModal(sch)"
+                            [disabled]="approvingId() > 0 || txVerifySubmitting() || rejectingScheduleId() > 0">
+                            @if (approvingId() === sch.depreciationSchedule_ID) { Approving... } @else { Validate & Approve }
+                          </button>
+                        }
+                        <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                          (click)="rejectDepreciation(sch.depreciationSchedule_ID)"
+                          [disabled]="approvingId() > 0 || depPosting() || rejectingScheduleId() > 0">
+                          @if (rejectingScheduleId() === sch.depreciationSchedule_ID) { Rejecting... } @else { Reject }
+                        </button>
+                      }
+                      <button mat-stroked-button style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                        (click)="toggleScheduleDetails(sch.depreciationSchedule_ID)"
+                        [disabled]="depScheduleItemsLoading()">
+                        @if (depDetailScheduleId() === sch.depreciationSchedule_ID && depScheduleItems().length > 0) { Hide Details } @else { View Details }
+                      </button>
+                      <button mat-stroked-button style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                        (click)="exportScheduleDetail(sch.depreciationSchedule_ID)"
+                        title="Export all detail to Excel">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">file_download</mat-icon> Excel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (depScheduleItemsLoading()) {
+            <div style="text-align:center;padding:16px">
+              <mat-spinner diameter="24" style="margin:0 auto 8px"></mat-spinner>
+              <div style="font-size:12px;color:#64748b">Loading schedule items...</div>
+            </div>
+          }
+
+          @if (depScheduleItems().length > 0) {
+            <div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h4 style="font-size:14px;font-weight:600;color:#1e293b;margin:0">Schedule #{{depDetailScheduleId()}} — Items by Type / Category / Sub Category / Measurement Type / Department / Division / Status</h4>
+                <button mat-stroked-button style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                  (click)="exportScheduleDetail(depDetailScheduleId())">
+                  <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">file_download</mat-icon> Export All to Excel
+                </button>
+              </div>
+              <div style="overflow-x:auto">
+                <table class="data-table" style="width:100%;font-size:12px">
+                  <thead>
+                    <tr>
+                      <th>Item ID</th>
+                      <th>Asset Type</th>
+                      <th>Asset Category</th>
+                      <th>Sub Category</th>
+                      <th>Measurement Type</th>
+                      <th>Department</th>
+                      <th>Division</th>
+                      <th>Status</th>
+                      <th>Financial Period</th>
+                      <th class="value-cell">Total Assets</th>
+                      <th class="value-cell">Total Depreciation</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (si of depScheduleItems(); track getItemId(si)) {
+                      <tr style="cursor:pointer" (click)="toggleScheduleItemDetail(depDetailScheduleId(), getItemId(si))">
+                        <td class="ref-cell">{{getItemId(si)}}</td>
+                        <td>{{getScheduleItemVal(si, 'AssetTypeName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'CategoryName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'SubCategoryName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'MeasurementTypeName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'DepartmentName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'DivisionName') || '—'}}</td>
+                        <td>{{getScheduleItemVal(si, 'StatusName') || '—'}}</td>
+                        <td>{{getScheduleItemFinPeriod(si)}}</td>
+                        <td class="value-cell">{{getScheduleItemVal(si, 'TotalAssets') || 0}}</td>
+                        <td class="value-cell" style="font-weight:600;color:#f59e0b">{{formatCurrency(getScheduleItemVal(si, 'TotalDepreciation'))}}</td>
+                        <td>
+                          <div style="display:flex;gap:4px">
+                            <button mat-stroked-button style="font-size:11px;padding:1px 8px;min-height:24px;line-height:24px"
+                              (click)="toggleScheduleItemDetail(depDetailScheduleId(), getItemId(si)); $event.stopPropagation()">
+                              @if (isItemExpanded(getItemId(si))) { Hide Detail } @else { View Detail }
+                            </button>
+                            <button mat-stroked-button style="font-size:11px;padding:1px 8px;min-height:24px;line-height:24px"
+                              (click)="exportScheduleDetail(depDetailScheduleId(), getItemId(si)); $event.stopPropagation()"
+                              title="Export this grouping to Excel">
+                              <mat-icon style="font-size:12px;width:12px;height:12px;vertical-align:middle">file_download</mat-icon>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      @if (isItemExpanded(getItemId(si))) {
+                        <tr>
+                          <td colspan="12" style="padding:0;border:none">
+                            @if (isItemLoading(getItemId(si))) {
+                              <div style="text-align:center;padding:12px">
+                                <mat-spinner diameter="20" style="margin:0 auto 4px"></mat-spinner>
+                                <div style="font-size:11px;color:#64748b">Loading asset details...</div>
+                              </div>
+                            } @else {
+                              <div style="padding:8px 16px 16px;background:#f8fafc">
+                                <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:6px">Per-Asset Detail ({{getItemDetails(getItemId(si)).length}} assets)</div>
+                                <div style="overflow-x:auto">
+                                  <table class="data-table" style="width:100%;font-size:11px;background:white">
+                                    <thead>
+                                      <tr>
+                                        <th>Asset ID</th>
+                                        <th>Description</th>
+                                        <th class="value-cell">In Service</th>
+                                        <th class="value-cell">UL (Mths)</th>
+                                        <th class="value-cell">RUL (Mths)</th>
+                                        <th class="value-cell">Days</th>
+                                        <th class="value-cell">Cost</th>
+                                        <th class="value-cell">Residual</th>
+                                        <th class="value-cell">Dep. Period</th>
+                                        <th class="value-cell">Accum. Dep.</th>
+                                        <th class="value-cell">Carrying Amt</th>
+                                        <th class="value-cell">Reval Reserve</th>
+                                        <th class="value-cell">Dep Offset Open</th>
+                                        <th class="value-cell">Dep Offset</th>
+                                        <th class="value-cell">Dep Offset Close</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      @for (d of getItemDetails(getItemId(si)); track $index) {
+                                        <tr>
+                                          <td class="ref-cell">{{getDetailVal(d, 'AssetRegisterItemId')}}</td>
+                                          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{getDetailVal(d, 'Description') || '—'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'InServiceDate') ? (getDetailVal(d, 'InServiceDate') | date:'yyyy-MM-dd') : '—'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'UsefulLifeMonths') | number:'1.0-0'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'RemainingUsefulLifeMonths') | number:'1.1-1'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'DaysFromLastRun')}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'CostPurchaseAmount') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'ResidualValue') | number:'1.2-2'}}</td>
+                                          <td class="value-cell" style="font-weight:600;color:#f59e0b">{{getDetailVal(d, 'DepreciationForPeriod') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'AccumulatedDepreciation') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'CarryingAmount') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'AccumulatedRevaluationReserveClosingBalance') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetOpeningBalance') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffset') | number:'1.2-2'}}</td>
+                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetClosingBalance') | number:'1.2-2'}}</td>
+                                        </tr>
+                                      }
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleRevalSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#8b5cf6">auto_graph</mat-icon>
+            Revaluation Approvals
+            <span class="section-badge" style="background:#ede9fe;color:#6d28d9">{{pendingRevaluations().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{revalSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (revalSectionExpanded()) {
+        @if (pendingRevaluations().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending revaluations</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Asset</th>
+                <th>Date</th>
+                <th class="value-cell">Fair Value</th>
+                <th class="value-cell">Surplus/Deficit</th>
+                <th class="value-cell">Dep Adj</th>
+                <th>Model</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (reval of pendingRevaluations(); track reval.Asset_RevaluationsID) {
+                <tr>
+                  <td>{{reval.Asset_RevaluationsID}}</td>
+                  <td>{{reval.AssetRegisterID}}</td>
+                  <td>{{reval.RevalutionDate ? (reval.RevalutionDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td class="value-cell" style="font-weight:600;color:#8b5cf6">{{formatCurrency(reval.RevalautionAmt)}}</td>
+                  <td class="value-cell">{{formatCurrency(reval.SurplusAmount)}}</td>
+                  <td class="value-cell">{{formatCurrency(reval.DepreciationAdjustment)}}</td>
+                  <td>
+                    @if (reval.RevalModel === 1) { Fair Value }
+                    @else if (reval.RevalModel === 2) { Cost To Sell }
+                    @else if (reval.RevalModel === 3) { Value In Use }
+                    @else { — }
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <button mat-stroked-button style="font-size:12px;padding:2px 10px;min-height:28px;line-height:28px" (click)="openDetail(reval, 'revaluation')">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">visibility</mat-icon> View
+                      </button>
+                      @if (approvalMethod() !== 'Automated') {
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="approveRevaluation(reval)" [disabled]="approvingId() > 0">
+                        @if (approvingId() === (reval.Asset_RevaluationsID || reval.asset_RevaluationsID)) { Approving... } @else { Approve }
+                      </button>
+                      }
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="rejectRevaluation(reval)" [disabled]="approvingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleImpairSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#ef4444">warning</mat-icon>
+            Impairment Approvals
+            <span class="section-badge" style="background:#fef2f2;color:#b91c1c">{{pendingImpairments().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{impairSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (impairSectionExpanded()) {
+        @if (pendingImpairments().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending impairments</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Asset</th>
+                <th>Date</th>
+                <th class="value-cell">Amount</th>
+                <th class="value-cell">Prev. Carrying</th>
+                <th class="value-cell">New Carrying</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (imp of pendingImpairments(); track imp.assetImpairment_ID) {
+                <tr>
+                  <td>{{imp.assetImpairment_ID}}</td>
+                  <td>{{imp.assetRegisterItem_ID || imp.asset_ItemID}}</td>
+                  <td>{{imp.impairmentDate ? (imp.impairmentDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td class="value-cell" style="font-weight:600;color:#ef4444">{{formatCurrency(imp.impairmentAmount)}}</td>
+                  <td class="value-cell">{{formatCurrency(imp.previousCarryingAmount)}}</td>
+                  <td class="value-cell">{{formatCurrency(imp.newCarryingAmount)}}</td>
+                  <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{imp.reason || '—'}}</td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <button mat-stroked-button style="font-size:12px;padding:2px 10px;min-height:28px;line-height:28px" (click)="openDetail(imp, 'impairment')">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">visibility</mat-icon> View
+                      </button>
+                      @if (approvalMethod() !== 'Automated') {
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="approveImpairment(imp)" [disabled]="approvingId() > 0">
+                        @if (approvingId() === imp.assetImpairment_ID) { Approving... } @else { Approve }
+                      </button>
+                      }
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="rejectImpairment(imp)" [disabled]="approvingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleReversalSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#16a34a">restore</mat-icon>
+            Impairment Reversal Approvals
+            <span class="section-badge" style="background:#f0fdf4;color:#15803d">{{pendingReversals().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{reversalSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (reversalSectionExpanded()) {
+        @if (pendingReversals().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending impairment reversals</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Asset</th>
+                <th>Date</th>
+                <th class="value-cell">Amount</th>
+                <th class="value-cell">Prev. Carrying</th>
+                <th class="value-cell">New Carrying</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (rev of pendingReversals(); track rev.assetImpairment_ID) {
+                <tr>
+                  <td>{{rev.assetImpairment_ID}}</td>
+                  <td>{{rev.assetRegisterItem_ID || rev.asset_ItemID}}</td>
+                  <td>{{rev.impairmentDate ? (rev.impairmentDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td class="value-cell" style="font-weight:600;color:#16a34a">{{formatCurrency(rev.impairmentAmount)}}</td>
+                  <td class="value-cell">{{formatCurrency(rev.previousCarryingAmount)}}</td>
+                  <td class="value-cell">{{formatCurrency(rev.newCarryingAmount)}}</td>
+                  <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{rev.reason || '—'}}</td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <button mat-stroked-button style="font-size:12px;padding:2px 10px;min-height:28px;line-height:28px" (click)="openDetail(rev, 'reversal')">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">visibility</mat-icon> View
+                      </button>
+                      @if (approvalMethod() !== 'Automated') {
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="approveImpairmentReversal(rev)" [disabled]="approvingId() > 0">
+                        @if (approvingId() === rev.assetImpairment_ID) { Approving... } @else { Approve }
+                      </button>
+                      }
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="rejectImpairmentReversal(rev)" [disabled]="approvingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleDisposalSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#dc2626">delete_sweep</mat-icon>
+            Disposal Approvals
+            <span class="section-badge" style="background:#fff1f2;color:#b91c1c">{{pendingDisposals().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{disposalSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (disposalSectionExpanded()) {
+        @if (pendingDisposals().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending disposals</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Asset</th>
+                <th>Date</th>
+                <th class="value-cell">Sale Price</th>
+                <th class="value-cell">Carrying</th>
+                <th class="value-cell">P/L</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of pendingDisposals(); track d.assetDisposal_ID) {
+                <tr>
+                  <td>{{d.assetDisposal_ID}}</td>
+                  <td>{{d.assetRegisterItem_ID}}</td>
+                  <td>{{d.disposalDate ? (d.disposalDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td class="value-cell">{{formatCurrency(d.salePrice)}}</td>
+                  <td class="value-cell">{{formatCurrency(d.carryingAmount)}}</td>
+                  <td class="value-cell" [style.color]="(d.profitLoss || 0) >= 0 ? '#16a34a' : '#ef4444'">{{formatCurrency(d.profitLoss)}}</td>
+                  <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{d.reason || '—'}}</td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <button mat-stroked-button style="font-size:12px;padding:2px 10px;min-height:28px;line-height:28px" (click)="openDetail(d, 'disposal')">
+                        <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">visibility</mat-icon> View
+                      </button>
+                      @if (approvalMethod() !== 'Automated') {
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="approveDisposal(d)" [disabled]="approvingId() > 0">
+                        @if (approvingId() === (d.assetDisposal_ID || d.AssetDisposal_ID)) { Approving... } @else { Approve }
+                      </button>
+                      }
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="rejectDisposal(d)" [disabled]="approvingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleRefurbSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#8b5cf6">build</mat-icon>
+            Refurbishment Approvals
+            <span class="section-badge" style="background:#f3e8ff;color:#6d28d9">{{pendingRefurbishments().length}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{refurbSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (refurbSectionExpanded()) {
+        @if (pendingRefurbishments().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending refurbishments</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Asset ID</th>
+                <th>Date</th>
+                <th>Fin Year</th>
+                <th class="value-cell">DT Amount</th>
+                <th class="value-cell">CT Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of pendingRefurbishments(); track r.asset_RefurbID) {
+                <tr>
+                  <td>{{r.asset_RefurbID}}</td>
+                  <td>{{r.assetRegisterID}}</td>
+                  <td>{{r.refurbDate ? (r.refurbDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td>{{r.financialYear || r.FinancialYear || '—'}}</td>
+                  <td class="value-cell">{{formatCurrency(r.refurb_DT)}}</td>
+                  <td class="value-cell">{{formatCurrency(r.refurb_CT)}}</td>
+                  <td>
+                    <div style="display:flex;gap:4px">
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="approveRefurbishment(r)" [disabled]="approvingId() > 0">
+                        @if (approvingId() === (r.asset_RefurbID)) { Approving... } @else { Approve }
+                      </button>
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px" (click)="rejectRefurbishment(r)" [disabled]="approvingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+
+    <div class="card-container" style="margin-bottom:20px">
+      <div style="padding:20px">
+        <div class="section-header" (click)="toggleAssetApprovalSection()">
+          <h3 class="section-title">
+            <mat-icon style="color:#0f2b46">inventory_2</mat-icon>
+            Asset Register Approvals
+            <span class="section-badge" style="background:#dbeafe;color:#1e40af">{{assetApprovalPendingCount()}}</span>
+          </h3>
+          <mat-icon style="color:#94a3b8;font-size:20px">{{assetApprovalSectionExpanded() ? 'expand_less' : 'expand_more'}}</mat-icon>
+        </div>
+        @if (assetApprovalSectionExpanded()) {
+        @if (assetApprovalError()) {
+          <div style="margin:8px 0;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:13px">{{assetApprovalError()}}</div>
+        }
+        @if (pendingAssetApprovals().length === 0) {
+          <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No pending asset register approvals</div>
+        } @else {
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th></th>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Asset ID</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th class="value-cell">Cost</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ap of pendingAssetApprovals(); track ap.approvalId) {
+                <tr style="cursor:pointer" (click)="openAssetApprovalDetail(ap.approvalId)">
+                  <td style="width:24px;color:#94a3b8">
+                    <mat-icon style="font-size:16px;width:16px;height:16px;vertical-align:middle">
+                      {{assetApprovalDetailId() === ap.approvalId ? 'expand_less' : 'expand_more'}}
+                    </mat-icon>
+                  </td>
+                  <td class="ref-cell">{{ap.approvalId}}</td>
+                  <td>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500"
+                          [style.background]="ap.approvalType === 'Acquisition' ? '#ecfdf5' : '#eff6ff'"
+                          [style.color]="ap.approvalType === 'Acquisition' ? '#065f46' : '#1e40af'">
+                      {{ap.approvalType}}@if (ap.acquisitionSubType) { &ndash; {{ap.acquisitionSubType}} }
+                    </span>
+                  </td>
+                  <td>{{ap.assetRegisterItemId || '—'}}</td>
+                  <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ap.description || '—'}}</td>
+                  <td style="font-size:12px;color:#475569">{{ap.categoryName || ap.typeName || '—'}}</td>
+                  <td class="value-cell">{{ap.cost ? formatCurrency(ap.cost) : '—'}}</td>
+                  <td style="font-size:12px">{{ap.submittedDate ? (ap.submittedDate | date:'yyyy-MM-dd') : '—'}}</td>
+                  <td (click)="$event.stopPropagation()">
+                    <div style="display:flex;gap:4px">
+                      <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                              (click)="approveAssetApproval(ap.approvalId)"
+                              [disabled]="assetApprovalApprovingId() > 0">
+                        @if (assetApprovalApprovingId() === ap.approvalId) { Approving... } @else { Approve }
+                      </button>
+                      <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
+                              (click)="beginRejectAssetApproval(ap.approvalId)"
+                              [disabled]="assetApprovalApprovingId() > 0">
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                @if (assetApprovalRejectId() === ap.approvalId) {
+                  <tr>
+                    <td colspan="9" style="padding:12px 16px;background:#fef2f2;border-top:1px solid #fecaca">
+                      <div style="font-size:13px;font-weight:600;color:#dc2626;margin-bottom:6px">Rejection Reason (required)</div>
+                      <textarea style="width:100%;padding:8px 10px;border:1px solid #fecaca;border-radius:6px;font-size:13px;min-height:60px;resize:vertical;box-sizing:border-box"
+                                [(ngModel)]="assetApprovalRejectReason" placeholder="Enter reason for rejection..."></textarea>
+                      <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+                        <button mat-stroked-button style="font-size:12px" (click)="cancelRejectAssetApproval()">Cancel</button>
+                        <button mat-flat-button color="warn" style="font-size:12px"
+                                [disabled]="!assetApprovalRejectReason.trim()"
+                                (click)="confirmRejectAssetApproval()">
+                          Confirm Rejection
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+
+                @if (assetApprovalDetailId() === ap.approvalId) {
+                  <tr>
+                    <td colspan="9" style="padding:0;background:#f8fafc;border-top:2px solid #dbeafe;border-bottom:2px solid #dbeafe">
+                      @if (assetApprovalDetailLoading()) {
+                        <div style="display:flex;justify-content:center;padding:32px">
+                          <mat-spinner diameter="28"></mat-spinner>
+                        </div>
+                      } @else if (assetApprovalDetail()) {
+                        <div style="padding:20px 24px">
+
+                          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #e2e8f0">
+                            <div style="background:#0f2b46;border-radius:8px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                              <mat-icon style="color:white;font-size:20px">inventory_2</mat-icon>
+                            </div>
+                            <div style="flex:1">
+                              <div style="font-size:15px;font-weight:700;color:#1e293b">
+                                @if (assetApprovalDetail().approvalType === 'Acquisition') {
+                                  New Asset Acquisition &mdash; {{assetApprovalDetail().acquisitionSubType}} #{{assetApprovalDetail().approvalId}}
+                                } @else {
+                                  Edit Approval #{{assetApprovalDetail().approvalId}} &mdash; Asset ID {{assetApprovalDetail().assetRegisterItemId}}
+                                }
+                              </div>
+                              <div style="font-size:12px;color:#64748b;margin-top:2px">
+                                Submitted: {{assetApprovalDetail().submittedDate ? (assetApprovalDetail().submittedDate | date:'yyyy-MM-dd HH:mm') : '—'}}
+                                &nbsp;&bull;&nbsp; Status: <span style="font-weight:600;color:#f59e0b">{{assetApprovalDetail().status}}</span>
+                              </div>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center">
+                              <button mat-flat-button color="primary" style="font-size:13px"
+                                      (click)="approveAssetApproval(assetApprovalDetail().approvalId)"
+                                      [disabled]="assetApprovalApprovingId() > 0">
+                                @if (assetApprovalApprovingId() === assetApprovalDetail().approvalId) { Approving... } @else { Approve }
+                              </button>
+                              <button mat-stroked-button color="warn" style="font-size:13px"
+                                      (click)="beginRejectAssetApproval(assetApprovalDetail().approvalId)"
+                                      [disabled]="assetApprovalApprovingId() > 0">
+                                Reject
+                              </button>
+                              <button mat-icon-button (click)="closeAssetApprovalDetail()"><mat-icon>close</mat-icon></button>
+                            </div>
+                          </div>
+
+                          @if (assetApprovalDetail().approvalType === 'Edit') {
+                            <div style="border-bottom:2px solid #e2e8f0;margin-bottom:0">
+                              <div style="display:flex;gap:0">
+                                @for (editTab of [
+                                  {key:'changes',label:'Changes',icon:'compare_arrows'},
+                                  {key:'details',label:'Asset Details',icon:'info'},
+                                  {key:'financial',label:'Financial',icon:'payments'},
+                                  {key:'ownership',label:'Ownership',icon:'person'},
+                                  {key:'location',label:'Location',icon:'location_on'}
+                                ]; track editTab.key) {
+                                  <button (click)="setAssetApprovalDetailTab(editTab.key)"
+                                    style="display:flex;align-items:center;gap:4px;padding:8px 14px;border:none;cursor:pointer;font-size:12px;font-weight:500;border-bottom:3px solid transparent;background:transparent;transition:all 0.15s"
+                                    [style.border-bottom-color]="assetApprovalDetailTab() === editTab.key ? '#0f2b46' : 'transparent'"
+                                    [style.color]="assetApprovalDetailTab() === editTab.key ? '#0f2b46' : '#64748b'"
+                                    [style.font-weight]="assetApprovalDetailTab() === editTab.key ? '700' : '500'">
+                                    <mat-icon style="font-size:14px;width:14px;height:14px">{{editTab.icon}}</mat-icon>
+                                    {{editTab.label}}
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                            <div style="padding-top:14px;min-height:120px">
+                              @if (assetApprovalDetailTab() === 'changes') {
+                                @if (assetApprovalDetail().changeSummary && assetApprovalDetail().changeSummary.length > 0) {
+                                  <table class="data-table" style="width:100%;background:white">
+                                    <thead>
+                                      <tr>
+                                        <th style="width:220px">Field</th>
+                                        <th>Current Value (Before)</th>
+                                        <th>Proposed Value (After)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      @for (ch of assetApprovalDetail().changeSummary; track ch.field) {
+                                        <tr>
+                                          <td style="font-weight:600;color:#334155;white-space:nowrap">{{ch.label || ch.field}}</td>
+                                          <td style="color:#dc2626;background:#fef2f2">{{ch.previousDescription || ch.previousValue || '—'}}</td>
+                                          <td style="color:#16a34a;font-weight:600;background:#f0fdf4">{{ch.newDescription || ch.newValue || '—'}}</td>
+                                        </tr>
+                                      }
+                                    </tbody>
+                                  </table>
+                                } @else {
+                                  <div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No change summary available</div>
+                                }
+                              }
+                              @if (assetApprovalDetailTab() === 'details' && assetApprovalDetail().assetData) {
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+                                  @if (getField(assetApprovalDetail().assetData,'Description')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Description</div><div style="font-size:13px;font-weight:600;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Description')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'MunicipalAssetID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Municipal Asset ID</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'MunicipalAssetID')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Barcode')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Barcode</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'Barcode')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SerialNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Serial Number</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'SerialNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Make')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Make</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Make')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Model')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Model</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Model')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'RegistrationNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Registration No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'RegistrationNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetType_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Asset Type</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetType_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetCategory_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Category</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetCategory_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Asset_SubCategory_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Sub-Category</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Asset_SubCategory_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetClass_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Asset Class</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetClass_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetCondition_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Condition</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetCondition_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetStatus_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Status</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetStatus_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ReasonForChange')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Reason for Change</div><div style="font-size:13px;color:#475569;font-style:italic">{{getField(assetApprovalDetail().assetData,'ReasonForChange')}}</div></div>
+                                  }
+                                </div>
+                              }
+                              @if (assetApprovalDetailTab() === 'financial' && assetApprovalDetail().assetData) {
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+                                  @if (getField(assetApprovalDetail().assetData,'PurchaseAmount')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Purchase Amount</div><div style="font-size:16px;font-weight:700;color:#16a34a">{{formatCurrency(getField(assetApprovalDetail().assetData,'PurchaseAmount'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ResidualValue')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Residual Value</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'ResidualValue'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AcquisitionDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Acquisition Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'AcquisitionDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'CommisioningDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Commissioning Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'CommisioningDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'InserviceDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">In-Service Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'InserviceDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'UsefulLifeYearComponent')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Useful Life (Yrs)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'UsefulLifeYearComponent')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'UsefulLifeMonthComponent')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Useful Life (Months)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'UsefulLifeMonthComponent')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Remaining_Useful_Life_Year')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Remaining UL (Yrs)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Remaining_Useful_Life_Year')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'RemainingUsefulLife')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Remaining Useful Life</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'RemainingUsefulLife')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AccumulatedDepreciationClosingBalance')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Accum. Dep. Closing</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'AccumulatedDepreciationClosingBalance'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AccumulatedImpairmentClosingBalance')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Accum. Impairment Closing</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'AccumulatedImpairmentClosingBalance'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DeemedCost')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Deemed Cost</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'DeemedCost'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'RevaluationReserveClosingBalance')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Reval Reserve Closing</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'RevaluationReserveClosingBalance'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ImpairmentAmountCurrentYear')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Impairment Curr Year</div><div style="font-size:13px;color:#ef4444">{{formatCurrency(getField(assetApprovalDetail().assetData,'ImpairmentAmountCurrentYear'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ReversalOfImpairmentAmount')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Impairment Reversal</div><div style="font-size:13px;color:#16a34a">{{formatCurrency(getField(assetApprovalDetail().assetData,'ReversalOfImpairmentAmount'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AccumulatedDepreciationCurrentYear')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Dep. Current Year</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'AccumulatedDepreciationCurrentYear'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DepreciatedReplacementCostDRC')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">DRC</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'DepreciatedReplacementCostDRC'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'CurrentReplacementCostCRC')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">CRC</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'CurrentReplacementCostCRC'))}}</div></div>
+                                  }
+                                </div>
+                              }
+                              @if (assetApprovalDetailTab() === 'ownership' && assetApprovalDetail().assetData) {
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+                                  @if (getField(assetApprovalDetail().assetData,'MunicipalDepartment_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Department</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('MunicipalDepartment_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Custodian_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Custodian</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Custodian_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'CustodianIdNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Custodian ID No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'CustodianIdNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SupplierName')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Supplier Name</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'SupplierName')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SupplierCode')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Supplier Code</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'SupplierCode')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Donor_Name')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Donor Name</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Donor_Name')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DonorRegNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Donor Reg No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'DonorRegNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundingSourceNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Funding Source No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'FundingSourceNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundingSourceAmount')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Funding Amount</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'FundingSourceAmount'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundType')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Fund Type</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'FundType')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundingDescription')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Funding Description</div><div style="font-size:13px;color:#475569">{{getField(assetApprovalDetail().assetData,'FundingDescription')}}</div></div>
+                                  }
+                                </div>
+                              }
+                              @if (assetApprovalDetailTab() === 'location' && assetApprovalDetail().assetData) {
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+                                  @if (getField(assetApprovalDetail().assetData,'Town_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Town</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Town_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Ward_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Ward</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Ward_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Street_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Street</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Street_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Building_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Building</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Building_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FloorID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Floor</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('FloorID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Room_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Room</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Room_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Suburb')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Suburb</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Suburb')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DivisionID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Division ID</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'DivisionID')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DeedNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Deed Number</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'DeedNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ErfNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Erf Number</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'ErfNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'PortionNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Portion Number</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'PortionNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'latitude')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Latitude</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'latitude')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'longitude')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Longitude</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'longitude')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'LocationDescription')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Location Description</div><div style="font-size:13px;color:#475569">{{getField(assetApprovalDetail().assetData,'LocationDescription')}}</div></div>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          }
+
+                          @if (assetApprovalDetail().approvalType === 'Acquisition') {
+
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+                              <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px">
+                                <div style="font-size:11px;font-weight:700;color:#0f2b46;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #0f2b46">Identity &amp; Description</div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                  @if (getField(assetApprovalDetail().assetData,'Description')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Description</div><div style="font-size:13px;font-weight:600;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Description')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Barcode')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Barcode</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'Barcode')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SerialNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Serial Number</div><div style="font-size:13px;color:#1e293b;font-family:monospace">{{getField(assetApprovalDetail().assetData,'SerialNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Make')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Make</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Make')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Model')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Model</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Model')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'RegistrationNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Registration No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'RegistrationNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'MunicipalAssetID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Municipal Asset ID</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'MunicipalAssetID')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetType_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Asset Type</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetType_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetCategory_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Category</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetCategory_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Asset_SubCategory_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Sub-Category</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Asset_SubCategory_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetCondition_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Condition</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetCondition_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AssetStatus_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Status</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('AssetStatus_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                </div>
+                              </div>
+
+                              <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px">
+                                <div style="font-size:11px;font-weight:700;color:#0f2b46;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #16a34a">Financial Information</div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                  @if (getField(assetApprovalDetail().assetData,'PurchaseAmount')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Purchase / Cost Amount</div><div style="font-size:15px;font-weight:700;color:#16a34a">{{formatCurrency(getField(assetApprovalDetail().assetData,'PurchaseAmount'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'ResidualValue')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Residual Value</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'ResidualValue'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AcquisitionDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Acquisition Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'AcquisitionDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'CommisioningDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Commissioning Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'CommisioningDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'InserviceDate')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">In-Service Date</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'InserviceDate') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'UsefulLifeYearComponent')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Useful Life (Yrs)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'UsefulLifeYearComponent')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'UsefulLifeMonthComponent')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Useful Life (Months)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'UsefulLifeMonthComponent')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Remaining_Useful_Life_Year')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Remaining UL (Yrs)</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Remaining_Useful_Life_Year')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'AccumulatedDepreciationClosingBalance')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Accum. Dep. Closing</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'AccumulatedDepreciationClosingBalance'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'DeemedCost')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Deemed Cost</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'DeemedCost'))}}</div></div>
+                                  }
+                                </div>
+                              </div>
+
+                              <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px">
+                                <div style="font-size:11px;font-weight:700;color:#0f2b46;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #8b5cf6">Ownership &amp; Location</div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                  @if (getField(assetApprovalDetail().assetData,'MunicipalDepartment_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Department</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('MunicipalDepartment_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Custodian_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Custodian</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Custodian_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Town_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Town</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Town_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Ward_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Ward</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Ward_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Building_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Building</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Building_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Room_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Room</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Room_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Street_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Street</div><div style="font-size:13px;color:#1e293b">{{fieldDisplay('Street_ID', assetApprovalDetail().assetData)}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Suburb')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Suburb</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Suburb')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'LocationDescription')) {
+                                    <div style="grid-column:1/-1"><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Location Description</div><div style="font-size:13px;color:#475569">{{getField(assetApprovalDetail().assetData,'LocationDescription')}}</div></div>
+                                  }
+                                </div>
+                              </div>
+
+                              <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px">
+                                <div style="font-size:11px;font-weight:700;color:#0f2b46;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #f59e0b">
+                                  Transfer &amp; Supplier Reference
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                  @if (assetApprovalDetail().scmTransferId) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">SCM Transfer ID</div><div style="font-size:13px;font-weight:600;color:#1e293b">{{assetApprovalDetail().scmTransferId}}</div></div>
+                                  }
+                                  @if (assetApprovalDetail().invTransferId) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Inventory Transfer ID</div><div style="font-size:13px;font-weight:600;color:#1e293b">{{assetApprovalDetail().invTransferId}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SupplierName')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Supplier Name</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'SupplierName')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'SupplierCode')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Supplier Code</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'SupplierCode')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'InvoiceNo')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Invoice No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'InvoiceNo')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'GRN_ID')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">GRN ID</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'GRN_ID')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Donor_Name')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Donor Name</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Donor_Name')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'Date_Donated')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Date Donated</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'Date_Donated') | date:'yyyy-MM-dd'}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundingSourceNumber')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Funding Source No</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'FundingSourceNumber')}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundingSourceAmount')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Funding Amount</div><div style="font-size:13px;color:#1e293b">{{formatCurrency(getField(assetApprovalDetail().assetData,'FundingSourceAmount'))}}</div></div>
+                                  }
+                                  @if (getField(assetApprovalDetail().assetData,'FundType')) {
+                                    <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Fund Type</div><div style="font-size:13px;color:#1e293b">{{getField(assetApprovalDetail().assetData,'FundType')}}</div></div>
+                                  }
+                                </div>
+                              </div>
+
+                            </div>
+                          }
+
+                          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0">
+                            @if (assetApprovalRejectId() === assetApprovalDetail().approvalId) {
+                              <div style="flex:1;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px">
+                                <div style="font-size:12px;font-weight:600;color:#dc2626;margin-bottom:6px">Rejection Reason (required)</div>
+                                <textarea style="width:100%;padding:8px 10px;border:1px solid #fecaca;border-radius:6px;font-size:13px;min-height:56px;resize:vertical;box-sizing:border-box"
+                                          [(ngModel)]="assetApprovalRejectReason" placeholder="Enter reason for rejection..."></textarea>
+                                <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+                                  <button mat-stroked-button style="font-size:12px" (click)="cancelRejectAssetApproval()">Cancel</button>
+                                  <button mat-flat-button color="warn" style="font-size:12px"
+                                          [disabled]="!assetApprovalRejectReason.trim()"
+                                          (click)="confirmRejectAssetApproval()">
+                                    Confirm Rejection
+                                  </button>
+                                </div>
+                              </div>
+                            } @else {
+                              <button mat-flat-button color="primary"
+                                      (click)="approveAssetApproval(assetApprovalDetail().approvalId)"
+                                      [disabled]="assetApprovalApprovingId() > 0">
+                                @if (assetApprovalApprovingId() === assetApprovalDetail().approvalId) { Approving... } @else { Approve Submission }
+                              </button>
+                              <button mat-stroked-button color="warn"
+                                      (click)="beginRejectAssetApproval(assetApprovalDetail().approvalId)"
+                                      [disabled]="assetApprovalApprovingId() > 0">
+                                Reject Submission
+                              </button>
+                            }
+                          </div>
+
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        }
+        }
+      </div>
+    </div>
+  </div>
+} @else {
+  @if (loading()) {
+    <div style="display:flex;justify-content:center;padding:60px"><mat-spinner diameter="40"></mat-spinner></div>
+  } @else {
+    @if (filteredWorkflows().length === 0) {
+      <div class="card-container" style="text-align:center;padding:60px;color:#94a3b8">
+        <mat-icon style="font-size:56px;margin-bottom:12px">inbox</mat-icon>
+        <div style="font-size:16px;font-weight:500;color:#64748b">
+          @if (activeTab() === 1) { No pending workflows }
+          @else if (activeTab() === 3) { No approved workflows }
+          @else if (activeTab() === 4) { No rejected workflows }
+          @else { No workflows found }
+        </div>
+        <div style="font-size:13px;margin-top:4px">All approvals are up to date</div>
+      </div>
+    } @else {
+      @for (wf of filteredWorkflows(); track wf.id) {
+        <div class="card-container" style="margin-bottom:16px;overflow:hidden">
+          <div style="padding:20px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <div [style.background]="getEntityColor(wf.entity_type)"
+                     style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <mat-icon style="font-size:20px;color:white">{{getEntityIcon(wf.entity_type)}}</mat-icon>
+                </div>
+                <div>
+                  <div style="font-size:16px;font-weight:600;color:#1e293b">{{wf.workflow_name || formatEntityType(wf.entity_type)}}</div>
+                  <div style="font-size:13px;color:#64748b;margin-top:2px">
+                    <span style="font-weight:500">{{formatEntityType(wf.entity_type)}}</span> · {{wf.entity_id}}
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;margin-top:2px">
+                    <mat-icon style="font-size:14px;vertical-align:middle;margin-right:2px">person</mat-icon>
+                    Initiated by {{wf.initiated_by_name || 'System'}} · {{formatDate(wf.initiated_at)}}
+                  </div>
+                  @if (wf.status === 'pending' || wf.status === 'in_progress') {
+                    <div style="margin-top:6px">
+                      <span [style.background]="getSlaColor(wf)" [style.color]="getSlaTextColor(wf)"
+                            style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600">
+                        <mat-icon style="font-size:13px">schedule</mat-icon> {{getSlaLabel(wf)}}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+              <span class="status-badge" [class]="'status-' + wf.status">{{wf.status}}</span>
+            </div>
+
+            <div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px">
+              <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Approval Progress</div>
+              <div style="display:flex;align-items:center;gap:0">
+                @for (step of getSteps(wf); track step.step || step.step_number; let i = $index; let last = $last) {
+                  <div style="display:flex;align-items:center;flex:1">
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+                      <div [style.background]="getStepBg(wf, step)"
+                           [style.color]="getStepColor(wf, step)"
+                           [style.border]="getStepBorder(wf, step)"
+                           style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;transition:all 0.3s">
+                        @if (isStepComplete(wf, step)) {
+                          <mat-icon style="font-size:18px">check</mat-icon>
+                        } @else if (isStepRejected(wf, step)) {
+                          <mat-icon style="font-size:18px">close</mat-icon>
+                        } @else {
+                          {{step.step || step.step_number}}
+                        }
+                      </div>
+                      <div style="font-size:11px;font-weight:600;color:#334155;text-align:center;max-width:80px;line-height:1.3">{{step.action}}</div>
+                      <div style="font-size:10px;color:#94a3b8;text-align:center">{{step.role}}</div>
+                    </div>
+                    @if (!last) {
+                      <div [style.background]="isStepComplete(wf, step) ? '#10b981' : '#e2e8f0'"
+                           style="flex:1;height:2px;margin:0 4px;margin-bottom:28px;transition:background 0.3s"></div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+
+            @if (expandedId() === wf.id) {
+              @if (wf.approvals && wf.approvals.length > 0) {
+                <div style="margin-bottom:16px">
+                  <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Approval Timeline</div>
+                  <div style="position:relative;padding-left:24px">
+                    <div style="position:absolute;left:11px;top:0;bottom:0;width:2px;background:#e2e8f0"></div>
+                    @for (approval of wf.approvals; track $index) {
+                      <div style="position:relative;margin-bottom:16px">
+                        <div [style.background]="getApprovalColor(approval.action)"
+                             style="position:absolute;left:-18px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:1">
+                          <mat-icon style="font-size:10px;color:white">
+                            {{approval.action === 'approve' ? 'check' : approval.action === 'reject' ? 'close' : 'undo'}}
+                          </mat-icon>
+                        </div>
+                        <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-left:8px">
+                          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                            <span style="font-size:13px;font-weight:600;color:#1e293b">
+                              Step {{approval.step_number}} · {{getApprovalLabel(approval.action)}}
+                            </span>
+                            <span style="font-size:11px;color:#94a3b8">{{formatDate(approval.acted_at)}}</span>
+                          </div>
+                          <div style="font-size:12px;color:#64748b">
+                            <mat-icon style="font-size:14px;vertical-align:middle;margin-right:2px">person</mat-icon>
+                            {{approval.approver_name || 'System'}}
+                          </div>
+                          @if (approval.comments) {
+                            <div style="margin-top:8px;padding:8px;background:#f8fafc;border-radius:6px;font-size:12px;color:#475569;font-style:italic">
+                              "{{approval.comments}}"
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            }
+
+            @if (activeActionId() === wf.id) {
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px">
+                <div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:8px">
+                  @if (activeAction() === 'approve') { Approve Workflow }
+                  @else if (activeAction() === 'reject') { Reject Workflow }
+                  @else { Return for Revision }
+                </div>
+                <div class="detail-field">
+                  <label>Comments {{activeAction() === 'reject' ? '(required)' : '(optional)'}}</label>
+                  <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:80px;resize:vertical"
+                            [(ngModel)]="actionComments" placeholder="Enter your comments..."></textarea>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                  <button mat-stroked-button (click)="cancelAction()">Cancel</button>
+                  @if (activeAction() === 'approve') {
+                    <button mat-flat-button style="background:#10b981;color:white" (click)="submitAction(wf.id, 'approve')">
+                      <mat-icon>check</mat-icon> Confirm Approval
+                    </button>
+                  }
+                  @if (activeAction() === 'reject') {
+                    <button mat-flat-button style="background:#ef4444;color:white" (click)="submitAction(wf.id, 'reject')"
+                            [disabled]="!actionComments.trim()">
+                      <mat-icon>close</mat-icon> Confirm Rejection
+                    </button>
+                  }
+                  @if (activeAction() === 'return') {
+                    <button mat-flat-button style="background:#f59e0b;color:white" (click)="submitAction(wf.id, 'return')">
+                      <mat-icon>undo</mat-icon> Return for Revision
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #f1f5f9">
+              <button mat-button style="color:#64748b;font-size:12px" (click)="toggleExpanded(wf)">
+                <mat-icon style="font-size:16px">{{expandedId() === wf.id ? 'expand_less' : 'expand_more'}}</mat-icon>
+                {{expandedId() === wf.id ? 'Hide' : 'Show'}} History
+              </button>
+              @if (wf.status === 'pending' || wf.status === 'in_progress') {
+                <div style="display:flex;gap:8px">
+                  <button mat-stroked-button style="border-color:#f59e0b;color:#f59e0b;font-size:12px;min-height:32px" (click)="openAction(wf.id, 'return')">
+                    <mat-icon style="font-size:16px">undo</mat-icon> Return
+                  </button>
+                  <button mat-stroked-button style="border-color:#ef4444;color:#ef4444;font-size:12px;min-height:32px" (click)="openAction(wf.id, 'reject')">
+                    <mat-icon style="font-size:16px">close</mat-icon> Reject
+                  </button>
+                  <button mat-flat-button style="background:#10b981;color:white;font-size:12px;min-height:32px" (click)="openAction(wf.id, 'approve')">
+                    <mat-icon style="font-size:16px">check</mat-icon> Approve
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+  }
+}

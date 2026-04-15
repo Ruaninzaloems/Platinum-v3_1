@@ -1,0 +1,26 @@
+<div class="progress-ring-container" [style.width.px]="size()" [style.height.px]="size()">
+  <svg [attr.width]="size()" [attr.height]="size()" [attr.viewBox]="'0 0 ' + size() + ' ' + size()">
+    <circle
+      [attr.cx]="center()"
+      [attr.cy]="center()"
+      [attr.r]="ringRadius()"
+      fill="none"
+      stroke="#e2e8f0"
+      [attr.stroke-width]="strokeWidth()" />
+    <circle
+      [attr.cx]="center()"
+      [attr.cy]="center()"
+      [attr.r]="ringRadius()"
+      fill="none"
+      [attr.stroke]="color()"
+      [attr.stroke-width]="strokeWidth()"
+      stroke-linecap="round"
+      [attr.stroke-dasharray]="circumference()"
+      [attr.stroke-dashoffset]="dashOffset()"
+      class="progress-circle"
+      [attr.transform]="'rotate(-90, ' + center() + ', ' + center() + ')'" />
+  </svg>
+  <div class="progress-ring-text">
+    <span class="progress-ring-value" [style.color]="color()">{{ clampedValue() }}%</span>
+  </div>
+</div>

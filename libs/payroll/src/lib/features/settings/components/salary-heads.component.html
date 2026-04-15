@@ -1,0 +1,530 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Salary Transactions</h1>
+      <p class="page-subtitle">Configure earnings, deductions, company contributions and fringe benefits</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="14"></app-icon> Add Transaction</button>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ items.length }}</span>
+      <span class="summary-label">Total</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ items.length - activeCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-earning">{{ earningsCount }}</span>
+      <span class="summary-label">Earnings</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-deduction">{{ deductionsCount }}</span>
+      <span class="summary-label">Deductions</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-company">{{ companyContribCount }}</span>
+      <span class="summary-label">Company Contrib.</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-fringe">{{ fringeBenefitCount }}</span>
+      <span class="summary-label">Fringe Benefits</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="14"></app-icon>
+      <input class="search-input" placeholder="Search by code, title, type or method..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterItems()">
+    </div>
+    <span class="result-count">{{ filteredItems.length }} of {{ items.length }} transactions</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading salary transactions...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredItems.length === 0) {
+        <div class="empty-state"><h3>No transactions found</h3><p>{{ items.length === 0 ? 'Click "Add Transaction" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th class="col-code">Code</th>
+                <th class="col-title">Title</th>
+                <th class="col-type">Type</th>
+                <th class="col-method">Calc Method</th>
+                <th class="col-status">Status</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of pagedItems; track r.id; let i = $index) {
+                <tr (click)="openDetail(r, i)">
+                  <td class="col-code"><span class="code-text">{{ r.code }}</span></td>
+                  <td class="col-title"><span class="title-text">{{ r.name }}</span></td>
+                  <td class="col-type"><span class="type-pill" [ngClass]="getTypeBadgeClass(r.transaction_type)">{{ getTypeLabel(r.transaction_type) }}</span></td>
+                  <td class="col-method">{{ getCalcMethodLabel(r.calculation_method) }}</td>
+                  <td class="col-status"><app-status-badge [status]="r.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      @if (!r.is_system) {
+                        <button class="btn btn-sm" (click)="openDetail(r, i); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteFromList(r, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      } @else {
+                        <span class="system-badge">System</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (totalPages > 1) {
+          <div class="pagination">
+            <button class="btn btn-sm" [disabled]="currentPage <= 1" (click)="goToPage(currentPage - 1)"><app-icon name="chevron-left" [size]="12"></app-icon></button>
+            <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button class="btn btn-sm" [disabled]="currentPage >= totalPages" (click)="goToPage(currentPage + 1)"><app-icon name="chevron-right" [size]="12"></app-icon></button>
+          </div>
+        }
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (item.id) {
+          <div class="detail-meta">
+            <span class="text-muted">{{ item.code }}</span>
+            @if (item.is_system) {
+              <span class="system-badge">System</span>
+            }
+            <app-status-badge [status]="item.enabled ? 'Active' : 'Inactive'"></app-status-badge>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (item.id) {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ items.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= items.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+      }
+      @if (mode === 'view' && !item.is_system) {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-tabs">
+    <button class="tab" [class.active]="activeTab === 'details'" (click)="switchTab('details')">Salary Transaction Details</button>
+    @if (showMocTab) {
+      <button class="tab" [class.active]="activeTab === 'moc'" (click)="switchTab('moc')">Method of Calculation</button>
+    }
+    @if (item.id) {
+      <button class="tab" [class.active]="activeTab === 'history'" (click)="switchTab('history')">History</button>
+    }
+  </div>
+
+  @if (activeTab === 'details') {
+    <div class="detail-card">
+      <div class="section-title">Transaction Details</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>START DATE</label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="item.start_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ item.start_date?.split('T')[0] || '—' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>END DATE</label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="item.end_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ formatEndDate(item.end_date) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>TRANSACTION TYPE <span class="required">*</span></label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="item.transaction_type">
+              <option [ngValue]="null">— Select Type —</option>
+              @for (t of transactionTypes; track t.id) {
+                <option [ngValue]="t.code">{{ t.description }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value"><span class="type-pill" [ngClass]="getTypeBadgeClass(item.transaction_type)">{{ getTypeLabel(item.transaction_type) }}</span></div>
+          }
+        </div>
+        <div class="form-group">
+          <label>TITLE <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" [(ngModel)]="item.name" placeholder="Enter title">
+          } @else {
+            <div class="field-value">{{ item.name || '—' }}</div>
+          }
+        </div>
+        @if (mode === 'create') {
+          <div class="form-group">
+            <label>CODE <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="item.code" placeholder="e.g. EARN001" maxlength="50">
+          </div>
+        }
+        <div class="form-group">
+          <label>IRP5 CODE</label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="item.irp5_code">
+              <option value="">— None —</option>
+              @for (c of irp5Codes; track c.id) {
+                <option [value]="c.code">{{ c.code }} — {{ c.description }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value">{{ item.irp5_code || '—' }}</div>
+          }
+        </div>
+        <div class="form-group" [style.grid-column]="mode === 'create' ? '1 / -1' : 'auto'">
+          <label>CALCULATION METHOD</label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="item.calculation_method">
+              @for (m of calculationMethods; track m.id) {
+                <option [ngValue]="m.code">{{ m.description }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value">{{ getCalcMethodLabel(item.calculation_method) }}</div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-card">
+      <div class="section-title">Options</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>GROUP ON PAYSLIP BY IRP5 CODE</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.group_on_payslip_by_irp5"></label>
+            </div>
+          } @else {
+            <div class="field-value"><span class="tag" [class]="item.group_on_payslip_by_irp5 ? 'tag-yes' : 'tag-no'">{{ item.group_on_payslip_by_irp5 ? 'Yes' : 'No' }}</span></div>
+          }
+        </div>
+        <div class="form-group">
+          <label>RETIREMENT FUNDING INCOME</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.retirement_funding_income"></label>
+            </div>
+          } @else {
+            <div class="field-value"><span class="tag" [class]="item.retirement_funding_income ? 'tag-yes' : 'tag-no'">{{ item.retirement_funding_income ? 'Yes' : 'No' }}</span></div>
+          }
+        </div>
+        <div class="form-group">
+          <label>PRO-RATED TRANSACTION</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.pro_rated"></label>
+            </div>
+          } @else {
+            <div class="field-value"><span class="tag" [class]="item.pro_rated ? 'tag-yes' : 'tag-no'">{{ item.pro_rated ? 'Yes' : 'No' }}</span></div>
+          }
+        </div>
+        <div class="form-group">
+          <label>ENABLED</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="item.enabled"></label>
+            </div>
+          } @else {
+            <div class="field-value"><span class="tag" [class]="item.enabled ? 'tag-yes' : 'tag-no'">{{ item.enabled ? 'Yes' : 'No' }}</span></div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'moc') {
+    @if (mocRules.length > 0 && !mocForm) {
+      <div class="detail-card">
+        <div class="section-title">Default Formula</div>
+        <div class="formula-display">
+          <code>{{ mocRules[0].formula }}</code>
+        </div>
+        @if (mocRules[0].rule_name) {
+          <div class="formula-meta">Rule: {{ mocRules[0].rule_name }}</div>
+        }
+      </div>
+    }
+
+    <div class="detail-card">
+      <div class="section-title">
+        Formula Rules
+        <button class="btn btn-primary btn-sm" style="margin-left: auto;" (click)="openMocCreate()"><app-icon name="plus" [size]="12"></app-icon> Add Rule</button>
+      </div>
+
+      @if (mocLoading) {
+        <div class="loading">Loading formula rules...</div>
+      } @else if (mocRules.length === 0 && !mocForm) {
+        <div class="empty-state">
+          <h3>No formula rules defined</h3>
+          <p>Add formula rules to define how this transaction is calculated for different employee groups</p>
+        </div>
+      } @else if (!mocForm) {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th>Rule Name</th>
+                <th>Formula</th>
+                <th>CoS</th>
+                <th>Employee Type</th>
+                <th>Priority</th>
+                <th>Effective</th>
+                <th>Status</th>
+                <th style="width: 90px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of mocRules; track r.id) {
+                <tr>
+                  <td><span class="title-text">{{ r.rule_name }}</span></td>
+                  <td><span class="moc-formula-text">{{ r.formula }}</span></td>
+                  <td>{{ r.cos_name || '—' }}</td>
+                  <td>{{ r.employee_type_name || '—' }}</td>
+                  <td>{{ r.priority }}</td>
+                  <td>{{ r.start_date ? (r.start_date | dateSa) : '—' }} – {{ r.end_date ? (r.end_date | dateSa) : '—' }}</td>
+                  <td><app-status-badge [status]="r.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openMocEdit(r)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteMocRule(r)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (mocForm) {
+      <div class="detail-card">
+        <div class="section-title" style="display: flex; align-items: center; justify-content: space-between;">
+          <span>{{ mocFormMode === 'edit' ? 'Edit Formula Rule' : 'New Formula Rule' }}</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary btn-sm" (click)="saveMocRule()"><app-icon name="check" [size]="12"></app-icon> {{ mocFormMode === 'edit' ? 'Save Changes' : 'Save Rule' }}</button>
+            <button class="btn btn-sm" (click)="cancelMocForm()">Cancel</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>RULE NAME <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="mocForm.rule_name" placeholder="e.g. Standard Calculation">
+          </div>
+          <div class="form-group">
+            <label>PRIORITY</label>
+            <input class="form-control" type="number" [(ngModel)]="mocForm.priority" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>CONDITION OF SERVICE</label>
+            <select class="form-control" [(ngModel)]="mocForm.condition_of_service_id">
+              <option [ngValue]="null">— All —</option>
+              @for (c of cosOptions; track c.id) {
+                <option [ngValue]="c.id">{{ c.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>EMPLOYEE TYPE</label>
+            <select class="form-control" [(ngModel)]="mocForm.employee_type_id">
+              <option [ngValue]="null">— All —</option>
+              @for (t of empTypeOptions; track t.id) {
+                <option [ngValue]="t.id">{{ t.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>EMPLOYEE SUBTYPE</label>
+            <select class="form-control" [(ngModel)]="mocForm.employee_subtype_id">
+              <option [ngValue]="null">— All —</option>
+              @for (s of empSubtypeOptions; track s.id) {
+                <option [ngValue]="s.id">{{ s.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ROUND METHOD</label>
+            <select class="form-control" [(ngModel)]="mocForm.round_method">
+              @for (m of roundMethods; track m.code) {
+                <option [ngValue]="m.code">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ROUND DIGITS</label>
+            <input class="form-control" type="number" [(ngModel)]="mocForm.round_digits" min="0" max="10">
+          </div>
+          <div class="form-group">
+            <label>EFFECTIVE FROM</label>
+            <app-date-input [(ngModel)]="mocForm.start_date"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>EFFECTIVE TO</label>
+            <app-date-input [(ngModel)]="mocForm.end_date"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>PRO-RATA</label>
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="mocForm.pro_rata"> Apply pro-rata for mid-period</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>ENABLED</label>
+            <div class="checkbox-row">
+              <label class="checkbox-label"><input type="checkbox" [(ngModel)]="mocForm.enabled"> Active</label>
+            </div>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>FORMULA <span class="required">*</span></label>
+            <textarea class="form-control moc-formula-input" [(ngModel)]="mocForm.formula" placeholder="e.g. BasicSalary * 0.075" rows="3"></textarea>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>NOTES</label>
+            <textarea class="form-control" [(ngModel)]="mocForm.notes" placeholder="Optional notes about this rule" rows="2" style="resize: vertical;"></textarea>
+          </div>
+        </div>
+
+        <div class="moc-form-actions">
+          <button class="btn btn-primary" (click)="saveMocRule()"><app-icon name="check" [size]="14"></app-icon> {{ mocFormMode === 'edit' ? 'Save Changes' : 'Save Rule' }}</button>
+          <button class="btn" (click)="cancelMocForm()">Cancel</button>
+        </div>
+
+        <div class="moc-test-section">
+          <div class="section-title">Test Formula</div>
+          <div class="moc-form-grid" style="grid-template-columns: 1fr 1fr auto;">
+            <div class="form-group">
+              <label>TEST EMPLOYEE (optional)</label>
+              <select class="form-control" [(ngModel)]="testEmployeeId">
+                <option [ngValue]="null">— Use sample data —</option>
+                @for (e of testEmployees; track e.id) {
+                  <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group" style="align-self: end;">
+              <button class="btn" (click)="testMocFormula()" [disabled]="testLoading"><app-icon name="play" [size]="14"></app-icon> Test Formula</button>
+            </div>
+          </div>
+        </div>
+
+        @if (testResult) {
+          <div class="moc-test-result" [class.moc-test-error]="testResult.error">
+            @if (testResult.error) {
+              <div class="moc-test-label">Error</div>
+              <div class="moc-test-value">{{ testResult.error }}</div>
+            } @else {
+              <div class="moc-test-label">Result</div>
+              <div class="moc-test-value moc-test-success">{{ testResult.result }}</div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="detail-card">
+        <div class="section-title">Formula Reference</div>
+        <div class="moc-ref-grid">
+          <div class="moc-ref-section">
+            <div class="moc-ref-heading">Variables <span class="text-muted">(click to insert)</span></div>
+            @for (v of formulaVariables; track v.name) {
+              <div class="moc-ref-item" (click)="insertVariable(v.name)">
+                <span class="moc-ref-code">{{ v.name }}</span>
+                <span class="moc-ref-desc">{{ v.desc }}</span>
+              </div>
+            }
+          </div>
+          <div class="moc-ref-section">
+            <div class="moc-ref-heading">Functions</div>
+            @for (f of formulaFunctions; track f.name) {
+              <div class="moc-ref-item">
+                <span class="moc-ref-code">{{ f.name }}</span>
+                <span class="moc-ref-desc">{{ f.desc }}</span>
+              </div>
+            }
+            <div class="moc-ref-heading" style="margin-top: 12px;">Operators</div>
+            <div class="moc-ref-item">
+              <span class="moc-ref-code">+ - * /</span>
+              <span class="moc-ref-desc">Arithmetic</span>
+            </div>
+            <div class="moc-ref-item">
+              <span class="moc-ref-code">> < >= <= == !=</span>
+              <span class="moc-ref-desc">Comparison</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'history') {
+    <div class="detail-card">
+      <div class="section-title">Change History</div>
+      @if (historyLoading) {
+        <div class="loading">Loading history...</div>
+      } @else if (history.length === 0) {
+        <div class="empty-state"><p>No history records found</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of history; track h.id) {
+                <tr>
+                  <td>{{ formatDate(h.changed_at) }}</td>
+                  <td><span class="type-pill" [class.pill-create]="h.change_type === 'CREATE'" [class.pill-update]="h.change_type === 'UPDATE'" [class.pill-delete]="h.change_type === 'DELETE'">{{ h.change_type }}</span></td>
+                  <td>{{ h.snapshot?.name || '—' }}</td>
+                  <td>{{ getTypeLabel(h.snapshot?.transaction_type) }}</td>
+                  <td><app-status-badge [status]="h.snapshot?.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}

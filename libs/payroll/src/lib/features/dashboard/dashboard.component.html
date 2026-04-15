@@ -1,0 +1,371 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Executive Dashboard</h1>
+    <p class="page-subtitle">
+      mSCOA HR & Payroll Management System
+      <span class="period-badge" *ngIf="cp">
+        {{ cp.tax_year - 1 }}/{{ cp.tax_year }}
+      </span>
+    </p>
+  </div>
+  <div class="toolbar-right" style="display:flex;gap:8px;align-items:center">
+    <span class="audit-badge">
+      <app-icon name="shield" [size]="12"></app-icon> AG READY
+    </span>
+    <button class="btn" (click)="loadDashboard()">
+      <app-icon name="refresh" [size]="14"></app-icon> Refresh
+    </button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab" [class.active]="activeTab === 'dashboard'" (click)="setTab('dashboard')">
+    <app-icon name="home" [size]="15"></app-icon> Executive Overview
+  </button>
+  <button class="tab" [class.active]="activeTab === 'list'" (click)="setTab('list')">
+    <app-icon name="users" [size]="15"></app-icon> Employee List
+  </button>
+  <button class="tab" [class.active]="activeTab === 'analytics'" (click)="setTab('analytics')">
+    <app-icon name="activity" [size]="15"></app-icon> AI Analytics
+  </button>
+  <button class="tab" [class.active]="activeTab === 'reports'" (click)="setTab('reports')">
+    <app-icon name="barChart" [size]="15"></app-icon> Reports
+  </button>
+</div>
+
+<div *ngIf="loading" class="loading">
+  <div class="spinner"></div>Loading dashboard...
+</div>
+
+<div *ngIf="!loading && activeTab === 'dashboard'" id="tab-dashboard" class="tab-content active">
+  <div class="cycles-section">
+    <div class="section-header">
+      <div class="section-title-row">
+        <h3 class="section-heading">Current Payroll Cycles</h3>
+      </div>
+      <div class="system-info">
+        <span class="system-tag">System Tax Year : {{ currentCyclesData.system_tax_year }}</span>
+      </div>
+    </div>
+    <div class="cycles-table-wrap">
+      <table class="cycles-table">
+        <thead>
+          <tr>
+            <th>Payroll</th>
+            <th>Cycle Type</th>
+            <th>Period</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="currentCyclesData.cycles.length === 0">
+            <td colspan="4" style="text-align:center; color:#94a3b8; padding:24px;">No active cycles configured</td>
+          </tr>
+          <tr *ngFor="let c of currentCyclesData.cycles">
+            <td>{{ c.payroll }}</td>
+            <td>{{ c.cycle_type }}</td>
+            <td>{{ c.period }}</td>
+            <td><span class="cycle-status" [class]="'cs-' + (c.status || 'none').toLowerCase().replace(' ', '-')">{{ c.status }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-header">
+        <span class="kpi-label">Total Employees</span>
+        <div class="kpi-icon blue"><app-icon name="user" [size]="22"></app-icon></div>
+      </div>
+      <div class="kpi-value">{{ formatNumber(emp.active_employees) }}</div>
+      <div class="kpi-sub">{{ formatNumber(emp.new_hires_30d) }} new hires (30d)</div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-header">
+        <span class="kpi-label">Annual CoE Budget</span>
+        <div class="kpi-icon green"><app-icon name="dollar" [size]="22"></app-icon></div>
+      </div>
+      <div class="kpi-value">{{ formatCurrency(emp.total_annual_salary) }}</div>
+      <div class="kpi-sub">{{ formatMonthly(emp.total_annual_salary) }}/month</div>
+    </div>
+    <div class="kpi-card kpi-teal">
+      <div class="kpi-header">
+        <span class="kpi-label">Vacancy Rate</span>
+        <div class="kpi-icon teal"><app-icon name="clipboard" [size]="22"></app-icon></div>
+      </div>
+      <div class="kpi-value">{{ vacancyRate }}%</div>
+      <div class="kpi-sub">{{ formatNumber(pos.vacant_positions) }} of {{ formatNumber(pos.total_positions) }} positions</div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-header">
+        <span class="kpi-label">Approval Rate</span>
+        <div class="kpi-icon green"><app-icon name="check" [size]="22"></app-icon></div>
+      </div>
+      <div class="kpi-value">{{ approvalRate }}%</div>
+      <div class="kpi-sub">{{ formatNumber(lv.pending_requests) }} pending</div>
+    </div>
+  </div>
+
+  <div class="alert-row">
+    <div class="alert-card">
+      <div class="alert-icon alert-danger"><app-icon name="alertTriangle" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Missing Tax Numbers</div>
+        <div class="alert-value" style="color:var(--danger-dark)">{{ formatNumber(cmp.data_quality?.missing_tax_numbers) }}</div>
+        <div class="alert-detail">Employees without SARS tax ref</div>
+      </div>
+    </div>
+    <div class="alert-card">
+      <div class="alert-icon alert-warning"><app-icon name="link" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Missing Bank Details</div>
+        <div class="alert-value" style="color:var(--warning-dark)">{{ formatNumber(cmp.data_quality?.missing_bank_details) }}</div>
+        <div class="alert-detail">Cannot process EFT payments</div>
+      </div>
+    </div>
+    <div class="alert-card">
+      <div class="alert-icon alert-info"><app-icon name="briefcase" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Unlinked Positions</div>
+        <div class="alert-value" style="color:var(--info-dark)">{{ formatNumber(cmp.data_quality?.unlinked_positions) }}</div>
+        <div class="alert-detail">Employees without position</div>
+      </div>
+    </div>
+    <div class="alert-card">
+      <div class="alert-icon alert-success"><app-icon name="fileText" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Audit Entries (7d)</div>
+        <div class="alert-value" style="color:var(--success-dark)">{{ formatNumber(cmp.audit?.recent_entries) }}</div>
+        <div class="alert-detail">AG-compliant trail active</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-row" style="margin-top:1.5rem">
+    <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (workflowCount > 0 ? 'var(--warning)' : 'var(--success)')" (click)="navigateToModule('settings-workflows')">
+      <div class="alert-icon" [ngClass]="workflowCount > 0 ? 'alert-warning' : 'alert-success'"><app-icon name="clock" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Pending Approvals</div>
+        <div class="alert-value" [style.color]="workflowCount > 0 ? 'var(--warning-dark)' : 'var(--success-dark)'">{{ formatNumber(workflowCount) }}</div>
+        <div class="alert-detail">Workflow items awaiting action</div>
+      </div>
+    </div>
+    <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (probationCount > 0 ? 'var(--warning)' : 'var(--success)')" (click)="navigateToModule('employees')">
+      <div class="alert-icon" [ngClass]="probationCount > 0 ? 'alert-warning' : 'alert-success'"><app-icon name="alertTriangle" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Probation Alerts</div>
+        <div class="alert-value" [style.color]="probationCount > 0 ? 'var(--warning-dark)' : 'var(--success-dark)'">{{ formatNumber(probationCount) }}</div>
+        <div class="alert-detail">Employees on probation review</div>
+      </div>
+    </div>
+    <div class="alert-card" style="cursor:pointer" [style.border-left]="'3px solid ' + (ghostCount > 0 ? 'var(--danger)' : 'var(--success)')" (click)="navigateToModule('time')">
+      <div class="alert-icon" [ngClass]="ghostCount > 0 ? 'alert-danger' : 'alert-success'"><app-icon name="eye" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">Ghost Employee Flags</div>
+        <div class="alert-value" [style.color]="ghostCount > 0 ? 'var(--danger-dark)' : 'var(--success-dark)'">{{ formatNumber(ghostCount) }}</div>
+        <div class="alert-detail">Flagged in last 3 months</div>
+      </div>
+    </div>
+    <div class="alert-card" style="border-left:3px solid var(--success)">
+      <div class="alert-icon alert-success"><app-icon name="shield" [size]="16"></app-icon></div>
+      <div>
+        <div class="alert-label">RBAC Active</div>
+        <div class="alert-value" style="color:var(--success-dark)">Enabled</div>
+        <div class="alert-detail">Role-based access control</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline">
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="file" [size]="16"></app-icon></div>
+      <div class="step-count">{{ pr.pending_runs || 0 }}</div>
+      <div class="step-label">Pending</div>
+      <div class="step-bar" style="background: var(--text-muted)"></div>
+    </div>
+    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="settings" [size]="16"></app-icon></div>
+      <div class="step-count">{{ pr.processing_runs || 0 }}</div>
+      <div class="step-label">Processing</div>
+      <div class="step-bar" style="background: var(--info)"></div>
+    </div>
+    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="check" [size]="16"></app-icon></div>
+      <div class="step-count">{{ pr.completed_runs || 0 }}</div>
+      <div class="step-label">Completed</div>
+      <div class="step-bar" style="background: var(--success)"></div>
+    </div>
+    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="dollar" [size]="16"></app-icon></div>
+      <div class="step-count">{{ formatCurrency(pr.total_paye || 0) }}</div>
+      <div class="step-label">PAYE</div>
+      <div class="step-bar" style="background: var(--primary)"></div>
+    </div>
+    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="home" [size]="16"></app-icon></div>
+      <div class="step-count">{{ formatCurrency(pr.total_uif || 0) }}</div>
+      <div class="step-label">UIF</div>
+      <div class="step-bar" style="background: var(--warning)"></div>
+    </div>
+    <div class="pipeline-arrow"><app-icon name="arrowRight" [size]="16"></app-icon></div>
+    <div class="pipeline-step pipeline-step-clickable" (click)="navigateToModule('payroll')">
+      <div class="step-icon"><app-icon name="award" [size]="16"></app-icon></div>
+      <div class="step-count">{{ formatCurrency(pr.total_sdl || 0) }}</div>
+      <div class="step-label">SDL</div>
+      <div class="step-bar" style="background: var(--purple)"></div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="dept-chart" *ngIf="deptData && deptData.length > 0">
+      <div class="chart-title">Department Headcount & CoE</div>
+      <div class="chart-bars">
+        <div class="chart-bar-row" *ngFor="let d of deptData; let i = index">
+          <div class="chart-bar-label">{{ truncateDeptName(d.name) }}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" [style.width.%]="getDeptBarWidth(d)" [style.background]="getDeptBarColor(i)">{{ d.active_employees || 0 }}</div>
+          </div>
+          <div class="chart-bar-value">{{ formatCurrency(d.total_salary_cost) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="dept-chart" *ngIf="!deptData || deptData.length === 0">
+      <div class="chart-title">Department Headcount</div>
+      <p style="color:var(--text-muted)">No data</p>
+    </div>
+
+    <div *ngIf="leaveData && leaveData.length > 0" class="data-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>Leave Type</th>
+            <th style="text-align:center">Total</th>
+            <th style="text-align:center">Pending</th>
+            <th style="text-align:center">Approved</th>
+            <th style="text-align:right">Days Taken</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of leaveData">
+            <td><span class="badge badge-info">{{ d.code }}</span> {{ d.leave_type }}</td>
+            <td style="text-align:center">{{ d.total_requests }}</td>
+            <td style="text-align:center"><span class="status-badge status-pending">{{ d.pending }}</span></td>
+            <td style="text-align:center"><span class="status-badge status-approved">{{ d.approved }}</span></td>
+            <td style="text-align:right; font-weight:600">{{ (+d.total_days_taken).toFixed(0) }} days</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div *ngIf="!leaveData || leaveData.length === 0" class="dept-chart">
+      <div class="chart-title">Leave Overview</div>
+      <p style="color:var(--text-muted)">No data</p>
+    </div>
+  </div>
+
+  <div class="ai-section">
+    <div class="ai-header">
+      <div class="ai-icon"><app-icon name="lightbulb" [size]="16"></app-icon></div>
+      <span class="ai-title">AI Compliance Insights</span>
+      <span class="ai-badge">Rule-based</span>
+    </div>
+    <div class="insights-grid">
+      <div class="insight-card" *ngFor="let i of insights">
+        <div class="insight-severity">
+          <span class="severity-dot" [ngClass]="i.severity"></span>
+          <span class="badge" [ngClass]="i.refBadge">{{ i.ref }}</span>
+        </div>
+        <div class="insight-title">{{ i.title }}</div>
+        <div class="insight-desc">{{ i.desc }}</div>
+        <div class="insight-actions">
+          <span class="insight-confidence">Confidence: {{ i.confidence }}%
+            <span class="progress-bar"><span class="progress-fill" [style.width.%]="i.confidence" [style.background]="getSeverityColor(i.severity)"></span></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="!loading && activeTab === 'list'" id="tab-list" class="tab-content active">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <div style="position:relative;flex:1;min-width:200px;max-width:320px">
+      <input type="text" class="form-control" placeholder="Search employees..." [value]="empListState.search" (input)="onSearchInput($any($event.target).value)" style="padding-left:12px;font-size:13px">
+    </div>
+    <select class="form-control" style="width:140px;font-size:13px" [value]="empListState.status" (change)="onStatusChange($any($event.target).value)">
+      <option value="">All Statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="SUSPENDED">Suspended</option>
+      <option value="TERMINATED">Terminated</option>
+      <option value="DECEASED">Deceased</option>
+    </select>
+    <select class="form-control" style="width:110px;font-size:13px" [value]="empListState.limit" (change)="onPageSizeChange($any($event.target).value)">
+      <option value="25">25 / page</option>
+      <option value="50">50 / page</option>
+      <option value="100">100 / page</option>
+      <option value="200">200 / page</option>
+    </select>
+  </div>
+
+  <div *ngIf="empListState.loading" class="loading"><div class="spinner"></div>Loading employees...</div>
+
+  <div *ngIf="!empListState.loading">
+    <div class="data-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th><th>Name</th><th>Position</th><th>Department</th><th>Division</th><th>Annual Salary</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="empListState.data.length === 0">
+            <td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No employees found</td>
+          </tr>
+          <tr *ngFor="let emp of empListState.data">
+            <td><strong>{{ emp.employee_code }}</strong></td>
+            <td>{{ emp.title || '' }} {{ emp.first_name }} {{ emp.surname }}</td>
+            <td>{{ emp.position_title || '-' }}</td>
+            <td>{{ emp.department_name || '-' }}</td>
+            <td>{{ emp.division_name || '-' }}</td>
+            <td>{{ formatCurrency(emp.annual_salary) }}</td>
+            <td><span class="status-badge" [ngClass]="'status-' + (emp.status || '').toLowerCase()">{{ emp.status }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;color:var(--text-secondary)">
+        Showing {{ empListState.total > 0 ? empShowingFrom : 0 }}<span *ngIf="empShowingTo > empShowingFrom">–{{ empShowingTo }}</span> of {{ empListState.total.toLocaleString() }} employees
+      </div>
+      <div *ngIf="empListState.totalPages > 1" style="display:flex;align-items:center;gap:4px">
+        <button class="pagination-btn" [disabled]="empListState.page <= 1" (click)="goToPage(empListState.page - 1)">
+          <app-icon name="chevronLeft" [size]="14"></app-icon>
+        </button>
+        <button *ngFor="let p of empPageButtons" class="pagination-btn" [class.pagination-active]="p === empListState.page" (click)="goToPage(p)">{{ p }}</button>
+        <button class="pagination-btn" [disabled]="empListState.page >= empListState.totalPages" (click)="goToPage(empListState.page + 1)">
+          <app-icon name="chevronRight" [size]="14"></app-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="!loading && activeTab === 'analytics'" id="tab-analytics" class="tab-content active">
+  <div class="loading" style="padding:40px;text-align:center">
+    <app-icon name="activity" [size]="24"></app-icon>
+    <p style="margin-top:12px;color:var(--text-secondary)">AI Analytics & Demographics Dashboard</p>
+    <p style="color:var(--text-muted);font-size:13px">Advanced analytics with employment equity, demographic charts, and compliance reporting</p>
+  </div>
+</div>
+
+<div *ngIf="!loading && activeTab === 'reports'" id="tab-reports" class="tab-content active">
+  <div class="loading" style="padding:40px;text-align:center">
+    <app-icon name="barChart" [size]="24"></app-icon>
+    <p style="margin-top:12px;color:var(--text-secondary)">Reports & Exports</p>
+    <p style="color:var(--text-muted);font-size:13px">IRP5, EMP201, EMP501, payslips, EFT files, e&#64;syFile, data exports</p>
+  </div>
+</div>

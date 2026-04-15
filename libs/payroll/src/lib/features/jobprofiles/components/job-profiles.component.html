@@ -1,0 +1,587 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Job Profiles</h1>
+      <p class="page-subtitle">Manage job profiles with OFO codes, competencies and job evaluation data</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="14"></app-icon> Add Profile</button>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ profiles.length }}</span>
+      <span class="summary-label">Total Profiles</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ profiles.length - activeCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="14"></app-icon>
+      <input class="search-input" placeholder="Search by title, OFO code, occupation or profile code..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterProfiles()">
+    </div>
+    <span class="result-count">{{ filteredProfiles.length }} of {{ profiles.length }} profiles</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading job profiles...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredProfiles.length === 0) {
+        <div class="empty-state"><h3>No job profiles found</h3><p>{{ profiles.length === 0 ? 'Click "Add Profile" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">Id</th>
+                <th class="col-code">Code</th>
+                <th class="col-title">Job Title</th>
+                <th class="col-ofo">OFO Code</th>
+                <th class="col-occ">Occupation</th>
+                <th class="col-grade">Task Grade</th>
+                <th class="col-type">Employee Type</th>
+                <th class="col-pos">Pos.</th>
+                <th class="col-status">Status</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of pagedProfiles; track p.id; let i = $index) {
+                <tr class="jp-row" (click)="openDetail(p, (page - 1) * limit + i)">
+                  <td style="width: 60px;">{{ p.id }}</td>
+                  <td class="col-code"><span class="code-badge">{{ p.job_description_code || '-' }}</span></td>
+                  <td class="col-title">
+                    <span class="title-text">{{ p.job_title }}</span>
+                  </td>
+                  <td class="col-ofo"><code class="ofo-code">{{ p.ofo_code || '-' }}</code></td>
+                  <td class="col-occ">{{ p.occupation || '-' }}</td>
+                  <td class="col-grade">{{ p.grade_name || '-' }}</td>
+                  <td class="col-type"><span class="type-pill">{{ p.employee_type_name || '-' }}</span></td>
+                  <td class="col-pos"><span class="pos-count">{{ p.position_count || 0 }}</span></td>
+                  <td class="col-status"><app-status-badge [status]="p.is_active !== false && p.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(p, (page - 1) * limit + i); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(p); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (filteredProfiles.length > limit) {
+          <div class="table-footer">
+            <app-pagination [total]="filteredProfiles.length" [page]="page" [limit]="limit" (pageChange)="page = $event"></app-pagination>
+          </div>
+        }
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (profile.id) {
+          <div class="detail-meta">
+            <span class="text-muted">ID: {{ profile.id }}</span>
+            <span class="text-muted">Code: {{ profile.job_description_code || '-' }}</span>
+            <app-status-badge [status]="profile.is_active !== false && profile.enabled ? 'Active' : 'Inactive'"></app-status-badge>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      <div class="detail-nav">
+        <input class="form-control" style="width: 180px; font-size: 13px;" placeholder="Search ID or title..."
+               [(ngModel)]="headerSearch" (keyup.enter)="searchHeader()">
+        <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+        <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ profiles.length }}</span>
+        <button class="btn btn-sm" [disabled]="currentIndex >= profiles.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+      </div>
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="mode === 'create' ? goBack() : mode = 'view'">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'details'" (click)="activeTab = 'details'">Job Details</button>
+    <button class="tab-btn" [class.active]="activeTab === 'duties'" (click)="activeTab = 'duties'" [disabled]="!profile.id">Duties and Responsibilities</button>
+    @if (profile.id) {
+      <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">History</button>
+    }
+  </div>
+
+  <div class="detail-body">
+    @if (activeTab === 'details') {
+      <div class="card detail-card">
+        <div class="section-title">Core Details</div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+          <div class="form-group">
+            <label>Job Title <span class="required">*</span></label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="profile.job_title" placeholder="e.g. Accountant Billing">
+            } @else {
+              <div class="field-value">{{ profile.job_title || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Job Description Code <span class="required">*</span></label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="profile.job_description_code" placeholder="e.g. Profile001">
+            } @else {
+              <div class="field-value">{{ profile.job_description_code || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Start Date <span class="required">*</span></label>
+            @if (isEditable) {
+              <app-date-input [(ngModel)]="profile.start_date"></app-date-input>
+            } @else {
+              <div class="field-value">{{ profile.start_date | dateSa }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>End Date <span class="required">*</span></label>
+            @if (isEditable) {
+              <app-date-input [(ngModel)]="profile.end_date"></app-date-input>
+            } @else {
+              <div class="field-value">{{ profile.end_date | dateSa }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Employee Type <span class="required">*</span></label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="profile.employee_type_id" (ngModelChange)="onEmployeeTypeChange()">
+                <option [ngValue]="null">-- Select --</option>
+                @for (t of employeeTypes; track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ profile.employee_type_name || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Employee Subtype <span class="required">*</span></label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="profile.employee_subtype_id" (ngModelChange)="onEmployeeSubtypeChange()">
+                <option [ngValue]="null">-- Select --</option>
+                @for (s of filteredSubtypes(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ profile.employee_subtype_name || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          @if (!isPostRetirement) {
+            <div class="form-group">
+              <label>Occupation Level / Job Family <span class="required">*</span></label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.job_family_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (f of jobFamilies; track f.id) { <option [ngValue]="f.id">{{ f.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.job_family_name || '-' }}</div>
+              }
+            </div>
+          } @else {
+            <div class="form-group"></div>
+          }
+          <div class="form-group">
+            <label>Salary Transaction Group <span class="required">*</span></label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="profile.salary_transaction_group_id">
+                <option [ngValue]="null">-- Select --</option>
+                @for (g of salaryTransactionGroups; track g.id) { <option [ngValue]="g.id">{{ g.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ profile.salary_transaction_group_name || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="checkbox-row">
+          @if (isEditable) {
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="profile.allow_overtime"> Allow Overtime</label>
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="profile.performance_assessment"> Performance Assessment</label>
+            <label class="checkbox-label"><input type="checkbox" [ngModel]="!profile.enabled" (ngModelChange)="profile.enabled = !$event"> Disable Job Profile</label>
+          } @else {
+            <span class="tag" [class.tag-yes]="profile.allow_overtime" [class.tag-no]="!profile.allow_overtime">Overtime: {{ profile.allow_overtime ? 'Yes' : 'No' }}</span>
+            <span class="tag" [class.tag-yes]="profile.performance_assessment" [class.tag-no]="!profile.performance_assessment">Performance: {{ profile.performance_assessment ? 'Yes' : 'No' }}</span>
+            <span class="tag" [class.tag-yes]="profile.enabled" [class.tag-no]="!profile.enabled">{{ profile.enabled ? 'Enabled' : 'Disabled' }}</span>
+          }
+        </div>
+      </div>
+
+      <div class="card detail-card">
+        <div class="section-title">Salary Structure</div>
+        @if (showTaskGrade) {
+          <div class="form-row">
+            <div class="form-group">
+              @if (isEditable) {
+                <label class="checkbox-label"><input type="checkbox" [(ngModel)]="profile.link_task_grade" (ngModelChange)="onLinkTaskGradeChange()"> Link Task Grade</label>
+              }
+              @if (profile.link_task_grade || (!isEditable && profile.task_grade_id)) {
+                <label style="margin-top: 8px;">Task Grade</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="profile.task_grade_id">
+                    <option [ngValue]="null">-- Select --</option>
+                    @for (g of taskGrades; track g.id) { <option [ngValue]="g.id">{{ g.grade_code ? g.grade_code + ' - ' : '' }}{{ g.grade_name }}</option> }
+                  </select>
+                } @else {
+                  <div class="field-value">{{ profile.grade_code ? profile.grade_code + ' - ' : '' }}{{ profile.grade_name || '-' }}</div>
+                }
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+        }
+        @if (showUpperLimit) {
+          <div class="form-row">
+            <div class="form-group">
+              @if (isEditable) {
+                <label class="checkbox-label"><input type="checkbox" [(ngModel)]="profile.link_upper_limit" (ngModelChange)="onLinkUpperLimitChange()"> Link Upper Limit</label>
+              }
+              @if (profile.link_upper_limit || (!isEditable && profile.upper_limit_id)) {
+                <label style="margin-top: 8px;">Limit Type</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="profile.upper_limit_type" (ngModelChange)="onUpperLimitTypeChange()">
+                    <option value="minimum">Minimum</option>
+                    <option value="midpoint">Midpoint</option>
+                    <option value="maximum">Maximum</option>
+                  </select>
+                } @else {
+                  <div class="field-value">{{ (profile.upper_limit_type || 'maximum') | titlecase }}</div>
+                }
+              }
+            </div>
+            <div class="form-group">
+              @if (profile.link_upper_limit || (!isEditable && profile.upper_limit_id)) {
+                <label style="margin-top: 8px;">Upper Limit</label>
+                @if (isEditable) {
+                  <select class="form-control" [(ngModel)]="profile.upper_limit_id">
+                    <option [ngValue]="null">-- Select --</option>
+                    @for (u of filteredUpperLimits(); track u.id) { <option [ngValue]="u.id">{{ u.employee_subtype_name || '-' }} (R{{ upperLimitDisplayAmount(u) }})</option> }
+                  </select>
+                } @else {
+                  <div class="field-value">{{ profile.upper_limit_subtype_name || profile.upper_limit_grading || '-' }} (R{{ upperLimitViewAmount() }})</div>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (!isPostRetirement) {
+        <div class="card detail-card">
+          <div class="section-title">OFO Classification</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Major Group</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.ofo_major_group_id" (ngModelChange)="onMajorGroupChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (g of ofoMajorGroups; track g.id) { <option [ngValue]="g.id">{{ g.code }} - {{ g.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.ofo_major_group_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Sub Major Group</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.ofo_sub_major_group_id" (ngModelChange)="onSubMajorGroupChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (g of filteredOfoSubMajorGroups(); track g.id) { <option [ngValue]="g.id">{{ g.code }} - {{ g.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.ofo_sub_major_group_name || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Minor Group</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.ofo_minor_group_id" (ngModelChange)="onMinorGroupChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (g of filteredOfoMinorGroups(); track g.id) { <option [ngValue]="g.id">{{ g.code }} - {{ g.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.ofo_minor_group_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Unit Group</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.ofo_unit_group_id" (ngModelChange)="onUnitGroupChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (g of filteredOfoUnitGroups(); track g.id) { <option [ngValue]="g.id">{{ g.code }} - {{ g.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.ofo_unit_group_name || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Occupation</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.ofo_occupation_id" (ngModelChange)="onOccupationChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (o of filteredOfoOccupations(); track o.id) { <option [ngValue]="o.id">{{ o.code }} - {{ o.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.ofo_occupation_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Specialist Title</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.specialist_id" (ngModelChange)="onSpecialistChange()">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (s of filteredOfoSpecialists(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.specialist_name || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>OFO Code</label>
+              <div class="field-value readonly">{{ profile.ofo_code || '-' }}</div>
+            </div>
+            <div class="form-group">
+              <label>Occupation Description</label>
+              <div class="field-value readonly">{{ profile.occupation || '-' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card detail-card">
+          <div class="section-title">Skills Planning (WSP)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employment Category <span class="required">*</span></label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.employment_category_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (c of employmentCategories; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.employment_category_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Employment Code <span class="required">*</span></label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.employment_code_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (c of employmentCodes; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.employment_code_name || '-' }}</div>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Work Area</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="profile.work_area_id">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (w of workAreas; track w.id) { <option [ngValue]="w.id">{{ w.name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ profile.work_area_name || '-' }}</div>
+              }
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+      }
+    }
+
+    @if (activeTab === 'duties') {
+      <div class="card detail-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="section-title" style="margin: 0;">Duties and Responsibilities</div>
+          @if (isEditable || mode === 'view') {
+            <button class="btn btn-primary btn-sm" (click)="openDutyForm()"><app-icon name="plus" [size]="12"></app-icon> Add Duty</button>
+          }
+        </div>
+
+        @if (showDutyForm) {
+          <div class="duty-form">
+            <div class="form-row">
+              <div class="form-group" style="flex: 3;">
+                <label>Duty Description <span class="required">*</span></label>
+                <textarea class="form-control" [(ngModel)]="dutyForm.duty_description" rows="2" placeholder="Describe the duty..."></textarea>
+              </div>
+              <div class="form-group" style="flex: 0 0 100px;">
+                <label>Sequence</label>
+                <input class="form-control" type="number" [(ngModel)]="dutyForm.sequence">
+              </div>
+              <div class="form-group" style="flex: 0 0 80px; align-self: flex-end;">
+                <label class="checkbox-label"><input type="checkbox" [(ngModel)]="dutyForm.is_active"> Active</label>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button class="btn btn-primary btn-sm" (click)="saveDuty()">{{ editingDuty ? 'Update' : 'Add' }}</button>
+              <button class="btn btn-sm" (click)="cancelDutyForm()">Cancel</button>
+            </div>
+          </div>
+        }
+
+        @if (duties.length === 0) {
+          <div class="empty-state" style="padding: 32px 0;"><p>No duties defined yet</p></div>
+        } @else {
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 60px;">#</th>
+                  <th>Duty Description</th>
+                  <th style="width: 80px;">Seq</th>
+                  <th style="width: 80px;">Active</th>
+                  <th style="width: 100px;">Created</th>
+                  <th style="width: 100px;">Modified</th>
+                  <th style="width: 100px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of duties; track d.id; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ d.duty_description }}</td>
+                    <td>{{ d.sequence }}</td>
+                    <td><app-status-badge [status]="d.is_active ? 'Active' : 'Inactive'"></app-status-badge></td>
+                    <td>{{ d.created_at | dateSa }}</td>
+                    <td>{{ d.updated_at | dateSa }}</td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="openDutyForm(d)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteDuty(d)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'history') {
+      <div class="card detail-card history-section">
+        <div class="section-title">
+          <app-icon name="clock" [size]="16"></app-icon>
+          Job Profile History
+          <span class="history-count">{{ history.length }} record{{ history.length !== 1 ? 's' : '' }}</span>
+        </div>
+        @if (history.length === 0) {
+          <div class="empty-state" style="padding: 24px 0;"><p>No history records</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th style="width: 90px;">Change</th>
+                  <th>Job Title</th>
+                  <th>Task Grade</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Employee Type</th>
+                  <th>Employee Subtype</th>
+                  <th style="width: 90px;">Status</th>
+                  <th>Captured</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (h of history; track h.id) {
+                  <tr>
+                    <td><span class="change-pill" [class.change-create]="h.change_type === 'CREATE'" [class.change-update]="h.change_type === 'UPDATE'">{{ h.change_type || '-' }}</span></td>
+                    <td><span class="title-text">{{ h.job_title }}</span></td>
+                    <td>{{ h.grade_name || '-' }}</td>
+                    <td class="date-cell">{{ h.start_date | dateSa }}</td>
+                    <td class="date-cell">{{ h.end_date | dateSa }}</td>
+                    <td>{{ h.employee_type_name || '-' }}</td>
+                    <td>{{ h.employee_subtype_name || '-' }}</td>
+                    <td><app-status-badge [status]="h.is_active ? 'Active' : 'Inactive'"></app-status-badge></td>
+                    <td class="date-cell">{{ h.captured_at | dateSa }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div class="card detail-card linked-section">
+        <div class="section-title">
+          <app-icon name="link" [size]="16"></app-icon>
+          Linked Positions
+          <span class="history-count">{{ linkedPositions.length }} position{{ linkedPositions.length !== 1 ? 's' : '' }}</span>
+        </div>
+        @if (linkedPositions.length === 0) {
+          <div class="empty-state" style="padding: 24px 0;"><p>No positions linked to this profile</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th style="width: 110px;">Position Code</th>
+                  <th>Title</th>
+                  <th>Department</th>
+                  <th>Grade</th>
+                  <th style="width: 90px;">Status</th>
+                  <th>Incumbent</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of linkedPositions; track p.id) {
+                  <tr>
+                    <td><span class="code-badge">{{ p.position_code }}</span></td>
+                    <td><span class="title-text">{{ p.title }}</span></td>
+                    <td>{{ p.department_name || '-' }}</td>
+                    <td>{{ p.grade_name || '-' }}</td>
+                    <td><app-status-badge [status]="p.status"></app-status-badge></td>
+                    <td>
+                      @if (p.first_name) {
+                        <span class="incumbent-name"><app-icon name="user" [size]="13"></app-icon> {{ p.first_name }} {{ p.surname }}</span>
+                      } @else {
+                        <span class="vacant-text">Vacant</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

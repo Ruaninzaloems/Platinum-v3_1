@@ -1,0 +1,183 @@
+:host { display: block; }
+
+.benefit-type-select {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f2b46;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  line-height: 1.2;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.detail-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.detail-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f2b46;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.field-value {
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.required { color: #ef4444; }
+
+.input-with-suffix {
+  position: relative;
+}
+.input-suffix {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.contributions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.contribution-card {
+  margin-bottom: 16px;
+}
+
+.contrib-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.radio-row {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding-top: 8px;
+}
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.tag-yes { background: #dcfce7; color: #166534; }
+.tag-no { background: #f3f4f6; color: #6b7280; }
+
+.date-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.salary-head-add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.info-message {
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 0;
+}
+
+.title-text {
+  font-weight: 600;
+  color: #0f2b46;
+}
+
+@media (max-width: 768px) {
+  .contributions-row {
+    grid-template-columns: 1fr;
+  }
+}

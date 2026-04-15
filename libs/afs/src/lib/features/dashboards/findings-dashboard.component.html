@@ -1,0 +1,128 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="loading-wrap">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading findings dashboard...</p>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load findings dashboard</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="load()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Audit Findings Dashboard</h1>
+        <p class="subtitle">Analysis of audit findings by severity, status, and risk</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="load()">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+        <button mat-flat-button color="primary" (click)="navigate('/findings')">
+          <mat-icon>flag</mat-icon> View All Findings
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Findings Raised" [value]="data.total" icon="flag" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Resolved" [value]="data.resolved" icon="check_circle" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Repeat Findings" [value]="data.repeatFindings" icon="replay" color="warning"></app-kpi-tile>
+      <app-kpi-tile title="High Risk" [value]="data.highRisk" icon="error" [color]="data.highRisk > 0 ? 'danger' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="Avg Days to Resolution" [value]="data.avgDaysToResolution" icon="schedule" color="info"></app-kpi-tile>
+    </div>
+
+    <div class="charts-grid">
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>bar_chart</mat-icon> Findings by Severity
+        </div>
+        <div class="severity-chart">
+          @for (item of severityItems; track item.key) {
+            <div class="h-bar-row">
+              <span class="h-bar-label">{{ item.label }}</span>
+              <div class="h-bar-track">
+                <div class="h-bar-fill" [style.width.%]="getBarPercent(item.count)" [style.background]="item.color"></div>
+              </div>
+              <span class="h-bar-value">{{ item.count }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>stacked_bar_chart</mat-icon> Findings by Status
+        </div>
+        <div class="status-chart">
+          @for (item of statusItems; track item.key) {
+            <div class="h-bar-row">
+              <span class="h-bar-label">{{ item.label }}</span>
+              <div class="h-bar-track">
+                <div class="h-bar-fill" [style.width.%]="getStatusBarPercent(item.count)" [style.background]="item.color"></div>
+              </div>
+              <span class="h-bar-value">{{ item.count }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+    </div>
+
+    @if (data.unresolvedList.length > 0) {
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>warning</mat-icon> High Risk Findings
+          <span class="card-count">{{ data.unresolvedList.length }} unresolved</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Title</th>
+                <th>Severity</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Age (Days)</th>
+                <th>Assigned To</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of data.unresolvedList; track f.id) {
+                <tr (click)="navigate('/findings')">
+                  <td class="ref-cell">{{ f.reference }}</td>
+                  <td class="desc-cell" [matTooltip]="f.title">{{ f.title }}</td>
+                  <td><span class="severity-badge" [class]="f.severity">{{ f.severity }}</span></td>
+                  <td>{{ formatCategory(f.category) }}</td>
+                  <td><span class="status-badge" [class]="f.status">{{ formatStatus(f.status) }}</span></td>
+                  <td class="value-cell" [class.overdue]="f.ageDays > 30">{{ f.ageDays }}</td>
+                  <td>{{ f.assignedTo || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </mat-card>
+    }
+
+    <div class="insights-section">
+      <div class="card-title">
+        <mat-icon>auto_awesome</mat-icon> AI Insights
+      </div>
+      <div class="insights-grid">
+        @for (insight of aiInsights; track insight.text) {
+          <app-ai-insight-card [insight]="insight"></app-ai-insight-card>
+        }
+      </div>
+    </div>
+  </div>
+}

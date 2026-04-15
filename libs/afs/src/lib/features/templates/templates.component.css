@@ -1,0 +1,119 @@
+.apply-info {
+  background: var(--platinum-bg-muted, #f8f9fa);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.info-label {
+  font-weight: 500;
+  color: var(--platinum-text-secondary, #6b7280);
+  font-size: 13px;
+}
+.info-value {
+  font-weight: 600;
+  color: var(--platinum-text-primary, #1f2937);
+  font-size: 13px;
+}
+.apply-description {
+  font-size: 13px;
+  color: var(--platinum-text-secondary, #6b7280);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.apply-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.preview-summary {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #166534;
+  margin-bottom: 10px;
+}
+.preview-counts {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.count-card {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 6px;
+  background: white;
+}
+.count-card.included { border: 1px solid #86efac; }
+.count-card.excluded { border: 1px solid #fca5a5; }
+.count-card.items { border: 1px solid #93c5fd; }
+.count-number {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+}
+.count-label {
+  font-size: 11px;
+  color: #6b7280;
+}
+.excluded-list {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #d1fae5;
+}
+.excluded-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #991b1b;
+  display: block;
+  margin-bottom: 4px;
+}
+.excluded-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 2px 0;
+}
+.excluded-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #dc2626;
+}
+.excluded-reason {
+  margin-left: auto;
+  font-style: italic;
+  font-size: 11px;
+}
+.preview-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 12px;
+}

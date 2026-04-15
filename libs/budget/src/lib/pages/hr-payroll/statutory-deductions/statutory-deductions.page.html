@@ -1,0 +1,369 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Statutory Deductions & Liabilities</h1>
+      <p class="page-subtitle">PAYE, UIF, SDL, pension, medical aid, payroll liabilities and payment phasing (HRPB1, HRPB13, HRPB15, HRPB17, HRPB21, HRPB22, HRPB23, HRPB84, HRPB86)</p>
+    </div>
+    <div class="btn-group">
+      <button class="btn-primary" (click)="calculateAll()" [disabled]="calculating">
+        <mat-icon>calculate</mat-icon> {{ calculating ? 'Calculating...' : 'Calculate All Deductions' }}
+      </button>
+      <button class="btn-secondary" (click)="showDeductionDialog = true; resetForm()">
+        <mat-icon>add</mat-icon> Configure Deduction
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card" *ngFor="let kpi of kpiCards">
+      <div class="kpi-icon-wrap" [ngClass]="kpi.colorClass">
+        <mat-icon>{{kpi.icon}}</mat-icon>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-label">{{kpi.label}}</div>
+        <div class="kpi-value">{{kpi.value}}</div>
+        <div class="kpi-sub">{{kpi.subtitle}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deduction Types Configuration -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('types')">
+      <div class="section-header">
+        <div class="section-icon si-blue"><mat-icon>settings</mat-icon></div>
+        <h2>Deduction Types Configuration</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">{{deductions.length}} deduction types</span>
+        <mat-icon>{{expandedSection === 'types' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'types'">
+      <table class="data-table" *ngIf="deductions.length; else noDeductions">
+        <thead>
+          <tr>
+            <th>Deduction Type</th>
+            <th>Calculation Method</th>
+            <th class="text-right">Rate / %</th>
+            <th class="text-right">Threshold</th>
+            <th class="text-right">Employer Contribution</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of deductions">
+            <td><span class="type-badge" [ngClass]="'type-' + d.deductionType.toLowerCase().replace(' ', '')">{{d.deductionType}}</span></td>
+            <td><span class="method-badge">{{d.calculationMethod}}</span></td>
+            <td class="text-right mono">{{d.rate | number:'1.2-2'}}%</td>
+            <td class="text-right mono">{{d.threshold ? ('R ' + (d.threshold | number:'1.2-2')) : '—'}}</td>
+            <td class="text-right mono">{{d.employerContributionRate ? (d.employerContributionRate | number:'1.2-2') + '%' : '—'}}</td>
+            <td>{{d.description || '—'}}</td>
+            <td><span class="status-badge" [ngClass]="d.isActive ? 'status-active' : 'status-inactive'">{{d.isActive ? 'Active' : 'Inactive'}}</span></td>
+            <td><button class="btn-icon" (click)="editDeduction(d)" title="Edit"><mat-icon>edit</mat-icon></button></td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #noDeductions>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No statutory deductions configured</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- PAYE Panel -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('paye')">
+      <div class="section-header">
+        <div class="section-icon si-amber"><mat-icon>account_balance</mat-icon></div>
+        <h2>PAYE (Pay As You Earn)</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">Tax table calculations</span>
+        <mat-icon>{{expandedSection === 'paye' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'paye'">
+      <div class="btn-group" style="margin-bottom: 12px;">
+        <button class="btn-primary" (click)="calculatePaye()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate PAYE
+        </button>
+      </div>
+      <table class="data-table" *ngIf="payeByDepartment.length; else noPaye">
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th class="text-right">Total Remuneration</th>
+            <th class="text-right">PAYE Calculated</th>
+            <th class="text-right">Effective Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of payeByDepartment">
+            <td class="fw-600">{{p.department}}</td>
+            <td class="text-right mono">R {{p.totalRemuneration | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{p.payeAmount | number:'1.2-2'}}</td>
+            <td class="text-right mono">{{p.effectiveRate | number:'1.1-1'}}%</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 700; border-top: 2px solid #e8ecf1;">
+            <td>Total</td>
+            <td class="text-right mono">R {{getTotalRemuneration() | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{getTotalPaye() | number:'1.2-2'}}</td>
+            <td class="text-right mono">{{getAvgPayeRate() | number:'1.1-1'}}%</td>
+          </tr>
+        </tfoot>
+      </table>
+      <ng-template #noPaye>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>Click "Calculate PAYE" to generate tax calculations by department</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- UIF / SDL Panel -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('uifsdl')">
+      <div class="section-header">
+        <div class="section-icon si-green"><mat-icon>shield</mat-icon></div>
+        <h2>UIF & SDL Contributions</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">Employee + Employer split</span>
+        <mat-icon>{{expandedSection === 'uifsdl' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'uifsdl'">
+      <div class="btn-group" style="margin-bottom: 12px;">
+        <button class="btn-primary" (click)="calculateUif()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate UIF
+        </button>
+        <button class="btn-primary" (click)="calculateSdl()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate SDL
+        </button>
+      </div>
+      <div class="split-row">
+        <div class="split-card">
+          <h4>UIF (Unemployment Insurance Fund)</h4>
+          <div class="split-value">R {{uifTotal | number:'1.2-2'}}</div>
+          <div class="split-sub">Employee: R {{uifEmployee | number:'1.2-2'}} | Employer: R {{uifEmployer | number:'1.2-2'}}</div>
+          <div class="split-sub">Rate: 1% employee + 1% employer (threshold R {{uifThreshold | number:'1.2-2'}}/month)</div>
+        </div>
+        <div class="split-card">
+          <h4>SDL (Skills Development Levy)</h4>
+          <div class="split-value">R {{sdlTotal | number:'1.2-2'}}</div>
+          <div class="split-sub">1% on total remuneration</div>
+          <div class="split-sub">Exemption threshold: R {{sdlThreshold | number:'1.2-2'}}/annum</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Other Deductions Panel -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('other')">
+      <div class="section-header">
+        <div class="section-icon si-purple"><mat-icon>local_hospital</mat-icon></div>
+        <h2>Other Deductions — Pension, Medical Aid, Union Fees, Group Life</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">{{otherDeductions.length}} items</span>
+        <mat-icon>{{expandedSection === 'other' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'other'">
+      <table class="data-table" *ngIf="otherDeductions.length; else noOther">
+        <thead>
+          <tr>
+            <th>Deduction</th>
+            <th>Method</th>
+            <th class="text-right">Employee Rate</th>
+            <th class="text-right">Employer Rate</th>
+            <th class="text-right">Employee Amount</th>
+            <th class="text-right">Employer Amount</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let od of otherDeductions">
+            <td class="fw-600"><span class="type-badge" [ngClass]="'type-' + od.deductionType.toLowerCase().replace(' ', '')">{{od.deductionType}}</span></td>
+            <td><span class="method-badge">{{od.calculationMethod}}</span></td>
+            <td class="text-right mono">{{od.rate | number:'1.2-2'}}%</td>
+            <td class="text-right mono">{{od.employerContributionRate ? (od.employerContributionRate | number:'1.2-2') + '%' : '—'}}</td>
+            <td class="text-right mono">R {{od.employeeAmount | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{od.employerAmount | number:'1.2-2'}}</td>
+            <td class="text-right mono fw-600">R {{od.totalAmount | number:'1.2-2'}}</td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #noOther>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>No other deductions configured</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Payroll Liabilities Summary -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('liabilities')">
+      <div class="section-header">
+        <div class="section-icon si-red"><mat-icon>account_balance_wallet</mat-icon></div>
+        <h2>Payroll Liabilities Summary</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">{{liabilities.length}} liability items</span>
+        <mat-icon>{{expandedSection === 'liabilities' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'liabilities'">
+      <div class="btn-group" style="margin-bottom: 12px;">
+        <button class="btn-primary" (click)="calculateLiabilities()" [disabled]="calculating">
+          <mat-icon>calculate</mat-icon> Calculate Liabilities
+        </button>
+      </div>
+      <table class="data-table" *ngIf="liabilities.length; else noLiabilities">
+        <thead>
+          <tr>
+            <th>Liability Type</th>
+            <th>Department</th>
+            <th class="text-right">Employee Contribution</th>
+            <th class="text-right">Employer Contribution</th>
+            <th class="text-right">Total Liability</th>
+            <th>Payment Period</th>
+            <th>mSCOA Item</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let l of liabilities">
+            <td class="fw-600">{{l.liabilityType}}</td>
+            <td><span class="dept-badge" *ngIf="l.department">{{l.department}}</span><span *ngIf="!l.department" class="text-muted">—</span></td>
+            <td class="text-right mono">R {{l.employeeContribution | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{l.employerContribution | number:'1.2-2'}}</td>
+            <td class="text-right mono fw-600">R {{l.totalLiability | number:'1.2-2'}}</td>
+            <td>{{l.paymentPeriod || '—'}}</td>
+            <td><span *ngIf="l.scoaItemCode" class="method-badge">{{l.scoaItemCode}}</span><span *ngIf="!l.scoaItemCode" class="text-muted">—</span></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 700; border-top: 2px solid #e8ecf1;">
+            <td colspan="2">Total</td>
+            <td class="text-right mono">R {{getTotalEmployeeContrib() | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{getTotalEmployerContrib() | number:'1.2-2'}}</td>
+            <td class="text-right mono">R {{getTotalLiabilities() | number:'1.2-2'}}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+      <ng-template #noLiabilities>
+        <div class="empty-state">
+          <mat-icon>info_outline</mat-icon>
+          <p>Click "Calculate Liabilities" to aggregate payroll liabilities</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Payment Phasing Panel -->
+  <div class="card-container">
+    <div class="card-title-bar" (click)="toggleSection('phasing')">
+      <div class="section-header">
+        <div class="section-icon si-teal"><mat-icon>calendar_month</mat-icon></div>
+        <h2>Payment Phasing — Monthly Distribution</h2>
+      </div>
+      <div class="section-meta">
+        <span class="section-count">12-month distribution</span>
+        <mat-icon>{{expandedSection === 'phasing' ? 'expand_less' : 'expand_more'}}</mat-icon>
+      </div>
+    </div>
+    <div class="card-body" *ngIf="expandedSection === 'phasing'">
+      <div class="btn-group" style="margin-bottom: 12px;">
+        <button class="btn-secondary" (click)="amendPaymentPercentages()">
+          <mat-icon>tune</mat-icon> Amend Payment Percentages
+        </button>
+      </div>
+      <div class="phasing-grid">
+        <div class="phasing-month" *ngFor="let m of monthlyPhasing">
+          <div class="month-label">{{m.label}}</div>
+          <div class="month-pct">{{m.percent | number:'1.1-1'}}%</div>
+        </div>
+      </div>
+      <div class="split-row" style="margin-top: 16px;">
+        <div class="split-card">
+          <h4>Annual Total</h4>
+          <div class="split-value">R {{annualTotal | number:'1.2-2'}}</div>
+          <div class="split-sub">Total statutory deductions + employer contributions</div>
+        </div>
+        <div class="split-card">
+          <h4>Monthly Average</h4>
+          <div class="split-value">R {{annualTotal / 12 | number:'1.2-2'}}</div>
+          <div class="split-sub">Even distribution basis</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configure Deduction Dialog -->
+  <div class="dialog-overlay" *ngIf="showDeductionDialog" (click)="showDeductionDialog = false">
+    <div class="dialog-panel" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>{{editingDeduction ? 'Edit' : 'Configure'}} Statutory Deduction</h2>
+        <button class="btn-icon" (click)="showDeductionDialog = false"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Deduction Type</label>
+            <select [(ngModel)]="deductionForm.deductionType" [disabled]="!!editingDeduction">
+              <option value="PAYE">PAYE</option>
+              <option value="UIF">UIF</option>
+              <option value="SDL">SDL</option>
+              <option value="Pension">Pension</option>
+              <option value="MedicalAid">Medical Aid</option>
+              <option value="UnionFees">Union Fees</option>
+              <option value="GroupLife">Group Life</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Calculation Method</label>
+            <select [(ngModel)]="deductionForm.calculationMethod">
+              <option value="Percentage">Percentage</option>
+              <option value="FixedAmount">Fixed Amount</option>
+              <option value="TaxTable">Tax Table</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Rate (%)</label>
+            <input type="number" [(ngModel)]="deductionForm.rate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Threshold (R)</label>
+            <input type="number" [(ngModel)]="deductionForm.threshold" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Employer Contribution Rate (%)</label>
+            <input type="number" [(ngModel)]="deductionForm.employerContributionRate" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input [(ngModel)]="deductionForm.description" placeholder="Optional description">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn-secondary" (click)="showDeductionDialog = false">Cancel</button>
+        <button class="btn-primary" (click)="saveDeduction()" [disabled]="saving">
+          {{saving ? 'Saving...' : (editingDeduction ? 'Update' : 'Create')}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

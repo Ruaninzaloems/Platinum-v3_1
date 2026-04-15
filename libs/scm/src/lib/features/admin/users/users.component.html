@@ -1,0 +1,392 @@
+    <div class="users-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <div class="tab-nav">
+        <button class="tab-btn" [class.active]="activeTab() === 'users'" (click)="activeTab.set('users')">Users</button>
+        <button class="tab-btn" [class.active]="activeTab() === 'roles'" (click)="activeTab.set('roles')">Roles & Permissions</button>
+        <button class="tab-btn" [class.active]="activeTab() === 'sod'" (click)="activeTab.set('sod')">Segregation of Duties</button>
+      </div>
+
+      <!-- ===================== USERS TAB ===================== -->
+      @if (activeTab() === 'users') {
+        @if (currentView() === 'list') {
+          <div class="kpi-strip">
+            <div class="kpi-tile" [matTooltip]="totalUsers() + ' total registered users'">
+              <mat-icon>people</mat-icon>
+              <span class="kpi-value">{{totalUsers()}}</span>
+              <span class="kpi-label">Total Users</span>
+            </div>
+            <div class="kpi-tile" [matTooltip]="activeUsers() + ' users currently active'">
+              <mat-icon>person</mat-icon>
+              <span class="kpi-value" style="color:#2e7d32">{{activeUsers()}}</span>
+              <span class="kpi-label">Active Users</span>
+            </div>
+            <div class="kpi-tile" [matTooltip]="inactiveUsers() + ' users currently inactive'">
+              <mat-icon>person_off</mat-icon>
+              <span class="kpi-value" [style.color]="inactiveUsers() > 0 ? '#ef6c00' : '#64748b'">{{inactiveUsers()}}</span>
+              <span class="kpi-label">Inactive Users</span>
+            </div>
+            <div class="kpi-tile" [matTooltip]="rolesInUse() + ' distinct roles assigned'">
+              <mat-icon>admin_panel_settings</mat-icon>
+              <span class="kpi-value">{{rolesInUse()}}</span>
+              <span class="kpi-label">Roles in Use</span>
+            </div>
+            <div class="kpi-tile" [matTooltip]="departments() + ' departments represented'">
+              <mat-icon>business</mat-icon>
+              <span class="kpi-value">{{departments()}}</span>
+              <span class="kpi-label">Departments</span>
+            </div>
+          </div>
+
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search users..." [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Role" [(ngModel)]="filterRole" (selectionChange)="applyFilters()">
+                <mat-option value="">All Roles</mat-option>
+                @for (role of allRoleKeys(); track role) {
+                  <mat-option [value]="role">{{getRoleLabel(role)}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="inactive">Inactive</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Department" [(ngModel)]="filterDepartment" (selectionChange)="applyFilters()">
+                <mat-option value="">All Departments</mat-option>
+                @for (dept of allDepartments(); track dept) {
+                  <mat-option [value]="dept">{{dept}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-stroked-button (click)="clearFilters()">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Cost Centre</th>
+                  <th>Delegation Limit</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of filteredUsers(); track user.id) {
+                  <tr class="data-row" (click)="viewUser(user)">
+                    <td>
+                      <div class="user-name-cell">
+                        <span class="avatar-initial" [style.background]="getAvatarColor(user.role)">{{getInitial(user)}}</span>
+                        <span class="user-fullname">{{user.firstName}} {{user.lastName}}</span>
+                      </div>
+                    </td>
+                    <td class="ref-cell">{{user.username}}</td>
+                    <td>{{user.email}}</td>
+                    <td><span class="role-badge" [style.background]="getRoleBadgeColor(user.role)" [style.color]="getRoleBadgeText(user.role)">{{user.roleLabel || getRoleLabel(user.role)}}</span></td>
+                    <td>{{user.department}}</td>
+                    <td>{{user.costCentre}}</td>
+                    <td class="value-cell">{{user.delegationLimit > 0 ? formatCurrency(user.delegationLimit) : '—'}}</td>
+                    <td><span class="status-badge" [class]="user.active ? 'status-approved' : 'status-voided'">{{user.active ? 'Active' : 'Inactive'}}</span></td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="userMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #userMenu="matMenu">
+                        <button mat-menu-item (click)="viewUser(user)"><mat-icon>visibility</mat-icon> View Details</button>
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="9" class="empty-state">
+                      <mat-icon>search_off</mat-icon>
+                      <span>No users found matching your criteria</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info">Showing {{filteredUsers().length}} of {{users().length}} users</span>
+          </div>
+        }
+
+        @if (currentView() === 'detail' && selectedUser()) {
+          <div class="detail-header">
+            <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+            <div class="detail-title-section">
+              <h2>
+                <span class="avatar-initial avatar-lg" [style.background]="getAvatarColor(selectedUser()!.role)">{{getInitial(selectedUser()!)}}</span>
+                {{selectedUser()!.firstName}} {{selectedUser()!.lastName}}
+              </h2>
+              <div class="detail-meta">
+                <span class="role-badge" [style.background]="getRoleBadgeColor(selectedUser()!.role)" [style.color]="getRoleBadgeText(selectedUser()!.role)">{{selectedUser()!.roleLabel || getRoleLabel(selectedUser()!.role)}}</span>
+                <span class="status-badge" [class]="selectedUser()!.active ? 'status-approved' : 'status-voided'">{{selectedUser()!.active ? 'Active' : 'Inactive'}}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-content">
+            <div class="detail-cards-row">
+              <div class="detail-card flex-2">
+                <h3><mat-icon>person</mat-icon> User Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-field">
+                    <label>User ID</label>
+                    <span>{{selectedUser()!.id}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Username</label>
+                    <span class="ref-cell">{{selectedUser()!.username}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Email</label>
+                    <span>{{selectedUser()!.email}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Department</label>
+                    <span>{{selectedUser()!.department}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Cost Centre</label>
+                    <span>{{selectedUser()!.costCentre}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Delegation Limit</label>
+                    <span class="value-cell">{{selectedUser()!.delegationLimit > 0 ? formatCurrency(selectedUser()!.delegationLimit) : 'None'}}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-card flex-1">
+                <h3><mat-icon>security</mat-icon> Role & Permissions</h3>
+                <div class="role-detail-card">
+                  <div class="role-detail-name">{{selectedUser()!.roleLabel || getRoleLabel(selectedUser()!.role)}}</div>
+                  <div class="role-detail-desc">{{getRoleDescription(selectedUser()!.role)}}</div>
+                </div>
+                @if (getUserPermissions(selectedUser()!.role); as perms) {
+                  <div class="permission-section">
+                    <div class="permission-group">
+                      <label>Can Create</label>
+                      <div class="permission-chips">
+                        @for (p of perms.canCreate; track p) {
+                          <span class="perm-chip perm-create">{{p}}</span>
+                        } @empty {
+                          <span class="perm-none">None</span>
+                        }
+                      </div>
+                    </div>
+                    <div class="permission-group">
+                      <label>Can View</label>
+                      <div class="permission-chips">
+                        @for (p of perms.canView; track p) {
+                          <span class="perm-chip perm-view">{{p}}</span>
+                        } @empty {
+                          <span class="perm-none">None</span>
+                        }
+                      </div>
+                    </div>
+                    <div class="permission-group">
+                      <label>Can Approve</label>
+                      <div class="permission-chips">
+                        @for (p of perms.canApprove; track p) {
+                          <span class="perm-chip perm-approve">{{p}}</span>
+                        } @empty {
+                          <span class="perm-none">None</span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            @if (userAuditTrail().length) {
+              <div class="detail-card">
+                <h3><mat-icon>history</mat-icon> Recent Activity</h3>
+                <ul class="audit-list">
+                  @for (entry of userAuditTrail(); track entry.id || $index) {
+                    <li class="audit-item">
+                      <span class="audit-dot" [class]="'dot-' + (entry.action || 'action')"></span>
+                      <div class="audit-content">
+                        <span class="audit-action">{{entry.action | titlecase}}: {{entry.entityType}}</span>
+                        <span class="audit-detail">{{entry.description}}</span>
+                        <span class="audit-date">{{formatDate(entry.timestamp)}} · {{entry.module}}</span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      <!-- ===================== ROLES TAB ===================== -->
+      @if (activeTab() === 'roles') {
+        <div class="roles-grid">
+          @for (roleKey of allRoleKeys(); track roleKey) {
+            <div class="role-card" [class.role-expanded]="expandedRole() === roleKey" (click)="toggleRole(roleKey)">
+              <div class="role-card-header">
+                <div class="role-card-icon" [style.background]="getAvatarColor(roleKey)">
+                  <mat-icon>{{getRoleIcon(roleKey)}}</mat-icon>
+                </div>
+                <div class="role-card-info">
+                  <div class="role-card-name">{{getRoleLabel(roleKey)}}</div>
+                  <div class="role-card-desc">{{getRoleDescription(roleKey)}}</div>
+                </div>
+                <div class="role-card-count" [matTooltip]="getPermissionCount(roleKey) + ' total permissions'">
+                  <span class="count-num">{{getPermissionCount(roleKey)}}</span>
+                  <span class="count-label">permissions</span>
+                </div>
+                <mat-icon class="expand-icon">{{expandedRole() === roleKey ? 'expand_less' : 'expand_more'}}</mat-icon>
+              </div>
+
+              @if (expandedRole() === roleKey) {
+                <div class="role-card-body" (click)="$event.stopPropagation()">
+                  @if (getUserPermissions(roleKey); as perms) {
+                    <div class="permission-section">
+                      <div class="permission-group">
+                        <label><mat-icon>add_circle</mat-icon> Can Create</label>
+                        <div class="permission-chips">
+                          @for (p of perms.canCreate; track p) {
+                            <span class="perm-chip perm-create">{{p}}</span>
+                          } @empty {
+                            <span class="perm-none">None</span>
+                          }
+                        </div>
+                      </div>
+                      <div class="permission-group">
+                        <label><mat-icon>visibility</mat-icon> Can View</label>
+                        <div class="permission-chips">
+                          @for (p of perms.canView; track p) {
+                            <span class="perm-chip perm-view">{{p}}</span>
+                          } @empty {
+                            <span class="perm-none">None</span>
+                          }
+                        </div>
+                      </div>
+                      <div class="permission-group">
+                        <label><mat-icon>check_circle</mat-icon> Can Approve</label>
+                        <div class="permission-chips">
+                          @for (p of perms.canApprove; track p) {
+                            <span class="perm-chip perm-approve">{{p}}</span>
+                          } @empty {
+                            <span class="perm-none">None</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="role-users-section">
+                      <label>Assigned Users</label>
+                      <div class="role-users-list">
+                        @for (user of getUsersByRole(roleKey); track user.id) {
+                          <span class="role-user-chip" (click)="viewUser(user)">
+                            <span class="avatar-initial avatar-sm" [style.background]="getAvatarColor(roleKey)">{{getInitial(user)}}</span>
+                            {{user.firstName}} {{user.lastName}}
+                          </span>
+                        } @empty {
+                          <span class="perm-none">No users assigned</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== SOD TAB ===================== -->
+      @if (activeTab() === 'sod') {
+        <div class="sod-header-card">
+          <div class="sod-header-content">
+            <mat-icon class="sod-header-icon">gavel</mat-icon>
+            <div>
+              <h3>Segregation of Duties (SoD) Rules</h3>
+              <p>These rules enforce separation of conflicting responsibilities to prevent fraud and errors in the procurement cycle. Based on MFMA requirements and best-practice internal controls.</p>
+            </div>
+          </div>
+          <div class="sod-stats">
+            <div class="sod-stat">
+              <span class="sod-stat-value">{{sodRules().length}}</span>
+              <span class="sod-stat-label">Total Rules</span>
+            </div>
+            <div class="sod-stat">
+              <span class="sod-stat-value sod-enforced">{{sodRules().length}}</span>
+              <span class="sod-stat-label">Enforced</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sod-grid">
+          @for (rule of sodRules(); track rule.description; let i = $index) {
+            <div class="sod-card">
+              <div class="sod-card-number">{{i + 1}}</div>
+              <div class="sod-card-content">
+                <div class="sod-card-desc">{{rule.description}}</div>
+                <div class="sod-conflict-row">
+                  <div class="sod-action">
+                    <mat-icon>{{getActionIcon(rule.action1)}}</mat-icon>
+                    <span>{{formatAction(rule.action1)}}</span>
+                  </div>
+                  <div class="sod-conflict-indicator">
+                    <mat-icon>block</mat-icon>
+                  </div>
+                  <div class="sod-action">
+                    <mat-icon>{{getActionIcon(rule.action2)}}</mat-icon>
+                    <span>{{formatAction(rule.action2)}}</span>
+                  </div>
+                </div>
+                <div class="sod-roles-involved">
+                  <label>Conflicting Roles:</label>
+                  <div class="sod-role-chips">
+                    @for (role of getConflictingRoles(rule); track role) {
+                      <span class="sod-role-chip">{{getRoleLabel(role)}}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+              <div class="sod-enforcement">
+                <mat-icon class="sod-enforced-icon">verified</mat-icon>
+                <span>Enforced</span>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

@@ -1,0 +1,350 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Performance Management</h1>
+    <p class="page-subtitle">Manage KPIs, assessments, reviews and goal alignment</p>
+  </div>
+</div>
+
+<div class="module-tabs">
+  <div class="detail-tab" [class.active]="activeTab === 'indicators'" (click)="switchTab('indicators')"><app-icon name="activity" [size]="14"></app-icon> KPA/KPI Indicators</div>
+  <div class="detail-tab" [class.active]="activeTab === 'periods'" (click)="switchTab('periods')"><app-icon name="calendar" [size]="14"></app-icon> Assessment Periods</div>
+  <div class="detail-tab" [class.active]="activeTab === 'scoring'" (click)="switchTab('scoring')"><app-icon name="barChart" [size]="14"></app-icon> Quarterly Scoring</div>
+  <div class="detail-tab" [class.active]="activeTab === 'reviews'" (click)="switchTab('reviews')"><app-icon name="fileText" [size]="14"></app-icon> Reviews</div>
+  <div class="detail-tab" [class.active]="activeTab === '360'" (click)="switchTab('360')"><app-icon name="users" [size]="14"></app-icon> 360 Feedback</div>
+  <div class="detail-tab" [class.active]="activeTab === 'pip'" (click)="switchTab('pip')"><app-icon name="alertTriangle" [size]="14"></app-icon> PIP</div>
+  <div class="detail-tab" [class.active]="activeTab === 'goals'" (click)="switchTab('goals')"><app-icon name="target" [size]="14"></app-icon> Goal Alignment</div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading performance...</div>
+}
+
+@if (!loading && activeTab === 'indicators') {
+  <div class="toolbar">
+    <div class="toolbar-filter">
+      <select class="toolbar-filter-select" [(ngModel)]="selectedPeriod" (ngModelChange)="onPeriodChange()">
+        @for (p of periods; track p.id) {
+          <option [ngValue]="p.id">{{ p.name }} ({{ p.financial_year }})</option>
+        }
+      </select>
+    </div>
+    <button class="btn btn-primary" (click)="openAddIndicator()">Add KPA/KPI</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th><th>KPA</th><th>KPI</th>
+          <th style="text-align:center">Weight</th><th style="text-align:center">Target</th>
+          <th style="text-align:center">Q1</th><th style="text-align:center">Q2</th>
+          <th style="text-align:center">Q3</th><th style="text-align:center">Q4</th>
+          <th style="text-align:center">Score</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (ind of indicators; track ind.id) {
+          <tr>
+            <td>{{ ind.employee_code }} - {{ ind.first_name }} {{ ind.surname }}</td>
+            <td><strong>{{ ind.kpa }}</strong></td>
+            <td>{{ ind.kpi }}</td>
+            <td style="text-align:center">{{ ind.weighting || 0 }}%</td>
+            <td style="text-align:center">{{ ind.annual_target || '-' }}</td>
+            <td style="text-align:center">{{ ind.q1_actual || '-' }}</td>
+            <td style="text-align:center">{{ ind.q2_actual || '-' }}</td>
+            <td style="text-align:center">{{ ind.q3_actual || '-' }}</td>
+            <td style="text-align:center">{{ ind.q4_actual || '-' }}</td>
+            <td style="text-align:center;font-weight:700" [style.color]="getScoreColor(ind.score)">{{ ind.score || '-' }}</td>
+            <td><button class="btn btn-sm" (click)="openScoreIndicator(ind)"><app-icon name="edit" [size]="12"></app-icon></button></td>
+          </tr>
+        }
+        @if (indicators.length === 0) {
+          <tr><td colspan="11" style="text-align:center;color:var(--text-muted)">No performance indicators found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if ((indicatorsMeta.total || 0) > 20) {
+    <app-pagination [page]="indicatorsPage" [limit]="20" [total]="indicatorsMeta.total" (pageChange)="onIndicatorsPage($event)"></app-pagination>
+  }
+}
+
+@if (!loading && activeTab === 'periods') {
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Period Name</th><th>Financial Year</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        @for (p of periods; track p.id) {
+          <tr>
+            <td><strong>{{ p.name }}</strong></td>
+            <td>{{ p.financial_year }}</td>
+            <td>{{ formatDate(p.start_date) }}</td>
+            <td>{{ formatDate(p.end_date) }}</td>
+            <td><app-status-badge [status]="p.status"></app-status-badge></td>
+            <td><button class="action-btn" (click)="selectedPeriod = p.id; switchTab('indicators')">View Indicators</button></td>
+          </tr>
+        }
+        @if (periods.length === 0) {
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No performance periods configured</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (!loading && activeTab === 'scoring') {
+  <div class="toolbar">
+    <div class="toolbar-filter">
+      <select class="toolbar-filter-select" [(ngModel)]="selectedPeriod" (ngModelChange)="loadScoring()">
+        @for (p of periods; track p.id) {
+          <option [ngValue]="p.id">{{ p.name }} ({{ p.financial_year }})</option>
+        }
+      </select>
+    </div>
+  </div>
+  <div class="stat-cards">
+    <div class="stat-card"><div class="stat-value" style="color:#3B82F6">{{ scoringStats.assessed }}</div><div class="stat-label">Employees Assessed</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#8B5CF6">{{ scoringStats.totalKpis }}</div><div class="stat-label">Total KPIs</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#10B981">{{ scoringStats.scored }}</div><div class="stat-label">KPIs Scored</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#F59E0B">{{ scoringStats.pending }}</div><div class="stat-label">Pending Scoring</div></div>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee</th><th style="text-align:center">KPIs</th><th style="text-align:center">Weight</th><th style="text-align:center">Avg Score</th><th>Rating</th></tr></thead>
+      <tbody>
+        @for (emp of scoringByEmployee; track emp.employee_id) {
+          <tr>
+            <td>{{ emp.name }}</td>
+            <td style="text-align:center">{{ emp.indicators.length }}</td>
+            <td style="text-align:center">{{ emp.totalWeight.toFixed(0) }}%</td>
+            <td style="text-align:center;font-weight:700" [style.color]="getScoreColor(emp.avgScore)">{{ emp.avgScore }}</td>
+            <td><span class="badge" [style.background]="getScoreColor(emp.avgScore) + '20'" [style.color]="getScoreColor(emp.avgScore)">{{ getRatingLabel(emp.avgScore) }}</span></td>
+          </tr>
+        }
+        @if (scoringByEmployee.length === 0) {
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No scoring data available</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (!loading && activeTab === 'reviews') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="fileText" [size]="16"></app-icon> Performance Reviews</div>
+  </div>
+  <div class="toolbar">
+    <div class="toolbar-filter">
+      <select class="toolbar-filter-select" [(ngModel)]="selectedReviewEmployee" (ngModelChange)="onReviewEmployeeChange()">
+        <option [ngValue]="null">-- Select Employee --</option>
+        @for (e of employees; track e.id) {
+          <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+        }
+      </select>
+      <select class="toolbar-filter-select" [(ngModel)]="selectedPeriod">
+        @for (p of periods; track p.id) {
+          <option [ngValue]="p.id">{{ p.name }} ({{ p.financial_year }})</option>
+        }
+      </select>
+    </div>
+    <button class="btn btn-primary" (click)="startReview()">Start Review</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Period</th><th style="text-align:center">Overall Score</th><th>Rating</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+        @for (r of reviews; track r.id) {
+          <tr>
+            <td>{{ r.period_name || r.review_period || '-' }}</td>
+            <td style="text-align:center;font-weight:700" [style.color]="getScoreColor(r.overall_score)">{{ r.overall_score ? (+r.overall_score).toFixed(1) : '-' }}</td>
+            <td><span class="badge" [style.background]="getScoreColor(r.overall_score) + '20'" [style.color]="getScoreColor(r.overall_score)">{{ getRatingLabel(r.overall_score) }}</span></td>
+            <td><app-status-badge [status]="r.status || 'DRAFT'"></app-status-badge></td>
+            <td>{{ formatDate(r.review_date) }}</td>
+          </tr>
+        }
+        @if (reviews.length === 0) {
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Select an employee to view reviews</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (!loading && activeTab === '360') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="users" [size]="16"></app-icon> 360 Feedback</div>
+    <button class="btn btn-primary" (click)="open360Form()"><app-icon name="plus" [size]="14"></app-icon> Initiate 360 Feedback</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee</th><th>Review Period</th><th>Status</th><th style="text-align:center">Responses</th><th>Initiated</th></tr></thead>
+      <tbody>
+        @for (fb of feedback360; track fb.id) {
+          <tr>
+            <td>{{ fb.employee_name || '-' }}</td>
+            <td>{{ fb.review_period || '-' }}</td>
+            <td><app-status-badge [status]="fb.status || 'DRAFT'"></app-status-badge></td>
+            <td style="text-align:center">{{ fb.response_count || 0 }}</td>
+            <td>{{ formatDate(fb.initiated_date) }}</td>
+          </tr>
+        }
+        @if (feedback360.length === 0) {
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No 360 feedback records found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (!loading && activeTab === 'pip') {
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="section-header" style="margin:0"><app-icon name="alertTriangle" [size]="16"></app-icon> Performance Improvement Plans</div>
+    <button class="btn btn-primary" (click)="openPIPForm()"><app-icon name="plus" [size]="14"></app-icon> Create PIP</button>
+  </div>
+  <div class="data-grid">
+    <table>
+      <thead><tr><th>Employee</th><th>Start Date</th><th>End Date</th><th>Status</th><th style="text-align:center">Milestones</th></tr></thead>
+      <tbody>
+        @for (pip of pips; track pip.id) {
+          <tr>
+            <td>{{ pip.employee_name || '-' }}</td>
+            <td>{{ formatDate(pip.start_date) }}</td>
+            <td>{{ formatDate(pip.end_date) }}</td>
+            <td><app-status-badge [status]="pip.status || 'ACTIVE'"></app-status-badge></td>
+            <td style="text-align:center">{{ pip.milestone_count || 0 }}</td>
+          </tr>
+        }
+        @if (pips.length === 0) {
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No PIPs found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (!loading && activeTab === 'goals') {
+  <div class="empty-state">
+    <app-icon name="target" [size]="32"></app-icon>
+    <h3>Goal Alignment</h3>
+    <p>Align individual goals with SDBIP objectives</p>
+  </div>
+}
+
+@if (showIndicatorModal) {
+  <div class="modal-overlay" (click)="showIndicatorModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Add KPA/KPI Indicator</h3><button class="modal-close" (click)="showIndicatorModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Assessment Period</label>
+            <select class="form-control" [(ngModel)]="indicatorForm.period_id">
+              @for (p of periods; track p.id) { <option [ngValue]="p.id">{{ p.name }} ({{ p.financial_year }})</option> }
+            </select>
+          </div>
+          <div class="form-group"><label>Employee</label>
+            <select class="form-control" [(ngModel)]="indicatorForm.employee_id">
+              @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>KPA</label><input class="form-control" [(ngModel)]="indicatorForm.kpa" placeholder="e.g. Financial Management"></div>
+        <div class="form-group"><label>KPI</label><textarea class="form-control" [(ngModel)]="indicatorForm.kpi" placeholder="e.g. Submit monthly reports by the 15th"></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Annual Target</label><input class="form-control" [(ngModel)]="indicatorForm.annual_target"></div>
+          <div class="form-group"><label>Weighting (%)</label><input type="number" class="form-control" [(ngModel)]="indicatorForm.weighting" min="0" max="100"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Q1 Target</label><input class="form-control" [(ngModel)]="indicatorForm.q1_target"></div>
+          <div class="form-group"><label>Q2 Target</label><input class="form-control" [(ngModel)]="indicatorForm.q2_target"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Q3 Target</label><input class="form-control" [(ngModel)]="indicatorForm.q3_target"></div>
+          <div class="form-group"><label>Q4 Target</label><input class="form-control" [(ngModel)]="indicatorForm.q4_target"></div>
+        </div>
+        <div style="margin-top:12px;padding:12px;background:#F0FDF4;border-radius:8px;font-size:13px;color:#166534">
+          <strong>SDBIP Alignment:</strong> KPAs should align with the municipality's Service Delivery and Budget Implementation Plan objectives. Weightings across all KPAs for an employee should total 100%.
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showIndicatorModal = false">Cancel</button><button class="btn btn-primary" (click)="saveIndicator()">Save Indicator</button></div>
+    </div>
+  </div>
+}
+
+@if (showScoreModal) {
+  <div class="modal-overlay" (click)="showScoreModal = false">
+    <div class="modal" style="max-width:600px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Record Performance Score</h3><button class="modal-close" (click)="showScoreModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Q1 Actual</label><input class="form-control" [(ngModel)]="scoreForm.q1_actual"></div>
+          <div class="form-group"><label>Q2 Actual</label><input class="form-control" [(ngModel)]="scoreForm.q2_actual"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Q3 Actual</label><input class="form-control" [(ngModel)]="scoreForm.q3_actual"></div>
+          <div class="form-group"><label>Q4 Actual</label><input class="form-control" [(ngModel)]="scoreForm.q4_actual"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Performance Score</label>
+            <select class="form-control" [(ngModel)]="scoreForm.score">
+              <option value="5">5 - Outstanding</option>
+              <option value="4">4 - Above Expectations</option>
+              <option value="3">3 - Fully Effective</option>
+              <option value="2">2 - Not Fully Effective</option>
+              <option value="1">1 - Unacceptable</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Status</label>
+            <select class="form-control" [(ngModel)]="scoreForm.status">
+              <option>DRAFT</option><option>SUBMITTED</option><option>REVIEWED</option><option>APPROVED</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showScoreModal = false">Cancel</button><button class="btn btn-primary" (click)="saveScore()">Save Score</button></div>
+    </div>
+  </div>
+}
+
+@if (show360Modal) {
+  <div class="modal-overlay" (click)="show360Modal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Initiate 360 Feedback</h3><button class="modal-close" (click)="show360Modal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="fb360Form.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Review Period</label>
+          <select class="form-control" [(ngModel)]="fb360Form.period_id">
+            @for (p of periods; track p.id) { <option [ngValue]="p.id">{{ p.name }} ({{ p.financial_year }})</option> }
+          </select>
+        </div>
+        <div class="form-group"><label>Due Date</label><app-date-input [(ngModel)]="fb360Form.due_date"></app-date-input></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="show360Modal = false">Cancel</button><button class="btn btn-primary" (click)="save360()">Create</button></div>
+    </div>
+  </div>
+}
+
+@if (showPIPModal) {
+  <div class="modal-overlay" (click)="showPIPModal = false">
+    <div class="modal" style="max-width:700px" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h3>Create Performance Improvement Plan</h3><button class="modal-close" (click)="showPIPModal = false">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label>Employee</label>
+          <select class="form-control" [(ngModel)]="pipForm.employee_id">
+            @for (e of employees; track e.id) { <option [ngValue]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option> }
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Start Date</label><app-date-input [(ngModel)]="pipForm.start_date"></app-date-input></div>
+          <div class="form-group"><label>End Date</label><app-date-input [(ngModel)]="pipForm.end_date"></app-date-input></div>
+        </div>
+        <div class="form-group"><label>Reason</label><textarea class="form-control" [(ngModel)]="pipForm.reason" placeholder="Describe areas requiring improvement"></textarea></div>
+        <div class="form-group"><label>Objectives</label><textarea class="form-control" [(ngModel)]="pipForm.objectives"></textarea></div>
+        <div class="form-group"><label>Support Provided</label><textarea class="form-control" [(ngModel)]="pipForm.support"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn" (click)="showPIPModal = false">Cancel</button><button class="btn btn-primary" (click)="savePIP()">Create PIP</button></div>
+    </div>
+  </div>
+}

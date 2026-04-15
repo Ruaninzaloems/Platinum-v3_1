@@ -1,0 +1,36 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Banking & Payments</h1>
+      <p class="page-subtitle">Configure payment modes and banking details</p>
+    </div>
+  </div>
+
+  <div class="form-grid">
+    <div class="form-section-title" style="grid-column:1/-1"><app-icon name="creditCard" [size]="16"></app-icon> Payment Configuration</div>
+    <div class="form-group">
+      <label>Payment Mode</label>
+      <select class="form-control" [(ngModel)]="settings.payment_mode">
+        <option value="MANUAL_EFT">Manual EFT</option>
+        <option value="HOST_TO_HOST">Host-to-Host (H2H)</option>
+      </select>
+    </div>
+    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="settings._auto_gl" style="width:auto"> Auto GL Post on Approval</label></div>
+    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="settings._auto_batches" style="width:auto"> Auto Generate Payment Batches</label></div>
+
+    <div class="form-section-title" style="grid-column:1/-1"><app-icon name="briefcase" [size]="16"></app-icon> Municipality Bank Details</div>
+    <div class="form-group"><label>Bank Name</label><input class="form-control" [(ngModel)]="settings.municipality_bank_name"></div>
+    <div class="form-group"><label>Branch Code</label><input class="form-control" [(ngModel)]="settings.municipality_branch_code"></div>
+    <div class="form-group"><label>Account Number</label><input class="form-control" [(ngModel)]="settings.municipality_account_number"></div>
+    <div class="form-group"><label>Account Name</label><input class="form-control" [(ngModel)]="settings.municipality_account_name"></div>
+
+    <div class="form-section-title" style="grid-column:1/-1"><app-icon name="link" [size]="16"></app-icon> Host-to-Host Integration</div>
+    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="settings._h2h_enabled" style="width:auto"> H2H Enabled</label></div>
+    <div class="form-group"><label>H2H API URL</label><input class="form-control" [(ngModel)]="settings.h2h_api_url" placeholder="https://..." [style.opacity]="settings._h2h_enabled ? '1' : '0.5'"></div>
+  </div>
+  <div style="margin-top:20px">
+    <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="13"></app-icon> Save Settings</button>
+  </div>
+}

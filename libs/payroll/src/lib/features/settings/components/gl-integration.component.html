@@ -1,0 +1,496 @@
+@if (view === 'list') {
+<div class="gl-page">
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">GL Integration</h2>
+      <p class="page-subtitle">Configure mSCOA General Ledger mappings for salary transactions</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value">{{ items.length }}</div>
+      <div class="stat-label">Total Transactions</div>
+    </div>
+    <div class="stat-card stat-configured">
+      <div class="stat-value">{{ configuredCount }}</div>
+      <div class="stat-label">GL Configured</div>
+    </div>
+    <div class="stat-card stat-unconfigured">
+      <div class="stat-value">{{ unconfiguredCount }}</div>
+      <div class="stat-label">Not Configured</div>
+    </div>
+  </div>
+
+  <div class="tabs-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'EARNING'" (click)="switchTab('EARNING')">
+      Earnings <span class="tab-count">{{ tabCounts['EARNING'] }}</span>
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'DEDUCTION'" (click)="switchTab('DEDUCTION')">
+      Deductions <span class="tab-count">{{ tabCounts['DEDUCTION'] }}</span>
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'COMPANY_CONTRIBUTION'" (click)="switchTab('COMPANY_CONTRIBUTION')">
+      Company Contributions <span class="tab-count">{{ tabCounts['COMPANY_CONTRIBUTION'] }}</span>
+    </button>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" class="search-input" [(ngModel)]="searchTerm" (ngModelChange)="filterItems()" placeholder="Search by ID or name..." />
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">Loading salary transactions...</div>
+  } @else if (filteredItems.length === 0) {
+    <div class="empty-state">No salary transactions found for this category.</div>
+  } @else {
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-id">Id</th>
+            <th class="col-name">Name</th>
+            <th class="col-type">Type</th>
+            <th class="col-scoa">SCOA Debit Item</th>
+            <th class="col-scoa">SCOA Credit Item</th>
+            <th class="col-status">GL Status</th>
+            <th class="col-action">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of pagedItems; track item.id) {
+            <tr class="table-row" (click)="openDetail(item)">
+              <td class="cell-id">{{ item.id }}</td>
+              <td>{{ item.name }}</td>
+              <td><span class="type-badge" [ngClass]="getTypeBadge(item.transaction_type)">{{ getTypeLabel(item.transaction_type) }}</span></td>
+              <td class="cell-scoa">{{ item.suspense_scoa_item_id || 'Not Configured' }}</td>
+              <td class="cell-scoa">{{ item.suspense_scoa_item_credit_id || 'Not Configured' }}</td>
+              <td>
+                @if (isConfigured(item)) {
+                  <span class="gl-badge gl-configured">Configured</span>
+                } @else if (isPartiallyConfigured(item)) {
+                  <span class="gl-badge gl-partial">Partial</span>
+                } @else {
+                  <span class="gl-badge gl-not-configured">Not Configured</span>
+                }
+              </td>
+              <td>
+                <button class="btn-configure" (click)="openDetail(item); $event.stopPropagation()">Configure</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages > 1) {
+      <div class="pagination">
+        <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+        <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button class="page-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+      </div>
+    }
+  }
+</div>
+}
+
+@if (view === 'detail' && selectedItem) {
+<div class="gl-detail">
+  <div class="detail-header">
+    <button class="btn-back" (click)="goBack()">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      Back to List
+    </button>
+    <div class="detail-title-block">
+      <h2 class="detail-title">{{ selectedItem.name }}</h2>
+      <div class="detail-meta">
+        <span class="meta-code">{{ selectedItem.code }}</span>
+        <span class="type-badge" [ngClass]="getTypeBadge(selectedItem.transaction_type)">{{ getTypeLabel(selectedItem.transaction_type) }}</span>
+        @if (isConfigured(selectedItem)) {
+          <span class="gl-badge gl-configured">GL Configured</span>
+        } @else {
+          <span class="gl-badge gl-not-configured">GL Not Configured</span>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-body">
+    <div class="type-hint">
+      @if (selectedItem.transaction_type === 'EARNING') {
+        <p class="hint-text">Earnings are debited to expenditure accounts (cost centres) and credited to salary control/clearing accounts.</p>
+      } @else if (selectedItem.transaction_type === 'DEDUCTION') {
+        <p class="hint-text">Deductions are debited to salary control/clearing accounts and credited to liability accounts (e.g. SARS, pension fund).</p>
+      } @else if (selectedItem.transaction_type === 'COMPANY_CONTRIBUTION') {
+        <p class="hint-text">Company contributions are debited to expenditure accounts and credited to liability accounts (e.g. UIF, SDL).</p>
+      } @else if (selectedItem.transaction_type === 'FRINGE_BENEFIT') {
+        <p class="hint-text">Fringe benefits are debited to expenditure accounts and credited to employee benefit clearing accounts.</p>
+      }
+    </div>
+
+    <div class="form-section">
+      <h3 class="section-title">Date Range &amp; Financial Year</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-input" [(ngModel)]="glForm.start_date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">End Date</label>
+          <input type="date" class="form-input" [(ngModel)]="glForm.end_date" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Financial Year</label>
+          <select class="form-input" [(ngModel)]="glForm.fin_year" (ngModelChange)="onFinancialYearChange()">
+            <option value="">-- Select Financial Year --</option>
+            @for (fy of financialYears; track fy) {
+              <option [value]="fy">{{ fy }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="section-title">
+        Control Items
+      </h3>
+      <div class="form-row form-row-single">
+        <div class="form-group">
+          <label class="form-label">Salary Control Project</label>
+          @if (projectsLoading) {
+            <select class="form-input" disabled><option>Loading projects...</option></select>
+          } @else if (externalProjects.length > 0) {
+            <select class="form-input" [ngModel]="toStr(glForm.scoa_project_id)" (ngModelChange)="glForm.scoa_project_id = $event; onProjectChange()">
+              <option value="">-- Select --</option>
+              @for (proj of externalProjects; track proj.projectId) {
+                <option [value]="toStr(proj.projectId)">{{ proj.projectName }}</option>
+              }
+            </select>
+          } @else {
+            <input type="text" class="form-input" value="Select a Financial Year to load projects" disabled />
+          }
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Salary Control Debit Item</label>
+          @if (controlItemsLoading) {
+            <select class="form-input" disabled><option>Loading SCOA items...</option></select>
+          } @else if (controlScoaItems.length > 0) {
+            <select class="form-input" [ngModel]="toStr(glForm.suspense_scoa_item_id)" (ngModelChange)="glForm.suspense_scoa_item_id = $event; onDebitItemChange()">
+              <option value="">-- Select --</option>
+              @for (item of controlScoaItems; track item.scoaId) {
+                <option [value]="toStr(item.scoaId)">{{ item.scoaDesc }}</option>
+              }
+            </select>
+          } @else {
+            <input type="text" class="form-input" value="Select a Salary Control Project first" disabled />
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">Salary Control Credit Item</label>
+          @if (controlItemsLoading) {
+            <select class="form-input" disabled><option>Loading SCOA items...</option></select>
+          } @else if (controlScoaItems.length > 0) {
+            <select class="form-input" [ngModel]="toStr(glForm.suspense_scoa_item_credit_id)" (ngModelChange)="glForm.suspense_scoa_item_credit_id = $event">
+              <option value="">-- Select --</option>
+              @for (item of controlScoaItems; track item.scoaId) {
+                <option [value]="toStr(item.scoaId)">{{ item.scoaDesc }}</option>
+              }
+            </select>
+          } @else {
+            <input type="text" class="form-input" value="Select a Salary Control Project first" disabled />
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (selectedItem.transaction_type === 'DEDUCTION') {
+      <div class="form-section">
+        <div class="field-row">
+          <label class="field-label">Journal Entry Only</label>
+          <div class="field-value">
+            <input type="checkbox" class="form-checkbox" [(ngModel)]="glForm.journal_entry_only" (ngModelChange)="onJournalEntryOnlyToggle()" />
+          </div>
+        </div>
+        @if (glForm.journal_entry_only) {
+          <div class="revenue-item-section">
+            <h4 class="subsection-title">SCOA Revenue Item</h4>
+            <div class="field-row">
+              <label class="field-label">SCOA Item <span class="required">*</span></label>
+              <div class="field-value">
+                <app-scoa-drilldown
+                  [finYear]="glForm.fin_year"
+                  [value]="glForm.scoa_item_id"
+                  [meta]="glForm.scoa_item_id_meta"
+                  placeholder="-- Select SCOA Item --"
+                  (valueChange)="onRevenueScoaItemChange($event)"
+                  (metaChange)="onRevenueScoaItemMetaChange($event)"
+                ></app-scoa-drilldown>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Plan Project Item <span class="required">*</span></label>
+              <div class="field-value">
+                @if (revenuePlanProjectItemsLoading) {
+                  <select class="form-input" disabled><option>Loading plan project items...</option></select>
+                } @else if (revenuePlanProjectItems.length > 0) {
+                  <select class="form-input" [ngModel]="toStr(glForm.plan_project_item_id)" (ngModelChange)="glForm.plan_project_item_id = $event; onRevenuePlanProjectItemChange()">
+                    <option value="">-- Select --</option>
+                    @for (ppi of revenuePlanProjectItems; track ppi.planProjectItemId) {
+                      <option [value]="toStr(ppi.planProjectItemId)">{{ ppi.planProjectItemId }} | {{ ppi.projectDesc }} | {{ ppi.fund }} | {{ ppi.scoaFunction }} | {{ ppi.region }} | {{ ppi.cost }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input type="text" class="form-input" value="Select a SCOA Item first" disabled />
+                }
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">SCOA Project <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.project" disabled>
+                  <option [value]="revenueItemDetails.project">{{ revenueItemDetails.project || '' }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Department <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.department" disabled>
+                  <option [value]="revenueItemDetails.department">{{ revenueItemDetails.department || '' }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Division <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.division" disabled>
+                  <option [value]="revenueItemDetails.division">{{ revenueItemDetails.division || '' }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Function <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.function" disabled>
+                  <option [value]="revenueItemDetails.function">{{ revenueItemDetails.function || '' }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Region <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.region" disabled>
+                  <option [value]="revenueItemDetails.region">{{ revenueItemDetails.region || '' }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <label class="field-label">Fund <span class="required">*</span></label>
+              <div class="field-value">
+                <select class="form-input readonly-select" [(ngModel)]="revenueItemDetails.fund" disabled>
+                  <option [value]="revenueItemDetails.fund">{{ revenueItemDetails.fund || '' }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    @if ((selectedItem.transaction_type === 'DEDUCTION' && !glForm.journal_entry_only) || selectedItem.transaction_type === 'COMPANY_CONTRIBUTION') {
+      <div class="form-section">
+        <h3 class="section-title">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Creditor Configuration
+        </h3>
+          <div class="field-row">
+            <label class="field-label">Creditor <span class="required">*</span></label>
+            <div class="field-value">
+              @if (vendorsLoading) {
+                <select class="form-input" disabled><option>Loading vendors...</option></select>
+              } @else {
+                <select class="form-input" [ngModel]="toStr(glForm.vendor_id)" (ngModelChange)="glForm.vendor_id = $event">
+                  <option value="">-- Select Creditor --</option>
+                  @for (v of vendors; track v.id) {
+                    <option [value]="toStr(v.id)">{{ v.name }}</option>
+                  }
+                </select>
+              }
+            </div>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Creditor Control Project <span class="required">*</span></label>
+            <div class="field-value">
+              @if (projectsLoading) {
+                <select class="form-input" disabled><option>Loading projects...</option></select>
+              } @else if (externalProjects.length > 0) {
+                <select class="form-input" [ngModel]="toStr(glForm.vendor_scoa_project_id)" (ngModelChange)="glForm.vendor_scoa_project_id = $event; onCreditorProjectChange()">
+                  <option value="">-- Select --</option>
+                  @for (proj of externalProjects; track proj.projectId) {
+                    <option [value]="toStr(proj.projectId)">{{ proj.projectName }}</option>
+                  }
+                </select>
+              } @else {
+                <input type="text" class="form-input" value="Select a Financial Year to load projects" disabled />
+              }
+            </div>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Creditor Control SCOA Credit Item <span class="required">*</span></label>
+            <div class="field-value">
+              @if (creditorControlItemsLoading) {
+                <select class="form-input" disabled><option>Loading SCOA items...</option></select>
+              } @else if (creditorControlScoaItems.length > 0) {
+                <select class="form-input" [ngModel]="toStr(glForm.vendor_scoa_id)" (ngModelChange)="glForm.vendor_scoa_id = $event">
+                  <option value="">-- Select --</option>
+                  @for (item of creditorControlScoaItems; track item.scoaId) {
+                    <option [value]="toStr(item.scoaId)">{{ item.scoaDesc }}</option>
+                  }
+                </select>
+              } @else {
+                <input type="text" class="form-input" value="Select a Creditor Control Project first" disabled />
+              }
+            </div>
+          </div>
+      </div>
+    }
+
+    @if (selectedItem.transaction_type !== 'DEDUCTION') {
+    <div class="form-section">
+      <h3 class="section-title">
+        Additional Configuration
+      </h3>
+
+      <div class="field-row">
+        <label class="field-label">Municipal Staff <span class="required">*</span></label>
+        <div class="field-value">
+          <app-scoa-drilldown
+            [finYear]="glForm.fin_year"
+            [value]="glForm.scoa_item_id_permanent_staff"
+            [meta]="glForm.scoa_item_id_permanent_staff_meta"
+            placeholder="-- Select Municipal Staff --"
+            (valueChange)="onMunicipalStaffChange($event)"
+            (metaChange)="onMunicipalStaffMetaChange($event)"
+          ></app-scoa-drilldown>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label">Override Project</label>
+        <div class="field-value">
+          <input type="checkbox" class="form-checkbox" [(ngModel)]="glForm.override_project" (ngModelChange)="onOverrideProjectToggle()" />
+        </div>
+      </div>
+
+      @if (glForm.override_project) {
+        <div class="field-row">
+          <label class="field-label">Plan Project Item <span class="required">*</span></label>
+          <div class="field-value">
+            @if (planProjectItemsLoading) {
+              <select class="form-input" disabled><option>Loading plan project items...</option></select>
+            } @else {
+              <select class="form-input" [ngModel]="toStr(glForm.plan_project_item_id)" (ngModelChange)="glForm.plan_project_item_id = $event; onPlanProjectItemChange()">
+                <option value="">-- Select --</option>
+                @for (ppi of planProjectItems; track ppi.planProjectItemId) {
+                  <option [value]="toStr(ppi.planProjectItemId)">{{ ppi.planProjectItemId }} | {{ ppi.projectDesc }} | {{ ppi.fund }} | {{ ppi.scoaFunction }} | {{ ppi.region }} | {{ ppi.cost }}</option>
+                }
+              </select>
+            }
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Project <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.project" disabled>
+              <option [value]="overrideProjectDetails.project">{{ overrideProjectDetails.project || '' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Department <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.department" disabled>
+              <option [value]="overrideProjectDetails.department">{{ overrideProjectDetails.department || '' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Division <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.division" disabled>
+              <option [value]="overrideProjectDetails.division">{{ overrideProjectDetails.division || '' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Function <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.function" disabled>
+              <option [value]="overrideProjectDetails.function">{{ overrideProjectDetails.function || '' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Region <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.region" disabled>
+              <option [value]="overrideProjectDetails.region">{{ overrideProjectDetails.region || '' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label class="field-label">Fund <span class="required">*</span></label>
+          <div class="field-value">
+            <select class="form-input readonly-select" [(ngModel)]="overrideProjectDetails.fund" disabled>
+              <option [value]="overrideProjectDetails.fund">{{ overrideProjectDetails.fund || '' }}</option>
+            </select>
+          </div>
+        </div>
+      }
+
+      <div class="field-row">
+        <label class="field-label">Earning is not applicable to Employee Type Post Retirement</label>
+        <div class="field-value">
+          <input type="checkbox" class="form-checkbox" [(ngModel)]="glForm.earning_not_applicable_post_retirement" (ngModelChange)="onPostRetirementToggle()" />
+        </div>
+      </div>
+
+      @if (!glForm.earning_not_applicable_post_retirement) {
+        <div class="field-row">
+          <label class="field-label">Post Retirement <span class="required">*</span></label>
+          <div class="field-value">
+            <app-scoa-drilldown
+              [finYear]="glForm.fin_year"
+              [value]="glForm.scoa_item_id_post_retirement"
+              [meta]="glForm.scoa_item_id_post_retirement_meta"
+              placeholder="-- Select Post Retirement --"
+              (valueChange)="onPostRetirementChange($event)"
+              (metaChange)="onPostRetirementMetaChange($event)"
+            ></app-scoa-drilldown>
+          </div>
+        </div>
+      }
+    </div>
+    }
+
+    <div class="form-actions">
+      <button class="btn btn-secondary" (click)="goBack()">Cancel</button>
+      <button class="btn btn-outline" (click)="clearGlMapping()">Clear All Segments</button>
+      <button class="btn btn-primary" (click)="saveGlMapping()" [disabled]="saving">
+        @if (saving) { Saving... } @else { Save GL Mapping }
+      </button>
+    </div>
+  </div>
+</div>
+}

@@ -1,0 +1,432 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load GL sync data</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Data Sync Dashboard</h1>
+        <p class="subtitle">General Ledger, Trial Balance &amp; Platinum Data Synchronisation</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData(); loadEmsStatus()" matTooltip="Reload status display (does not sync data)">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+        @if (syncing) {
+          <button mat-stroked-button color="warn" (click)="cancelSync()" matTooltip="Cancel the running sync">
+            <mat-icon>cancel</mat-icon> Cancel
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- STATUS BANNER -->
+    <div class="status-banner" [class]="'status-' + (syncing ? 'syncing' : (apiConnected ? 'connected' : 'idle'))">
+      <mat-icon>{{ syncing ? 'sync' : (apiConnected ? 'cloud_done' : 'cloud_queue') }}</mat-icon>
+      <div class="status-info">
+        <span class="status-text">{{ syncing ? 'Sync in progress...' : (apiConnected ? 'Platinum API Connected' : 'Idle') }}</span>
+        <span class="status-time">{{ totalLocalEntries | number }} local entries | {{ totalApiEntries | number }} API entries</span>
+      </div>
+      <app-traffic-light [status]="apiConnected ? 'green' : 'amber'"></app-traffic-light>
+    </div>
+
+    <!-- PLATINUM API SECTION -->
+    <div class="source-section-header">
+      <div class="source-section-icon"><mat-icon>cloud_sync</mat-icon></div>
+      <div class="source-section-text">
+        <h2>Platinum API — Trial Balance &amp; General Ledger</h2>
+        <p>Syncs financial data (TB &amp; GL entries) from the Platinum C# API into the local database</p>
+      </div>
+    </div>
+
+    <mat-card class="controls-card">
+      <div class="controls-row">
+        <mat-form-field appearance="outline" class="fy-field">
+          <mat-label>Financial Year</mat-label>
+          <mat-select [(ngModel)]="selectedFinYear" (selectionChange)="onFinYearChange()">
+            @for (fy of availableFinYears; track fy) {
+              <mat-option [value]="fy">{{ fy }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="btn-group">
+          <button mat-flat-button color="primary" [matMenuTriggerFor]="syncMenu"
+            [disabled]="syncing || !selectedFinYear" class="sync-btn">
+            @if (syncing) {
+              <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+              Syncing...
+            } @else {
+              <mat-icon>sync</mat-icon> Sync Data
+              <mat-icon class="dropdown-arrow">arrow_drop_down</mat-icon>
+            }
+          </button>
+          <mat-menu #syncMenu="matMenu" class="sync-menu-panel">
+            <button mat-menu-item (click)="doSync('incremental')">
+              <mat-icon>bolt</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">Incremental (Smart)</span>
+                <span class="menu-item-desc">Only months with new/changed data</span>
+              </div>
+            </button>
+            <button mat-menu-item (click)="doSync('full')">
+              <mat-icon>sync</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">Full Sync</span>
+                <span class="menu-item-desc">Re-download all months from scratch</span>
+              </div>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="doSync('selected')" [disabled]="getSelectedMonths().length === 0">
+              <mat-icon>checklist</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">Sync Selected ({{ getSelectedMonths().length }} months)</span>
+                <span class="menu-item-desc">Only the months you've ticked below</span>
+              </div>
+            </button>
+            <button mat-menu-item (click)="doSync('selected-incremental')" [disabled]="getSelectedMonths().length === 0">
+              <mat-icon>bolt</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">Selected Incremental</span>
+                <span class="menu-item-desc">Smart sync for ticked months only</span>
+              </div>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="doTbOnlySync()">
+              <mat-icon>table_chart</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">Trial Balance Only</span>
+                <span class="menu-item-desc">TB only, no General Ledger sync</span>
+              </div>
+            </button>
+            <button mat-menu-item (click)="doSync('gl-only-incremental')">
+              <mat-icon>receipt_long</mat-icon>
+              <div class="menu-item-content">
+                <span class="menu-item-label">GL Only (skip TB)</span>
+                <span class="menu-item-desc">General Ledger only, no Trial Balance</span>
+              </div>
+            </button>
+          </mat-menu>
+        </div>
+      </div>
+
+      @if (syncing && syncPhase) {
+        <div class="phase-indicator">
+          <mat-icon>{{ syncPhase === 'trial_balance' ? 'table_chart' : (syncPhase === 'complete' ? 'check_circle' : 'receipt_long') }}</mat-icon>
+          <span>
+            @if (syncPhase === 'trial_balance') {
+              {{ tbOnlyMode ? 'Syncing Trial Balance...' : 'Phase 1/2: Syncing Trial Balance...' }}
+              @if (tbSyncedLive > 0) { ({{ tbSyncedLive | number }} entries) }
+            } @else if (syncPhase === 'general_ledger') {
+              Phase 2/2: Syncing GL — {{ getOverallPercent() }}% ({{ getCompletedCount() }}/{{ getLiveTotal() }} periods)
+              @if (syncModeLive) { [{{ syncModeLive }}] }
+            } @else if (syncPhase === 'complete') {
+              Sync complete!
+            }
+          </span>
+        </div>
+      }
+    </mat-card>
+
+    <!-- KPI STRIP -->
+    <div class="kpi-strip">
+      <app-kpi-tile title="TB Entries" [value]="tbEntries" icon="table_chart"
+        [subtitle]="tbEntries > 0 ? 'synced' : 'not synced'" color="info"></app-kpi-tile>
+      <app-kpi-tile title="GL Entries" [value]="totalLocalEntries" icon="receipt_long"
+        [subtitle]="totalLocalEntries > 0 ? 'synced' : 'not synced'" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Months Synced" [value]="getSyncedMonthCount() + '/' + monthStatuses.length" icon="date_range"
+        subtitle="periods" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Stale Months" [value]="getStaleCount()" icon="warning"
+        [subtitle]="getStaleCount() > 0 ? 'need refresh' : 'all fresh'" [color]="getStaleCount() > 0 ? 'warning' : 'success'"></app-kpi-tile>
+    </div>
+
+    <!-- LIVE PROGRESS -->
+    @if (liveProgress.length > 0) {
+      <div class="section-header">
+        <div class="section-title">
+          <mat-icon>{{ syncing ? 'hourglass_top' : 'check_circle' }}</mat-icon>
+          {{ syncing ? 'Syncing GL...' : 'Sync Complete' }}
+        </div>
+      </div>
+      @if (syncing) {
+        <div class="overall-progress">
+          <mat-progress-bar mode="determinate" [value]="getOverallPercent()"></mat-progress-bar>
+          <span class="overall-label">{{ getOverallPercent() }}% — {{ getTotalSyncedEntries() | number }} of {{ getTotalExpectedEntries() | number }} entries synced
+            @if (getLiveSkippedCount() > 0) { , {{ getLiveSkippedCount() }} months skipped (up to date) }
+          </span>
+        </div>
+      }
+      <div class="period-grid">
+        @for (mp of liveProgress; track mp.month) {
+          <mat-card class="period-card" [class]="'period-' + mp.status">
+            <div class="period-header">
+              <div class="period-icon-wrap">
+                @if (mp.status === 'completed') {
+                  <mat-icon class="p-icon done">check_circle</mat-icon>
+                } @else if (mp.status === 'in_progress') {
+                  <mat-spinner diameter="20"></mat-spinner>
+                } @else if (mp.status === 'failed') {
+                  <mat-icon class="p-icon fail">error</mat-icon>
+                } @else if (mp.status === 'skipped') {
+                  <mat-icon class="p-icon skip">fast_forward</mat-icon>
+                } @else {
+                  <mat-icon class="p-icon wait">schedule</mat-icon>
+                }
+              </div>
+              <div class="period-title">
+                <span class="period-name">{{ getMonthName(mp.month) }}</span>
+                <span class="period-num">Period {{ mp.month }}</span>
+              </div>
+              <span class="period-badge" [class]="'badge-' + mp.status">
+                {{ getLiveStatusLabel(mp.status) }}
+              </span>
+            </div>
+            @if (mp.status !== 'skipped') {
+              <mat-progress-bar class="period-bar"
+                [mode]="'determinate'"
+                [value]="mp.status === 'completed' ? 100 : getMonthPercent(mp)"
+                [color]="mp.status === 'completed' ? 'primary' : (mp.status === 'failed' ? 'warn' : 'accent')">
+              </mat-progress-bar>
+            }
+            <div class="period-footer">
+              <span class="period-entries">{{ (mp.entriesSynced > mp.totalEntries ? mp.totalEntries : mp.entriesSynced) | number }} / {{ mp.totalEntries | number }}</span>
+              <span class="period-pct">{{ mp.status === 'completed' ? 100 : getMonthPercent(mp) }}%</span>
+            </div>
+            @if (mp.skippedReason) {
+              <div class="period-skip-reason">{{ mp.skippedReason }}</div>
+            }
+            @if (mp.error) {
+              <div class="period-error">{{ mp.error }}</div>
+            }
+          </mat-card>
+        }
+      </div>
+    }
+
+    <!-- MONTH STATUS GRID -->
+    @if (monthStatuses.length > 0 && liveProgress.length === 0) {
+      <div class="section-header">
+        <div class="section-title">
+          <mat-icon>calendar_month</mat-icon> Monthly GL Status
+        </div>
+        <div class="select-actions">
+          <button mat-stroked-button class="sm-btn" (click)="selectAll()">Select All</button>
+          <button mat-stroked-button class="sm-btn" (click)="deselectAll()">Deselect All</button>
+          <button mat-stroked-button class="sm-btn" (click)="selectStale()">Select Stale</button>
+        </div>
+      </div>
+
+      <div class="month-grid">
+        @for (ms of monthStatuses; track ms.month) {
+          <mat-card class="month-card" [class]="'month-' + ms.status" (click)="toggleMonth(ms)">
+            <div class="month-check">
+              <mat-checkbox [checked]="ms.selected" (click)="$event.stopPropagation()" (change)="ms.selected = $event.checked"></mat-checkbox>
+            </div>
+            <div class="month-body">
+              <div class="month-header">
+                <span class="month-name">{{ getMonthName(ms.month) }}</span>
+                <span class="month-status-badge" [class]="'ms-' + ms.status">{{ ms.status }}</span>
+              </div>
+              <div class="month-counts">
+                <div class="count-row">
+                  <span class="count-label">API</span>
+                  <span class="count-value">{{ ms.apiEntryCount | number }}</span>
+                </div>
+                <div class="count-row">
+                  <span class="count-label">Local</span>
+                  <span class="count-value" [class.mismatch]="ms.localEntryCount !== ms.apiEntryCount && ms.localEntryCount > 0">
+                    {{ ms.localEntryCount | number }}
+                  </span>
+                </div>
+              </div>
+              @if (ms.localEntryCount !== ms.apiEntryCount && ms.localEntryCount > 0) {
+                <div class="count-diff">
+                  <mat-icon>{{ ms.apiEntryCount > ms.localEntryCount ? 'trending_up' : 'trending_down' }}</mat-icon>
+                  {{ getDiffLabel(ms) }}
+                </div>
+              }
+              <div class="month-footer-row">
+                @if (ms.lastSyncedAt) {
+                  <div class="month-synced-at">
+                    <mat-icon>schedule</mat-icon> {{ formatTimeAgo(ms.lastSyncedAt) }}
+                    @if (ms.syncDurationMs) {
+                      ({{ formatDuration(ms.syncDurationMs) }})
+                    }
+                  </div>
+                } @else {
+                  <div class="month-synced-at never">
+                    <mat-icon>schedule</mat-icon> Never synced
+                  </div>
+                }
+                <button mat-icon-button class="month-sync-btn"
+                  (click)="$event.stopPropagation(); syncSingleMonth(ms)"
+                  [disabled]="syncing"
+                  [matTooltip]="'Sync ' + getMonthName(ms.month) + ' only'">
+                  <mat-icon>sync</mat-icon>
+                </button>
+              </div>
+            </div>
+          </mat-card>
+        }
+      </div>
+    }
+
+    <!-- SUMMARY CARDS -->
+    @if (!syncing && monthStatuses.length > 0) {
+      <div class="sync-cards">
+        <mat-card class="sync-card">
+          <div class="sync-card-header"><mat-icon>table_chart</mat-icon> Trial Balance</div>
+          <div class="sync-ring-wrap">
+            <app-progress-ring [value]="tbEntries > 0 ? 100 : 0" [size]="80"
+              [color]="tbEntries > 0 ? '#22c55e' : '#e2e8f0'"></app-progress-ring>
+          </div>
+          <div class="sync-detail">{{ tbEntries | number }} entries</div>
+        </mat-card>
+        <mat-card class="sync-card">
+          <div class="sync-card-header"><mat-icon>receipt_long</mat-icon> General Ledger</div>
+          <div class="sync-ring-wrap">
+            <app-progress-ring [value]="totalApiEntries > 0 ? Math.round(totalLocalEntries / totalApiEntries * 100) : 0" [size]="80"
+              [color]="totalLocalEntries >= totalApiEntries && totalApiEntries > 0 ? '#22c55e' : '#f59e0b'"></app-progress-ring>
+          </div>
+          <div class="sync-detail">{{ totalLocalEntries | number }} / {{ totalApiEntries | number }} entries</div>
+        </mat-card>
+      </div>
+    }
+
+    @if (syncMessage) {
+      <div class="sync-message" [class.success]="syncSuccess" [class.error]="!syncSuccess">
+        <mat-icon>{{ syncSuccess ? 'check_circle' : 'error' }}</mat-icon>
+        {{ syncMessage }}
+      </div>
+    }
+
+    @if (postSyncValidation.length > 0) {
+      <div class="post-sync-validation">
+        <div class="psv-header">
+          <mat-icon style="color:#3b82f6;font-size:18px;width:18px;height:18px">rule</mat-icon>
+          <span style="font-weight:600;font-size:14px">Post-Sync Validation</span>
+          @if (postSyncPassCount > 0) {
+            <span class="psv-chip psv-pass">{{ postSyncPassCount }} passed</span>
+          }
+          @if (postSyncFailCount > 0) {
+            <span class="psv-chip psv-fail">{{ postSyncFailCount }} failed</span>
+          }
+          @if (postSyncWarnCount > 0) {
+            <span class="psv-chip psv-warn">{{ postSyncWarnCount }} warnings</span>
+          }
+        </div>
+        @if (postSyncFailCount > 0 || postSyncWarnCount > 0) {
+          <div class="psv-list">
+            @for (pv of postSyncValidation; track pv.ruleId) {
+              @if (pv.status !== 'pass') {
+                <div class="psv-row" [class]="'psv-' + pv.status">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">
+                    {{ pv.status === 'fail' ? 'cancel' : 'warning' }}
+                  </mat-icon>
+                  <span style="font-weight:500">{{ pv.ruleName }}</span>
+                  <span style="color:#64748b;font-size:12px;flex:1">{{ pv.message }}</span>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- EMS DATA SYNC SECTION -->
+    <div class="source-divider">
+      <mat-divider></mat-divider>
+    </div>
+
+    <div class="source-section-header ems-source">
+      <div class="source-section-icon"><mat-icon>storage</mat-icon></div>
+      <div class="source-section-text">
+        <h2>Platinum Data (ART API)</h2>
+        <p>Syncs operational Platinum tables (assets, billing, payroll, SCM, etc.) from the ART API</p>
+      </div>
+      <div class="source-section-action">
+        <button mat-flat-button color="primary" (click)="syncAllEms()" [disabled]="emsSyncing"
+          style="height:36px;font-size:13px;line-height:36px;padding:0 18px">
+          @if (emsSyncing) {
+            <mat-spinner diameter="14" class="btn-spinner"></mat-spinner> Syncing...
+          } @else {
+            <mat-icon style="font-size:16px;width:16px;height:16px;margin-right:4px">sync</mat-icon> Sync All Platinum Tables
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (emsSyncing && emsSyncProgressTotal > 0) {
+      <div class="sync-message" style="margin-bottom:12px;background:#e3f2fd;border:1px solid #90caf9;color:#1565c0">
+        <mat-icon>sync</mat-icon>
+        Syncing {{ emsSyncProgressDone }}/{{ emsSyncProgressTotal }} tables
+        @if (emsSyncCurrentTable) { — currently: {{ emsSyncCurrentTable }} }
+      </div>
+    }
+
+    @if (emsSyncMessage) {
+      <div class="sync-message" [class.success]="emsSyncSuccess" [class.error]="!emsSyncSuccess && !emsSyncPartial" [class.warning]="emsSyncPartial" style="margin-bottom:12px">
+        <mat-icon>{{ emsSyncSuccess ? 'check_circle' : emsSyncPartial ? 'warning' : 'error' }}</mat-icon>
+        {{ emsSyncMessage }}
+      </div>
+    }
+
+    <div class="ems-kpi-strip">
+      <app-kpi-tile title="Platinum Tables" [value]="emsStatuses.length" icon="table_view"
+        subtitle="mirror tables" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Tables with Data" [value]="getEmsLoadedCount()" icon="check_circle"
+        [subtitle]="getEmsLoadedCount() + '/' + emsStatuses.length + ' synced'" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Total Platinum Rows" [value]="getTotalEmsRows()" icon="dataset"
+        subtitle="in local database" color="primary"></app-kpi-tile>
+    </div>
+
+    @if (emsStatuses.length > 0) {
+      <div class="ems-table-grid">
+        @for (ems of emsStatuses; track ems.table) {
+          <div class="ems-table-card" [class.ems-has-data]="ems.count > 0" [class.ems-syncing]="ems.syncing">
+            <div class="ems-table-header">
+              <span class="ems-table-name">{{ ems.table }}</span>
+              @if (ems.syncing) {
+                <mat-spinner diameter="16"></mat-spinner>
+              } @else {
+                <button mat-icon-button (click)="syncOneEms(ems)" [disabled]="emsSyncing"
+                  [matTooltip]="'Sync ' + ems.table + ' only'" class="ems-sync-btn">
+                  <mat-icon>sync</mat-icon>
+                </button>
+              }
+            </div>
+            <div class="ems-table-count">
+              <span class="ems-count-value">{{ ems.count | number }}</span>
+              <span class="ems-count-label">rows</span>
+            </div>
+            @if (ems.lastResult) {
+              <div class="ems-last-result" [class.ems-result-ok]="!ems.lastError" [class.ems-result-err]="ems.lastError">
+                {{ ems.lastError || ('Fetched ' + ems.lastResult) }}
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

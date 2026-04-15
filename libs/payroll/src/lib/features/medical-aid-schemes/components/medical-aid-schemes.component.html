@@ -1,0 +1,331 @@
+@if (view === 'list') {
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ schemes.length }}</span>
+      <span class="summary-label">Total Schemes</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-active">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-inactive">{{ schemes.length - activeCount }}</span>
+      <span class="summary-label">Inactive</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+      <input class="search-input" placeholder="Search by scheme name, vendor or plan..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterSchemes()">
+      <span class="result-count">{{ filteredSchemes.length }} results</span>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="16"></app-icon> Add Scheme</button>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading medical aid schemes...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredSchemes.length === 0) {
+        <div class="empty-state"><h3>No medical aid schemes found</h3><p>{{ schemes.length === 0 ? 'Click "Add Scheme" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th class="col-id">ID</th>
+                <th class="col-name">Scheme Name</th>
+                <th class="col-vendor">Vendor</th>
+                <th class="col-plan">Plan</th>
+                <th class="col-amount">Max Employer Contrib</th>
+                <th class="col-pct">Employer %</th>
+                <th class="col-amount">Main Member</th>
+                <th class="col-amount">Child Dep.</th>
+                <th class="col-amount">Adult Dep.</th>
+                <th class="col-deps">Max Deps</th>
+                <th class="col-dates">Dates</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of filteredSchemes; track s.id; let i = $index) {
+                <tr (click)="openDetail(s, i)">
+                  <td><span class="id-badge">{{ s.id }}</span></td>
+                  <td class="col-name"><span class="title-text">{{ s.name }}</span></td>
+                  <td class="col-vendor">{{ vendorName(s.vendor_id) }}</td>
+                  <td class="col-plan"><span class="plan-badge">{{ s.contribution_plan || '-' }}</span></td>
+                  <td class="col-amount" style="text-align:right">{{ formatCurrency(s.max_employer_contribution) }}</td>
+                  <td class="col-pct" style="text-align:right">{{ s.employer_contribution_percentage || 0 }}%</td>
+                  <td class="col-amount" style="text-align:right">{{ formatCurrency(s.main_member_contribution) }}</td>
+                  <td class="col-amount" style="text-align:right">{{ formatCurrency(s.child_dependant_contribution || 0) }}</td>
+                  <td class="col-amount" style="text-align:right">{{ formatCurrency(s.adult_dependant_contribution || 0) }}</td>
+                  <td class="col-deps" style="text-align:center">{{ s.max_dependants || 0 }}</td>
+                  <td class="col-dates date-cell">{{ s.start_date ? s.start_date.split('T')[0] : '-' }} — {{ formatDate(s.end_date) }}</td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(s, i); $event.stopPropagation()" title="View"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(s, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (scheme.id) {
+          <div class="detail-meta">
+            <span class="text-muted">ID: {{ scheme.id }}</span>
+            <span class="text-muted">Vendor: {{ vendorName(scheme.vendor_id) }}</span>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      @if (scheme.id) {
+        <div class="detail-nav">
+          <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+          <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ schemes.length }}</span>
+          <button class="btn btn-sm" [disabled]="currentIndex >= schemes.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+        </div>
+      }
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="cancelEdit()">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'details'" (click)="activeTab = 'details'">Scheme Details</button>
+    @if (scheme.id) {
+      <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">Effective Date History</button>
+    }
+  </div>
+
+  @if (activeTab === 'details') {
+    <div class="detail-card">
+      <div class="section-title">Medical Aid Scheme</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Start Date <span class="required">*</span></label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="scheme.start_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ scheme.start_date ? scheme.start_date.split('T')[0] : '-' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>End Date <span class="required">*</span></label>
+          @if (isEditable) {
+            <app-date-input [(ngModel)]="scheme.end_date"></app-date-input>
+          } @else {
+            <div class="field-value">{{ formatDate(scheme.end_date) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Medical Aid Schemes <span class="required">*</span></label>
+          @if (isEditable) {
+            <select class="form-control" [(ngModel)]="scheme.vendor_id" (ngModelChange)="onVendorChange()">
+              <option value="">-- Select --</option>
+              @for (v of vendors; track v.id) {
+                <option [value]="v.id">{{ v.name }}</option>
+              }
+            </select>
+          } @else {
+            <div class="field-value">{{ vendorName(scheme.vendor_id) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Maximum Employer Contribution <span class="required">*</span></label>
+          @if (isEditable) {
+            <div class="input-with-suffix">
+              <input class="form-control" type="number" [(ngModel)]="scheme.max_employer_contribution" step="0.01" min="0">
+              <span class="input-suffix">R</span>
+            </div>
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.max_employer_contribution) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Medical Aid Contribution Plan <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" [(ngModel)]="scheme.contribution_plan" placeholder="e.g. (Option A R10 491+)">
+          } @else {
+            <div class="field-value">{{ scheme.contribution_plan || '-' }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Employer Contribution Percentage <span class="required">*</span></label>
+          @if (isEditable) {
+            <div class="input-with-suffix">
+              <input class="form-control" type="number" [(ngModel)]="scheme.employer_contribution_percentage" step="0.01" min="0" max="100">
+              <span class="input-suffix">%</span>
+            </div>
+          } @else {
+            <div class="field-value">{{ scheme.employer_contribution_percentage || 0 }}%</div>
+          }
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Minimum Monthly Income</label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.min_monthly_income" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.min_monthly_income) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Maximum Monthly Income</label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.max_monthly_income" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.max_monthly_income) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Main Member Contribution <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.main_member_contribution" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.main_member_contribution) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Adult Dependent Contribution <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.adult_dependant_contribution" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.adult_dependant_contribution) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Child Dependent Contribution <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.child_dependant_contribution" step="0.01" min="0">
+          } @else {
+            <div class="field-value">{{ formatCurrency(scheme.child_dependant_contribution) }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Maximum on Child Dependents only</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="scheme.max_child_dependants_only">
+              </label>
+            </div>
+          } @else {
+            <div class="field-value">
+              <span class="tag" [class]="scheme.max_child_dependants_only ? 'tag-yes' : 'tag-no'">{{ scheme.max_child_dependants_only ? 'Yes' : 'No' }}</span>
+            </div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Student Dependent</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="scheme.student_dependent">
+              </label>
+            </div>
+          } @else {
+            <div class="field-value">
+              <span class="tag" [class]="scheme.student_dependent ? 'tag-yes' : 'tag-no'">{{ scheme.student_dependent ? 'Yes' : 'No' }}</span>
+            </div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Maximum Dependents <span class="required">*</span></label>
+          @if (isEditable) {
+            <input class="form-control" type="number" [(ngModel)]="scheme.max_dependants" step="1" min="0">
+          } @else {
+            <div class="field-value">{{ scheme.max_dependants || 0 }}</div>
+          }
+        </div>
+        <div class="form-group">
+          <label>Disabled Dependent</label>
+          @if (isEditable) {
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="scheme.disabled_dependent">
+              </label>
+            </div>
+          } @else {
+            <div class="field-value">
+              <span class="tag" [class]="scheme.disabled_dependent ? 'tag-yes' : 'tag-no'">{{ scheme.disabled_dependent ? 'Yes' : 'No' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (activeTab === 'history') {
+    <div class="detail-card history-section">
+      <div class="section-title">
+        Effective Date History
+        <span class="history-count">{{ history.length }} records</span>
+      </div>
+      @if (historyLoading) {
+        <div class="loading">Loading history...</div>
+      } @else if (history.length === 0) {
+        <div class="empty-state"><h3>No history records</h3><p>History will be recorded when schemes are created or updated</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Contribution Plan</th>
+                <th style="text-align:right">Max Employer Contrib</th>
+                <th style="text-align:right">Employer %</th>
+                <th style="text-align:right">Main Member</th>
+                <th style="text-align:right">Adult Dep.</th>
+                <th style="text-align:right">Child Dep.</th>
+                <th style="text-align:right">Max Deps</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of history; track h.id) {
+                <tr>
+                  <td class="date-cell">{{ h.start_date ? h.start_date.split('T')[0] : '-' }}</td>
+                  <td class="date-cell">{{ formatDate(h.end_date) }}</td>
+                  <td>{{ h.contribution_plan || '-' }}</td>
+                  <td style="text-align:right">{{ formatCurrency(h.max_employer_contribution) }}</td>
+                  <td style="text-align:right">{{ h.employer_contribution_percentage || 0 }}%</td>
+                  <td style="text-align:right">{{ formatCurrency(h.main_member_contribution) }}</td>
+                  <td style="text-align:right">{{ formatCurrency(h.adult_dependant_contribution) }}</td>
+                  <td style="text-align:right">{{ formatCurrency(h.child_dependant_contribution) }}</td>
+                  <td style="text-align:right">{{ h.max_dependants || 0 }}</td>
+                  <td><span class="change-pill" [class]="h.change_type === 'CREATE' ? 'change-create' : 'change-update'">{{ h.change_type }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}

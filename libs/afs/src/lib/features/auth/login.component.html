@@ -1,0 +1,77 @@
+<div class="login-container">
+  <div class="login-left">
+    <div class="logo-icon">
+      <mat-icon class="shield-icon">account_balance</mat-icon>
+    </div>
+    <h1 class="login-brand">PLATINUM</h1>
+    <span class="tagline">Annual Financial Statements</span>
+    <div class="divider"></div>
+    <div class="features">
+      <div class="feature-item">
+        <mat-icon>check_circle</mat-icon>
+        <span>GRAP-compliant AFS compilation</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>check_circle</mat-icon>
+        <span>mSCOA v6.9 integrated chart</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>check_circle</mat-icon>
+        <span>Full audit collaboration suite</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>check_circle</mat-icon>
+        <span>NT specimen format templates</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>check_circle</mat-icon>
+        <span>MFMA Section 122 compliance</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="login-right">
+    <div class="login-card">
+      <h2 class="login-title">Sign in to your account</h2>
+      <p class="login-subtitle">Enter your credentials to continue</p>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label class="field-label">EMAIL ADDRESS</label>
+          <mat-form-field appearance="outline">
+            <input matInput formControlName="email" type="email" placeholder="name&#64;municipality.gov.za">
+            <mat-icon matPrefix>email</mat-icon>
+          </mat-form-field>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">PASSWORD</label>
+          <mat-form-field appearance="outline">
+            <input matInput formControlName="password" [type]="hidePassword ? 'password' : 'text'" placeholder="Enter your password">
+            <mat-icon matPrefix>lock</mat-icon>
+            <button mat-icon-button matSuffix type="button" (click)="hidePassword = !hidePassword">
+              <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+
+        @if (errorMessage) {
+          <div class="error-message">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ errorMessage }}</span>
+          </div>
+        }
+
+        <button mat-flat-button class="login-button" type="submit" [disabled]="loginForm.invalid || loading">
+          @if (loading) {
+            <span>Signing in...</span>
+          } @else {
+            <span>Sign In</span>
+          }
+        </button>
+      </form>
+
+      <p class="login-footer">Platinum AFS v4.0 &middot; Municipal Financial Statements</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,677 @@
+    <div class="grn-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      <!-- ===================== LIST VIEW ===================== -->
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn active">GRN List</button>
+          <button class="tab-btn" (click)="navigateTo('analytics')">AI Analytics</button>
+        </div>
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total GRNs captured in system'">
+            <mat-icon>inventory</mat-icon>
+            <span class="kpi-value">{{summary().totalGRNs || 0}}</span>
+            <span class="kpi-label">Total GRNs</span>
+          </div>
+          <div class="kpi-tile" [style.border-left-color]="(summary().pendingApproval || 0) > 0 ? '#ef6c00' : '#2e7d32'" [matTooltip]="(summary().pendingApproval || 0) + ' GRNs awaiting approval'">
+            <mat-icon>pending_actions</mat-icon>
+            <span class="kpi-value" [style.color]="(summary().pendingApproval || 0) > 0 ? '#ef6c00' : '#2e7d32'">{{summary().pendingApproval || 0}}</span>
+            <span class="kpi-label">Pending Approval</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="(summary().partialDeliveries || 0) + ' orders with partial deliveries'">
+            <mat-icon>local_shipping</mat-icon>
+            <span class="kpi-value">{{summary().partialDeliveries || 0}}</span>
+            <span class="kpi-label">Partial Deliveries</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total value of goods received'">
+            <mat-icon>account_balance</mat-icon>
+            <span class="kpi-value">{{formatCurrency(summary().totalValue || 0)}}</span>
+            <span class="kpi-label">Total Value</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search GRNs..." [(ngModel)]="searchQuery" (keyup.enter)="loadGrns()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Status" [(ngModel)]="filterStatus" (selectionChange)="loadGrns()">
+              <mat-option value="">All Statuses</mat-option>
+              <mat-option value="draft">Draft</mat-option>
+              <mat-option value="submitted">Submitted</mat-option>
+              <mat-option value="approved">Approved</mat-option>
+              <mat-option value="voided">Voided</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="showFilters.set(!showFilters())">
+            <mat-icon>{{showFilters() ? 'expand_less' : 'tune'}}</mat-icon> Filters
+          </button>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="openCaptureForm()">
+            <mat-icon>add</mat-icon> New GRN
+          </button>
+        </div>
+
+        @if (showFilters()) {
+          <div class="advanced-filters">
+            <mat-form-field appearance="outline">
+              <mat-label>GRN Number</mat-label>
+              <input matInput [(ngModel)]="filterGrnNumber" (keyup.enter)="loadGrns()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Order Number</mat-label>
+              <input matInput [(ngModel)]="filterOrderNumber" (keyup.enter)="loadGrns()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Vendor Name</mat-label>
+              <input matInput [(ngModel)]="filterVendorName" (keyup.enter)="loadGrns()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Store</mat-label>
+              <mat-select [(ngModel)]="filterStore" (selectionChange)="loadGrns()">
+                <mat-option value="">All Stores</mat-option>
+                @for (store of stores(); track store.id) {
+                  <mat-option [value]="store.id">{{store.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Financial Year</mat-label>
+              <mat-select [(ngModel)]="filterFinancialYear" (selectionChange)="loadGrns()">
+                <mat-option value="">All Years</mat-option>
+                <mat-option value="2025/2026">2025/2026</mat-option>
+                <mat-option value="2024/2025">2024/2025</mat-option>
+                <mat-option value="2023/2024">2023/2024</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>GRN #</th>
+                <th>Date Received</th>
+                <th>Order #</th>
+                <th>Supplier</th>
+                <th>Store Location</th>
+                <th>Receipt Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (grn of grns(); track grn.id) {
+                <tr class="data-row" (click)="viewGrn(grn)">
+                  <td class="ref-cell">{{grn.grnNumber}}</td>
+                  <td>{{formatDate(grn.dateReceived)}}</td>
+                  <td class="ref-cell">{{grn.orderNumber || '—'}}</td>
+                  <td>{{grn.vendorName || grn.supplier?.name || '—'}}</td>
+                  <td>{{grn.storeName || grn.storeLocation || '—'}}</td>
+                  <td>{{grn.receiptType || (grn.directDelivery ? 'Direct' : 'Store') | titlecase}}</td>
+                  <td><span class="status-badge" [class]="'status-' + grn.status">{{getStatusLabel(grn.status)}}</span></td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #actionMenu="matMenu">
+                      <button mat-menu-item (click)="viewGrn(grn)"><mat-icon>visibility</mat-icon> View</button>
+                      @if (grn.status === 'draft') {
+                        <button mat-menu-item (click)="editGrn(grn)"><mat-icon>edit</mat-icon> Edit</button>
+                      }
+                      @if (grn.status === 'draft') {
+                        <button mat-menu-item (click)="submitGrn(grn.id)"><mat-icon>send</mat-icon> Submit</button>
+                      }
+                      @if (grn.status === 'submitted') {
+                        <button mat-menu-item (click)="approveGrn(grn.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+                      }
+                      @if (grn.status !== 'voided') {
+                        <button mat-menu-item (click)="voidGrn(grn.id)"><mat-icon>cancel</mat-icon> Void</button>
+                      }
+                      <button mat-menu-item (click)="printPdf(grn.id)"><mat-icon>picture_as_pdf</mat-icon> Print PDF</button>
+                    </mat-menu>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No GRNs found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="page-info">Page {{currentPage()}} of {{totalPages()}}</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">{{currentPage()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ===================== ANALYTICS VIEW ===================== -->
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('list')">GRN List</button>
+          <button class="tab-btn active">AI Analytics</button>
+        </div>
+        @if (grnAnalytics()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #10b981; font-size: 20px; width: 20px; height: 20px;">check_circle</mat-icon>
+                  3-Way Match Health (PO ↔ GRN ↔ Invoice)
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s115</span>
+              </div>
+              <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+                <div style="flex: 1; background: #dcfce7; border-radius: 10px; padding: 14px; text-align: center;">
+                  <div style="font-size: 28px; font-weight: 700; color: #166534;">{{grnAnalytics().threeWayMatch.matchRate}}%</div>
+                  <div style="font-size: 11px; color: #166534;">Match Rate</div>
+                </div>
+                <div style="flex: 1; background: #fef2f2; border-radius: 10px; padding: 14px; text-align: center;">
+                  <div style="font-size: 28px; font-weight: 700; color: #dc2626;">{{grnAnalytics().threeWayMatch.mismatched}}</div>
+                  <div style="font-size: 11px; color: #dc2626;">Mismatched</div>
+                </div>
+              </div>
+              <div style="height: 160px; position: relative;">
+                <canvas id="threeWayMatchChart"></canvas>
+              </div>
+              <div style="margin-top: 12px; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Top Mismatch Causes</div>
+              @for (cause of grnAnalytics().threeWayMatch.mismatchCauses; track cause.cause) {
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f8fafc;">
+                  <span style="font-size: 11px; color: #334155;">{{cause.cause}}</span>
+                  <span style="font-size: 11px; font-weight: 600; color: #dc2626;">{{cause.count}} ({{cause.percentage}}%)</span>
+                </div>
+              }
+            </div>
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">local_shipping</mat-icon>
+                  Supplier OTIF Performance
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s116(2)(b)</span>
+              </div>
+              <div style="height: 200px; position: relative;">
+                <canvas id="supplierOtifChart"></canvas>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9;">
+                <div style="text-align: center;"><div style="font-size: 18px; font-weight: 700; color: #3b82f6;">{{grnAnalytics().supplierOtif.overall.otif}}%</div><div style="font-size: 10px; color: #94a3b8;">OTIF</div></div>
+                <div style="text-align: center;"><div style="font-size: 18px; font-weight: 700; color: #10b981;">{{grnAnalytics().supplierOtif.overall.onTime}}%</div><div style="font-size: 10px; color: #94a3b8;">On-Time</div></div>
+                <div style="text-align: center;"><div style="font-size: 18px; font-weight: 700; color: #8b5cf6;">{{grnAnalytics().supplierOtif.overall.inFull}}%</div><div style="font-size: 10px; color: #94a3b8;">In-Full</div></div>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ===================== DETAIL VIEW ===================== -->
+      @if (currentView() === 'detail' && selectedGrn()) {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>{{selectedGrn()!.grnNumber}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge" [class]="'status-' + selectedGrn()!.status">{{getStatusLabel(selectedGrn()!.status)}}</span>
+              @if (selectedGrn()!.directDelivery) {
+                <span class="badge badge-info">Direct Delivery</span>
+              }
+              @if (selectedGrn()!.qualityCheckPassed === true) {
+                <span class="badge badge-success">QC Passed</span>
+              } @else if (selectedGrn()!.qualityCheckPassed === false && selectedGrn()!.qualityCheckPerformed) {
+                <span class="badge badge-danger">QC Failed</span>
+              } @else {
+                <span class="badge badge-warning">QC Pending</span>
+              }
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedGrn()!.status === 'draft') {
+              <button mat-stroked-button (click)="editGrn(selectedGrn()!)"><mat-icon>edit</mat-icon> Edit</button>
+              <button mat-flat-button color="primary" (click)="submitGrn(selectedGrn()!.id)"><mat-icon>send</mat-icon> Submit</button>
+            }
+            @if (selectedGrn()!.status === 'submitted') {
+              <button mat-flat-button style="background:#2e7d32;color:white" (click)="approveGrn(selectedGrn()!.id)"><mat-icon>check_circle</mat-icon> Approve</button>
+            }
+            @if (selectedGrn()!.status !== 'voided') {
+              <button mat-stroked-button color="warn" (click)="voidGrn(selectedGrn()!.id)"><mat-icon>cancel</mat-icon> Void</button>
+            }
+            <button mat-stroked-button (click)="printPdf(selectedGrn()!.id)"><mat-icon>print</mat-icon> Print</button>
+            @if (selectedGrn()!.status === 'approved') {
+              <button mat-flat-button style="background:#1565c0;color:white" (click)="createInvoiceFromGrn(selectedGrn()!)"><mat-icon>receipt_long</mat-icon> Create Invoice</button>
+              <button mat-stroked-button (click)="notifyInventory(selectedGrn()!.id)"><mat-icon>warehouse</mat-icon> Notify Inventory</button>
+              <button mat-stroked-button (click)="notifyAssets(selectedGrn()!.id)"><mat-icon>category</mat-icon> Notify Assets</button>
+            }
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-cards-row">
+            <div class="detail-card flex-2">
+              <h3><mat-icon>info</mat-icon> GRN Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Supplier</label>
+                  <span>{{selectedGrn()!.vendorName || selectedGrn()!.supplier?.name || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Order Reference</label>
+                  <span class="ref-cell">{{selectedGrn()!.orderNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Delivery Note #</label>
+                  <span>{{selectedGrn()!.deliveryNoteNumber || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Date Received</label>
+                  <span>{{formatDate(selectedGrn()!.dateReceived)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Received By</label>
+                  <span>{{selectedGrn()!.receivedBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Storage Location</label>
+                  <span>{{selectedGrn()!.storeName || selectedGrn()!.storeLocation || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Direct Delivery</label>
+                  <span>{{selectedGrn()!.directDelivery ? 'Yes' : 'No'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Financial Year</label>
+                  <span>{{selectedGrn()!.financialYear || '—'}}</span>
+                </div>
+              </div>
+              @if (selectedGrn()!.comments) {
+                <div class="detail-field" style="margin-top:16px">
+                  <label>Comments</label>
+                  <span class="desc-text">{{selectedGrn()!.comments}}</span>
+                </div>
+              }
+            </div>
+
+            <div class="detail-card flex-1">
+              <h3><mat-icon>verified</mat-icon> Quality Check</h3>
+              <div class="qc-status">
+                @if (selectedGrn()!.qualityCheckPassed === true) {
+                  <div class="qc-indicator qc-passed">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>Quality Check Passed</span>
+                  </div>
+                } @else if (selectedGrn()!.qualityCheckPassed === false && selectedGrn()!.qualityCheckPerformed) {
+                  <div class="qc-indicator qc-failed">
+                    <mat-icon>cancel</mat-icon>
+                    <span>Quality Check Failed</span>
+                  </div>
+                } @else {
+                  <div class="qc-indicator qc-pending">
+                    <mat-icon>hourglass_empty</mat-icon>
+                    <span>Quality Check Pending</span>
+                  </div>
+                }
+              </div>
+              @if (selectedGrn()!.qualityCheckPassed !== true && selectedGrn()!.status !== 'voided') {
+                <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                  <button mat-flat-button style="background:#2e7d32;color:white" (click)="performQualityCheck(selectedGrn()!.id, true)">
+                    <mat-icon>check_circle</mat-icon> Pass Quality Check
+                  </button>
+                  <button mat-stroked-button color="warn" (click)="performQualityCheck(selectedGrn()!.id, false)">
+                    <mat-icon>cancel</mat-icon> Fail Quality Check
+                  </button>
+                </div>
+              }
+              @if (selectedGrn()!.qualityNotes) {
+                <div class="detail-field" style="margin-top:12px">
+                  <label>Quality Notes</label>
+                  <span class="desc-text">{{selectedGrn()!.qualityNotes}}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>Ordered Qty</th>
+                    <th>Received Qty</th>
+                    <th>Rejected Qty</th>
+                    <th>Accepted Qty</th>
+                    <th>UoM</th>
+                    <th>Condition</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of selectedGrn()!.lineItems; track line; let i = $index) {
+                    <tr>
+                      <td>{{i + 1}}</td>
+                      <td>{{line.description}}</td>
+                      <td class="value-cell">{{line.orderedQuantity || line.orderedQty || 0}}</td>
+                      <td class="value-cell">{{line.receivedQuantity || line.receivedQty || 0}}</td>
+                      <td class="value-cell" [style.color]="(line.rejectedQuantity || line.rejectedQty || 0) > 0 ? '#c62828' : 'inherit'">{{line.rejectedQuantity || line.rejectedQty || 0}}</td>
+                      <td class="value-cell" style="font-weight:700">{{line.acceptedQuantity || line.acceptedQty || ((line.receivedQuantity || line.receivedQty || 0) - (line.rejectedQuantity || line.rejectedQty || 0))}}</td>
+                      <td>{{line.unitOfMeasure || line.uom || 'each'}}</td>
+                      <td>
+                        <span class="condition-badge" [class]="'condition-' + (line.condition || 'good')">{{(line.condition || 'good') | titlecase}}</span>
+                      </td>
+                      <td>{{line.notes || '—'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="9" class="empty-state">No line items</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (budgetImpact()) {
+            <div class="detail-card">
+              <h3><mat-icon>account_balance_wallet</mat-icon> Budget Impact</h3>
+              <div class="budget-state-machine">
+                <div class="state-node completed">
+                  <mat-icon>lock</mat-icon>
+                  <span class="state-label">Committed</span>
+                  <span class="state-amount">{{formatCurrencyFull(budgetImpact()?.committedAmount || 0)}}</span>
+                </div>
+                <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                <div class="state-node" [class.active]="selectedGrn()!.status === 'approved'" [class.completed]="selectedGrn()!.status === 'approved'">
+                  <mat-icon>receipt</mat-icon>
+                  <span class="state-label">Consumed</span>
+                  <span class="state-amount">{{formatCurrencyFull(budgetImpact()?.consumedAmount || 0)}}</span>
+                </div>
+                <div class="state-arrow"><mat-icon>arrow_forward</mat-icon></div>
+                <div class="state-node">
+                  <mat-icon>savings</mat-icon>
+                  <span class="state-label">Remaining</span>
+                  <span class="state-amount">{{formatCurrencyFull(budgetImpact()?.remainingAmount || 0)}}</span>
+                </div>
+              </div>
+              @if (budgetImpact()?.voteNumber) {
+                <div class="detail-grid" style="margin-top:16px">
+                  <div class="detail-field">
+                    <label>Vote Number</label>
+                    <span>{{budgetImpact()?.voteNumber}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>mSCOA Segment</label>
+                    <span>{{budgetImpact()?.mscoaSegment || '—'}}</span>
+                  </div>
+                  <div class="detail-field">
+                    <label>Department</label>
+                    <span>{{budgetImpact()?.department || '—'}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (selectedGrn()!.documents?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>attach_file</mat-icon> Attachments / Documents</h3>
+              <div class="doc-list">
+                @for (doc of selectedGrn()!.documents; track doc.name || doc.id) {
+                  <div class="doc-item">
+                    <mat-icon class="doc-icon">description</mat-icon>
+                    <div class="doc-info">
+                      <span class="doc-name">{{doc.name || doc.fileName}}</span>
+                      <span class="doc-meta">{{doc.type || 'Document'}} &middot; {{formatDate(doc.uploadDate || doc.createdAt)}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (correspondence().length) {
+            <div class="detail-card">
+              <h3><mat-icon>forum</mat-icon> Correspondence Timeline</h3>
+              <ul class="audit-list">
+                @for (entry of correspondence(); track entry.id || entry.date) {
+                  <li class="audit-item">
+                    <span class="audit-dot" [class]="'dot-' + (entry.type || 'action')"></span>
+                    <div class="audit-content">
+                      <span class="audit-action">{{entry.action || entry.subject}}</span>
+                      <span class="audit-detail">{{entry.message || entry.details}}</span>
+                      <span class="audit-date">{{formatDate(entry.date || entry.createdAt)}} &middot; {{entry.user || entry.by}}</span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (selectedGrn()!.status === 'voided' && selectedGrn()!.voidDetails) {
+            <div class="detail-card void-card">
+              <h3><mat-icon>cancel</mat-icon> Void Details</h3>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Voided By</label>
+                  <span>{{selectedGrn()!.voidDetails.voidedBy || '—'}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Void Date</label>
+                  <span>{{formatDate(selectedGrn()!.voidDetails.voidDate)}}</span>
+                </div>
+                <div class="detail-field">
+                  <label>Reason</label>
+                  <span class="desc-text">{{selectedGrn()!.voidDetails.reason || '—'}}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ===================== CAPTURE VIEW ===================== -->
+      @if (currentView() === 'capture') {
+        <div class="form-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <h2>{{editMode() ? 'Edit GRN' : 'Capture New GRN'}}</h2>
+        </div>
+
+        <div class="capture-form">
+          <div class="detail-card">
+            <h3><mat-icon>shopping_cart</mat-icon> Order Selection</h3>
+            <div class="order-search-row">
+              <mat-form-field appearance="outline" class="order-search-field">
+                <mat-label>PO / Order Number</mat-label>
+                <input matInput [(ngModel)]="grnForm.orderSearch" (keyup.enter)="searchOrder()" placeholder="e.g. PO-2026-302">
+                <mat-icon matPrefix>receipt_long</mat-icon>
+              </mat-form-field>
+              <button mat-flat-button color="primary" class="order-search-btn" (click)="searchOrder()" [disabled]="!grnForm.orderSearch">
+                <mat-icon>search</mat-icon> Load Order
+              </button>
+            </div>
+            @if (grnForm.orderNumber) {
+              <div class="selected-order-info">
+                <mat-icon>check_circle</mat-icon>
+                <span>Order <strong>{{grnForm.orderNumber}}</strong> loaded &mdash; Supplier: <strong>{{grnForm.vendorName}}</strong></span>
+              </div>
+            }
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>local_shipping</mat-icon> Delivery Information</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Store / Location</mat-label>
+                <mat-icon matPrefix>warehouse</mat-icon>
+                <mat-select [(ngModel)]="grnForm.storeId">
+                  <mat-option value="">-- Select Store --</mat-option>
+                  @for (store of stores(); track store.id) {
+                    <mat-option [value]="store.id">{{store.name}}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Bin Location</mat-label>
+                <mat-icon matPrefix>inventory_2</mat-icon>
+                <input matInput [(ngModel)]="grnForm.binLocation" placeholder="e.g. Rack A, Shelf 3">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Delivery Note Number</mat-label>
+                <mat-icon matPrefix>description</mat-icon>
+                <input matInput [(ngModel)]="grnForm.deliveryNoteNumber" placeholder="Vendor delivery note #">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Delivery Note Date</mat-label>
+                <input matInput [matDatepicker]="deliveryNotePicker" [(ngModel)]="grnForm.deliveryNoteDate">
+                <mat-datepicker-toggle matIconSuffix [for]="deliveryNotePicker"></mat-datepicker-toggle>
+                <mat-datepicker #deliveryNotePicker></mat-datepicker>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date Received</mat-label>
+                <input matInput [matDatepicker]="receivedPicker" [(ngModel)]="grnForm.dateReceived">
+                <mat-datepicker-toggle matIconSuffix [for]="receivedPicker"></mat-datepicker-toggle>
+                <mat-datepicker #receivedPicker></mat-datepicker>
+              </mat-form-field>
+              <div class="toggle-field-card">
+                <mat-slide-toggle [(ngModel)]="grnForm.directDelivery">Direct Delivery</mat-slide-toggle>
+                <span class="toggle-hint">Goods delivered directly to requesting department</span>
+              </div>
+            </div>
+            <div class="form-full-row">
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Comments / Notes</mat-label>
+                <textarea matInput [(ngModel)]="grnForm.comments" rows="3" placeholder="Any remarks about this delivery..."></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>list_alt</mat-icon> Line Items</h3>
+            @if (formLineItems.length === 0) {
+              <div class="empty-line-items">
+                <mat-icon>inbox</mat-icon>
+                <p>No line items yet</p>
+                <span>Load an order above to auto-populate items, or add manually below.</span>
+              </div>
+            }
+            @if (formLineItems.length > 0) {
+              <div class="line-items-table-wrapper">
+                <table class="line-items-table">
+                  <thead>
+                    <tr>
+                      <th class="col-desc">Description</th>
+                      <th class="col-num">Ordered</th>
+                      <th class="col-num">Prev Recv</th>
+                      <th class="col-num">This Delivery</th>
+                      <th class="col-num">Rejected</th>
+                      <th class="col-cond">Condition</th>
+                      <th class="col-notes">Notes</th>
+                      <th class="col-act"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (line of formLineItems; track line; let i = $index) {
+                      <tr class="line-item-data-row">
+                        <td>
+                          <input class="inline-input desc-input" [(ngModel)]="line.description" [readonly]="!!line.fromOrder" placeholder="Item description">
+                        </td>
+                        <td>
+                          <input class="inline-input num-input" type="number" [(ngModel)]="line.orderedQuantity" readonly>
+                        </td>
+                        <td>
+                          <input class="inline-input num-input" type="number" [(ngModel)]="line.previouslyReceived" readonly>
+                        </td>
+                        <td>
+                          <input class="inline-input num-input highlight-input" type="number" [(ngModel)]="line.receivedQuantity" min="0" placeholder="0">
+                        </td>
+                        <td>
+                          <input class="inline-input num-input" type="number" [(ngModel)]="line.rejectedQuantity" min="0" placeholder="0">
+                        </td>
+                        <td>
+                          <select class="inline-select" [(ngModel)]="line.condition">
+                            <option value="good">Good</option>
+                            <option value="damaged">Damaged</option>
+                            <option value="defective">Defective</option>
+                            <option value="expired">Expired</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input class="inline-input" [(ngModel)]="line.notes" placeholder="Notes...">
+                        </td>
+                        <td>
+                          @if (!line.fromOrder) {
+                            <button mat-icon-button color="warn" (click)="removeLineItem(i)" matTooltip="Remove item">
+                              <mat-icon>delete_outline</mat-icon>
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            <button mat-stroked-button (click)="addLineItem()" class="add-line-btn">
+              <mat-icon>add_circle_outline</mat-icon> Add Line Item
+            </button>
+          </div>
+
+          <div class="detail-card qc-card">
+            <h3><mat-icon>verified</mat-icon> Quality Check</h3>
+            <div class="qc-toggle-row">
+              <mat-slide-toggle [(ngModel)]="grnForm.qualityCheckPassed" color="primary">
+                Quality Check Passed
+              </mat-slide-toggle>
+              <span class="qc-hint">
+                @if (grnForm.qualityCheckPassed) {
+                  <mat-icon class="qc-ok">check_circle</mat-icon> Goods inspected and accepted
+                } @else {
+                  <mat-icon class="qc-pending">hourglass_empty</mat-icon> Pending quality inspection
+                }
+              </span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button (click)="backToList()">
+              <mat-icon>close</mat-icon> Cancel
+            </button>
+            <button mat-flat-button color="primary" (click)="saveGrn()" [disabled]="saving()">
+              <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Save Draft'}}
+            </button>
+            <button mat-flat-button style="background:#2e7d32;color:white" (click)="saveAndSubmit()" [disabled]="saving()">
+              <mat-icon>send</mat-icon> {{saving() ? 'Submitting...' : 'Save & Submit'}}
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

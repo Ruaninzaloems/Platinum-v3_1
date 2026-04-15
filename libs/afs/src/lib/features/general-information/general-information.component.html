@@ -1,0 +1,633 @@
+<div class="gi-container">
+  <div class="gi-header">
+    <div class="gi-header-left">
+      <h1>General Information</h1>
+      <p class="gi-subtitle">Capture entity details for AFS cover and introductory pages</p>
+    </div>
+    <div class="gi-header-right">
+      @if (validationResult) {
+        <span class="validation-badge" [class.complete]="validationResult.complete" [class.incomplete]="!validationResult.complete">
+          <mat-icon>{{ validationResult.complete ? 'check_circle' : 'warning' }}</mat-icon>
+          {{ validationResult.complete ? 'Complete' : validationResult.missingFields.length + ' missing field(s)' }}
+        </span>
+      }
+      <button mat-stroked-button (click)="validateRecord()" [disabled]="saving || validating" matTooltip="Check completeness">
+        @if (validating) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+        } @else {
+          <mat-icon>fact_check</mat-icon>
+        }
+        Validate
+      </button>
+      <button mat-stroked-button (click)="seedDefaults()" [disabled]="saving" matTooltip="Seed default values">
+        <mat-icon>auto_fix_high</mat-icon> Seed Defaults
+      </button>
+      <button mat-flat-button class="btn-save" (click)="save()" [disabled]="saving || !form">
+        @if (saving) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+        } @else {
+          <mat-icon>save</mat-icon>
+        }
+        Save
+      </button>
+      <button mat-flat-button class="btn-review" (click)="submitForReview()" [disabled]="saving || !form" matTooltip="Send to a reviewer for feedback">
+        <mat-icon>rate_review</mat-icon> Submit for Review
+      </button>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading general information...</p>
+    </div>
+  } @else if (form) {
+    <form [formGroup]="form" class="gi-form">
+
+      <mat-card class="section-card entity-type-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('entityType')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">category</mat-icon> Entity Type
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('entityType')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('entityType')) {
+          <mat-card-content @slideContent>
+            <mat-form-field appearance="outline" class="entity-type-select">
+              <mat-label>Entity Type</mat-label>
+              <mat-select [value]="entityType" (selectionChange)="onEntityTypeChange($event.value)">
+                @for (et of entityTypes; track et.value) {
+                  <mat-option [value]="et.value">{{ et.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <p class="entity-type-hint">Controls which fields and governance sections are shown</p>
+          </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card logo-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('logo')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">image</mat-icon> {{ currentConfig.logoLabel }}
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('logo')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('logo')) {
+        <mat-card-content @slideContent>
+          <div class="logo-panel">
+            <div class="logo-preview-area">
+              @if (logoUploading) {
+                <div class="logo-placeholder">
+                  <mat-spinner diameter="32"></mat-spinner>
+                </div>
+              } @else if (logoPreviewUrl) {
+                <img [src]="logoPreviewUrl" [alt]="currentConfig.logoLabel" class="logo-thumbnail">
+              } @else {
+                <div class="logo-placeholder">
+                  <mat-icon>add_photo_alternate</mat-icon>
+                  <span>No logo uploaded</span>
+                </div>
+              }
+            </div>
+            <div class="logo-controls">
+              <input type="file" #logoInput accept="image/*" (change)="onLogoFileSelected($event)" hidden>
+              <button mat-stroked-button (click)="logoInput.click()" [disabled]="logoUploading">
+                <mat-icon>upload</mat-icon> {{ logoMetadata ? 'Replace' : 'Upload' }} Logo
+              </button>
+              @if (logoMetadata) {
+                <button mat-stroked-button color="warn" (click)="removeLogo()" [disabled]="logoUploading">
+                  <mat-icon>delete</mat-icon> Remove
+                </button>
+              }
+              <p class="logo-hint">Any image format, max 10 MB</p>
+              @if (logoMetadata) {
+                <div class="logo-meta">
+                  <span>{{ logoMetadata.fileName }}</span>
+                  <span>{{ formatFileSize(logoMetadata.fileSize) }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (isSectionCustomContentExpanded('logo')) {
+            <div class="section-custom-content">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Heading (optional)</mat-label>
+                <input matInput [value]="getSectionCustomContent('logo').heading || ''" (input)="onSectionHeadingInput('logo', $event)" placeholder="Custom heading for this section">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Text (optional)</mat-label>
+                <textarea matInput [value]="getSectionCustomContent('logo').text || ''" (input)="onSectionTextInput('logo', $event)" rows="2" placeholder="Custom text for this section"></textarea>
+              </mat-form-field>
+            </div>
+          } @else {
+            <button mat-button color="primary" class="add-custom-content-btn" (click)="toggleSectionCustomContent('logo')">
+              <mat-icon>add</mat-icon> Add custom content
+            </button>
+          }
+        </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('details')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">location_city</mat-icon> {{ currentConfig.detailsLabel }}
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('details')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('details')) {
+        <mat-card-content @slideContent>
+          <div class="field-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ currentConfig.entityNameLabel }}</mat-label>
+              <input matInput formControlName="municipalityName">
+            </mat-form-field>
+            @if (!isFieldHidden('demarcationCode')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Demarcation Code</mat-label>
+                <input matInput formControlName="demarcationCode">
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Registered Office Address</mat-label>
+              <textarea matInput formControlName="registeredOffice" rows="2"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Postal Address</mat-label>
+              <textarea matInput formControlName="postalAddress" rows="2"></textarea>
+            </mat-form-field>
+            @if (!isFieldHidden('legalStatus')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Legal Status</mat-label>
+                <mat-select formControlName="legalStatus">
+                  <mat-option value="Category A">Category A</mat-option>
+                  <mat-option value="Category B">Category B</mat-option>
+                  <mat-option value="Category C">Category C</mat-option>
+                </mat-select>
+              </mat-form-field>
+            }
+            @if (!isFieldHidden('municipalCategory')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Category</mat-label>
+                <mat-select formControlName="municipalCategory">
+                  <mat-option value="">— None —</mat-option>
+                  @for (cat of municipalCategories; track cat) {
+                    <mat-option [value]="cat">{{ cat }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>Legislation</mat-label>
+              <input matInput formControlName="legislation">
+            </mat-form-field>
+            @if (!isFieldHidden('province')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Province</mat-label>
+                <mat-select formControlName="province">
+                  @for (p of provinces; track p) {
+                    <mat-option [value]="p">{{ p }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>Country</mat-label>
+              <input matInput formControlName="country">
+            </mat-form-field>
+            @if (!isFieldHidden('grading')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Grading</mat-label>
+                <mat-select formControlName="grading">
+                  <mat-option value="">— None —</mat-option>
+                  @for (g of gradings; track g) {
+                    <mat-option [value]="g">{{ g }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>{{ currentConfig.registrationNumberLabel }}</mat-label>
+              <input matInput formControlName="registrationNumber">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Nature of Business</mat-label>
+              <textarea matInput formControlName="natureOfBusiness" rows="3"></textarea>
+            </mat-form-field>
+          </div>
+
+          @if (isSectionCustomContentExpanded('details')) {
+            <div class="section-custom-content">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Heading (optional)</mat-label>
+                <input matInput [value]="getSectionCustomContent('details').heading || ''" (input)="onSectionHeadingInput('details', $event)" placeholder="Custom heading for this section">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Text (optional)</mat-label>
+                <textarea matInput [value]="getSectionCustomContent('details').text || ''" (input)="onSectionTextInput('details', $event)" rows="2" placeholder="Custom text for this section"></textarea>
+              </mat-form-field>
+            </div>
+          } @else {
+            <button mat-button color="primary" class="add-custom-content-btn" (click)="toggleSectionCustomContent('details')">
+              <mat-icon>add</mat-icon> Add custom content
+            </button>
+          }
+        </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('entities')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">account_tree</mat-icon> Consolidated Entities
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('entities')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('entities')) {
+        <mat-card-content @slideContent>
+          <p style="color:#666; margin-bottom:16px; font-size:13px">
+            Add entities here if this municipality has controlled entities for consolidated reporting.
+            When entities are added, notes will display both Economic Entity and Municipality columns.
+          </p>
+          @for (entity of consolidatedEntitiesArray.controls; track $index) {
+            <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px" [formGroup]="$any(entity)">
+              <mat-form-field appearance="outline" style="flex:1">
+                <mat-label>Entity Name</mat-label>
+                <input matInput formControlName="name" placeholder="e.g. Municipal Water Entity">
+              </mat-form-field>
+              <mat-form-field appearance="outline" style="width:180px">
+                <mat-label>Entity Type</mat-label>
+                <input matInput formControlName="type" placeholder="e.g. Entity, SOE">
+              </mat-form-field>
+              <button mat-icon-button color="warn" (click)="removeEntity($index)" matTooltip="Remove entity">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          }
+          <button mat-stroked-button color="primary" (click)="addEntity()" style="margin-top:4px">
+            <mat-icon>add</mat-icon> Add Entity
+          </button>
+        </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('contact')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">contact_phone</mat-icon> Contact Information
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('contact')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('contact')) {
+        <mat-card-content @slideContent>
+          <div class="field-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Telephone</mat-label>
+              <input matInput formControlName="telephone">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Fax</mat-label>
+              <input matInput formControlName="fax">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Email</mat-label>
+              <input matInput formControlName="email" type="email">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Website</mat-label>
+              <input matInput formControlName="website">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Accounting Officer</mat-label>
+              <input matInput formControlName="accountingOfficer">
+            </mat-form-field>
+            @if (!isFieldHidden('speaker')) {
+              <mat-form-field appearance="outline">
+                <mat-label>Speaker</mat-label>
+                <input matInput formControlName="speaker">
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>Chief Financial Officer</mat-label>
+              <input matInput formControlName="cfo">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>External Auditor</mat-label>
+              <input matInput formControlName="auditor">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Prior Year Auditor</mat-label>
+              <input matInput formControlName="priorYearAuditor">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Auditor Address</mat-label>
+              <textarea matInput formControlName="auditorAddress" rows="2"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Banker</mat-label>
+              <input matInput formControlName="banker">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Attorneys</mat-label>
+              <input matInput formControlName="attorneys">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Banker Address</mat-label>
+              <textarea matInput formControlName="bankerAddress" rows="2"></textarea>
+            </mat-form-field>
+          </div>
+
+          @if (isSectionCustomContentExpanded('contact')) {
+            <div class="section-custom-content">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Heading (optional)</mat-label>
+                <input matInput [value]="getSectionCustomContent('contact').heading || ''" (input)="onSectionHeadingInput('contact', $event)" placeholder="Custom heading for this section">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Text (optional)</mat-label>
+                <textarea matInput [value]="getSectionCustomContent('contact').text || ''" (input)="onSectionTextInput('contact', $event)" rows="2" placeholder="Custom text for this section"></textarea>
+              </mat-form-field>
+            </div>
+          } @else {
+            <button mat-button color="primary" class="add-custom-content-btn" (click)="toggleSectionCustomContent('contact')">
+              <mat-icon>add</mat-icon> Add custom content
+            </button>
+          }
+        </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('assurance')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">event</mat-icon> Assurance & Reporting
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('assurance')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('assurance')) {
+        <mat-card-content @slideContent>
+          <div class="field-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Reporting Period Start</mat-label>
+              <input matInput [matDatepicker]="pickerStart" formControlName="reportingPeriodStart">
+              <mat-datepicker-toggle matIconSuffix [for]="pickerStart"></mat-datepicker-toggle>
+              <mat-datepicker #pickerStart></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Reporting Period End</mat-label>
+              <input matInput [matDatepicker]="pickerEnd" formControlName="reportingPeriodEnd">
+              <mat-datepicker-toggle matIconSuffix [for]="pickerEnd"></mat-datepicker-toggle>
+              <mat-datepicker #pickerEnd></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Approval Date</mat-label>
+              <input matInput [matDatepicker]="pickerApproval" formControlName="approvalDate">
+              <mat-datepicker-toggle matIconSuffix [for]="pickerApproval"></mat-datepicker-toggle>
+              <mat-datepicker #pickerApproval></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Level of Assurance</mat-label>
+              <mat-select formControlName="levelOfAssurance">
+                <mat-option value="Draft">Draft</mat-option>
+                <mat-option value="Final">Final</mat-option>
+                <mat-option value="Audited">Audited</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Vision</mat-label>
+              <textarea matInput formControlName="vision" rows="2"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Mission</mat-label>
+              <textarea matInput formControlName="mission" rows="2"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Slogan</mat-label>
+              <input matInput formControlName="slogan">
+            </mat-form-field>
+          </div>
+
+          @if (isSectionCustomContentExpanded('assurance')) {
+            <div class="section-custom-content">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Heading (optional)</mat-label>
+                <input matInput [value]="getSectionCustomContent('assurance').heading || ''" (input)="onSectionHeadingInput('assurance', $event)" placeholder="Custom heading for this section">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Section Text (optional)</mat-label>
+                <textarea matInput [value]="getSectionCustomContent('assurance').text || ''" (input)="onSectionTextInput('assurance', $event)" rows="2" placeholder="Custom text for this section"></textarea>
+              </mat-form-field>
+            </div>
+          } @else {
+            <button mat-button color="primary" class="add-custom-content-btn" (click)="toggleSectionCustomContent('assurance')">
+              <mat-icon>add</mat-icon> Add custom content
+            </button>
+          }
+        </mat-card-content>
+        }
+      </mat-card>
+
+      @for (tbl of visibleGovernanceTables; track tbl.name) {
+        <mat-card class="section-card">
+          <mat-card-header>
+            <mat-card-title class="section-header-clickable" (click)="toggleSection('gov_' + tbl.name)">
+              <span class="section-header-left">
+                <mat-icon class="section-icon">{{ tbl.icon }}</mat-icon> {{ tbl.title }}
+              </span>
+              <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('gov_' + tbl.name)">expand_more</mat-icon>
+            </mat-card-title>
+          </mat-card-header>
+          @if (!isSectionCollapsed('gov_' + tbl.name)) {
+          <mat-card-content @slideContent>
+            <div class="table-toolbar">
+              <button mat-stroked-button [matMenuTriggerFor]="colMenu" matTooltip="Show/hide & reorder columns">
+                <mat-icon>view_column</mat-icon> Columns
+              </button>
+              <mat-menu #colMenu="matMenu">
+                @for (col of getAllColumnsForMenu(tbl.name); track col.key) {
+                  <div class="col-menu-row">
+                    <button mat-menu-item (click)="toggleColumnVisibility(tbl.name, col.key); $event.stopPropagation()" [disabled]="col.required" class="col-menu-toggle">
+                      @if (col.required) {
+                        <mat-icon>lock</mat-icon>
+                      } @else {
+                        <mat-icon>{{ isColumnHidden(tbl.name, col.key) ? 'check_box_outline_blank' : 'check_box' }}</mat-icon>
+                      }
+                      {{ col.label }}{{ col.required ? ' (required)' : '' }}{{ col.isCustom ? ' (custom)' : '' }}
+                    </button>
+                    <button mat-icon-button class="col-reorder-btn" (click)="moveColumnUp(tbl.name, col.key); $event.stopPropagation()" matTooltip="Move up" [disabled]="$first">
+                      <mat-icon>arrow_upward</mat-icon>
+                    </button>
+                    <button mat-icon-button class="col-reorder-btn" (click)="moveColumnDown(tbl.name, col.key); $event.stopPropagation()" matTooltip="Move down" [disabled]="$last">
+                      <mat-icon>arrow_downward</mat-icon>
+                    </button>
+                  </div>
+                }
+              </mat-menu>
+              <button mat-stroked-button (click)="addCustomColumn(tbl.name)" matTooltip="Add a custom column">
+                <mat-icon>add_circle_outline</mat-icon> Add Column
+              </button>
+              @for (cc of getCustomColumns(tbl.name); track cc.key) {
+                <span class="custom-col-chip">
+                  <span class="custom-col-label" (click)="renameCustomColumn(tbl.name, cc.key)" matTooltip="Click to rename">{{ cc.label }}</span>
+                  <button mat-icon-button class="chip-remove" (click)="removeCustomColumn(tbl.name, cc.key)" matTooltip="Remove column">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </span>
+              }
+            </div>
+            <div class="governance-table-wrap">
+              <table class="repeatable-table governance-table">
+                <thead>
+                  <tr>
+                    <th class="row-num-col">#</th>
+                    @for (col of getVisibleOrderedColumns(tbl.name); track col.key) {
+                      <th [class.narrow-col]="col.narrow">{{ col.label }}{{ col.required ? ' *' : '' }}</th>
+                    }
+                    <th class="action-col-header"></th>
+                  </tr>
+                </thead>
+                <tbody [formArrayName]="tbl.name">
+                  @for (ctrl of getFormArray(tbl.name).controls; track $index; let i = $index) {
+                    <tr [formGroupName]="i">
+                      <td class="row-num-col">
+                        <span class="row-number">{{ i + 1 }}</span>
+                      </td>
+                      @for (col of getVisibleOrderedColumns(tbl.name); track col.key) {
+                        @if (col.isCustom) {
+                          <td formGroupName="customFields">
+                            <input matInput [formControlName]="col.key" [placeholder]="col.placeholder || ''" class="table-input">
+                          </td>
+                        } @else if (col.type === 'checkbox') {
+                          <td [class.narrow-col]="col.narrow"><mat-checkbox [formControlName]="col.key"></mat-checkbox></td>
+                        } @else if (col.type === 'date') {
+                          <td><input matInput [formControlName]="col.key" type="date" class="table-input date-input"></td>
+                        } @else {
+                          <td><input matInput [formControlName]="col.key" [placeholder]="col.placeholder || ''" class="table-input"></td>
+                        }
+                      }
+                      <td class="action-col">
+                        <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Row actions">
+                          <mat-icon>more_vert</mat-icon>
+                        </button>
+                        <mat-menu #rowMenu="matMenu">
+                          <button mat-menu-item (click)="insertRowAt(tbl.name, i, tbl.isCouncil)">
+                            <mat-icon>arrow_upward</mat-icon> Insert row above
+                          </button>
+                          <button mat-menu-item (click)="insertRowAt(tbl.name, i + 1, tbl.isCouncil)">
+                            <mat-icon>arrow_downward</mat-icon> Insert row below
+                          </button>
+                          <button mat-menu-item class="delete-action" (click)="removeRow(tbl.name, i)">
+                            <mat-icon>delete</mat-icon> Delete row
+                          </button>
+                        </mat-menu>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <button mat-stroked-button class="add-row-btn" (click)="addRow(tbl.name, tbl.isCouncil)">
+              <mat-icon>add</mat-icon> Add Member
+            </button>
+
+            @if (isSectionCustomContentExpanded('governance_' + tbl.name)) {
+              <div class="section-custom-content">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Section Heading (optional)</mat-label>
+                  <input matInput [value]="getSectionCustomContent('governance_' + tbl.name).heading || ''" (input)="onSectionHeadingInput('governance_' + tbl.name, $event)" placeholder="Custom heading for this section">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Section Text (optional)</mat-label>
+                  <textarea matInput [value]="getSectionCustomContent('governance_' + tbl.name).text || ''" (input)="onSectionTextInput('governance_' + tbl.name, $event)" rows="2" placeholder="Custom text for this section"></textarea>
+                </mat-form-field>
+              </div>
+            } @else {
+              <button mat-button color="primary" class="add-custom-content-btn" (click)="toggleSectionCustomContent('governance_' + tbl.name)">
+                <mat-icon>add</mat-icon> Add custom content
+              </button>
+            }
+          </mat-card-content>
+          }
+        </mat-card>
+      }
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('abbreviations')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">short_text</mat-icon> Abbreviations
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('abbreviations')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('abbreviations')) {
+          <mat-card-content @slideContent>
+            <p class="ao-section-hint">Manage abbreviations used throughout the Annual Financial Statements. These appear in the Preamble abbreviations section.</p>
+            <app-abbreviations></app-abbreviations>
+          </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('aoResponsibilities')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">gavel</mat-icon> Accounting Officer's Responsibilities and Approval
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('aoResponsibilities')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('aoResponsibilities')) {
+          <mat-card-content @slideContent>
+            <p class="ao-section-hint">This content appears in the AFS Preamble under "Accounting Officer's Responsibilities and Approval". Edit the text below to customise it for this financial year.</p>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>AO Responsibilities Content</mat-label>
+              <textarea matInput formControlName="aoResponsibilitiesContent" rows="14" placeholder="The Accounting Officer is required by the Municipal Finance Management Act..."></textarea>
+            </mat-form-field>
+            <button mat-stroked-button (click)="seedAoResponsibilities()" matTooltip="Reset to default NT specimen text">
+              <mat-icon>restart_alt</mat-icon> Reset to Default
+            </button>
+          </mat-card-content>
+        }
+      </mat-card>
+
+      <mat-card class="section-card">
+        <mat-card-header>
+          <mat-card-title class="section-header-clickable" (click)="toggleSection('aoReport')">
+            <span class="section-header-left">
+              <mat-icon class="section-icon">summarize</mat-icon> Accounting Officer's Report
+            </span>
+            <mat-icon class="section-collapse-icon" [class.collapsed]="isSectionCollapsed('aoReport')">expand_more</mat-icon>
+          </mat-card-title>
+        </mat-card-header>
+        @if (!isSectionCollapsed('aoReport')) {
+          <mat-card-content @slideContent>
+            <p class="ao-section-hint">This content appears in the AFS Preamble under "Accounting Officer's Report". Edit the text below to customise it for this financial year.</p>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>AO Report Content</mat-label>
+              <textarea matInput formControlName="aoReportContent" rows="18" placeholder="1. Review of activities..."></textarea>
+            </mat-form-field>
+            <button mat-stroked-button (click)="seedAoReport()" matTooltip="Reset to default NT specimen text">
+              <mat-icon>restart_alt</mat-icon> Reset to Default
+            </button>
+          </mat-card-content>
+        }
+      </mat-card>
+
+    </form>
+  }
+</div>

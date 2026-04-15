@@ -1,0 +1,74 @@
+<aside class="sidebar" [class.collapsed]="collapsed$ | async">
+  <button class="sidebar-toggle" (click)="toggleSidebar()" title="Collapse sidebar">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="sidebar-brand">
+    <div class="brand-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+    <div class="brand-text">
+      <span class="brand-title">PLATINUM</span>
+      <span class="brand-subtitle">HR & Payroll</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    @for (item of navItems; track item.label) {
+      <div class="nav-section">
+        @if (item.subgroups && item.toggleKey) {
+          <div class="nav-item" [class.expanded]="expandedGroups[item.toggleKey]" (click)="toggleGroup(item.toggleKey)">
+            <span class="nav-icon" [innerHTML]="svgHtml(item.svgIcon)"></span>
+            <span>{{ item.label }}</span>
+            <span class="nav-chevron">&#9654;</span>
+          </div>
+          <div class="nav-children" [class.show]="expandedGroups[item.toggleKey]">
+            @if (item.children) {
+              @for (child of item.children; track child.label) {
+                <a class="nav-child" [routerLink]="child.route" routerLinkActive="active">
+                  <span class="nav-icon" [innerHTML]="svgHtml(child.svgIcon)"></span>
+                  {{ child.label }}
+                </a>
+              }
+            }
+            @for (sub of item.subgroups; track sub.label) {
+              <div class="nav-subgroup">
+                <div class="nav-subgroup-header" [class.expanded]="expandedGroups[sub.toggleKey]" (click)="toggleGroup(sub.toggleKey); $event.stopPropagation()">
+                  <span class="nav-icon" [innerHTML]="svgHtml(sub.svgIcon)"></span>
+                  <span>{{ sub.label }}</span>
+                  <span class="nav-chevron">&#9654;</span>
+                </div>
+                <div class="nav-subgroup-children" [class.show]="expandedGroups[sub.toggleKey]">
+                  @for (child of sub.children; track child.label) {
+                    <a class="nav-child nav-child-deep" [routerLink]="child.route" routerLinkActive="active">
+                      <span class="nav-icon" [innerHTML]="svgHtml(child.svgIcon)"></span>
+                      {{ child.label }}
+                    </a>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else if (item.children && item.toggleKey) {
+          <div class="nav-item" [class.expanded]="expandedGroups[item.toggleKey]" (click)="toggleGroup(item.toggleKey)">
+            <span class="nav-icon" [innerHTML]="svgHtml(item.svgIcon)"></span>
+            <span>{{ item.label }}</span>
+            <span class="nav-chevron">&#9654;</span>
+          </div>
+          <div class="nav-children" [class.show]="expandedGroups[item.toggleKey]">
+            @for (child of item.children; track child.label) {
+              <a class="nav-child" [routerLink]="child.route" routerLinkActive="active">
+                <span class="nav-icon" [innerHTML]="svgHtml(child.svgIcon)"></span>
+                {{ child.label }}
+              </a>
+            }
+          </div>
+        } @else {
+          <a class="nav-item" [routerLink]="item.route" routerLinkActive="active">
+            <span class="nav-icon" [innerHTML]="svgHtml(item.svgIcon)"></span>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+      </div>
+    }
+  </nav>
+  <div class="sidebar-footer">
+    <div>v4.0</div>
+  </div>
+</aside>

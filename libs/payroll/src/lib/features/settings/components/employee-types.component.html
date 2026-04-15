@@ -1,0 +1,180 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Employee Types</h1>
+    <p class="page-subtitle">Configure employee types and sub-types</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ types.length }}</span>
+    <span class="summary-label">Total Types</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number">{{ subtypes.length }}</span>
+    <span class="summary-label">Total Sub Types</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ activeSubtypeCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ disabledSubtypeCount }}</span>
+    <span class="summary-label">Disabled</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search employee types..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredTypes.length }} results</span>
+  </div>
+  <button class="btn btn-primary" (click)="openSubtypeModal()">
+    <app-icon name="plus" [size]="16"></app-icon> Add Sub Type
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr><th class="col-id">ID</th><th>Code</th><th>Name</th><th>Hours/Month</th><th>Days/Month</th><th>Config Flags</th><th>Status</th><th style="width:90px">Actions</th></tr>
+        </thead>
+        <tbody>
+          @if (filteredTypes.length === 0) {
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">No data</td></tr>
+          } @else {
+            @for (type of filteredTypes; track type.id) {
+              <tr style="background:var(--bg-light, #f8fafc)">
+                <td><span class="id-badge">{{ type.id }}</span></td>
+                <td><strong><app-icon name="layers" [size]="13"></app-icon> {{ type.code }}</strong></td>
+                <td><strong>{{ type.name }}</strong></td>
+                <td style="text-align:right">{{ type.working_hours_per_month || '166.00' }}</td>
+                <td style="text-align:right">{{ type.working_days_per_month || '20.75' }}</td>
+                <td></td>
+                <td><span class="badge badge-info">Type</span> <span class="badge badge-secondary" style="margin-left:4px">{{ getSubtypeCount(type.id) }} {{ getSubtypeCount(type.id) === 1 ? 'Subtype' : 'Subtypes' }}</span></td>
+                <td>
+                  <div style="display:flex;gap:4px;align-items:center">
+                    <button class="action-btn" (click)="openTypeModal(type)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+              @for (sub of getFilteredSubtypesForType(type.id); track sub.id) {
+                <tr>
+                  <td><span class="id-badge">{{ sub.id }}</span></td>
+                  <td style="padding-left:32px"><app-icon name="chevronRight" [size]="12"></app-icon></td>
+                  <td>{{ sub.name }}</td>
+                  <td></td>
+                  <td></td>
+                  <td style="font-size:11px">
+                    @if (sub.exclude_uif) { <span class="badge badge-warning" style="margin-right:4px">No UIF</span> }
+                    @if (sub.exclude_sdl) { <span class="badge badge-warning" style="margin-right:4px">No SDL</span> }
+                    @if (sub.enable_bonus) { <span class="badge badge-success">Bonus</span> }
+                    @if (!sub.exclude_uif && !sub.exclude_sdl && !sub.enable_bonus) { <span style="color:var(--text-muted)">-</span> }
+                  </td>
+                  <td>
+                    @if (sub.enabled !== false) {
+                      <span class="badge badge-success">Active</span>
+                    } @else {
+                      <span class="badge badge-secondary">Disabled</span>
+                    }
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px;align-items:center">
+                      <button class="action-btn" (click)="openSubtypeModal(sub)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                      <button class="action-btn danger" (click)="deleteSubtype(sub)" title="Delete"><app-icon name="trash" [size]="14"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showTypeModal) {
+  <div class="modal-overlay visible" (click)="showTypeModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Employee Type — {{ editType.name }}</h3>
+        <button class="modal-close" (click)="showTypeModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">These values serve as defaults for employees linked to this Employee Type.</p>
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Name</label>
+          <input class="form-control" [value]="editType.name" readonly style="background:var(--bg-light)">
+        </div>
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group">
+            <label>Working Hours Per Month</label>
+            <input class="form-control" type="number" [(ngModel)]="editType.working_hours_per_month" step="0.01" min="0.01">
+          </div>
+          <div class="form-group">
+            <label>Working Days Per Month</label>
+            <input class="form-control" type="number" [(ngModel)]="editType.working_days_per_month" step="0.01" min="0.01">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showTypeModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveType()">Update</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showSubtypeModal) {
+  <div class="modal-overlay visible" (click)="showSubtypeModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editSubtype.id ? 'Edit' : 'Add' }} Sub Type</h3>
+        <button class="modal-close" (click)="showSubtypeModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group">
+            <label>Employee Type</label>
+            <select class="form-control" [(ngModel)]="editSubtype.employee_type_id">
+              <option [ngValue]="null">-- Select Type --</option>
+              @for (t of types; track t.id) {
+                <option [ngValue]="t.id">{{ t.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Name</label>
+            <input class="form-control" [(ngModel)]="editSubtype.name">
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;padding:8px 0">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+              <input type="checkbox" [(ngModel)]="editSubtype.exclude_uif" style="width:auto"> Exclude UIF
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+              <input type="checkbox" [(ngModel)]="editSubtype.exclude_sdl" style="width:auto"> Exclude SDL
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+              <input type="checkbox" [(ngModel)]="editSubtype.enable_bonus" style="width:auto"> Enable Bonus
+            </label>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" [(ngModel)]="editSubtype.enabled" style="width:auto"> Active
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showSubtypeModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveSubtype()">{{ editSubtype.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,1442 @@
+@if (txVerifyOpen()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#f59e0b">verified</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Transaction Verification</span>
+      </div>
+      <div style="padding:20px 24px">
+        <p style="color:#475569;font-size:13px;margin:0 0 20px 0;line-height:1.6;background:#fefce8;border-left:3px solid #f59e0b;padding:10px 12px;border-radius:0 6px 6px 0">
+          Please verify that all transactions for FY <strong>{{monthEndFilters.finYear}}</strong> Period <strong>{{monthEndFilters.period}}</strong> have been completed and captured before running the Month-End process. Check each transaction type below to confirm.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px" [style.background]="txVerifyReval() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyReval() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyReval()" (change)="setTxVerifyReval($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Revaluation</span>
+            @if (txVerifyReval()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px" [style.background]="txVerifyImp() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyImp() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyImp()" (change)="setTxVerifyImp($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Impairment</span>
+            @if (txVerifyImp()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px" [style.background]="txVerifyReversal() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyReversal() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyReversal()" (change)="setTxVerifyReversal($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Impairment Reversal</span>
+            @if (txVerifyReversal()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px" [style.background]="txVerifyDisposal() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyDisposal() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyDisposal()" (change)="setTxVerifyDisposal($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">Disposal</span>
+            @if (txVerifyDisposal()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
+          </label>
+        </div>
+        @if (txVerifyError()) {
+          <div style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">{{txVerifyError()}}</div>
+        }
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button mat-stroked-button (click)="closeTxVerify()" [disabled]="txVerifySubmitting()">Cancel</button>
+          <button mat-flat-button color="primary" (click)="submitTxVerifyMonthEnd()" [disabled]="!txVerifyAllChecked() || txVerifySubmitting()">
+            @if (txVerifySubmitting()) { Processing... } @else { Apply }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (glValidating()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:1000;display:flex;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:12px;padding:32px 40px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center">
+      <mat-spinner diameter="36" style="margin:0 auto 16px"></mat-spinner>
+      <div style="font-size:15px;font-weight:600;color:#1e293b">Validating GL Posting Configuration...</div>
+      <div style="font-size:13px;color:#64748b;margin-top:4px">Checking all mSCOA segments for completeness</div>
+    </div>
+  </div>
+}
+
+@if (depRunModalVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#f59e0b">calculate</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Depreciation Run</span>
+      </div>
+      <div style="padding:24px 28px">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depRunStep() >= 2 ? '#16a34a' : depRunStep() === 1 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depRunStep() >= 1 ? 'white' : '#94a3b8'">
+                @if (depRunStep() >= 2) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 1 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depRunStep() >= 2 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depRunStep() === 1 ? '#2563eb' : depRunStep() >= 2 ? '#16a34a' : '#94a3b8'">Checking mSCOA Configuration</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depRunStep() === 1 ? '#3b82f6' : depRunStep() >= 2 ? '#15803d' : '#cbd5e1'">
+                @if (depRunStep() === 1) { Validating GL posting configuration for all asset groups... }
+                @else if (depRunStep() >= 2) { mSCOA configuration verified }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depRunStep() >= 3 ? '#16a34a' : depRunStep() === 2 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depRunStep() >= 2 ? 'white' : '#94a3b8'">
+                @if (depRunStep() >= 3) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depRunStep() >= 3 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depRunStep() === 2 ? '#2563eb' : depRunStep() >= 3 ? '#16a34a' : '#94a3b8'">Preparing Depreciation Schedule</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depRunStep() === 2 ? '#3b82f6' : depRunStep() >= 3 ? '#15803d' : '#cbd5e1'">
+                @if (depRunStep() === 2) { Initialising schedule and validating asset groups... }
+                @else if (depRunStep() >= 3) { Schedule prepared }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depRunStep() >= 4 ? '#16a34a' : depRunStep() === 3 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depRunStep() >= 3 ? 'white' : '#94a3b8'">
+                @if (depRunStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depRunStep() >= 4 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depRunStep() === 3 ? '#2563eb' : depRunStep() >= 4 ? '#16a34a' : '#94a3b8'">Processing Asset Groups</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depRunStep() === 3 ? '#3b82f6' : depRunStep() >= 4 ? '#15803d' : '#cbd5e1'">
+                @if (depRunStep() === 3) { Calculating depreciation charges per asset group... }
+                @else if (depRunStep() >= 4) { All asset groups calculated }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depRunStep() >= 5 ? '#16a34a' : depRunStep() === 4 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depRunStep() >= 4 ? 'white' : '#94a3b8'">
+                @if (depRunStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depRunStep() >= 5 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depRunStep() === 4 ? '#2563eb' : depRunStep() >= 5 ? '#16a34a' : '#94a3b8'">Writing Depreciation Records</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depRunStep() === 4 ? '#3b82f6' : depRunStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depRunStep() === 4) { Saving depreciation entries for each asset... }
+                @else if (depRunStep() >= 5) { All records saved }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depRunStep() >= 5 ? '#16a34a' : '#e2e8f0'"
+                [style.color]="depRunStep() >= 5 ? 'white' : '#94a3b8'">
+                @if (depRunStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 5 }
+              </div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600" [style.color]="depRunStep() >= 5 ? '#16a34a' : '#94a3b8'">Complete</div>
+              <div style="font-size:12px;margin-top:2px" [style.color]="depRunStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depRunStep() >= 5 && depRunResult()) { {{depRunResult().assetsProcessed | number}} assets — R {{depRunResult().totalDepreciation | number:'1.2-2'}} total }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+        </div>
+        @if (depRunStep() < 5) {
+          <div style="margin-top:24px">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+              <div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);animation:dep-progress-slide 1.4s ease-in-out infinite;width:40%"></div>
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-top:8px;text-align:center">Calculating depreciation for all assets — please do not close this window.</div>
+          </div>
+        }
+        @if (depRunStep() >= 5) {
+          <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#16a34a">check_circle</mat-icon>
+            <span style="font-size:13px;color:#15803d;font-weight:500">Depreciation calculated and submitted for approval</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (depApproveVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:520px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
+      <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#f59e0b">account_balance</mat-icon>
+        <span style="font-size:17px;font-weight:700;color:white">Depreciation Posting</span>
+      </div>
+      <div style="padding:24px 28px">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depApproveStep() >= 2 ? '#16a34a' : depApproveStep() === 1 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depApproveStep() >= 1 ? 'white' : '#94a3b8'">
+                @if (depApproveStep() >= 2) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 1 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
+                [style.background]="depApproveStep() >= 2 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depApproveStep() === 1 ? '#2563eb' : depApproveStep() >= 2 ? '#16a34a' : '#94a3b8'">
+                Validating GL Configuration
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depApproveStep() === 1 ? '#3b82f6' : depApproveStep() >= 2 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() === 1) { Checking mSCOA segments per schedule group... }
+                @else if (depApproveStep() >= 2) { All GL segments validated }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depApproveStep() >= 3 ? '#16a34a' : depApproveStep() === 2 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depApproveStep() >= 2 ? 'white' : '#94a3b8'">
+                @if (depApproveStep() >= 3) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
+                [style.background]="depApproveStep() >= 3 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depApproveStep() === 2 ? '#2563eb' : depApproveStep() >= 3 ? '#16a34a' : '#94a3b8'">
+                Submitting Journal Entries
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depApproveStep() === 2 ? '#3b82f6' : depApproveStep() >= 3 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() === 2) { Creating GL entries and posting depreciation journals... }
+                @else if (depApproveStep() >= 3) { All journal entries posted }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depApproveStep() >= 4 ? '#16a34a' : depApproveStep() === 3 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depApproveStep() >= 3 ? 'white' : '#94a3b8'">
+                @if (depApproveStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
+                [style.background]="depApproveStep() >= 4 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depApproveStep() === 3 ? '#2563eb' : depApproveStep() >= 4 ? '#16a34a' : '#94a3b8'">
+                Updating Asset Register
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depApproveStep() === 3 ? '#3b82f6' : depApproveStep() >= 4 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() === 3) { Refreshing asset balances and carrying amounts... }
+                @else if (depApproveStep() >= 4) { Asset register updated }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depApproveStep() >= 5 ? '#16a34a' : depApproveStep() === 4 ? '#2563eb' : '#e2e8f0'"
+                [style.color]="depApproveStep() >= 4 ? 'white' : '#94a3b8'">
+                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
+              </div>
+              <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
+                [style.background]="depApproveStep() >= 5 ? '#16a34a' : '#e2e8f0'"></div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depApproveStep() === 4 ? '#2563eb' : depApproveStep() >= 5 ? '#16a34a' : '#94a3b8'">
+                Rebuilding Asset Summaries
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depApproveStep() === 4 ? '#3b82f6' : depApproveStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() === 4) { Rebuilding transaction summaries for all affected assets... }
+                @else if (depApproveStep() >= 5) { Transaction summaries rebuilt }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:14px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
+                [style.background]="depApproveStep() >= 5 ? '#16a34a' : '#e2e8f0'"
+                [style.color]="depApproveStep() >= 5 ? 'white' : '#94a3b8'">
+                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 5 }
+              </div>
+            </div>
+            <div style="padding-top:4px">
+              <div style="font-size:14px;font-weight:600"
+                [style.color]="depApproveStep() >= 5 ? '#16a34a' : '#94a3b8'">
+                Complete
+              </div>
+              <div style="font-size:12px;margin-top:2px"
+                [style.color]="depApproveStep() >= 5 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() >= 5) { Depreciation successfully posted to the General Ledger }
+                @else { Pending }
+              </div>
+            </div>
+          </div>
+        </div>
+        @if (depApproveStep() < 5) {
+          <div style="margin-top:24px">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+              <div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);animation:dep-progress-slide 1.4s ease-in-out infinite;width:40%"></div>
+            </div>
+            <div style="font-size:12px;color:#64748b;margin-top:8px;text-align:center">
+              This may take a moment for large asset registers. Please do not close this window.
+            </div>
+          </div>
+        }
+        @if (depApproveStep() >= 5) {
+          <div style="margin-top:20px;padding:12px 16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#16a34a">check_circle</mat-icon>
+            <span style="font-size:13px;color:#15803d;font-weight:500">Depreciation has been posted to the General Ledger</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (glValidationVisible()) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:12px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:700px;width:95%;max-height:80vh;overflow:auto">
+      <div style="padding:20px 24px;background:#fef2f2;border-bottom:1px solid #fecaca;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px">
+        <mat-icon style="color:#dc2626;font-size:24px">error</mat-icon>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#991b1b">GL Posting Validation Failed</div>
+          <div style="font-size:13px;color:#b91c1c">{{glValidationTxnType()}} transaction cannot be posted — missing mSCOA configuration</div>
+        </div>
+      </div>
+      <div style="padding:20px 24px">
+        @for (asset of glValidationErrors(); track asset.assetRegisterItemId) {
+          <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+            <div style="padding:10px 14px;background:#f8fafc;font-size:13px;font-weight:600;color:#334155;border-bottom:1px solid #e5e7eb">
+              @if (glValidationTxnType() === 'Depreciation') { {{asset.assetDescription}} } @else { Asset #{{asset.assetRegisterItemId}} — {{asset.assetDescription}} }
+            </div>
+            @for (leg of asset.legs; track leg.leg) {
+              @if (!leg.valid) {
+                <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9">
+                  <div style="font-size:13px;font-weight:600;color:#b91c1c;margin-bottom:4px">
+                    <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle;color:#dc2626">close</mat-icon> {{leg.leg}} Leg @if (leg.scoaField) { — <span style="font-weight:500;color:#6b7280;font-style:italic">{{leg.scoaField}}</span>}
+                  </div>
+                  <div style="font-size:12px;color:#6b7280;padding-left:18px">
+                    Missing: {{getMissingFieldsText(leg.missingFields)}}
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        }
+        <div style="margin-top:8px;padding:12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#1e40af">
+          <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
+          Resolve the missing configuration under <strong>Administration &gt; mSCOA Configuration</strong> before proceeding.
+          Ensure the required Plan_ProjectItem and Led_Vote records exist for the current financial year.
+        </div>
+      </div>
+      <div style="padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end">
+        <button mat-stroked-button (click)="dismissGlValidation()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Transactions</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Manage asset transactions — disposals, revaluations, impairments, depreciation runs, prior year adjustments, and prior period adjustments</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="period-badge">{{settingsData()?.current_period || 'FY ' + getDateBasedFinYear()}} · Period {{getCurrentPeriod()}}</span>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px">
+  @for (stat of transactionStats(); track stat.label) {
+    <div class="kpi-tile" [style.border-left-color]="stat.color">
+      <div style="font-size:24px;font-weight:700;color:#1e293b">{{stat.value}}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px">{{stat.label}}</div>
+    </div>
+  }
+</div>
+
+<mat-tab-group animationDuration="200ms">
+
+  <!-- DEPRECIATION RUN TAB -->
+  <mat-tab label="Depreciation Run">
+    <div style="padding:20px">
+      @if (approvalMethod() === 'Automated') {
+      <div class="form-card" style="max-width:1100px">
+        <h3 class="section-title">
+          <mat-icon style="color:#3b82f6">play_circle</mat-icon> Month-End Processing (Automated Mode)
+        </h3>
+        <p class="section-desc">In Automated mode, the Month-End process auto-approves all pending transactions (revaluations, impairments, reversals, disposals) in the correct GRAP order, then runs and posts bulk depreciation in one step.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          <div class="form-field">
+            <label>Financial Year *</label>
+            <select [(ngModel)]="monthEndFilters.finYear" class="form-input" (ngModelChange)="onMonthEndFilterChange()">
+              @for (fy of getAvailableFinYears(); track fy) {
+                <option [value]="fy">{{fy}}</option>
+              }
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Period *</label>
+            <select [(ngModel)]="monthEndFilters.period" class="form-input" (ngModelChange)="onMonthEndFilterChange()">
+              @for (pm of periodMonths; track pm.value) {
+                <option [ngValue]="pm.value">Period {{pm.value}} ({{pm.label}})</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button mat-stroked-button (click)="checkMonthEnd()" [disabled]="monthEndChecking() || monthEndRunning() || !monthEndFilters.finYear">
+            @if (monthEndChecking()) { Checking... } @else { Check Status }
+          </button>
+          <button mat-flat-button color="primary" (click)="openTxVerifyMonthEnd()"
+            [disabled]="monthEndRunning() || monthEndChecking() || !monthEndFilters.finYear || (monthEndStatus() && monthEndStatus().alreadyRun) || monthEndApprovalExists()">
+            @if (monthEndRunning()) { Processing... } @else { Run Month-End }
+          </button>
+        </div>
+        @if (monthEndApprovalExists()) {
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <mat-icon style="color:#15803d;font-size:18px">check_circle</mat-icon>
+            <span style="color:#15803d;font-size:13px;font-weight:500">Transaction verification has already been completed for FY {{monthEndFilters.finYear}} Period {{monthEndFilters.period}}. The Month-End run cannot be repeated for this period.</span>
+          </div>
+        }
+        @if (monthEndStatus() && !monthEndResult()) {
+          @if (monthEndStatus().alreadyRun) {
+            <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+              <mat-icon style="color:#92400e">check_circle</mat-icon>
+              <span style="color:#92400e;font-weight:500">Month-End for FY {{monthEndFilters.finYear}} Period {{monthEndFilters.period}} has already been run (Schedule ID {{monthEndStatus().scheduleId}}).</span>
+            </div>
+          } @else {
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+              <mat-icon style="color:#1e40af">info</mat-icon>
+              <span style="color:#1e40af;font-weight:500">Not yet run for FY {{monthEndFilters.finYear}} Period {{monthEndFilters.period}}. Ready to process.</span>
+            </div>
+          }
+        }
+        @if (monthEndResult()) {
+          @if (monthEndResult().success) {
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                <mat-icon style="color:#16a34a">check_circle</mat-icon>
+                <span style="font-size:15px;font-weight:600;color:#16a34a">Month-End completed successfully</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+                <div style="text-align:center"><div style="font-size:12px;color:#64748b">Revaluations</div><div style="font-size:20px;font-weight:700;color:#8b5cf6">{{monthEndResult().results?.revaluations || 0}}</div></div>
+                <div style="text-align:center"><div style="font-size:12px;color:#64748b">Impairments</div><div style="font-size:20px;font-weight:700;color:#ef4444">{{monthEndResult().results?.impairments || 0}}</div></div>
+                <div style="text-align:center"><div style="font-size:12px;color:#64748b">Reversals</div><div style="font-size:20px;font-weight:700;color:#16a34a">{{monthEndResult().results?.reversals || 0}}</div></div>
+                <div style="text-align:center"><div style="font-size:12px;color:#64748b">Disposals</div><div style="font-size:20px;font-weight:700;color:#dc2626">{{monthEndResult().results?.disposals || 0}}</div></div>
+                <div style="text-align:center"><div style="font-size:12px;color:#64748b">Dep. Schedule</div><div style="font-size:14px;font-weight:700;color:#f59e0b">ID {{monthEndResult().depreciationScheduleId || '—'}}</div></div>
+              </div>
+            </div>
+          } @else {
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <mat-icon style="color:#dc2626">error</mat-icon>
+                <span style="font-size:15px;font-weight:600;color:#dc2626">Month-End encountered errors</span>
+              </div>
+              @for (err of monthEndResult().errors; track $index) {
+                <div style="font-size:12px;color:#b91c1c;padding:2px 0">{{err}}</div>
+              }
+            </div>
+          }
+          @if (monthEndResult().errors && monthEndResult().errors.length > 0 && monthEndResult().success) {
+            <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+              <div style="font-weight:500;color:#92400e;margin-bottom:6px">Partial errors:</div>
+              @for (err of monthEndResult().errors; track $index) {
+                <div style="font-size:12px;color:#92400e;padding:2px 0">{{err}}</div>
+              }
+            </div>
+          }
+        }
+      </div>
+      } @else {
+      <div class="form-card" style="max-width:1100px">
+        <h3 class="section-title">
+          <mat-icon style="color:#f59e0b">trending_down</mat-icon> Run Depreciation (Daily Calculation)
+        </h3>
+        <p class="section-desc">Calculate depreciation per asset based on actual days elapsed since last transaction. Assets already depreciated for the selected period are excluded; partial-period assets receive remaining-days calculation.</p>
+
+        @if (!depRunResult()) {
+          <div class="detail-grid" style="margin-bottom:20px">
+            <div class="detail-field"><label>Method</label><span>Straight-line, daily rate (GRAP 17.72)</span></div>
+            <div class="detail-field"><label>Calculation</label><span>Per-asset: excludes already-depreciated, partial period = remaining days</span></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="form-field">
+              <label>Financial Year *</label>
+              <select [(ngModel)]="depSelectedFinYear" class="form-input" (ngModelChange)="onDepFinYearChange($event)">
+                @for (fy of getAvailableFinYears(); track fy) {
+                  <option [value]="fy">{{fy}}</option>
+                }
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Period *</label>
+              <select [(ngModel)]="depSelectedPeriod" class="form-input">
+                @for (pm of periodMonths; track pm.value) {
+                  <option [ngValue]="pm.value" [disabled]="depCompletedPeriods().includes(pm.value)">
+                    @if (depCompletedPeriods().includes(pm.value)) { ✓ Period {{pm.value}} ({{pm.label}}) — Completed } @else { Period {{pm.value}} ({{pm.label}}) }
+                  </option>
+                }
+              </select>
+            </div>
+          </div>
+
+          @if (depCompletedPeriods().includes(depSelectedPeriod)) {
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;display:flex;align-items:center;gap:8px">
+              <mat-icon style="font-size:16px;width:16px;height:16px;color:#b45309">block</mat-icon>
+              Period {{depSelectedPeriod}} ({{getPeriodLabel(depSelectedPeriod)}}) has already been run for FY {{depSelectedFinYear}}. Select a different period.
+            </div>
+          }
+
+          @if (depSelectedFinYear && depSelectedPeriod && !depCompletedPeriods().includes(depSelectedPeriod)) {
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1e40af">
+              <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
+              Scheduled Date (period end): <strong>{{getScheduledDateForPeriod()}}</strong> — FY {{depSelectedFinYear}}, Period {{depSelectedPeriod}} ({{getPeriodLabel(depSelectedPeriod)}})
+            </div>
+          }
+
+          @if (depRunDateError()) {
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-bottom:12px">{{depRunDateError()}}</div>
+          }
+
+          <div style="display:flex;gap:8px">
+            <button mat-flat-button color="primary" (click)="runDepreciation()" [disabled]="depRunning() || !depSelectedFinYear || !depSelectedPeriod || depCompletedPeriods().includes(depSelectedPeriod)">
+              @if (depRunning()) { Calculating... } @else { Calculate & Submit for Approval }
+            </button>
+          </div>
+        } @else {
+          <div class="success-box">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <mat-icon style="color:#16a34a">check_circle</mat-icon>
+              <span style="font-size:15px;font-weight:600;color:#16a34a">Depreciation Calculated & Submitted</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+              <div>
+                <div style="font-size:12px;color:#64748b">Period</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">FY {{depRunResult().finYear}} — Period {{depRunResult().period}} ({{depRunResult().periodName}})</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Assets Processed</div>
+                <div style="font-size:20px;font-weight:700;color:#1e293b">{{depRunResult().assetsProcessed | number}}</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Total Depreciation</div>
+                <div style="font-size:20px;font-weight:700;color:#1e293b">{{formatCurrency(depRunResult().totalDepreciation)}}</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Status</div>
+                <div style="font-size:14px;font-weight:600;color:#f59e0b">Pending Approval</div>
+              </div>
+            </div>
+          </div>
+          <button mat-stroked-button (click)="depRunResult.set(null)" style="margin-top:8px">
+            <mat-icon style="margin-right:4px">refresh</mat-icon> New Run
+          </button>
+        }
+
+      </div>
+      }
+    </div>
+  </mat-tab>
+
+  <!-- REVALUATION TAB -->
+  <mat-tab label="Revaluation">
+    <div style="padding:20px">
+      <div class="form-card" style="max-width:900px">
+        <h3 class="section-title">
+          <mat-icon style="color:#8b5cf6">auto_graph</mat-icon> Record Revaluation (GRAP 17.39-42)
+        </h3>
+        <p class="section-desc">Record a revaluation for an individual asset. Depreciation from last depreciation date to revaluation date is calculated first to determine the adjusted carrying amount.</p>
+
+        <div class="asset-search-section">
+          <label class="search-label">Search Asset</label>
+          <div class="search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+              class="search-input"
+              placeholder="Type asset ID, barcode, or description to search..."
+              [value]="revalSearchTerm"
+              (input)="onRevalSearch($event)"
+              (blur)="closeDropdown('reval')"
+              [disabled]="!!revalSelectedAsset()">
+            @if (revalSelectedAsset()) {
+              <button class="clear-btn" (click)="clearRevalAsset()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+          @if (revalShowDropdown && revalFilteredAssets().length > 0) {
+            <div class="search-dropdown">
+              @for (asset of revalFilteredAssets(); track asset.id) {
+                <div class="search-dropdown-item" (mousedown)="selectRevalAsset(asset)">
+                  <div class="dropdown-main">
+                    <span class="dropdown-id">{{asset.assetId}}</span>
+                    <span class="dropdown-desc">{{asset.description}}</span>
+                  </div>
+                  <div class="dropdown-meta">
+                    <span>{{asset.categoryName}}</span>
+                    <span class="dropdown-value">{{formatCurrency(asset.carryingAmount)}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (revalShowDropdown && revalFilteredAssets().length === 0 && revalSearchTerm.length >= 2) {
+            <div class="search-dropdown">
+              <div class="search-dropdown-empty">No assets found matching "{{revalSearchTerm}}"</div>
+            </div>
+          }
+        </div>
+
+        @if (revalSelectedAsset(); as asset) {
+          <div class="asset-detail-panel">
+            <div class="asset-detail-header">
+              <mat-icon style="color:#8b5cf6">inventory_2</mat-icon>
+              <div>
+                <div style="font-weight:600;color:#1e293b">{{asset.assetId}} — {{asset.description}}</div>
+                <div style="font-size:12px;color:#64748b">{{asset.assetTypeName}} · {{asset.categoryName}}</div>
+              </div>
+            </div>
+            <div class="asset-detail-grid">
+              <div class="asset-detail-item"><label>Asset Register ID</label><span>{{asset.assetId}}</span></div>
+              <div class="asset-detail-item"><label>Asset Class</label><span>{{asset.assetClassName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Asset Type</label><span>{{asset.assetTypeName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Category</label><span>{{asset.categoryName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Cost / Revalued Amount</label><span class="value-highlight">{{formatCurrency(asset.costClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Depreciation</label><span class="value-highlight">{{formatCurrency(asset.depreciationClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Carrying Amount (at last dep)</label><span class="value-highlight carrying">{{formatCurrency(asset.carryingAmount)}}</span></div>
+              <div class="asset-detail-item"><label>Revaluation Reserve Balance</label><span class="value-highlight" style="color:#8b5cf6">{{formatCurrency(asset.revaluationReserveClosingBalance || 0)}}</span></div>
+            </div>
+          </div>
+
+          <div class="form-section-divider">Revaluation Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-field">
+              <label>Revaluation Date *</label>
+              <input type="date" [(ngModel)]="revalForm.revaluation_date" class="form-input" [max]="todayDate" [min]="effectiveMinDate(lastDepreciationDate())" (change)="onRevalDateChange()">
+              @if (revalDateError()) {
+                <span class="date-error">{{revalDateError()}}</span>
+              }
+            </div>
+            <div class="form-field">
+              <label>Last Depreciation Date</label>
+              <div class="readonly-value">{{lastDepreciationDate() || 'None (In-Service Date per asset)'}}</div>
+            </div>
+          </div>
+
+          @if (revalCatchupLoading()) {
+            <div class="catchup-loading"><mat-spinner diameter="20"></mat-spinner> Calculating catch-up depreciation...</div>
+          }
+
+          @if (revalCatchupDep(); as catchup) {
+            <div class="catchup-panel">
+              <h4 class="catchup-title"><mat-icon style="font-size:16px;color:#f59e0b">trending_down</mat-icon> Catch-up Depreciation ({{catchup.fromDate}} to {{catchup.toDate}})</h4>
+              <div class="catchup-grid">
+                <div><span class="catchup-label">Days</span><span class="catchup-value">{{catchup.days}}</span></div>
+                <div><span class="catchup-label">Daily Rate</span><span class="catchup-value">{{formatCurrency(catchup.dailyRate)}}</span></div>
+                <div><span class="catchup-label">Depreciation Amount</span><span class="catchup-value" style="color:#f59e0b">{{formatCurrency(catchup.depreciationAmount)}}</span></div>
+                <div><span class="catchup-label">Depreciation Offset</span><span class="catchup-value" style="color:#ef4444">{{formatCurrency(catchup.depreciationOffset)}}</span></div>
+                <div><span class="catchup-label">Carrying Before</span><span class="catchup-value">{{formatCurrency(catchup.carryingAmountBefore)}}</span></div>
+                <div><span class="catchup-label">Carrying After Dep</span><span class="catchup-value" style="color:#3b82f6;font-weight:700">{{formatCurrency(catchup.carryingAmountAfter)}}</span></div>
+              </div>
+            </div>
+          }
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+            <div class="form-field">
+              <label>Carrying Amount (after catch-up dep)</label>
+              <div class="calculated-value" style="color:#3b82f6">
+                {{formatCurrency(getAdjustedCarryingAmount(revalCatchupDep(), asset))}}
+              </div>
+            </div>
+            <div class="form-field">
+              <label>Market Value / Fair Value *</label>
+              <input type="number" [(ngModel)]="revalForm.market_value" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Valuation Module *</label>
+              <select [(ngModel)]="revalForm.valuation_module" class="form-input">
+                <option [ngValue]="-1">--Select--</option>
+                <option [ngValue]="1">Fair Value</option>
+                <option [ngValue]="2">Fair Value Cost To Sell</option>
+                <option [ngValue]="3">Value In Use</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Accumulated Depreciation Adjustment</label>
+              <input type="number" [(ngModel)]="revalForm.dep_adjustment" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Fair Value Adjustment</label>
+              <div class="calculated-value" [style.color]="getRevalSurplusColor()">
+                {{formatCurrency(getRevalFairValueAdjustment())}}
+              </div>
+            </div>
+            <div class="form-field">
+              <label>Revaluation Reserve Balance</label>
+              <div class="calculated-value" style="color:#8b5cf6;font-weight:700">
+                {{formatCurrency(getRevalReserveBalance())}}
+              </div>
+            </div>
+          </div>
+
+          @if (revalError()) {
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-top:8px">{{revalError()}}</div>
+          }
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button mat-flat-button color="primary" (click)="validateAndSubmitRevaluation()" [disabled]="submittingReval() || glValidating() || !revalForm.revaluation_date || !!revalDateError()">
+              @if (submittingReval()) { Submitting... } @else { Submit for Approval }
+            </button>
+            <button mat-stroked-button (click)="clearRevalAsset()">Cancel</button>
+          </div>
+        }
+
+        @if (revalSuccess()) {
+          <div class="success-msg">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Revaluation submitted successfully (including catch-up depreciation)
+          </div>
+        }
+
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- IMPAIRMENT TAB -->
+  <mat-tab label="Impairment">
+    <div style="padding:20px">
+      <div class="form-card" style="max-width:900px">
+        <h3 class="section-title">
+          <mat-icon style="color:#ef4444">warning</mat-icon> Record Impairment (GRAP 21/26)
+        </h3>
+        <p class="section-desc">Record an impairment loss. Depreciation from last depreciation date to transaction date is calculated first to determine the adjusted carrying amount the impairment is based on.</p>
+
+        <div class="asset-search-section">
+          <label class="search-label">Search Asset</label>
+          <div class="search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+              class="search-input"
+              placeholder="Type asset ID, barcode, or description to search..."
+              [value]="impairSearchTerm"
+              (input)="onImpairSearch($event)"
+              (blur)="closeDropdown('impair')"
+              [disabled]="!!impairSelectedAsset()">
+            @if (impairSelectedAsset()) {
+              <button class="clear-btn" (click)="clearImpairAsset()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+          @if (impairShowDropdown && impairFilteredAssets().length > 0) {
+            <div class="search-dropdown">
+              @for (asset of impairFilteredAssets(); track asset.id) {
+                <div class="search-dropdown-item" (mousedown)="selectImpairAsset(asset)">
+                  <div class="dropdown-main">
+                    <span class="dropdown-id">{{asset.assetId}}</span>
+                    <span class="dropdown-desc">{{asset.description}}</span>
+                  </div>
+                  <div class="dropdown-meta">
+                    <span>{{asset.categoryName}}</span>
+                    <span class="dropdown-value">{{formatCurrency(asset.carryingAmount)}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (impairShowDropdown && impairFilteredAssets().length === 0 && impairSearchTerm.length >= 2) {
+            <div class="search-dropdown">
+              <div class="search-dropdown-empty">No assets found matching "{{impairSearchTerm}}"</div>
+            </div>
+          }
+        </div>
+
+        @if (impairSelectedAsset(); as asset) {
+          <div class="asset-detail-panel">
+            <div class="asset-detail-header">
+              <mat-icon style="color:#ef4444">inventory_2</mat-icon>
+              <div>
+                <div style="font-weight:600;color:#1e293b">{{asset.assetId}} — {{asset.description}}</div>
+                <div style="font-size:12px;color:#64748b">{{asset.assetTypeName}} · {{asset.categoryName}}</div>
+              </div>
+            </div>
+            <div class="asset-detail-grid">
+              <div class="asset-detail-item"><label>Asset Register ID</label><span>{{asset.assetId}}</span></div>
+              <div class="asset-detail-item"><label>Asset Class</label><span>{{asset.assetClassName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Category</label><span>{{asset.categoryName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Cost</label><span class="value-highlight">{{formatCurrency(asset.costClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Depreciation</label><span class="value-highlight">{{formatCurrency(asset.depreciationClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Carrying Amount (at last dep)</label><span class="value-highlight carrying">{{formatCurrency(asset.carryingAmount)}}</span></div>
+            </div>
+          </div>
+
+          <div class="form-section-divider">Impairment Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-field">
+              <label>Transaction Date *</label>
+              <input type="date" [ngModel]="impairForm.transaction_date" (ngModelChange)="onImpairDateChange($event)" class="form-input" [max]="todayDate" [min]="effectiveMinDate(impairAssetMinDate() || lastDepreciationDate())">
+              @if (impairDateError()) {
+                <span class="date-error">{{impairDateError()}}</span>
+              }
+            </div>
+            <div class="form-field">
+              <label>Impairment Type *</label>
+              <select [(ngModel)]="impairForm.impairment_type" class="form-input">
+                <option value="cash_generating">Cash-Generating (GRAP 26)</option>
+                <option value="non_cash_generating">Non-Cash-Generating (GRAP 21)</option>
+              </select>
+            </div>
+          </div>
+
+          @if (impairCatchupLoading()) {
+            <div class="catchup-loading"><mat-spinner diameter="20"></mat-spinner> Calculating catch-up depreciation...</div>
+          }
+
+          @if (impairCatchupDep(); as catchup) {
+            <div class="catchup-panel">
+              <h4 class="catchup-title"><mat-icon style="font-size:16px;color:#f59e0b">trending_down</mat-icon> Catch-up Depreciation ({{catchup.fromDate}} to {{catchup.toDate}})</h4>
+              <div class="catchup-grid">
+                <div><span class="catchup-label">Days</span><span class="catchup-value">{{catchup.days}}</span></div>
+                <div><span class="catchup-label">Daily Rate</span><span class="catchup-value">{{formatCurrency(catchup.dailyRate)}}</span></div>
+                <div><span class="catchup-label">Depreciation Amount</span><span class="catchup-value" style="color:#f59e0b">{{formatCurrency(catchup.depreciationAmount)}}</span></div>
+                <div><span class="catchup-label">Depreciation Offset</span><span class="catchup-value" style="color:#ef4444">{{formatCurrency(catchup.depreciationOffset)}}</span></div>
+                <div><span class="catchup-label">Carrying Before</span><span class="catchup-value">{{formatCurrency(catchup.carryingAmountBefore)}}</span></div>
+                <div><span class="catchup-label">Adjusted Carrying Amount</span><span class="catchup-value" style="color:#3b82f6;font-weight:700">{{formatCurrency(catchup.carryingAmountAfter)}}</span></div>
+              </div>
+            </div>
+          }
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+            <div class="form-field">
+              <label>Adjusted Carrying Amount (after catch-up dep)</label>
+              <div class="readonly-value">{{formatCurrency(getAdjustedCarryingAmount(impairCatchupDep(), asset))}}</div>
+            </div>
+            <div class="form-field">
+              <label>Revaluation Reserve</label>
+              <div class="readonly-value">{{formatCurrency(getEffectiveRevaluationReserve())}}</div>
+            </div>
+            <div class="form-field">
+              <label>Recoverable Service Amount *</label>
+              <input type="number" [(ngModel)]="impairForm.recoverable_amount" class="form-input" placeholder="0.00">
+            </div>
+            <div class="form-field">
+              <label>Value in Use</label>
+              <input type="number" [(ngModel)]="impairForm.value_in_use" class="form-input" placeholder="0.00">
+            </div>
+            @if (calculateImpairmentRevaluationReserve() > 0) {
+              <div class="form-field">
+                <label>From Revaluation Reserve</label>
+                <div class="calculated-value-large" style="color:#f59e0b">
+                  {{formatCurrency(calculateImpairmentRevaluationReserve())}}
+                </div>
+              </div>
+              <div class="form-field">
+                <label>Impairment Loss (to P&amp;L)</label>
+                <div class="calculated-value-large" style="color:#ef4444">
+                  {{formatCurrency(calculateImpairmentLoss())}}
+                </div>
+              </div>
+            } @else {
+              <div class="form-field" style="grid-column:span 2">
+                <label>Impairment Loss</label>
+                <div class="calculated-value-large" style="color:#ef4444">
+                  {{formatCurrency(calculateImpairmentLoss())}}
+                </div>
+              </div>
+            }
+            <div class="form-field" style="grid-column:span 2">
+              <label>Reason / Indicators of Impairment *</label>
+              <textarea [(ngModel)]="impairForm.reason" class="form-input" rows="3" placeholder="Describe the indicators of impairment (e.g., physical damage, obsolescence, change in use)..."></textarea>
+            </div>
+          </div>
+          @if (impairError()) {
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-top:8px">{{impairError()}}</div>
+          }
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button mat-flat-button color="warn" (click)="validateAndSubmitImpairment()" [disabled]="submittingImpair() || glValidating() || !impairForm.transaction_date || !!impairDateError()">
+              @if (submittingImpair()) { Submitting... } @else { Submit for Approval }
+            </button>
+            <button mat-stroked-button (click)="clearImpairAsset()">Cancel</button>
+          </div>
+        }
+
+        @if (impairSuccess()) {
+          <div class="success-msg">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Impairment submitted for workflow approval (including catch-up depreciation)
+          </div>
+        }
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- IMPAIRMENT REVERSAL TAB -->
+  <mat-tab label="Impairment Reversal">
+    <div style="padding:20px">
+      <div class="form-card" style="max-width:900px">
+        <h3 class="section-title">
+          <mat-icon style="color:#16a34a">restore</mat-icon> Reversal of Impairment (GRAP 21/26)
+        </h3>
+        <p class="section-desc">Reverse a previously recognised impairment loss when indicators show the recoverable service amount has increased. Reversal is capped at the accumulated impairment balance.</p>
+
+        <div class="asset-search-section">
+          <label class="search-label">Search Asset</label>
+          <div class="search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+              class="search-input"
+              placeholder="Type asset ID, barcode, or description to search..."
+              [value]="reversalSearchTerm"
+              (input)="onReversalSearch($event)"
+              (blur)="closeDropdown('reversal')"
+              [disabled]="!!reversalSelectedAsset()">
+            @if (reversalSelectedAsset()) {
+              <button class="clear-btn" (click)="clearReversalAsset()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+          @if (reversalShowDropdown && reversalFilteredAssets().length > 0) {
+            <div class="search-dropdown">
+              @for (asset of reversalFilteredAssets(); track asset.id) {
+                <div class="search-dropdown-item" (mousedown)="selectReversalAsset(asset)">
+                  <div class="dropdown-main">
+                    <span class="dropdown-id">{{asset.assetId}}</span>
+                    <span class="dropdown-desc">{{asset.description}}</span>
+                  </div>
+                  <div class="dropdown-meta">
+                    <span>{{asset.categoryName}}</span>
+                    <span class="dropdown-value">{{formatCurrency(asset.carryingAmount)}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (reversalShowDropdown && reversalFilteredAssets().length === 0 && reversalSearchTerm.length >= 2) {
+            <div class="search-dropdown">
+              <div class="search-dropdown-empty">No assets found matching "{{reversalSearchTerm}}"</div>
+            </div>
+          }
+        </div>
+
+        @if (reversalSelectedAsset(); as asset) {
+          <div class="asset-detail-panel">
+            <div class="asset-detail-header">
+              <mat-icon style="color:#16a34a">inventory_2</mat-icon>
+              <div>
+                <div style="font-weight:600;color:#1e293b">{{asset.assetId}} — {{asset.description}}</div>
+                <div style="font-size:12px;color:#64748b">{{asset.assetTypeName}} · {{asset.categoryName}}</div>
+              </div>
+            </div>
+            <div class="asset-detail-grid">
+              <div class="asset-detail-item"><label>Asset Register ID</label><span>{{asset.assetId}}</span></div>
+              <div class="asset-detail-item"><label>Asset Class</label><span>{{asset.assetClassName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Category</label><span>{{asset.categoryName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Cost</label><span class="value-highlight">{{formatCurrency(asset.costClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Depreciation</label><span class="value-highlight">{{formatCurrency(asset.depreciationClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Carrying Amount (at last dep)</label><span class="value-highlight carrying">{{formatCurrency(asset.carryingAmount)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Impairment</label><span class="value-highlight" style="color:#ef4444">{{formatCurrency(getReversalAccumulatedImpairment())}}</span></div>
+            </div>
+          </div>
+
+          @if (getReversalAccumulatedImpairment() <= 0) {
+            <div style="background:#fef3c7;border:1px solid #fcd34d;padding:12px 16px;border-radius:6px;color:#92400e;font-size:13px;margin-top:12px">
+              <mat-icon style="font-size:16px;vertical-align:middle">info</mat-icon> This asset has no accumulated impairment to reverse.
+            </div>
+          }
+
+          @if (getReversalAccumulatedImpairment() > 0) {
+            <div class="form-section-divider">Reversal Details</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-field">
+                <label>Transaction Date *</label>
+                <input type="date" [ngModel]="reversalForm.transaction_date" (ngModelChange)="onReversalDateChange($event)" class="form-input" [max]="todayDate" [min]="effectiveMinDate(reversalAssetMinDate() || lastDepreciationDate())">
+                @if (reversalDateError()) {
+                  <span class="date-error">{{reversalDateError()}}</span>
+                }
+              </div>
+              <div class="form-field">
+                <label>Maximum Reversible</label>
+                <div class="readonly-value" style="color:#16a34a;font-weight:600">{{formatCurrency(getReversalAccumulatedImpairment())}}</div>
+              </div>
+            </div>
+
+            @if (reversalCatchupLoading()) {
+              <div class="catchup-loading"><mat-spinner diameter="20"></mat-spinner> Calculating catch-up depreciation...</div>
+            }
+
+            @if (reversalCatchupDep(); as catchup) {
+              <div class="catchup-panel">
+                <h4 class="catchup-title"><mat-icon style="font-size:16px;color:#f59e0b">trending_down</mat-icon> Catch-up Depreciation ({{catchup.fromDate}} to {{catchup.toDate}})</h4>
+                <div class="catchup-grid">
+                  <div><span class="catchup-label">Days</span><span class="catchup-value">{{catchup.days}}</span></div>
+                  <div><span class="catchup-label">Daily Rate</span><span class="catchup-value">{{formatCurrency(catchup.dailyRate)}}</span></div>
+                  <div><span class="catchup-label">Depreciation Amount</span><span class="catchup-value" style="color:#f59e0b">{{formatCurrency(catchup.depreciationAmount)}}</span></div>
+                  <div><span class="catchup-label">Depreciation Offset</span><span class="catchup-value" style="color:#ef4444">{{formatCurrency(catchup.depreciationOffset)}}</span></div>
+                  <div><span class="catchup-label">Current Carrying Before</span><span class="catchup-value">{{formatCurrency(asset.carryingAmount)}}</span></div>
+                  <div><span class="catchup-label">Would-Have-Been Carrying (GRAP Cap)</span><span class="catchup-value" style="color:#3b82f6;font-weight:700">{{formatCurrency(catchup.carryingAmountAfter)}}</span></div>
+                </div>
+              </div>
+            }
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+              <div class="form-field">
+                <label>Current Carrying (after catch-up dep)</label>
+                <div class="readonly-value">{{formatCurrency(getReversalCurrentCarrying(reversalCatchupDep(), asset))}}</div>
+              </div>
+              <div class="form-field">
+                <label>Original Impairment P&amp;L Component (GRAP 21.29)</label>
+                <div class="readonly-value" style="color:#6366f1;font-weight:600">
+                  @if (reversalOriginalBasis()) {
+                    {{formatCurrency(reversalOriginalBasis()!.originalPnL)}}
+                  } @else if (reversalBasisError()) {
+                    <span style="color:#dc2626;font-weight:400;font-size:0.85em">{{reversalBasisError()}}</span>
+                  } @else {
+                    <span style="color:#9ca3af;font-weight:400">Loading...</span>
+                  }
+                </div>
+              </div>
+              <div class="form-field">
+                <label>Recoverable Service Amount *</label>
+                <input type="number" [(ngModel)]="reversalForm.recoverable_amount" class="form-input" placeholder="0.00" [style.border-color]="getReversalBasisError() ? '#dc2626' : ''">
+              </div>
+              <div class="form-field">
+                <label>Value in Use</label>
+                <input type="number" [(ngModel)]="reversalForm.value_in_use" class="form-input" placeholder="0.00" [style.border-color]="getReversalBasisError() ? '#dc2626' : ''">
+              </div>
+              @if (getReversalBasisError()) {
+                <div style="grid-column:span 2;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#dc2626;font-size:13px;display:flex;align-items:flex-start;gap:6px">
+                  <mat-icon style="font-size:16px;width:16px;height:16px;margin-top:1px;flex-shrink:0">block</mat-icon>
+                  {{getReversalBasisError()}}
+                </div>
+              }
+              @if (calculateReversalRevaluationReserve() > 0) {
+                <div class="form-field">
+                  <label>To Revaluation Reserve</label>
+                  <div class="calculated-value-large" style="color:#f59e0b">
+                    {{formatCurrency(calculateReversalRevaluationReserve())}}
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label>Reversal to Income (P&amp;L)</label>
+                  <div class="calculated-value-large" style="color:#16a34a">
+                    {{formatCurrency(calculateReversalToIncome())}}
+                  </div>
+                </div>
+              } @else {
+                <div class="form-field" style="grid-column:span 2">
+                  <label>Reversal Amount</label>
+                  <div class="calculated-value-large" style="color:#16a34a">
+                    {{formatCurrency(calculateTotalReversal())}}
+                  </div>
+                </div>
+              }
+              <div class="form-field" style="grid-column:span 2">
+                <label>Reason / Evidence of Reversal *</label>
+                <textarea [(ngModel)]="reversalForm.reason" class="form-input" rows="3" placeholder="Describe the reasons for reversal (e.g., restored service potential, increased demand, improved condition)..."></textarea>
+              </div>
+            </div>
+            @if (reversalError()) {
+              <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-top:8px">{{reversalError()}}</div>
+            }
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button mat-flat-button color="primary" (click)="validateAndSubmitReversal()" [disabled]="submittingReversal() || glValidating() || !reversalForm.transaction_date">
+                @if (submittingReversal()) { Submitting... } @else { Submit for Approval }
+              </button>
+              <button mat-stroked-button (click)="clearReversalAsset()">Cancel</button>
+            </div>
+          }
+        }
+
+        @if (reversalSuccess()) {
+          <div class="success-msg">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Impairment reversal submitted for workflow approval
+          </div>
+        }
+
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- DISPOSAL TAB -->
+  <mat-tab label="Disposal">
+    <div style="padding:20px">
+      <div class="form-card" style="max-width:900px">
+        <h3 class="section-title">
+          <mat-icon style="color:#dc2626">delete_sweep</mat-icon> Asset Disposal (MFMA S.14)
+        </h3>
+        <p class="section-desc">Dispose of an asset per MFMA Section 14. Depreciation from last depreciation date to disposal date is calculated first to determine the adjusted carrying amount for profit/loss calculation.</p>
+
+        <div class="asset-search-section">
+          <label class="search-label">Search Asset</label>
+          <div class="search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+              class="search-input"
+              placeholder="Type asset ID, barcode, or description to search..."
+              [value]="disposalSearchTerm"
+              (input)="onDisposalSearch($event)"
+              (blur)="closeDropdown('disposal')"
+              [disabled]="!!disposalSelectedAsset()">
+            @if (disposalSelectedAsset()) {
+              <button class="clear-btn" (click)="clearDisposalAsset()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+          @if (disposalShowDropdown && disposalFilteredAssets().length > 0) {
+            <div class="search-dropdown">
+              @for (asset of disposalFilteredAssets(); track asset.id) {
+                <div class="search-dropdown-item" (mousedown)="selectDisposalAsset(asset)">
+                  <div class="dropdown-main">
+                    <span class="dropdown-id">{{asset.assetId}}</span>
+                    <span class="dropdown-desc">{{asset.description}}</span>
+                  </div>
+                  <div class="dropdown-meta">
+                    <span>{{asset.categoryName}}</span>
+                    <span class="dropdown-value">{{formatCurrency(asset.carryingAmount)}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (disposalShowDropdown && disposalFilteredAssets().length === 0 && disposalSearchTerm.length >= 2) {
+            <div class="search-dropdown">
+              <div class="search-dropdown-empty">No assets found matching "{{disposalSearchTerm}}"</div>
+            </div>
+          }
+        </div>
+
+        @if (disposalSelectedAsset(); as asset) {
+          <div class="asset-detail-panel">
+            <div class="asset-detail-header">
+              <mat-icon style="color:#dc2626">inventory_2</mat-icon>
+              <div>
+                <div style="font-weight:600;color:#1e293b">{{asset.assetId}} — {{asset.description}}</div>
+                <div style="font-size:12px;color:#64748b">{{asset.assetTypeName}} · {{asset.categoryName}}</div>
+              </div>
+            </div>
+            <div class="asset-detail-grid">
+              <div class="asset-detail-item"><label>Asset Register ID</label><span>{{asset.assetId}}</span></div>
+              <div class="asset-detail-item"><label>Asset Class</label><span>{{asset.assetClassName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Asset Type</label><span>{{asset.assetTypeName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Category</label><span>{{asset.categoryName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Cost</label><span class="value-highlight">{{formatCurrency(asset.costClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Depreciation</label><span class="value-highlight">{{formatCurrency(asset.depreciationClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Carrying Amount (at last dep)</label><span class="value-highlight carrying">{{formatCurrency(asset.carryingAmount)}}</span></div>
+              <div class="asset-detail-item"><label>Measurement Type</label><span>{{asset.measurementType || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Status</label><span>{{asset.status || '—'}}</span></div>
+            </div>
+          </div>
+
+          <div class="form-section-divider">Disposal Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-field">
+              <label>Disposal Date *</label>
+              <input type="date" [(ngModel)]="disposalForm.disposal_date" class="form-input" [max]="todayDate" [min]="effectiveMinDate(disposalAssetLastDepDate())" (change)="onDisposalDateChange()">
+              @if (disposalDateError()) {
+                <span class="date-error">{{disposalDateError()}}</span>
+              }
+            </div>
+            <div class="form-field">
+              <label>Disposal Method *</label>
+              <select [(ngModel)]="disposalForm.method" class="form-input">
+                <option value="">Select method...</option>
+                <option value="Sale">Sale (Public Tender)</option>
+                <option value="Auction">Auction</option>
+                <option value="Donation">Donation</option>
+                <option value="Scrapping">Scrapping / Write-off</option>
+                <option value="Trade-in">Trade-in</option>
+                <option value="Theft/Loss">Theft / Loss</option>
+                <option value="Return">Return to Supplier</option>
+              </select>
+            </div>
+          </div>
+
+          @if (disposalCatchupLoading()) {
+            <div class="catchup-loading"><mat-spinner diameter="20"></mat-spinner> Calculating catch-up depreciation...</div>
+          }
+
+          @if (disposalCatchupDep(); as catchup) {
+            <div class="catchup-panel">
+              <h4 class="catchup-title"><mat-icon style="font-size:16px;color:#f59e0b">trending_down</mat-icon> Catch-up Depreciation ({{catchup.fromDate}} to {{catchup.toDate}})</h4>
+              <div class="catchup-grid">
+                <div><span class="catchup-label">Days</span><span class="catchup-value">{{catchup.days}}</span></div>
+                <div><span class="catchup-label">Daily Rate</span><span class="catchup-value">{{formatCurrency(catchup.dailyRate)}}</span></div>
+                <div><span class="catchup-label">Depreciation Amount</span><span class="catchup-value" style="color:#f59e0b">{{formatCurrency(catchup.depreciationAmount)}}</span></div>
+                <div><span class="catchup-label">Depreciation Offset</span><span class="catchup-value" style="color:#ef4444">{{formatCurrency(catchup.depreciationOffset)}}</span></div>
+                <div><span class="catchup-label">Carrying Before</span><span class="catchup-value">{{formatCurrency(catchup.carryingAmountBefore)}}</span></div>
+                <div><span class="catchup-label">Adjusted Carrying Amount</span><span class="catchup-value" style="color:#3b82f6;font-weight:700">{{formatCurrency(catchup.carryingAmountAfter)}}</span></div>
+              </div>
+            </div>
+          }
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+            <div class="form-field">
+              <label>Adjusted Carrying Amount</label>
+              <div class="readonly-value">{{formatCurrency(getAdjustedCarryingAmount(disposalCatchupDep(), asset))}}</div>
+            </div>
+            <div class="form-field">
+              <label>Disposal Proceeds (R) *</label>
+              <input type="number" [(ngModel)]="disposalForm.value" class="form-input" placeholder="0.00">
+            </div>
+            <div class="form-field" style="grid-column:span 2">
+              <label>{{getDisposalProfitLossLabel()}}</label>
+              <div class="calculated-value-large" [style.color]="getDisposalProfitLossColor()">
+                {{formatCurrency(calculateDisposalProfitLoss())}}
+              </div>
+            </div>
+            <div class="form-field" style="grid-column:span 2">
+              <label>Disposal Reason *</label>
+              <textarea [(ngModel)]="disposalForm.reason" class="form-input" rows="3" placeholder="Reason for disposal per MFMA S.14..."></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button mat-flat-button color="warn" (click)="validateAndSubmitDisposal()" [disabled]="submittingDisposal() || glValidating() || !disposalForm.disposal_date || !!disposalDateError()">
+              @if (submittingDisposal()) { Submitting... } @else { Submit for Approval }
+            </button>
+            <button mat-stroked-button (click)="clearDisposalAsset()">Cancel</button>
+          </div>
+        }
+
+        @if (disposalError()) {
+          <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-bottom:8px">{{disposalError()}}</div>
+        }
+        @if (disposalSuccess()) {
+          <div class="success-msg">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Disposal request submitted for MFMA S.14 approval workflow (including catch-up depreciation)
+          </div>
+        }
+
+      </div>
+    </div>
+  </mat-tab>
+
+
+  <!-- REFURBISHMENT TAB -->
+  <mat-tab label="Refurbishment">
+    <div style="padding:20px">
+      <div class="form-card" style="max-width:900px">
+        <h3 class="section-title">
+          <mat-icon style="color:#0891b2">build_circle</mat-icon> Asset Refurbishment (GRAP 17)
+        </h3>
+        <p class="section-desc">Record asset refurbishment costs that increase the asset's value. Refurbishment adjusts the cost, accumulated depreciation, and revaluation reserve per GRAP 17.</p>
+
+        <div class="asset-search-section">
+          <label class="search-label">Search Asset</label>
+          <div class="search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+              class="search-input"
+              placeholder="Type asset ID, barcode, or description to search..."
+              [value]="refurbSearchTerm"
+              (input)="onRefurbSearch($event)"
+              (blur)="closeDropdown('refurb')"
+              [disabled]="!!refurbSelectedAsset()">
+            @if (refurbSelectedAsset()) {
+              <button class="clear-btn" (click)="clearRefurbAsset()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+          @if (refurbShowDropdown && refurbFilteredAssets().length > 0) {
+            <div class="search-dropdown">
+              @for (asset of refurbFilteredAssets(); track asset.id) {
+                <div class="search-dropdown-item" (mousedown)="selectRefurbAsset(asset)">
+                  <div class="dropdown-main">
+                    <span class="dropdown-id">{{asset.assetId}}</span>
+                    <span class="dropdown-desc">{{asset.description}}</span>
+                  </div>
+                  <div class="dropdown-meta">
+                    <span>{{asset.categoryName}}</span>
+                    <span class="dropdown-value">{{formatCurrency(asset.carryingAmount)}}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (refurbShowDropdown && refurbFilteredAssets().length === 0 && refurbSearchTerm.length >= 2) {
+            <div class="search-dropdown">
+              <div class="search-dropdown-empty">No assets found matching "{{refurbSearchTerm}}"</div>
+            </div>
+          }
+        </div>
+
+        @if (refurbSelectedAsset(); as asset) {
+          <div class="asset-detail-panel">
+            <div class="asset-detail-header">
+              <mat-icon style="color:#0891b2">inventory_2</mat-icon>
+              <div>
+                <div style="font-weight:600;color:#1e293b">{{asset.assetId}} — {{asset.description}}</div>
+                <div style="font-size:12px;color:#64748b">{{asset.assetTypeName}} · {{asset.categoryName}}</div>
+              </div>
+            </div>
+            <div class="asset-detail-grid">
+              <div class="asset-detail-item"><label>Asset Register ID</label><span>{{asset.assetId}}</span></div>
+              <div class="asset-detail-item"><label>Asset Class</label><span>{{asset.assetClassName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Asset Type</label><span>{{asset.assetTypeName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Category</label><span>{{asset.categoryName || '—'}}</span></div>
+              <div class="asset-detail-item"><label>Cost</label><span class="value-highlight">{{formatCurrency(asset.costClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Accumulated Depreciation</label><span class="value-highlight">{{formatCurrency(asset.depreciationClosingBalance)}}</span></div>
+              <div class="asset-detail-item"><label>Carrying Amount</label><span class="value-highlight carrying">{{formatCurrency(asset.carryingAmount)}}</span></div>
+              <div class="asset-detail-item"><label>Status</label><span>{{asset.status || '—'}}</span></div>
+            </div>
+          </div>
+
+          <div class="form-section-divider">Refurbishment Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-field">
+              <label>Refurbishment Date *</label>
+              <input type="date" [(ngModel)]="refurbForm.refurb_date" class="form-input" [max]="todayDate" [min]="effectiveMinDate('')" (change)="onRefurbDateChange()">
+              @if (refurbDateError()) {
+                <span class="date-error">{{refurbDateError()}}</span>
+              }
+            </div>
+          </div>
+
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;overflow:hidden">
+              <div style="font-size:12px;font-weight:600;color:#0891b2;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Refurbishment Acquisition Account</div>
+              <div style="display:flex;gap:12px">
+                <div class="form-field" style="flex:1;min-width:0">
+                  <label>Debit Project</label>
+                  <select class="form-input" style="width:100%" [(ngModel)]="refurbDtProjectId" (change)="onRefurbDtProjectChange()">
+                    <option value="">Select project...</option>
+                    @for (p of refurbDtProjects; track p.projectId) {
+                      <option [value]="p.projectId">{{p.projectCode}} | {{p.projectName}}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-field" style="flex:1;min-width:0">
+                  <label>Debit SCOA Item</label>
+                  <select class="form-input" style="width:100%" [(ngModel)]="refurbDtScoaItemId" [disabled]="!refurbDtProjectId" (change)="onRefurbDtScoaItemChange()">
+                    <option value="">{{refurbDtProjectId ? 'Select SCOA item...' : 'Select project first'}}</option>
+                    @for (s of refurbDtScoaItems; track s.planProjectItemId) {
+                      <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;overflow:hidden">
+              <div style="font-size:12px;font-weight:600;color:#0891b2;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Refurbishment Offset Account</div>
+              <div style="display:flex;gap:12px">
+                <div class="form-field" style="flex:1;min-width:0">
+                  <label>Credit Project</label>
+                  <select class="form-input" style="width:100%" [(ngModel)]="refurbCtProjectId" (change)="onRefurbCtProjectChange()">
+                    <option value="">Select project...</option>
+                    @for (p of refurbCtProjects; track p.projectId) {
+                      <option [value]="p.projectId">{{p.projectCode}} | {{p.projectName}}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-field" style="flex:1;min-width:0">
+                  <label>Credit SCOA Item</label>
+                  <select class="form-input" style="width:100%" [(ngModel)]="refurbCtScoaItemId" [disabled]="!refurbCtProjectId" (change)="onRefurbCtScoaItemChange()">
+                    <option value="">{{refurbCtProjectId ? 'Select SCOA item...' : 'Select project first'}}</option>
+                    @for (s of refurbCtScoaItems; track s.planProjectItemId) {
+                      <option [value]="s.planProjectItemId">{{s.scoaDesc}}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (refurbCatchupLoading()) {
+            <div class="catchup-loading"><mat-spinner diameter="20"></mat-spinner> Calculating catch-up depreciation...</div>
+          }
+
+          @if (refurbCatchupDep(); as catchup) {
+            <div class="catchup-panel">
+              <h4 class="catchup-title"><mat-icon style="font-size:16px;color:#f59e0b">trending_down</mat-icon> Catch-up Depreciation ({{catchup.fromDate}} to {{catchup.toDate}})</h4>
+              <div class="catchup-grid">
+                <div><span class="catchup-label">Days</span><span class="catchup-value">{{catchup.days}}</span></div>
+                <div><span class="catchup-label">Daily Rate</span><span class="catchup-value">{{formatCurrency(catchup.dailyRate)}}</span></div>
+                <div><span class="catchup-label">Depreciation Amount</span><span class="catchup-value" style="color:#f59e0b">{{formatCurrency(catchup.depreciationAmount)}}</span></div>
+                <div><span class="catchup-label">Carrying Before</span><span class="catchup-value">{{formatCurrency(catchup.carryingAmountBefore)}}</span></div>
+                <div><span class="catchup-label">Adjusted Carrying Amount</span><span class="catchup-value" style="color:#3b82f6;font-weight:700">{{formatCurrency(catchup.carryingAmountAfter)}}</span></div>
+              </div>
+            </div>
+          }
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div class="form-field">
+              <label>Refurbishment Debit (R) *</label>
+              <input type="number" [(ngModel)]="refurbForm.refurb_dt" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Refurbishment Credit (R)</label>
+              <input type="number" [(ngModel)]="refurbForm.refurb_ct" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Refurbishment Depreciation Adjustment (R)</label>
+              <input type="number" [(ngModel)]="refurbForm.refurb_depreciation" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Refurbishment Revaluation Adjustment (R)</label>
+              <input type="number" [(ngModel)]="refurbForm.refurb_revaluation" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-field">
+              <label>Refurbishment Impairment Adjustment (R)</label>
+              <input type="number" [(ngModel)]="refurbForm.refurb_impairment" class="form-input" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button mat-flat-button color="primary" (click)="validateAndSubmitRefurbishment()" [disabled]="submittingRefurb() || glValidating() || !refurbForm.refurb_date">
+              @if (submittingRefurb()) { Submitting... } @else { Submit for Approval }
+            </button>
+            <button mat-stroked-button (click)="clearRefurbAsset()">Cancel</button>
+          </div>
+        }
+
+        @if (refurbError()) {
+          <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:6px;color:#dc2626;font-size:13px;margin-bottom:8px">{{refurbError()}}</div>
+        }
+        @if (refurbSuccess()) {
+          <div class="success-msg">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Refurbishment submitted for workflow approval
+          </div>
+        }
+
+      </div>
+
+    </div>
+  </mat-tab>
+
+  <!-- PRIOR YEAR ADJUSTMENTS TAB -->
+  <mat-tab label="Prior Year Adjustments">
+    <div style="padding-top:20px">
+      <app-prior-year-adjustments></app-prior-year-adjustments>
+    </div>
+  </mat-tab>
+
+  <!-- PRIOR PERIOD ADJUSTMENTS TAB -->
+  <mat-tab label="Prior Period Adjustments">
+    <div style="padding-top:20px">
+      <app-prior-period-adjustments></app-prior-period-adjustments>
+    </div>
+  </mat-tab>
+</mat-tab-group>

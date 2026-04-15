@@ -1,0 +1,78 @@
+.expanded-row {
+  padding: 0 !important;
+  background: var(--platinum-surface);
+}
+.detail-sections {
+  padding: 16px;
+}
+.detail-section {
+  margin-bottom: 16px;
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--platinum-navy);
+    margin-bottom: 8px;
+  }
+}
+.tickmarks-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tickmark-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  &.small {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+}
+.tickmark-symbol {
+  font-weight: 700;
+  font-size: 14px;
+}
+.entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.entry-item {
+  background: white;
+  border: 1px solid var(--platinum-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.entry-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--platinum-text-secondary);
+}
+.entry-content {
+  font-size: 13px;
+  color: var(--platinum-text);
+  line-height: 1.5;
+}
+.entry-meta {
+  font-size: 11px;
+  color: var(--platinum-text-muted);
+  margin-top: 6px;
+}
+.empty-detail {
+  text-align: center;
+  padding: 24px;
+  color: var(--platinum-text-muted);
+  font-size: 13px;
+}

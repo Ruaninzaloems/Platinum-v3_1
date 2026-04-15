@@ -1,0 +1,193 @@
+<div class="page-header">
+  <div>
+    <h1>Maintenance Requests</h1>
+    <p class="subtitle">Corrective maintenance request management</p>
+  </div>
+  <button class="btn-primary" (click)="showNewForm ? closeNewForm() : openNewForm()">
+    <mat-icon>add</mat-icon> New Request
+  </button>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-value">{{totalCount()}}</div>
+    <div class="kpi-label">Total Requests</div>
+    <mat-icon class="kpi-icon" style="color:#3b82f6">assignment</mat-icon>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{pendingCount()}}</div>
+    <div class="kpi-label">Pending Approval</div>
+    <mat-icon class="kpi-icon" style="color:#f59e0b">hourglass_empty</mat-icon>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{inProgressCount()}}</div>
+    <div class="kpi-label">In Progress</div>
+    <mat-icon class="kpi-icon" style="color:#6366f1">autorenew</mat-icon>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{approvedCount()}}</div>
+    <div class="kpi-label">Approved</div>
+    <mat-icon class="kpi-icon" style="color:#10b981">check_circle</mat-icon>
+  </div>
+</div>
+
+@if (showNewForm) {
+  <div class="form-card">
+    <h3>New Maintenance Request</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Service Group *</label>
+        <select [(ngModel)]="newRequest.assetServiceGroupId">
+          <option value="">Select Service Group</option>
+          @for (sg of serviceGroups(); track sg.assetServiceGroupId) {
+            <option [value]="sg.assetServiceGroupId">{{sg.assetServiceGroupDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Asset Type *</label>
+        <select [(ngModel)]="newRequest.assetTypeId" (ngModelChange)="onAssetTypeChange()">
+          <option value="">Select Asset Type</option>
+          @for (at of assetTypes(); track at.assetTypeId) {
+            <option [value]="at.assetTypeId">{{at.assetTypeDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Asset Category *</label>
+        <select [(ngModel)]="newRequest.assetCategoryId" (ngModelChange)="onAssetCategoryChange()" [disabled]="!newRequest.assetTypeId">
+          <option value="">Select Category</option>
+          @for (ac of filteredCategories(); track ac.assetCategoryId) {
+            <option [value]="ac.assetCategoryId">{{ac.assetCategoryDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Sub-Category</label>
+        <select [(ngModel)]="newRequest.assetSubCategoryId" [disabled]="!newRequest.assetCategoryId">
+          <option [ngValue]="null">Select Sub-Category</option>
+          @for (sc of filteredSubCategories(); track sc.assetSubCategoryId) {
+            <option [value]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Request Date *</label>
+        <input type="date" [(ngModel)]="newRequest.requestDate" (change)="onLeadTimeChange()">
+      </div>
+      <div class="form-group">
+        <label>Lead Time *</label>
+        <select [(ngModel)]="newRequest.leadTimeId" (change)="onLeadTimeChange()">
+          <option value="">Select Lead Time</option>
+          @for (lt of leadTimes(); track lt.leadTimeId) {
+            <option [value]="lt.leadTimeId">{{lt.maintenanceDesc}} ({{lt.leadTimeDays}} days)</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Proposed Closing Date</label>
+        <input type="date" [value]="getProposedClosing()" disabled>
+      </div>
+      <div class="form-group full-width">
+        <label>Description *</label>
+        <textarea rows="3" [(ngModel)]="newRequest.maintenanceDescription" placeholder="Describe the maintenance required"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" (click)="closeNewForm()">Cancel</button>
+      <button class="btn-primary" (click)="submitRequest()">Submit Request</button>
+    </div>
+  </div>
+}
+
+<div class="filter-bar">
+  <select [(ngModel)]="filterServiceGroup">
+    <option value="">All Service Groups</option>
+    @for (sg of serviceGroups(); track sg.assetServiceGroupId) {
+      <option [value]="sg.assetServiceGroupId">{{sg.assetServiceGroupDesc}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterApproved">
+    <option value="">All Statuses</option>
+    <option value="true">Approved</option>
+    <option value="false">Pending</option>
+  </select>
+  <input type="date" [(ngModel)]="filterDateFrom" placeholder="From">
+  <input type="date" [(ngModel)]="filterDateTo" placeholder="To">
+  <button class="btn-filter" (click)="applyFilters()"><mat-icon>search</mat-icon> Filter</button>
+  <button class="btn-clear" (click)="clearFilters()"><mat-icon>clear</mat-icon> Clear</button>
+</div>
+
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading maintenance requests...</span>
+  </div>
+} @else if (items().length === 0) {
+  <div class="empty-state">
+    <mat-icon>build</mat-icon>
+    <h3>No Maintenance Requests</h3>
+    <p>Click "New Request" to create your first maintenance request.</p>
+  </div>
+} @else {
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Description</th>
+          <th>Service Group</th>
+          <th>Asset Type</th>
+          <th>Request Date</th>
+          <th>Lead Time</th>
+          <th>Proposed Closing</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of items(); track item.requestId) {
+          <tr class="clickable-row" (click)="openRequest(item)">
+            <td><span class="id-badge">MR-{{item.requestId}}</span></td>
+            <td class="desc-cell">{{item.maintenanceDescription}}</td>
+            <td>{{item.serviceGroupDesc}}</td>
+            <td>{{item.assetTypeDesc}}</td>
+            <td>{{formatDate(item.requestDate)}}</td>
+            <td>{{item.leadTimeDesc}}</td>
+            <td>{{formatDate(item.proposedClosingTime)}}</td>
+            <td>
+              @if (item.isApproved) {
+                <span class="status-badge status-approved">Approved</span>
+              } @else {
+                <span class="status-badge status-pending">Pending</span>
+              }
+            </td>
+            <td>
+              @if (item.isApproved) {
+                <button mat-icon-button class="action-btn" title="Print" (click)="printRequest(item); $event.stopPropagation()">
+                  <mat-icon>print</mat-icon>
+                </button>
+              }
+              <button mat-icon-button class="action-btn" (click)="confirmDelete(item); $event.stopPropagation()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (pendingDelete()) {
+  <div class="modal-overlay" (click)="cancelDelete()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <h3>Confirm Delete</h3>
+      <p>Are you sure you want to delete request <strong>MR-{{pendingDelete().requestId}}</strong>?<br>This will also delete all linked work orders.</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="cancelDelete()">Cancel</button>
+        <button class="btn-danger" (click)="doDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+}

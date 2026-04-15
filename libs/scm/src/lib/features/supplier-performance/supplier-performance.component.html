@@ -1,0 +1,1140 @@
+    <div class="sp-page">
+      @if (notification()) {
+        <div class="notification-bar">
+          <mat-icon>check_circle</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'main') {
+        <div class="top-tabs">
+          <button class="top-tab" [class.active]="activeTab() === 'dashboard'" (click)="activeTab.set('dashboard'); loadDashboard()">
+            <mat-icon>dashboard</mat-icon> Dashboard
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'issues'" (click)="activeTab.set('issues'); loadIssues()">
+            <mat-icon>report_problem</mat-icon> Issue Register
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'blacklist'" (click)="activeTab.set('blacklist'); loadBlacklist()">
+            <mat-icon>block</mat-icon> Blacklist
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'whitelist'" (click)="activeTab.set('whitelist'); loadWhitelist()">
+            <mat-icon>verified_user</mat-icon> Whitelist
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'scorecards'" (click)="activeTab.set('scorecards'); loadScorecards()">
+            <mat-icon>scorecard</mat-icon> Scorecards
+          </button>
+          <button class="top-tab" [class.active]="activeTab() === 'reports'" (click)="activeTab.set('reports'); loadDiversity()">
+            <mat-icon>assessment</mat-icon> Reports
+          </button>
+          <button class="top-tab" (click)="navigateTo('analytics')">
+            <mat-icon>analytics</mat-icon> AI Analytics
+          </button>
+        </div>
+
+        @if (activeTab() === 'dashboard') {
+          <div class="kpi-strip">
+            <div class="kpi-tile" matTooltip="Total issues logged">
+              <mat-icon>assignment_late</mat-icon>
+              <span class="kpi-value">{{dashboardData().totalIssues || 0}}</span>
+              <span class="kpi-label">Total Issues</span>
+            </div>
+            <div class="kpi-tile" style="border-left:4px solid #c62828" matTooltip="Critical severity issues requiring immediate action">
+              <mat-icon style="color:#c62828">error</mat-icon>
+              <span class="kpi-value" style="color:#c62828">{{dashboardData().criticalIssues || 0}}</span>
+              <span class="kpi-label">Critical Issues</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Issues currently open or in progress">
+              <mat-icon style="color:#ef6c00">pending_actions</mat-icon>
+              <span class="kpi-value" style="color:#ef6c00">{{dashboardData().openIssues || 0}}</span>
+              <span class="kpi-label">Open Issues</span>
+            </div>
+            <div class="kpi-tile" style="border-left:4px solid #c62828" matTooltip="Vendors on National Treasury or Municipal blacklist">
+              <mat-icon style="color:#c62828">block</mat-icon>
+              <span class="kpi-value" style="color:#c62828">{{dashboardData().blacklistedVendors || 0}}</span>
+              <span class="kpi-label">Blacklisted Vendors</span>
+            </div>
+            <div class="kpi-tile" style="border-left:4px solid #2e7d32" matTooltip="Approved preferred vendors">
+              <mat-icon style="color:#2e7d32">verified_user</mat-icon>
+              <span class="kpi-value" style="color:#2e7d32">{{dashboardData().whitelistedVendors || 0}}</span>
+              <span class="kpi-label">Whitelisted Vendors</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Average performance score across all scorecards">
+              <mat-icon>speed</mat-icon>
+              <span class="kpi-value" [style.color]="getScoreColor(dashboardData().avgScore || 0)">{{dashboardData().avgScore || 0}}%</span>
+              <span class="kpi-label">Avg Performance Score</span>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="detail-card">
+              <h3><mat-icon>category</mat-icon> Issue Category Breakdown</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead>
+                    <tr><th>Category</th><th>Count</th><th>Distribution</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (cat of dashboardData().categoryBreakdown || []; track cat.code) {
+                      <tr>
+                        <td><span class="category-badge" matTooltip="{{cat.description}}">{{cat.name}}</span></td>
+                        <td matTooltip="Number of issues in this category"><strong>{{cat.count}}</strong></td>
+                        <td>
+                          <div class="bar-container">
+                            <div class="bar-fill" [style.width.%]="cat.percentage" [style.background]="'#3b82f6'"></div>
+                          </div>
+                          <span class="bar-label" matTooltip="Percentage of total issues">{{cat.percentage}}%</span>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="3" class="empty-state"><mat-icon>info</mat-icon><span>No issues recorded</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>warning</mat-icon> Severity Distribution</h3>
+              <div class="severity-grid">
+                <div class="severity-card" style="background:#ffebee;border-left:4px solid #c62828" matTooltip="Critical severity issues">
+                  <span class="severity-count" style="color:#c62828">{{dashboardData().severityCounts?.CRITICAL || 0}}</span>
+                  <span class="severity-label" style="color:#c62828">Critical</span>
+                </div>
+                <div class="severity-card" style="background:#fff3e0;border-left:4px solid #ef6c00" matTooltip="High severity issues">
+                  <span class="severity-count" style="color:#ef6c00">{{dashboardData().severityCounts?.HIGH || 0}}</span>
+                  <span class="severity-label" style="color:#ef6c00">Major</span>
+                </div>
+                <div class="severity-card" style="background:#fff8e1;border-left:4px solid #f9a825" matTooltip="Medium severity issues">
+                  <span class="severity-count" style="color:#f9a825">{{dashboardData().severityCounts?.MEDIUM || 0}}</span>
+                  <span class="severity-label" style="color:#f9a825">Moderate</span>
+                </div>
+                <div class="severity-card" style="background:#e8f5e9;border-left:4px solid #2e7d32" matTooltip="Low severity issues">
+                  <span class="severity-count" style="color:#2e7d32">{{dashboardData().severityCounts?.LOW || 0}}</span>
+                  <span class="severity-label" style="color:#2e7d32">Minor</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>history</mat-icon> Recent Issues</h3>
+            <div class="tender-table-wrapper">
+              <table class="tender-table">
+                <thead>
+                  <tr><th>Issue ID</th><th>Supplier</th><th>Category</th><th>Severity</th><th>Description</th><th>Date</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  @for (issue of dashboardData().recentIssues || []; track issue.id) {
+                    <tr class="tender-row" (click)="viewIssueDetail(issue)">
+                      <td class="ref-cell" matTooltip="{{issue.id}}">{{issue.id}}</td>
+                      <td matTooltip="{{issue.supplierName}}">{{issue.supplierName}}</td>
+                      <td><span class="category-badge" matTooltip="{{getCategoryName(issue.category)}}">{{getCategoryName(issue.category)}}</span></td>
+                      <td><span class="severity-badge" [class]="'severity-' + issue.severity?.toLowerCase()" matTooltip="{{issue.severity}}">{{issue.severity}}</span></td>
+                      <td class="desc-cell" matTooltip="{{issue.description}}">{{issue.description | slice:0:60}}{{issue.description?.length > 60 ? '...' : ''}}</td>
+                      <td matTooltip="{{issue.loggedDate}}">{{formatDate(issue.loggedDate)}}</td>
+                      <td><span class="status-badge" [class]="'status-' + issue.status" matTooltip="{{issue.status}}">{{formatStatus(issue.status)}}</span></td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="7" class="empty-state"><mat-icon>search_off</mat-icon><span>No issues found</span></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (diversityData()) {
+            <div class="detail-card">
+              <h3><mat-icon>diversity_3</mat-icon> B-BBEE Distribution Summary</h3>
+              <div class="kpi-strip">
+                @for (entry of getBbbeeEntries(); track entry.key) {
+                  <div class="kpi-tile" matTooltip="{{entry.key}}: {{entry.value}} suppliers">
+                    <span class="kpi-value">{{entry.value}}</span>
+                    <span class="kpi-label">{{entry.key}}</span>
+                  </div>
+                }
+              </div>
+              @if (diversityData()?.preferentialProcurement) {
+                <div class="kpi-strip" style="margin-top:12px">
+                  <div class="kpi-tile" matTooltip="Total contract value">
+                    <span class="kpi-value">R{{formatAmount(diversityData().preferentialProcurement.totalContractValue?.amount)}}</span>
+                    <span class="kpi-label">Total Contract Value</span>
+                  </div>
+                  <div class="kpi-tile" matTooltip="B-BBEE Level 1-3 spend">
+                    <span class="kpi-value" style="color:#2e7d32">R{{formatAmount(diversityData().preferentialProcurement.bbbee123Spend?.amount)}}</span>
+                    <span class="kpi-label">B-BBEE 1-3 Spend</span>
+                  </div>
+                  <div class="kpi-tile" matTooltip="B-BBEE Level 1-3 percentage">
+                    <span class="kpi-value" style="color:#2e7d32">{{diversityData().preferentialProcurement.bbbee123Percentage}}%</span>
+                    <span class="kpi-label">B-BBEE 1-3 %</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'issues') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search issues..." [(ngModel)]="issueSearch" (keyup.enter)="loadIssues()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Category" [(ngModel)]="issueFilterCategory" (selectionChange)="issuePageNum.set(1); loadIssues()">
+                <mat-option value="">All Categories</mat-option>
+                @for (cat of config().issueCategories || []; track cat.code) {
+                  <mat-option [value]="cat.code">{{cat.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Severity" [(ngModel)]="issueFilterSeverity" (selectionChange)="issuePageNum.set(1); loadIssues()">
+                <mat-option value="">All Severities</mat-option>
+                @for (sev of config().issueSeverities || []; track sev.code) {
+                  <mat-option [value]="sev.code">{{sev.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="issueFilterStatus" (selectionChange)="issuePageNum.set(1); loadIssues()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="open">Open</mat-option>
+                <mat-option value="in_progress">In Progress</mat-option>
+                <mat-option value="resolved">Resolved</mat-option>
+                <mat-option value="closed">Closed</mat-option>
+                <mat-option value="escalated">Escalated</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="issueFromPicker" [(ngModel)]="issueDateFrom" (dateChange)="issuePageNum.set(1); loadIssues()">
+              <mat-datepicker-toggle matIconSuffix [for]="issueFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #issueFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="issueToPicker" [(ngModel)]="issueDateTo" (dateChange)="issuePageNum.set(1); loadIssues()">
+              <mat-datepicker-toggle matIconSuffix [for]="issueToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #issueToPicker></mat-datepicker>
+            </mat-form-field>
+            <button mat-stroked-button (click)="clearIssueFilters()" matTooltip="Clear all filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear All
+            </button>
+            <button mat-flat-button color="primary" (click)="showCreateIssue.set(true)" matTooltip="Log a new issue">
+              <mat-icon>add</mat-icon> Log Issue
+            </button>
+          </div>
+
+          @if (showCreateIssue()) {
+            <div class="detail-card">
+              <h3><mat-icon>add_circle</mat-icon> Log New Issue</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Supplier</mat-label>
+                  <mat-select [(ngModel)]="issueForm.supplierId" (selectionChange)="onIssueSupplierChange()">
+                    @for (s of suppliers(); track s.id) {
+                      <mat-option [value]="s.id">{{s.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Category</mat-label>
+                  <mat-select [(ngModel)]="issueForm.category">
+                    @for (cat of config().issueCategories || []; track cat.code) {
+                      <mat-option [value]="cat.code">{{cat.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Severity</mat-label>
+                  <mat-select [(ngModel)]="issueForm.severity">
+                    @for (sev of config().issueSeverities || []; track sev.code) {
+                      <mat-option [value]="sev.code">{{sev.name}} (Penalty: -{{sev.scorePenalty}})</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Description</mat-label>
+                  <textarea matInput [(ngModel)]="issueForm.description" rows="3" placeholder="Detailed description of the issue"></textarea>
+                </mat-form-field>
+              </div>
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showCreateIssue.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="createIssue()" [disabled]="saving() || !issueForm.supplierId || !issueForm.category || !issueForm.severity || !issueForm.description">
+                  <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Log Issue'}}
+                </button>
+              </div>
+            </div>
+          }
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr>
+                  <th>Issue ID</th><th>Supplier</th><th>Category</th><th>Severity</th><th>Description</th><th>Date</th><th>Score Penalty</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (issue of issues(); track issue.id) {
+                  <tr class="tender-row" (click)="viewIssueDetail(issue)">
+                    <td class="ref-cell" matTooltip="{{issue.id}}">{{issue.id}}</td>
+                    <td matTooltip="{{issue.supplierName}}">{{issue.supplierName}}</td>
+                    <td><span class="category-badge" matTooltip="{{getCategoryName(issue.category)}}">{{getCategoryName(issue.category)}}</span></td>
+                    <td><span class="severity-badge" [class]="'severity-' + issue.severity?.toLowerCase()" matTooltip="{{issue.severity}} severity">{{issue.severity}}</span></td>
+                    <td class="desc-cell" matTooltip="{{issue.description}}">{{issue.description | slice:0:50}}{{issue.description?.length > 50 ? '...' : ''}}</td>
+                    <td matTooltip="{{issue.loggedDate}}">{{formatDate(issue.loggedDate)}}</td>
+                    <td matTooltip="Score penalty applied"><span class="penalty-badge">-{{issue.scorePenaltyApplied || 0}}</span></td>
+                    <td><span class="status-badge" [class]="'status-' + issue.status" matTooltip="{{formatStatus(issue.status)}}">{{formatStatus(issue.status)}}</span></td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button [matMenuTriggerFor]="issueMenu">
+                        <mat-icon>more_vert</mat-icon>
+                      </button>
+                      <mat-menu #issueMenu="matMenu">
+                        <button mat-menu-item (click)="viewIssueDetail(issue)"><mat-icon>visibility</mat-icon> View</button>
+                        @if (issue.status === 'open' || issue.status === 'in_progress' || issue.status === 'escalated') {
+                          <button mat-menu-item (click)="resolveIssue(issue)"><mat-icon>check_circle</mat-icon> Resolve</button>
+                        }
+                        <button mat-menu-item (click)="deleteIssue(issue.id)"><mat-icon>delete</mat-icon> Delete</button>
+                      </mat-menu>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="empty-state"><mat-icon>search_off</mat-icon><span>No issues found</span></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info" matTooltip="Showing page {{issuePageNum()}} of {{issueTotalPages()}}">Showing {{issuePageStart()}} - {{issuePageEnd()}} of {{issueTotal()}} issues</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="issuePageNum() <= 1" (click)="issuePageNum.set(issuePageNum() - 1); loadIssues()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{issuePageNum()}} of {{issueTotalPages()}}</span>
+              <button mat-icon-button [disabled]="issuePageNum() >= issueTotalPages()" (click)="issuePageNum.set(issuePageNum() + 1); loadIssues()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'blacklist') {
+          <div class="kpi-strip">
+            <div class="kpi-tile" style="border-left:4px solid #c62828" matTooltip="Total active blacklisted suppliers">
+              <mat-icon style="color:#c62828">block</mat-icon>
+              <span class="kpi-value" style="color:#c62828">{{blacklistData().length || 0}}</span>
+              <span class="kpi-label">Total Blacklisted</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Blacklisted from National Treasury source">
+              <mat-icon>account_balance</mat-icon>
+              <span class="kpi-value">{{countBySource('National Treasury')}}</span>
+              <span class="kpi-label">NT Source</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Blacklisted from Municipal source">
+              <mat-icon>location_city</mat-icon>
+              <span class="kpi-value">{{countBySource('Municipal')}}</span>
+              <span class="kpi-label">Municipal Source</span>
+            </div>
+            <div class="kpi-tile" matTooltip="Automatically matched to existing vendors">
+              <mat-icon>sync</mat-icon>
+              <span class="kpi-value">{{countAutoMatched()}}</span>
+              <span class="kpi-label">Auto-Matched</span>
+            </div>
+          </div>
+
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search blacklist..." [(ngModel)]="blSearch" (keyup.enter)="loadBlacklist()">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Source" [(ngModel)]="blFilterSource" (selectionChange)="blPageNum.set(1); loadBlacklist()">
+                <mat-option value="">All Sources</mat-option>
+                <mat-option value="National Treasury">National Treasury</mat-option>
+                <mat-option value="Municipal">Municipal</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Status" [(ngModel)]="blFilterStatus" (selectionChange)="blPageNum.set(1); loadBlacklist()">
+                <mat-option value="">All Statuses</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="expired">Expired</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <button mat-stroked-button (click)="blSearch=''; blFilterSource=''; blFilterStatus=''; blPageNum.set(1); loadBlacklist()" matTooltip="Clear all filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+            <button mat-flat-button color="primary" (click)="showImportCsv.set(true)" matTooltip="Import blacklist from CSV data">
+              <mat-icon>upload_file</mat-icon> Import CSV
+            </button>
+            <button mat-flat-button color="accent" (click)="showCheckSuppliers.set(true)" matTooltip="Check suppliers against blacklist">
+              <mat-icon>fact_check</mat-icon> Check Suppliers
+            </button>
+          </div>
+
+          @if (showImportCsv()) {
+            <div class="detail-card">
+              <h3><mat-icon>upload_file</mat-icon> Import Blacklist CSV Data</h3>
+              <mat-form-field appearance="outline" style="width:100%">
+                <mat-label>CSV Data (one entry per line: supplierName, registrationNumber, reason, source)</mat-label>
+                <textarea matInput [(ngModel)]="csvImportText" rows="6" placeholder="Corruption Consulting CC, 2019/999888/23, Convicted of fraud, National Treasury"></textarea>
+              </mat-form-field>
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showImportCsv.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="importBlacklistCsv()" [disabled]="saving() || !csvImportText">
+                  <mat-icon>upload</mat-icon> {{saving() ? 'Importing...' : 'Import'}}
+                </button>
+              </div>
+              @if (importResult()) {
+                <div class="import-result" style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px">
+                  <p matTooltip="Import summary"><strong>{{importResult().message}}</strong></p>
+                  @if (importResult().errors?.length) {
+                    <h4 style="color:#c62828">Errors:</h4>
+                    @for (err of importResult().errors; track err.row) {
+                      <p style="color:#c62828;font-size:12px" matTooltip="Row {{err.row}}">Row {{err.row}}: {{err.error}}</p>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (showCheckSuppliers()) {
+            <div class="detail-card">
+              <h3><mat-icon>fact_check</mat-icon> Check Supplier Against Blacklist</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Registration Number</mat-label>
+                  <input matInput [(ngModel)]="checkForm.registrationNumber" placeholder="e.g., 2019/999888/23">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>CSD Number</mat-label>
+                  <input matInput [(ngModel)]="checkForm.csdNumber" placeholder="e.g., MAAA0001234">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Supplier Name</mat-label>
+                  <input matInput [(ngModel)]="checkForm.supplierName" placeholder="Search by name">
+                </mat-form-field>
+              </div>
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showCheckSuppliers.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="checkSupplierBlacklist()" [disabled]="saving() || (!checkForm.registrationNumber && !checkForm.csdNumber && !checkForm.supplierName)">
+                  <mat-icon>search</mat-icon> {{saving() ? 'Checking...' : 'Check'}}
+                </button>
+              </div>
+              @if (checkResult()) {
+                <div style="margin-top:12px;padding:12px;border-radius:8px" [style.background]="checkResult().isBlacklisted ? '#ffebee' : '#e8f5e9'">
+                  @if (checkResult().isBlacklisted) {
+                    <p style="color:#c62828;font-weight:600" matTooltip="Supplier is blacklisted"><mat-icon style="color:#c62828;vertical-align:middle">warning</mat-icon> BLACKLISTED - {{checkResult().matches?.length}} match(es) found</p>
+                    @for (m of checkResult().matches; track m.id) {
+                      <div style="padding:8px;margin-top:8px;background:white;border-radius:6px;border:1px solid #ffcdd2">
+                        <p matTooltip="{{m.supplierName}}"><strong>{{m.supplierName}}</strong></p>
+                        <p style="font-size:12px" matTooltip="{{m.reason}}">Reason: {{m.reason}}</p>
+                        <p style="font-size:12px" matTooltip="{{m.source}}">Source: {{m.source}} | Case: {{m.caseReference || 'N/A'}}</p>
+                      </div>
+                    }
+                  } @else {
+                    <p style="color:#2e7d32;font-weight:600" matTooltip="Supplier is not blacklisted"><mat-icon style="color:#2e7d32;vertical-align:middle">check_circle</mat-icon> NOT BLACKLISTED - Supplier is clear</p>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr><th>Supplier Name</th><th>Registration Number</th><th>Reason</th><th>Source</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                @for (bl of blacklistData(); track bl.id) {
+                  <tr>
+                    <td matTooltip="{{bl.supplierName}}"><strong>{{bl.supplierName}}</strong></td>
+                    <td matTooltip="{{bl.registrationNumber}}">{{bl.registrationNumber}}</td>
+                    <td class="desc-cell" matTooltip="{{bl.reason}}">{{bl.reason | slice:0:50}}{{bl.reason?.length > 50 ? '...' : ''}}</td>
+                    <td matTooltip="{{bl.source}}"><span class="source-badge">{{bl.source}}</span></td>
+                    <td matTooltip="{{bl.startDate}}">{{bl.startDate}}</td>
+                    <td><span class="status-badge" [class]="bl.status === 'active' ? 'status-rejected' : 'status-draft'" matTooltip="{{bl.status}}">{{bl.status}}</span></td>
+                    <td class="actions-cell">
+                      <button mat-icon-button matTooltip="View details" (click)="viewBlacklistDetail(bl)">
+                        <mat-icon>visibility</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="7" class="empty-state"><mat-icon>search_off</mat-icon><span>No blacklist entries found</span></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info" matTooltip="Pagination info">Showing {{blPageStart()}} - {{blPageEnd()}} of {{blTotal()}} entries</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="blPageNum() <= 1" (click)="blPageNum.set(blPageNum() - 1); loadBlacklist()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{blPageNum()}} of {{blTotalPages()}}</span>
+              <button mat-icon-button [disabled]="blPageNum() >= blTotalPages()" (click)="blPageNum.set(blPageNum() + 1); loadBlacklist()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'whitelist') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-select placeholder="Commodity Category" [(ngModel)]="wlFilterCategory" (selectionChange)="wlPageNum.set(1); loadWhitelist()">
+                <mat-option value="">All Categories</mat-option>
+                @for (cat of getWhitelistCategories(); track cat) {
+                  <mat-option [value]="cat">{{cat}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-stroked-button (click)="wlFilterCategory=''; wlPageNum.set(1); loadWhitelist()" matTooltip="Clear filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+            <button mat-flat-button color="primary" (click)="showAddWhitelist.set(true)" matTooltip="Add supplier to whitelist">
+              <mat-icon>add</mat-icon> Add to Whitelist
+            </button>
+          </div>
+
+          @if (showAddWhitelist()) {
+            <div class="detail-card">
+              <h3><mat-icon>verified_user</mat-icon> Add Supplier to Whitelist</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Supplier</mat-label>
+                  <mat-select [(ngModel)]="wlForm.supplierId" (selectionChange)="onWlSupplierChange()">
+                    @for (s of suppliers(); track s.id) {
+                      <mat-option [value]="s.id">{{s.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Commodity Category</mat-label>
+                  <input matInput [(ngModel)]="wlForm.category" placeholder="e.g., Civil Engineering, IT Services">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="form-field-full">
+                  <mat-label>Reason for Whitelisting</mat-label>
+                  <textarea matInput [(ngModel)]="wlForm.reason" rows="2" placeholder="Reason for adding to preferred whitelist"></textarea>
+                </mat-form-field>
+              </div>
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showAddWhitelist.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="addToWhitelist()" [disabled]="saving() || !wlForm.supplierId || !wlForm.category || !wlForm.reason">
+                  <mat-icon>save</mat-icon> {{saving() ? 'Saving...' : 'Add to Whitelist'}}
+                </button>
+              </div>
+            </div>
+          }
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr><th>Supplier</th><th>Commodity Category</th><th>Reason</th><th>Added By</th><th>Date</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                @for (wl of whitelistData(); track wl.id) {
+                  <tr>
+                    <td matTooltip="{{wl.supplierName}}"><strong>{{wl.supplierName}}</strong></td>
+                    <td matTooltip="{{wl.category}}"><span class="category-badge">{{wl.category}}</span></td>
+                    <td class="desc-cell" matTooltip="{{wl.reason}}">{{wl.reason | slice:0:60}}{{wl.reason?.length > 60 ? '...' : ''}}</td>
+                    <td matTooltip="{{wl.addedBy}}">{{wl.addedBy}}</td>
+                    <td matTooltip="{{wl.addedDate}}">{{wl.addedDate}}</td>
+                    <td class="actions-cell">
+                      <button mat-icon-button color="warn" (click)="removeFromWhitelist(wl)" matTooltip="Remove from whitelist">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="6" class="empty-state"><mat-icon>search_off</mat-icon><span>No whitelist entries found</span></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info" matTooltip="Pagination info">Showing {{wlPageStart()}} - {{wlPageEnd()}} of {{wlTotal()}} entries</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="wlPageNum() <= 1" (click)="wlPageNum.set(wlPageNum() - 1); loadWhitelist()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{wlPageNum()}} of {{wlTotalPages()}}</span>
+              <button mat-icon-button [disabled]="wlPageNum() >= wlTotalPages()" (click)="wlPageNum.set(wlPageNum() + 1); loadWhitelist()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'scorecards') {
+          <div class="filters-bar">
+            <mat-form-field appearance="outline">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search scorecards..." [(ngModel)]="scSearch" (keyup.enter)="loadScorecards()">
+            </mat-form-field>
+            <button mat-stroked-button (click)="scSearch=''; scPageNum.set(1); loadScorecards()" matTooltip="Clear filters">
+              <mat-icon>filter_alt_off</mat-icon> Clear
+            </button>
+            <button mat-flat-button color="primary" (click)="showCreateScorecard.set(true); loadScorecardWeights()" matTooltip="Create new scorecard">
+              <mat-icon>add</mat-icon> New Scorecard
+            </button>
+          </div>
+
+          @if (showCreateScorecard()) {
+            <div class="detail-card">
+              <h3><mat-icon>scorecard</mat-icon> Create Performance Scorecard</h3>
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Supplier</mat-label>
+                  <mat-select [(ngModel)]="scForm.supplierId" (selectionChange)="onScSupplierChange()">
+                    @for (s of suppliers(); track s.id) {
+                      <mat-option [value]="s.id">{{s.name}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Assessment Period</mat-label>
+                  <input matInput [(ngModel)]="scForm.assessmentPeriod" placeholder="e.g., 2024/2025 Q4">
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Industry Profile</mat-label>
+                  <mat-select [(ngModel)]="scForm.industryProfile" (selectionChange)="onProfileChange()">
+                    <mat-option value="default">Default</mat-option>
+                    <mat-option value="construction">Construction</mat-option>
+                    <mat-option value="services">Services</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              @if (currentWeights()) {
+                <h4 style="margin:16px 0 8px">Dimension Scoring</h4>
+                <div class="tender-table-wrapper">
+                  <table class="tender-table">
+                    <thead>
+                      <tr><th>Dimension</th><th>Weight (%)</th><th>Score (0-100)</th><th>Weighted Score</th></tr>
+                    </thead>
+                    <tbody>
+                      @for (dim of getWeightDimensions(); track dim.key) {
+                        <tr>
+                          <td matTooltip="{{dim.name}}"><strong>{{dim.name}}</strong></td>
+                          <td matTooltip="Weight: {{dim.weight}}%">{{dim.weight}}%</td>
+                          <td>
+                            <mat-form-field appearance="outline" style="width:100px">
+                              <input matInput type="number" min="0" max="100" [(ngModel)]="scDimensionScores[dim.key]" (ngModelChange)="calcOverallScore()">
+                            </mat-form-field>
+                          </td>
+                          <td matTooltip="Weighted contribution">{{calcDimWeightedScore(dim.key, dim.weight)}}</td>
+                        </tr>
+                      }
+                      <tr style="background:#f8fafc">
+                        <td><strong>Overall Score</strong></td>
+                        <td matTooltip="Total weight">100%</td>
+                        <td></td>
+                        <td><strong matTooltip="Calculated overall score" [style.color]="getScoreColor(scOverallScore())">{{scOverallScore()}}%</strong></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              <div class="form-actions">
+                <button mat-stroked-button (click)="showCreateScorecard.set(false)">Cancel</button>
+                <button mat-flat-button color="primary" (click)="createScorecard()" [disabled]="saving() || !scForm.supplierId || !scForm.assessmentPeriod">
+                  <mat-icon>save</mat-icon> {{saving() ? 'Creating...' : 'Create Scorecard'}}
+                </button>
+              </div>
+            </div>
+          }
+
+          <div class="tender-table-wrapper">
+            <table class="tender-table">
+              <thead>
+                <tr><th>Supplier</th><th>Period</th><th>Overall Score</th><th>Trend</th><th>Issues</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                @for (sc of scorecards(); track sc.id) {
+                  <tr class="tender-row" (click)="viewScorecardDetail(sc)">
+                    <td matTooltip="{{sc.supplierName}}"><strong>{{sc.supplierName}}</strong></td>
+                    <td matTooltip="{{sc.assessmentPeriod}}">{{sc.assessmentPeriod}}</td>
+                    <td>
+                      <span class="score-badge" [style.background]="getScoreBg(sc.overallScore)" [style.color]="getScoreColor(sc.overallScore)" matTooltip="Overall weighted score: {{sc.overallScore}}%">
+                        {{sc.overallScore}}%
+                      </span>
+                    </td>
+                    <td matTooltip="Performance trend">
+                      @if (sc.trend === 'up') { <mat-icon style="color:#2e7d32">trending_up</mat-icon> }
+                      @if (sc.trend === 'down') { <mat-icon style="color:#c62828">trending_down</mat-icon> }
+                      @if (sc.trend === 'stable') { <mat-icon style="color:#64748b">trending_flat</mat-icon> }
+                    </td>
+                    <td matTooltip="{{sc.activeIssues}} active of {{sc.issuesCount}} total">{{sc.activeIssues}}/{{sc.issuesCount}}</td>
+                    <td matTooltip="{{sc.assessmentDate}}">{{sc.assessmentDate}}</td>
+                    <td><span class="status-badge" [class]="'status-' + sc.status" matTooltip="{{sc.status}}">{{sc.status}}</span></td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button mat-icon-button matTooltip="View scorecard details" (click)="viewScorecardDetail(sc)">
+                        <mat-icon>visibility</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="8" class="empty-state"><mat-icon>search_off</mat-icon><span>No scorecards found</span></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span class="page-info" matTooltip="Pagination info">Showing {{scPageStart()}} - {{scPageEnd()}} of {{scTotal()}} scorecards</span>
+            <div class="page-buttons">
+              <button mat-icon-button [disabled]="scPageNum() <= 1" (click)="scPageNum.set(scPageNum() - 1); loadScorecards()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-num">Page {{scPageNum()}} of {{scTotalPages()}}</span>
+              <button mat-icon-button [disabled]="scPageNum() >= scTotalPages()" (click)="scPageNum.set(scPageNum() + 1); loadScorecards()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'reports') {
+          <div class="report-tabs">
+            <button class="tab-btn" [class.active]="reportTab() === 'performance'" (click)="reportTab.set('performance')">Performance Summary</button>
+            <button class="tab-btn" [class.active]="reportTab() === 'diversity'" (click)="reportTab.set('diversity'); loadDiversity()">Diversity Report</button>
+            <button class="tab-btn" [class.active]="reportTab() === 'trends'" (click)="reportTab.set('trends')">Issue Trends</button>
+          </div>
+
+          @if (reportTab() === 'performance') {
+            <div class="detail-card">
+              <h3><mat-icon>emoji_events</mat-icon> Top Performing Suppliers</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead><tr><th>#</th><th>Supplier</th><th>Score</th><th>Trend</th><th>Active Issues</th></tr></thead>
+                  <tbody>
+                    @for (sc of getTopSuppliers(); track sc.id; let i = $index) {
+                      <tr>
+                        <td matTooltip="Rank {{i + 1}}">{{i + 1}}</td>
+                        <td matTooltip="{{sc.supplierName}}"><strong>{{sc.supplierName}}</strong></td>
+                        <td><span class="score-badge" [style.background]="getScoreBg(sc.overallScore)" [style.color]="getScoreColor(sc.overallScore)" matTooltip="{{sc.overallScore}}%">{{sc.overallScore}}%</span></td>
+                        <td matTooltip="{{sc.trend}}">
+                          @if (sc.trend === 'up') { <mat-icon style="color:#2e7d32">trending_up</mat-icon> }
+                          @if (sc.trend === 'down') { <mat-icon style="color:#c62828">trending_down</mat-icon> }
+                          @if (sc.trend === 'stable') { <mat-icon style="color:#64748b">trending_flat</mat-icon> }
+                        </td>
+                        <td matTooltip="{{sc.activeIssues}} active issues">{{sc.activeIssues}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><mat-icon>info</mat-icon><span>No scorecard data</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>warning</mat-icon> Bottom Performing Suppliers</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead><tr><th>#</th><th>Supplier</th><th>Score</th><th>Trend</th><th>Active Issues</th></tr></thead>
+                  <tbody>
+                    @for (sc of getBottomSuppliers(); track sc.id; let i = $index) {
+                      <tr>
+                        <td matTooltip="Rank {{i + 1}}">{{i + 1}}</td>
+                        <td matTooltip="{{sc.supplierName}}"><strong>{{sc.supplierName}}</strong></td>
+                        <td><span class="score-badge" [style.background]="getScoreBg(sc.overallScore)" [style.color]="getScoreColor(sc.overallScore)" matTooltip="{{sc.overallScore}}%">{{sc.overallScore}}%</span></td>
+                        <td matTooltip="{{sc.trend}}">
+                          @if (sc.trend === 'up') { <mat-icon style="color:#2e7d32">trending_up</mat-icon> }
+                          @if (sc.trend === 'down') { <mat-icon style="color:#c62828">trending_down</mat-icon> }
+                          @if (sc.trend === 'stable') { <mat-icon style="color:#64748b">trending_flat</mat-icon> }
+                        </td>
+                        <td matTooltip="{{sc.activeIssues}} active issues">{{sc.activeIssues}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><mat-icon>info</mat-icon><span>No scorecard data</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button mat-flat-button color="primary" (click)="printReport()" matTooltip="Print report">
+                <mat-icon>print</mat-icon> Print Report
+              </button>
+            </div>
+          }
+
+          @if (reportTab() === 'diversity') {
+            @if (diversityData()) {
+              <div class="detail-card">
+                <h3><mat-icon>diversity_3</mat-icon> B-BBEE Distribution</h3>
+                <div class="kpi-strip">
+                  @for (entry of getBbbeeEntries(); track entry.key) {
+                    <div class="kpi-tile" matTooltip="{{entry.key}}: {{entry.value}} suppliers">
+                      <span class="kpi-value">{{entry.value}}</span>
+                      <span class="kpi-label">{{entry.key}}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="detail-card">
+                <h3><mat-icon>account_balance</mat-icon> Preferential Procurement</h3>
+                <div class="kpi-strip">
+                  <div class="kpi-tile" matTooltip="Total active suppliers">
+                    <span class="kpi-value">{{diversityData().totalActiveSuppliers}}</span>
+                    <span class="kpi-label">Active Suppliers</span>
+                  </div>
+                  <div class="kpi-tile" matTooltip="Total contract value">
+                    <span class="kpi-value">R{{formatAmount(diversityData().preferentialProcurement?.totalContractValue?.amount)}}</span>
+                    <span class="kpi-label">Total Contract Value</span>
+                  </div>
+                  <div class="kpi-tile" style="border-left:4px solid #2e7d32" matTooltip="B-BBEE Level 1-3 spend">
+                    <span class="kpi-value" style="color:#2e7d32">R{{formatAmount(diversityData().preferentialProcurement?.bbbee123Spend?.amount)}}</span>
+                    <span class="kpi-label">B-BBEE 1-3 Spend</span>
+                  </div>
+                  <div class="kpi-tile" style="border-left:4px solid #2e7d32" matTooltip="B-BBEE Level 1-3 percentage of total spend">
+                    <span class="kpi-value" style="color:#2e7d32">{{diversityData().preferentialProcurement?.bbbee123Percentage}}%</span>
+                    <span class="kpi-label">B-BBEE 1-3 %</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-card">
+                <h3><mat-icon>group_add</mat-icon> Registration Trends</h3>
+                <div class="kpi-strip">
+                  <div class="kpi-tile" matTooltip="New suppliers registered in last 30 days">
+                    <span class="kpi-value">{{diversityData().registrationTrends?.last30Days || 0}}</span>
+                    <span class="kpi-label">Last 30 Days</span>
+                  </div>
+                  <div class="kpi-tile" matTooltip="New suppliers registered in last 90 days">
+                    <span class="kpi-value">{{diversityData().registrationTrends?.last90Days || 0}}</span>
+                    <span class="kpi-label">Last 90 Days</span>
+                  </div>
+                  <div class="kpi-tile" matTooltip="New suppliers registered in last year">
+                    <span class="kpi-value">{{diversityData().registrationTrends?.lastYear || 0}}</span>
+                    <span class="kpi-label">Last Year</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button mat-flat-button color="primary" (click)="printReport()" matTooltip="Print diversity report">
+                  <mat-icon>print</mat-icon> Print Report
+                </button>
+              </div>
+            }
+          }
+
+          @if (reportTab() === 'trends') {
+            <div class="detail-card">
+              <h3><mat-icon>timeline</mat-icon> Issue Trends by Category</h3>
+              <div class="tender-table-wrapper">
+                <table class="tender-table">
+                  <thead><tr><th>Category</th><th>Total</th><th>Open</th><th>Resolved</th><th>Avg Resolution (days)</th></tr></thead>
+                  <tbody>
+                    @for (cat of dashboardData().categoryBreakdown || []; track cat.code) {
+                      <tr>
+                        <td matTooltip="{{cat.name}}"><span class="category-badge">{{cat.name}}</span></td>
+                        <td matTooltip="Total issues">{{cat.count}}</td>
+                        <td matTooltip="Open issues" style="color:#ef6c00">{{cat.open || 0}}</td>
+                        <td matTooltip="Resolved issues" style="color:#2e7d32">{{cat.resolved || 0}}</td>
+                        <td matTooltip="Average resolution time">{{cat.avgDays || 'N/A'}}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="5" class="empty-state"><mat-icon>info</mat-icon><span>No trend data</span></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h3><mat-icon>bar_chart</mat-icon> Issue Trends by Severity</h3>
+              <div class="severity-grid">
+                <div class="severity-card" style="background:#ffebee;border-left:4px solid #c62828" matTooltip="Critical issues">
+                  <span class="severity-count" style="color:#c62828">{{dashboardData().severityCounts?.CRITICAL || 0}}</span>
+                  <span class="severity-label" style="color:#c62828">Critical</span>
+                </div>
+                <div class="severity-card" style="background:#fff3e0;border-left:4px solid #ef6c00" matTooltip="High/Major issues">
+                  <span class="severity-count" style="color:#ef6c00">{{dashboardData().severityCounts?.HIGH || 0}}</span>
+                  <span class="severity-label" style="color:#ef6c00">Major</span>
+                </div>
+                <div class="severity-card" style="background:#fff8e1;border-left:4px solid #f9a825" matTooltip="Medium/Moderate issues">
+                  <span class="severity-count" style="color:#f9a825">{{dashboardData().severityCounts?.MEDIUM || 0}}</span>
+                  <span class="severity-label" style="color:#f9a825">Moderate</span>
+                </div>
+                <div class="severity-card" style="background:#e8f5e9;border-left:4px solid #2e7d32" matTooltip="Low/Minor issues">
+                  <span class="severity-count" style="color:#2e7d32">{{dashboardData().severityCounts?.LOW || 0}}</span>
+                  <span class="severity-label" style="color:#2e7d32">Minor</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button mat-flat-button color="primary" (click)="printReport()" matTooltip="Print trends report">
+                <mat-icon>print</mat-icon> Print Report
+              </button>
+            </div>
+          }
+        }
+      }
+
+      @if (currentView() === 'analytics') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="navigateTo('main')">Dashboard</button>
+          <button class="tab-btn active">AI Analytics</button>
+        </div>
+        @if (spAnalytics()) {
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #3b82f6; font-size: 20px; width: 20px; height: 20px;">trending_up</mat-icon>
+                  OTIF, Defect & Dispute Trends
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">MFMA s116(2)(b)</span>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="otifTrendChart"></canvas>
+              </div>
+            </div>
+            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  <mat-icon style="color: #f59e0b; font-size: 20px; width: 20px; height: 20px;">scatter_plot</mat-icon>
+                  Performance vs Award Correlation
+                </h3>
+                <span style="font-size: 10px; color: #94a3b8; background: #fffbeb; padding: 2px 8px; border-radius: 4px;">Are you awarding to poor performers?</span>
+              </div>
+              <div style="height: 260px; position: relative;">
+                <canvas id="perfAwardCorrelation"></canvas>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'issue-detail') {
+        <div class="detail-header">
+          <div class="detail-title-section">
+            <h2>{{selectedIssue()?.id}} - {{getCategoryName(selectedIssue()?.category)}}</h2>
+            <div class="detail-meta">
+              <span class="severity-badge" [class]="'severity-' + selectedIssue()?.severity?.toLowerCase()" matTooltip="Severity">{{selectedIssue()?.severity}}</span>
+              <span class="status-badge" [class]="'status-' + selectedIssue()?.status" matTooltip="Status">{{formatStatus(selectedIssue()?.status)}}</span>
+              <span class="dept-tag" matTooltip="Financial year">{{selectedIssue()?.financialYear}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            @if (selectedIssue()?.status === 'open' || selectedIssue()?.status === 'in_progress' || selectedIssue()?.status === 'escalated') {
+              <button mat-flat-button color="primary" (click)="resolveIssue(selectedIssue())" matTooltip="Resolve this issue">
+                <mat-icon>check_circle</mat-icon> Resolve
+              </button>
+            }
+            <button mat-stroked-button (click)="currentView.set('main')" matTooltip="Back to list">
+              <mat-icon>arrow_back</mat-icon> Back
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-card">
+            <h3><mat-icon>info</mat-icon> Issue Details</h3>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Supplier</label><span matTooltip="{{selectedIssue()?.supplierName}}">{{selectedIssue()?.supplierName}}</span></div>
+              <div class="detail-field"><label>Category</label><span matTooltip="{{getCategoryName(selectedIssue()?.category)}}">{{getCategoryName(selectedIssue()?.category)}}</span></div>
+              <div class="detail-field"><label>Severity</label><span matTooltip="{{selectedIssue()?.severity}}">{{selectedIssue()?.severity}}</span></div>
+              <div class="detail-field"><label>Status</label><span matTooltip="{{formatStatus(selectedIssue()?.status)}}">{{formatStatus(selectedIssue()?.status)}}</span></div>
+              <div class="detail-field"><label>Logged By</label><span matTooltip="{{selectedIssue()?.loggedByName}}">{{selectedIssue()?.loggedByName}}</span></div>
+              <div class="detail-field"><label>Logged Date</label><span matTooltip="{{selectedIssue()?.loggedDate}}">{{formatDate(selectedIssue()?.loggedDate)}}</span></div>
+              <div class="detail-field"><label>Score Penalty</label><span matTooltip="Score penalty applied" style="color:#c62828">-{{selectedIssue()?.scorePenaltyApplied || 0}}</span></div>
+              <div class="detail-field"><label>Elapsed Days</label><span matTooltip="Days since issue was logged">{{selectedIssue()?.elapsedDays || 'Ongoing'}}</span></div>
+              <div class="detail-field"><label>Linked Order</label><span matTooltip="{{selectedIssue()?.linkedOrderId || 'None'}}">{{selectedIssue()?.linkedOrderId || 'N/A'}}</span></div>
+              <div class="detail-field"><label>Financial Year</label><span matTooltip="{{selectedIssue()?.financialYear}}">{{selectedIssue()?.financialYear}}</span></div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>description</mat-icon> Description</h3>
+            <p style="font-size:13px;color:#1e293b;line-height:1.6" matTooltip="Issue description">{{selectedIssue()?.description}}</p>
+          </div>
+
+          @if (selectedIssue()?.resolvedDate) {
+            <div class="detail-card" style="border-left:4px solid #2e7d32">
+              <h3><mat-icon>check_circle</mat-icon> Resolution</h3>
+              <div class="detail-grid">
+                <div class="detail-field"><label>Resolved By</label><span matTooltip="{{selectedIssue()?.resolvedByName}}">{{selectedIssue()?.resolvedByName}}</span></div>
+                <div class="detail-field"><label>Resolved Date</label><span matTooltip="{{selectedIssue()?.resolvedDate}}">{{formatDate(selectedIssue()?.resolvedDate)}}</span></div>
+                <div class="detail-field"><label>Resolution Time</label><span matTooltip="{{selectedIssue()?.elapsedDays}} days">{{selectedIssue()?.elapsedDays}} days</span></div>
+              </div>
+              @if (selectedIssue()?.resolutionNotes) {
+                <p style="margin-top:12px;font-size:13px;color:#1e293b;line-height:1.6" matTooltip="Resolution notes">{{selectedIssue()?.resolutionNotes}}</p>
+              }
+            </div>
+          }
+
+          @if (selectedIssue()?.contactLog?.length) {
+            <div class="detail-card">
+              <h3><mat-icon>contact_phone</mat-icon> Contact Log</h3>
+              <div class="timeline">
+                @for (contact of selectedIssue()?.contactLog; track contact.contactNo) {
+                  <div class="timeline-item">
+                    <div class="timeline-dot" style="background:#3b82f6"></div>
+                    <div class="timeline-content">
+                      <div class="timeline-header">
+                        <span class="dept-tag" matTooltip="Contact type">{{contact.contactType}}</span>
+                        <strong matTooltip="Contact person">{{contact.contactPerson}}</strong>
+                      </div>
+                      <p class="timeline-reason" matTooltip="{{contact.comments}}">{{contact.comments}}</p>
+                      <span class="timeline-meta" matTooltip="{{contact.contactDate}}">{{contact.contactBy}} - {{formatDate(contact.contactDate)}}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="detail-card">
+            <h3><mat-icon>add_comment</mat-icon> Add Contact Entry</h3>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Type</mat-label>
+                <mat-select [(ngModel)]="contactForm.contactType">
+                  <mat-option value="Email">Email</mat-option>
+                  <mat-option value="Phone">Phone</mat-option>
+                  <mat-option value="Fax">Fax</mat-option>
+                  <mat-option value="Meeting">Meeting</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Person</mat-label>
+                <input matInput [(ngModel)]="contactForm.contactPerson">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Email</mat-label>
+                <input matInput [(ngModel)]="contactForm.email">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="form-field-full">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="contactForm.comments" rows="2"></textarea>
+              </mat-form-field>
+            </div>
+            <div class="form-actions">
+              <button mat-flat-button color="primary" (click)="addContactEntry()" [disabled]="saving() || !contactForm.contactType || !contactForm.comments">
+                <mat-icon>send</mat-icon> {{saving() ? 'Adding...' : 'Add Entry'}}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'scorecard-detail') {
+        <div class="detail-header">
+          <div class="detail-title-section">
+            <h2>{{selectedScorecard()?.supplierName}}</h2>
+            <div class="detail-meta">
+              <span class="dept-tag" matTooltip="Assessment period">{{selectedScorecard()?.assessmentPeriod}}</span>
+              <span class="score-badge" [style.background]="getScoreBg(selectedScorecard()?.overallScore)" [style.color]="getScoreColor(selectedScorecard()?.overallScore)" matTooltip="Overall score">{{selectedScorecard()?.overallScore}}%</span>
+              <span class="status-badge" [class]="'status-' + selectedScorecard()?.status" matTooltip="{{selectedScorecard()?.status}}">{{selectedScorecard()?.status}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button mat-stroked-button (click)="currentView.set('main')" matTooltip="Back to list">
+              <mat-icon>arrow_back</mat-icon> Back
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-card">
+            <h3><mat-icon>info</mat-icon> Scorecard Summary</h3>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Assessed By</label><span matTooltip="{{selectedScorecard()?.assessedByName}}">{{selectedScorecard()?.assessedByName}}</span></div>
+              <div class="detail-field"><label>Assessment Date</label><span matTooltip="{{selectedScorecard()?.assessmentDate}}">{{selectedScorecard()?.assessmentDate}}</span></div>
+              <div class="detail-field"><label>Previous Score</label><span matTooltip="Previous score">{{selectedScorecard()?.previousScore || 'N/A'}}%</span></div>
+              <div class="detail-field"><label>Trend</label>
+                <span matTooltip="{{selectedScorecard()?.trend}}">
+                  @if (selectedScorecard()?.trend === 'up') { <mat-icon style="color:#2e7d32;font-size:18px;width:18px;height:18px">trending_up</mat-icon> Improving }
+                  @if (selectedScorecard()?.trend === 'down') { <mat-icon style="color:#c62828;font-size:18px;width:18px;height:18px">trending_down</mat-icon> Declining }
+                  @if (selectedScorecard()?.trend === 'stable') { <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">trending_flat</mat-icon> Stable }
+                </span>
+              </div>
+              <div class="detail-field"><label>Total Issues</label><span matTooltip="{{selectedScorecard()?.issuesCount}} issues">{{selectedScorecard()?.issuesCount}}</span></div>
+              <div class="detail-field"><label>Active Issues</label><span matTooltip="{{selectedScorecard()?.activeIssues}} active" [style.color]="selectedScorecard()?.activeIssues > 0 ? '#c62828' : '#2e7d32'">{{selectedScorecard()?.activeIssues}}</span></div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <h3><mat-icon>radar</mat-icon> Dimension Scores</h3>
+            <div class="dimension-display">
+              @for (dim of getScorecardDimensions(); track dim.key) {
+                <div class="dimension-row">
+                  <div class="dim-label" matTooltip="{{dim.name}}">{{dim.name}}</div>
+                  <div class="dim-weight" matTooltip="Weight: {{dim.weight}}%">{{dim.weight}}%</div>
+                  <div class="dim-bar-container">
+                    <div class="dim-bar" [style.width.%]="dim.score" [style.background]="getScoreColor(dim.score)"></div>
+                  </div>
+                  <div class="dim-score" [style.color]="getScoreColor(dim.score)" matTooltip="Score: {{dim.score}}%">{{dim.score}}%</div>
+                </div>
+              }
+              <div class="dimension-row" style="border-top:2px solid #e2e8f0;padding-top:12px;margin-top:8px">
+                <div class="dim-label"><strong>Overall Score</strong></div>
+                <div class="dim-weight">100%</div>
+                <div class="dim-bar-container">
+                  <div class="dim-bar" [style.width.%]="selectedScorecard()?.overallScore" [style.background]="getScoreColor(selectedScorecard()?.overallScore)"></div>
+                </div>
+                <div class="dim-score" [style.color]="getScoreColor(selectedScorecard()?.overallScore)" matTooltip="Overall: {{selectedScorecard()?.overallScore}}%"><strong>{{selectedScorecard()?.overallScore}}%</strong></div>
+              </div>
+            </div>
+          </div>
+
+          @if (selectedScorecard()?.recommendations) {
+            <div class="detail-card">
+              <h3><mat-icon>lightbulb</mat-icon> Recommendations</h3>
+              <p style="font-size:13px;color:#1e293b;line-height:1.6" matTooltip="Recommendations">{{selectedScorecard()?.recommendations}}</p>
+            </div>
+          }
+        </div>
+      }
+
+      @if (currentView() === 'blacklist-detail') {
+        <div class="detail-header">
+          <div class="detail-title-section">
+            <h2>{{selectedBlacklist()?.supplierName}}</h2>
+            <div class="detail-meta">
+              <span class="status-badge status-rejected" matTooltip="Blacklisted">Blacklisted</span>
+              <span class="dept-tag" matTooltip="Source">{{selectedBlacklist()?.source}}</span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button mat-stroked-button (click)="currentView.set('main')" matTooltip="Back to list">
+              <mat-icon>arrow_back</mat-icon> Back
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-content">
+          <div class="detail-card">
+            <h3><mat-icon>info</mat-icon> Blacklist Details</h3>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Supplier Name</label><span matTooltip="{{selectedBlacklist()?.supplierName}}">{{selectedBlacklist()?.supplierName}}</span></div>
+              <div class="detail-field"><label>Registration Number</label><span matTooltip="{{selectedBlacklist()?.registrationNumber}}">{{selectedBlacklist()?.registrationNumber || 'N/A'}}</span></div>
+              <div class="detail-field"><label>CSD Number</label><span matTooltip="{{selectedBlacklist()?.csdNumber}}">{{selectedBlacklist()?.csdNumber || 'N/A'}}</span></div>
+              <div class="detail-field"><label>Reason</label><span matTooltip="{{selectedBlacklist()?.reason}}">{{selectedBlacklist()?.reason}}</span></div>
+              <div class="detail-field"><label>Restriction Period</label><span matTooltip="{{selectedBlacklist()?.restrictionPeriod}}">{{selectedBlacklist()?.restrictionPeriod}}</span></div>
+              <div class="detail-field"><label>Start Date</label><span matTooltip="{{selectedBlacklist()?.startDate}}">{{selectedBlacklist()?.startDate}}</span></div>
+              <div class="detail-field"><label>End Date</label><span matTooltip="{{selectedBlacklist()?.endDate || 'Indefinite'}}">{{selectedBlacklist()?.endDate || 'Indefinite'}}</span></div>
+              <div class="detail-field"><label>Source</label><span matTooltip="{{selectedBlacklist()?.source}}">{{selectedBlacklist()?.source}}</span></div>
+              <div class="detail-field"><label>Case Reference</label><span matTooltip="{{selectedBlacklist()?.caseReference || 'N/A'}}">{{selectedBlacklist()?.caseReference || 'N/A'}}</span></div>
+              <div class="detail-field"><label>Imported By</label><span matTooltip="{{selectedBlacklist()?.importedBy}}">{{selectedBlacklist()?.importedBy}}</span></div>
+              <div class="detail-field"><label>Import Date</label><span matTooltip="{{selectedBlacklist()?.importDate}}">{{formatDate(selectedBlacklist()?.importDate)}}</span></div>
+              <div class="detail-field"><label>Status</label><span class="status-badge" [class]="selectedBlacklist()?.status === 'active' ? 'status-rejected' : 'status-draft'" matTooltip="{{selectedBlacklist()?.status}}">{{selectedBlacklist()?.status}}</span></div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>

@@ -1,0 +1,12 @@
+@if (data().length > 1) {
+  <svg [attr.width]="'100%'" [attr.height]="height()" [attr.viewBox]="viewBox()" preserveAspectRatio="none" class="sparkline-svg">
+    <defs>
+      <linearGradient [attr.id]="gradientId()" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" [attr.stop-color]="color()" stop-opacity="0.2" />
+        <stop offset="100%" [attr.stop-color]="color()" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    <path [attr.d]="fillPath()" [attr.fill]="'url(#' + gradientId() + ')'" />
+    <polyline [attr.points]="polylinePoints()" fill="none" [attr.stroke]="color()" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+  </svg>
+}

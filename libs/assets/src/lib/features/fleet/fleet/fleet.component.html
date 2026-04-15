@@ -1,0 +1,206 @@
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Fleet Management</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Vehicle management, trip requests, and inspections</p>
+  </div>
+  <button mat-flat-button style="background:#0f2b46;color:white" (click)="showTripForm = !showTripForm">
+    <mat-icon>{{showTripForm ? 'close' : 'add'}}</mat-icon> {{showTripForm ? 'Cancel' : 'New Trip Request'}}
+  </button>
+</div>
+
+@if (showTripForm) {
+  <div class="card-container" style="margin-bottom:20px;border:2px solid #3b82f6">
+    <div style="padding:20px">
+      <h3 style="font-size:16px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#3b82f6">directions_car</mat-icon> New Trip Request
+      </h3>
+      <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="detail-field">
+          <label>Vehicle *</label>
+          <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.vehicleId">
+            <option value="">Select vehicle...</option>
+            @for (v of availableVehicles(); track v.id) {
+              <option [value]="v.assetId">{{v.registrationNumber || v.assetId}} - {{v.description}}</option>
+            }
+          </select>
+        </div>
+        <div class="detail-field">
+          <label>Destination *</label>
+          <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.destination" placeholder="Destination address" />
+        </div>
+        <div class="detail-field">
+          <label>Purpose *</label>
+          <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.purpose" placeholder="Trip purpose" />
+        </div>
+        <div class="detail-field">
+          <label>Departure Date *</label>
+          <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.departureDate" />
+        </div>
+        <div class="detail-field">
+          <label>Return Date *</label>
+          <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.returnDate" />
+        </div>
+        <div class="detail-field">
+          <label>Passengers</label>
+          <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="tripForm.passengers" min="1" max="20" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button mat-stroked-button (click)="showTripForm = false">Cancel</button>
+        <button mat-flat-button style="background:#0f2b46;color:white" (click)="submitTrip()">
+          <mat-icon>send</mat-icon> Submit Request
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-blue"><mat-icon>directions_car</mat-icon></div>
+    <div><div class="kpi-label">Fleet Vehicles</div><div class="kpi-value">{{vehicles().length}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-green"><mat-icon>check_circle</mat-icon></div>
+    <div><div class="kpi-label">Available</div><div class="kpi-value">{{availableCount()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-amber"><mat-icon>pending_actions</mat-icon></div>
+    <div><div class="kpi-label">Pending Trips</div><div class="kpi-value">{{pendingTripsCount()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-purple"><mat-icon>build</mat-icon></div>
+    <div><div class="kpi-label">Under Maintenance</div><div class="kpi-value">{{maintenanceCount()}}</div></div>
+  </div>
+</div>
+
+<mat-tab-group animationDuration="0ms" style="background:white;border-radius:12px;border:1px solid #e2e8f0">
+  <mat-tab label="Vehicles">
+    <div style="padding:20px">
+      @if (loadingVehicles()) {
+        <div style="display:flex;justify-content:center;padding:40px"><mat-spinner diameter="32"></mat-spinner></div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr><th>Asset ID</th><th>Description</th><th>Registration</th><th>Status</th><th>Condition</th><th>Location</th><th>Carrying Value</th></tr>
+          </thead>
+          <tbody>
+            @for (v of vehicles(); track v.id) {
+              <tr>
+                <td class="ref-cell">{{v.assetId}}</td>
+                <td>{{v.description}}</td>
+                <td style="font-weight:600">{{v.registrationNumber || 'N/A'}}</td>
+                <td><span [class]="getStatusClass(v.status)">{{v.status}}</span></td>
+                <td>
+                  <span style="display:inline-flex;align-items:center;gap:4px">
+                    <span [style.background]="getConditionColor(v.condition)" style="width:8px;height:8px;border-radius:50%"></span>
+                    {{v.condition}}
+                  </span>
+                </td>
+                <td style="font-size:12px;color:#64748b">{{v.locationName}}</td>
+                <td class="value-cell">R {{v.carryingValue | number:'1.0-0'}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </mat-tab>
+  <mat-tab label="Trip Requests">
+    <div style="padding:20px">
+      @if (trips().length === 0) {
+        <div style="text-align:center;padding:40px;color:#94a3b8">
+          <mat-icon style="font-size:48px;margin-bottom:8px">directions_car</mat-icon>
+          <div style="font-size:14px;font-weight:500;color:#64748b">No trip requests yet</div>
+          <div style="font-size:12px;margin-top:4px">Click "New Trip Request" to create one</div>
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead><tr><th>Vehicle</th><th>Requestor</th><th>Purpose</th><th>Destination</th><th>Status</th><th>Departure</th><th>Actions</th></tr></thead>
+          <tbody>
+            @for (t of trips(); track t.id) {
+              <tr>
+                <td class="ref-cell">{{t.vehicle_asset_id}}</td>
+                <td>{{t.requestor_name || 'Current User'}}</td>
+                <td>{{t.purpose}}</td>
+                <td>{{t.destination}}</td>
+                <td><span [class]="getStatusClass(t.status)">{{t.status}}</span></td>
+                <td style="font-size:12px;color:#94a3b8">{{t.departure_date}}</td>
+                <td>
+                  @if (pendingCancelTrip()?.id === t.id) {
+                    <div style="display:flex;gap:4px">
+                      <button mat-stroked-button style="font-size:11px;padding:2px 6px;min-height:26px" (click)="pendingCancelTrip.set(null)">No</button>
+                      <button mat-flat-button style="background:#ef4444;color:white;font-size:11px;padding:2px 6px;min-height:26px" (click)="confirmCancelTrip()">Yes, Cancel</button>
+                    </div>
+                  } @else if (t.status === 'pending') {
+                    <button mat-icon-button style="color:#ef4444" (click)="cancelTrip(t)"><mat-icon>cancel</mat-icon></button>
+                  }
+                  @if (t.status === 'approved') {
+                    <button mat-stroked-button style="font-size:11px;padding:2px 8px;min-height:28px;border-color:#3b82f6;color:#3b82f6" (click)="startInspection(t)">
+                      <mat-icon style="font-size:14px">checklist</mat-icon> Inspect
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </mat-tab>
+  <mat-tab label="Inspections">
+    <div style="padding:20px">
+      @if (showInspection()) {
+        <div class="form-card" style="border:2px solid #10b981">
+          <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+            <mat-icon style="color:#10b981;font-size:20px">checklist</mat-icon> Pre-Trip Inspection Checklist
+          </h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            @for (item of inspectionChecklist; track item.label) {
+              <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;cursor:pointer;font-size:13px">
+                <input type="checkbox" [(ngModel)]="item.checked" style="accent-color:#10b981;width:16px;height:16px" />
+                {{item.label}}
+              </label>
+            }
+          </div>
+          <div class="detail-field" style="margin-top:12px">
+            <label>Inspector Comments</label>
+            <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:60px" [(ngModel)]="inspectionComments"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button mat-stroked-button (click)="showInspection.set(false)">Cancel</button>
+            <button mat-flat-button style="background:#10b981;color:white" (click)="submitInspection()">
+              <mat-icon>check</mat-icon> Complete Inspection
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div style="text-align:center;padding:40px;color:#94a3b8">
+          <mat-icon style="font-size:48px;margin-bottom:8px">fact_check</mat-icon>
+          <div style="font-size:14px;font-weight:500;color:#64748b">No pending inspections</div>
+          <div style="font-size:12px;margin-top:4px">Approve a trip request to initiate vehicle inspection</div>
+        </div>
+      }
+    </div>
+  </mat-tab>
+  <mat-tab label="Bookings">
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px">
+        @for (day of weekDays; track day) {
+          <div style="text-align:center;font-size:12px;font-weight:600;color:#64748b;padding:8px">{{day}}</div>
+        }
+        @for (slot of calendarSlots(); track slot.date) {
+          <div [style.background]="slot.booked ? '#dbeafe' : '#f8fafc'" 
+               [style.border]="slot.booked ? '1px solid #93c5fd' : '1px solid #e2e8f0'"
+               style="padding:8px;border-radius:6px;min-height:60px;cursor:pointer"
+               (click)="slot.booked ? viewBooking(slot) : null">
+            <div style="font-size:11px;font-weight:600;color:#1e293b">{{slot.dayNum}}</div>
+            @if (slot.booked) {
+              <div style="font-size:10px;color:#3b82f6;margin-top:4px;font-weight:500">{{slot.vehicle}}</div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </mat-tab>
+</mat-tab-group>

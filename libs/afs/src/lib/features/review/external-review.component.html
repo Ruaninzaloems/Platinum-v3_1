@@ -1,0 +1,208 @@
+<div class="external-review-container">
+  <header class="review-header">
+    <div class="header-brand">
+      <h1 class="brand-name">PLATINUM</h1>
+      <span class="brand-sub">Annual Financial Statements — External Review</span>
+    </div>
+  </header>
+
+  <div class="review-content" *ngIf="loading">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading review content...</p>
+    </div>
+  </div>
+
+  <div class="review-content" *ngIf="error && !loading">
+    <div class="error-state">
+      <div class="error-icon">⚠</div>
+      <h2>Unable to Access Review</h2>
+      <p>{{ error }}</p>
+    </div>
+  </div>
+
+  <div class="review-content" *ngIf="reviewData && !loading && !error">
+    <div class="review-meta-bar">
+      <div class="meta-item">
+        <span class="meta-label">Municipality</span>
+        <span class="meta-value">{{ reviewData.content.municipalityName }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Financial Year</span>
+        <span class="meta-value">{{ reviewData.content.financialYearLabel }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Request Type</span>
+        <span class="meta-value badge" [class]="'badge-' + reviewData.requestType">{{ getRequestTypeLabel(reviewData.requestType) }}</span>
+      </div>
+      <div class="meta-item" *ngIf="reviewData.dueDate">
+        <span class="meta-label">Due Date</span>
+        <span class="meta-value">{{ reviewData.dueDate }}</span>
+      </div>
+      <div class="meta-item" *ngIf="reviewData.displayName">
+        <span class="meta-label">Reviewer</span>
+        <span class="meta-value">{{ reviewData.displayName }}</span>
+      </div>
+    </div>
+
+    <div class="review-message" *ngIf="reviewData.message">
+      <div class="message-label">Message from requester:</div>
+      <div class="message-text">{{ reviewData.message }}</div>
+    </div>
+
+    <ng-container *ngIf="!isGiScope">
+      <h2 class="content-title">{{ reviewData.content.compilationName }}</h2>
+      <p class="content-subtitle">{{ reviewData.content.templateName }}</p>
+
+      <div class="sections-container">
+        <div class="section-block" *ngFor="let section of reviewData.content.sections">
+          <div class="section-header">
+            <h3>{{ section.title }}</h3>
+            <span class="section-type-badge">{{ section.statementType }}</span>
+            <span class="note-number" *ngIf="section.noteNumber">Note {{ section.noteNumber }}</span>
+            <button class="comment-section-btn" (click)="setCommentTarget('section', section.sectionId)" title="Comment on this section">💬</button>
+          </div>
+
+          <table class="line-items-table" *ngIf="section.items && section.items.length > 0">
+            <thead>
+              <tr>
+                <th class="col-label">Description</th>
+                <th class="col-amount">{{ reviewData.content.currentYearLabel }}</th>
+                <th class="col-amount">{{ reviewData.content.priorYearLabel }}</th>
+                <th class="col-note">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of section.items" [class.bold-row]="item.isBold" [class.total-row]="item.isTotal" [class.subtotal-row]="item.isSubTotal">
+                <td class="col-label" [style.padding-left.px]="16 + (item.indentLevel * 20)">{{ item.label }}</td>
+                <td class="col-amount">{{ formatCurrency(item.currentYear) }}</td>
+                <td class="col-amount">{{ formatCurrency(item.priorYear) }}</td>
+                <td class="col-note">{{ item.noteReference }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="section-comments" *ngIf="getCommentsForTarget('section', section.sectionId).length > 0">
+            <div class="comment-thread-label">Comments on this section:</div>
+            <div class="comment-item" *ngFor="let c of getCommentsForTarget('section', section.sectionId)" [class.own-comment]="c.isOwnComment">
+              <span class="comment-author">{{ c.recipientName }}</span>
+              <span class="comment-date">{{ c.createdAt | date:'short' }}</span>
+              <p class="comment-text">{{ c.commentText }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="isGiScope">
+      <h2 class="content-title">General Information Review</h2>
+      <p class="content-subtitle">{{ reviewData.content.entityType }}</p>
+
+      <div class="sections-container">
+        <div class="section-block">
+          <div class="section-header">
+            <h3>Entity Details</h3>
+            <button class="comment-section-btn" (click)="setCommentTarget('general_information', reviewData!.requestId)" title="Comment on general information">💬</button>
+          </div>
+          <table class="gi-details-table">
+            <tbody>
+              <tr *ngIf="reviewData.content.demarcationCode"><td class="gi-label">Demarcation Code</td><td>{{ reviewData.content.demarcationCode }}</td></tr>
+              <tr *ngIf="reviewData.content.province"><td class="gi-label">Province</td><td>{{ reviewData.content.province }}</td></tr>
+              <tr *ngIf="reviewData.content.registrationNumber"><td class="gi-label">Registration Number</td><td>{{ reviewData.content.registrationNumber }}</td></tr>
+              <tr *ngIf="reviewData.content.registeredOffice"><td class="gi-label">Registered Office</td><td>{{ reviewData.content.registeredOffice }}</td></tr>
+              <tr *ngIf="reviewData.content.postalAddress"><td class="gi-label">Postal Address</td><td>{{ reviewData.content.postalAddress }}</td></tr>
+              <tr *ngIf="reviewData.content.telephone"><td class="gi-label">Telephone</td><td>{{ reviewData.content.telephone }}</td></tr>
+              <tr *ngIf="reviewData.content.email"><td class="gi-label">Email</td><td>{{ reviewData.content.email }}</td></tr>
+              <tr *ngIf="reviewData.content.website"><td class="gi-label">Website</td><td>{{ reviewData.content.website }}</td></tr>
+              <tr *ngIf="reviewData.content.reportingPeriodStart"><td class="gi-label">Reporting Period</td><td>{{ reviewData.content.reportingPeriodStart | date:'mediumDate' }} — {{ reviewData.content.reportingPeriodEnd | date:'mediumDate' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-block" *ngIf="reviewData.content.levelOfAssurance || reviewData.content.auditor || reviewData.content.cfo || reviewData.content.accountingOfficer">
+          <div class="section-header">
+            <h3>Assurance &amp; Officers</h3>
+          </div>
+          <table class="gi-details-table">
+            <tbody>
+              <tr *ngIf="reviewData.content.levelOfAssurance"><td class="gi-label">Level of Assurance</td><td>{{ reviewData.content.levelOfAssurance }}</td></tr>
+              <tr *ngIf="reviewData.content.auditor"><td class="gi-label">Auditor</td><td>{{ reviewData.content.auditor }}</td></tr>
+              <tr *ngIf="reviewData.content.cfo"><td class="gi-label">Chief Financial Officer</td><td>{{ reviewData.content.cfo }}</td></tr>
+              <tr *ngIf="reviewData.content.accountingOfficer"><td class="gi-label">Accounting Officer</td><td>{{ reviewData.content.accountingOfficer }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-block" *ngIf="reviewData.content.governanceMembers && reviewData.content.governanceMembers.length > 0">
+          <div class="section-header">
+            <h3>Governance Members</h3>
+            <button class="comment-section-btn" (click)="setCommentTarget('governance', reviewData!.requestId)" title="Comment on governance">💬</button>
+          </div>
+          <table class="line-items-table">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Full Name</th>
+                <th>Designation</th>
+                <th>Date Appointed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let member of reviewData.content.governanceMembers">
+                <td>{{ member.tableName }}</td>
+                <td>{{ member.fullName }}</td>
+                <td>{{ member.designation }}</td>
+                <td>{{ member.dateAppointed | date:'mediumDate' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </ng-container>
+
+    <div class="general-comments-section">
+      <h3>Comments</h3>
+
+      <div class="existing-comments" *ngIf="comments.length > 0">
+        <div class="comment-item" *ngFor="let c of comments" [class.own-comment]="c.isOwnComment">
+          <div class="comment-meta">
+            <span class="comment-author">{{ c.recipientName }}</span>
+            <span class="comment-target" *ngIf="c.targetType !== 'compilation'">on {{ c.targetType }}: {{ c.targetId }}</span>
+            <span class="comment-date">{{ c.createdAt | date:'medium' }}</span>
+          </div>
+          <p class="comment-text">{{ c.commentText }}</p>
+        </div>
+      </div>
+
+      <div class="no-comments" *ngIf="comments.length === 0">
+        <p>No comments yet. Be the first to add one.</p>
+      </div>
+
+      <div class="comment-form">
+        <div class="comment-target-info" *ngIf="(isGiScope && commentTargetType !== 'general_information') || (!isGiScope && commentTargetType !== 'compilation')">
+          Commenting on: <strong>{{ commentTargetType }}</strong>
+          <button class="clear-target-btn" (click)="setCommentTarget(isGiScope ? 'general_information' : 'compilation', reviewData.requestId)">Clear target</button>
+        </div>
+        <textarea
+          [(ngModel)]="newComment"
+          placeholder="Add your comment here... (plain text only)"
+          rows="4"
+          maxlength="5000"
+          [disabled]="submittingComment"
+        ></textarea>
+        <div class="comment-form-actions">
+          <span class="char-count">{{ newComment.length }} / 5000</span>
+          <button class="submit-comment-btn" (click)="submitComment()" [disabled]="!newComment.trim() || submittingComment">
+            {{ submittingComment ? 'Submitting...' : 'Submit Comment' }}
+          </button>
+        </div>
+        <div class="comment-success" *ngIf="commentSuccess">{{ commentSuccess }}</div>
+      </div>
+    </div>
+
+    <footer class="review-footer">
+      <p>This is a read-only review. You may add comments but cannot modify, approve, or export this content.</p>
+      <p class="expiry-note">This link expires on {{ reviewData.expiresAt | date:'medium' }}.</p>
+    </footer>
+  </div>
+</div>

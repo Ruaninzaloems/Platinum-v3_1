@@ -1,0 +1,51 @@
+.page-container { padding: 1.5rem; max-width: 80rem; margin: 0 auto; }
+.breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 12px; color: var(--platinum-text-muted); margin-bottom: 0.75rem; }
+.breadcrumb-link { cursor: pointer; transition: color 0.2s; color: var(--platinum-text-muted); background: none; border: none; font-size: 12px; padding: 0; }
+.breadcrumb-link:hover { color: var(--platinum-text); }
+.breadcrumb-sep { font-size: 10px; }
+.breadcrumb-current { color: var(--platinum-text); font-weight: 500; }
+.page-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem; }
+.header-left { display: flex; align-items: center; gap: 0.75rem; }
+.icon-box { width: 2.5rem; height: 2.5rem; border-radius: 10px; background: linear-gradient(135deg, var(--platinum-accent), var(--platinum-accent-dark)); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: white; }
+.page-title { font-size: 22px; font-weight: 700; color: var(--platinum-text); }
+.page-subtitle { font-size: 14px; color: var(--platinum-text-muted); margin-top: 0.125rem; }
+.content-area { display: flex; flex-direction: column; gap: 1rem; }
+
+.stat-grid { display: grid; gap: 0.75rem; }
+.stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-card { padding: 0.75rem; display: flex; align-items: center; gap: 0.75rem; background: white; border: 1px solid var(--platinum-border); border-radius: var(--platinum-card-radius); box-shadow: var(--platinum-card-shadow); }
+.stat-icon { width: 2rem; height: 2rem; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+.icon-accent { background: linear-gradient(135deg, var(--platinum-accent), var(--platinum-accent-dark)); color: white; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--platinum-text); }
+.stat-label { font-size: 12px; color: var(--platinum-text-muted); }
+.stat-success .stat-value { color: var(--platinum-success); }
+.stat-danger .stat-value { color: var(--platinum-danger); }
+.stat-warning .stat-value { color: #d97706; }
+
+.section-title { font-size: 14px; font-weight: 600; color: var(--platinum-text); margin-bottom: 0.75rem; }
+.channel-card { padding: 0.75rem; background: white; border: 1px solid var(--platinum-border); border-radius: var(--platinum-card-radius); box-shadow: var(--platinum-card-shadow); }
+.channel-header { margin-bottom: 0.5rem; }
+.channel-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.25rem; text-align: center; margin-bottom: 0.5rem; }
+.channel-stat-value { font-size: 18px; font-weight: 700; color: var(--platinum-text); }
+.channel-stat-label { font-size: 10px; color: var(--platinum-text-muted); }
+.progress-bar { height: 6px; background: #e2e8f0; border-radius: 9999px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--platinum-success); border-radius: 9999px; transition: width 0.3s; }
+.channel-rate { font-size: 10px; color: var(--platinum-text-muted); text-align: center; margin-top: 0.25rem; }
+
+.filter-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.filter-controls { display: flex; align-items: center; gap: 0.5rem; }
+.filter-input { width: 8rem; }
+.filter-select { width: auto; min-width: 7rem; }
+.pagination-row { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; font-size: 12px; color: var(--platinum-text-muted); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.form-group { margin-bottom: 0.5rem; }
+.message-textarea { min-height: 7rem; resize: vertical; }
+
+.suggestions-dropdown { position: absolute; z-index: 50; width: 100%; margin-top: 4px; background: white; border: 1px solid var(--platinum-border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 8rem; overflow-y: auto; }
+.suggestion-item { width: 100%; text-align: left; padding: 8px 14px; font-size: 13px; border: none; background: none; cursor: pointer; color: var(--platinum-text); }
+.suggestion-item:hover { background: var(--platinum-surface-alt); }
+
+@media (max-width: 768px) {
+  .stat-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .form-grid { grid-template-columns: 1fr; }
+}

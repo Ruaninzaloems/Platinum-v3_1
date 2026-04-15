@@ -1,0 +1,13 @@
+{
+  "/perf-app/api": {
+    "target": "http://localhost:6800",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/perf-app/api": "/api" }
+  },
+  "/api": {
+    "target": "http://localhost:6800",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

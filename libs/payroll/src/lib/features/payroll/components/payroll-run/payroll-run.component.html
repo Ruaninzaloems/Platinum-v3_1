@@ -1,0 +1,467 @@
+<div class="page-container">
+  <div class="page-header-card">
+    <div class="page-title-row">
+      <h2>Payroll Run</h2>
+      @if (currentRun) {
+        <div class="run-status-group">
+          <span class="status-badge" [ngClass]="'status-' + (currentRun.status || '').toLowerCase()">{{ currentRun.status }}</span>
+          <span class="run-type-label">{{ currentRun.run_type }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="content-card">
+    <div class="form-section">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">PAYROLL RUN TYPE <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="runType" [disabled]="true">
+            <option value="NORMAL">Normal Payroll Run</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CYCLE <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="selectedCycleId" (change)="onCycleChange()">
+            <option value="">-- Select Cycle --</option>
+            @for (c of cycles; track c.id) {
+              <option [value]="c.id">{{ c.name }} ({{ c.cycle_type }})</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PERIOD</label>
+          <input type="text" class="form-control readonly-field" [value]="activePeriod ? ('Period ' + activePeriod.period_number + ' — Tax Year ' + activePeriod.tax_year) : (selectedCycleId ? 'No open period' : '')" readonly />
+        </div>
+        <div class="form-group">
+          <label class="form-label">DATE RANGE</label>
+          <input type="text" class="form-control readonly-field" [value]="fromDate && toDate ? (formatDate(fromDate) + '  to  ' + formatDate(toDate)) : ''" readonly />
+        </div>
+      </div>
+    </div>
+
+    @if (!activePeriod && selectedCycleId && !loading) {
+      <div class="alert-warning">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        No open period found for the selected cycle. Please generate periods under Configuration first.
+      </div>
+    }
+  </div>
+
+  <div class="stepper-card">
+    <div class="stepper-row">
+      @for (step of stepLabels; track $index) {
+        @if ($index > 0) {
+          <div class="stepper-line" [class.completed]="currentStep >= $index"></div>
+        }
+        <div class="stepper-item" [class.active]="currentStep === $index" [class.completed]="currentStep > $index">
+          <div class="stepper-circle">
+            @if (currentStep > $index) {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            } @else {
+              {{ $index + 1 }}
+            }
+          </div>
+          <span class="stepper-text">{{ step }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="action-bar">
+    @if (currentStep === 0 && !showTrialResults) {
+      <button class="btn btn-primary" (click)="runTrial()" [disabled]="!canRun || loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run Trial
+      </button>
+    }
+    @if (canLockdown) {
+      <button class="btn btn-warning" (click)="lockdownTrial()" [disabled]="loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Lockdown Trial
+      </button>
+    }
+    @if (canUnlock) {
+      <button class="btn btn-outline" (click)="unlockTrial()" [disabled]="loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 019.9-1"/></svg>
+        Cancel Lockdown
+      </button>
+    }
+    @if (canFinalRun) {
+      <button class="btn btn-success" (click)="finalRun()" [disabled]="loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Approve Trial Run
+      </button>
+    }
+    @if (showTrialResults && currentRun) {
+      <button class="btn btn-outline btn-sm" (click)="postToLedger()" [disabled]="postingToLedger" title="Post GL transactions to ledger" style="margin-left:auto;">
+        @if (postingToLedger) {
+          <span class="spinner-sm"></span> Posting...
+        } @else {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></svg>
+          Post to Ledger
+        }
+      </button>
+      <button class="btn btn-outline btn-sm" (click)="downloadExcel()" title="Download to Excel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Excel
+      </button>
+    }
+  </div>
+
+  @if (errorMessage) {
+    <div class="alert alert-error" style="background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:14px;">
+      <strong>Error:</strong> {{ errorMessage }}
+    </div>
+  }
+
+  @if (showErrorsPanel && runErrors.length > 0) {
+    <div class="errors-panel">
+      <div class="errors-panel-header">
+        <h3 class="errors-panel-title">{{ runErrors.length }} Employee Error(s)</h3>
+        <span class="errors-panel-hint">These employees must be fixed before the trial run can be locked.</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="jp-table errors-table">
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Employee Code</th>
+              <th>Employee Name</th>
+              <th>Error Type</th>
+              <th>Error Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (err of runErrors; track $index) {
+              <tr>
+                <td class="font-mono">{{ err.employee_id }}</td>
+                <td class="font-mono">{{ err.employee_code || '-' }}</td>
+                <td>{{ err.first_name }} {{ err.surname }}</td>
+                <td><span class="error-type-badge">{{ err.error_type || 'ERROR' }}</span></td>
+                <td class="error-message-cell">{{ err.error_message }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  @if (currentStep === 1 && currentRun && currentRun.status === 'LOCKED') {
+    <div class="locked-summary-card">
+      <div class="locked-summary-header">
+        <h3>Locked Trial Run Summary</h3>
+      </div>
+      <div class="table-wrapper">
+        <table class="jp-table">
+          <thead>
+            <tr>
+              <th>Payroll Cycle</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Approved</th>
+              <th class="text-right">Total Cost to Company</th>
+              <th class="text-right">Number of Employees</th>
+              <th>Date Executed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="locked-row">
+              <td>{{ getCycleName() }}</td>
+              <td>{{ formatDate(fromDate) }}</td>
+              <td>{{ formatDate(toDate) }}</td>
+              <td>No</td>
+              <td class="text-right tabnum">{{ formatCurrency(currentRun.total_earnings) }}</td>
+              <td class="text-right">{{ currentRun.employee_count }}</td>
+              <td>{{ formatDate(currentRun.completed_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="locked-summary-details">
+        <p>Payroll Cycle: <strong>{{ getCycleName() }}</strong></p>
+        <p>Payroll Period: <strong>{{ formatDate(toDate) }}</strong></p>
+        <p>Number of Employees: <strong>{{ currentRun.employee_count }}</strong></p>
+        <p>Total Cost to Company: <strong>{{ formatCurrency(currentRun.total_earnings) }}</strong></p>
+      </div>
+    </div>
+  }
+
+  @if (showTrialResults) {
+    <div class="results-card">
+      <div class="results-tabs">
+        <button class="results-tab" [class.active]="resultsTab === 'results'" (click)="switchTab('results')">Run Results</button>
+        <button class="results-tab" [class.active]="resultsTab === 'ledger'" (click)="switchTab('ledger')">GL Ledger</button>
+        @if (resultsTab === 'results' && resultsMeta.total) {
+          <span class="results-count">{{ resultsMeta.total }} employees processed</span>
+        }
+        @if (resultsTab === 'ledger' && glLedgerMeta.total) {
+          <span class="results-count">{{ glLedgerMeta.total }} ledger rows</span>
+        }
+      </div>
+
+      @if (resultsTab === 'results') {
+        @if (resultsLoading) {
+          <div class="loading-msg">Loading results...</div>
+        }
+        <div class="table-wrapper">
+          <table class="jp-table">
+            <colgroup>
+              <col class="col-reason" />
+              <col class="col-id" />
+              <col class="col-emp-no" />
+              <col class="col-code" />
+              <col class="col-name" />
+              <col class="col-surname" />
+              <col class="col-currency" />
+              <col class="col-currency" />
+              <col class="col-currency" />
+              <col class="col-currency" />
+              <col class="col-currency" />
+              <col class="col-currency" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Reason</th>
+                <th>ID</th>
+                <th>Emp No</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Surname</th>
+                <th class="text-right">Salary</th>
+                <th class="text-right">Earnings</th>
+                <th class="text-right">Deductions</th>
+                <th class="text-right">Contributions</th>
+                <th class="text-right">Fringe</th>
+                <th class="text-right">Nett Salary</th>
+              </tr>
+              <tr class="filter-row">
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.reason" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.id" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.emp_no" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.code" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.name" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th><input type="text" class="col-filter" [(ngModel)]="filters.surname" (input)="onFilterChange()" placeholder="Filter..." /></th>
+                <th></th><th></th><th></th><th></th><th></th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of results; track row.emp_id) {
+                <tr>
+                  <td>
+                    @if (row.reason === 'CALCULATED') {
+                      <span class="status-badge status-approved">{{ row.reason }}</span>
+                    } @else if (row.reason === 'SKIPPED') {
+                      <span class="status-badge status-pending">{{ row.reason }}</span>
+                    } @else {
+                      <span class="status-badge status-rejected">{{ row.reason }}</span>
+                    }
+                  </td>
+                  <td>{{ row.emp_id }}</td>
+                  <td>{{ row.emp_id }}</td>
+                  <td>{{ row.employee_code }}</td>
+                  <td>{{ row.first_name }}</td>
+                  <td>{{ row.surname }}</td>
+                  <td class="text-right tabnum">{{ row.salary | currencyZar }}</td>
+                  <td class="text-right tabnum">{{ row.earnings | currencyZar }}</td>
+                  <td class="text-right tabnum">{{ row.deductions | currencyZar }}</td>
+                  <td class="text-right tabnum">{{ row.contributions | currencyZar }}</td>
+                  <td class="text-right tabnum">{{ row.fringe | currencyZar }}</td>
+                  <td class="text-right tabnum nett-col">{{ row.nett_salary | currencyZar }}</td>
+                </tr>
+              }
+              @if (results.length === 0 && !resultsLoading) {
+                <tr><td colspan="12" class="empty-row">No results found</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (resultsMeta.totalPages > 1) {
+          <div class="pagination-bar">
+            <div class="page-nav">
+              <button class="page-btn" [disabled]="resultsMeta.page <= 1" (click)="goToPage(1)" title="First">&laquo;</button>
+              <button class="page-btn" [disabled]="resultsMeta.page <= 1" (click)="goToPage(resultsMeta.page - 1)" title="Previous">&lsaquo;</button>
+              @for (p of getPageArray(); track p) {
+                <button class="page-btn" [class.active]="resultsMeta.page === p" (click)="goToPage(p)">{{ p }}</button>
+              }
+              <button class="page-btn" [disabled]="resultsMeta.page >= resultsMeta.totalPages" (click)="goToPage(resultsMeta.page + 1)" title="Next">&rsaquo;</button>
+              <button class="page-btn" [disabled]="resultsMeta.page >= resultsMeta.totalPages" (click)="goToPage(resultsMeta.totalPages)" title="Last">&raquo;</button>
+            </div>
+            <div class="page-info-row">
+              Page {{ resultsMeta.page }} of {{ resultsMeta.totalPages }} ({{ resultsMeta.total }} items)
+              <select class="page-size-select" [(ngModel)]="resultsMeta.limit" (change)="onFilterChange()">
+                <option [value]="25">25</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+            </div>
+          </div>
+        }
+      }
+
+      @if (resultsTab === 'ledger') {
+        @if (glLedgerLoading) {
+          <div class="loading-msg">Loading GL ledger...</div>
+        }
+        <div class="gl-scroll-wrapper">
+          <table class="jp-table gl-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Emp Type</th>
+                <th>Salary Head ID</th>
+                <th>Head Name</th>
+                <th>JE Only</th>
+                <th>Tx Type</th>
+                <th class="text-right">Amount</th>
+                <th>Debit Division</th>
+                <th>Debit Item</th>
+                <th>Debit Project</th>
+                <th>Debit Function</th>
+                <th>Debit Region</th>
+                <th>Debit Fund</th>
+                <th>Credit Division</th>
+                <th>Credit Item</th>
+                <th>Credit Project</th>
+                <th>Credit Function</th>
+                <th>Credit Region</th>
+                <th>Credit Fund</th>
+                <th>Debit PlanProjItem</th>
+                <th>Credit PlanProjItem</th>
+              </tr>
+              <tr class="filter-row">
+                <th><input type="text" class="col-filter" [(ngModel)]="glFilters.employee_code" (input)="onGlFilterChange()" placeholder="Filter..." /></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>
+                  <select class="col-filter" [(ngModel)]="glFilters.transaction_type" (change)="onGlFilterChange()">
+                    <option value="">All</option>
+                    <option value="EARNING">Earning</option>
+                    <option value="DEDUCTION">Deduction</option>
+                    <option value="COMPANY_CONTRIBUTION">CC</option>
+                  </select>
+                </th>
+                <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of glLedgerRows; track $index) {
+                <tr>
+                  <td class="font-mono">{{ row.employee_id }}</td>
+                  <td class="font-mono">{{ row.employee_type_id || '-' }}</td>
+                  <td class="font-mono">{{ row.salary_head_id || '-' }}</td>
+                  <td>{{ row.head_name }}</td>
+                  <td class="font-mono">{{ row.journal_entry_only ? 'Y' : 'N' }}</td>
+                  <td><span class="status-badge" [ngClass]="{'status-approved': row.transaction_type === 'EARNING', 'status-rejected': row.transaction_type === 'DEDUCTION', 'status-processing': row.transaction_type === 'COMPANY_CONTRIBUTION'}">{{ row.transaction_type }}</span></td>
+                  <td class="text-right tabnum">{{ row.amount | currencyZar }}</td>
+                  <td class="font-mono">{{ row.division_id || '-' }}</td>
+                  <td class="font-mono">{{ row.scoa_item_id || '-' }}</td>
+                  <td class="font-mono">{{ row.scoa_project_id || '-' }}</td>
+                  <td class="font-mono">{{ row.scoa_function_id || '-' }}</td>
+                  <td class="font-mono">{{ row.scoa_region_id || '-' }}</td>
+                  <td class="font-mono">{{ row.scoa_fund_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_division_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_scoa_item_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_scoa_project_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_scoa_function_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_scoa_region_id || '-' }}</td>
+                  <td class="font-mono">{{ row.contra_scoa_fund_id || '-' }}</td>
+                  <td class="font-mono">{{ row.debit_plan_project_item_id || '-' }}</td>
+                  <td class="font-mono">{{ row.credit_plan_project_item_id || '-' }}</td>
+                </tr>
+              }
+              @if (glLedgerRows.length === 0 && !glLedgerLoading) {
+                <tr><td colspan="21" class="empty-row">No GL ledger data found</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (glLedgerMeta.totalPages > 1) {
+          <div class="pagination-bar">
+            <div class="page-nav">
+              <button class="page-btn" [disabled]="glLedgerMeta.page <= 1" (click)="goToGlPage(1)" title="First">&laquo;</button>
+              <button class="page-btn" [disabled]="glLedgerMeta.page <= 1" (click)="goToGlPage(glLedgerMeta.page - 1)" title="Previous">&lsaquo;</button>
+              @for (p of getGlPageArray(); track p) {
+                <button class="page-btn" [class.active]="glLedgerMeta.page === p" (click)="goToGlPage(p)">{{ p }}</button>
+              }
+              <button class="page-btn" [disabled]="glLedgerMeta.page >= glLedgerMeta.totalPages" (click)="goToGlPage(glLedgerMeta.page + 1)" title="Next">&rsaquo;</button>
+              <button class="page-btn" [disabled]="glLedgerMeta.page >= glLedgerMeta.totalPages" (click)="goToGlPage(glLedgerMeta.totalPages)" title="Last">&raquo;</button>
+            </div>
+            <div class="page-info-row">
+              Page {{ glLedgerMeta.page }} of {{ glLedgerMeta.totalPages }} ({{ glLedgerMeta.total }} items)
+              <select class="page-size-select" [(ngModel)]="glLedgerMeta.limit" (change)="onGlFilterChange()">
+                <option [value]="25">25</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>
+
+@if (showProgress) {
+  <div class="modal-overlay visible">
+    <div class="modal" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>Processing Payroll</h3>
+      </div>
+      <div class="modal-body">
+        <div class="progress-info-row">
+          <span class="progress-label-text">Status</span>
+          <span class="progress-value-text">{{ progressData.status === 'PROCESSING' ? 'Calculating...' : progressData.status }}</span>
+        </div>
+        @if (progressData.currentEmployee) {
+          <div class="progress-info-row">
+            <span class="progress-label-text">Current</span>
+            <span class="progress-value-text">{{ progressData.currentEmployee }}</span>
+          </div>
+        }
+        <div class="progress-info-row">
+          <span class="progress-label-text">Progress</span>
+          <span class="progress-value-text">{{ progressData.processed || 0 }} / {{ progressData.total || 0 }}</span>
+        </div>
+        <div class="progress-info-row">
+          <span class="progress-label-text">Elapsed</span>
+          <span class="progress-value-text">{{ elapsedTime }}</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" [style.width.%]="progressData.percent || 0"></div>
+        </div>
+        <div class="progress-pct-text">{{ (progressData.percent || 0).toFixed(1) }}%</div>
+        @if (progressData.errors > 0) {
+          <div class="progress-errors">{{ progressData.errors }} error(s) encountered</div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showCompletionPopup) {
+  <div class="modal-overlay visible">
+    <div class="modal completion-popup">
+      <div class="completion-popup-header">
+        <h3>PAYROLL RUN RESULTS</h3>
+        <button class="popup-close-btn" (click)="dismissCompletionPopup()">&#10005;</button>
+      </div>
+      <div class="completion-popup-body">
+        <p>Salaries Generated for the Selected Cycle</p>
+        <p class="completion-count">{{ completionEmployeeCount }} employees processed</p>
+        <p style="color:#6b7280; margin-top:4px;">Completed in {{ completionElapsedTime }}</p>
+        @if (completionErrorCount > 0) {
+          <p style="color:#dc2626; font-weight:600; margin-top:8px;">{{ completionErrorCount }} error(s) encountered — see details below</p>
+        }
+      </div>
+      <div class="completion-popup-footer">
+        <button class="btn btn-primary" (click)="dismissCompletionPopup()">Close</button>
+      </div>
+    </div>
+  </div>
+}

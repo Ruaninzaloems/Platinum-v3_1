@@ -1,0 +1,153 @@
+.hier-page { width: 100%; }
+
+.hier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.hier-title { font-size: 24px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
+.hier-subtitle { font-size: 14px; color: #64748b; margin: 0; }
+.hier-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn-primary { background: #0f2b46 !important; color: white !important; }
+
+.loading-container { display: flex; justify-content: center; padding: 60px; }
+
+.tree-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+  padding-right: 12px;
+}
+.tree-row:last-child { border-bottom: none; }
+.tree-row:hover { background: #f8fafc; }
+
+.expand-cell { display: flex; align-items: center; width: 32px; flex-shrink: 0; }
+.expand-btn { width: 28px; height: 28px; line-height: 28px; }
+.expand-icon { font-size: 20px; width: 20px; height: 20px; color: #94a3b8; transition: transform 0.2s; }
+.expand-icon.rotated { transform: rotate(90deg); }
+.expand-placeholder { display: inline-block; width: 28px; }
+.expand-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e2e8f0; margin: 0 11px; flex-shrink: 0; }
+.leaf-dot { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #cbd5e1; margin: 0 12px; flex-shrink: 0; }
+
+.level-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.node-desc {
+  flex: 1;
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 500;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.child-count {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.child-count.muted { opacity: 0.6; }
+
+.node-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tree-row:hover .node-actions { opacity: 1; }
+
+.action-btn { width: 30px; height: 30px; line-height: 30px; }
+.action-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.add-btn mat-icon { color: #059669; }
+.edit-btn mat-icon { color: #3b82f6; }
+.del-btn mat-icon { color: #ef4444; }
+
+.empty-state { text-align: center; padding: 48px; color: #94a3b8; font-size: 14px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-box {
+  background: white;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: #1e293b; }
+.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field label { font-size: 13px; font-weight: 500; color: #475569; }
+.form-input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%; box-sizing: border-box; }
+.form-input:focus { border-color: #3b82f6; }
+
+.readonly-field {
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.form-row { display: flex; gap: 16px; align-items: flex-end; }
+.form-row .form-field { flex: 1; }
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 2px;
+  flex-shrink: 0;
+}
+.checkbox-field input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.checkbox-field label { font-size: 13px; color: #475569; cursor: pointer; margin: 0; font-weight: 500; }

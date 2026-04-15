@@ -1,0 +1,1193 @@
+<div class="detail-tabs">
+  @for (tab of tabs; track tab.id) {
+    <button class="detail-tab" [class.active]="activeTab === tab.id" (click)="switchTab(tab.id)">
+      <app-icon [name]="tab.icon" [size]="14"></app-icon>
+      {{ tab.label }}
+    </button>
+  }
+</div>
+
+<div id="payroll-tab-content">
+
+  <!-- RUNS TAB -->
+  @if (activeTab === 'runs') {
+    <div class="toolbar">
+      <div class="toolbar-filter">
+        <select class="toolbar-filter-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
+          @for (opt of statusOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+        <select class="toolbar-filter-select" [(ngModel)]="filters.cycle_id" (change)="onFilterChange()">
+          <option value="">All Cycles</option>
+          @for (c of cycles; track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" (click)="openPayslipView()">
+          <app-icon name="eye" [size]="14"></app-icon> Employee Payslips
+        </button>
+        <button class="btn" (click)="showMockPayslip()">
+          <app-icon name="fileText" [size]="14"></app-icon> Mock Payslip
+        </button>
+        <button class="btn btn-primary" (click)="openCreateRunModal()">&#43; Create Payroll Run</button>
+      </div>
+    </div>
+
+    <div class="workflow-steps">
+      <div class="workflow-step" [class.active]="pipelineCounts.trial > 0" [class.completed]="pipelineCounts.trial === 0 && pipelineCounts.reviewed > 0">
+        <div class="step-circle">{{ pipelineCounts.trial }}</div>
+        <div class="step-name">Trial</div>
+      </div>
+      <div class="workflow-arrow">→</div>
+      <div class="workflow-step" [class.active]="pipelineCounts.reviewed > 0" [class.completed]="pipelineCounts.reviewed === 0 && pipelineCounts.locked > 0">
+        <div class="step-circle">{{ pipelineCounts.reviewed }}</div>
+        <div class="step-name">Reviewed</div>
+      </div>
+      <div class="workflow-arrow">→</div>
+      <div class="workflow-step" [class.active]="pipelineCounts.locked > 0" [class.completed]="pipelineCounts.locked === 0 && pipelineCounts.approved > 0">
+        <div class="step-circle">{{ pipelineCounts.locked }}</div>
+        <div class="step-name">Locked</div>
+      </div>
+      <div class="workflow-arrow">→</div>
+      <div class="workflow-step" [class.completed]="pipelineCounts.approved > 0">
+        <div class="step-circle">{{ pipelineCounts.approved }}</div>
+        <div class="step-name">Approved</div>
+      </div>
+    </div>
+
+    @if (loading) {
+      <div class="loading"><div class="spinner"></div>Loading runs...</div>
+    } @else if (runs.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="dollarSign" [size]="32"></app-icon></div>
+        <div class="empty-title">No Payroll Runs</div>
+        <div class="empty-desc">Create a new payroll run to get started</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Run #</th><th>Cycle</th><th>Period</th><th>Type</th><th>Employees</th>
+              <th style="text-align:right">Gross</th><th style="text-align:right">Deductions</th>
+              <th style="text-align:right">Nett Pay</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (run of runs; track run.id) {
+              <tr class="clickable-row" (click)="showRunDetail(run.id)">
+                <td><strong>#{{ run.id }}</strong></td>
+                <td>{{ run.cycle_name || '-' }}</td>
+                <td>Period {{ run.period_number }} ({{ run.tax_year }})</td>
+                <td><span class="badge" [class.badge-info]="isTrial(run)" [class.badge-danger]="!isTrial(run)">{{ run.run_type }}</span></td>
+                <td>{{ run.employee_count || 0 }}</td>
+                <td style="text-align:right">{{ run.total_earnings || 0 | currencyZar }}</td>
+                <td style="text-align:right">{{ run.total_deductions || 0 | currencyZar }}</td>
+                <td style="text-align:right;font-weight:600">{{ run.total_nett || 0 | currencyZar }}</td>
+                <td><app-status-badge [status]="run.status"></app-status-badge></td>
+                <td>
+                  <div class="action-bar" (click)="$event.stopPropagation()">
+                    @if (run.status === 'PENDING' || run.status === 'FAILED') {
+                      <button class="action-btn" (click)="executeRun(run.id)" title="Execute"><app-icon name="activity" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'PROCESSING') {
+                      <button class="action-btn" (click)="openProgressModal(run.id, true)" title="View Progress" style="color:#2e7d32"><app-icon name="eye" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'COMPLETED') {
+                      <button class="action-btn" (click)="executeRun(run.id)" title="Re-execute"><app-icon name="refresh" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'COMPLETED' && isTrial(run)) {
+                      <button class="action-btn success" (click)="promoteRun(run.id)" title="Promote to Final & Lock"><app-icon name="chevronRight" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'COMPLETED' && !isTrial(run)) {
+                      <button class="action-btn success" (click)="lockRun(run.id)" title="Lock"><app-icon name="shield" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'LOCKED') {
+                      <button class="action-btn" (click)="unlockRun(run.id)" title="Unlock"><app-icon name="refresh" [size]="14"></app-icon></button>
+                      <button class="action-btn success" (click)="approveRun(run.id)" title="Approve"><app-icon name="check" [size]="14"></app-icon></button>
+                    }
+                    @if (run.status === 'COMPLETED') {
+                      <button class="action-btn danger" (click)="openVoidModal(run.id)" title="Void"><app-icon name="x" [size]="14"></app-icon></button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (pagination.total > pagination.limit) {
+        <div class="pagination">
+          <div class="pagination-info">
+            <span class="page-info">Showing</span>
+            <span class="page-num">{{ (pagination.page - 1) * pagination.limit + 1 }}-{{ pagination.page * pagination.limit > pagination.total ? pagination.total : pagination.page * pagination.limit }}</span>
+            <span class="page-info">of {{ pagination.total }}</span>
+          </div>
+          <div class="pagination-controls">
+            <button [disabled]="pagination.page <= 1" (click)="goToPage(pagination.page - 1)">‹</button>
+            @for (p of [].constructor(Math.ceil(pagination.total / pagination.limit)); track $index) {
+              <button [class.active]="pagination.page === $index + 1" (click)="goToPage($index + 1)">{{ $index + 1 }}</button>
+            }
+            <button [disabled]="pagination.page * pagination.limit >= pagination.total" (click)="goToPage(pagination.page + 1)">›</button>
+          </div>
+        </div>
+      }
+    }
+  }
+
+  <!-- SALARY INCREASES TAB -->
+  @if (activeTab === 'salaryincreases') {
+    <div class="toolbar">
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="toolbar-filter-select" [(ngModel)]="siStatusFilter" (change)="onSiFilterChange()">
+          <option value="">All Statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="APPLIED">Applied</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" (click)="applyAllIncreases()"><app-icon name="check" [size]="14"></app-icon> Apply All Approved</button>
+      </div>
+    </div>
+    @if (siLoading) {
+      <div class="loading"><div class="spinner"></div>Loading salary increases...</div>
+    } @else if (salaryIncreases.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="trendingUp" [size]="32"></app-icon></div>
+        <div class="empty-title">No Salary Increases</div>
+        <div class="empty-desc">Use "Mass Increase" to create salary increases for employees</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Employee Code</th><th>Employee</th><th style="text-align:right">Old Salary</th><th style="text-align:right">New Salary</th><th style="text-align:right">% Change</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            @for (si of salaryIncreases; track si.id) {
+              <tr>
+                <td><strong>{{ si.employee_code || '-' }}</strong></td>
+                <td>{{ si.first_name || '' }} {{ si.surname || '' }}</td>
+                <td style="text-align:right">{{ si.old_salary | currencyZar }}</td>
+                <td style="text-align:right;font-weight:600">{{ si.new_salary | currencyZar }}</td>
+                <td style="text-align:right;color:var(--success)">{{ getSiPercentChange(si) }}%</td>
+                <td><app-status-badge [status]="si.status"></app-status-badge></td>
+                <td>
+                  <div class="action-bar">
+                    @if (si.status === 'PENDING') {
+                      <button class="action-btn success" (click)="approveSalaryIncrease(si.id)" title="Approve"><app-icon name="check" [size]="14"></app-icon></button>
+                    }
+                    @if (si.status === 'APPROVED') {
+                      <button class="action-btn" (click)="applySalaryIncrease(si.id)" title="Apply"><app-icon name="activity" [size]="14"></app-icon></button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  <!-- VARIANCE TAB -->
+  @if (activeTab === 'variance') {
+    <div style="margin-bottom:16px">
+      <h3 style="margin:0 0 12px;font-size:16px">Payroll Variance Comparison</h3>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label style="display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:var(--text-muted)">Select Payroll Run</label>
+          <select class="toolbar-filter-select" style="width:100%" [(ngModel)]="varianceRunId">
+            <option value="">-- Select a Run --</option>
+            @for (r of varianceRuns; track r.id) {
+              <option [value]="r.id">Run #{{ r.id }} - {{ r.cycle_name || '' }} Period {{ r.period_number || '' }} ({{ r.tax_year || '' }}) - {{ r.run_type }} - {{ r.status }}</option>
+            }
+          </select>
+        </div>
+        <div style="min-width:180px">
+          <label style="display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:var(--text-muted)">Compare Type</label>
+          <select class="toolbar-filter-select" style="width:100%" [(ngModel)]="varianceCompareType">
+            <option value="">Auto-detect</option>
+            <option value="TRIAL_VS_FINAL">Trial vs Final</option>
+            <option value="PERIOD_COMPARISON">Period Comparison</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" [disabled]="!varianceRunId" (click)="loadVarianceData()">
+          <app-icon name="barChart" [size]="14"></app-icon> Load Variance
+        </button>
+      </div>
+    </div>
+    @if (varianceLoading) {
+      <div class="loading"><div class="spinner"></div>Loading variance data...</div>
+    } @else if (varianceData) {
+      @if (varianceData.message || !varianceData.summary_variance) {
+        <div class="empty-state">
+          <div class="empty-icon"><app-icon name="barChart" [size]="32"></app-icon></div>
+          <div class="empty-title">No Variance Data</div>
+          <div class="empty-desc">{{ varianceData.message || 'No previous run found for comparison' }}</div>
+        </div>
+      } @else {
+        <div class="stat-cards">
+          <div class="stat-card" style="border-left-color:#4F6AFF"><div class="stat-value">#{{ varianceData.current_run?.id || varianceRunId }}</div><div class="stat-label">Current Run</div></div>
+          <div class="stat-card" style="border-left-color:#8B5CF6"><div class="stat-value">{{ varianceData.previous_run?.id ? '#' + varianceData.previous_run.id : 'N/A' }}</div><div class="stat-label">Previous Run</div></div>
+          <div class="stat-card" [style.border-left-color]="isVarianceSignificant(varianceData.summary_variance?.nett_variance) ? '#EF4444' : '#10B981'"><div class="stat-value">{{ formatCurrency(varianceData.summary_variance?.nett_variance || 0) }}</div><div class="stat-label">Nett Variance</div></div>
+          <div class="stat-card" style="border-left-color:#F59E0B"><div class="stat-value">{{ varianceData.summary_variance?.employees_with_changes || 0 }}</div><div class="stat-label">Employees Changed</div></div>
+        </div>
+
+        <h4 style="margin:16px 0 8px;font-size:14px">Summary Comparison</h4>
+        <div class="data-grid" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Metric</th><th style="text-align:right">Current</th><th style="text-align:right">Previous</th><th style="text-align:right">Variance</th></tr></thead>
+            <tbody>
+              <tr><td>Employee Count</td><td style="text-align:right">{{ varianceData.summary_variance?.current_employee_count || 0 }}</td><td style="text-align:right">{{ varianceData.summary_variance?.previous_employee_count || 0 }}</td><td style="text-align:right">{{ fmtVarianceDiff((varianceData.summary_variance?.current_employee_count || 0) - (varianceData.summary_variance?.previous_employee_count || 0)) }}</td></tr>
+              <tr><td>Total Earnings</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.current_earnings || 0) }}</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.previous_earnings || 0) }}</td><td style="text-align:right">{{ fmtVarianceDiff(varianceData.summary_variance?.earnings_variance) }}</td></tr>
+              <tr><td>Total Deductions</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.current_deductions || 0) }}</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.previous_deductions || 0) }}</td><td style="text-align:right">{{ fmtVarianceDiff(varianceData.summary_variance?.deductions_variance) }}</td></tr>
+              <tr style="font-weight:600"><td>Nett Pay</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.current_nett || 0) }}</td><td style="text-align:right">{{ formatCurrency(varianceData.summary_variance?.previous_nett || 0) }}</td><td style="text-align:right">{{ fmtVarianceDiff(varianceData.summary_variance?.nett_variance) }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        @if (varianceData.detail_variance?.length > 0) {
+          <h4 style="margin:16px 0 8px;font-size:14px">Salary Head Breakdown</h4>
+          <div class="data-grid" style="margin-bottom:20px">
+            <table>
+              <thead><tr><th>Code</th><th>Salary Head</th><th>Type</th><th style="text-align:right">Current</th><th style="text-align:right">Previous</th><th style="text-align:right">Variance</th><th style="text-align:right">Change %</th></tr></thead>
+              <tbody>
+                @for (h of varianceData.detail_variance; track h.code) {
+                  <tr [style.background]="isVarianceSignificant(h.variance_amount) ? 'rgba(239,68,68,0.06)' : ''">
+                    <td><strong>{{ h.code || '-' }}</strong></td>
+                    <td>{{ h.name || '-' }}</td>
+                    <td><span class="badge" [class.badge-success]="h.transaction_type === 'EARNING'" [class.badge-danger]="h.transaction_type === 'DEDUCTION'" [class.badge-info]="h.transaction_type !== 'EARNING' && h.transaction_type !== 'DEDUCTION'">{{ h.transaction_type || '-' }}</span></td>
+                    <td style="text-align:right">{{ formatCurrency(h.current_total || 0) }}</td>
+                    <td style="text-align:right">{{ formatCurrency(h.previous_total || 0) }}</td>
+                    <td style="text-align:right">{{ fmtVarianceDiff(h.variance_amount) }}</td>
+                    <td style="text-align:right">{{ fmtVariancePct(h.variance_percentage) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (varianceData.employee_variance?.length > 0) {
+          <h4 style="margin:16px 0 8px;font-size:14px">Employee-Level Variance</h4>
+          <div class="data-grid">
+            <table>
+              <thead><tr><th>Code</th><th>Employee</th><th style="text-align:right">Curr Earn</th><th style="text-align:right">Prev Earn</th><th style="text-align:right">Earn Var</th><th style="text-align:right">Curr Ded</th><th style="text-align:right">Prev Ded</th><th style="text-align:right">Ded Var</th><th style="text-align:right">Nett Var</th></tr></thead>
+              <tbody>
+                @for (e of varianceData.employee_variance; track e.employee_code) {
+                  <tr [style.background]="isVarianceSignificant(e.nett_variance) ? 'rgba(239,68,68,0.06)' : ''">
+                    <td><strong>{{ e.employee_code }}</strong></td>
+                    <td>{{ e.name }}</td>
+                    <td style="text-align:right">{{ formatCurrency(e.current_earnings) }}</td>
+                    <td style="text-align:right">{{ formatCurrency(e.previous_earnings) }}</td>
+                    <td style="text-align:right">{{ fmtVarianceDiff(e.earnings_variance) }}</td>
+                    <td style="text-align:right">{{ formatCurrency(e.current_deductions) }}</td>
+                    <td style="text-align:right">{{ formatCurrency(e.previous_deductions) }}</td>
+                    <td style="text-align:right">{{ fmtVarianceDiff(e.deductions_variance) }}</td>
+                    <td style="text-align:right;font-weight:600">{{ fmtVarianceDiff(e.nett_variance) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
+  }
+
+  <!-- GL & SUB-LEDGER TAB -->
+  @if (activeTab === 'gl') {
+    @if (glRuns.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="book" [size]="32"></app-icon></div>
+        <div class="empty-title">No GL Postings</div>
+        <div class="empty-desc">Complete a FINAL payroll run and post to GL to see postings here</div>
+      </div>
+    } @else {
+      <div class="toolbar">
+        <div style="display:flex;gap:12px;align-items:center">
+          <select class="form-control" style="width:400px" [(ngModel)]="glRunId" (change)="onGlRunChange()">
+            @for (r of glRuns; track r.id) {
+              <option [value]="r.id">Run #{{ r.id }} - {{ r.cycle_name || 'Payroll' }} - Period {{ r.period_number || '?' }} ({{ r.tax_year || '' }}) - {{ r.status }}</option>
+            }
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" [class.btn-primary]="glView === 'gl'" (click)="setGlView('gl')">GL Postings</button>
+          <button class="btn" [class.btn-primary]="glView === 'subledger'" (click)="setGlView('subledger')">Sub-Ledger</button>
+          <button class="btn" [class.btn-primary]="glView === 'reconcile'" (click)="setGlView('reconcile')" style="border-color:#c9a84c;color:#c9a84c">
+            <app-icon name="shield" [size]="13"></app-icon> Reconcile
+          </button>
+        </div>
+      </div>
+
+      @if (glLoading) {
+        <div class="loading"><div class="spinner"></div>Loading...</div>
+      } @else if (glView === 'gl' && glData) {
+        @if ((glData.data || []).length === 0) {
+          <div class="empty-state">
+            <div class="empty-icon"><app-icon name="book" [size]="32"></app-icon></div>
+            <div class="empty-title">No GL Journals</div>
+            <div class="empty-desc">Click "GL Post" on a completed FINAL run to generate journal entries</div>
+          </div>
+        } @else {
+          <div class="stat-cards">
+            <div class="stat-card" style="border-left-color:#EF4444"><div class="stat-value">{{ formatCurrency(glData.totals?.total_debits || 0) }}</div><div class="stat-label">Total Debits</div></div>
+            <div class="stat-card" style="border-left-color:#10B981"><div class="stat-value">{{ formatCurrency(glData.totals?.total_credits || 0) }}</div><div class="stat-label">Total Credits</div></div>
+            <div class="stat-card" [style.border-left-color]="glData.totals?.balanced ? '#10B981' : '#EF4444'"><div class="stat-value">{{ glData.totals?.balanced ? 'BALANCED' : 'UNBALANCED' }}</div><div class="stat-label">Balance Check</div></div>
+            <div class="stat-card" style="border-left-color:#4F6AFF"><div class="stat-value">{{ glData.totals?.journal_count || (glData.data || []).length }}</div><div class="stat-label">Journal Entries</div></div>
+          </div>
+          <div class="data-grid">
+            <table>
+              <thead><tr><th>Date</th><th>mSCOA Item</th><th>Fund</th><th>Function</th><th>Description</th><th>Reference</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead>
+              <tbody>
+                @for (j of glData.data || []; track $index) {
+                  <tr style="font-size:12px">
+                    <td>{{ j.journal_date?.split('T')[0] || '-' }}</td>
+                    <td><strong style="font-family:monospace">{{ j.scoa_item_id || '-' }}</strong></td>
+                    <td>{{ j.scoa_fund_id || '-' }}</td>
+                    <td>{{ j.scoa_function_id || '-' }}</td>
+                    <td>{{ j.description || '-' }}</td>
+                    <td style="font-family:monospace;font-size:11px">{{ j.reference || '-' }}</td>
+                    <td style="text-align:right;color:var(--danger);font-weight:500">{{ (+j.debit_amount > 0) ? formatCurrency(j.debit_amount) : '' }}</td>
+                    <td style="text-align:right;color:var(--success);font-weight:500">{{ (+j.credit_amount > 0) ? formatCurrency(j.credit_amount) : '' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else if (glView === 'subledger' && slData) {
+        <div class="stat-cards">
+          <div class="stat-card" style="border-left-color:#4F6AFF"><div class="stat-value">{{ slData.totals?.total_employees || 0 }}</div><div class="stat-label">Employees</div></div>
+          <div class="stat-card" style="border-left-color:#10B981"><div class="stat-value">{{ formatCurrency(slData.totals?.total_earnings || 0) }}</div><div class="stat-label">Total Earnings</div></div>
+          <div class="stat-card" style="border-left-color:#EF4444"><div class="stat-value">{{ formatCurrency(slData.totals?.total_deductions || 0) }}</div><div class="stat-label">Total Deductions</div></div>
+          <div class="stat-card" style="border-left-color:#0f2b46"><div class="stat-value">{{ formatCurrency((slData.totals?.total_earnings || 0) - (slData.totals?.total_deductions || 0)) }}</div><div class="stat-label">Nett Pay</div></div>
+        </div>
+
+        @if ((slData.by_account || []).length > 0) {
+          <h4 style="margin:16px 0 8px;font-size:14px"><span class="badge badge-info">Sub-Ledger Account Summary</span></h4>
+          <div class="data-grid" style="margin-bottom:16px">
+            <table>
+              <thead><tr><th>mSCOA Item</th><th>Salary Heads</th><th style="text-align:center">Lines</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead>
+              <tbody>
+                @for (a of slData.by_account; track a.scoa_item_id) {
+                  <tr>
+                    <td><strong style="font-family:monospace">{{ a.scoa_item_id || 'UNMAPPED' }}</strong></td>
+                    <td style="font-size:12px">{{ a.heads || '-' }}</td>
+                    <td style="text-align:center">{{ a.line_count }}</td>
+                    <td style="text-align:right;color:var(--danger);font-weight:600">{{ a.total_debit > 0 ? formatCurrency(a.total_debit) : '' }}</td>
+                    <td style="text-align:right;color:var(--success);font-weight:600">{{ a.total_credit > 0 ? formatCurrency(a.total_credit) : '' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if ((slData.by_employee || []).length > 0) {
+          <h4 style="margin:16px 0 8px;font-size:14px"><span class="badge badge-success">Sub-Ledger by Employee</span></h4>
+          @for (emp of slData.by_employee; track emp.employee_id) {
+            <div style="margin-bottom:8px;border:1px solid var(--border);border-radius:8px;padding:10px 16px;display:flex;justify-content:space-between;font-size:13px;background:#f8fafc">
+              <div style="display:flex;gap:12px;align-items:center">
+                <strong>{{ emp.employee_name }}</strong>
+                <span style="color:var(--text-muted);font-size:11px">{{ emp.department_name || '' }}</span>
+              </div>
+              <div style="display:flex;gap:16px;font-size:12px">
+                <span style="color:var(--success)">Gross: {{ formatCurrency(emp.total_earnings) }}</span>
+                <span style="color:var(--danger)">Deductions: {{ formatCurrency(emp.total_deductions) }}</span>
+                <span style="font-weight:700">Nett: {{ formatCurrency(emp.total_earnings - emp.total_deductions) }}</span>
+              </div>
+            </div>
+          }
+        }
+      } @else if (glView === 'reconcile' && reconData) {
+        <div style="display:flex;align-items:center;gap:16px;padding:20px;border-radius:10px;margin-bottom:16px"
+             [style.background]="reconData.overall_status === 'PASS' ? '#e8f5e9' : '#ffebee'"
+             [style.border]="'2px solid ' + (reconData.overall_status === 'PASS' ? '#2e7d32' : '#c62828')">
+          <div style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white"
+               [style.background]="reconData.overall_status === 'PASS' ? '#2e7d32' : '#c62828'">
+            <app-icon [name]="reconData.overall_status === 'PASS' ? 'check' : 'alertTriangle'" [size]="24"></app-icon>
+          </div>
+          <div>
+            <div style="font-size:18px;font-weight:700" [style.color]="reconData.overall_status === 'PASS' ? '#2e7d32' : '#c62828'">Reconciliation: {{ reconData.overall_status }}</div>
+            <div style="font-size:13px;color:var(--text-muted)">Sub-Ledger to GL integrity check</div>
+          </div>
+        </div>
+
+        @if (reconData.checks?.length > 0) {
+          <div class="data-grid">
+            <table>
+              <thead><tr><th>Status</th><th>Check</th><th>Description</th><th>Severity</th><th>Detail</th></tr></thead>
+              <tbody>
+                @for (c of reconData.checks; track c.check) {
+                  <tr>
+                    <td><span class="badge" [class.badge-success]="c.status === 'PASS'" [class.badge-danger]="c.status === 'FAIL'" [class.badge-warning]="c.status === 'WARNING'">{{ c.status }}</span></td>
+                    <td><strong>{{ c.check }}</strong></td>
+                    <td>{{ c.description }}</td>
+                    <td><span style="font-size:11px;font-weight:600">{{ c.severity }}</span></td>
+                    <td style="font-size:12px;font-family:monospace;color:var(--text-muted)">{{ c.detail }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
+  }
+
+  <!-- GRAP 25 TAB -->
+  @if (activeTab === 'grap25') {
+    <div style="margin-bottom:24px">
+      <h3 style="margin:0 0 8px;font-size:16px;font-weight:600">GRAP 25 - Employee Benefits Accruals</h3>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">Post leave liability and bonus accrual journals as required by GRAP 25</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="padding:20px;background:#fff;border:1px solid var(--border);border-radius:8px">
+        <h4 style="margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px"><app-icon name="calendar" [size]="16"></app-icon> Leave Liability</h4>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">Calculate total outstanding leave balance liability across all employees.</p>
+        <div class="form-group" style="margin-bottom:12px">
+          <label>As At Date</label>
+          <app-date-input [(ngModel)]="grap25LeaveDate"></app-date-input>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" [(ngModel)]="grap25LeavePostJournal" style="width:16px;height:16px">
+            Post journal entry to GL
+          </label>
+        </div>
+        <button class="btn btn-primary" (click)="calculateLeaveLiability()" [disabled]="grap25LeaveLoading">
+          <app-icon name="book" [size]="14"></app-icon> Calculate Leave Liability
+        </button>
+        @if (grap25LeaveLoading) {
+          <div class="loading" style="margin-top:12px"><div class="spinner"></div>Calculating...</div>
+        }
+        @if (grap25LeaveResult && !grap25LeaveResult.error) {
+          <div style="padding:12px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;margin-top:12px">
+            <div style="font-weight:600;color:#059669;margin-bottom:4px">Leave Liability Calculated</div>
+            <div style="font-size:13px;color:#475569">
+              Total Liability: <strong>{{ formatCurrency(grap25LeaveResult.total_liability || 0) }}</strong><br>
+              Employees: {{ grap25LeaveResult.employee_count || 0 }}
+            </div>
+          </div>
+        }
+      </div>
+      <div style="padding:20px;background:#fff;border:1px solid var(--border);border-radius:8px">
+        <h4 style="margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px"><app-icon name="dollarSign" [size]="16"></app-icon> Bonus Accrual (13th Cheque)</h4>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">Calculate pro-rata 13th cheque provision for all employees.</p>
+        <div class="form-group" style="margin-bottom:12px">
+          <label>As At Date</label>
+          <app-date-input [(ngModel)]="grap25BonusDate"></app-date-input>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" [(ngModel)]="grap25BonusPostJournal" style="width:16px;height:16px">
+            Post journal entry to GL
+          </label>
+        </div>
+        <button class="btn btn-primary" (click)="calculateBonusAccrual()" [disabled]="grap25BonusLoading">
+          <app-icon name="book" [size]="14"></app-icon> Calculate Bonus Accrual
+        </button>
+        @if (grap25BonusLoading) {
+          <div class="loading" style="margin-top:12px"><div class="spinner"></div>Calculating...</div>
+        }
+        @if (grap25BonusResult && !grap25BonusResult.error) {
+          <div style="padding:12px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;margin-top:12px">
+            <div style="font-weight:600;color:#059669;margin-bottom:4px">Bonus Accrual Calculated</div>
+            <div style="font-size:13px;color:#475569">
+              Total Accrual: <strong>{{ formatCurrency(grap25BonusResult.total_accrual || 0) }}</strong><br>
+              Employees: {{ grap25BonusResult.employee_count || 0 }}
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- PAYMENTS TAB -->
+  @if (activeTab === 'payments') {
+    @if (paymentRuns.length === 0 && !payLoading) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="briefcase" [size]="32"></app-icon></div>
+        <div class="empty-title">No Approved Runs</div>
+        <div class="empty-desc">Approve a FINAL payroll run to manage payments here</div>
+      </div>
+    } @else {
+      <div class="toolbar">
+        <div style="display:flex;gap:12px;align-items:center">
+          <select class="form-control" style="width:420px" [(ngModel)]="paySelectedRunId" (change)="onPayRunChange()">
+            @for (r of paymentRuns; track r.id) {
+              <option [value]="r.id">Run #{{ r.id }} - {{ r.cycle_name || 'Payroll' }} P{{ r.period_number || '?' }} ({{ r.tax_year || '' }}) - {{ formatCurrency(r.total_nett) }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      @if (payStats.length > 0) {
+        <div class="stat-cards">
+          @for (s of payStats; track s.label) {
+            <div class="stat-card" [style.border-left-color]="s.color"><div class="stat-value">{{ s.value }}</div><div class="stat-label">{{ s.label }}</div></div>
+          }
+        </div>
+      }
+
+      @if (payLoading) {
+        <div class="loading"><div class="spinner"></div>Loading batches...</div>
+      } @else if (payBatches.length === 0) {
+        <div style="text-align:center;padding:32px;color:var(--text-muted)">
+          <app-icon name="briefcase" [size]="24"></app-icon>
+          <p style="margin:8px 0 0">No payment batches for this run.</p>
+        </div>
+      } @else {
+        <div class="data-grid">
+          <table>
+            <thead><tr><th>Type</th><th>Description</th><th style="text-align:right">Amount</th><th style="text-align:center">Employees</th><th>Status</th><th>Method</th><th>Actions</th></tr></thead>
+            <tbody>
+              @for (b of payBatches; track b.id) {
+                <tr>
+                  <td><span class="badge" [class.badge-primary]="b.batch_type === 'EMPLOYEE_NETT'" [class.badge-info]="b.batch_type !== 'EMPLOYEE_NETT'">{{ b.batch_type?.replace('_', ' ') }}</span></td>
+                  <td>{{ b.vendor_name || '-' }}</td>
+                  <td style="text-align:right;font-weight:600">{{ b.total_amount | currencyZar }}</td>
+                  <td style="text-align:center">{{ b.employee_count }}</td>
+                  <td><span class="badge" [class.badge-warning]="b.status === 'PENDING_REVIEW'" [class.badge-info]="b.status === 'REVIEWED'" [class.badge-primary]="b.status === 'AUTHORIZED'" [class.badge-success]="b.status === 'PAID'">{{ b.status?.replace('_', ' ') }}</span></td>
+                  <td>{{ b.payment_method === 'HOST_TO_HOST' ? 'H2H' : 'Manual EFT' }}</td>
+                  <td>
+                    <div class="action-bar">
+                      @if (b.status === 'PENDING_REVIEW') {
+                        <button class="action-btn" (click)="payBatchAction('review', b.id)" title="Review"><app-icon name="check" [size]="14"></app-icon></button>
+                      }
+                      @if (b.status === 'REVIEWED') {
+                        <button class="action-btn" (click)="payBatchAction('authorize', b.id)" title="Authorize" style="color:var(--primary)"><app-icon name="shield" [size]="14"></app-icon></button>
+                        <button class="action-btn" (click)="downloadEft(b.id)" title="Download EFT"><app-icon name="download" [size]="14"></app-icon></button>
+                      }
+                      @if (b.status === 'AUTHORIZED') {
+                        <button class="action-btn" (click)="downloadEft(b.id)" title="Download EFT"><app-icon name="download" [size]="14"></app-icon></button>
+                        <button class="action-btn" (click)="payBatchAction('mark-paid', b.id)" title="Mark Paid" style="color:var(--success)"><app-icon name="check" [size]="14"></app-icon></button>
+                      }
+                      @if (b.status === 'PAID') {
+                        <button class="action-btn" (click)="downloadEft(b.id)" title="Download EFT"><app-icon name="download" [size]="14"></app-icon></button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+
+  <!-- COUNCILLOR TAB -->
+  @if (activeTab === 'councillor') {
+    <div style="margin-bottom:16px">
+      <h3 style="margin:0 0 8px;font-size:16px;font-weight:600">Councillor Register</h3>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">Upper Limit Remuneration Framework for Municipal Councillors</p>
+    </div>
+    @if (councillorLoading) {
+      <div class="loading"><div class="spinner"></div>Loading councillor register...</div>
+    } @else if (councillors.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="users" [size]="32"></app-icon></div>
+        <div class="empty-title">No Councillors Found</div>
+        <div class="empty-desc">No employees are marked as councillors</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Code</th><th>Councillor</th><th>Position</th><th>Category</th><th style="text-align:right">Remuneration</th><th style="text-align:right">Upper Limit</th><th style="text-align:right">% of Limit</th><th>Status</th></tr></thead>
+          <tbody>
+            @for (c of councillors; track c.employee_code) {
+              <tr [style.background]="isOverLimit(c) ? 'rgba(239,68,68,0.06)' : ''">
+                <td><strong>{{ c.employee_code || '-' }}</strong></td>
+                <td>{{ c.first_name || '' }} {{ c.surname || '' }}</td>
+                <td>{{ c.position_title || c.position_type || '-' }}</td>
+                <td>{{ c.council_category || '-' }}</td>
+                <td style="text-align:right">{{ c.annual_salary || 0 | currencyZar }}</td>
+                <td style="text-align:right">{{ c.upper_limit ? formatCurrency(c.upper_limit) : '-' }}</td>
+                <td style="text-align:right;font-weight:600" [style.color]="isOverLimit(c) ? 'var(--danger)' : 'var(--success)'">{{ getCouncillorPct(c) }}%</td>
+                <td>
+                  @if (isOverLimit(c)) { <span class="badge badge-danger">Over Limit</span> }
+                  @else { <span class="badge badge-success">Within Limit</span> }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  <!-- TAX TABLES TAB -->
+  @if (activeTab === 'tax') {
+    @if (taxLoading) {
+      <div class="loading"><div class="spinner"></div>Loading tax tables...</div>
+    } @else if (taxData) {
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <h3 style="margin:0;font-size:16px">SARS Tax Tables - Tax Year {{ taxData.tax_year }}</h3>
+        <span class="badge badge-info">Current Year</span>
+      </div>
+
+      <div class="stat-cards">
+        <div class="stat-card"><div class="stat-value">{{ taxData.uif?.employee_rate || 'N/A' }}%</div><div class="stat-label">UIF Rate (Employee)</div></div>
+        <div class="stat-card"><div class="stat-value">{{ taxData.uif?.employer_rate || 'N/A' }}%</div><div class="stat-label">UIF Rate (Employer)</div></div>
+        <div class="stat-card"><div class="stat-value">{{ taxData.uif ? formatCurrency(taxData.uif.ceiling) : 'N/A' }}</div><div class="stat-label">UIF Ceiling</div></div>
+        <div class="stat-card"><div class="stat-value">{{ taxData.sdl?.rate || 'N/A' }}%</div><div class="stat-label">SDL Rate</div></div>
+        <div class="stat-card"><div class="stat-value">{{ taxData.sdl ? formatCurrency(taxData.sdl.threshold) : 'N/A' }}</div><div class="stat-label">SDL Threshold</div></div>
+      </div>
+
+      <h4 style="margin:20px 0 8px;font-size:14px">Income Tax Brackets</h4>
+      <div class="data-grid" style="margin-bottom:20px">
+        <table>
+          <thead><tr><th>#</th><th style="text-align:right">From</th><th style="text-align:right">To</th><th style="text-align:right">Rate</th><th style="text-align:right">Base Tax</th></tr></thead>
+          <tbody>
+            @for (b of taxData.brackets || []; track b.bracket_number) {
+              <tr>
+                <td>{{ b.bracket_number }}</td>
+                <td style="text-align:right">{{ b.min_income | currencyZar }}</td>
+                <td style="text-align:right">{{ b.max_income | currencyZar }}</td>
+                <td style="text-align:right">{{ b.rate }}%</td>
+                <td style="text-align:right">{{ b.base_tax | currencyZar }}</td>
+              </tr>
+            }
+            @if ((taxData.brackets || []).length === 0) {
+              <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No brackets configured</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <h4 style="margin:20px 0 8px;font-size:14px">Tax Rebates</h4>
+      <div class="data-grid" style="margin-bottom:20px">
+        <table>
+          <thead><tr><th>Type</th><th>Age</th><th style="text-align:right">Annual</th><th style="text-align:right">Monthly</th></tr></thead>
+          <tbody>
+            @for (r of taxData.rebates || []; track r.rebate_type) {
+              <tr>
+                <td>{{ r.rebate_type }}</td>
+                <td>{{ r.age_threshold > 0 ? r.age_threshold + '+' : 'All' }}</td>
+                <td style="text-align:right">{{ r.amount | currencyZar }}</td>
+                <td style="text-align:right">{{ formatCurrency(+r.amount / 12) }}</td>
+              </tr>
+            }
+            @if ((taxData.rebates || []).length === 0) {
+              <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No rebates configured</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <h4 style="margin:20px 0 8px;font-size:14px">Tax Thresholds</h4>
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Type</th><th style="text-align:right">Annual</th><th style="text-align:right">Monthly</th></tr></thead>
+          <tbody>
+            @for (t of taxData.thresholds || []; track t.threshold_type) {
+              <tr>
+                <td>{{ t.threshold_type || t.age_group || '-' }}</td>
+                <td style="text-align:right">{{ t.amount | currencyZar }}</td>
+                <td style="text-align:right">{{ formatCurrency(+t.amount / 12) }}</td>
+              </tr>
+            }
+            @if ((taxData.thresholds || []).length === 0) {
+              <tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No thresholds configured</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="fileText" [size]="32"></app-icon></div>
+        <div class="empty-title">Tax Tables Not Available</div>
+        <div class="empty-desc">Configure tax tables in Settings</div>
+      </div>
+    }
+  }
+
+  <!-- THIRD PARTY TAB -->
+  @if (activeTab === 'thirdparty') {
+    <div class="toolbar">
+      <div style="display:flex;gap:16px;font-size:12px;align-items:center">
+        <span style="color:var(--text-muted)">Pending: <strong style="color:var(--warning)">{{ formatCurrency(tppTotalPending) }}</strong></span>
+        <span style="color:var(--text-muted)">Approved: <strong style="color:var(--primary)">{{ formatCurrency(tppTotalApproved) }}</strong></span>
+        <span style="color:var(--text-muted)">Paid: <strong style="color:var(--success)">{{ formatCurrency(tppTotalPaid) }}</strong></span>
+      </div>
+    </div>
+    @if (thirdPartyLoading) {
+      <div class="loading"><div class="spinner"></div>Loading third party payments...</div>
+    } @else if (thirdPartyPayments.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="users" [size]="32"></app-icon></div>
+        <div class="empty-title">No Third Party Payments</div>
+        <div class="empty-desc">Execute a payroll run to generate payment schedules</div>
+      </div>
+    } @else {
+      <div class="data-grid" style="margin-top:12px">
+        <table>
+          <thead><tr><th>Vendor</th><th>Reference</th><th>Salary Head</th><th style="text-align:right">Amount</th><th style="text-align:center">Employees</th><th>Payment Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            @for (p of thirdPartyPayments; track p.id) {
+              <tr>
+                <td><strong>{{ p.vendor_name || '-' }}</strong></td>
+                <td style="font-size:12px;color:var(--text-muted)">{{ p.vendor_reference || '-' }}</td>
+                <td>{{ p.salary_head_name || '-' }}</td>
+                <td style="text-align:right;font-weight:600">{{ p.total_amount | currencyZar }}</td>
+                <td style="text-align:center">{{ p.employee_count || 0 }}</td>
+                <td>{{ p.payment_date | dateSa }}</td>
+                <td><app-status-badge [status]="p.status || 'PENDING'"></app-status-badge></td>
+                <td>
+                  <div class="action-bar">
+                    @if (p.status === 'PENDING') {
+                      <button class="action-btn" (click)="updateTppStatus(p.id, 'APPROVED')" title="Approve" style="color:var(--success)"><app-icon name="check" [size]="14"></app-icon></button>
+                    }
+                    @if (p.status === 'APPROVED') {
+                      <button class="action-btn" (click)="updateTppStatus(p.id, 'PAID')" title="Mark Paid" style="color:var(--success)"><app-icon name="check" [size]="14"></app-icon></button>
+                    }
+                    @if (p.status !== 'PAID') {
+                      <button class="action-btn danger" (click)="deleteTpp(p.id, p.vendor_name || '')" title="Delete"><app-icon name="trash" [size]="14"></app-icon></button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  <!-- SALARY HEADS TAB -->
+  @if (activeTab === 'salaryheads') {
+    @if (salaryHeadsLoading) {
+      <div class="loading"><div class="spinner"></div>Loading salary heads...</div>
+    } @else if (salaryHeads.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon"><app-icon name="clipboard" [size]="32"></app-icon></div>
+        <div class="empty-title">No Salary Heads</div>
+        <div class="empty-desc">Configure salary heads in Settings</div>
+      </div>
+    } @else {
+      <div class="data-grid">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Method</th><th>Tax</th><th>UIF</th><th>SDL</th><th>Status</th></tr></thead>
+          <tbody>
+            @for (h of salaryHeads; track h.id) {
+              <tr>
+                <td><strong>{{ h.code }}</strong></td>
+                <td>{{ h.name }}</td>
+                <td><span class="badge" [class.badge-success]="h.transaction_type === 'EARNING'" [class.badge-danger]="h.transaction_type === 'DEDUCTION'" [class.badge-info]="h.transaction_type !== 'EARNING' && h.transaction_type !== 'DEDUCTION'">{{ h.transaction_type }}</span></td>
+                <td>{{ h.calculation_method || '-' }}</td>
+                <td>{{ h.taxable ? '✓' : '✗' }}</td>
+                <td>{{ h.affects_uif ? '✓' : '✗' }}</td>
+                <td>{{ h.affects_sdl ? '✓' : '✗' }}</td>
+                <td><app-status-badge [status]="h.enabled ? 'Active' : 'Inactive'"></app-status-badge></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>
+
+<!-- CREATE RUN MODAL -->
+@if (showRunModal) {
+  <div class="modal-overlay visible" (click)="showRunModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Create Payroll Run</h3>
+        <button class="modal-close" (click)="showRunModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="padding-top:16px">
+          <div class="form-section-title full-width"><app-icon name="settings" [size]="16"></app-icon> Payroll Run Configuration</div>
+          <div class="form-group">
+            <label>Payroll Cycle <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newRun.cycle_id" (change)="onCycleChange()">
+              <option value="">-- Select Cycle --</option>
+              @for (c of cycles; track c.id) {
+                <option [value]="c.id">{{ c.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Payroll Period <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newRun.period_id" [disabled]="!newRun.cycle_id">
+              @if (loadingPeriods) { <option value="">Loading...</option> }
+              @else if (!newRun.cycle_id) { <option value="">-- Select Cycle First --</option> }
+              @else if (newRunPeriods.length === 0) { <option value="">No available periods</option> }
+              @else {
+                @if (newRunPeriods.length > 1) { <option value="">-- Select Period --</option> }
+                @for (p of newRunPeriods; track p.id) {
+                  <option [value]="p.id">Period {{ p.period_number }} - Tax Year {{ p.tax_year }} ({{ p.start_date?.split('T')[0] }} to {{ p.end_date?.split('T')[0] }})</option>
+                }
+              }
+            </select>
+            <span class="form-hint">Select a cycle first</span>
+          </div>
+          <div class="form-group">
+            <label>Run Type <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newRun.run_type">
+              <option value="TRIAL">Trial Run (promoted to Final after review)</option>
+              <option value="ADHOC_TRIAL">Ad Hoc Trial (once-off calculation)</option>
+              <option value="NORMAL">Normal (standard payroll run)</option>
+              <option value="SUPPLEMENTARY">Supplementary (selected heads only)</option>
+              <option value="BONUS_13TH_CHEQUE">Bonus 13th Cheque</option>
+              <option value="LEAVE_ENCASHMENT">Leave Encashment</option>
+            </select>
+            <span class="form-hint">Runs start as Trial. Promote to Final after reviewing results.</span>
+          </div>
+          <div class="form-group">
+            <label>Payment Date</label>
+            <app-date-input [(ngModel)]="newRun.payment_date"></app-date-input>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showRunModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="submitRun()">Create Run</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- PROGRESS MODAL -->
+@if (showProgressModal) {
+  <div class="modal-overlay visible" (click)="closeProgressModal()">
+    <div class="modal modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Payroll Execution</h3>
+        <button class="modal-close" (click)="closeProgressModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="padding:16px 0">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            @if (progressData.status !== 'COMPLETED' && progressData.status !== 'FAILED') {
+              <div class="spinner"></div>
+            } @else if (progressData.status === 'COMPLETED') {
+              <span style="color:var(--success)"><app-icon name="check" [size]="24"></app-icon></span>
+            } @else {
+              <span style="color:var(--danger)"><app-icon name="alertTriangle" [size]="24"></app-icon></span>
+            }
+            <div>
+              <div style="font-weight:600;font-size:15px;color:var(--primary-dark)">{{ progressTitle }}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">{{ progressSubtitle }}</div>
+            </div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;height:24px;overflow:hidden;border:1px solid var(--border)">
+            <div style="height:100%;background:linear-gradient(90deg,#2e7d32,#4caf50);border-radius:8px;transition:width 0.3s ease;display:flex;align-items:center;justify-content:center"
+                 [style.width.%]="progressData.percent || 0"
+                 [style.background]="progressData.status === 'FAILED' ? '#e8a0a0' : ''">
+              @if ((progressData.percent || 0) > 8) {
+                <span style="font-size:11px;font-weight:600;color:#fff">{{ progressData.percent }}%</span>
+              }
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px">
+            <span style="font-size:12px;color:var(--text-secondary)">{{ (progressData.processed || 0).toLocaleString() }} / {{ (progressData.total || 0).toLocaleString() }} employees</span>
+            <span style="font-size:12px;color:var(--text-muted)">{{ progressData.status === 'COMPLETED' ? getProgressElapsed() : getProgressEta() }}</span>
+          </div>
+          @if (progressData.currentEmployee) {
+            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Processing: {{ progressData.currentEmployee }}</div>
+          }
+          @if (progressData.errors > 0) {
+            <div style="font-size:12px;color:var(--danger);margin-top:4px">{{ progressData.errors }} error(s) encountered</div>
+          }
+          @if (progressData.status !== 'COMPLETED' && progressData.status !== 'FAILED') {
+            <div style="font-size:11px;color:var(--text-muted);margin-top:12px;padding:8px;background:#f8f9fb;border-radius:6px;border:1px solid var(--border)">
+              <app-icon name="activity" [size]="14"></app-icon> You can close this window — the payroll will continue processing in the background.
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="closeProgressModal()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- VOID MODAL -->
+@if (showVoidModal) {
+  <div class="modal-overlay visible" (click)="showVoidModal = false">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Void Payroll Run #{{ voidRunId }}</h3>
+        <button class="modal-close" (click)="showVoidModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="padding-top:16px">
+          <div class="form-section-title full-width"><app-icon name="x" [size]="16"></app-icon> Void Payroll Run</div>
+          <div class="form-group full-width">
+            <label>Reason for Voiding <span class="required">*</span></label>
+            <textarea class="form-control" [(ngModel)]="voidReason" placeholder="Enter the reason for voiding this payroll run..." rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showVoidModal = false">Cancel</button>
+        <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" (click)="submitVoid()">Void Run</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- RUN DETAIL MODAL -->
+@if (showDetailModal) {
+  <div class="modal-overlay visible" (click)="showDetailModal = false">
+    <div class="modal modal-xl" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Payroll Run #{{ detailRun?.id }}</h3>
+        <button class="modal-close" (click)="showDetailModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        @if (detailLoading) {
+          <div class="loading"><div class="spinner"></div>Loading run details...</div>
+        } @else if (detailRun) {
+          <div class="workflow-steps" style="margin-bottom:16px">
+            @for (step of detailStatusSteps; track step.label; let i = $index) {
+              @if (i > 0) { <div class="workflow-arrow">→</div> }
+              <div class="workflow-step" [class.completed]="step.status === 'completed'" [class.active]="step.status === 'active'">
+                <div class="step-circle">{{ step.status === 'completed' ? '✓' : i + 1 }}</div>
+                <div class="step-name">{{ step.label }}</div>
+              </div>
+            }
+          </div>
+
+          <div class="stat-cards">
+            <div class="stat-card" style="border-left-color:#4F6AFF"><div class="stat-value">{{ detailRun.employee_count || 0 }}</div><div class="stat-label">Employees</div></div>
+            <div class="stat-card" style="border-left-color:#10B981"><div class="stat-value">{{ formatCurrency(detailRun.total_earnings || 0) }}</div><div class="stat-label">Total Gross</div></div>
+            <div class="stat-card" style="border-left-color:#F59E0B"><div class="stat-value">{{ formatCurrency(detailRun.total_deductions || 0) }}</div><div class="stat-label">Deductions</div></div>
+            <div class="stat-card" style="border-left-color:#4F6AFF"><div class="stat-value">{{ formatCurrency(detailRun.total_nett || 0) }}</div><div class="stat-label">Nett Pay</div></div>
+            <div class="stat-card" style="border-left-color:#EF4444"><div class="stat-value">{{ formatCurrency(detailTotalPaye) }}</div><div class="stat-label">PAYE</div></div>
+            <div class="stat-card" style="border-left-color:#F59E0B"><div class="stat-value">{{ formatCurrency(detailTotalUifEe) }}</div><div class="stat-label">UIF (Employee)</div></div>
+            <div class="stat-card" style="border-left-color:#8B5CF6"><div class="stat-value">{{ formatCurrency(detailTotalSdl) }}</div><div class="stat-label">SDL</div></div>
+            <div class="stat-card" style="border-left-color:#2e7d32"><div class="stat-value">{{ formatCurrency(detailTotalEti) }}</div><div class="stat-label">ETI Credit</div></div>
+          </div>
+
+          <div class="detail-tabs">
+            <button class="detail-tab" [class.active]="detailActiveTab === 'detail-summary'" (click)="detailActiveTab = 'detail-summary'">
+              <app-icon name="clipboard" [size]="14"></app-icon> Summary
+            </button>
+            <button class="detail-tab" [class.active]="detailActiveTab === 'detail-employees'" (click)="detailActiveTab = 'detail-employees'">
+              <app-icon name="users" [size]="14"></app-icon> Employees ({{ detailEmployees.length }})
+            </button>
+            <button class="detail-tab" [class.active]="detailActiveTab === 'detail-results'" (click)="detailActiveTab = 'detail-results'">
+              <app-icon name="fileText" [size]="14"></app-icon> Line Items ({{ detailLineItems.length }})
+            </button>
+            @if (detailScoaEntries.length > 0) {
+              <button class="detail-tab" [class.active]="detailActiveTab === 'detail-scoa'" (click)="detailActiveTab = 'detail-scoa'">
+                <app-icon name="grid" [size]="14"></app-icon> mSCOA Allocation
+              </button>
+            }
+            <button class="detail-tab" [class.active]="detailActiveTab === 'detail-gl'" (click)="detailActiveTab = 'detail-gl'; loadDetailGLJournals()">
+              <app-icon name="book" [size]="14"></app-icon> GL Journals
+            </button>
+            @if (detailErrors.length > 0) {
+              <button class="detail-tab" [class.active]="detailActiveTab === 'detail-errors'" (click)="detailActiveTab = 'detail-errors'">
+                <app-icon name="alertTriangle" [size]="14"></app-icon> Errors ({{ detailErrors.length }})
+              </button>
+            }
+          </div>
+
+          <!-- Summary Panel -->
+          @if (detailActiveTab === 'detail-summary') {
+            <div class="info-grid">
+              <div class="info-item"><div class="info-label">Cycle</div><div class="info-value">{{ detailRun.cycle_name }}</div></div>
+              <div class="info-item"><div class="info-label">Period</div><div class="info-value">Period {{ detailRun.period_number }} ({{ detailRun.tax_year }})</div></div>
+              <div class="info-item"><div class="info-label">Run Type</div><div class="info-value">{{ detailRun.run_type }}</div></div>
+              <div class="info-item"><div class="info-label">Status</div><div class="info-value"><app-status-badge [status]="detailRun.status"></app-status-badge></div></div>
+              <div class="info-item"><div class="info-label">Period Start</div><div class="info-value">{{ detailRun.period_start?.split('T')[0] || '-' }}</div></div>
+              <div class="info-item"><div class="info-label">Period End</div><div class="info-value">{{ detailRun.period_end?.split('T')[0] || '-' }}</div></div>
+              <div class="info-item"><div class="info-label">Payment Date</div><div class="info-value">{{ detailRun.payment_date?.split('T')[0] || '-' }}</div></div>
+              <div class="info-item"><div class="info-label">Run Date</div><div class="info-value">{{ detailRun.run_date?.split('T')[0] || '-' }}</div></div>
+            </div>
+
+            @if (isTrial(detailRun) && detailRun.status === 'COMPLETED') {
+              <div style="padding:10px 14px;background:var(--info-bg);border-radius:var(--radius-sm);margin-top:12px;font-size:12px;display:flex;align-items:center;gap:8px;color:var(--info-dark)">
+                <app-icon name="activity" [size]="16"></app-icon> Trial run complete. Review results below, then <strong>Promote to Final</strong> to lock down for approval.
+              </div>
+            }
+            @if (detailRun.status === 'LOCKED') {
+              <div style="padding:10px 14px;background:var(--success-bg);border-radius:var(--radius-sm);margin-top:12px;font-size:12px;display:flex;align-items:center;gap:8px;color:var(--success-dark)">
+                <app-icon name="shield" [size]="16"></app-icon> Run is locked as FINAL. Approve to authorise payment, or Unlock to revert.
+              </div>
+            }
+
+            <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap">
+              @if (detailRun.status === 'PENDING' || detailRun.status === 'FAILED') {
+                <button class="btn btn-primary" (click)="showDetailModal = false; executeRun(detailRun.id)"><app-icon name="activity" [size]="14"></app-icon> Execute Run</button>
+              }
+              @if (detailRun.status === 'COMPLETED') {
+                <button class="btn btn-primary" (click)="showDetailModal = false; executeRun(detailRun.id)"><app-icon name="refresh" [size]="14"></app-icon> Re-execute</button>
+              }
+              @if (detailRun.status === 'COMPLETED' && isTrial(detailRun)) {
+                <button class="btn btn-primary" (click)="showDetailModal = false; promoteRun(detailRun.id)"><app-icon name="chevronRight" [size]="14"></app-icon> Promote to Final</button>
+              }
+              @if (detailRun.status === 'COMPLETED' && !isTrial(detailRun)) {
+                <button class="btn btn-primary" (click)="showDetailModal = false; lockRun(detailRun.id)"><app-icon name="shield" [size]="14"></app-icon> Lock Run</button>
+              }
+              @if (detailRun.status === 'LOCKED') {
+                <button class="btn" (click)="showDetailModal = false; unlockRun(detailRun.id)" style="border-color:var(--warning);color:var(--warning)"><app-icon name="refresh" [size]="14"></app-icon> Unlock</button>
+                <button class="btn btn-primary" (click)="showDetailModal = false; approveRun(detailRun.id)"><app-icon name="check" [size]="14"></app-icon> Approve Run</button>
+              }
+              @if (detailRun.status === 'LOCKED' || detailRun.status === 'COMPLETED') {
+                <button class="btn btn-primary" (click)="showDetailModal = false; glPostRun(detailRun.id)"><app-icon name="fileText" [size]="14"></app-icon> GL Post</button>
+              }
+              @if (detailRun.status === 'COMPLETED') {
+                <button class="btn" (click)="showDetailModal = false; openVoidModal(detailRun.id)" style="border-color:var(--danger);color:var(--danger)"><app-icon name="x" [size]="14"></app-icon> Void</button>
+              }
+            </div>
+          }
+
+          <!-- Employees Panel -->
+          @if (detailActiveTab === 'detail-employees') {
+            @if (detailEmployees.length > 0) {
+              <div class="data-grid">
+                <table>
+                  <thead><tr><th>Code</th><th>Employee</th><th style="text-align:right">Earnings</th><th style="text-align:right">Deductions</th><th style="text-align:right">Company</th><th style="text-align:right">Nett Pay</th><th>Indicators</th></tr></thead>
+                  <tbody>
+                    @for (emp of detailEmployees; track emp.id) {
+                      <tr>
+                        <td><strong>{{ emp.code }}</strong></td>
+                        <td>{{ emp.name }}</td>
+                        <td style="text-align:right">{{ formatCurrency(emp.earnings) }}</td>
+                        <td style="text-align:right">{{ formatCurrency(emp.deductions) }}</td>
+                        <td style="text-align:right">{{ formatCurrency(emp.company) }}</td>
+                        <td style="text-align:right;font-weight:600">{{ formatCurrency(emp.earnings - emp.deductions) }}</td>
+                        <td>
+                          @if (emp.eti > 0) { <span class="badge badge-success" [title]="'ETI: ' + formatCurrency(emp.eti)">ETI</span> }
+                          @if (emp.hasArrears) { <span class="badge badge-warning">ARR</span> }
+                          @if (emp.hasOvertime) { <span class="badge badge-info">OT</span> }
+                          @if (emp.hasInstalment) { <span class="badge badge-danger">INST</span> }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <div class="empty-icon"><app-icon name="users" [size]="32"></app-icon></div>
+                <div class="empty-title">No Employee Results</div>
+                <div class="empty-desc">Execute the payroll run to generate results</div>
+              </div>
+            }
+          }
+
+          <!-- Line Items Panel -->
+          @if (detailActiveTab === 'detail-results') {
+            @if (detailLineItems.length > 0) {
+              <div class="data-grid">
+                <table>
+                  <thead><tr><th>Code</th><th>Employee</th><th>Head Code</th><th>Salary Head</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead>
+                  <tbody>
+                    @for (r of detailLineItems; track $index) {
+                      <tr>
+                        <td>{{ r.employee_code }}</td>
+                        <td>{{ r.first_name }} {{ r.surname }}</td>
+                        <td>{{ r.salary_head_code }}</td>
+                        <td>{{ r.salary_head_name }}</td>
+                        <td><span class="badge" [class.badge-success]="r.transaction_type === 'EARNING'" [class.badge-danger]="r.transaction_type === 'DEDUCTION'" [class.badge-info]="r.transaction_type !== 'EARNING' && r.transaction_type !== 'DEDUCTION'">{{ r.transaction_type }}</span></td>
+                        <td style="text-align:right;font-weight:500">{{ r.amount | currencyZar }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <div class="empty-icon"><app-icon name="fileText" [size]="32"></app-icon></div>
+                <div class="empty-title">No Line Items</div>
+                <div class="empty-desc">Execute the payroll run to generate results</div>
+              </div>
+            }
+          }
+
+          <!-- mSCOA Panel -->
+          @if (detailActiveTab === 'detail-scoa' && detailScoaEntries.length > 0) {
+            <h4 style="margin:0 0 12px;font-size:14px">mSCOA Segment Allocation Summary</h4>
+            <div class="data-grid">
+              <table>
+                <thead><tr><th>mSCOA Item ID</th><th>Transaction Type</th><th>Transactions</th><th style="text-align:right">Total Amount</th></tr></thead>
+                <tbody>
+                  @for (s of detailScoaEntries; track s.scoa_item_id) {
+                    <tr>
+                      <td><strong>{{ s.scoa_item_id }}</strong></td>
+                      <td><span class="badge" [class.badge-success]="s.type === 'EARNING'" [class.badge-danger]="s.type === 'DEDUCTION'" [class.badge-info]="s.type !== 'EARNING' && s.type !== 'DEDUCTION'">{{ s.type }}</span></td>
+                      <td>{{ s.count }}</td>
+                      <td style="text-align:right;font-weight:500">{{ formatCurrency(s.total) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <!-- GL Journals Panel -->
+          @if (detailActiveTab === 'detail-gl') {
+            @if (glJournalsLoading) {
+              <div class="loading"><div class="spinner"></div>Loading GL journal entries...</div>
+            } @else if (glJournalsData && (glJournalsData.data || glJournalsData)?.length > 0) {
+              <div class="stat-cards">
+                <div class="stat-card" style="border-left-color:#EF4444"><div class="stat-value">{{ formatCurrency(getGlJournalTotalDebits()) }}</div><div class="stat-label">Total Debits</div></div>
+                <div class="stat-card" style="border-left-color:#10B981"><div class="stat-value">{{ formatCurrency(getGlJournalTotalCredits()) }}</div><div class="stat-label">Total Credits</div></div>
+                <div class="stat-card" [style.border-left-color]="getGlJournalBalanced() ? '#10B981' : '#EF4444'"><div class="stat-value">{{ getGlJournalBalanced() ? 'Balanced' : formatCurrency(getGlJournalTotalDebits() - getGlJournalTotalCredits()) }}</div><div class="stat-label">Balance</div></div>
+              </div>
+              <div class="data-grid">
+                <table>
+                  <thead><tr><th>Date</th><th>mSCOA Item</th><th>Fund</th><th>Function</th><th>Description</th><th>Reference</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead>
+                  <tbody>
+                    @for (j of glJournalsData.data || glJournalsData || []; track $index) {
+                      <tr>
+                        <td>{{ j.journal_date?.split('T')[0] || '-' }}</td>
+                        <td><strong>{{ j.scoa_item_id || '-' }}</strong></td>
+                        <td>{{ j.scoa_fund_id || '-' }}</td>
+                        <td>{{ j.scoa_function_id || '-' }}</td>
+                        <td>{{ j.description || '-' }}</td>
+                        <td>{{ j.reference || '-' }}</td>
+                        <td style="text-align:right;color:var(--danger);font-weight:500">{{ (+j.debit_amount > 0) ? formatCurrency(j.debit_amount) : '' }}</td>
+                        <td style="text-align:right;color:var(--success);font-weight:500">{{ (+j.credit_amount > 0) ? formatCurrency(j.credit_amount) : '' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div style="text-align:center;padding:32px;color:var(--text-muted)">
+                <app-icon name="book" [size]="24"></app-icon>
+                <p style="margin:8px 0 0">No GL journal entries for this run</p>
+                <button class="btn btn-primary btn-sm" style="margin-top:12px" (click)="loadDetailGLJournals()"><app-icon name="refresh" [size]="14"></app-icon> Load GL Journals</button>
+              </div>
+            }
+          }
+
+          <!-- Errors Panel -->
+          @if (detailActiveTab === 'detail-errors' && detailErrors.length > 0) {
+            <div class="data-grid">
+              <table>
+                <thead><tr><th>Code</th><th>Employee</th><th>Severity</th><th>Type</th><th>Message</th></tr></thead>
+                <tbody>
+                  @for (e of detailErrors; track $index) {
+                    <tr>
+                      <td>{{ e.employee_code || '-' }}</td>
+                      <td>{{ e.first_name || '' }} {{ e.surname || '' }}</td>
+                      <td><span class="badge" [class.badge-danger]="e.severity === 'ERROR'" [class.badge-warning]="e.severity !== 'ERROR'">{{ e.severity }}</span></td>
+                      <td>{{ e.error_type }}</td>
+                      <td>{{ e.error_message }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}

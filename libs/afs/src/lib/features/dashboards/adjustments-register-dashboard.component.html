@@ -1,0 +1,105 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load adjustments register</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Adjustments Register</h1>
+        <p class="subtitle">Summary of all adjustments, posted and unposted</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh adjustments register">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Adjustments" [value]="data.total" icon="swap_horiz" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Posted" [value]="data.posted" icon="check_circle" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Unposted" [value]="data.unposted" icon="pending" [color]="data.unposted > 0 ? 'warning' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="Net Effect on Surplus" [value]="formatCurrency(data.netEffectOnSurplus)" icon="trending_up" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Net Effect on Net Assets" [value]="formatCurrency(data.netEffectOnNetAssets)" icon="account_balance" color="info"></app-kpi-tile>
+    </div>
+
+    <div class="summary-grid">
+      <mat-card class="summary-card posted">
+        <div class="summary-card-title">
+          <mat-icon>check_circle</mat-icon> Posted Totals
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Total Debits</span>
+          <span class="summary-value debit">{{ formatCurrency(data.totalDebitPosted) }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Total Credits</span>
+          <span class="summary-value credit">{{ formatCurrency(data.totalCreditPosted) }}</span>
+        </div>
+      </mat-card>
+      <mat-card class="summary-card unposted">
+        <div class="summary-card-title">
+          <mat-icon>pending</mat-icon> Unposted Totals
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Total Debits</span>
+          <span class="summary-value debit">{{ formatCurrency(data.totalDebitUnposted) }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Total Credits</span>
+          <span class="summary-value credit">{{ formatCurrency(data.totalCreditUnposted) }}</span>
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="section-title">
+      <mat-icon>table_chart</mat-icon> Adjustment Entries
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th class="text-right">Total Debit</th>
+            <th class="text-right">Total Credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of data.entries; track entry.id) {
+            <tr>
+              <td class="ref-cell">{{ entry.reference }}</td>
+              <td class="desc-cell" [matTooltip]="entry.description">{{ entry.description }}</td>
+              <td><span class="chip chip-blue">{{ formatLabel(entry.type) }}</span></td>
+              <td><span class="chip" [class]="'chip-' + entry.status">{{ formatLabel(entry.status) }}</span></td>
+              <td class="text-right mono">{{ formatCurrency(entry.totalDebit) }}</td>
+              <td class="text-right mono">{{ formatCurrency(entry.totalCredit) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

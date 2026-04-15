@@ -1,0 +1,351 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Tax Tables</h1>
+      <p class="page-subtitle">Manage SARS tax brackets, rebates and thresholds by tax year</p>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+    <select class="form-control" style="width:280px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm, 6px);font-size:13px" [(ngModel)]="selectedYear" (ngModelChange)="onYearChange()">
+      @for (y of taxYears; track y) {
+        <option [ngValue]="y">Tax Year {{ y }} (Mar {{ y - 1 }} - Feb {{ y }})</option>
+      }
+    </select>
+    @if (hasChanges) {
+      <button class="btn btn-primary" (click)="saveAll()"><app-icon name="check" [size]="14"></app-icon> Save All Changes</button>
+    }
+    <button class="btn" (click)="openCopyModal()"><app-icon name="file" [size]="14"></app-icon> Copy to New Year</button>
+  </div>
+
+  @if (taxData) {
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-label">UIF Rate (EE)</div>
+        <div class="stat-value">{{ taxData.uif ? fmtPercent(taxData.uif.employee_rate) : 'N/A' }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">UIF Rate (ER)</div>
+        <div class="stat-value">{{ taxData.uif ? fmtPercent(taxData.uif.employer_rate) : 'N/A' }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">UIF Ceiling</div>
+        <div class="stat-value">{{ taxData.uif ? fmtCurrency(taxData.uif.ceiling) : 'N/A' }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SDL Rate</div>
+        <div class="stat-value">{{ taxData.sdl ? fmtPercent(taxData.sdl.rate) : 'N/A' }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SDL Threshold</div>
+        <div class="stat-value">{{ taxData.sdl ? fmtCurrency(taxData.sdl.threshold) : 'N/A' }}</div>
+      </div>
+    </div>
+
+    <div class="tax-tables-grid">
+      <div class="brackets-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="margin:0;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="fileText" [size]="14"></app-icon> Income Tax Brackets</h4>
+          <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" (click)="openAddBracketModal()"><app-icon name="plus" [size]="12"></app-icon> Add Bracket</button>
+        </div>
+        <div class="data-grid">
+          <table>
+            <thead><tr><th style="width:40px">#</th><th style="text-align:right">From (R)</th><th style="text-align:right">To (R)</th><th style="text-align:right">Base Tax (R)</th><th style="text-align:right;width:120px">Rate %</th><th style="width:100px">Actions</th></tr></thead>
+            <tbody>
+              @if (!taxData.brackets || taxData.brackets.length === 0) {
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No brackets</td></tr>
+              } @else {
+                @for (b of taxData.brackets; track b.id) {
+                  <tr>
+                    <td>{{ b.bracket_number }}</td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="b.min_income" (ngModelChange)="markChanged()" step="1"></td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="b.max_income" (ngModelChange)="markChanged()" step="1"></td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="b.base_tax" (ngModelChange)="markChanged()" step="1"></td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm rate-input" [(ngModel)]="b.rate" (ngModelChange)="markChanged()" step="0.01"></td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="editBracket(b)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteBracket(b)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="right-panels">
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="shield" [size]="14"></app-icon> Tax Rebates</h4>
+        <div class="data-grid" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Type</th><th>Age</th><th style="text-align:right">Annual (R)</th><th style="text-align:right">Monthly (R)</th><th style="width: 100px;">Actions</th></tr></thead>
+            <tbody>
+              @if (!taxData.rebates || taxData.rebates.length === 0) {
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No rebates</td></tr>
+              } @else {
+                @for (r of taxData.rebates; track r.id) {
+                  <tr>
+                    <td><span class="badge badge-info">{{ r.rebate_type }}</span></td>
+                    <td>{{ r.age_threshold > 0 ? r.age_threshold + '+' : 'All' }}</td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="r.amount" (ngModelChange)="markChanged()" step="1"></td>
+                    <td style="text-align:right">{{ fmtMonthly(r.amount) }}</td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="editRebate(r)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteRebate(r)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="activity" [size]="14"></app-icon> Tax Thresholds</h4>
+        <div class="data-grid" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Type</th><th>Age Group</th><th style="text-align:right">Annual (R)</th><th style="text-align:right">Monthly (R)</th><th style="width: 100px;">Actions</th></tr></thead>
+            <tbody>
+              @if (!taxData.thresholds || taxData.thresholds.length === 0) {
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No thresholds</td></tr>
+              } @else {
+                @for (t of taxData.thresholds; track t.id) {
+                  <tr>
+                    <td>{{ (t.threshold_type || t.age_group || '').replace('_', ' ') }}</td>
+                    <td>{{ t.age_group || '-' }}</td>
+                    <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="t.amount" (ngModelChange)="markChanged()" step="1"></td>
+                    <td style="text-align:right">{{ fmtMonthly(t.amount) }}</td>
+                    <td>
+                      <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sm" (click)="editThreshold(t)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteThreshold(t)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="heart" [size]="14"></app-icon> Medical Tax Credits (Monthly)</h4>
+        <div class="data-grid" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Category</th><th style="text-align:right">Amount (R)</th></tr></thead>
+            <tbody>
+              @if (taxData.medical_tax_credits) {
+                <tr><td>Main Member</td><td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="taxData.medical_tax_credits.main_member" (ngModelChange)="markChanged()" step="1"></td></tr>
+                <tr><td>First Dependant</td><td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="taxData.medical_tax_credits.first_dependant" (ngModelChange)="markChanged()" step="1"></td></tr>
+                <tr><td>Additional Dependant</td><td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="taxData.medical_tax_credits.additional_dependant" (ngModelChange)="markChanged()" step="1"></td></tr>
+              } @else {
+                <tr><td colspan="2" style="text-align:center;color:var(--text-muted)">No data</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="dollar" [size]="14"></app-icon> UIF & SDL Settings</h4>
+        <div class="data-grid">
+          <table>
+            <thead><tr><th>Setting</th><th style="text-align:right">Value</th></tr></thead>
+            <tbody>
+              @if (taxData.uif) {
+                <tr><td>UIF Employee Rate (%)</td><td style="text-align:right"><input type="number" class="form-control form-control-sm settings-input" [(ngModel)]="taxData.uif.employee_rate" (ngModelChange)="markChanged()" step="0.01"></td></tr>
+                <tr><td>UIF Employer Rate (%)</td><td style="text-align:right"><input type="number" class="form-control form-control-sm settings-input" [(ngModel)]="taxData.uif.employer_rate" (ngModelChange)="markChanged()" step="0.01"></td></tr>
+                <tr><td>UIF Monthly Ceiling (R)</td><td style="text-align:right"><input type="number" class="form-control form-control-sm settings-input" [(ngModel)]="taxData.uif.ceiling" (ngModelChange)="markChanged()" step="1"></td></tr>
+              }
+              @if (taxData.sdl) {
+                <tr><td>SDL Rate (%)</td><td style="text-align:right"><input type="number" class="form-control form-control-sm settings-input" [(ngModel)]="taxData.sdl.rate" (ngModelChange)="markChanged()" step="0.01"></td></tr>
+                <tr><td>SDL Annual Threshold (R)</td><td style="text-align:right"><input type="number" class="form-control form-control-sm settings-input" [(ngModel)]="taxData.sdl.threshold" (ngModelChange)="markChanged()" step="1"></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px"><app-icon name="fileText" [size]="14"></app-icon> SARS Prescribed Rates (S&T Claims)</h4>
+        <div style="display:flex;gap:8px">
+          @if (hasSarsChanges) {
+            <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" (click)="saveSarsRates()"><app-icon name="check" [size]="12"></app-icon> Save SARS Changes</button>
+          }
+          <button class="btn" style="font-size:11px;padding:4px 10px" (click)="openSarsCopyModal()"><app-icon name="file" [size]="12"></app-icon> Copy to New Year</button>
+          <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" (click)="openSarsModal()"><app-icon name="plus" [size]="12"></app-icon> Add Rate</button>
+        </div>
+      </div>
+      <div class="data-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Tax Year</th>
+              <th>Description</th>
+              <th>Subtype</th>
+              <th>IRP5 Code</th>
+              <th style="text-align:right">Daily Rate (R)</th>
+              <th>Effective Date</th>
+              <th>End Date</th>
+              <th style="width:70px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (sarsRates.length === 0) {
+              <tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No SARS prescribed rates configured</td></tr>
+            } @else {
+              @for (r of sarsRates; track r.id) {
+                <tr>
+                  <td><input type="number" class="form-control form-control-sm" [(ngModel)]="r.tax_year" (ngModelChange)="markSarsChanged()" style="width:70px"></td>
+                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="r.description" (ngModelChange)="markSarsChanged()"></td>
+                  <td>{{ r.subtype_index }}</td>
+                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="r.irp5_code" (ngModelChange)="markSarsChanged()" style="width:120px"></td>
+                  <td style="text-align:right"><input type="number" class="form-control form-control-sm" [(ngModel)]="r.rate" (ngModelChange)="markSarsChanged()" step="0.01" style="width:100px"></td>
+                  <td><input type="date" class="form-control form-control-sm" [(ngModel)]="r.effective_date" (ngModelChange)="markSarsChanged()" style="width:130px"></td>
+                  <td><input type="date" class="form-control form-control-sm" [(ngModel)]="r.end_date" (ngModelChange)="markSarsChanged()" style="width:130px"></td>
+                  <td>
+                    <button class="btn btn-sm" (click)="deleteSarsRate(r)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+}
+
+@if (showSarsModal) {
+  <div class="modal-overlay visible" (click)="showSarsModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add SARS Prescribed Rate</h3>
+        <button class="modal-close" (click)="showSarsModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="dollar" [size]="16"></app-icon> Rate Details</div>
+          <div class="form-group"><label>Tax Year *</label><input class="form-control" type="number" [(ngModel)]="editSarsRate.tax_year"></div>
+          <div class="form-group"><label>Description *</label><input class="form-control" [(ngModel)]="editSarsRate.description" placeholder="e.g. Meals and Incidental Cost"></div>
+          <div class="form-group">
+            <label>Subtype Index *</label>
+            <select class="form-control" [(ngModel)]="editSarsRate.subtype_index">
+              <option value="">-- Select --</option>
+              <option value="Local – Meals and Incidental Costs">Local – Meals and Incidental Costs</option>
+              <option value="Local – Incidental Costs">Local – Incidental Costs</option>
+              <option value="Foreign">Foreign</option>
+            </select>
+          </div>
+          <div class="form-group"><label>IRP5 Code</label><input class="form-control" [(ngModel)]="editSarsRate.irp5_code" placeholder="e.g. 3704, 3705, 3714"></div>
+          <div class="form-group"><label>Daily Rate (R) *</label><input class="form-control" type="number" [(ngModel)]="editSarsRate.rate" min="0" step="0.01"></div>
+          <div class="form-group"><label>Effective Date</label><app-date-input [(ngModel)]="editSarsRate.effective_date"></app-date-input></div>
+          <div class="form-group"><label>End Date</label><app-date-input [(ngModel)]="editSarsRate.end_date"></app-date-input></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showSarsModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveSarsRate()">Create</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showSarsCopyModal) {
+  <div class="modal-overlay visible" (click)="showSarsCopyModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Copy SARS Prescribed Rates to New Year</h3>
+        <button class="modal-close" (click)="showSarsCopyModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group">
+            <label>Copy From Tax Year *</label>
+            <select class="form-control" [(ngModel)]="sarsCopyFrom">
+              @for (y of sarsYears; track y) {
+                <option [ngValue]="y">Tax Year {{ y }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Copy To (New Tax Year) *</label>
+            <input class="form-control" type="number" [(ngModel)]="sarsCopyTo">
+            <span class="form-hint">Enter the new tax year (e.g. {{ (sarsYears[0] || 2027) + 1 }})</span>
+          </div>
+        </div>
+        <p style="padding:10px 14px;background:var(--success-bg, #f0fdf4);border-radius:var(--radius-sm, 6px);font-size:12px;color:var(--success-dark, #166534);margin-top:8px">
+          <app-icon name="activity" [size]="14"></app-icon> This will copy all SARS prescribed rates to the new tax year. You can then update the rate values for the new year.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showSarsCopyModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="doSarsCopy()">Copy Rates</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showBracketModal) {
+  <div class="modal-overlay visible" (click)="showBracketModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Tax Bracket</h3>
+        <button class="modal-close" (click)="showBracketModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="fileText" [size]="16"></app-icon> New Bracket</div>
+          <div class="form-group"><label>Bracket Number *</label><input class="form-control" type="number" [(ngModel)]="newBracket.bracket_number"></div>
+          <div class="form-group"><label>From (R) *</label><input class="form-control" type="number" [(ngModel)]="newBracket.min_income" step="1"></div>
+          <div class="form-group"><label>To (R) *</label><input class="form-control" type="number" [(ngModel)]="newBracket.max_income" step="1"></div>
+          <div class="form-group"><label>Base Tax (R) *</label><input class="form-control" type="number" [(ngModel)]="newBracket.base_tax" step="1"></div>
+          <div class="form-group"><label>Rate (%) *</label><input class="form-control" type="number" [(ngModel)]="newBracket.rate" step="0.01" min="0" max="100"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showBracketModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="addBracket()">Add Bracket</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showCopyModal) {
+  <div class="modal-overlay visible" (click)="showCopyModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Copy Tax Tables to New Year</h3>
+        <button class="modal-close" (click)="showCopyModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-group">
+            <label>Copy From *</label>
+            <select class="form-control" [(ngModel)]="copyFrom">
+              @for (y of taxYears; track y) {
+                <option [ngValue]="y">Tax Year {{ y }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Copy To (New Year) *</label>
+            <input class="form-control" type="number" [(ngModel)]="copyTo">
+            <span class="form-hint">Enter the new tax year (e.g. 2027)</span>
+          </div>
+        </div>
+        <p style="padding:10px 14px;background:var(--success-bg, #f0fdf4);border-radius:var(--radius-sm, 6px);font-size:12px;color:var(--success-dark, #166534);margin-top:8px">
+          <app-icon name="activity" [size]="14"></app-icon> This will copy all brackets, rebates, thresholds, medical credits, UIF and SDL settings to the new year. You can then edit the values for the new year.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showCopyModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="doCopy()">Copy Tables</button>
+      </div>
+    </div>
+  </div>
+}

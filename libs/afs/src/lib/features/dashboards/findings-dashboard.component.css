@@ -1,0 +1,56 @@
+:host { display: block; }
+.loading-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 400px; gap: 16px; color: var(--platinum-text-muted);
+}
+.error-container {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 400px; gap: 12px; text-align: center;
+}
+.error-icon { font-size: 48px; width: 48px; height: 48px; color: var(--platinum-danger); }
+
+.kpi-strip {
+  display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+}
+
+.charts-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+}
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+.h-bar-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.h-bar-label {
+  min-width: 100px; font-size: 13px; font-weight: 500; color: var(--platinum-text);
+  text-transform: capitalize;
+}
+.h-bar-track {
+  flex: 1; height: 24px; background: #f1f5f9; border-radius: 6px; overflow: hidden;
+}
+.h-bar-fill {
+  height: 100%; border-radius: 6px; transition: width 0.5s ease;
+  min-width: 4px;
+}
+.h-bar-value {
+  min-width: 36px; text-align: right; font-size: 14px; font-weight: 700;
+  color: var(--platinum-text); font-family: 'SF Mono', ui-monospace, monospace;
+}
+
+.card-count {
+  margin-left: auto; font-size: 12px; font-weight: 500; color: var(--platinum-text-muted);
+  background: #f1f5f9; padding: 2px 10px; border-radius: 12px;
+}
+
+.overdue { color: var(--platinum-danger) !important; font-weight: 700 !important; }
+
+.insights-section { margin-bottom: 24px; }
+.insights-section > .card-title {
+  font-size: 16px; font-weight: 600; color: var(--platinum-text);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.insights-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;
+}

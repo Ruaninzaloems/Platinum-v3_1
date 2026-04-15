@@ -1,0 +1,283 @@
+<div style="margin-bottom:20px">
+  <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">Administration</h1>
+  <p style="font-size:14px;color:#64748b;margin:0">System configuration, users, and settings</p>
+</div>
+
+<mat-tab-group animationDuration="0ms" style="background:white;border-radius:12px;border:1px solid #e2e8f0">
+  <mat-tab label="Users & Roles">
+    <div style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="font-size:16px;font-weight:600;color:#1e293b;margin:0">System Users</h3>
+        <button mat-flat-button style="background:#0f2b46;color:white"><mat-icon>person_add</mat-icon> Add User</button>
+      </div>
+      @if (loadingUsers()) {
+        <div style="display:flex;justify-content:center;padding:40px"><mat-spinner diameter="32"></mat-spinner></div>
+      } @else {
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr>
+                <td style="font-weight:500">{{u.full_name}}</td>
+                <td class="ref-cell">{{u.username}}</td>
+                <td style="font-size:12px;color:#64748b">{{u.email}}</td>
+                <td><span class="mscoa-tag" style="background:#f3e8ff;color:#7c3aed">{{u.role_name}}</span></td>
+                <td><span class="status-badge" [class]="u.is_active ? 'status-active' : 'status-rejected'">{{u.is_active ? 'Active' : 'Inactive'}}</span></td>
+                <td style="font-size:12px;color:#94a3b8">{{u.last_login | date:'medium'}}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </mat-tab>
+
+  <mat-tab label="Organisation Settings">
+    <div style="padding:20px">
+      @if (settings()) {
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div class="form-card">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#3b82f6;font-size:20px">business</mat-icon> Municipality Details
+              @if (!editingSettings()) {
+                <button mat-stroked-button style="margin-left:auto;font-size:12px;min-height:30px;padding:0 12px" (click)="startEditSettings()">
+                  <mat-icon style="font-size:16px;margin-right:4px">edit</mat-icon> Edit
+                </button>
+              }
+            </h3>
+            @if (!editingSettings()) {
+              <div class="detail-grid">
+                <div class="detail-field"><label>Municipality</label><span>{{settings().municipality_name}}</span></div>
+                <div class="detail-field"><label>Financial Year</label><span>{{settings().financial_year}}</span></div>
+                <div class="detail-field"><label>Current Period</label><span class="status-badge status-active">Period {{getCurrentPeriodMonth()}} ({{getCurrentPeriodMonthName()}})</span></div>
+                <div class="detail-field"><label>mSCOA Enabled</label><span class="status-badge status-active">{{settings().mscoa_enabled ? 'Yes' : 'No'}}</span></div>
+                <div class="detail-field"><label>Measurement Model</label><span>{{settings().measurement_model || 'Cost'}} Model</span></div>
+                <div class="detail-field"><label>Approval Method</label><span class="status-badge" [class]="settings().approval_method === 'Automated' ? 'status-approved' : 'status-active'">{{settings().approval_method || 'Manual'}}</span></div>
+              </div>
+            } @else {
+              <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-field">
+                  <label>Municipality Name</label>
+                  <input type="text" [(ngModel)]="settingsForm.municipality_name" class="form-input">
+                </div>
+                <div class="form-field">
+                  <label>Financial Year</label>
+                  <select [(ngModel)]="settingsForm.financial_year" class="form-input">
+                    @for (fy of financialYearOptions; track fy) {
+                      <option [value]="fy">{{fy}}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>Current Period (Month in FY)</label>
+                  <select [(ngModel)]="settingsForm.current_period_month" class="form-input">
+                    @for (pm of periodMonths; track pm.value) {
+                      <option [value]="pm.value">Period {{pm.value}} — {{pm.label}}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>Measurement Model</label>
+                  <select [(ngModel)]="settingsForm.measurement_model" class="form-input">
+                    <option value="Cost">Cost Model</option>
+                    <option value="Revaluation">Revaluation Model</option>
+                    <option value="Mixed">Mixed Model</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>mSCOA Enabled</label>
+                  <select [(ngModel)]="settingsForm.mscoa_enabled" class="form-input">
+                    <option [ngValue]="true">Yes</option>
+                    <option [ngValue]="false">No</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>Approval Method</label>
+                  <select [(ngModel)]="settingsForm.approval_method" class="form-input">
+                    <option value="Manual">Manual — User approves each transaction</option>
+                    <option value="Automated">Automated — Month-End bulk processing</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+                <button mat-stroked-button (click)="editingSettings.set(false)" style="font-size:13px">Cancel</button>
+                <button mat-flat-button color="primary" (click)="saveSettings()" [disabled]="savingSettings()" style="font-size:13px">
+                  @if (savingSettings()) { Saving... } @else { Save Changes }
+                </button>
+              </div>
+              @if (settingsSaved()) {
+                <div style="margin-top:12px;padding:8px 12px;background:#f0fdf4;color:#16a34a;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:6px">
+                  <mat-icon style="font-size:16px">check_circle</mat-icon> Settings saved successfully
+                </div>
+              }
+            }
+          </div>
+          <div class="form-card">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#10b981;font-size:20px">settings</mat-icon> Configuration
+            </h3>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Measurement Model</label><span class="status-badge status-active">{{settings().measurement_model || 'Mixed'}}</span></div>
+              @if (settings().settings) {
+                <div class="detail-field"><label>Province</label><span>{{settings().settings.province}}</span></div>
+                <div class="detail-field"><label>Municipality Code</label><span>{{settings().settings.municipality_code}}</span></div>
+                <div class="detail-field"><label>Demarcation Code</label><span>{{settings().settings.demarcation_code}}</span></div>
+                <div class="detail-field"><label>Audit Status</label><span class="status-badge status-approved">{{settings().settings.audit_status}}</span></div>
+                <div class="detail-field"><label>Depreciation Method</label><span>{{settings().settings.depreciation_method}}</span></div>
+              }
+            </div>
+          </div>
+        </div>
+        @if (settings().settings?.grap_standards) {
+          <div class="form-card" style="margin-top:16px">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 12px">GRAP Standards Applied</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              @for (s of settings().settings.grap_standards; track s) {
+                <span class="legislation-ref">{{s}}</span>
+              }
+            </div>
+          </div>
+        }
+        @if (settings().settings?.revaluation_policy) {
+          <div class="form-card" style="margin-top:16px">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 12px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#8b5cf6;font-size:20px">auto_graph</mat-icon> Revaluation Policy (GRAP 17.39-42)
+            </h3>
+            <div class="detail-grid">
+              <div class="detail-field"><label>Infrastructure Assets</label><span>{{settings().settings.revaluation_policy.infrastructure_assets}}</span></div>
+              <div class="detail-field"><label>Movable Assets</label><span>{{settings().settings.revaluation_policy.movable_assets}}</span></div>
+              <div class="detail-field"><label>Revaluation Frequency</label><span>Every {{settings().settings.revaluation_policy.revaluation_frequency_years}} years</span></div>
+              <div class="detail-field"><label>Last Revaluation</label><span>{{settings().settings.revaluation_policy.last_revaluation_date}}</span></div>
+              <div class="detail-field"><label>Next Revaluation Due</label><span>{{settings().settings.revaluation_policy.next_revaluation_due}}</span></div>
+            </div>
+            @if (settings().settings?.financial_summary) {
+              <div style="display:flex;gap:16px;margin-top:16px">
+                <div style="flex:1;background:#f0f9ff;padding:12px;border-radius:8px;text-align:center">
+                  <div style="font-size:22px;font-weight:700;color:#2563eb">{{settings().settings.financial_summary.total_records | number}}</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:2px">Total Assets</div>
+                </div>
+                <div style="flex:1;background:#f5f3ff;padding:12px;border-radius:8px;text-align:center">
+                  <div style="font-size:22px;font-weight:700;color:#7c3aed">{{settings().settings.financial_summary.revaluation_model_assets | number}}</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:2px">Revaluation Model</div>
+                </div>
+                <div style="flex:1;background:#f0fdf4;padding:12px;border-radius:8px;text-align:center">
+                  <div style="font-size:22px;font-weight:700;color:#16a34a">{{settings().settings.financial_summary.cost_model_assets | number}}</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:2px">Cost Model</div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+        @if (settings().settings?.mscoa_segments) {
+          <div class="form-card" style="margin-top:16px">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 12px">mSCOA Segments</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              @for (s of settings().settings.mscoa_segments; track s) {
+                <span class="mscoa-tag">{{s}}</span>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </mat-tab>
+
+
+  <mat-tab label="Data Sources">
+    <div style="padding:20px">
+
+      @if (dbToggle.activeBackend() === 'postgresql') {
+        <div style="margin-bottom:20px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;display:flex;align-items:flex-start;gap:10px">
+          <mat-icon style="color:#2563eb;font-size:20px;margin-top:1px">info</mat-icon>
+          <span style="font-size:13px;color:#1e40af">
+            These settings only apply when the global database mode is SQL Server. In PostgreSQL mode all tables are served from the PostgreSQL API.
+          </span>
+        </div>
+      }
+
+      <div style="margin-bottom:24px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+        <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 4px;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#3b82f6;font-size:20px">storage</mat-icon> Global Data Source
+        </h3>
+        <p style="font-size:13px;color:#64748b;margin:0 0 14px">Select the default database backend for all shared tables. Individual tables can override this setting below when SQL Server mode is active.</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button mat-flat-button
+            [style]="dbToggle.activeBackend() === 'postgresql' ? 'background:#16a34a;color:white;min-width:160px' : 'background:#e2e8f0;color:#475569;min-width:160px'"
+            (click)="setGlobalBackend('postgresql')">
+            <mat-icon>dataset</mat-icon> PostgreSQL
+          </button>
+          <button mat-flat-button
+            [style]="dbToggle.activeBackend() === 'sqlserver' ? 'background:#0f2b46;color:white;min-width:160px' : 'background:#e2e8f0;color:#475569;min-width:160px'"
+            (click)="setGlobalBackend('sqlserver')">
+            <mat-icon>dns</mat-icon> SQL Server
+          </button>
+          <span style="font-size:13px;color:#64748b;margin-left:8px">
+            Active: <strong>{{dbToggle.activeBackend() === 'postgresql' ? 'PostgreSQL (PSQL API)' : 'SQL Server (ASSETS-API)'}}</strong>
+          </span>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 2px">Per-Table Data Source</h3>
+          <p style="font-size:13px;color:#64748b;margin:0">When SQL Server mode is active, individual tables can be routed to PostgreSQL or SQL Server.</p>
+        </div>
+        @if (dbToggle.activeBackend() === 'sqlserver') {
+          <button mat-stroked-button (click)="resetAllTableSources()" style="font-size:12px;color:#dc2626;border-color:#fecaca">
+            <mat-icon style="font-size:16px">refresh</mat-icon> Reset All
+          </button>
+        }
+      </div>
+
+      @for (category of tableCategories; track category) {
+        <div style="margin-bottom:20px">
+          <h4 style="font-size:13px;font-weight:600;color:#64748b;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+            <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block"></span>
+            {{category}}
+          </h4>
+          <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#f8fafc">
+                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Table</th>
+                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Description</th>
+                  <th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0">Data Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (table of getTablesInCategory(category); track table.key) {
+                  <tr [style]="(dbToggle.activeBackend() === 'sqlserver' && hasOverride(table.key)) ? 'background:#fefce8;border-bottom:1px solid #f1f5f9' : 'background:white;border-bottom:1px solid #f1f5f9'">
+                    <td style="padding:10px 12px;font-size:12px;color:#64748b;font-family:monospace">{{table.sqlTable}}</td>
+                    <td style="padding:10px 12px">
+                      <span style="font-size:13px;font-weight:500;color:#1e293b">{{table.label}}</span>
+                      @if (dbToggle.activeBackend() === 'sqlserver' && hasOverride(table.key)) {
+                        <span style="margin-left:6px;font-size:10px;background:#fef08a;color:#854d0e;padding:1px 6px;border-radius:4px;font-weight:600">OVERRIDE</span>
+                      }
+                    </td>
+                    <td style="padding:10px 12px">
+                      @if (dbToggle.activeBackend() === 'postgresql') {
+                        <span style="font-size:12px;padding:2px 10px;background:#dcfce7;color:#16a34a;border-radius:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px">
+                          <mat-icon style="font-size:14px;width:14px;height:14px">lock</mat-icon> PostgreSQL (global)
+                        </span>
+                      } @else {
+                        <select
+                          [ngModel]="hasOverride(table.key) ? getEffectiveBackend(table.key) : 'inherit'"
+                          (ngModelChange)="setTableSource(table.key, $event)"
+                          style="font-size:12px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;color:#374151;background:white">
+                          <option value="inherit">Use global (SQL Server)</option>
+                          <option value="postgresql">PostgreSQL</option>
+                          <option value="sqlserver">SQL Server</option>
+                        </select>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+  </mat-tab>
+
+</mat-tab-group>

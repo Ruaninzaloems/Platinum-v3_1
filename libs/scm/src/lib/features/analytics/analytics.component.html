@@ -1,0 +1,632 @@
+    <div class="analytics-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error]="notificationType() === 'error'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+          <button mat-icon-button (click)="notification.set('')"><mat-icon>close</mat-icon></button>
+        </div>
+      }
+
+      <div class="tab-nav">
+        <button class="tab-btn" [class.active]="currentTab() === 'requisitions'" (click)="switchTab('requisitions')">Requisitions</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'orders'" (click)="switchTab('orders')">Orders</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'invoices'" (click)="switchTab('invoices')">Invoices</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'payments'" (click)="switchTab('payments')">Payments</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'vendors'" (click)="switchTab('vendors')">Vendors</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'compliance'" (click)="switchTab('compliance')">Compliance</button>
+        <button class="tab-btn" [class.active]="currentTab() === 'inventory'" (click)="switchTab('inventory')">Inventory</button>
+      </div>
+
+      @if (currentTab() === 'requisitions') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total requisitions processed through pipeline'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">description</mat-icon>
+            <span class="kpi-value">{{reqData()?.agingFunnel?.stages?.[5]?.count || 0}}</span>
+            <span class="kpi-label">Converted to PO</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Requisitions pending in pipeline'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">hourglass_empty</mat-icon>
+            <span class="kpi-value">{{getPendingReqs()}}</span>
+            <span class="kpi-label">Pending</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Irregular risk items detected by AI'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">warning</mat-icon>
+            <span class="kpi-value">{{reqData()?.irregularRisk?.length || 0}}</span>
+            <span class="kpi-label">Risk Items</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Splitting patterns detected'">
+            <mat-icon class="kpi-icon" style="color:#c62828">call_split</mat-icon>
+            <span class="kpi-value">{{getTotalSplitting()}}</span>
+            <span class="kpi-label">Splitting Cases</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Demand vs Budget vs Committed</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s15(a) — budget alignment'">MFMA s15</span>
+            </div>
+            <canvas id="reqDemandBudgetChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Requisition Aging Funnel</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 12 — procurement processes'">SCM Reg 12</span>
+            </div>
+            <canvas id="reqAgingFunnelChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Splitting Detection Trend</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 12(3) — prohibition on splitting'">SCM Reg 12(3)</span>
+            </div>
+            <canvas id="reqSplittingChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Demand by Department</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s66 — expenditure per vote'">MFMA s66</span>
+            </div>
+            <canvas id="reqDeptDemandChart"></canvas>
+          </div>
+        </div>
+
+        @if (reqData()?.irregularRisk?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>report_problem</mat-icon> Irregular Risk Items</h3>
+              <span class="legislation-badge">AI Detection</span>
+            </div>
+            <div class="risk-items">
+              @for (item of reqData().irregularRisk; track item.ref) {
+                <div class="risk-card" [class]="'severity-' + item.severity">
+                  <div class="risk-top">
+                    <span class="risk-ref">{{item.ref}}</span>
+                    <span class="severity-badge" [class]="'sev-' + item.severity">
+                      <mat-icon class="sev-icon">{{item.severity === 'critical' ? 'error' : item.severity === 'warning' ? 'warning' : 'info'}}</mat-icon>
+                      {{item.severity | uppercase}}
+                    </span>
+                    <span class="risk-score">Score: {{item.riskScore}}/100</span>
+                  </div>
+                  <div class="risk-title">{{item.title}}</div>
+                  <div class="risk-dept">{{item.department}}</div>
+                  <div class="risk-reasons">
+                    @for (reason of item.riskReasons; track reason) {
+                      <div class="risk-reason"><mat-icon>chevron_right</mat-icon> {{reason}}</div>
+                    }
+                  </div>
+                  <div class="risk-legislation"><mat-icon>gavel</mat-icon> {{item.legislationRef}}</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'orders') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Orders created this period'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">shopping_cart</mat-icon>
+            <span class="kpi-value">{{orderData()?.conversionPipeline?.stages?.[0]?.count || 0}}</span>
+            <span class="kpi-label">POs Created</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Overall conversion rate from PO to payment'">
+            <mat-icon class="kpi-icon" style="color:#10b981">trending_up</mat-icon>
+            <span class="kpi-value">{{orderData()?.conversionPipeline?.conversionRates?.overall || 0}}%</span>
+            <span class="kpi-label">Overall Conversion</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'GRN matching rate'">
+            <mat-icon class="kpi-icon" style="color:#6a1b9a">check_circle</mat-icon>
+            <span class="kpi-value">{{orderData()?.conversionPipeline?.conversionRates?.poToGrn || 0}}%</span>
+            <span class="kpi-label">PO → GRN Rate</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total PO value'">
+            <mat-icon class="kpi-icon" style="color:#ef6c00">payments</mat-icon>
+            <span class="kpi-value">{{formatCurrency(orderData()?.conversionPipeline?.stages?.[0]?.value || 0)}}</span>
+            <span class="kpi-label">Total PO Value</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Conversion Pipeline</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 38 — receipt & payment process'">SCM Reg 38</span>
+            </div>
+            <canvas id="orderConversionChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Spend by Procurement Method</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 12 — method determination'">SCM Reg 12</span>
+            </div>
+            <canvas id="orderSpendMethodChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Order Aging</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s65 — payment within 30 days'">MFMA s65</span>
+            </div>
+            <canvas id="orderAgingChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Amendments Heatmap</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 5 — variation orders'">SCM Reg 5</span>
+            </div>
+            <canvas id="orderAmendmentsChart"></canvas>
+          </div>
+        </div>
+
+        @if (orderData()?.priceReasonableness?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>price_check</mat-icon> Price Reasonableness Analysis</h3>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Current Price</th>
+                    <th>Historical Avg</th>
+                    <th>Variance</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of orderData().priceReasonableness; track item.item) {
+                    <tr>
+                      <td class="ref-cell">{{item.item}}</td>
+                      <td>R{{item.currentPrice | number:'1.2-2'}}</td>
+                      <td>R{{item.historicalAvg | number:'1.2-2'}}</td>
+                      <td>
+                        <span class="trend-badge" [class]="item.variance > 10 ? 'trend-up-bad' : item.variance < 0 ? 'trend-down-good' : 'trend-neutral'">
+                          {{item.variance > 0 ? '+' : ''}}{{item.variance}}%
+                        </span>
+                      </td>
+                      <td>
+                        <span class="status-badge" [class]="'status-' + item.status">{{item.status | titlecase}}</span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'invoices') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total invoices processed'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">receipt_long</mat-icon>
+            <span class="kpi-value">{{invoiceData()?.exceptionWaterfall?.total || 0}}</span>
+            <span class="kpi-label">Total Invoices</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Clean match percentage — no exceptions'">
+            <mat-icon class="kpi-icon" style="color:#10b981">check_circle</mat-icon>
+            <span class="kpi-value">{{invoiceData()?.exceptionWaterfall?.categories?.[0]?.percentage || 0}}%</span>
+            <span class="kpi-label">Clean Match Rate</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Duplicate invoices detected'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">content_copy</mat-icon>
+            <span class="kpi-value">{{invoiceData()?.duplicateDetection?.detected || 0}}</span>
+            <span class="kpi-label">Duplicates Detected</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Value saved by duplicate prevention'">
+            <mat-icon class="kpi-icon" style="color:#2e7d32">savings</mat-icon>
+            <span class="kpi-value">{{formatCurrency(invoiceData()?.duplicateDetection?.valueSaved || 0)}}</span>
+            <span class="kpi-label">Saved</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Invoice Aging by Department</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s65(2)(e) — 30-day payment compliance'">MFMA s65</span>
+            </div>
+            <canvas id="invoiceAgingChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Exception Waterfall</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 38 — 3-way matching'">SCM Reg 38</span>
+            </div>
+            <canvas id="invoiceExceptionChart"></canvas>
+          </div>
+        </div>
+
+        @if (invoiceData()?.aging?.stuckReasons?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>block</mat-icon> Top Stuck Invoice Reasons</h3>
+            </div>
+            <div class="stuck-reasons">
+              @for (reason of invoiceData().aging.stuckReasons; track reason.reason) {
+                <div class="stuck-item">
+                  <div class="stuck-info">
+                    <span class="stuck-label">{{reason.reason}}</span>
+                    <span class="stuck-count">{{reason.count}} invoices</span>
+                  </div>
+                  <span class="stuck-value">{{formatCurrency(reason.value)}}</span>
+                  <mat-progress-bar mode="determinate" [value]="(reason.count / invoiceData().aging.stuckReasons[0].count) * 100"></mat-progress-bar>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'payments') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Average payment cycle time'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">timer</mat-icon>
+            <span class="kpi-value">{{getAvgCycleTime()}} days</span>
+            <span class="kpi-label">Avg Cycle Time</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'MFMA s65 — 30-day payment compliance rate'">
+            <mat-icon class="kpi-icon" style="color:#10b981">verified_user</mat-icon>
+            <span class="kpi-value">100%</span>
+            <span class="kpi-label">30-Day Compliance</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Currently blocked payments'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">block</mat-icon>
+            <span class="kpi-value">{{paymentData()?.blockedPayments?.total || 0}}</span>
+            <span class="kpi-label">Blocked Payments</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total value of blocked payments'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">money_off</mat-icon>
+            <span class="kpi-value">{{formatCurrency(paymentData()?.blockedPayments?.totalValue || 0)}}</span>
+            <span class="kpi-label">Blocked Value</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Payment Cycle Time Trend</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s65(2)(e) — 30-day payment compliance'">MFMA s65</span>
+            </div>
+            <canvas id="paymentCycleChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Bank Detail Changes</h3>
+              <span class="legislation-badge" [matTooltip]="'NT Instruction Note 34 — bank verification'">NT Instruction 34</span>
+            </div>
+            <canvas id="paymentBankChangeChart"></canvas>
+          </div>
+        </div>
+
+        @if (paymentData()?.blockedPayments?.reasons?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>block</mat-icon> Blocked Payment Reasons</h3>
+            </div>
+            <div class="blocked-reasons">
+              @for (r of paymentData().blockedPayments.reasons; track r.reason) {
+                <div class="blocked-item">
+                  <mat-icon class="blocked-icon">{{r.icon}}</mat-icon>
+                  <div class="blocked-info">
+                    <span class="blocked-label">{{r.reason}}</span>
+                    <span class="blocked-count">{{r.count}} payments &middot; {{formatCurrency(r.value)}}</span>
+                  </div>
+                  <mat-progress-bar mode="determinate" [value]="(r.count / paymentData().blockedPayments.total) * 100"></mat-progress-bar>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'vendors') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total registered suppliers'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">business</mat-icon>
+            <span class="kpi-value">{{vendorData()?.complianceStatus?.total || 0}}</span>
+            <span class="kpi-label">Total Suppliers</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Active suppliers'">
+            <mat-icon class="kpi-icon" style="color:#10b981">check_circle</mat-icon>
+            <span class="kpi-value">{{vendorData()?.complianceStatus?.active || 0}}</span>
+            <span class="kpi-label">Active</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Blocked/suspended suppliers'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">block</mat-icon>
+            <span class="kpi-value">{{(vendorData()?.complianceStatus?.blocked || 0) + (vendorData()?.complianceStatus?.suspended || 0)}}</span>
+            <span class="kpi-label">Blocked/Suspended</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Expired documents requiring renewal'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">schedule</mat-icon>
+            <span class="kpi-value">{{vendorData()?.complianceStatus?.expired || 0}}</span>
+            <span class="kpi-label">Expired</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Supplier Status Distribution</h3>
+              <span class="legislation-badge" [matTooltip]="'NT Instruction 4A — CSD verification'">NT Instruction 4A</span>
+            </div>
+            <canvas id="vendorStatusChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Supplier OTIF Performance</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 14 — supplier performance monitoring'">SCM Reg 14</span>
+            </div>
+            <canvas id="vendorOtifChart"></canvas>
+          </div>
+        </div>
+
+        @if (vendorData()?.concentrationIndex?.data?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>donut_large</mat-icon> Market Concentration by Commodity (HHI)</h3>
+              <span class="legislation-badge">PPPFA s2</span>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Commodity</th>
+                    <th>Top 10 Share</th>
+                    <th>HHI Index</th>
+                    <th>Top Supplier</th>
+                    <th>Top Share</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of vendorData().concentrationIndex.data; track item.commodity) {
+                    <tr>
+                      <td class="ref-cell">{{item.commodity}}</td>
+                      <td>{{item.top10Share}}%</td>
+                      <td>
+                        <span class="hhi-value" [class]="item.hhi > 1800 ? 'hhi-high' : item.hhi > 1000 ? 'hhi-moderate' : 'hhi-healthy'">
+                          {{item.hhi}}
+                        </span>
+                      </td>
+                      <td>{{item.topSupplier}}</td>
+                      <td>{{item.topShare}}%</td>
+                      <td>
+                        <span class="status-badge" [class]="'conc-' + item.status">
+                          {{item.status === 'high_concentration' ? 'High' : item.status === 'moderate' ? 'Moderate' : 'Healthy'}}
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (vendorData()?.complianceStatus?.expiringDocuments?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>schedule</mat-icon> Expiring Documents</h3>
+            </div>
+            <div class="expiring-docs">
+              @for (doc of vendorData().complianceStatus.expiringDocuments; track doc.type) {
+                <div class="expiring-item">
+                  <div class="expiring-info">
+                    <span class="expiring-label">{{doc.type}}</span>
+                    <span class="expiring-count">{{doc.count}} total expiring</span>
+                  </div>
+                  <div class="expiring-urgency">
+                    <span class="urgency-badge urgency-critical">{{doc.within30Days}} in 30 days</span>
+                    <span class="urgency-badge urgency-warning">{{doc.within60Days}} in 60 days</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'compliance') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total procurement deviations'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">alt_route</mat-icon>
+            <span class="kpi-value">{{getTotalDeviations()}}</span>
+            <span class="kpi-label">Deviations</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total splitting cases detected'">
+            <mat-icon class="kpi-icon" style="color:#c62828">call_split</mat-icon>
+            <span class="kpi-value">{{complianceData()?.splittingRisk?.totalCases || 0}}</span>
+            <span class="kpi-label">Splitting Cases</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Splitting value at risk'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">money_off</mat-icon>
+            <span class="kpi-value">{{formatCurrency(complianceData()?.splittingRisk?.totalValue || 0)}}</span>
+            <span class="kpi-label">Splitting Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total transactions by procurement method'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">bar_chart</mat-icon>
+            <span class="kpi-value">{{getTotalMethodCount()}}</span>
+            <span class="kpi-label">Total Transactions</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <h3>Deviation Trend</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 36 — deviation from normal procurement'">SCM Reg 36</span>
+            </div>
+            <canvas id="compDeviationTrendChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Method Distribution (Actual vs Expected)</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 12(1)(c) — procurement methods'">SCM Reg 12</span>
+            </div>
+            <canvas id="compMethodDistChart"></canvas>
+          </div>
+        </div>
+
+        @if (complianceData()?.deviationRegister?.byReason?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>alt_route</mat-icon> Deviation Reasons</h3>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Reason</th>
+                    <th>Count</th>
+                    <th>Value</th>
+                    <th>% of Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of complianceData().deviationRegister.byReason; track r.reason) {
+                    <tr>
+                      <td class="ref-cell">{{r.reason}}</td>
+                      <td>{{r.count}}</td>
+                      <td>{{formatCurrency(r.value)}}</td>
+                      <td>
+                        <div class="pct-bar-cell">
+                          <div class="pct-bar" [style.width.%]="r.percentage"></div>
+                          <span>{{r.percentage}}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (complianceData()?.deviationRegister?.repeatOffenders?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>repeat</mat-icon> Repeat Deviation Departments</h3>
+            </div>
+            <div class="repeat-offenders">
+              @for (dept of complianceData().deviationRegister.repeatOffenders; track dept.department) {
+                <div class="offender-item">
+                  <div class="offender-info">
+                    <span class="offender-name">{{dept.department}}</span>
+                    <span class="offender-count">{{dept.count}} deviations &middot; {{formatCurrency(dept.value)}}</span>
+                  </div>
+                  <mat-progress-bar mode="determinate" [value]="(dept.count / complianceData().deviationRegister.repeatOffenders[0].count) * 100" color="warn"></mat-progress-bar>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentTab() === 'inventory') {
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="'Total inventory items by ABC classification'">
+            <mat-icon class="kpi-icon" style="color:#3b82f6">inventory_2</mat-icon>
+            <span class="kpi-value">{{getTotalInventoryItems()}}</span>
+            <span class="kpi-label">Total Items</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Items at stockout risk'">
+            <mat-icon class="kpi-icon" style="color:#ef4444">warning</mat-icon>
+            <span class="kpi-value">{{inventoryData()?.stockoutRiskMatrix?.atRisk?.length || 0}}</span>
+            <span class="kpi-label">Stockout Risk</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Total value of items at expiry risk'">
+            <mat-icon class="kpi-icon" style="color:#f59e0b">timer_off</mat-icon>
+            <span class="kpi-value">{{formatCurrency(inventoryData()?.expiryRiskTimeline?.totalExpiryRiskValue || 0)}}</span>
+            <span class="kpi-label">Expiry Risk Value</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Demand forecast accuracy'">
+            <mat-icon class="kpi-icon" style="color:#10b981">track_changes</mat-icon>
+            <span class="kpi-value">{{inventoryData()?.demandForecastAccuracy?.accuracy?.overallAccuracy || 0}}%</span>
+            <span class="kpi-label">Forecast Accuracy</span>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>ABC Classification</h3>
+              <span class="legislation-badge" [matTooltip]="'GRAP 12 — Inventories classification'">GRAP 12</span>
+            </div>
+            <canvas id="invAbcChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Stock Turnover Trend</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s63 — optimal inventory turnover'">MFMA s63</span>
+            </div>
+            <canvas id="invTurnoverChart"></canvas>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Warehouse Utilisation</h3>
+              <span class="legislation-badge" [matTooltip]="'MFMA s63(1)(a) — safeguarding municipal assets'">MFMA s63</span>
+            </div>
+            <canvas id="invWarehouseChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Movement Patterns</h3>
+              <span class="legislation-badge" [matTooltip]="'SCM Reg 40 — inventory recording'">SCM Reg 40</span>
+            </div>
+            <canvas id="invMovementChart"></canvas>
+          </div>
+        </div>
+
+        @if (inventoryData()?.stockoutRiskMatrix?.atRisk?.length) {
+          <div class="detail-card">
+            <div class="detail-header">
+              <h3><mat-icon>warning</mat-icon> Stockout Risk Items</h3>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Current Days</th>
+                    <th>Safety Days</th>
+                    <th>Severity</th>
+                    <th>Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of inventoryData().stockoutRiskMatrix.atRisk; track item.item) {
+                    <tr>
+                      <td class="ref-cell">{{item.item}}</td>
+                      <td>{{item.currentDays}}</td>
+                      <td>{{item.safetyDays}}</td>
+                      <td>
+                        <span class="severity-badge" [class]="'sev-' + item.severity">{{item.severity | titlecase}}</span>
+                      </td>
+                      <td>{{item.impact}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

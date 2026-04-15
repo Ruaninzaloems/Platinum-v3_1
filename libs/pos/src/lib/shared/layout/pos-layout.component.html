@@ -1,0 +1,117 @@
+<div class="app-shell" [class.embedded-mode]="isEmbedded()">
+  <aside class="app-sidenav" [class.collapsed]="sidebarCollapsed()" [class.mobile-open]="mobileSidebarOpen()">
+    <div class="sidenav-header">
+      <a routerLink="/" class="brand" (click)="mobileSidebarOpen.set(false)" data-testid="link-home-logo">
+        <div class="brand-icon">
+          <span class="material-icons">account_balance</span>
+        </div>
+        <div class="brand-text" [class.hidden]="sidebarCollapsed()">
+          <span class="brand-name">PLATINUM</span>
+          <span class="brand-sub">Municipal POS</span>
+        </div>
+      </a>
+    </div>
+
+    <nav class="sidenav-nav">
+      @for (item of navItems; track item.label) {
+        @if (isGroup(item)) {
+          <div class="nav-group">
+            <button class="group-header" (click)="onGroupClick(item.label)"
+                    [class.group-active]="isGroupActive($any(item))"
+                    [attr.data-testid]="'nav-group-' + item.label">
+              <span class="material-icons group-icon">{{ item.icon }}</span>
+              <span class="group-label" [class.hidden]="sidebarCollapsed()">{{ item.label }}</span>
+              <span class="material-icons group-chevron" [class.hidden]="sidebarCollapsed()"
+                    [class.rotated]="isGroupExpanded(item.label)">expand_more</span>
+            </button>
+            @if (isGroupExpanded(item.label) && !sidebarCollapsed()) {
+              <div class="group-children">
+                @for (child of $any(item).children; track child.label) {
+                  <a class="nav-link sub-item" [routerLink]="child.href"
+                     routerLinkActive="active-link"
+                     (click)="mobileSidebarOpen.set(false)"
+                     [attr.data-testid]="'link-' + child.label">
+                    <span class="material-icons nav-icon">{{ child.icon }}</span>
+                    <span class="nav-label">{{ child.label }}</span>
+                  </a>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <a class="nav-link" [routerLink]="$any(item).href"
+             routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: $any(item).href === '/'}"
+             (click)="mobileSidebarOpen.set(false)"
+             [attr.data-testid]="'link-' + item.label">
+            <span class="material-icons nav-icon">{{ item.icon }}</span>
+            <span class="nav-label" [class.hidden]="sidebarCollapsed()">{{ item.label }}</span>
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="sidenav-footer" [class.hidden]="sidebarCollapsed()">
+      <span class="footer-version">v2.0 Municipal POS</span>
+    </div>
+  </aside>
+
+  @if (mobileSidebarOpen() && !isEmbedded()) {
+    <div class="sidebar-overlay" (click)="toggleMobileSidebar()"></div>
+  }
+
+  <div class="app-main">
+    @if (!isEmbedded()) {
+    <header class="app-toolbar" data-testid="app-toolbar">
+      <div class="toolbar-left">
+        <button class="toolbar-menu-btn" (click)="toggleMobileSidebar()" data-testid="button-mobile-menu">
+          <span class="material-icons">menu</span>
+        </button>
+        <button class="toolbar-collapse-btn" (click)="toggleSidebar()" data-testid="button-collapse-sidebar">
+          <span class="material-icons">{{ sidebarCollapsed() ? 'chevron_right' : 'chevron_left' }}</span>
+        </button>
+        <span class="municipality-name">{{ getMunicipalityName() }}</span>
+      </div>
+
+      <div class="toolbar-center">
+        <span class="period-badge">
+          <span class="material-icons" style="font-size: 14px; margin-right: 4px;">date_range</span>
+          FY {{ getFinancialPeriod() }}
+        </span>
+      </div>
+
+      <div class="toolbar-right">
+        <button class="toolbar-icon-btn" title="Settings" (click)="navigateTo('/settings')" data-testid="button-settings">
+          <span class="material-icons">settings</span>
+        </button>
+        <div class="user-section" data-testid="text-user-info">
+          <div class="user-avatar">{{ getUserInitial() }}</div>
+          <span class="user-name-toolbar">{{ getUserDisplayName() }}</span>
+        </div>
+        <button class="toolbar-icon-btn sign-out" (click)="signOut()" title="Sign out" data-testid="button-sign-out">
+          <span class="material-icons">logout</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="breadcrumb-bar">
+      <div class="breadcrumb-trail">
+        <a class="breadcrumb-home" routerLink="/">
+          <span class="material-icons" style="font-size: 16px;">home</span>
+        </a>
+        @for (crumb of breadcrumbs(); track crumb.label; let last = $last) {
+          <span class="material-icons breadcrumb-separator">chevron_right</span>
+          @if (last) {
+            <span class="breadcrumb-current">{{ crumb.label }}</span>
+          } @else {
+            <span class="breadcrumb-group">{{ crumb.label }}</span>
+          }
+        }
+      </div>
+    </div>
+    }
+
+    <main class="content-area">
+      <router-outlet />
+    </main>
+  </div>
+</div>

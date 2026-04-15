@@ -1,0 +1,328 @@
+<div class="page-tabs">
+  <a class="page-tab active" routerLink="/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+    <mat-icon>construction</mat-icon> WIP Register
+  </a>
+  <a class="page-tab" routerLink="/wip/unbundling" routerLinkActive="active">
+    <mat-icon>category</mat-icon> Asset Unbundling
+  </a>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px">WIP Register</h1>
+    <p style="font-size:14px;color:#64748b;margin:0">Work-in-Progress capital projects register</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button mat-stroked-button style="color:#0f2b46;border-color:#0f2b46" (click)="openScmModal()">
+      <mat-icon>list_alt</mat-icon> Create from SCM
+    </button>
+    <button mat-flat-button style="background:#0f2b46;color:white" (click)="toggleNewForm()">
+      <mat-icon>{{showNewForm ? 'close' : 'add'}}</mat-icon> {{showNewForm ? 'Cancel' : 'Create WIP Project'}}
+    </button>
+  </div>
+</div>
+
+@if (showNewForm) {
+  <div style="background:white;border:2px solid #3b82f6;border-radius:12px;padding:20px;margin-bottom:20px">
+    <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+      <mat-icon style="color:#3b82f6;font-size:20px">construction</mat-icon> New WIP Project
+    </h3>
+    <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:10px;letter-spacing:0.04em">Project Information</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px">
+      <div>
+        <label class="form-label">Project No *</label>
+        <input class="form-input" [(ngModel)]="newProject.projectNo" placeholder="e.g. AUC2441" />
+      </div>
+      <div>
+        <label class="form-label">Project Name / Description *</label>
+        <input class="form-input" [(ngModel)]="newProject.projectName" placeholder="Enter project name" />
+      </div>
+      <div>
+        <label class="form-label">Financial Year *</label>
+        <select class="form-input" [(ngModel)]="newProject.finYear">
+          <option value="">Select Year</option>
+          @for (fy of financialYears; track fy) {
+            <option [value]="fy">{{fy}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Project Status</label>
+        <select class="form-input" [(ngModel)]="newProject.statusId">
+          <option [ngValue]="null">Select Status</option>
+          @for (s of statuses(); track s.projectStatusId) {
+            <option [ngValue]="s.projectStatusId">{{s.statusDesc}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Contract / SCM Number</label>
+        <input class="form-input" [(ngModel)]="newProject.contractNumber" placeholder="Contract registration no" />
+      </div>
+      <div>
+        <label class="form-label">Contract Value (R)</label>
+        <input type="number" class="form-input" [(ngModel)]="newProject.contractValue" placeholder="0.00" />
+      </div>
+      <div>
+        <label class="form-label">Contract Start Date</label>
+        <input type="date" class="form-input" [(ngModel)]="newProject.contractStartDate" />
+      </div>
+      <div>
+        <label class="form-label">Contract End Date</label>
+        <input type="date" class="form-input" [(ngModel)]="newProject.contractEndDate" />
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;margin:16px 0 10px;letter-spacing:0.04em">Organisation & Location</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px">
+      <div>
+        <label class="form-label">Department</label>
+        <select class="form-input" [(ngModel)]="newProject.departmentId" (ngModelChange)="onDepartmentChange()">
+          <option [ngValue]="null">Select Department</option>
+          @for (d of departments(); track d.id) {
+            <option [ngValue]="d.id">{{d.description}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Division</label>
+        <select class="form-input" [(ngModel)]="newProject.divisionId">
+          <option [ngValue]="null">Select Division</option>
+          @for (dv of getFilteredDivisions(); track dv.id) {
+            <option [ngValue]="dv.id">{{dv.description}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Custodian</label>
+        <select class="form-input" [(ngModel)]="newProject.custodianId">
+          <option [ngValue]="null">Select Custodian</option>
+          @for (emp of employees(); track emp.employeeId) {
+            <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Latitude</label>
+        <input class="form-input" [(ngModel)]="newProject.latitude" placeholder="e.g. -31.5925" />
+      </div>
+      <div>
+        <label class="form-label">Longitude</label>
+        <input class="form-input" [(ngModel)]="newProject.longitude" placeholder="e.g. 28.7748" />
+      </div>
+      <div>
+        <label class="form-label">Budget Project</label>
+        <select class="form-input" [(ngModel)]="newProject.budgetProjectId">
+          <option [ngValue]="null">Select Budget Project</option>
+          @for (pp of planProjects(); track pp.projectId) {
+            <option [ngValue]="pp.projectId">{{pp.projectCode}} - {{pp.projectName}}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;margin:16px 0 10px;letter-spacing:0.04em">Funding Sources</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      @for (fs of getFilteredFundingSources(); track fs.fundingSourceId) {
+        <label class="funding-checkbox" [class.selected]="isFundingSourceSelected(fs.fundingSourceId)">
+          <input type="checkbox" [checked]="isFundingSourceSelected(fs.fundingSourceId)" (change)="toggleFundingSource(fs.fundingSourceId)" style="margin-right:6px" />
+          {{fs.fundingSourceDesc}}
+        </label>
+      }
+      @if (getFilteredFundingSources().length === 0) {
+        <span style="font-size:13px;color:#94a3b8">{{newProject.finYear ? 'No funding sources for ' + newProject.finYear : 'Select a financial year to see funding sources'}}</span>
+      }
+    </div>
+    <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;margin:16px 0 10px;letter-spacing:0.04em">Opening Balances</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px">
+      <div>
+        <label class="form-label">WIP Opening Balance (R)</label>
+        <input type="number" class="form-input" [(ngModel)]="newProject.wipOpeningBalance" placeholder="0.00" />
+      </div>
+      <div>
+        <label class="form-label">Restated Opening Balance (R)</label>
+        <input type="number" class="form-input" [(ngModel)]="newProject.restatedOpeningBalance" placeholder="0.00" />
+      </div>
+      <div>
+        <label class="form-label">WIP Closing Balance (R)</label>
+        <input type="number" class="form-input" [(ngModel)]="newProject.wipClosingBalance" placeholder="0.00" />
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button mat-stroked-button (click)="toggleNewForm()">Cancel</button>
+      <button mat-flat-button style="background:#0f2b46;color:white" [disabled]="saving()" (click)="saveNewProject()">
+        @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+        <mat-icon>save</mat-icon> Save Project
+      </button>
+    </div>
+  </div>
+}
+
+<div class="kpi-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-blue"><mat-icon>construction</mat-icon></div>
+    <div><div class="kpi-label">Total Projects</div><div class="kpi-value">{{totalProjects()}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-green"><mat-icon>payments</mat-icon></div>
+    <div><div class="kpi-label">Total Contract Value</div><div class="kpi-value">{{formatMillion(totalContractValue())}}</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon-wrap icon-teal"><mat-icon>account_balance_wallet</mat-icon></div>
+    <div><div class="kpi-label">Total WIP Closing Balance</div><div class="kpi-value">{{formatMillion(totalWipClosing())}}</div></div>
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;background:white;padding:12px 16px;border-radius:10px;border:1px solid #e2e8f0">
+  <mat-icon style="color:#64748b;font-size:18px">filter_list</mat-icon>
+  <div style="display:flex;flex-direction:column;gap:2px">
+    <label style="font-size:11px;font-weight:600;color:#94a3b8">Financial Year</label>
+    <select style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="filterFinYear">
+      <option value="">All Years</option>
+      @for (fy of financialYears; track fy) {
+        <option [value]="fy">{{fy}}</option>
+      }
+    </select>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px">
+    <label style="font-size:11px;font-weight:600;color:#94a3b8">Project Status</label>
+    <select style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="filterStatus">
+      <option value="">All Statuses</option>
+      @for (s of statuses(); track s.projectStatusId) {
+        <option [value]="s.statusDesc">{{s.statusDesc}}</option>
+      }
+    </select>
+  </div>
+  <button mat-flat-button style="background:#0f2b46;color:white;margin-top:16px" (click)="applyFilters()">
+    <mat-icon>search</mat-icon> Apply
+  </button>
+  <button mat-stroked-button style="margin-top:16px" (click)="clearFilters()">Clear</button>
+  <span style="margin-left:auto;font-size:13px;color:#64748b">{{projects().length}} project(s)</span>
+</div>
+
+@if (showScmModal) {
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center" (click)="closeScmModal()">
+    <div style="background:white;border-radius:12px;width:min(1100px,95vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)" (click)="$event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <mat-icon style="color:#0f2b46">list_alt</mat-icon>
+          <span style="font-size:16px;font-weight:700;color:#1e293b">Select SCM Contract</span>
+        </div>
+        <button mat-icon-button (click)="closeScmModal()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding:0">
+        @if (scmContractsLoading()) {
+          <div style="display:flex;justify-content:center;padding:48px"><mat-spinner diameter="36"></mat-spinner></div>
+        } @else if (scmContracts().length === 0) {
+          <div style="text-align:center;padding:48px;color:#94a3b8">
+            <mat-icon style="font-size:40px;width:40px;height:40px;margin-bottom:10px">check_circle</mat-icon>
+            <div style="font-size:14px;font-weight:500">All available SCM contracts have already been added to the WIP Register</div>
+          </div>
+        } @else {
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f8fafc;position:sticky;top:0;z-index:1">
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">Contract No</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0">Description</th>
+                <th style="padding:10px 14px;text-align:right;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">Contract Value (R)</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0">Vendor</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">Fin Year</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">Planned Start</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;white-space:nowrap">Planned End</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of scmContracts(); track c.contractId) {
+                <tr class="scm-contract-row" (click)="selectContract(c)">
+                  <td style="padding:10px 14px;font-weight:600;color:#0f2b46;white-space:nowrap">{{c.contractNumber}}</td>
+                  <td style="padding:10px 14px;max-width:260px">{{c.contractDescription}}</td>
+                  <td style="padding:10px 14px;text-align:right;white-space:nowrap">{{formatCurrency(c.contractValue)}}</td>
+                  <td style="padding:10px 14px;color:#475569">{{c.vendorName || ''}}</td>
+                  <td style="padding:10px 14px;white-space:nowrap">{{c.financialYear}}</td>
+                  <td style="padding:10px 14px;white-space:nowrap">{{formatDate(c.plannedStartDate)}}</td>
+                  <td style="padding:10px 14px;white-space:nowrap">{{formatDate(c.plannedEndDate)}}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:right">
+        {{scmContracts().length}} contract(s) available &mdash; contracts already in WIP Register are excluded
+      </div>
+    </div>
+  </div>
+}
+
+@if (loading()) {
+  <div style="display:flex;justify-content:center;padding:60px"><mat-spinner diameter="40"></mat-spinner></div>
+} @else if (projects().length === 0) {
+  <div style="text-align:center;padding:60px;color:#94a3b8">
+    <mat-icon style="font-size:48px;width:48px;height:48px;margin-bottom:12px">construction</mat-icon>
+    <div style="font-size:15px;font-weight:500">No WIP projects found</div>
+    <div style="font-size:13px;margin-top:4px">Adjust your filters or create a new project</div>
+  </div>
+} @else {
+  <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px;background:white">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>WIP ID</th>
+          <th>Project No</th>
+          <th>Project Name / Description</th>
+          <th>Project Status</th>
+          <th>Department</th>
+          <th>Contract Start</th>
+          <th>Contract End</th>
+          <th style="text-align:right">Contract Value</th>
+          <th style="text-align:right">WIP Opening</th>
+          <th style="text-align:right">Additions</th>
+          <th style="text-align:right">Transfer</th>
+          <th style="text-align:right">Write Off</th>
+          <th style="text-align:right">Impairment</th>
+          <th style="text-align:right">Prior Yr Adj</th>
+          <th style="text-align:right">WIP Closing</th>
+          <th style="text-align:right">Progress %</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (p of projects(); track p.wipRegisterId) {
+          <tr class="clickable-row" (click)="viewProject(p.wipRegisterId)">
+            <td class="ref-cell">{{p.wipRegisterId}}</td>
+            <td>{{p.projectNo || p.projectNumber || ''}}</td>
+            <td style="font-weight:500;max-width:220px">{{p.projectName}}</td>
+            <td><span [class]="getStatusClass(p.statusDesc || p.status)">{{p.statusDesc || p.status || ''}}</span></td>
+            <td>{{getDeptDesc(p.departmentId)}}</td>
+            <td style="font-size:12px;color:#64748b;white-space:nowrap">{{formatDate(p.contractStartDate)}}</td>
+            <td style="font-size:12px;color:#64748b;white-space:nowrap">{{formatDate(p.contractEndDate)}}</td>
+            <td class="value-cell">{{formatCurrency(p.contractValue)}}</td>
+            <td class="value-cell">{{formatCurrency(p.wipOpeningBalance)}}</td>
+            <td class="value-cell">{{formatCurrency(p.additions)}}</td>
+            <td class="value-cell">{{formatCurrency(p.transferOfAssets)}}</td>
+            <td class="value-cell">{{formatCurrency(p.writeOff)}}</td>
+            <td class="value-cell">{{formatCurrency(p.impairment)}}</td>
+            <td class="value-cell">{{formatCurrency(p.priorYearAdjustment)}}</td>
+            <td class="value-cell" style="font-weight:600;color:#0f2b46">{{formatCurrency(p.wipClosingBalance)}}</td>
+            <td style="text-align:right">{{p.financialProgress != null ? p.financialProgress + '%' : ''}}</td>
+            <td (click)="$event.stopPropagation()">
+              @if (deleteConfirmId === p.wipRegisterId) {
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:11px;color:#ef4444">Delete?</span>
+                  <div style="display:flex;gap:4px">
+                    <button mat-stroked-button style="font-size:11px;padding:2px 6px;min-height:26px" (click)="cancelDelete()">No</button>
+                    <button mat-flat-button style="background:#ef4444;color:white;font-size:11px;padding:2px 6px;min-height:26px" (click)="deleteProject(p.wipRegisterId)">Yes</button>
+                  </div>
+                </div>
+              } @else {
+                <div style="display:flex;gap:4px">
+                  <button mat-icon-button style="width:28px;height:28px;line-height:28px;color:#ef4444" (click)="confirmDelete(p.wipRegisterId)">
+                    <mat-icon style="font-size:16px">delete</mat-icon>
+                  </button>
+                </div>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

@@ -1,0 +1,218 @@
+@if (loading()) {
+  <div class="page-container">
+    <div class="loading-center">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading RFI dashboard...</p>
+    </div>
+  </div>
+} @else if (error()) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load RFI dashboard</h3>
+      <p>{{ error() }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data()) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>RFI Intelligence Dashboard</h1>
+        <p class="subtitle">Request for Information management and SLA compliance monitoring</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh dashboard data">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+        <button mat-flat-button color="primary" (click)="navigateTo('/rfis')" matTooltip="View all RFIs">
+          <mat-icon>question_answer</mat-icon> View All RFIs
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 1: KPI Strip -->
+    <div class="kpi-strip">
+      <app-kpi-tile
+        title="Total RFIs"
+        [value]="data()!.total"
+        icon="question_answer"
+        color="primary"
+        subtitle="All time"
+      />
+      <app-kpi-tile
+        title="Open"
+        [value]="data()!.open"
+        icon="pending_actions"
+        color="info"
+        [subtitle]="data()!.open + ' awaiting response'"
+      />
+      <app-kpi-tile
+        title="Overdue"
+        [value]="data()!.overdue"
+        icon="warning"
+        [color]="data()!.overdue > 0 ? 'danger' : 'success'"
+        [subtitle]="data()!.overdue > 0 ? 'Action required!' : 'All on track'"
+      />
+      <app-kpi-tile
+        title="Avg Response"
+        [value]="data()!.avgResponseDays + ' days'"
+        icon="schedule"
+        color="warning"
+        subtitle="Average response time"
+      />
+      <app-kpi-tile
+        title="SLA Compliance"
+        [value]="data()!.slaCompliance + '%'"
+        icon="verified"
+        [color]="data()!.slaCompliance >= 80 ? 'success' : data()!.slaCompliance >= 50 ? 'warning' : 'danger'"
+        subtitle="Responded within SLA"
+      />
+    </div>
+
+    <!-- Row 2: Pipeline View -->
+    <div class="section-title">
+      <mat-icon>linear_scale</mat-icon> RFI Pipeline
+    </div>
+    <mat-card class="pipeline-card">
+      <div class="pipeline-funnel">
+        @for (stage of pipelineStages(); track stage.key) {
+          <div class="pipeline-stage" [class]="'stage-' + stage.key">
+            <div class="stage-count">{{ stage.count }}</div>
+            <div class="stage-label">{{ stage.label }}</div>
+            <div class="stage-bar" [style.width.%]="stage.pct"></div>
+          </div>
+          @if (!$last) {
+            <div class="pipeline-arrow">
+              <mat-icon>chevron_right</mat-icon>
+            </div>
+          }
+        }
+      </div>
+    </mat-card>
+
+    <!-- Row 3: Charts -->
+    <div class="dashboard-grid">
+      <!-- Priority Donut -->
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>priority_high</mat-icon> RFI by Priority
+        </div>
+        <div class="donut-container">
+          <div class="donut-chart">
+            <svg viewBox="0 0 160 160">
+              @for (seg of prioritySegments(); track seg.key) {
+                <circle
+                  cx="80" cy="80" r="60"
+                  fill="none"
+                  [attr.stroke]="seg.color"
+                  stroke-width="24"
+                  [attr.stroke-dasharray]="seg.dashArray"
+                  [attr.stroke-dashoffset]="seg.dashOffset"
+                  transform="rotate(-90, 80, 80)" />
+              }
+            </svg>
+            <div class="donut-center">
+              <span class="donut-total">{{ data()!.total }}</span>
+              <span class="donut-label">Total</span>
+            </div>
+          </div>
+          <div class="donut-legend">
+            @for (seg of prioritySegments(); track seg.key) {
+              <div class="legend-item">
+                <span class="legend-dot" [style.background]="seg.color"></span>
+                <span class="legend-label">{{ seg.label }}</span>
+                <span class="legend-count">{{ seg.count }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Status Bars -->
+      <mat-card class="detail-card">
+        <div class="card-title">
+          <mat-icon>bar_chart</mat-icon> RFI by Status
+        </div>
+        <div class="status-bars">
+          @for (s of statusBars(); track s.key) {
+            <div class="status-bar-row">
+              <div class="sbar-info">
+                <span class="sbar-label">{{ s.label }}</span>
+                <span class="sbar-count">{{ s.count }}</span>
+              </div>
+              <div class="sbar-track">
+                <div class="sbar-fill" [style.width.%]="s.pct" [style.background]="s.color"></div>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Row 4: Overdue RFIs Table -->
+    @if (data()!.overdueList.length > 0) {
+      <div class="section-title overdue-section">
+        <mat-icon>report_problem</mat-icon> Overdue RFIs
+        <span class="overdue-count">{{ data()!.overdueList.length }}</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Subject</th>
+              <th>Assigned To</th>
+              <th>Due Date</th>
+              <th>Days Overdue</th>
+              <th>Priority</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (rfi of data()!.overdueList; track rfi.id) {
+              <tr (click)="navigateTo('/rfis')">
+                <td class="ref-cell">{{ rfi.reference }}</td>
+                <td class="desc-cell">{{ rfi.subject }}</td>
+                <td>{{ rfi.assignedTo }}</td>
+                <td class="date-cell">{{ rfi.dueDate | date:'mediumDate' }}</td>
+                <td>
+                  <span class="days-overdue" [class.critical]="rfi.daysOverdue > 7">
+                    {{ rfi.daysOverdue }} days
+                  </span>
+                </td>
+                <td><span class="priority-badge" [class]="rfi.priority">{{ rfi.priority }}</span></td>
+                <td><span class="status-badge" [class]="rfi.status">{{ rfi.status.replace('_', ' ') }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <mat-card class="detail-card no-overdue-card">
+        <mat-icon class="no-overdue-icon">check_circle</mat-icon>
+        <p>No overdue RFIs — all requests are within SLA deadlines</p>
+      </mat-card>
+    }
+
+    <!-- Monthly Trend -->
+    @if (data()!.monthlyTrend.length > 1) {
+      <div class="section-title">
+        <mat-icon>show_chart</mat-icon> RFI Monthly Trend
+      </div>
+      <mat-card class="detail-card">
+        <div class="trend-chart">
+          @for (m of data()!.monthlyTrend; track m.month) {
+            <div class="trend-bar-col" [matTooltip]="m.month + ': ' + m.count + ' RFIs'">
+              <div class="trend-bar" [style.height.%]="getTrendBarHeight(m.count)"></div>
+              <span class="trend-count">{{ m.count }}</span>
+              <span class="trend-month">{{ formatMonth(m.month) }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+    }
+  </div>
+}

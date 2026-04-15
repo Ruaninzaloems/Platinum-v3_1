@@ -1,0 +1,203 @@
+<div class="scoa-explorer-panel">
+  <div class="panel-header">
+    <span class="panel-title">{{ showOnlyWithBalance ? 'Unmapped GL Accounts' : 'SCOA Explorer' }}</span>
+    <span class="panel-subtitle">{{ showOnlyWithBalance ? 'Accounts with TB balances — drag to map' : 'mSCOA Chart of Accounts' }}</span>
+  </div>
+
+  <div class="search-bar">
+    <mat-form-field subscriptSizing="dynamic" style="width: 100%;">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchQuery" (ngModelChange)="onSearch($event)" placeholder="Search accounts...">
+      @if (searchQuery) {
+        <button matSuffix mat-icon-button (click)="clearSearch()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+  </div>
+
+  @if (showOnlyWithBalance) {
+    <div class="segment-tabs">
+      @for (g of groupedAccounts; track g.category) {
+        <button class="seg-chip" [class.active]="activeGrapCategory === g.category" (click)="selectGrapCategory(g.category)"
+          [matTooltip]="g.category + ' (' + g.accounts.length + ')'">
+          {{ g.category }}
+          <span class="seg-count">{{ g.accounts.length }}</span>
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="segment-tabs">
+      @for (seg of segments; track seg.code) {
+        <button class="seg-chip" [class.active]="activeSegment === seg.code" (click)="selectSegment(seg.code)"
+          [matTooltip]="seg.label">
+          {{ seg.code }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (selectedNodes.length > 0) {
+    <div class="selection-bar">
+      <span class="selection-count">{{ selectedNodes.length }} selected</span>
+      <button mat-flat-button class="add-selected-btn" (click)="showOnlyWithBalance ? addSelectedAvailableToWorkspace() : addSelectedToWorkspace()"
+        matTooltip="Add selected items to the mapping workspace">
+        <mat-icon>playlist_add</mat-icon>
+        Add to Mapping
+      </button>
+      <button mat-icon-button (click)="showOnlyWithBalance ? clearAvailableSelection() : clearSelection()" matTooltip="Clear selection" class="clear-sel-btn">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  @if (loading) {
+    <div class="tree-loading">
+      <mat-spinner diameter="28"></mat-spinner>
+    </div>
+  } @else if (showOnlyWithBalance) {
+    @if (filteredAccounts.length === 0) {
+      <div class="tree-empty">
+        <mat-icon>check_circle</mat-icon>
+        <span>All accounts with balances are mapped</span>
+      </div>
+    } @else {
+      <div class="col-headings-row">
+        <span class="col-h col-h-check"></span>
+        <span class="col-h col-h-code">SCOA Account</span>
+        <span class="col-h col-h-short">Short Description</span>
+        <span class="col-h col-h-long">Long Description</span>
+        <span class="col-h col-h-bal">Current Year</span>
+        <span class="col-h col-h-bal">Prior Year</span>
+        <span class="col-h col-h-drag"></span>
+      </div>
+      <div class="tree-container"
+        cdkDropList
+        id="scoa-unmapped-list"
+        cdkDropListSortingDisabled
+        [cdkDropListData]="filteredAccounts"
+        [cdkDropListConnectedTo]="['mapping-workspace-drop']"
+        [cdkDropListEnterPredicate]="noReturnPredicate">
+        @for (group of groupedAccounts; track group.category) {
+          <div class="group-header" (click)="toggleGroup(group)">
+            <mat-icon class="expand-icon">{{ group.expanded ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            <span class="group-title">{{ group.category }}</span>
+            <span class="group-count">{{ group.accounts.length }}</span>
+          </div>
+          @if (group.expanded) {
+            @for (account of group.accounts; track account.accountNumber) {
+              <div class="avail-row"
+                [class.row-selected]="account._selected"
+                cdkDrag
+                [cdkDragData]="account._selected && selectedNodes.length > 1 ? getSelectedAvailableDragData() : account"
+                (click)="onAvailableAccountClick(account)">
+                <mat-checkbox
+                  [checked]="!!account._selected"
+                  (change)="onAvailableAccountClick(account)"
+                  (click)="$event.stopPropagation()"
+                  class="node-checkbox">
+                </mat-checkbox>
+                <span class="avail-code">{{ account.accountNumber }}</span>
+                <span class="avail-short" [matTooltip]="account.shortDescription || ''">{{ account.shortDescription || '—' }}</span>
+                <span class="avail-desc" [matTooltip]="account.description">{{ account.description || account.shortDescription }}</span>
+                <span class="avail-bal" [class.negative]="account.closingBalance < 0">{{ formatRand(account.closingBalance) }}</span>
+                <span class="avail-bal prior" [class.negative]="account.priorYear1Balance < 0">{{ formatRand(account.priorYear1Balance) }}</span>
+                <mat-icon class="drag-handle" cdkDragHandle matTooltip="Drag to map">drag_indicator</mat-icon>
+                <div *cdkDragPlaceholder class="drag-placeholder"></div>
+                <div *cdkDragPreview class="drag-preview">
+                  <mat-icon>link</mat-icon>
+                  @if (account._selected && selectedNodes.length > 1) {
+                    <span>{{ selectedNodes.length }} accounts</span>
+                  } @else {
+                    <span>{{ account.accountNumber }} — {{ account.description || account.shortDescription }}</span>
+                  }
+                </div>
+              </div>
+            }
+          }
+        }
+      </div>
+    }
+  } @else if (treeNodes.length === 0) {
+    <div class="tree-empty">
+      <mat-icon>account_tree</mat-icon>
+      <span>No SCOA data loaded</span>
+    </div>
+  } @else {
+    <div class="tree-container"
+      cdkDropList
+      id="scoa-tree-list"
+      cdkDropListSortingDisabled
+      [cdkDropListData]="treeNodes"
+      [cdkDropListConnectedTo]="['mapping-workspace-drop']"
+      [cdkDropListEnterPredicate]="noReturnPredicate">
+      <ng-container *ngTemplateOutlet="nodeListTpl; context: { $implicit: treeNodes }"></ng-container>
+    </div>
+  }
+
+  <div class="panel-footer">
+    @if (showOnlyWithBalance) {
+      <span class="footer-stat">{{ filteredAccounts.length }} unmapped with balance</span>
+      <span class="footer-stat">of {{ availableAccounts.length }} total</span>
+    } @else {
+      <span class="footer-stat">{{ postingCount }} posting items</span>
+      <span class="footer-stat">{{ mappedOfTotal }} mapped</span>
+    }
+  </div>
+</div>
+
+<ng-template #nodeListTpl let-nodes>
+  @for (node of nodes; track node.id) {
+    @if (node.visible) {
+      <div class="scoa-node"
+        [class.posting]="node.postingLevel"
+        [class.mapped]="mappedAccountCodes.has(node.accountNumber)"
+        [class.non-posting]="!node.postingLevel"
+        [class.node-selected]="node.selected"
+        [style.paddingLeft.px]="12 + (node.level - 1) * 16"
+        [cdkDragDisabled]="!node.postingLevel"
+        cdkDrag
+        [cdkDragData]="node.selected && selectedNodes.length > 1 ? getSelectedDragData() : node"
+        (cdkDragStarted)="node.selected && selectedNodes.length > 1 ? onMultiDragStart($event) : onDragStart($event, node)"
+        (click)="onNodeClick(node)">
+        @if (node.postingLevel && !mappedAccountCodes.has(node.accountNumber)) {
+          <mat-checkbox
+            [checked]="node.selected"
+            (change)="toggleNodeSelection(node, $event.checked)"
+            (click)="$event.stopPropagation()"
+            class="node-checkbox">
+          </mat-checkbox>
+        } @else if (node.children.length > 0) {
+          <mat-icon class="expand-icon" (click)="toggleNode(node, $event)">
+            {{ node.expanded ? 'expand_more' : 'chevron_right' }}
+          </mat-icon>
+        } @else {
+          <span class="expand-spacer"></span>
+        }
+        @if (node.postingLevel) {
+          <span class="posting-indicator" [class.is-mapped]="mappedAccountCodes.has(node.accountNumber)"
+            [matTooltip]="mappedAccountCodes.has(node.accountNumber) ? 'Already mapped' : 'Available for mapping'">
+            {{ mappedAccountCodes.has(node.accountNumber) ? '●' : '○' }}
+          </span>
+        }
+        <span class="node-code">{{ node.accountNumber | slice:0:12 }}</span>
+        <span class="node-desc">{{ node.description || node.shortDescription }}</span>
+        @if (node.postingLevel && !mappedAccountCodes.has(node.accountNumber)) {
+          <mat-icon class="drag-handle" cdkDragHandle matTooltip="Drag to map">drag_indicator</mat-icon>
+        }
+        <div *cdkDragPlaceholder class="drag-placeholder"></div>
+        <div *cdkDragPreview class="drag-preview" [class.multi-drag-preview]="node.selected && selectedNodes.length > 1">
+          <mat-icon>link</mat-icon>
+          @if (node.selected && selectedNodes.length > 1) {
+            <span>{{ selectedNodes.length }} SCOA items</span>
+          } @else {
+            <span>{{ node.accountNumber | slice:0:12 }} — {{ node.description || node.shortDescription }}</span>
+          }
+        </div>
+      </div>
+      @if (node.expanded && node.children.length > 0) {
+        <ng-container *ngTemplateOutlet="nodeListTpl; context: { $implicit: node.children }"></ng-container>
+      }
+    }
+  }
+</ng-template>

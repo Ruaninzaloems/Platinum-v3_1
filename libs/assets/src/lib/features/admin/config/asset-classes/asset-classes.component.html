@@ -1,0 +1,182 @@
+<div class="config-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Asset Classes</h1>
+      <p class="page-subtitle">Manage asset class definitions ({{totalItems()}} total)</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
+      <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Class</button>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="form-field" style="min-width:220px">
+      <label>Search</label>
+      <input type="text" class="form-input" placeholder="Search classes..." (input)="onSearch($any($event.target).value)">
+    </div>
+    <div class="form-field" style="min-width:180px">
+      <label>Asset Type</label>
+      <select class="form-input" (change)="onFilterTypeChange($any($event.target).value)">
+        <option value="">All Types</option>
+        @for (t of assetTypes(); track t.assetType_ID) {
+          <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+        }
+      </select>
+    </div>
+    <div class="form-field" style="min-width:180px">
+      <label>Category</label>
+      <select class="form-input" (change)="onFilterCategoryChange($any($event.target).value)" [disabled]="!filterTypeId()">
+        <option value="">All Categories</option>
+        @for (c of filterCategories(); track c.assetCategoryID) {
+          <option [value]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (showForm()) {
+    <div class="form-card">
+      <h3 class="form-title">{{editingId() ? 'Edit' : 'Add'}} Asset Class</h3>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Asset Class *</label>
+          <input type="text" class="form-input" [(ngModel)]="formData.assetClassDesc" placeholder="Enter class description">
+        </div>
+        <div class="form-field">
+          <label>Useful Life (Months) *</label>
+          <input type="number" class="form-input" [(ngModel)]="formData.usefulLifeInMonths" placeholder="e.g. 360">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Asset Type *</label>
+          <select class="form-input" [ngModel]="formData.typeID" (ngModelChange)="onFormTypeChange($event)">
+            <option [ngValue]="null" disabled>Select type</option>
+            @for (t of assetTypes(); track t.assetType_ID) {
+              <option [ngValue]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Category *</label>
+          <select class="form-input" [ngModel]="formData.assetCategoryID" (ngModelChange)="onFormCategoryChange($event)" [disabled]="!formData.typeID">
+            <option [ngValue]="null" disabled>Select category</option>
+            @for (c of formCategories(); track c.assetCategoryID) {
+              <option [ngValue]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Sub Category *</label>
+          <select class="form-input" [(ngModel)]="formData.asset_SubCategory_ID" [disabled]="!formData.assetCategoryID">
+            <option [ngValue]="null" disabled>Select sub category</option>
+            @for (sc of formSubCategories(); track sc.asset_SubCategory_ID) {
+              <option [ngValue]="sc.asset_SubCategory_ID">{{sc.asset_SubCategoryDescription}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Measurement Type</label>
+          <select class="form-input" [(ngModel)]="formData.assetMeasurement_ID">
+            <option [ngValue]="null">None</option>
+            @for (m of measurementTypes(); track m.assetMeasurement_ID) {
+              <option [ngValue]="m.assetMeasurement_ID">{{m.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Asset Status *</label>
+          <select class="form-input" [(ngModel)]="formData.assetStatus_ID">
+            <option [ngValue]="null" disabled>Select status</option>
+            @for (s of statuses(); track s.assetStatus_ID) {
+              <option [ngValue]="s.assetStatus_ID">{{s.assetStatusDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Depreciation Method</label>
+          <select class="form-input" [(ngModel)]="formData.assetDepreciationMethod_ID">
+            <option [ngValue]="null">None</option>
+            @for (d of depreciationMethods(); track d.assetDepreciationMethod_ID) {
+              <option [ngValue]="d.assetDepreciationMethod_ID">{{d.assetDepreciationMethodDesc}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+        <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.assetClassDesc || !formData.typeID">{{editingId() ? 'Update' : 'Create'}}</button>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Class Description</th>
+            <th>Useful Life</th>
+            <th>Status</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.assetClass_ID) {
+            <tr>
+              <td class="id-cell">{{item.assetClass_ID}}</td>
+              <td class="desc-cell">{{item.assetClassDesc}}</td>
+              <td>{{item.usefulLifeInMonths}} months</td>
+              <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
+              <td class="actions-cell">
+                <button mat-icon-button (click)="openEdit(item)"><mat-icon class="action-icon edit">edit</mat-icon></button>
+                <button mat-icon-button (click)="confirmDelete(item)"><mat-icon class="action-icon delete">delete</mat-icon></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (items().length === 0) { <div class="empty-state">No asset classes found</div> }
+    </div>
+    <div class="pagination">
+      <button mat-stroked-button [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">Previous</button>
+      <span class="page-info">Page {{currentPage()}} of {{getTotalPages()}}</span>
+      <button mat-stroked-button [disabled]="currentPage() >= getTotalPages()" (click)="goToPage(currentPage() + 1)">Next</button>
+    </div>
+  }
+
+  @if (showImport()) {
+    <div class="modal-overlay" (click)="closeImport()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Import Asset Classes from Excel</h3>
+          <button mat-icon-button (click)="closeImport()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="modal-body">
+          <button mat-stroked-button (click)="downloadTemplate()" class="template-btn"><mat-icon>download</mat-icon> Download Template</button>
+          <div class="upload-area" (click)="fileInput.click()">
+            <input #fileInput type="file" accept=".xlsx,.xls" style="display:none" (change)="onImportFileSelected($event)">
+            <mat-icon class="upload-icon">cloud_upload</mat-icon>
+            @if (importFile()) { <span>{{importFile()!.name}}</span> } @else { <span>Click to select .xlsx file</span> }
+          </div>
+          @if (importSuccess()) { <div class="import-success"><mat-icon>check_circle</mat-icon> {{importSuccess()}}</div> }
+          @if (importErrors().length > 0) {
+            <div class="import-errors"><h4>Import Errors</h4><div class="error-list">
+              @for (err of importErrors(); track err.row) { <div class="error-row"><span class="error-row-num">Row {{err.row}}</span><span class="error-col">{{err.column}}</span><span class="error-msg">{{err.message}}</span></div> }
+            </div></div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button mat-stroked-button (click)="closeImport()">Cancel</button>
+          <button mat-flat-button class="btn-primary" (click)="doImport()" [disabled]="!importFile() || importing()">{{importing() ? 'Importing...' : 'Import'}}</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

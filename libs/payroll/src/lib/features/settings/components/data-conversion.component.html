@@ -1,0 +1,285 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Data Conversion</h1>
+      <p class="page-subtitle">Import configuration and master data from existing SQL Server system</p>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">Loading conversion types...</div>
+  } @else {
+
+    @if (step === 'list') {
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">{{ conversionTypes.length }}</div>
+          <div class="stat-label">CONVERSION TYPES</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ totalImports }}</div>
+          <div class="stat-label">IMPORTS COMPLETED</div>
+        </div>
+      </div>
+
+      <div class="conversion-grid">
+        @for (ct of conversionTypes; track ct.key) {
+          <div class="conversion-card" (click)="selectType(ct)">
+            <div class="card-header">
+              <div class="card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  @if (ct.category === 'config') {
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  } @else {
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  }
+                </svg>
+              </div>
+              <div class="card-title-area">
+                <h3 class="card-title">{{ ct.name }}</h3>
+                <p class="card-desc">{{ ct.description }}</p>
+              </div>
+            </div>
+            <div class="card-stats">
+              <div class="card-stat">
+                <span class="card-stat-value">{{ ct.currentCount }}</span>
+                <span class="card-stat-label">Records</span>
+              </div>
+              @if (ct.lastImport) {
+                <div class="card-stat">
+                  <span class="card-stat-label last-import">Last: {{ formatDate(ct.lastImport.created_at) }}</span>
+                </div>
+              } @else {
+                <div class="card-stat">
+                  <span class="card-stat-label no-import">Never imported</span>
+                </div>
+              }
+            </div>
+            @if (ct.requiredTabs) {
+              <div class="card-tabs">Required tabs: {{ ct.requiredTabs.join(', ') }}</div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (history.length > 0) {
+        <div class="history-section">
+          <h2 class="section-title">Import History</h2>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>TYPE</th>
+                <th>STATUS</th>
+                <th>TOTAL</th>
+                <th>INSERTED</th>
+                <th>SKIPPED</th>
+                <th>DATE</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of history; track log.id) {
+                <tr>
+                  <td>{{ getTypeName(log.conversion_type) }}</td>
+                  <td><span class="status-badge" [class]="log.status">{{ log.status | uppercase }}</span></td>
+                  <td>{{ log.total_rows }}</td>
+                  <td>{{ log.inserted_rows }}</td>
+                  <td>{{ log.skipped_rows }}</td>
+                  <td>{{ formatDate(log.created_at) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+
+    @if (step === 'upload') {
+      <div class="step-container">
+        <div class="step-header">
+          <button class="btn btn-sm btn-back" (click)="goBack()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <h2 class="step-title">Import: {{ selectedType?.name }}</h2>
+        </div>
+
+        <div class="upload-area" (click)="fileInput.click()" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p class="upload-text">Click or drag an Excel file here to upload</p>
+          <p class="upload-hint">.xlsx files only (max 50MB)</p>
+          @if (selectedType?.requiredTabs) {
+            <p class="upload-hint">Required tabs: {{ selectedType.requiredTabs.join(', ') }}</p>
+          }
+          <input #fileInput type="file" accept=".xlsx,.xls" (change)="onFileSelected($event)" style="display:none"/>
+        </div>
+
+        @if (uploading) {
+          <div class="loading-state">Analyzing file...</div>
+        }
+      </div>
+    }
+
+    @if (step === 'preview') {
+      <div class="step-container">
+        <div class="step-header">
+          <button class="btn btn-sm btn-back" (click)="step = 'upload'; cdr.detectChanges()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <h2 class="step-title">Preview: {{ selectedType?.name }}</h2>
+        </div>
+
+        @if (!previewData?.valid) {
+          <div class="error-box">
+            <strong>Validation Failed:</strong> {{ previewData?.error }}
+          </div>
+        } @else {
+          <div class="preview-summary">
+            <div class="preview-stat">
+              <span class="preview-stat-value">{{ previewData.totalRows }}</span>
+              <span class="preview-stat-label">Total Rows</span>
+            </div>
+            @for (tab of getTabEntries(); track tab[0]) {
+              <div class="preview-stat">
+                <span class="preview-stat-value">{{ tab[1] }}</span>
+                <span class="preview-stat-label">{{ tab[0] }}</span>
+              </div>
+            }
+          </div>
+
+          @if (previewData.warnings?.length) {
+            <div class="warnings-box">
+              <strong>Warnings ({{ previewData.warnings.length }}):</strong>
+              <ul>
+                @for (w of previewData.warnings; track w) {
+                  <li>{{ w }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          <div class="mapping-section">
+            <h3 class="section-subtitle">Column Mapping</h3>
+            <table class="data-table mapping-table">
+              <thead>
+                <tr><th>MAPPING</th><th>DESCRIPTION</th></tr>
+              </thead>
+              <tbody>
+                @for (entry of getMappingEntries(); track entry[0]) {
+                  <tr>
+                    <td class="mapping-key">{{ entry[0] }}</td>
+                    <td>{{ entry[1] }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (previewData.sampleRows?.length) {
+            <div class="sample-section">
+              <h3 class="section-subtitle">Sample Data (first {{ previewData.sampleRows.length }} rows)</h3>
+              <div class="sample-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      @for (col of getSampleColumns(); track col) {
+                        <th>{{ col }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of previewData.sampleRows; track $index) {
+                      <tr>
+                        @for (col of getSampleColumns(); track col) {
+                          <td>{{ formatCell(row[col]) }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          <div class="action-bar">
+            <div class="action-warning">
+              This will <strong>replace all existing data</strong> in the {{ selectedType?.name }} table with {{ previewData.totalRows }} rows from the uploaded file.
+            </div>
+            <button class="btn btn-primary" (click)="executeConversion()" [disabled]="executing">
+              @if (executing) {
+                Importing...
+              } @else {
+                Import {{ previewData.totalRows }} Records
+              }
+            </button>
+          </div>
+        }
+      </div>
+    }
+
+    @if (step === 'result') {
+      <div class="step-container">
+        <div class="step-header">
+          <button class="btn btn-sm btn-back" (click)="goBack()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back to Types
+          </button>
+          <h2 class="step-title">Import Complete: {{ selectedType?.name }}</h2>
+        </div>
+
+        @if (importResult) {
+          <div class="result-box" [class.result-success]="importResult.success" [class.result-error]="!importResult.success">
+            <div class="result-icon">
+              @if (importResult.success) {
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              } @else {
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              }
+            </div>
+            <div class="result-details">
+              <div class="result-title">{{ importResult.success ? 'Import Successful' : 'Import Failed' }}</div>
+              <div class="result-stats">
+                <span><strong>{{ importResult.inserted }}</strong> inserted</span>
+                <span><strong>{{ importResult.skipped?.length || 0 }}</strong> skipped</span>
+                <span>of <strong>{{ importResult.total }}</strong> total</span>
+              </div>
+            </div>
+          </div>
+
+          @if (importResult.warnings?.length) {
+            <div class="warnings-box">
+              <strong>Notes:</strong>
+              <ul>
+                @for (w of importResult.warnings; track w) {
+                  <li>{{ w }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (importResult.skipped?.length) {
+            <div class="skipped-section">
+              <h3 class="section-subtitle">Skipped Records</h3>
+              <table class="data-table">
+                <thead><tr><th>ID</th><th>NAME</th><th>REASON</th></tr></thead>
+                <tbody>
+                  @for (s of importResult.skipped; track s.id) {
+                    <tr>
+                      <td>{{ s.id }}</td>
+                      <td>{{ s.name }}</td>
+                      <td class="error-text">{{ s.reason }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </div>
+    }
+  }
+</div>

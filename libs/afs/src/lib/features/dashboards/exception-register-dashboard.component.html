@@ -1,0 +1,92 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load exception register</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Exception Register</h1>
+        <p class="subtitle">AFS exceptions grouped by status and severity</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh exception register">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Exceptions" [value]="data.totalExceptions" icon="report_problem" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Material" [value]="data.materialCount" icon="error" [color]="data.materialCount > 0 ? 'danger' : 'success'"></app-kpi-tile>
+      <app-kpi-tile title="High Severity" [value]="data.bySeverity['high'] || 0" icon="warning" color="danger"></app-kpi-tile>
+      <app-kpi-tile title="Medium Severity" [value]="data.bySeverity['medium'] || 0" icon="info" color="warning"></app-kpi-tile>
+      <app-kpi-tile title="Low Severity" [value]="data.bySeverity['low'] || 0" icon="check_circle" color="success"></app-kpi-tile>
+    </div>
+
+    <div class="status-summary">
+      @for (status of statusKeys; track status) {
+        <mat-card class="status-card">
+          <div class="status-card-header">
+            <span class="chip" [class]="'chip-' + status">{{ formatLabel(status) }}</span>
+            <span class="status-count">{{ data.byStatus[status] || 0 }}</span>
+          </div>
+        </mat-card>
+      }
+    </div>
+
+    @for (status of statusKeys; track status) {
+      @if (getExceptionsByStatus(status).length > 0) {
+        <div class="section-title">
+          <mat-icon>{{ status === 'open' ? 'lock_open' : status === 'resolved' ? 'check_circle' : 'thumb_up' }}</mat-icon>
+          {{ formatLabel(status) }} Exceptions ({{ getExceptionsByStatus(status).length }})
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Statement</th>
+                <th>Note</th>
+                <th>Description</th>
+                <th>Severity</th>
+                <th>Materiality</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ex of getExceptionsByStatus(status); track ex.id) {
+                <tr>
+                  <td class="name-cell">{{ ex.statement }}</td>
+                  <td>{{ ex.note }}</td>
+                  <td class="desc-cell" [matTooltip]="ex.description">{{ ex.description }}</td>
+                  <td><span class="severity-badge" [class]="'severity-' + ex.severity">{{ ex.severity }}</span></td>
+                  <td>{{ ex.materiality }}</td>
+                  <td><span class="chip" [class]="'chip-' + ex.status">{{ formatLabel(ex.status) }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </div>
+}

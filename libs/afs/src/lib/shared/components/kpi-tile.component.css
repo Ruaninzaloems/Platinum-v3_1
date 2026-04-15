@@ -1,0 +1,73 @@
+:host { display: block; flex: 1; min-width: 160px; }
+.kpi-tile-card {
+  padding: 20px;
+  border-radius: 12px !important;
+  border-left: 3px solid var(--platinum-info);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.kpi-tile-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--platinum-card-shadow-hover);
+}
+.kpi-tile-primary { border-left-color: var(--platinum-primary); }
+.kpi-tile-success { border-left-color: var(--platinum-success); }
+.kpi-tile-warning { border-left-color: var(--platinum-warning); }
+.kpi-tile-danger { border-left-color: var(--platinum-danger); }
+.kpi-tile-info { border-left-color: var(--platinum-info); }
+.kpi-tile-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.kpi-tile-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.icon-primary { background: rgba(15, 43, 70, 0.08); color: var(--platinum-primary); }
+.icon-success { background: var(--platinum-success-light); color: var(--platinum-success); }
+.icon-warning { background: var(--platinum-warning-light); color: var(--platinum-warning); }
+.icon-danger { background: var(--platinum-danger-light); color: var(--platinum-danger); }
+.icon-info { background: var(--platinum-info-light); color: var(--platinum-info); }
+.kpi-tile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kpi-tile-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--platinum-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.kpi-tile-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--platinum-text);
+  line-height: 1.2;
+}
+.kpi-tile-subtitle {
+  font-size: 12px;
+  color: var(--platinum-text-muted);
+}
+.kpi-tile-trend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.kpi-tile-trend .trend-arrow {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+.trend-up { color: var(--platinum-success); }
+.trend-down { color: var(--platinum-danger); }

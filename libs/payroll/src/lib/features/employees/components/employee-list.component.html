@@ -1,0 +1,691 @@
+<div class="stat-cards">
+  <div class="stat-card" style="border-left-color: #6C7AE0">
+    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-label">Total Employees</div>
+  </div>
+  <div class="stat-card" style="border-left-color: #68D391">
+    <div class="stat-value">{{ stats.active }}</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat-card" style="border-left-color: #FC8181">
+    <div class="stat-value">{{ stats.terminated }}</div>
+    <div class="stat-label">Terminated</div>
+  </div>
+</div>
+
+@if (probationAlerts.length > 0) {
+  <div style="background:#fdf8e8;border:1px solid #c9a84c;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#0f2b46">
+      <app-icon name="clock" [size]="14"></app-icon> Probation Alerts - {{ probationAlerts.length }} employee{{ probationAlerts.length !== 1 ? 's' : '' }} nearing probation end
+    </div>
+    @if (probationAlerts.length <= 10) {
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        @for (e of probationAlerts; track e.id) {
+          <span class="badge badge-warning" style="cursor:pointer;font-size:11px" (click)="viewEmployee(e.id)">{{ e.first_name }} {{ e.surname }}{{ getProbationDaysLeft(e) !== null ? ' (' + getProbationDaysLeft(e) + 'd)' : '' }}</span>
+        }
+      </div>
+    }
+  </div>
+}
+
+<div class="toolbar">
+  <div class="toolbar-search">
+    <input type="text" placeholder="Search by name, code, or ID number..." [(ngModel)]="search" (input)="onSearchInput()">
+  </div>
+  <div class="toolbar-filter">
+    <select [(ngModel)]="cycleFilter" (change)="onFilterChange()">
+      <option value="">All Cycles</option>
+      @for (cycle of cycles; track cycle.id) {
+        <option [value]="cycle.id">{{ cycle.name }}</option>
+      }
+    </select>
+    <select [(ngModel)]="statusFilter" (change)="onFilterChange()">
+      <option value="">All Statuses</option>
+      <option value="ACTIVE">Active</option>
+      <option value="SUSPENDED">Suspended</option>
+      <option value="TERMINATED">Terminated</option>
+      <option value="DECEASED">Deceased</option>
+    </select>
+  </div>
+  <button class="btn" (click)="exportToExcel()">
+    <app-icon name="download" [size]="14"></app-icon> Export to Excel
+  </button>
+  <button class="btn" (click)="openImportModal()">
+    <app-icon name="upload" [size]="14"></app-icon> Import Employees
+  </button>
+  <button class="btn btn-primary" routerLink="/employees/new">
+    <app-icon name="plus" [size]="14"></app-icon> Add Employee
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading employees...</div>
+} @else {
+  <div class="data-grid">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 60px;">Id</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Cycle</th>
+          <th>Salary Type</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (employees.length === 0) {
+          <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:40px">No employees found</td></tr>
+        }
+        @for (emp of employees; track emp.id) {
+          <tr class="clickable-row" (click)="viewEmployee(emp.id)">
+            <td style="width: 60px;">{{ emp.id }}</td>
+            <td><strong>{{ emp.employee_code }}</strong></td>
+            <td>{{ emp.title }} {{ emp.first_name }} {{ emp.surname }}
+              @if (getProbationBadge(emp)) {
+                <span class="badge" style="font-size:10px;padding:2px 6px;margin-left:4px;background:#c9a84c;color:#fff">
+                  <app-icon name="clock" [size]="10"></app-icon> {{ getProbationBadge(emp) }}
+                </span>
+              }
+            </td>
+            <td>{{ emp.position_title || '-' }}</td>
+            <td>{{ $any(emp).payroll_cycle_name || '-' }}</td>
+            <td>{{ emp.salary_type || '-' }}</td>
+            <td><app-status-badge [status]="emp.status"></app-status-badge></td>
+            <td>
+              <div class="action-bar" (click)="$event.stopPropagation()">
+                <button class="action-btn" (click)="viewEmployee(emp.id)" title="View"><app-icon name="eye" [size]="14"></app-icon></button>
+                <button class="action-btn" (click)="viewEmployee(emp.id)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                @if (emp.status === 'ACTIVE') {
+                  <button class="action-btn danger" (click)="openTerminateModal(emp)" title="Terminate"><app-icon name="trash" [size]="14"></app-icon></button>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-pagination [page]="page" [limit]="limit" [total]="total" (pageChange)="onPageChange($event)"></app-pagination>
+}
+
+@if (showAddModal) {
+  <div class="modal-overlay visible" (click)="showAddModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add New Employee</h3>
+        <button class="modal-close" (click)="showAddModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-section-title full-width"><app-icon name="user" [size]="16"></app-icon> Personal Details</div>
+          <div class="form-group">
+            <label>Employee Code <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="newEmployee.employee_code" placeholder="e.g. EMP001">
+          </div>
+          <div class="form-group">
+            <label>SA ID Number <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="newEmployee.id_number" maxlength="13" placeholder="13-digit SA ID" (blur)="onIdNumberBlur()">
+            <div class="form-hint">Auto-fills DOB & Gender</div>
+          </div>
+          <div class="form-group">
+            <label>Title</label>
+            <select class="form-control" [(ngModel)]="newEmployee.title">
+              @for (t of titleOptions; track t.id) { <option [value]="t.abbreviation">{{ t.abbreviation }} - {{ t.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>First Name <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="newEmployee.first_name">
+          </div>
+          <div class="form-group">
+            <label>Second Name</label>
+            <input class="form-control" [(ngModel)]="newEmployee.second_name">
+          </div>
+          <div class="form-group">
+            <label>Surname <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="newEmployee.surname">
+          </div>
+          <div class="form-group">
+            <label>Known As</label>
+            <input class="form-control" [(ngModel)]="newEmployee.known_as">
+          </div>
+          <div class="form-group">
+            <label>Initials</label>
+            <input class="form-control" [(ngModel)]="newEmployee.initials" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Date of Birth <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="newEmployee.date_of_birth"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>Gender <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="newEmployee.gender">
+              @for (g of genderOptions; track g.id) { <option [value]="g.name">{{ g.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Race</label>
+            <select class="form-control" [(ngModel)]="newEmployee.race">
+              @for (r of raceOptions; track r.id) { <option [value]="r.name">{{ r.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Nationality</label>
+            <input class="form-control" [(ngModel)]="newEmployee.nationality">
+          </div>
+          <div class="form-group">
+            <label>Home Language</label>
+            <input class="form-control" [(ngModel)]="newEmployee.language">
+          </div>
+          <div class="form-group">
+            <label>Marital Status</label>
+            <select class="form-control" [(ngModel)]="newEmployee.marital_status">
+              @for (m of maritalOptions; track m) { <option [value]="m">{{ m }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Dependants</label>
+            <input class="form-control" type="number" min="0" [(ngModel)]="newEmployee.dependants">
+          </div>
+          <div class="form-group">
+            <label>Disability Status</label>
+            <input class="form-control" [(ngModel)]="newEmployee.disability_status">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="briefcase" [size]="16"></app-icon> Contact Details</div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input class="form-control" type="email" [(ngModel)]="newEmployee.email_address" placeholder="employee@municipality.gov.za">
+          </div>
+          <div class="form-group">
+            <label>Cell Number</label>
+            <input class="form-control" [(ngModel)]="newEmployee.cell_number" placeholder="0XX XXX XXXX">
+          </div>
+          <div class="form-group">
+            <label>Home Number</label>
+            <input class="form-control" [(ngModel)]="newEmployee.home_number">
+          </div>
+          <div class="form-group">
+            <label>Work Number</label>
+            <input class="form-control" [(ngModel)]="newEmployee.work_number">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="briefcase" [size]="16"></app-icon> Employment Details</div>
+          <div class="form-group">
+            <label>Joining Date <span class="required">*</span></label>
+            <app-date-input [(ngModel)]="newEmployee.joining_date"></app-date-input>
+          </div>
+          <div class="form-group">
+            <label>Income Tax Number</label>
+            <input class="form-control" [(ngModel)]="newEmployee.income_tax_number" placeholder="SARS Tax Ref">
+          </div>
+          <div class="form-group">
+            <label>TASK Grade</label>
+            <select class="form-control" [(ngModel)]="newEmployee.task_grade_id">
+              <option [ngValue]="undefined">Select grade</option>
+              @for (g of taskGrades; track g.id) { <option [ngValue]="g.id">{{ g.grade_code }} - {{ g.grade_name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notch</label>
+            <input class="form-control" type="number" min="1" [(ngModel)]="newEmployee.current_notch" placeholder="Notch number">
+          </div>
+          <div class="form-group">
+            <label>Annual Salary (R) <span class="required">*</span></label>
+            <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="newEmployee.annual_salary">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="home" [size]="16"></app-icon> Physical Address</div>
+          <div class="form-group">
+            <label>Address Line 1</label>
+            <input class="form-control" [(ngModel)]="newEmployee.physical_address_1">
+          </div>
+          <div class="form-group">
+            <label>Address Line 2</label>
+            <input class="form-control" [(ngModel)]="newEmployee.physical_address_2">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input class="form-control" [(ngModel)]="newEmployee.physical_city">
+          </div>
+          <div class="form-group">
+            <label>Province</label>
+            <select class="form-control" [(ngModel)]="newEmployee.physical_province">
+              <option value="">Select province</option>
+              @for (p of provinceOptions; track p) { <option [value]="p">{{ p }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Postal Code</label>
+            <input class="form-control" [(ngModel)]="newEmployee.physical_postal_code" maxlength="4">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="fileText" [size]="16"></app-icon> Postal Address</div>
+          <div class="form-group">
+            <label>Address Line 1</label>
+            <input class="form-control" [(ngModel)]="newEmployee.postal_address_1">
+          </div>
+          <div class="form-group">
+            <label>Address Line 2</label>
+            <input class="form-control" [(ngModel)]="newEmployee.postal_address_2">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input class="form-control" [(ngModel)]="newEmployee.postal_city">
+          </div>
+          <div class="form-group">
+            <label>Province</label>
+            <select class="form-control" [(ngModel)]="newEmployee.postal_province">
+              <option value="">Select province</option>
+              @for (p of provinceOptions; track p) { <option [value]="p">{{ p }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Postal Code</label>
+            <input class="form-control" [(ngModel)]="newEmployee.postal_code" maxlength="4">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="shield" [size]="16"></app-icon> Banking Details</div>
+          <div class="form-group">
+            <label>Bank Name</label>
+            <input class="form-control" [(ngModel)]="newEmployee.bank_name" placeholder="e.g. ABSA, FNB, Nedbank, Standard Bank">
+          </div>
+          <div class="form-group">
+            <label>Branch Code</label>
+            <input class="form-control" [(ngModel)]="newEmployee.bank_branch_code" maxlength="6">
+          </div>
+          <div class="form-group">
+            <label>Account Number</label>
+            <input class="form-control" [(ngModel)]="newEmployee.bank_account_number">
+          </div>
+          <div class="form-group">
+            <label>Account Type</label>
+            <select class="form-control" [(ngModel)]="newEmployee.bank_account_type">
+              <option value="">Select type</option>
+              @for (b of bankTypeOptions; track b) { <option [value]="b">{{ b }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name</label>
+            <input class="form-control" [(ngModel)]="newEmployee.bank_account_holder">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showAddModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="saveEmployee()">Save Employee</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showEditModal) {
+  <div class="modal-overlay visible" (click)="showEditModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Employee - {{ editEmployee.first_name }} {{ editEmployee.surname }}</h3>
+        <button class="modal-close" (click)="showEditModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-section-title full-width"><app-icon name="user" [size]="16"></app-icon> Personal Details</div>
+          <div class="form-group">
+            <label>Title</label>
+            <select class="form-control" [(ngModel)]="editEmployee.title">
+              @for (t of titleOptions; track t.id) { <option [value]="t.abbreviation">{{ t.abbreviation }} - {{ t.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>First Name <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="editEmployee.first_name">
+          </div>
+          <div class="form-group">
+            <label>Second Name</label>
+            <input class="form-control" [(ngModel)]="editEmployee.second_name">
+          </div>
+          <div class="form-group">
+            <label>Surname <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="editEmployee.surname">
+          </div>
+          <div class="form-group">
+            <label>Known As</label>
+            <input class="form-control" [(ngModel)]="editEmployee.known_as">
+          </div>
+          <div class="form-group">
+            <label>Initials</label>
+            <input class="form-control" [(ngModel)]="editEmployee.initials" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Race</label>
+            <select class="form-control" [(ngModel)]="editEmployee.race">
+              @for (r of raceOptions; track r.id) { <option [value]="r.name">{{ r.name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Marital Status</label>
+            <select class="form-control" [(ngModel)]="editEmployee.marital_status">
+              @for (m of maritalOptions; track m) { <option [value]="m">{{ m }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Dependants</label>
+            <input class="form-control" type="number" min="0" [(ngModel)]="editEmployee.dependants">
+          </div>
+          <div class="form-group">
+            <label>Disability Status</label>
+            <input class="form-control" [(ngModel)]="editEmployee.disability_status">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="briefcase" [size]="16"></app-icon> Contact Details</div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input class="form-control" type="email" [(ngModel)]="editEmployee.email_address">
+          </div>
+          <div class="form-group">
+            <label>Cell Number</label>
+            <input class="form-control" [(ngModel)]="editEmployee.cell_number">
+          </div>
+          <div class="form-group">
+            <label>Home Number</label>
+            <input class="form-control" [(ngModel)]="editEmployee.home_number">
+          </div>
+          <div class="form-group">
+            <label>Work Number</label>
+            <input class="form-control" [(ngModel)]="editEmployee.work_number">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="briefcase" [size]="16"></app-icon> Employment Details</div>
+          <div class="form-group">
+            <label>Income Tax Number</label>
+            <input class="form-control" [(ngModel)]="editEmployee.income_tax_number">
+          </div>
+          <div class="form-group">
+            <label>TASK Grade</label>
+            <select class="form-control" [(ngModel)]="editEmployee.task_grade_id">
+              <option [ngValue]="undefined">Select grade</option>
+              @for (g of taskGrades; track g.id) { <option [ngValue]="g.id">{{ g.grade_code }} - {{ g.grade_name }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notch</label>
+            <input class="form-control" type="number" min="1" [(ngModel)]="editEmployee.current_notch">
+          </div>
+          <div class="form-group">
+            <label>Annual Salary (R)</label>
+            <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="editEmployee.annual_salary">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="home" [size]="16"></app-icon> Physical Address</div>
+          <div class="form-group">
+            <label>Address Line 1</label>
+            <input class="form-control" [(ngModel)]="editEmployee.physical_address_1">
+          </div>
+          <div class="form-group">
+            <label>Address Line 2</label>
+            <input class="form-control" [(ngModel)]="editEmployee.physical_address_2">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input class="form-control" [(ngModel)]="editEmployee.physical_city">
+          </div>
+          <div class="form-group">
+            <label>Province</label>
+            <select class="form-control" [(ngModel)]="editEmployee.physical_province">
+              <option value="">Select province</option>
+              @for (p of provinceOptions; track p) { <option [value]="p">{{ p }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Postal Code</label>
+            <input class="form-control" [(ngModel)]="editEmployee.physical_postal_code" maxlength="4">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="fileText" [size]="16"></app-icon> Postal Address</div>
+          <div class="form-group">
+            <label>Address Line 1</label>
+            <input class="form-control" [(ngModel)]="editEmployee.postal_address_1">
+          </div>
+          <div class="form-group">
+            <label>Address Line 2</label>
+            <input class="form-control" [(ngModel)]="editEmployee.postal_address_2">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input class="form-control" [(ngModel)]="editEmployee.postal_city">
+          </div>
+          <div class="form-group">
+            <label>Province</label>
+            <select class="form-control" [(ngModel)]="editEmployee.postal_province">
+              <option value="">Select province</option>
+              @for (p of provinceOptions; track p) { <option [value]="p">{{ p }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Postal Code</label>
+            <input class="form-control" [(ngModel)]="editEmployee.postal_code" maxlength="4">
+          </div>
+
+          <div class="form-section-title full-width" style="margin-top:8px"><app-icon name="shield" [size]="16"></app-icon> Banking Details</div>
+          <div class="form-group">
+            <label>Bank Name</label>
+            <input class="form-control" [(ngModel)]="editEmployee.bank_name">
+          </div>
+          <div class="form-group">
+            <label>Branch Code</label>
+            <input class="form-control" [(ngModel)]="editEmployee.bank_branch_code" maxlength="6">
+          </div>
+          <div class="form-group">
+            <label>Account Number</label>
+            <input class="form-control" [(ngModel)]="editEmployee.bank_account_number">
+          </div>
+          <div class="form-group">
+            <label>Account Type</label>
+            <select class="form-control" [(ngModel)]="editEmployee.bank_account_type">
+              <option value="">Select type</option>
+              @for (b of bankTypeOptions; track b) { <option [value]="b">{{ b }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name</label>
+            <input class="form-control" [(ngModel)]="editEmployee.bank_account_holder">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showEditModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="updateEmployee()">Update Employee</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showTerminateModal) {
+  <div class="modal-overlay visible" (click)="showTerminateModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><app-icon name="alertTriangle" [size]="18"></app-icon> Terminate Employee - {{ terminateEmployee.first_name }} {{ terminateEmployee.surname }}</h3>
+        <button class="modal-close" (click)="showTerminateModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:4px;margin-bottom:20px">
+          @for (s of [1,2,3,4]; track s) {
+            <div style="flex:1;height:4px;border-radius:2px" [style.background]="s <= wizardStep ? 'var(--primary)' : 'var(--border)'"></div>
+          }
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:16px;font-size:12px;color:var(--text-secondary)">
+          <span [style.color]="wizardStep === 1 ? 'var(--primary)' : ''" [style.font-weight]="wizardStep === 1 ? '600' : ''">1. Details</span>
+          <span [style.color]="wizardStep === 2 ? 'var(--primary)' : ''" [style.font-weight]="wizardStep === 2 ? '600' : ''">2. Payout</span>
+          <span [style.color]="wizardStep === 3 ? 'var(--primary)' : ''" [style.font-weight]="wizardStep === 3 ? '600' : ''">3. Checklist</span>
+          <span [style.color]="wizardStep === 4 ? 'var(--primary)' : ''" [style.font-weight]="wizardStep === 4 ? '600' : ''">4. Confirm</span>
+        </div>
+
+        @if (wizardStep === 1) {
+          <div style="padding:12px 16px;background:var(--danger-bg);border-radius:8px;margin-bottom:16px;color:var(--danger);font-size:13px">
+            <app-icon name="alertTriangle" [size]="14"></app-icon> This action will terminate the employee and update their status. This cannot be easily reversed.
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label>Employee</label>
+              <input class="form-control" [value]="terminateEmployee.employee_code + ' - ' + terminateEmployee.first_name + ' ' + terminateEmployee.surname" disabled>
+            </div>
+            <div class="form-group">
+              <label>Termination Type <span class="required">*</span></label>
+              <select class="form-control" [(ngModel)]="wizardState.termination_type">
+                <option value="">Select type</option>
+                @for (t of terminationTypes; track t.value) { <option [value]="t.value">{{ t.label }}</option> }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Last Working Date <span class="required">*</span></label>
+              <app-date-input [(ngModel)]="wizardState.last_working_date"></app-date-input>
+            </div>
+            <div class="form-group full-width">
+              <label>Reason for Termination</label>
+              <textarea class="form-control" rows="3" [(ngModel)]="wizardState.reason" placeholder="Provide reason for termination..."></textarea>
+            </div>
+          </div>
+        }
+
+        @if (wizardStep === 2) {
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px"><app-icon name="dollarSign" [size]="16"></app-icon> Calculated Termination Payout</div>
+          <div class="data-grid">
+            <table>
+              <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+              <tbody>
+                <tr><td>Notice Period Days</td><td style="text-align:right">{{ calculatedAmounts?.notice_period_days || 0 }} days</td></tr>
+                <tr><td>Notice Pay</td><td style="text-align:right">{{ formatCurrency(calculatedAmounts?.notice_pay || 0) }}</td></tr>
+                <tr><td>Severance Pay</td><td style="text-align:right">{{ formatCurrency(calculatedAmounts?.severance_pay || 0) }}</td></tr>
+                <tr><td>Leave Payout</td><td style="text-align:right">{{ formatCurrency(calculatedAmounts?.leave_payout || 0) }}</td></tr>
+                <tr><td>Pro-rata Bonus</td><td style="text-align:right">{{ formatCurrency(calculatedAmounts?.pro_rata_bonus || 0) }}</td></tr>
+                <tr style="font-weight:700;background:var(--primary-light)"><td>Total Payout</td><td style="text-align:right">{{ formatCurrency(calculatedAmounts?.total_payout || 0) }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;padding:8px 12px;background:#f0f4f8;border-radius:8px;font-size:12px;color:#555">
+            <app-icon name="info" [size]="14"></app-icon> These amounts are auto-calculated based on termination type and date. Final amounts may be adjusted during payroll processing.
+          </div>
+        }
+
+        @if (wizardStep === 3) {
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px"><app-icon name="clipboard" [size]="16"></app-icon> Exit Checklist</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" [(ngModel)]="wizardState.checklist_equipment">
+              <span>Return equipment (laptop, phone, keys, cards, uniform)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" [(ngModel)]="wizardState.checklist_exit_interview">
+              <span>Exit interview conducted</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" [(ngModel)]="wizardState.checklist_access">
+              <span>IT access revoked</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" [(ngModel)]="wizardState.checklist_assets">
+              <span>Company assets returned</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" [(ngModel)]="wizardState.checklist_payslip">
+              <span>Final payslip issued</span>
+            </label>
+          </div>
+          <div style="margin-top:16px">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Exit Interview Notes</label>
+            <textarea style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;resize:vertical" rows="4" [(ngModel)]="wizardState.exit_interview_notes" placeholder="Notes from exit interview..."></textarea>
+          </div>
+        }
+
+        @if (wizardStep === 4) {
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px"><app-icon name="check" [size]="16"></app-icon> Confirm Termination</div>
+          <div class="info-grid" style="margin-bottom:16px">
+            <div class="info-item"><div class="info-label">Employee</div><div class="info-value">{{ terminateEmployee.first_name }} {{ terminateEmployee.surname }} ({{ terminateEmployee.employee_code }})</div></div>
+            <div class="info-item"><div class="info-label">Termination Type</div><div class="info-value">{{ getTermLabel() }}</div></div>
+            <div class="info-item"><div class="info-label">Last Working Date</div><div class="info-value">{{ wizardState.last_working_date }}</div></div>
+            <div class="info-item"><div class="info-label">Total Payout</div><div class="info-value" style="font-weight:700;color:var(--primary)">{{ formatCurrency(calculatedAmounts?.total_payout || 0) }}</div></div>
+            <div class="info-item"><div class="info-label">Equipment Returned</div><div class="info-value"><span [class]="wizardState.checklist_equipment ? 'badge badge-success' : 'badge badge-danger'">{{ wizardState.checklist_equipment ? 'Yes' : 'No' }}</span></div></div>
+            <div class="info-item"><div class="info-label">Exit Interview</div><div class="info-value"><span [class]="wizardState.checklist_exit_interview ? 'badge badge-success' : 'badge badge-danger'">{{ wizardState.checklist_exit_interview ? 'Conducted' : 'Not Done' }}</span></div></div>
+            <div class="info-item"><div class="info-label">IT Access Revoked</div><div class="info-value"><span [class]="wizardState.checklist_access ? 'badge badge-success' : 'badge badge-danger'">{{ wizardState.checklist_access ? 'Yes' : 'No' }}</span></div></div>
+            <div class="info-item"><div class="info-label">Assets Returned</div><div class="info-value"><span [class]="wizardState.checklist_assets ? 'badge badge-success' : 'badge badge-danger'">{{ wizardState.checklist_assets ? 'Yes' : 'No' }}</span></div></div>
+            <div class="info-item"><div class="info-label">Final Payslip</div><div class="info-value"><span [class]="wizardState.checklist_payslip ? 'badge badge-success' : 'badge badge-danger'">{{ wizardState.checklist_payslip ? 'Issued' : 'Not Issued' }}</span></div></div>
+          </div>
+          @if (wizardState.reason) {
+            <div style="margin-bottom:12px"><strong>Reason:</strong> {{ wizardState.reason }}</div>
+          }
+          @if (wizardState.exit_interview_notes) {
+            <div style="margin-bottom:12px"><strong>Exit Interview Notes:</strong> {{ wizardState.exit_interview_notes }}</div>
+          }
+          <div style="padding:12px 16px;background:var(--danger-bg);border-radius:8px;color:var(--danger);font-size:13px">
+            <app-icon name="alertTriangle" [size]="14"></app-icon> Click "Finalise Termination" to complete the process. This action cannot be undone.
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        @if (wizardStep === 1) {
+          <button class="btn" (click)="showTerminateModal = false">Cancel</button>
+          <button class="btn btn-primary" (click)="wizardNext()"><app-icon name="chevronRight" [size]="14"></app-icon> Next</button>
+        }
+        @if (wizardStep === 2 || wizardStep === 3) {
+          <button class="btn" (click)="wizardPrev()"><app-icon name="chevronLeft" [size]="14"></app-icon> Previous</button>
+          <button class="btn btn-primary" (click)="wizardNext()"><app-icon name="chevronRight" [size]="14"></app-icon> Next</button>
+        }
+        @if (wizardStep === 4) {
+          <button class="btn" (click)="wizardPrev()"><app-icon name="chevronLeft" [size]="14"></app-icon> Previous</button>
+          <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" (click)="finaliseTermination()"><app-icon name="check" [size]="14"></app-icon> Finalise Termination</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showImportModal) {
+  <div class="modal-overlay visible" (click)="showImportModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Import Employees</h3>
+        <button class="modal-close" (click)="showImportModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:8px"><app-icon name="upload" [size]="16"></app-icon> Upload Employee Data</div>
+          <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">Upload a CSV or Excel file to bulk-import employees. The file must include the required columns listed below.</p>
+        </div>
+        <div style="padding:16px;background:#f8f9fb;border-radius:8px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Required Columns</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            @for (c of ['employee_code','first_name','surname','id_number','date_of_birth','gender','start_date','position_title','department_name','annual_salary']; track c) {
+              <span class="badge badge-info" style="font-size:11px">{{ c }}</span>
+            }
+          </div>
+        </div>
+        <div style="padding:16px;background:#f8f9fb;border-radius:8px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Optional Columns</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            @for (c of ['title','email','phone','tax_number','bank_name','bank_account_number','bank_branch_code','employee_type','race','disability','marital_status']; track c) {
+              <span class="badge" style="font-size:11px;background:#E2E8F0;color:#475569">{{ c }}</span>
+            }
+          </div>
+        </div>
+        <div style="border:2px dashed var(--border);border-radius:8px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.2s" (click)="importFileInput.click()">
+          <app-icon name="upload" [size]="32"></app-icon>
+          <div style="font-size:14px;font-weight:600;margin-top:8px">Drop file here or click to browse</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Accepted formats: .csv, .xlsx</div>
+          <input #importFileInput type="file" accept=".csv,.xlsx" style="display:none" (change)="onImportFileSelect($event)">
+        </div>
+        @if (importFileName) {
+          <div style="margin-top:8px;font-size:13px;color:var(--text-muted)">Selected: {{ importFileName }}</div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showImportModal = false">Cancel</button>
+        <a href="/api/v1/employees/import/template" class="btn" style="text-decoration:none"><app-icon name="download" [size]="14"></app-icon> Download Template</a>
+        <button class="btn btn-primary" [disabled]="!importFile || importing" (click)="doImport()">
+          @if (importing) { <div class="spinner" style="width:14px;height:14px"></div> Importing... } @else { <app-icon name="upload" [size]="14"></app-icon> Import }
+        </button>
+      </div>
+    </div>
+  </div>
+}

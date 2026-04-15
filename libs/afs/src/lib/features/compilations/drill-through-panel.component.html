@@ -1,0 +1,427 @@
+<div class="dt-overlay" [class.open]="open" (click)="onOverlayClick($event)">
+  <div class="dt-panel" [class.open]="open" (click)="$event.stopPropagation()">
+    <div class="dt-header">
+      <div class="dt-breadcrumb">
+        @for (crumb of breadcrumbs; track crumb.level; let i = $index; let last = $last) {
+          @if (i > 0) {
+            <mat-icon class="bc-sep">chevron_right</mat-icon>
+          }
+          <span class="bc-item" [class.bc-active]="last" [class.bc-link]="!last" (click)="navigateTo(i)">
+            {{ crumb.label }}
+          </span>
+        }
+      </div>
+      <button mat-icon-button (click)="close()" matTooltip="Close drill-through">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="dt-body">
+      @if (currentLevel === 'line-item') {
+        <div class="dt-section-title">
+          <mat-icon class="dt-level-icon">account_tree</mat-icon>
+          <div>
+            <div class="dt-title">GL Account Breakdown</div>
+            <div class="dt-subtitle">{{ lineItemLabel }}</div>
+          </div>
+        </div>
+        <div class="dt-summary-row">
+          <div class="dt-stat">
+            <span class="dt-stat-label">Accounts</span>
+            <span class="dt-stat-value">{{ glEntries.length }}</span>
+          </div>
+          <div class="dt-stat">
+            <span class="dt-stat-label">Total Amount</span>
+            <span class="dt-stat-value" [class.negative]="totalAmount < 0">{{ formatAmount(totalAmount) }}</span>
+          </div>
+        </div>
+        <table class="dt-table">
+          <thead>
+            <tr>
+              <th>Account Code</th>
+              <th>Account Name</th>
+              <th class="amt">Amount</th>
+              <th class="amt">{{ priorYearLabel }}</th>
+              <th class="amt">Budget</th>
+              <th class="act"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of glEntries; track entry.accountCode) {
+              <tr class="dt-row-hover">
+                <td>
+                  <span class="mscoa-tag" matTooltip="{{ entry.accountCode }}">{{ (entry.accountCode || '').substring(0, 20) }}{{ (entry.accountCode || '').length > 20 ? '...' : '' }}</span>
+                </td>
+                <td>{{ entry.accountName }}</td>
+                <td class="amt">
+                  <span [class.negative]="entry.amount < 0">{{ formatAmount(entry.amount) }}</span>
+                </td>
+                <td class="amt">
+                  <span [class.negative]="(entry.priorYearAmount || 0) < 0">{{ formatAmount(entry.priorYearAmount) }}</span>
+                </td>
+                <td class="amt">
+                  <span [class.negative]="(entry.budgetAmount || 0) < 0">{{ formatAmount(entry.budgetAmount) }}</span>
+                </td>
+                <td class="act">
+                  <button mat-icon-button matTooltip="View individual GL transactions for this account" (click)="drillToTransactions(entry)">
+                    <mat-icon>list_alt</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+            @if (glEntries.length === 0) {
+              <tr><td colspan="6" class="dt-empty">No GL breakdown available</td></tr>
+            }
+          </tbody>
+        </table>
+      }
+
+      @if (currentLevel === 'account') {
+        <div class="dt-section-title">
+          <mat-icon class="dt-level-icon">receipt_long</mat-icon>
+          <div>
+            <div class="dt-title">GL Transactions</div>
+            <div class="dt-subtitle">{{ selectedAccount?.accountName }} ({{ selectedAccount?.accountCode }})</div>
+          </div>
+        </div>
+        @if (transactionsLoading) {
+          <div class="dt-loading">
+            <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+            <span>Loading transactions...</span>
+          </div>
+        } @else if (transactionsError) {
+          <div class="dt-error">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ transactionsError }}</span>
+          </div>
+        } @else {
+          <div class="dt-summary-row">
+            <div class="dt-stat">
+              <span class="dt-stat-label">Transactions</span>
+              <span class="dt-stat-value">{{ transactionsTotal }}</span>
+            </div>
+            <div class="dt-stat">
+              <span class="dt-stat-label">Page</span>
+              <span class="dt-stat-value">{{ transactionsPage }} / {{ transactionsTotalPages }}</span>
+            </div>
+            <div class="dt-period-filter">
+              <mat-form-field appearance="outline" style="width:140px">
+                <mat-label>Period</mat-label>
+                <mat-select [value]="periodFilter" (selectionChange)="onPeriodChange($event.value)">
+                  @for (m of months; track m.value) {
+                    <mat-option [value]="m.value">{{ m.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+          <table class="dt-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Doc Number</th>
+                <th>Description</th>
+                <th class="amt">Debit</th>
+                <th class="amt">Credit</th>
+                <th class="amt">Balance</th>
+                <th class="act"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tx of transactions; track tx.id) {
+                <tr class="dt-row-hover">
+                  <td class="dt-date">{{ tx.postingDate | date:'dd MMM yyyy' }}</td>
+                  <td>
+                    @if (tx.documentNumber) {
+                      <span class="doc-link" matTooltip="View transaction detail" (click)="drillToDocument(tx)">{{ tx.documentNumber }}</span>
+                    } @else {
+                      <span class="dt-muted">—</span>
+                    }
+                  </td>
+                  <td class="dt-desc">{{ tx.transactionDescription || '—' }}</td>
+                  <td class="amt">
+                    @if (tx.glDebit > 0) {
+                      <span>{{ formatCurrency(tx.glDebit) }}</span>
+                    } @else {
+                      <span class="dt-muted">—</span>
+                    }
+                  </td>
+                  <td class="amt">
+                    @if (tx.glCredit > 0) {
+                      <span>{{ formatCurrency(tx.glCredit) }}</span>
+                    } @else {
+                      <span class="dt-muted">—</span>
+                    }
+                  </td>
+                  <td class="amt">
+                    <span [class.negative]="tx.glBalance < 0">{{ formatCurrency(tx.glBalance) }}</span>
+                  </td>
+                  <td class="act">
+                    @if (tx.documentNumber) {
+                      <button mat-icon-button matTooltip="View transaction detail" (click)="drillToDocument(tx)">
+                        <mat-icon>receipt_long</mat-icon>
+                      </button>
+                      <button mat-icon-button matTooltip="View source document" (click)="drillToSourceDocument(tx)">
+                        <mat-icon>description</mat-icon>
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+              @if (transactions.length === 0) {
+                <tr><td colspan="7" class="dt-empty">No transactions found</td></tr>
+              }
+            </tbody>
+          </table>
+          @if (transactionsTotalPages > 1) {
+            <div class="dt-pagination">
+              <button mat-icon-button [disabled]="transactionsPage <= 1" (click)="txPageChange(-1)" matTooltip="Previous page">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span>Page {{ transactionsPage }} of {{ transactionsTotalPages }}</span>
+              <button mat-icon-button [disabled]="transactionsPage >= transactionsTotalPages" (click)="txPageChange(1)" matTooltip="Next page">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+            </div>
+          }
+        }
+      }
+
+      @if (currentLevel === 'transaction') {
+        <div class="dt-section-title">
+          <mat-icon class="dt-level-icon">receipt</mat-icon>
+          <div>
+            <div class="dt-title">Transaction Detail</div>
+            <div class="dt-subtitle">{{ selectedTransaction?.documentNumber || 'Transaction' }}</div>
+          </div>
+        </div>
+        @if (selectedTransaction) {
+          <div class="dt-doc-header">
+            <div class="dt-doc-grid">
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Document Number</span>
+                <span class="dt-doc-value">{{ selectedTransaction.documentNumber || '—' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Document Type</span>
+                <span class="dt-doc-value">{{ selectedTransaction.documentType || '—' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Posting Date</span>
+                <span class="dt-doc-value">{{ selectedTransaction.postingDate | date:'dd MMM yyyy' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Processing Month</span>
+                <span class="dt-doc-value">{{ selectedTransaction.processingMonth || '—' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Description</span>
+                <span class="dt-doc-value">{{ selectedTransaction.transactionDescription || '—' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Captured By</span>
+                <span class="dt-doc-value">{{ selectedTransaction.capturedBy || '—' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Vote</span>
+                <span class="dt-doc-value">{{ selectedTransaction.voteNumber || '—' }} {{ selectedTransaction.voteDescription ? '— ' + selectedTransaction.voteDescription : '' }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">mSCOA Item</span>
+                <span class="dt-doc-value">{{ selectedTransaction.scoaItemShortDesc || selectedTransaction.scoaItemCode || '—' }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="dt-tx-amounts">
+            <div class="dt-tx-amount-row">
+              <span class="dt-tx-amount-label">Debit</span>
+              <span class="dt-tx-amount-value">{{ formatCurrency(selectedTransaction.glDebit) }}</span>
+            </div>
+            <div class="dt-tx-amount-row">
+              <span class="dt-tx-amount-label">Credit</span>
+              <span class="dt-tx-amount-value">{{ formatCurrency(selectedTransaction.glCredit) }}</span>
+            </div>
+            <div class="dt-tx-amount-row dt-tx-balance">
+              <span class="dt-tx-amount-label">Running Balance</span>
+              <span class="dt-tx-amount-value" [class.negative]="selectedTransaction.glBalance < 0">{{ formatCurrency(selectedTransaction.glBalance) }}</span>
+            </div>
+          </div>
+          @if (selectedTransaction.documentNumber) {
+            <div style="margin-top:16px;text-align:center">
+              <button mat-raised-button color="primary" (click)="drillToSourceDocument(selectedTransaction)">
+                <mat-icon>description</mat-icon>
+                View Source Document
+              </button>
+            </div>
+          }
+        }
+      }
+
+      @if (currentLevel === 'document') {
+        <div class="dt-section-title">
+          <mat-icon class="dt-level-icon">description</mat-icon>
+          <div>
+            <div class="dt-title">Source Document</div>
+            <div class="dt-subtitle">{{ selectedDocNumber }}</div>
+          </div>
+        </div>
+        @if (documentLoading) {
+          <div class="dt-loading">
+            <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+            <span>Loading source document...</span>
+          </div>
+        } @else if (documentError) {
+          <div class="dt-error">
+            <mat-icon>info</mat-icon>
+            <span>{{ documentError }}</span>
+          </div>
+        } @else if (sourceDocument) {
+          <div class="dt-doc-header">
+            <div class="dt-doc-grid">
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Document Number</span>
+                <span class="dt-doc-value">{{ sourceDocument.documentNumber }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Financial Year</span>
+                <span class="dt-doc-value">{{ sourceDocument.finYear || '—' }}</span>
+              </div>
+              @if (sourceDocument.transactionType) {
+                <div class="dt-doc-field">
+                  <span class="dt-doc-label">Transaction Type</span>
+                  <span class="dt-doc-value">
+                    <span class="dt-type-badge">{{ sourceDocument.transactionType }}</span>
+                    <span class="dt-muted" style="margin-left:6px">{{ getDocTypeLabel(sourceDocument.transactionType) }}</span>
+                  </span>
+                </div>
+              }
+              @if (sourceDocument.postingDate) {
+                <div class="dt-doc-field">
+                  <span class="dt-doc-label">Posting Date</span>
+                  <span class="dt-doc-value">{{ sourceDocument.postingDate | date:'dd MMM yyyy' }}</span>
+                </div>
+              }
+              @if (sourceDocument.capturedBy) {
+                <div class="dt-doc-field">
+                  <span class="dt-doc-label">Captured By</span>
+                  <span class="dt-doc-value">{{ sourceDocument.capturedBy }}</span>
+                </div>
+              }
+              @for (meta of getDocTypeMeta(sourceDocument); track meta.label) {
+                <div class="dt-doc-field">
+                  <span class="dt-doc-label">{{ meta.label }}</span>
+                  <span class="dt-doc-value">{{ meta.value }}</span>
+                </div>
+              }
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Line Items</span>
+                <span class="dt-doc-value">{{ sourceDocument.lineItemCount }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Total Debit</span>
+                <span class="dt-doc-value">{{ formatCurrency(sourceDocument.totalDebit) }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Total Credit</span>
+                <span class="dt-doc-value">{{ formatCurrency(sourceDocument.totalCredit) }}</span>
+              </div>
+              <div class="dt-doc-field">
+                <span class="dt-doc-label">Net Amount</span>
+                <span class="dt-doc-value" [class.negative]="sourceDocument.netAmount < 0">{{ formatCurrency(sourceDocument.netAmount) }}</span>
+              </div>
+            </div>
+          </div>
+
+          @if (sourceDocument.lineItems && sourceDocument.lineItems.length > 0) {
+            <div class="dt-subsection">Journal / Transaction Lines</div>
+            <table class="dt-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>Account</th>
+                  <th class="amt">Debit</th>
+                  <th class="amt">Credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (li of sourceDocument.lineItems; track li.genLedgerId) {
+                  <tr>
+                    <td class="dt-date">{{ li.postingDate | date:'dd MMM yyyy' }}</td>
+                    <td><span class="dt-type-badge">{{ li.transactionType || '—' }}</span></td>
+                    <td class="dt-desc">{{ li.transactionDetails || '—' }}</td>
+                    <td>
+                      <span class="mscoa-tag" matTooltip="{{ li.scoaItemDescription }}">{{ li.voteNumber || '—' }}</span>
+                    </td>
+                    <td class="amt">
+                      @if (li.debit > 0) {
+                        <span>{{ formatCurrency(li.debit) }}</span>
+                      } @else {
+                        <span class="dt-muted">—</span>
+                      }
+                    </td>
+                    <td class="amt">
+                      @if (li.credit > 0) {
+                        <span>{{ formatCurrency(li.credit) }}</span>
+                      } @else {
+                        <span class="dt-muted">—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="dt-total-row">
+                  <td colspan="4" style="text-align:right;font-weight:700">Total</td>
+                  <td class="amt" style="font-weight:700">{{ formatCurrency(sourceDocument.totalDebit) }}</td>
+                  <td class="amt" style="font-weight:700">{{ formatCurrency(sourceDocument.totalCredit) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          }
+
+          @if (relatedDocs.length > 0) {
+            <div class="dt-subsection">Related Documents</div>
+            <div class="dt-related-list">
+              @for (rd of relatedDocs; track rd.documentNumber) {
+                <div class="dt-related-item" (click)="drillToRelatedDoc(rd.documentNumber)">
+                  <mat-icon>link</mat-icon>
+                  <div>
+                    <span class="doc-link">{{ rd.documentNumber }}</span>
+                    <span class="dt-muted" style="font-size:11px;margin-left:6px">{{ rd.transactionType }} &middot; {{ rd.lineItemCount }} lines</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (evidenceAttachments.length > 0) {
+            <div class="dt-subsection">DMS Evidence Attachments</div>
+            <div class="dt-related-list">
+              @for (ev of evidenceAttachments; track ev.id) {
+                <div class="dt-related-item">
+                  <mat-icon>attach_file</mat-icon>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ev.originalName || ev.fileName }}</div>
+                    <div class="dt-muted" style="font-size:11px">
+                      {{ ev.category || 'Evidence' }} &middot; {{ formatFileSize(ev.fileSize) }}
+                      @if (ev.description) { &middot; {{ ev.description }} }
+                    </div>
+                  </div>
+                  @if (ev.tags?.length) {
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-left:8px">
+                      @for (tag of ev.tags; track tag) {
+                        <span class="mscoa-tag" style="font-size:10px">{{ tag }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      }
+    </div>
+  </div>
+</div>

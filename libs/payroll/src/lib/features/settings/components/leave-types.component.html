@@ -1,0 +1,143 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Leave Types</h1>
+    <p class="page-subtitle">Manage leave type definitions and rules</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ items.length }}</span>
+    <span class="summary-label">Total Leave Types</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ paidCount }}</span>
+    <span class="summary-label">Paid</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ unpaidCount }}</span>
+    <span class="summary-label">Unpaid</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search leave types..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredItems.length }} results</span>
+  </div>
+  <button class="btn btn-primary" (click)="openModal()">
+    <app-icon name="plus" [size]="16"></app-icon> Add Leave Type
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th>Code</th><th>Leave Type</th><th>Scheme</th><th style="text-align:right">Annual Days</th>
+            <th style="text-align:right">Max Accumulation</th><th>Accrual Freq</th><th style="text-align:right">Carry Over</th>
+            <th style="text-align:center">Docs Required</th><th style="text-align:center">Paid</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filteredItems.length === 0) {
+            <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:32px">No leave types found</td></tr>
+          } @else {
+            @for (lt of filteredItems; track lt.id) {
+              <tr>
+                <td><span class="badge badge-info">{{ lt.code }}</span></td>
+                <td style="font-weight:500">{{ lt.name }}</td>
+                <td>{{ lt.scheme_name || '-' }}</td>
+                <td style="text-align:right">{{ formatDays(lt.accrual_days) }}</td>
+                <td style="text-align:right">{{ formatDays(lt.max_accumulation) }}</td>
+                <td>{{ lt.accrual_frequency || '-' }}</td>
+                <td style="text-align:right">{{ formatDays(lt.carry_over_days) }}</td>
+                <td style="text-align:center">
+                  @if (lt.requires_document) {
+                    <span class="badge badge-warning">Yes</span>
+                  } @else {
+                    <span style="color:var(--text-muted)">No</span>
+                  }
+                </td>
+                <td style="text-align:center">
+                  @if (lt.paid) {
+                    <span class="badge badge-success">Paid</span>
+                  } @else {
+                    <span class="badge badge-danger">Unpaid</span>
+                  }
+                </td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="action-btn" (click)="openModal(lt)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                    <button class="action-btn danger" (click)="deleteItem(lt)" title="Delete"><app-icon name="trash" [size]="14"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editItem.id ? 'Edit Leave Type: ' + editItem.code : 'Add Leave Type' }}</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="calendar" [size]="16"></app-icon> {{ editItem.id ? 'Edit Leave Type' : 'New Leave Type' }}</div>
+          <div class="form-group">
+            <label>Code *</label>
+            @if (editItem.id) {
+              <input class="form-control" [value]="editItem.code" readonly>
+            } @else {
+              <input class="form-control" [(ngModel)]="editItem.code" placeholder="e.g. ANNUAL, SICK">
+            }
+          </div>
+          <div class="form-group"><label>Name *</label><input class="form-control" [(ngModel)]="editItem.name" placeholder="e.g. Annual Leave"></div>
+          <div class="form-group">
+            <label>Leave Scheme</label>
+            <select class="form-control" [(ngModel)]="editItem.leave_scheme_id">
+              <option value="">-- Select --</option>
+              @for (s of leaveSchemes; track s.id) {
+                <option [value]="s.id">{{ s.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="activity" [size]="16"></app-icon> Accrual Rules</div>
+          <div class="form-group"><label>Annual Days</label><input class="form-control" type="number" [(ngModel)]="editItem.accrual_days" min="0" step="0.5"><span class="form-hint">Total days accrued per year</span></div>
+          <div class="form-group"><label>Max Accumulation</label><input class="form-control" type="number" [(ngModel)]="editItem.max_accumulation" min="0" step="0.5"><span class="form-hint">Maximum balance that can accumulate</span></div>
+          <div class="form-group">
+            <label>Accrual Frequency</label>
+            <select class="form-control" [(ngModel)]="editItem.accrual_frequency">
+              <option value="ANNUAL">Annual (credited at start of cycle)</option>
+              <option value="MONTHLY">Monthly (accrued monthly)</option>
+              <option value="ONCE_OFF">Once Off (granted once)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Carry Over Days</label><input class="form-control" type="number" [(ngModel)]="editItem.carry_over_days" min="0" step="0.5"><span class="form-hint">Days that carry over to next cycle</span></div>
+
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="shield" [size]="16"></app-icon> Rules</div>
+          <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="editItem.requires_document" style="width:auto"> Supporting documentation required</label></div>
+          <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="editItem.paid" style="width:auto"> Employee receives pay during leave</label></div>
+          <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" [(ngModel)]="editItem.negative_balance_allowed" style="width:auto"> Allow leave requests with insufficient balance</label></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">{{ editItem.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}

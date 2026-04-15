@@ -1,9 +1,51 @@
 import { Routes } from '@angular/router';
+import { roleGuard } from './core/guards/role.guard';
 
-  export const SCM_ROUTES: Routes = [
-    {
-      path: '',
-      loadComponent: () => import('./scm-landing.component').then(m => m.ScmLandingComponent)
-    }
-  ];
-  
+const R = {
+  REQUESTOR: 'requestor', SCM_PRACTITIONER: 'scm_practitioner', SCM_MANAGER: 'scm_manager',
+  BUDGET_OFFICER: 'budget_officer', APPROVING_OFFICER: 'approving_officer', STORES_OFFICER: 'stores_officer',
+  CREDITORS_CLERK: 'creditors_clerk', EXPENDITURE_OFFICER: 'expenditure_officer', CFO: 'cfo',
+  MUNICIPAL_MANAGER: 'municipal_manager', BSC_CHAIRPERSON: 'bsc_chairperson', BEC_CHAIRPERSON: 'bec_chairperson',
+  BAC_CHAIRPERSON: 'bac_chairperson', INTERNAL_AUDITOR: 'internal_auditor', SYSTEM_ADMIN: 'system_admin'
+};
+const PROCUREMENT_ROLES = [R.REQUESTOR, R.SCM_PRACTITIONER, R.SCM_MANAGER, R.BUDGET_OFFICER, R.APPROVING_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const RECEIVING_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.STORES_OFFICER, R.CREDITORS_CLERK, R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const MANAGEMENT_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.APPROVING_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.BSC_CHAIRPERSON, R.BEC_CHAIRPERSON, R.BAC_CHAIRPERSON, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const COMPLIANCE_ROLES = [R.SCM_MANAGER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const REPORTING_ROLES = [R.SCM_MANAGER, R.BUDGET_OFFICER, R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const ADMIN_ROLES = [R.CFO, R.MUNICIPAL_MANAGER, R.SYSTEM_ADMIN];
+const SUPPLIER_PORTAL_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.CREDITORS_CLERK, R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+const TENDER_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.BSC_CHAIRPERSON, R.BEC_CHAIRPERSON, R.BAC_CHAIRPERSON, R.APPROVING_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
+
+export const SCM_ROUTES: Routes = [
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent), data: { breadcrumb: 'Executive Dashboard', icon: 'dashboard', group: 'Home' } },
+  { path: 'demand', loadComponent: () => import('./features/demand/demand.component').then(m => m.DemandComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Demand Management', icon: 'inventory_2', group: 'Procurement' } },
+  { path: 'requisitions', loadComponent: () => import('./features/requisitions/requisitions.component').then(m => m.RequisitionsComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Requisitions', icon: 'description', group: 'Procurement' } },
+  { path: 'quotations', loadComponent: () => import('./features/quotations/quotations.component').then(m => m.QuotationsComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Quotations (RFQ)', icon: 'request_quote', group: 'Procurement' } },
+  { path: 'tenders', loadComponent: () => import('./features/tenders/tenders.component').then(m => m.TendersComponent), canActivate: [roleGuard], data: { roles: TENDER_ROLES, breadcrumb: 'Tenders & Bidding', icon: 'gavel', group: 'Procurement' } },
+  { path: 'orders', loadComponent: () => import('./features/orders/orders.component').then(m => m.OrdersComponent), canActivate: [roleGuard], data: { roles: [...PROCUREMENT_ROLES, R.STORES_OFFICER, R.CREDITORS_CLERK], breadcrumb: 'Purchase Orders', icon: 'shopping_cart', group: 'Procurement' } },
+  { path: 'grn', loadComponent: () => import('./features/grn/grn.component').then(m => m.GrnComponent), canActivate: [roleGuard], data: { roles: RECEIVING_ROLES, breadcrumb: 'Goods Received Notes', icon: 'local_shipping', group: 'Receiving & Payments' } },
+  { path: 'gra', loadComponent: () => import('./features/gra/gra.component').then(m => m.GraComponent), canActivate: [roleGuard], data: { roles: RECEIVING_ROLES, breadcrumb: 'Goods Return Advice', icon: 'assignment_return', group: 'Receiving & Payments' } },
+  { path: 'invoices', loadComponent: () => import('./features/invoices/invoices.component').then(m => m.InvoicesComponent), canActivate: [roleGuard], data: { roles: [R.SCM_MANAGER, R.CREDITORS_CLERK, R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Invoice Processing', icon: 'receipt_long', group: 'Receiving & Payments' } },
+  { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent), canActivate: [roleGuard], data: { roles: [R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Payment Processing', icon: 'payments', group: 'Receiving & Payments' } },
+  { path: 'suppliers', loadComponent: () => import('./features/suppliers/suppliers.component').then(m => m.SuppliersComponent), canActivate: [roleGuard], data: { roles: MANAGEMENT_ROLES, breadcrumb: 'Supplier Management', icon: 'business', group: 'Management' } },
+  { path: 'informal-tenders', loadComponent: () => import('./features/informal-tenders/informal-tenders.component').then(m => m.InformalTendersComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Informal Tenders', icon: 'fact_check', group: 'Procurement' } },
+  { path: 'supplier-performance', loadComponent: () => import('./features/supplier-performance/supplier-performance.component').then(m => m.SupplierPerformanceComponent), canActivate: [roleGuard], data: { roles: MANAGEMENT_ROLES, breadcrumb: 'Supplier Performance', icon: 'speed', group: 'Management' } },
+  { path: 'interest-charges', loadComponent: () => import('./features/interest-charges/interest-charges.component').then(m => m.InterestChargesComponent), canActivate: [roleGuard], data: { roles: [R.CREDITORS_CLERK, R.EXPENDITURE_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Interest Charges', icon: 'percent', group: 'Receiving & Payments' } },
+  { path: 'contracts', loadComponent: () => import('./features/contracts/contracts.component').then(m => m.ContractsComponent), canActivate: [roleGuard], data: { roles: MANAGEMENT_ROLES, breadcrumb: 'Contract Management', icon: 'handshake', group: 'Management' } },
+  { path: 'inventory', loadComponent: () => import('./features/inventory/inventory.component').then(m => m.InventoryComponent), canActivate: [roleGuard], data: { roles: [R.STORES_OFFICER, R.SCM_PRACTITIONER, R.SCM_MANAGER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Inventory Management', icon: 'warehouse', group: 'Management' } },
+  { path: 'inventory-settings', loadComponent: () => import('./features/inventory-settings/inventory-settings.component').then(m => m.InventorySettingsComponent), canActivate: [roleGuard], data: { roles: [R.STORES_OFFICER, R.SCM_MANAGER, R.CFO, R.SYSTEM_ADMIN], breadcrumb: 'Inventory Settings', icon: 'settings', group: 'Management' } },
+  { path: 'water-inventory', loadComponent: () => import('./features/water-inventory/water-inventory.component').then(m => m.WaterInventoryComponent), canActivate: [roleGuard], data: { roles: [R.STORES_OFFICER, R.SCM_PRACTITIONER, R.SCM_MANAGER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Water Inventory', icon: 'water_drop', group: 'Management' } },
+  { path: 'land-inventory', loadComponent: () => import('./features/land-inventory/land-inventory.component').then(m => m.LandInventoryComponent), canActivate: [roleGuard], data: { roles: [R.STORES_OFFICER, R.SCM_PRACTITIONER, R.SCM_MANAGER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN], breadcrumb: 'Land Inventory', icon: 'terrain', group: 'Management' } },
+  { path: 'ifw-register', loadComponent: () => import('./features/ifw-register/ifw-register.component').then(m => m.IfwRegisterComponent), canActivate: [roleGuard], data: { roles: COMPLIANCE_ROLES, breadcrumb: 'IFW Register', icon: 'warning', group: 'Compliance' } },
+  { path: 'audit-trail', loadComponent: () => import('./features/audit-trail/audit-trail.component').then(m => m.AuditTrailComponent), canActivate: [roleGuard], data: { roles: COMPLIANCE_ROLES, breadcrumb: 'Audit Trail', icon: 'history', group: 'Compliance' } },
+  { path: 'delegations', loadComponent: () => import('./features/delegations/delegations.component').then(m => m.DelegationsComponent), canActivate: [roleGuard], data: { roles: COMPLIANCE_ROLES, breadcrumb: 'Delegations', icon: 'supervisor_account', group: 'Compliance' } },
+  { path: 'reports', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), canActivate: [roleGuard], data: { roles: REPORTING_ROLES, breadcrumb: 'Reports', icon: 'assessment', group: 'Reports' } },
+  { path: 'analytics', loadComponent: () => import('./features/analytics/analytics.component').then(m => m.AnalyticsComponent), canActivate: [roleGuard], data: { roles: REPORTING_ROLES, breadcrumb: 'Analytics', icon: 'analytics', group: 'Reports' } },
+  { path: 'bi-dashboards', loadComponent: () => import('./features/bi-dashboards/bi-dashboards.component').then(m => m.BiDashboardsComponent), canActivate: [roleGuard], data: { roles: REPORTING_ROLES, breadcrumb: 'BI Dashboards', icon: 'dashboard', group: 'Reports' } },
+  { path: 'supplier-portal', loadComponent: () => import('./features/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent), canActivate: [roleGuard], data: { roles: SUPPLIER_PORTAL_ROLES, breadcrumb: 'Supplier Portal', icon: 'storefront', group: 'Management' } },
+  { path: 'financial-integration', loadComponent: () => import('./features/financial-integration/financial-integration.component').then(m => m.FinancialIntegrationComponent), canActivate: [roleGuard], data: { roles: REPORTING_ROLES, breadcrumb: 'Financial Integration', icon: 'account_balance_wallet', group: 'Reports' } },
+  { path: 'admin/users', loadComponent: () => import('./features/admin/users/users.component').then(m => m.UsersComponent), canActivate: [roleGuard], data: { roles: ADMIN_ROLES, breadcrumb: 'Users & Roles', icon: 'admin_panel_settings', group: 'Settings' } },
+  { path: 'admin/system-config', loadComponent: () => import('./features/admin/system-config/system-config.component').then(m => m.SystemConfigComponent), canActivate: [roleGuard], data: { roles: ADMIN_ROLES, breadcrumb: 'SCM Configuration', icon: 'tune', group: 'Settings' } },
+];

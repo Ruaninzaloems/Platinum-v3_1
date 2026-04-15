@@ -1,0 +1,1343 @@
+<div class="mapping-workbench">
+  @if (!compilationContextLoading && !hasCompilationContext) {
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+      <mat-icon style="font-size:64px;width:64px;height:64px;color:#9e9e9e;margin-bottom:16px">playlist_add_check</mat-icon>
+      <h2 style="margin:0 0 8px;color:#424242">No Active Compilation</h2>
+      <p style="color:#757575;margin:0 0 24px;max-width:400px">Select or create a compilation before accessing the Mapping Workbench.</p>
+      <button mat-flat-button color="primary" (click)="goToCompilations()">
+        <mat-icon>arrow_forward</mat-icon> Go to Compilations
+      </button>
+    </div>
+  } @else if (!tbBatchesLoading && !hasCurrentYearCommitted) {
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+      <mat-icon style="font-size:64px;width:64px;height:64px;color:#ff9800;margin-bottom:16px">hourglass_empty</mat-icon>
+      <h2 style="margin:0 0 8px;color:#424242">No Current-Year Trial Balance Data</h2>
+      <p style="color:#757575;margin:0 0 16px;max-width:460px">A committed current-year Trial Balance is required before mapping can begin. Import and commit current-year TB data first.</p>
+      @if (tbBatchStatuses.length > 0) {
+        <div style="margin-bottom:24px;text-align:left;background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;min-width:280px">
+          <div style="font-weight:500;margin-bottom:8px;color:#424242">Period Status:</div>
+          @for (p of tbBatchStatuses; track p.periodType) {
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0">
+              <span>{{ p.periodType }}</span>
+              <span [style.color]="p.status === 'committed' ? '#4caf50' : p.status === 'not_loaded' ? '#9e9e9e' : p.status === 'validation_failed' ? '#f44336' : '#ff9800'">{{ p.status === 'not_loaded' ? 'Not Loaded' : p.status }}</span>
+            </div>
+          }
+        </div>
+      }
+      <button mat-flat-button color="primary" (click)="goToTbImport()">
+        <mat-icon>arrow_forward</mat-icon> Go to TB Import
+      </button>
+    </div>
+  } @else {
+  @if (showOpeningBalanceWarning) {
+    <div [style.background]="obWarningStyle === 'red' ? '#fce4ec' : obWarningStyle === 'amber' ? '#fff3e0' : '#e3f2fd'"
+         [style.border]="obWarningStyle === 'red' ? '1px solid #ef9a9a' : obWarningStyle === 'amber' ? '1px solid #ffcc80' : '1px solid #90caf9'"
+         [style.border-left]="obWarningStyle === 'red' ? '4px solid #b71c1c' : obWarningStyle === 'amber' ? '4px solid #e65100' : '4px solid #1565c0'"
+         style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin:0 0 16px;border-radius:8px">
+      <mat-icon [style.color]="obWarningStyle === 'red' ? '#b71c1c' : obWarningStyle === 'amber' ? '#e65100' : '#1565c0'">{{ obWarningStyle === 'red' ? 'error' : obWarningStyle === 'amber' ? 'warning' : 'info' }}</mat-icon>
+      <div style="flex:1">
+        <strong [style.color]="obWarningStyle === 'red' ? '#b71c1c' : obWarningStyle === 'amber' ? '#e65100' : '#1565c0'">{{ obWarningStyle === 'red' ? 'Opening Balance Status Unavailable' : obWarningStyle === 'amber' ? 'Opening Balance Control Pending' : 'Opening Balance Awaiting Confirmation' }}</strong>
+        <span [style.color]="obWarningStyle === 'red' ? '#c62828' : obWarningStyle === 'amber' ? '#bf360c' : '#1565c0'" style="margin-left:8px">{{ obWarningMessage }}</span>
+      </div>
+      <button mat-stroked-button (click)="goToOpeningBalanceControl()">
+        <mat-icon>balance</mat-icon> {{ obWarningAction }}
+      </button>
+    </div>
+  }
+  @if (showPriorYearWarning) {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin:0 0 16px;background:#e3f2fd;border:1px solid #90caf9;border-left:4px solid #1565c0;border-radius:8px">
+      <mat-icon style="color:#1565c0">info</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#1565c0">Prior-Year Trial Balance Not Committed</strong>
+        <span style="color:#1565c0;margin-left:8px">Comparative mapping columns will be unavailable until prior-year data is imported and committed.</span>
+      </div>
+      <button mat-stroked-button (click)="goToTbImport()">
+        <mat-icon>upload_file</mat-icon> Import Prior-Year TB
+      </button>
+    </div>
+  }
+  @if (hasStaleRuns) {
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin:0 0 16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+      <mat-icon style="color:#e65100">report_problem</mat-icon>
+      <div style="flex:1">
+        <strong style="color:#e65100">Stale Data Detected</strong>
+        <span style="color:#bf360c;margin-left:8px">One or more mapping runs are based on outdated source data. Reload affected TB periods and re-run mapping before exporting.</span>
+      </div>
+      <button mat-stroked-button (click)="goToTbImport()">
+        <mat-icon>refresh</mat-icon> Reload TB Data
+      </button>
+    </div>
+  }
+  <mat-progress-bar *ngIf="loading" mode="indeterminate"></mat-progress-bar>
+
+  <!-- RUN LIST VIEW -->
+  <div *ngIf="!selectedRun" class="run-list-view">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title style="display:flex;align-items:center;gap:12px">
+          AFS Mapping & Review Workbench
+          @if (showObChip) {
+            <span [style.background]="obChipColor + '1a'" [style.color]="obChipColor" [style.border]="'1px solid ' + obChipColor + '40'" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;white-space:nowrap">
+              <mat-icon style="font-size:14px;width:14px;height:14px">{{ isOpeningBalanceConfirmed ? 'check_circle' : 'warning' }}</mat-icon>
+              {{ obChipText }}
+            </span>
+          }
+        </mat-card-title>
+        <mat-card-subtitle>Create, execute, and review mapping runs for committed TB datasets</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="create-run-form" style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <mat-form-field appearance="outline" style="min-width:280px;flex:1">
+              <mat-label>Compilation</mat-label>
+              <mat-select [(ngModel)]="selectedCompilationId" (ngModelChange)="onCompilationChange()">
+                @for (comp of compilations; track comp.id) {
+                  <mat-option [value]="comp.id">{{ comp.name }} — {{ comp.status }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          @if (eligibleBatchesLoading) {
+            <mat-progress-bar mode="indeterminate" style="margin:8px 0"></mat-progress-bar>
+          }
+
+          @if (selectedCompilationId && eligibleBatchesData && !eligibleBatchesLoading) {
+            <div style="background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:16px">
+              <div style="font-weight:500;margin-bottom:12px;color:#424242;display:flex;align-items:center;gap:8px">
+                <mat-icon style="font-size:18px;width:18px;height:18px;color:#1565c0">storage</mat-icon>
+                TB Sources
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="font-weight:500;min-width:100px;color:#616161">Current Year:</span>
+                  @if (currentYearBatches.length === 0) {
+                    <span style="color:#d32f2f;display:flex;align-items:center;gap:4px">
+                      <mat-icon style="font-size:16px;width:16px;height:16px">error</mat-icon>
+                      No committed current-year TB data available
+                    </span>
+                  } @else if (currentYearBatches.length === 1) {
+                    <span style="color:#2e7d32;background:#e8f5e9;padding:4px 12px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:4px">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon>
+                      {{ formatBatchLabel(currentYearBatches[0]) }}
+                    </span>
+                  } @else {
+                    <mat-form-field appearance="outline" style="min-width:320px;margin:0" subscriptSizing="dynamic">
+                      <mat-label>Select Current Year TB Source</mat-label>
+                      <mat-select [(ngModel)]="selectedCurrentYearBatchId">
+                        @for (b of currentYearBatches; track b.id) {
+                          <mat-option [value]="b.id">{{ formatBatchLabel(b) }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                </div>
+
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span style="font-weight:500;min-width:100px;color:#616161">Prior Year 1:</span>
+                  @if (priorYear1Batches.length === 0) {
+                    <span style="color:#e65100;display:flex;align-items:center;gap:4px">
+                      <mat-icon style="font-size:16px;width:16px;height:16px">info</mat-icon>
+                      No comparative data — comparative outputs unavailable
+                    </span>
+                  } @else if (priorYear1Batches.length === 1) {
+                    <span style="color:#2e7d32;background:#e8f5e9;padding:4px 12px;border-radius:12px;font-size:13px;display:flex;align-items:center;gap:4px">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon>
+                      {{ formatBatchLabel(priorYear1Batches[0]) }}
+                    </span>
+                  } @else {
+                    <mat-form-field appearance="outline" style="min-width:320px;margin:0" subscriptSizing="dynamic">
+                      <mat-label>Select Prior Year 1 TB Source</mat-label>
+                      <mat-select [(ngModel)]="selectedPriorYear1BatchId">
+                        @for (b of priorYear1Batches; track b.id) {
+                          <mat-option [value]="b.id">{{ formatBatchLabel(b) }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (currentYearBatches.length === 0) {
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fce4ec;border:1px solid #ef9a9a;border-radius:8px">
+                <mat-icon style="color:#c62828">block</mat-icon>
+                <span style="color:#c62828">No committed current-year TB data available for this compilation. Import and commit a current-year Trial Balance first.</span>
+              </div>
+            }
+
+            @if (priorYear1Batches.length === 0 && currentYearBatches.length > 0) {
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+                <mat-icon style="color:#e65100">warning</mat-icon>
+                <span style="color:#e65100">No committed prior-year comparative TB data. Comparative mapping outputs will be unavailable.</span>
+              </div>
+            }
+
+            @if (hasActiveRunForScope) {
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px">
+                <mat-icon style="color:#e65100">report_problem</mat-icon>
+                <span style="color:#e65100">An active mapping run already exists for this compilation and current-year source (status: {{ activeRunInfo.status }}). Complete or abandon it before creating a new one.</span>
+              </div>
+            }
+          }
+
+          <div style="display:flex;justify-content:flex-end">
+            <button mat-raised-button color="primary" (click)="createRun()" [disabled]="!canCreateRun">
+              <mat-icon>add</mat-icon> Create Mapping Run
+            </button>
+          </div>
+        </div>
+
+        <mat-divider class="section-divider"></mat-divider>
+
+        <div *ngIf="runs.length === 0 && !loading" class="empty-state">
+          <mat-icon class="empty-icon">assignment</mat-icon>
+          <p>No mapping runs found for this financial year. Create one to get started.</p>
+        </div>
+
+        <table mat-table [dataSource]="runs" *ngIf="runs.length > 0" class="runs-table">
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let run">
+              <mat-chip [color]="getStatusColor(run.status)" selected>{{ run.status }}</mat-chip>
+              <mat-icon *ngIf="run.isStale" matTooltip="Stale — source data has been replaced" color="warn" class="stale-icon">report_problem</mat-icon>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="createdAt">
+            <th mat-header-cell *matHeaderCellDef>Created</th>
+            <td mat-cell *matCellDef="let run">{{ run.createdAt | date:'short' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="createdBy">
+            <th mat-header-cell *matHeaderCellDef>Created By</th>
+            <td mat-cell *matCellDef="let run">{{ run.createdBy }}</td>
+          </ng-container>
+          <ng-container matColumnDef="stats">
+            <th mat-header-cell *matHeaderCellDef>Mapping Stats</th>
+            <td mat-cell *matCellDef="let run">
+              <span *ngIf="run.totalTbRows > 0">
+                {{ run.matchedRows }}/{{ run.totalTbRows }} matched
+                ({{ run.coveragePercent }}%)
+              </span>
+              <span *ngIf="run.totalTbRows === 0" class="not-executed">Not executed</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let run">
+              <button mat-icon-button (click)="selectRun(run)" matTooltip="View details">
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="['status', 'createdAt', 'createdBy', 'stats', 'actions']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['status', 'createdAt', 'createdBy', 'stats', 'actions']"
+              [class.stale-row]="row.isStale"></tr>
+        </table>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- RUN DETAIL VIEW -->
+  <div *ngIf="selectedRun" class="run-detail-view">
+    <button mat-button (click)="backToList()" class="back-button">
+      <mat-icon>arrow_back</mat-icon> Back to runs
+    </button>
+
+    <!-- Run Summary Card -->
+    <mat-card class="summary-card">
+      <mat-card-header>
+        <mat-card-title style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          Mapping Run
+          <mat-chip [color]="getStatusColor(selectedRun.status)" selected class="status-chip">
+            {{ selectedRun.status }}
+          </mat-chip>
+          <mat-icon *ngIf="selectedRun.isStale" color="warn" matTooltip="Stale — source data replaced">report_problem</mat-icon>
+          @if (showObChip) {
+            <span [style.background]="obChipColor + '1a'" [style.color]="obChipColor" [style.border]="'1px solid ' + obChipColor + '40'" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;white-space:nowrap">
+              <mat-icon style="font-size:14px;width:14px;height:14px">{{ isOpeningBalanceConfirmed ? 'check_circle' : 'warning' }}</mat-icon>
+              {{ obChipText }}
+            </span>
+          }
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">Total TB Rows</span>
+            <span class="stat-value">{{ selectedRun.totalTbRows }}</span>
+          </div>
+          <div class="stat-item matched">
+            <span class="stat-label">Matched</span>
+            <span class="stat-value">{{ selectedRun.matchedRows }}</span>
+          </div>
+          <div class="stat-item unmatched">
+            <span class="stat-label">Unmatched</span>
+            <span class="stat-value">{{ selectedRun.unmatchedRows }}</span>
+          </div>
+          <div class="stat-item ambiguous">
+            <span class="stat-label">Ambiguous</span>
+            <span class="stat-value">{{ selectedRun.ambiguousRows }}</span>
+          </div>
+          <div class="stat-item excluded">
+            <span class="stat-label">Excluded</span>
+            <span class="stat-value">{{ selectedRun.excludedRows }}</span>
+          </div>
+          <div class="stat-item coverage">
+            <span class="stat-label">Coverage</span>
+            <span class="stat-value">{{ selectedRun.coveragePercent }}%</span>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-bar">
+          <button mat-raised-button (click)="runReconciliation()"
+                  [disabled]="loading || selectedRun.totalTbRows === 0"
+                  matTooltip="Run reconciliation controls">
+            <mat-icon>fact_check</mat-icon> Run Controls
+          </button>
+          <button mat-raised-button color="accent" (click)="submitForReview()"
+                  [disabled]="loading || selectedRun.status !== 'draft'"
+                  matTooltip="Submit for reviewer approval">
+            <mat-icon>send</mat-icon> Submit for Review
+          </button>
+          <button mat-raised-button color="primary" (click)="approve()"
+                  [disabled]="loading || selectedRun.status !== 'in_review'"
+                  matTooltip="Approve mapping run">
+            <mat-icon>check</mat-icon> Approve
+          </button>
+        </div>
+
+        <!-- Reviewer Acknowledgments (for approval) -->
+        <div *ngIf="selectedRun.status === 'in_review'" class="acknowledgment-section">
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>Reviewer Acknowledgments</mat-panel-title>
+            </mat-expansion-panel-header>
+            <div class="ack-group">
+              <mat-checkbox [(ngModel)]="rc09Acknowledged">
+                I acknowledge that >50% of mapped value has not been human-reviewed (RC-09)
+              </mat-checkbox>
+              <mat-form-field *ngIf="rc09Acknowledged" appearance="outline" class="ack-reason">
+                <mat-label>RC-09 Acknowledgment Reason</mat-label>
+                <textarea matInput [(ngModel)]="rc09Reason" rows="2"></textarea>
+              </mat-form-field>
+            </div>
+            <div class="ack-group">
+              <mat-checkbox [(ngModel)]="rc11Acknowledged">
+                I acknowledge that >25% of mapped value relies on backbone defaults (RC-11)
+              </mat-checkbox>
+              <mat-form-field *ngIf="rc11Acknowledged" appearance="outline" class="ack-reason">
+                <mat-label>RC-11 Acknowledgment Reason</mat-label>
+                <textarea matInput [(ngModel)]="rc11Reason" rows="2"></textarea>
+              </mat-form-field>
+            </div>
+            <div *ngIf="sfpValidation?.overrideGovernance?.overrideRiskTier === 'HIGH_RISK'" class="ack-group">
+              <mat-checkbox [(ngModel)]="sfpHighRiskAcknowledged">
+                I acknowledge the HIGH_RISK override tier — aggregate override exposure exceeds materiality thresholds (AB-16)
+              </mat-checkbox>
+            </div>
+            <div *ngIf="sfpValidation?.hasMaterialException" class="ack-group">
+              <mat-checkbox [(ngModel)]="sfpMaterialExceptionAcknowledged">
+                I acknowledge that material exceptions exist and will propagate to the compilation and all downstream outputs (AB-17)
+              </mat-checkbox>
+            </div>
+          </mat-expansion-panel>
+
+          <div class="reject-section">
+            <mat-form-field appearance="outline" class="reason-input">
+              <mat-label>Rejection Reason</mat-label>
+              <input matInput [(ngModel)]="rejectReason">
+            </mat-form-field>
+            <button mat-raised-button color="warn" (click)="reject()" [disabled]="loading || !rejectReason">
+              <mat-icon>close</mat-icon> Reject
+            </button>
+          </div>
+        </div>
+
+        <!-- Draft Actions -->
+        <div *ngIf="selectedRun.status === 'draft'" class="draft-actions">
+          <mat-form-field appearance="outline" class="reason-input">
+            <mat-label>Abandon Reason</mat-label>
+            <input matInput [(ngModel)]="abandonReason">
+          </mat-form-field>
+          <button mat-button color="warn" (click)="abandonRun()" [disabled]="loading || !abandonReason">
+            <mat-icon>delete_forever</mat-icon> Abandon
+          </button>
+        </div>
+
+        <!-- Approved Actions -->
+        <div *ngIf="selectedRun.status === 'approved'" class="approved-actions">
+          <mat-form-field appearance="outline" class="reason-input">
+            <mat-label>Reopen Reason</mat-label>
+            <input matInput [(ngModel)]="reopenReason">
+          </mat-form-field>
+          <button mat-button color="warn" (click)="reopenRun()" [disabled]="loading || !reopenReason">
+            <mat-icon>lock_open</mat-icon> Reopen
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Tabs: Rows / Disclosures / Controls / Decisions -->
+    <mat-tab-group [(selectedIndex)]="activeTab" class="detail-tabs">
+      <!-- TAB 1: Mapping Rows -->
+      <mat-tab label="Mapping Rows">
+        <div class="tab-content">
+          <div class="filter-bar">
+            <mat-form-field appearance="outline" class="filter-field">
+              <mat-label>Match Status</mat-label>
+              <mat-select [(ngModel)]="matchStatusFilter" (selectionChange)="onFilterChange()">
+                <option value="">All</option>
+                <option value="matched">Matched</option>
+                <option value="unmatched">Unmatched</option>
+                <option value="ambiguous">Ambiguous</option>
+                <option value="excluded">Excluded</option>
+                <option value="manually_mapped">Manually Mapped</option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="filter-field">
+              <mat-label>Review Status</mat-label>
+              <mat-select [(ngModel)]="reviewStatusFilter" (selectionChange)="onFilterChange()">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="overridden">Overridden</option>
+                <option value="intentionally_unmapped">Intentionally Unmapped</option>
+                <option value="deferred">Deferred</option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <!-- Batch Decision Bar -->
+          <div *ngIf="selectedRun.status === 'draft' && selectedRowIds.size > 0" class="batch-decision-bar">
+            <span>{{ selectedRowIds.size }} row(s) selected</span>
+            <mat-form-field appearance="outline" class="decision-field">
+              <mat-label>Decision Type</mat-label>
+              <mat-select [(ngModel)]="decisionType">
+                <option value="confirm_auto">Confirm Auto</option>
+                <option value="manual_map">Manual Map</option>
+                <option value="intentionally_unmapped">Intentionally Unmapped</option>
+                <option value="defer">Defer</option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field *ngIf="decisionType === 'manual_map'" appearance="outline" class="decision-field">
+              <mat-label>Target Disclosure ID</mat-label>
+              <input matInput [(ngModel)]="decisionDisclosureId">
+            </mat-form-field>
+            <mat-form-field *ngIf="decisionType === 'intentionally_unmapped'" appearance="outline" class="decision-field">
+              <mat-label>Classification</mat-label>
+              <mat-select [(ngModel)]="unmappedClassification">
+                <option value="non_afs">Non-AFS</option>
+                <option value="immaterial">Immaterial</option>
+                <option value="pending_external">Pending External</option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="decision-field reason-field">
+              <mat-label>Reason (required)</mat-label>
+              <input matInput [(ngModel)]="decisionReason">
+            </mat-form-field>
+            <button mat-raised-button color="primary" (click)="applyBatchDecision()" [disabled]="!decisionReason || !decisionType">
+              Apply to Selected
+            </button>
+          </div>
+
+          <table mat-table [dataSource]="rows" class="rows-table">
+            <ng-container matColumnDef="select">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let row">
+                <mat-checkbox *ngIf="selectedRun.status === 'draft'"
+                              [checked]="selectedRowIds.has(row.id)"
+                              (change)="toggleRowSelection(row.id)">
+                </mat-checkbox>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="matchStatus">
+              <th mat-header-cell *matHeaderCellDef>Match</th>
+              <td mat-cell *matCellDef="let row">
+                <mat-icon [matTooltip]="row.matchStatus">{{ getMatchStatusIcon(row.matchStatus) }}</mat-icon>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="scoaItemCode">
+              <th mat-header-cell *matHeaderCellDef>SCOA Code</th>
+              <td mat-cell *matCellDef="let row">{{ row.scoaItemCode || '(no code)' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="sortDesc">
+              <th mat-header-cell *matHeaderCellDef>Description</th>
+              <td mat-cell *matCellDef="let row" class="desc-cell">{{ row.sortDesc }}</td>
+            </ng-container>
+            <ng-container matColumnDef="backbone">
+              <th mat-header-cell *matHeaderCellDef>Backbone</th>
+              <td mat-cell *matCellDef="let row">{{ row.backbone || '-' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="disclosure">
+              <th mat-header-cell *matHeaderCellDef>Disclosure</th>
+              <td mat-cell *matCellDef="let row">{{ row.matchedDisclosureId || '-' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="confidence">
+              <th mat-header-cell *matHeaderCellDef>Confidence</th>
+              <td mat-cell *matCellDef="let row">
+                <mat-chip>{{ row.matchConfidence }}</mat-chip>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef>CY Amount</th>
+              <td mat-cell *matCellDef="let row" class="amount-cell">{{ row.currentYearAmount | number:'1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="reviewStatus">
+              <th mat-header-cell *matHeaderCellDef>Review</th>
+              <td mat-cell *matCellDef="let row">{{ row.reviewStatus }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="['select','matchStatus','scoaItemCode','sortDesc','backbone','disclosure','confidence','amount','reviewStatus']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['select','matchStatus','scoaItemCode','sortDesc','backbone','disclosure','confidence','amount','reviewStatus']"
+                [class.unmatched-row]="row.matchStatus === 'unmatched'"
+                [class.ambiguous-row]="row.matchStatus === 'ambiguous'"></tr>
+          </table>
+
+          <mat-paginator [length]="rowsTotal" [pageSize]="rowsLimit" [pageSizeOptions]="[50, 100, 200, 500]"
+                         (page)="onPageChange($event)"></mat-paginator>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 2: Disclosure Totals -->
+      <mat-tab label="Disclosure Totals">
+        <div class="tab-content">
+          <table mat-table [dataSource]="disclosureTotals" class="disclosure-table">
+            <ng-container matColumnDef="disclosureId">
+              <th mat-header-cell *matHeaderCellDef>Disclosure ID</th>
+              <td mat-cell *matCellDef="let d">{{ d.disclosureId }}</td>
+            </ng-container>
+            <ng-container matColumnDef="statementGroup">
+              <th mat-header-cell *matHeaderCellDef>Statement Group</th>
+              <td mat-cell *matCellDef="let d">{{ d.statementGroup || '-' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="currentYearTotal">
+              <th mat-header-cell *matHeaderCellDef>Current Year</th>
+              <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.currentYearTotal | number:'1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="priorYearTotal">
+              <th mat-header-cell *matHeaderCellDef>Prior Year</th>
+              <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.priorYearTotal | number:'1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="budgetTotal">
+              <th mat-header-cell *matHeaderCellDef>Budget</th>
+              <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.budgetTotal | number:'1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="sourceRowCount">
+              <th mat-header-cell *matHeaderCellDef>Rows</th>
+              <td mat-cell *matCellDef="let d">{{ d.sourceRowCount }}</td>
+            </ng-container>
+            <ng-container matColumnDef="resolve">
+              <th mat-header-cell *matHeaderCellDef>Resolve</th>
+              <td mat-cell *matCellDef="let d">
+                <button mat-icon-button color="primary"
+                        matTooltip="Resolve child disclosures"
+                        (click)="openResolveDisclosure(d.disclosureId)">
+                  <mat-icon>account_tree</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="['disclosureId','statementGroup','currentYearTotal','priorYearTotal','budgetTotal','sourceRowCount','resolve']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['disclosureId','statementGroup','currentYearTotal','priorYearTotal','budgetTotal','sourceRowCount','resolve']"></tr>
+          </table>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 3: Reconciliation Controls -->
+      <mat-tab label="Reconciliation Controls">
+        <div class="tab-content">
+          <div *ngIf="reconciliationControls.length === 0" class="empty-state">
+            <p>No reconciliation controls computed. Run controls to see results.</p>
+          </div>
+          <div *ngFor="let rc of reconciliationControls" class="control-card">
+            <mat-card [class]="'rc-' + rc.status">
+              <mat-card-header>
+                <mat-icon [style.color]="getControlStatusColor(rc.status)">
+                  {{ getControlStatusIcon(rc.status) }}
+                </mat-icon>
+                <mat-card-title>{{ rc.controlId }}: {{ rc.controlName }}</mat-card-title>
+                <mat-chip>{{ rc.severity }}</mat-chip>
+              </mat-card-header>
+              <mat-card-content>
+                <p>{{ rc.message }}</p>
+                <div *ngIf="rc.actualValue !== null" class="control-values">
+                  <span *ngIf="rc.expectedValue !== null">Expected: {{ rc.expectedValue | number:'1.2-2' }}</span>
+                  <span>Actual: {{ rc.actualValue | number:'1.2-2' }}</span>
+                  <span *ngIf="rc.difference !== null">Difference: {{ rc.difference | number:'1.2-2' }}</span>
+                </div>
+                <div *ngIf="rc.status === 'FAIL' && getDisclosuresForControl(rc.controlId).length > 0" class="control-resolve-actions">
+                  <span class="resolve-hint">Related disclosures to resolve:</span>
+                  <button *ngFor="let discId of getDisclosuresForControl(rc.controlId)"
+                          mat-stroked-button color="accent" class="resolve-entry-btn"
+                          (click)="openResolveDisclosure(discId)">
+                    <mat-icon>assignment</mat-icon> Resolve {{ discId }}
+                  </button>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 4: Decisions Audit Trail -->
+      <mat-tab label="Decisions ({{ decisions.length }})">
+        <div class="tab-content">
+          <table mat-table [dataSource]="decisions" *ngIf="decisions.length > 0" class="decisions-table">
+            <ng-container matColumnDef="decidedAt">
+              <th mat-header-cell *matHeaderCellDef>When</th>
+              <td mat-cell *matCellDef="let d">{{ d.decidedAt | date:'short' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="decidedBy">
+              <th mat-header-cell *matHeaderCellDef>By</th>
+              <td mat-cell *matCellDef="let d">{{ d.decidedBy }}</td>
+            </ng-container>
+            <ng-container matColumnDef="decisionType">
+              <th mat-header-cell *matHeaderCellDef>Type</th>
+              <td mat-cell *matCellDef="let d">{{ d.decisionType }}</td>
+            </ng-container>
+            <ng-container matColumnDef="reason">
+              <th mat-header-cell *matHeaderCellDef>Reason</th>
+              <td mat-cell *matCellDef="let d" class="desc-cell">{{ d.reason }}</td>
+            </ng-container>
+            <ng-container matColumnDef="disclosure">
+              <th mat-header-cell *matHeaderCellDef>Disclosure</th>
+              <td mat-cell *matCellDef="let d">{{ d.previousDisclosureId || '-' }} -> {{ d.newDisclosureId || '-' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="superseded">
+              <th mat-header-cell *matHeaderCellDef>Superseded</th>
+              <td mat-cell *matCellDef="let d">{{ d.supersededAt ? 'Yes' : '-' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="['decidedAt','decidedBy','decisionType','reason','disclosure','superseded']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['decidedAt','decidedBy','decisionType','reason','disclosure','superseded']"
+                [class.superseded-decision]="row.supersededAt"></tr>
+          </table>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 5: SFP Validation & Overrides -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          SFP Validation
+          <span *ngIf="getSfpUnresolvedCount() > 0" class="sfp-tab-badge sfp-tab-badge-error">{{ getSfpUnresolvedCount() }}</span>
+          <span *ngIf="getSfpOverriddenCount() > 0" class="sfp-tab-badge sfp-tab-badge-warn">{{ getSfpOverriddenCount() }} overridden</span>
+        </ng-template>
+        <div class="tab-content">
+          <mat-progress-bar *ngIf="sfpValidationLoading" mode="indeterminate"></mat-progress-bar>
+
+          <!-- Approval Status Banner -->
+          <div *ngIf="sfpValidation" class="sfp-approval-banner" [ngClass]="'sfp-approval-' + sfpValidation.approvalStatus">
+            <mat-icon>{{ sfpValidation.approvalStatus === 'APPROVED' ? 'check_circle' : sfpValidation.approvalStatus === 'BLOCKED' ? 'block' : 'warning' }}</mat-icon>
+            <div class="sfp-approval-text">
+              <strong>SFP Approval Status: {{ sfpValidation.approvalStatus }}</strong>
+              <span *ngIf="sfpValidation.approvalStatus === 'BLOCKED'">
+                — {{ getSfpUnresolvedCount() }} unresolved finding(s) must be addressed before approval
+              </span>
+              <span *ngIf="sfpValidation.approvalStatus === 'APPROVED'">
+                — All validation checks passed
+              </span>
+              <span *ngIf="sfpValidation.approvalStatus === 'APPROVED_WITH_WARNINGS'">
+                — Passed with overridden findings
+              </span>
+              <span *ngIf="sfpValidation.approvalStatus === 'REVIEW_REQUIRED'">
+                — Active errors require review before approval
+              </span>
+            </div>
+          </div>
+
+          <!-- Material Exception Warning -->
+          <div *ngIf="sfpValidation?.hasMaterialException" class="material-exception-banner">
+            <mat-icon>report_problem</mat-icon>
+            <div>
+              <strong>Material Exception</strong>
+              <span> — This mapping run contains overrides that create a material exception. This will propagate to the compilation and all export outputs.</span>
+            </div>
+          </div>
+
+          <!-- Override Governance Summary -->
+          <div *ngIf="sfpValidation?.overrideGovernance" class="sfp-governance-card">
+            <div class="sfp-governance-header">
+              <mat-icon>shield</mat-icon>
+              <strong>Override Governance</strong>
+              <mat-chip [ngClass]="'risk-tier-' + (sfpValidation.overrideGovernance.overrideRiskTier || 'STANDARD')">
+                {{ sfpValidation.overrideGovernance.overrideRiskTier || 'STANDARD' }}
+              </mat-chip>
+            </div>
+            <div class="sfp-governance-stats">
+              <div class="sfp-gov-stat">
+                <span class="sfp-gov-stat-label">Active Overrides</span>
+                <span class="sfp-gov-stat-value">{{ sfpValidation.overrideGovernance.overrideCount }}</span>
+              </div>
+              <div class="sfp-gov-stat">
+                <span class="sfp-gov-stat-label">Total Override Value</span>
+                <span class="sfp-gov-stat-value">{{ formatRand(sfpValidation.overrideGovernance.cumulativeOverrideValue) }}</span>
+              </div>
+              <div class="sfp-gov-stat">
+                <span class="sfp-gov-stat-label">Unresolved Blocks</span>
+                <span class="sfp-gov-stat-value" [class.sfp-gov-alert]="getSfpUnresolvedCount() > 0">{{ getSfpUnresolvedCount() }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Material Issues -->
+          <div *ngIf="sfpValidation?.topMaterialIssues?.length > 0" class="sfp-material-issues">
+            <h4 class="sfp-section-title">
+              <mat-icon>priority_high</mat-icon> Top Material Issues
+            </h4>
+            <div *ngFor="let issue of sfpValidation.topMaterialIssues" class="sfp-material-issue-card">
+              <div class="sfp-issue-header">
+                <span class="sfp-severity-chip" [style.background]="getSeverityColor(issue.severity)">{{ issue.severity }}</span>
+                <span class="sfp-issue-code">{{ issue.code }}</span>
+                <span class="sfp-issue-title">{{ issue.title }}</span>
+                <span class="sfp-status-badge" [ngClass]="getStatusBadgeClass(issue.status)">{{ issue.status }}</span>
+              </div>
+              <p class="sfp-issue-detail">{{ issue.detail }}</p>
+              <div *ngIf="issue.diagnosticHint" class="sfp-diagnostic-hint">
+                <mat-icon>lightbulb</mat-icon> {{ issue.diagnosticHint }}
+              </div>
+            </div>
+          </div>
+
+          <!-- All Findings -->
+          <h4 *ngIf="getSfpFindings().length > 0" class="sfp-section-title">
+            <mat-icon>fact_check</mat-icon>
+            All Findings ({{ getSfpFindings().length }})
+            <span class="sfp-findings-summary">
+              {{ getSfpPassCount() }} passed, {{ getSfpUnresolvedCount() }} unresolved, {{ getSfpOverriddenCount() }} overridden
+            </span>
+          </h4>
+
+          <div *ngFor="let finding of getSfpFindings()" class="sfp-finding-card" [ngClass]="'sfp-finding-' + finding.status">
+            <div class="sfp-finding-header">
+              <span class="sfp-severity-chip" [style.background]="getSeverityColor(finding.severity)">{{ finding.severity }}</span>
+              <span class="sfp-finding-code">{{ finding.code }}</span>
+              <span class="sfp-finding-title">{{ finding.title }}</span>
+              <span class="sfp-status-badge" [ngClass]="getStatusBadgeClass(finding.status)">{{ finding.status }}</span>
+            </div>
+            <p class="sfp-finding-detail">{{ finding.detail }}</p>
+
+            <div *ngIf="finding.actualValue != null" class="sfp-finding-values">
+              <span *ngIf="finding.expectedValue != null">Expected: {{ formatRand(finding.expectedValue) }}</span>
+              <span>Actual: {{ formatRand(finding.actualValue) }}</span>
+            </div>
+
+            <div *ngIf="finding.diagnosticHint" class="sfp-diagnostic-hint">
+              <mat-icon>lightbulb</mat-icon> {{ finding.diagnosticHint }}
+            </div>
+
+            <!-- Override metadata (if overridden) -->
+            <div *ngIf="finding.overrideMetadata" class="sfp-override-info">
+              <mat-icon>gavel</mat-icon>
+              <span>Overridden by {{ finding.overrideMetadata.authoriserName }} ({{ finding.overrideMetadata.authoriserRole }}) on {{ finding.overrideMetadata.overriddenAt | date:'short' }}</span>
+              <span class="sfp-override-reason">Reason: {{ finding.overrideMetadata.reason }}</span>
+              <button mat-stroked-button color="warn" class="sfp-revoke-btn" (click)="openRevokeDialog(finding.code)"
+                      *ngIf="selectedRun.status === 'draft' || selectedRun.status === 'in_review'">
+                <mat-icon>undo</mat-icon> Revoke
+              </button>
+            </div>
+
+            <!-- Override action (if unresolved and in draft/in_review) -->
+            <div *ngIf="finding.status === 'UNRESOLVED' && (selectedRun.status === 'draft' || selectedRun.status === 'in_review')" class="sfp-finding-actions">
+              <button mat-raised-button color="primary" (click)="openOverrideDialog(finding)">
+                <mat-icon>gavel</mat-icon> Create Override
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="!sfpValidation && !sfpValidationLoading" class="empty-state">
+            <p>No SFP validation data. Run controls first to generate validation results.</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 6: Diagnostics -->
+      <!-- TAB: Resolution Progress -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Resolution Progress
+          <mat-icon *ngIf="resolutionProgress && resolutionProgress.overallResolutionPercent < 100"
+                    class="tab-warning-icon" color="warn">warning</mat-icon>
+        </ng-template>
+        <div class="tab-content">
+          <div *ngIf="resolutionLoading" class="loading-container">
+            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+          </div>
+          <div *ngIf="!resolutionLoading && !resolutionProgress" class="empty-state">
+            <p>Resolution progress not loaded.</p>
+            <button mat-stroked-button color="primary" (click)="loadResolutionProgress()">Load Progress</button>
+          </div>
+          <div *ngIf="resolutionProgress && !resolutionLoading" class="resolution-progress-content">
+            <div class="resolution-summary-cards">
+              <mat-card class="resolution-metric-card">
+                <div class="metric-value">{{ resolutionProgress.overallResolutionPercent }}%</div>
+                <div class="metric-label">Overall Resolution</div>
+                <mat-progress-bar mode="determinate" [value]="resolutionProgress.overallResolutionPercent"
+                    [color]="resolutionProgress.overallResolutionPercent >= 80 ? 'primary' : resolutionProgress.overallResolutionPercent >= 50 ? 'accent' : 'warn'">
+                </mat-progress-bar>
+              </mat-card>
+              <mat-card class="resolution-metric-card">
+                <div class="metric-value" style="color: #4caf50">{{ resolutionProgress.fullyResolvedDisclosures }}</div>
+                <div class="metric-label">Fully Resolved</div>
+              </mat-card>
+              <mat-card class="resolution-metric-card">
+                <div class="metric-value" style="color: #ff9800">{{ resolutionProgress.partiallyResolvedDisclosures }}</div>
+                <div class="metric-label">Partially Resolved</div>
+              </mat-card>
+              <mat-card class="resolution-metric-card">
+                <div class="metric-value" style="color: #f44336">{{ resolutionProgress.unresolved }}</div>
+                <div class="metric-label">Unresolved</div>
+              </mat-card>
+            </div>
+            <div *ngIf="resolutionProgress.controlImpact && resolutionProgress.controlImpact.likelyAffectedControls.length > 0"
+                 class="control-impact-banner"
+                 [class.blocked]="resolutionProgress.controlImpact.possibleReadinessImprovement === 'BLOCKED_TO_WARNING'"
+                 [class.warning]="resolutionProgress.controlImpact.possibleReadinessImprovement === 'WARNING_TO_READY'">
+              <div class="impact-header">
+                <mat-icon>{{ resolutionProgress.controlImpact.possibleReadinessImprovement === 'BLOCKED_TO_WARNING' ? 'block' : 'trending_up' }}</mat-icon>
+                <strong>Release Readiness Impact</strong>
+                <mat-chip-set>
+                  <mat-chip *ngIf="resolutionProgress.controlImpact.possibleReadinessImprovement === 'BLOCKED_TO_WARNING'"
+                            style="background: #ffebee; color: #c62828">
+                    {{ resolutionProgress.controlImpact.blockedDisclosureCount }} disclosure(s) blocking controls
+                  </mat-chip>
+                  <mat-chip *ngIf="resolutionProgress.controlImpact.possibleReadinessImprovement === 'WARNING_TO_READY'"
+                            style="background: #fff3e0; color: #e65100">
+                    Resolution may clear warnings
+                  </mat-chip>
+                </mat-chip-set>
+              </div>
+              <div class="affected-controls">
+                <span class="controls-label">Affected Controls:</span>
+                <mat-chip-set>
+                  <mat-chip *ngFor="let ctrl of resolutionProgress.controlImpact.likelyAffectedControls">
+                    {{ ctrl }}
+                  </mat-chip>
+                </mat-chip-set>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+            <h3>Disclosures Requiring Resolution</h3>
+            <div *ngFor="let disc of resolutionProgress.disclosures" class="resolution-disc-row"
+                 [class.resolved]="disc.childCoverageStatus === 'FULL'"
+                 [class.partial]="disc.childCoverageStatus === 'PARTIAL'"
+                 [class.unresolved]="disc.childCoverageStatus === 'NONE'">
+              <div class="disc-info">
+                <mat-icon [style.color]="disc.childCoverageStatus === 'FULL' ? '#4caf50' : disc.childCoverageStatus === 'PARTIAL' ? '#ff9800' : '#f44336'">
+                  {{ disc.childCoverageStatus === 'FULL' ? 'check_circle' : disc.childCoverageStatus === 'PARTIAL' ? 'timelapse' : 'radio_button_unchecked' }}
+                </mat-icon>
+                <div class="disc-text">
+                  <strong>{{ disc.label }}</strong>
+                  <span class="disc-code">{{ disc.disclosureId }}</span>
+                </div>
+                <div class="disc-controls" *ngIf="disc.affectedControls && disc.affectedControls.length > 0">
+                  <mat-chip-set>
+                    <mat-chip *ngFor="let ctrl of disc.affectedControls"
+                              style="font-size: 11px; height: 22px; background: #fff3e0; color: #e65100">
+                      {{ ctrl }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </div>
+              </div>
+              <div class="disc-metrics">
+                <span>{{ disc.resolvedRows }}/{{ disc.totalRows }} rows</span>
+                <span>{{ disc.resolutionPercent }}%</span>
+                <span *ngIf="disc.unresolvedAmount > 0" class="unresolved-amount">
+                  {{ formatRand(disc.unresolvedAmount) }} unresolved
+                </span>
+              </div>
+              <div class="disc-actions">
+                <button mat-stroked-button color="primary" (click)="openResolveDisclosure(disc.disclosureId)"
+                        *ngIf="disc.childCoverageStatus !== 'FULL'">
+                  <mat-icon>account_tree</mat-icon> Resolve
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="resolutionProgress && resolutionProgress.overallResolutionPercent >= 80" style="display:flex;justify-content:flex-end;margin-top:16px">
+            <button mat-raised-button color="primary" (click)="goToCompilation()">
+              <mat-icon>assessment</mat-icon> Go to Compilation
+            </button>
+          </div>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Diagnostics">
+        <div class="tab-content diagnostic-tab">
+          <div *ngIf="diagnosticsLoading" class="loading-state">
+            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+            <p>Generating diagnostics...</p>
+          </div>
+
+          <div *ngIf="!diagnosticsLoading && diagnostics.length > 0" class="diagnostics-container">
+            <div class="diagnostic-header">
+              <h3>Root Cause Diagnostics</h3>
+              <span class="diagnostic-count">{{ diagnostics.length }} diagnostic(s) generated</span>
+              <button mat-stroked-button color="primary" (click)="loadDiagnostics()">
+                <mat-icon>refresh</mat-icon> Refresh
+              </button>
+            </div>
+
+            <div class="diagnostic-cards">
+              <mat-card *ngFor="let diag of diagnostics" class="diagnostic-card" [class.selected]="selectedDiagnostic?.diagnosticType === diag.diagnosticType">
+                <mat-card-header>
+                  <span class="sfp-severity-chip" [style.background]="getDiagnosticSeverityColor(diag.severity)">{{ diag.severity }}</span>
+                  <mat-card-title>{{ getDiagnosticTypeLabel(diag.diagnosticType) }}</mat-card-title>
+                  <mat-card-subtitle>{{ diag.findingCode }} — {{ diag.title }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="diagnostic-summary-row">
+                    <span class="diagnostic-metric"><strong>Affected Value:</strong> {{ formatRand(diag.totalAffectedValue) }}</span>
+                    <span class="diagnostic-metric"><strong>Rows:</strong> {{ diag.rowCount }}</span>
+                  </div>
+                  <p class="diagnostic-root-cause">{{ diag.rootCauseSummary }}</p>
+
+                  <div *ngIf="diag.segmentBreakdown" class="segment-breakdown">
+                    <h4>Segment Breakdown</h4>
+                    <div class="segment-grid">
+                      <div class="segment-item"><span class="segment-label">IA (Assets)</span> <span>{{ formatRand(diag.segmentBreakdown.IA) }}</span></div>
+                      <div class="segment-item"><span class="segment-label">IL (Liabilities)</span> <span>{{ formatRand(diag.segmentBreakdown.IL) }}</span></div>
+                      <div class="segment-item"><span class="segment-label">LN (Net Assets)</span> <span>{{ formatRand(diag.segmentBreakdown.LN) }}</span></div>
+                      <div class="segment-item"><span class="segment-label">IE/IR/IZ (Transfers)</span> <span>{{ formatRand(diag.segmentBreakdown.IE_IR_IZ_transfer) }}</span></div>
+                    </div>
+                  </div>
+
+                  <div *ngIf="diag.expectedTransfer !== undefined" class="transfer-summary">
+                    <h4>Transfer Reconciliation</h4>
+                    <div class="segment-grid">
+                      <div class="segment-item"><span class="segment-label">Expected (IE/IR/IZ)</span> <span>{{ formatRand(diag.expectedTransfer) }}</span></div>
+                      <div class="segment-item"><span class="segment-label">Actual (LN001)</span> <span>{{ formatRand(diag.actualTransfer) }}</span></div>
+                      <div class="segment-item"><span class="segment-label">Gap</span> <span class="diagnostic-gap">{{ formatRand(diag.transferGap) }}</span></div>
+                    </div>
+                  </div>
+
+                  <div *ngIf="diag.topContributors && diag.topContributors.length > 0" class="top-contributors">
+                    <h4>Top Contributors</h4>
+                    <table class="diagnostic-table">
+                      <thead>
+                        <tr>
+                          <th>SCOA Code</th>
+                          <th>Description</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let tc of diag.topContributors.slice(0, 5)"
+                            [class.clickable-row]="tc.mappingRunRowId"
+                            (click)="navigateToContributor(tc)">
+                          <td class="mono">{{ tc.scoaItemCode }}</td>
+                          <td>{{ tc.sortDesc }}</td>
+                          <td class="amount">{{ formatRand(tc.currentYearAmount) }}</td>
+                          <td><span class="status-badge">{{ tc.matchStatus }}</span></td>
+                          <td>
+                            <mat-icon *ngIf="tc.mappingRunRowId" class="nav-icon">open_in_new</mat-icon>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p *ngIf="diag.topContributors.length > 5" class="more-link">and {{ diag.topContributors.length - 5 }} more...</p>
+                  </div>
+
+                  <div *ngIf="diag.groupedBreakdowns" class="grouped-breakdowns">
+                    <mat-expansion-panel *ngFor="let groupKey of objectKeys(diag.groupedBreakdowns)">
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>{{ groupKey }}</mat-panel-title>
+                        <mat-panel-description>{{ diag.groupedBreakdowns[groupKey].length }} groups</mat-panel-description>
+                      </mat-expansion-panel-header>
+                      <table class="diagnostic-table">
+                        <thead>
+                          <tr>
+                            <th>Group</th>
+                            <th>Rows</th>
+                            <th>Value</th>
+                            <th>%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let gb of diag.groupedBreakdowns[groupKey]">
+                            <td>{{ gb.groupLabel }}</td>
+                            <td>{{ gb.rowCount }}</td>
+                            <td class="amount">{{ formatRand(gb.totalValue) }}</td>
+                            <td>{{ gb.percentOfTotal }}%</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </mat-expansion-panel>
+                  </div>
+
+                  <div *ngIf="diag.suggestedActions && diag.suggestedActions.length > 0" class="suggested-actions">
+                    <h4>Suggested Actions</h4>
+                    <div *ngFor="let action of diag.suggestedActions"
+                         class="action-item"
+                         [class.clickable-action]="action.targetType"
+                         (click)="navigateToAction(action)">
+                      <span class="action-priority">{{ action.priority }}</span>
+                      <div class="action-content">
+                        <strong>{{ action.action }}</strong>
+                        <span class="action-category-chip">{{ action.category }}</span>
+                        <p>{{ action.detail }}</p>
+                      </div>
+                      <mat-icon *ngIf="action.targetType" class="nav-icon">arrow_forward</mat-icon>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+
+          <div *ngIf="!diagnosticsLoading && diagnostics.length === 0" class="empty-state">
+            <mat-icon>analytics</mat-icon>
+            <p>No diagnostic data available. Diagnostics are generated when validation findings exist.</p>
+            <button mat-stroked-button color="primary" (click)="loadDiagnostics()">Generate Diagnostics</button>
+          </div>
+        </div>
+      </mat-tab>
+      <mat-tab label="Mapping Studio">
+        <div class="tab-content">
+          <app-advanced-mapping
+            *ngIf="selectedRun"
+            [runId]="selectedRun.id"
+            [runStatus]="selectedRun.status"
+            (mappingApplied)="onAdvancedMappingApplied()">
+          </app-advanced-mapping>
+        </div>
+      </mat-tab>
+
+      <!-- TAB: Audit Report -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon style="margin-right:4px;font-size:18px;width:18px;height:18px">summarize</mat-icon>
+          Audit Report
+        </ng-template>
+        <div class="tab-content">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button mat-raised-button color="primary" (click)="loadAuditReport()" [disabled]="auditReportLoading">
+                <mat-icon>refresh</mat-icon> {{ auditReport ? 'Refresh' : 'Generate' }} Report
+              </button>
+              <button mat-raised-button (click)="exportAuditReport()" [disabled]="!auditReport || auditReportLoading">
+                <mat-icon>download</mat-icon> Export Excel
+              </button>
+            </div>
+            <div *ngIf="auditReport" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <mat-form-field appearance="outline" style="min-width:180px" subscriptSizing="dynamic">
+                <mat-label>Statement Group</mat-label>
+                <mat-select [(ngModel)]="auditStatementFilter" (ngModelChange)="applyAuditFilters()">
+                  <mat-option value="">All</mat-option>
+                  @for (sg of auditReport.summary.statementGroups; track sg) {
+                    <mat-option [value]="sg">{{ sg }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" style="min-width:160px" subscriptSizing="dynamic">
+                <mat-label>Audit Status</mat-label>
+                <mat-select [(ngModel)]="auditStatusFilter" (ngModelChange)="applyAuditFilters()">
+                  <mat-option value="">All</mat-option>
+                  <mat-option value="SUGGESTED">Suggested</mat-option>
+                  <mat-option value="ACCEPTED">Accepted</mat-option>
+                  <mat-option value="OVERRIDDEN">Overridden</mat-option>
+                  <mat-option value="UNMAPPED">Unmapped</mat-option>
+                  <mat-option value="CONFLICT">Conflict</mat-option>
+                  <mat-option value="EXCLUDED">Excluded</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <mat-progress-bar *ngIf="auditReportLoading" mode="indeterminate"></mat-progress-bar>
+
+          <!-- Summary Cards -->
+          <div *ngIf="auditReport" class="audit-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+            <div style="background:#e3f2fd;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#1565c0">{{ auditReport.summary.totalSourceRows | number }}</div>
+              <div style="font-size:12px;color:#1565c0">Total Rows</div>
+            </div>
+            <div style="background:#e8f5e9;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#2e7d32">{{ auditReport.summary.mappedRows | number }}</div>
+              <div style="font-size:12px;color:#2e7d32">Mapped</div>
+            </div>
+            <div style="background:#fff3e0;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#e65100">{{ auditReport.summary.unmappedRows | number }}</div>
+              <div style="font-size:12px;color:#e65100">Unmapped</div>
+            </div>
+            <div style="background:#fce4ec;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#c62828">{{ auditReport.summary.conflictRows | number }}</div>
+              <div style="font-size:12px;color:#c62828">Conflicts</div>
+            </div>
+            <div style="background:#f3e5f5;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#6a1b9a">{{ auditReport.summary.excludedRows | number }}</div>
+              <div style="font-size:12px;color:#6a1b9a">Excluded</div>
+            </div>
+            <div style="background:#e0f2f1;border-radius:8px;padding:12px;text-align:center">
+              <div style="font-size:22px;font-weight:600;color:#00695c">{{ auditReport.summary.coveragePercent }}%</div>
+              <div style="font-size:12px;color:#00695c">Coverage</div>
+            </div>
+          </div>
+
+          <!-- Amount Totals -->
+          <div *ngIf="auditReport" style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font-weight:500;color:#616161">CY Total:</span>
+              <span style="font-weight:600;color:#1565c0">{{ auditReport.summary.totalCurrentYear | number:'1.2-2' }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font-weight:500;color:#616161">PY Total:</span>
+              <span style="font-weight:600;color:#424242">{{ auditReport.summary.totalPriorYear | number:'1.2-2' }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font-weight:500;color:#616161">Budget Total:</span>
+              <span style="font-weight:600;color:#424242">{{ auditReport.summary.totalBudget | number:'1.2-2' }}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font-weight:500;color:#616161">Disclosures:</span>
+              <span style="font-weight:600">{{ auditReport.summary.disclosureCount }}</span>
+            </div>
+          </div>
+
+          <!-- Disclosure Summary Table -->
+          <div *ngIf="auditReport">
+            <h3 style="margin:0 0 8px;color:#424242;font-size:15px;font-weight:500">Disclosure Summary</h3>
+            <div style="overflow-x:auto;margin-bottom:24px">
+              <table mat-table [dataSource]="filteredDisclosureSummaries" class="disclosure-table" style="width:100%">
+                <ng-container matColumnDef="statementGroup">
+                  <th mat-header-cell *matHeaderCellDef>Statement</th>
+                  <td mat-cell *matCellDef="let d">{{ d.statementGroup || '-' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="disclosureId">
+                  <th mat-header-cell *matHeaderCellDef>Disclosure ID</th>
+                  <td mat-cell *matCellDef="let d" style="font-family:monospace;font-size:12px">{{ d.disclosureId }}</td>
+                </ng-container>
+                <ng-container matColumnDef="disclosureLineLabel">
+                  <th mat-header-cell *matHeaderCellDef>Label</th>
+                  <td mat-cell *matCellDef="let d">{{ d.disclosureLineLabel }}</td>
+                </ng-container>
+                <ng-container matColumnDef="sourceRowCount">
+                  <th mat-header-cell *matHeaderCellDef>Rows</th>
+                  <td mat-cell *matCellDef="let d" style="text-align:right">{{ d.sourceRowCount }}</td>
+                </ng-container>
+                <ng-container matColumnDef="currentYearTotal">
+                  <th mat-header-cell *matHeaderCellDef>CY Total</th>
+                  <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.currentYearTotal | number:'1.2-2' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="priorYearTotal">
+                  <th mat-header-cell *matHeaderCellDef>PY Total</th>
+                  <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.priorYearTotal | number:'1.2-2' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="budgetTotal">
+                  <th mat-header-cell *matHeaderCellDef>Budget Total</th>
+                  <td mat-cell *matCellDef="let d" class="amount-cell">{{ d.budgetTotal | number:'1.2-2' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="statusBreakdown">
+                  <th mat-header-cell *matHeaderCellDef>Status Breakdown</th>
+                  <td mat-cell *matCellDef="let d">
+                    <span *ngIf="d.suggestedCount" style="color:#1565c0;margin-right:6px" matTooltip="Suggested">S:{{ d.suggestedCount }}</span>
+                    <span *ngIf="d.acceptedCount" style="color:#2e7d32;margin-right:6px" matTooltip="Accepted">A:{{ d.acceptedCount }}</span>
+                    <span *ngIf="d.overriddenCount" style="color:#6a1b9a;margin-right:6px" matTooltip="Overridden">O:{{ d.overriddenCount }}</span>
+                    <span *ngIf="d.unmappedCount" style="color:#e65100;margin-right:6px" matTooltip="Unmapped">U:{{ d.unmappedCount }}</span>
+                    <span *ngIf="d.conflictCount" style="color:#c62828;margin-right:6px" matTooltip="Conflict">C:{{ d.conflictCount }}</span>
+                    <span *ngIf="d.excludedCount" style="color:#757575;margin-right:6px" matTooltip="Excluded">X:{{ d.excludedCount }}</span>
+                    <span style="color:#37474f;font-size:11px" matTooltip="Auto-mapped / Manual override">{{ d.autoMappedCount || 0 }}a / {{ d.manualOverrideCount || 0 }}m</span>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="expand">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let d">
+                    <button mat-icon-button (click)="toggleAuditDisclosure(d.disclosureId)" matTooltip="Show source rows">
+                      <mat-icon>{{ expandedAuditDisclosure === d.disclosureId ? 'expand_less' : 'expand_more' }}</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="auditSummaryCols"></tr>
+                <tr mat-row *matRowDef="let row; columns: auditSummaryCols"
+                    [style.background]="expandedAuditDisclosure === row.disclosureId ? '#e3f2fd' : ''"></tr>
+              </table>
+            </div>
+
+            <!-- Expanded Detail Rows for selected disclosure -->
+            <div *ngIf="expandedAuditDisclosure && expandedAuditDetailRows.length > 0"
+                 style="background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:24px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h4 style="margin:0;color:#1565c0">Source Rows for: {{ expandedAuditDisclosureLabel }}</h4>
+                <button mat-icon-button (click)="expandedAuditDisclosure = ''" matTooltip="Close">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div style="overflow-x:auto">
+                <table mat-table [dataSource]="expandedAuditDetailRows" style="width:100%">
+                  <ng-container matColumnDef="auditStatus">
+                    <th mat-header-cell *matHeaderCellDef>Status</th>
+                    <td mat-cell *matCellDef="let r">
+                      <span [style.color]="getAuditStatusColor(r.auditStatus)" style="font-weight:500">{{ r.auditStatus }}</span>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="mappingMethod">
+                    <th mat-header-cell *matHeaderCellDef>Method</th>
+                    <td mat-cell *matCellDef="let r">{{ r.mappingMethod }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="scoaItemCode">
+                    <th mat-header-cell *matHeaderCellDef>mSCOA Code</th>
+                    <td mat-cell *matCellDef="let r" style="font-family:monospace;font-size:12px">{{ r.scoaItemCode }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="sortDesc">
+                    <th mat-header-cell *matHeaderCellDef>Description</th>
+                    <td mat-cell *matCellDef="let r" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.sortDesc || r.scoaItemDescription }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="currentYearAmount">
+                    <th mat-header-cell *matHeaderCellDef>CY Amount</th>
+                    <td mat-cell *matCellDef="let r" class="amount-cell">{{ r.currentYearAmount | number:'1.2-2' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="priorYearAmount">
+                    <th mat-header-cell *matHeaderCellDef>PY Amount</th>
+                    <td mat-cell *matCellDef="let r" class="amount-cell">{{ r.priorYearAmount | number:'1.2-2' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="budgetAmount">
+                    <th mat-header-cell *matHeaderCellDef>Budget</th>
+                    <td mat-cell *matCellDef="let r" class="amount-cell">{{ r.budgetAmount | number:'1.2-2' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="matchConfidence">
+                    <th mat-header-cell *matHeaderCellDef>Confidence</th>
+                    <td mat-cell *matCellDef="let r">
+                      <span *ngIf="r.matchConfidence" [style.color]="r.matchConfidence === 'high' ? '#2e7d32' : '#e65100'" style="font-weight:500">{{ r.matchConfidence }}</span>
+                      <span *ngIf="!r.matchConfidence">-</span>
+                    </td>
+                  </ng-container>
+                  <ng-container matColumnDef="matchReason">
+                    <th mat-header-cell *matHeaderCellDef>Match Reason</th>
+                    <td mat-cell *matCellDef="let r" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.matchReason || r.ruleSummary || '-' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="matchedRuleId">
+                    <th mat-header-cell *matHeaderCellDef>Rule</th>
+                    <td mat-cell *matCellDef="let r" style="font-family:monospace;font-size:11px">{{ r.matchedRuleId || '-' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="latestDecisionType">
+                    <th mat-header-cell *matHeaderCellDef>Decision</th>
+                    <td mat-cell *matCellDef="let r">{{ r.latestDecisionType || '-' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="latestDecisionBy">
+                    <th mat-header-cell *matHeaderCellDef>By</th>
+                    <td mat-cell *matCellDef="let r" style="font-size:12px">{{ r.latestDecisionBy || '-' }}</td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="auditDetailCols"></tr>
+                  <tr mat-row *matRowDef="let row; columns: auditDetailCols"></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="!auditReport && !auditReportLoading" class="empty-state">
+            <mat-icon>summarize</mat-icon>
+            <p>Click "Generate Report" to build the Mapping Disclosure Source Audit Report for this run.</p>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+
+    <!-- Resolve Disclosure View -->
+    <div *ngIf="resolveDisclosureId" class="resolve-disclosure-overlay">
+      <app-resolve-disclosure
+        [runId]="selectedRun.id"
+        [disclosureId]="resolveDisclosureId"
+        [runStatus]="selectedRun.status"
+        (closed)="closeResolveDisclosure()"
+        (applied)="onBulkApplyCompleted()">
+      </app-resolve-disclosure>
+    </div>
+
+    <!-- Override Dialog -->
+    <div *ngIf="overrideDialogOpen" class="sfp-dialog-overlay" (click)="closeOverrideDialog()">
+      <div class="sfp-dialog" (click)="$event.stopPropagation()">
+        <div class="sfp-dialog-header">
+          <h3>Create SFP Validation Override</h3>
+          <button mat-icon-button (click)="closeOverrideDialog()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="sfp-dialog-body">
+          <div class="sfp-dialog-finding-summary">
+            <span class="sfp-severity-chip" [style.background]="getSeverityColor(overrideFinding?.severity)">{{ overrideFinding?.severity }}</span>
+            <strong>{{ overrideFinding?.code }}</strong>: {{ overrideFinding?.title }}
+          </div>
+          <p class="sfp-dialog-detail">{{ overrideFinding?.detail }}</p>
+
+          <div *ngIf="overrideFinding?.actualValue != null" class="sfp-dialog-amount">
+            Affected Amount: <strong>{{ formatRand(overrideFinding?.actualValue) }}</strong>
+          </div>
+
+          <div *ngIf="sfpValidation?.overrideGovernance" class="sfp-dialog-aggregate-warning">
+            <mat-icon>warning</mat-icon>
+            <span>Current aggregate override exposure: {{ formatRand(sfpValidation.overrideGovernance.cumulativeOverrideValue) }}
+              ({{ sfpValidation.overrideGovernance.overrideCount }} active overrides, risk tier: {{ sfpValidation.overrideGovernance.overrideRiskTier }})</span>
+          </div>
+
+          <mat-form-field appearance="outline" class="sfp-dialog-field">
+            <mat-label>Reason Category</mat-label>
+            <mat-select [(ngModel)]="overrideReasonCategory">
+              <mat-option value="timing">Timing Difference</mat-option>
+              <mat-option value="classification">Classification Dispute</mat-option>
+              <mat-option value="data">Data Quality Issue</mat-option>
+              <mat-option value="other">Other</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sfp-dialog-field">
+            <mat-label>Override Reason (min 20 characters)</mat-label>
+            <textarea matInput [(ngModel)]="overrideReason" rows="3" minlength="20"></textarea>
+            <mat-hint>{{ overrideReason.length }}/20 minimum characters</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sfp-dialog-field">
+            <mat-label>Supporting Note (optional)</mat-label>
+            <input matInput [(ngModel)]="overrideSupportingNote">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sfp-dialog-field">
+            <mat-label>Supporting Reference (optional)</mat-label>
+            <input matInput [(ngModel)]="overrideSupportingReference" placeholder="e.g., GRAP 1.23, Council Resolution 456">
+          </mat-form-field>
+
+          <div class="sfp-dialog-ack">
+            <mat-checkbox [(ngModel)]="overrideAggregateAcknowledged">
+              I confirm I have reviewed the aggregate override exposure and accept the governance implications
+            </mat-checkbox>
+          </div>
+          <div *ngIf="sfpValidation?.overrideGovernance?.overrideRiskTier === 'HIGH_RISK' || overrideFinding?.severity === 'BLOCK'" class="sfp-dialog-ack">
+            <mat-checkbox [(ngModel)]="overrideHighRiskAcknowledged">
+              I acknowledge this override requires elevated authority ({{ overrideFinding?.severity === 'BLOCK' ? 'BLOCK-level finding' : 'HIGH_RISK aggregate tier' }})
+            </mat-checkbox>
+          </div>
+        </div>
+        <div class="sfp-dialog-actions">
+          <button mat-button (click)="closeOverrideDialog()">Cancel</button>
+          <button mat-raised-button color="primary" (click)="submitOverride()"
+                  [disabled]="loading || !overrideReason || overrideReason.length < 20 || !overrideReasonCategory || !overrideAggregateAcknowledged">
+            <mat-icon>gavel</mat-icon> Create Override
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revoke Dialog -->
+    <div *ngIf="revokeDialogOpen" class="sfp-dialog-overlay" (click)="closeRevokeDialog()">
+      <div class="sfp-dialog sfp-dialog-small" (click)="$event.stopPropagation()">
+        <div class="sfp-dialog-header">
+          <h3>Revoke Override</h3>
+          <button mat-icon-button (click)="closeRevokeDialog()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="sfp-dialog-body">
+          <p>Revoking this override will reinstate the original validation finding. If the mapping run is approved, the approval will be invalidated.</p>
+          <mat-form-field appearance="outline" class="sfp-dialog-field">
+            <mat-label>Revocation Reason</mat-label>
+            <textarea matInput [(ngModel)]="revokeReason" rows="2"></textarea>
+          </mat-form-field>
+        </div>
+        <div class="sfp-dialog-actions">
+          <button mat-button (click)="closeRevokeDialog()">Cancel</button>
+          <button mat-raised-button color="warn" (click)="submitRevoke()" [disabled]="loading || !revokeReason">
+            <mat-icon>undo</mat-icon> Revoke Override
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+</div>

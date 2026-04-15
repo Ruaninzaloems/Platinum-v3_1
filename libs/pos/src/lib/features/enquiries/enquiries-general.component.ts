@@ -1,0 +1,7366 @@
+import { Component, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../core/services/api.service';
+import { ToastService } from '../../core/services/toast.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ExportService, ExportOptions } from '../../services/export.service';
+import { firstValueFrom } from 'rxjs';
+
+interface SearchCriteria {
+  [key: string]: string | undefined;
+  accountNo?: string;
+  oldAccountCode?: string;
+  name?: string;
+  idNo?: string;
+  passportNumber?: string;
+  locationAddress?: string;
+  mobileNumber?: string;
+  physicalMeterNumber?: string;
+  emailAddress?: string;
+  sgNumber?: string;
+  erfNumber?: string;
+}
+
+interface SearchResult {
+  account_ID: number;
+  accountID: number;
+  accountNumber: string;
+  oldAccountCode: string;
+  name: string;
+  surname_Company: string;
+  initials: string;
+  idRegistrationNumber: string;
+  deliveryAddress: string;
+  locationAddress: string;
+  address: string;
+  statusDesc: string;
+  accountStatus: string;
+  accountDesc: string;
+  accountType: string;
+  outStandingAmt: number;
+  outStandingAmount: number;
+  addName: string;
+  contactDetails: string;
+  unitID: number;
+  unitPartitionID: number;
+  sgNumber: string;
+  propertyID: string;
+  [key: string]: any;
+}
+
+interface SearchField {
+  key: string;
+  label: string;
+  placeholder: string;
+  icon: string;
+}
+
+interface TabItem {
+  value: string;
+  label: string;
+  icon: string;
+}
+
+interface TabGroup {
+  heading: string;
+  tabs: TabItem[];
+}
+
+interface RiskFlag {
+  id: string;
+  label: string;
+  detail: string;
+  severity: 'critical' | 'warning' | 'info';
+  icon: string;
+}
+
+@Component({
+  selector: 'app-enquiries-general',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './enquiries-general.component.html',
+  styleUrl: './enquiries-general.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
+  @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
+
+  quickQuery = signal('');
+  criteria = signal<SearchCriteria>({});
+  results = signal<SearchResult[]>([]);
+  dropdownResults = signal<SearchResult[]>([]);
+  searching = signal(false);
+  dropdownSearching = signal(false);
+  searchError = signal<string | null>(null);
+  hasSearched = signal(false);
+  selectedAccount = signal<SearchResult | null>(null);
+  showAdvanced = signal(false);
+  activeTab = signal('account');
+  showDropdown = signal(false);
+  highlightIdx = signal(-1);
+  headerBalance = signal<number | null>(null);
+  globalSnapshot = signal<Record<string, any> | null>(null);
+  globalSnapshotLoading = signal(false);
+  riskFlags = signal<RiskFlag[]>([]);
+  riskFlagsLoading = signal(false);
+  expandedRowId = signal<number | null>(null);
+  expandedRowData = signal<any>(null);
+  expandedRowLoading = signal(false);
+
+  tabData = signal<any>(null);
+  tabLoading = signal(false);
+  tabError = signal<string | null>(null);
+
+  private _apiCache = new Map<string, Promise<any>>();
+  private _apiCacheAccountId: number | null = null;
+
+  private readonly NOCACHE_PATTERNS = [
+    'total-balance', 'close-balance', 'account-balance', 'payment-amount',
+    'service-type-balance', 'deposit-amount', 'outstanding', 'debt-inquiry',
+    'closing-balance', 'open-balance',
+  ];
+
+  private cachedGet<T = any>(url: string, params?: Record<string, string>): Promise<T> {
+    const isFinancial = this.NOCACHE_PATTERNS.some(p => url.includes(p));
+    const finalParams = isFinancial ? { ...params, _t: String(Date.now()) } : params;
+
+    const sortedParams = finalParams ? Object.keys(finalParams).filter(k => k !== '_t').sort().map(k => `${k}=${finalParams[k]}`).join('&') : '';
+    const key = `${url}?${sortedParams}`;
+
+    if (!isFinancial) {
+      const existing = this._apiCache.get(key);
+      if (existing) return existing;
+    }
+
+    const promise = firstValueFrom(this.api.get<T>(url, finalParams)).catch((err: any) => {
+      return { _error: true, status: err?.status, statusText: err?.statusText, detail: err?.message } as any;
+    });
+    if (!isFinancial) {
+      this._apiCache.set(key, promise);
+    }
+    return promise;
+  }
+
+  private clearApiCache(accountId?: number): void {
+    this._apiCache.clear();
+    this._apiCacheAccountId = accountId || null;
+  }
+
+  summaryFinYear = signal('');
+  summaryData = signal<any[]>([]);
+  summaryLoading = signal(false);
+  summaryError = signal<string | null>(null);
+  summaryAvailableYears = signal<string[]>([]);
+
+  bvpFinYear = signal('');
+  bvpAvailableYears = signal<string[]>([]);
+  ratesFinYear = signal('');
+  ratesAvailableYears = signal<string[]>([]);
+  summarySource = signal<'monthly' | 'aging' | ''>('');
+
+  detailFinYear = signal('');
+  detailMonth = signal('');
+  detailTransactions = signal<any[]>([]);
+  detailLoading = signal(false);
+  detailError = signal<string | null>(null);
+  detailSelectedTxn = signal<any>(null);
+  detailTxnData = signal<any>(null);
+  detailTxnLoading = signal(false);
+  detailMonths: string[] = ['July','August','September','October','November','December','January','February','March','April','May','June'];
+  exportFromMonth = signal('July');
+  exportToMonth = signal('June');
+  exportingCsv = signal(false);
+
+  consumptionSelectedMeter = signal<any>(null);
+  consumptionHistory = signal<any[]>([]);
+  consumptionAllHistory = signal<any[]>([]);
+  consumptionHistoryLoading = signal(false);
+  consumptionChartData = signal<any[]>([]);
+  consumptionInsights = signal<any>(null);
+  consumptionFinYears = signal<string[]>([]);
+  consumptionSelectedYears = signal<string[]>([]);
+  consumptionViewMode = signal<'chart' | 'table'>('chart');
+  consumptionSortCol = signal<string>('');
+  consumptionSortDir = signal<'asc' | 'desc'>('desc');
+  consumptionMonthFrom = signal<string>('');
+  consumptionMonthTo = signal<string>('');
+  consumptionShowMonthFilter = signal(false);
+
+  svcBalanceData = signal<any[]>([]);
+  svcBalanceLoading = signal(false);
+  svcBalanceError = signal('');
+  svcSelectedService = signal<any>(null);
+  svcDrilldownMode = signal<'balance' | 'purchase-history'>('balance');
+  svcPurchaseHistory = signal<any[]>([]);
+  svcPurchaseStats = signal<any>(null);
+  svcPurchaseLoading = signal(false);
+  svcBalanceFinYear = signal((() => {
+    const now = new Date();
+    const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${y}/${y + 1}`;
+  })());
+
+  consIntelligenceMonths = signal(6);
+  consIntelligenceShow = signal(true);
+  consBillingEstShow = signal(true);
+  consBillingVatRate = signal(15);
+
+  meterSelectedConv = signal<any>(null);
+  meterConvHistory = signal<any[]>([]);
+  meterConvLoading = signal(false);
+  meterConvInsights = signal<any>(null);
+  meterIntelMonths = signal(6);
+  meterIntelShow = signal(true);
+  meterEstShow = signal(true);
+  meterEstVatRate = signal(15);
+  meterSelectedPrepaid = signal<any>(null);
+  meterPrepaidSales = signal<any[]>([]);
+  meterPrepaidLoading = signal(false);
+  meterPrepaidStats = signal<any>(null);
+
+  indigentInsights = signal<any>(null);
+
+  s129FinYear = signal('');
+  s129Month = signal('');
+  s129Loading = signal(false);
+  s129Filtered = signal<any[]>([]);
+  s129Insights = signal<any>(null);
+  s129AvailableYears = signal<string[]>([]);
+
+  stmtType = signal<'standard' | 'detailed'>('standard');
+  stmtFinYear = signal('');
+  stmtMonth = signal('');
+  stmtMonthFrom = signal('');
+  stmtMonthTo = signal('');
+  stmtGenerating = signal(false);
+  stmtGenerated = signal<any>(null);
+  stmtGeneratingLink = signal(false);
+  stmtGeneratedLink = signal('');
+  stmtSending = signal(false);
+  stmtSendMode = signal<'email' | 'sms' | null>(null);
+  stmtEmail = signal('');
+  stmtPhone = signal('');
+  stmtAvailableYears = signal<string[]>([]);
+  stmtMonths: string[] = ['', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
+  stmtSendPanelOpen = signal(false);
+  stmtReportOpening = signal(false);
+  stmtFileStorageBaseUrl = signal('');
+  stmtBiEmbeddedUrl = signal('');
+  stmtBiReportUsername = signal('');
+  stmtBaseWebUrl = signal('');
+  stmtAttachment = signal<{type: string; finYear: string; monthFrom: string; monthTo: string; fileUrl?: string} | null>(null);
+  stmtAvailableEmails = signal<{email: string; label: string; selected: boolean}[]>([]);
+  stmtAvailablePhones = signal<{phone: string; label: string; selected: boolean}[]>([]);
+  stmtSubject = signal('');
+  stmtMessageBody = signal('');
+  stmtSmsBody = signal('');
+  stmtCommHistory = signal<any[]>([]);
+  stmtCommHistoryLoading = signal(false);
+  stmtSendStep = signal<'compose' | 'sent'>('compose');
+
+  commMethod = signal<'email' | 'sms'>('email');
+  commRecipient = signal('');
+  commSubject = signal('');
+  commMessage = signal('');
+  commSending = signal(false);
+  commTemplates = signal<any[]>([]);
+  commTemplatesLoading = signal(false);
+  commSelectedTemplate = signal('');
+  commShowCompose = signal(false);
+
+  linkedAccounts = signal<any[]>([]);
+  linkedAccountsLoading = signal(false);
+  linkedTotalOutstanding = signal(0);
+  linkedExpandedAcct = signal<string | null>(null);
+  linkedServicesMap = signal<Record<string, any[]>>({});
+  linkedServicesLoading = signal<string | null>(null);
+
+  propDebtAccounts = signal<any[]>([]);
+  propDebtLoading = signal(false);
+  propDebtTotals = signal<any>(null);
+  propDebtExpandedAcct = signal<string | null>(null);
+
+  receiptViewMode = signal<'list' | 'timeline'>('list');
+  receiptFilter = signal<string>('all');
+  receiptSortDir = signal<'desc' | 'asc'>('desc');
+  receiptSelectedTxn = signal<any>(null);
+  receiptDetailData = signal<any>(null);
+  receiptDetailLoading = signal(false);
+  receiptPrinting = signal<number | null>(null);
+
+  relatedAccounts = signal<any[]>([]);
+  relatedAccountsLoading = signal(false);
+  relatedAccountsSearched = signal(false);
+
+  occupiersList = signal<any[]>([]);
+  occupierAddName = signal('');
+  occupierAddId = signal('');
+  occupierAddLoading = signal(false);
+  occupierRemoveLoading = signal<number | null>(null);
+  showAddOccupierModal = signal(false);
+  showProofModal = signal(false);
+  proofData = signal<any>(null);
+  proofLoading = signal(false);
+  selectedOccupierIdx = signal<number | null>(null);
+  expandedClearanceRow = signal<number | null>(null);
+  rebuildingAccount = signal(false);
+  clearanceLinkedAccounts = signal<any[]>([]);
+
+  handoverYear = signal('');
+  handoverMonth = signal('All');
+  handoverPage = signal(1);
+  handoverPageSize = signal(50);
+  expandedLinkedRow = signal<number | null>(null);
+
+  generatingPropertyLetter = signal<string | null>(null);
+  printOverlayHtml = signal<string | null>(null);
+  printOverlayTitle = signal<string>('');
+
+  nbeLoading = signal(false);
+  nbeCalculated = signal(false);
+  nbeError = signal<string | null>(null);
+  nbeLineItems = signal<any[]>([]);
+  nbeBillingMonth = signal('');
+  nbeWarnings = signal<string[]>([]);
+
+  advancedSuggestions = signal<{ displayItem: string; accountId: number }[]>([]);
+  activeFieldKey = signal<string | null>(null);
+  advancedFieldLoading = signal(false);
+
+  private debounceTimer: any;
+  private advancedDebounceTimers: Record<string, any> = {};
+  private searchToken = 0;
+  private quickSearchToken = 0;
+  private advancedSearchToken = 0;
+  private balanceCache = new Map<number, number>();
+
+  searchFields: SearchField[] = [
+    { key: 'accountNo', label: 'Account Number', placeholder: 'e.g. 000000003698', icon: '🔢' },
+    { key: 'oldAccountCode', label: 'Old Account Code', placeholder: 'Legacy code', icon: '📄' },
+    { key: 'name', label: 'Name / Company', placeholder: 'Search by name', icon: '👤' },
+    { key: 'idNo', label: 'ID / Registration No.', placeholder: '13 digit ID number', icon: '💳' },
+    { key: 'emailAddress', label: 'Email Address', placeholder: 'user@example.com', icon: '✉️' },
+    { key: 'physicalMeterNumber', label: 'Meter Number', placeholder: 'Physical meter number', icon: '⚡' },
+    { key: 'locationAddress', label: 'Location / Erf Address', placeholder: 'Street, location or erf', icon: '📍' },
+    { key: 'mobileNumber', label: 'Mobile Number', placeholder: '0821234567', icon: '📱' },
+    { key: 'sgNumber', label: 'SG Number', placeholder: 'e.g. C027/0002/00013110/00000', icon: '🏠' },
+    { key: 'erfNumber', label: 'ERF Number', placeholder: 'e.g. 13110', icon: '🏛️' },
+  ];
+
+  tabGroups: TabGroup[] = [
+    {
+      heading: 'ACCOUNT & PARTY',
+      tabs: [
+        { value: 'account', label: 'Account', icon: '👤' },
+        { value: 'name', label: 'Name', icon: '👥' },
+        { value: 'property', label: 'Property', icon: '🏠' },
+        { value: 'linked-accounts', label: 'Linked Accts', icon: '🏢' },
+        { value: 'contact', label: 'Contact', icon: '📞' },
+        { value: 'handover', label: 'Handover', icon: '➡️' },
+      ],
+    },
+    {
+      heading: 'SERVICES & CONSUMPTION',
+      tabs: [
+        { value: 'services', label: 'Services', icon: '📊' },
+        { value: 'services-meters', label: 'Meters', icon: '⏱️' },
+        { value: 'consumption', label: 'Consumption', icon: '💧' },
+      ],
+    },
+    {
+      heading: 'FINANCIAL',
+      tabs: [
+        { value: 'balance', label: 'Balance / Debt', icon: '💳' },
+        { value: 'property-debt', label: 'Property Debt', icon: '🏘️' },
+        { value: 'txn-detailed', label: 'Transaction Detail', icon: '📋' },
+        { value: 'txn-summary', label: 'Transaction Summary', icon: '📄' },
+        { value: 'transactions', label: 'Receipts', icon: '🧾' },
+        { value: 'deposits', label: 'Deposits', icon: '💵' },
+        { value: 'payment-plans', label: 'Payment Plans', icon: '📅' },
+        { value: 'extensions', label: 'Extensions', icon: '📆' },
+        { value: 'billed-vs-paid', label: 'Billed vs Paid', icon: '📊' },
+        { value: 'next-bill', label: 'Next Bill Estimate', icon: '🧮' },
+      ],
+    },
+    {
+      heading: 'BILLING & TARIFFS',
+      tabs: [
+        { value: 'rates', label: 'Rates', icon: '⚖️' },
+        { value: 'debit-orders', label: 'Debit Orders', icon: '🏦' },
+        { value: 'statements', label: 'Statements', icon: '📄' },
+      ],
+    },
+    {
+      heading: 'COMPLIANCE & LEGAL',
+      tabs: [
+        { value: 'clearance', label: 'Clearance', icon: '🛡️' },
+        { value: 'debtor-notes', label: 'Debtor Notes', icon: '📝' },
+        { value: 'section129', label: 'Section 129', icon: '⚠️' },
+        { value: 'occupiers', label: 'Occupiers', icon: '🏘️' },
+      ],
+    },
+    {
+      heading: 'NOTIFICATIONS & SUBSIDIES',
+      tabs: [
+        { value: 'notifications', label: 'Notifications', icon: '🔔' },
+        { value: 'incentives', label: 'Incentives', icon: '🎁' },
+        { value: 'indigent', label: 'Indigent Subsidy', icon: '🛡️' },
+      ],
+    },
+  ];
+
+  mobileTabMenuOpen = signal(false);
+
+  private userFinYear = computed(() => this.auth.user()?.finYear || '');
+
+  private exportService: ExportService;
+
+  constructor(
+    private api: ApiService,
+    private toast: ToastService,
+    private auth: AuthService,
+  ) {
+    this.exportService = new ExportService();
+  }
+
+  ngOnInit(): void {}
+
+  ngOnDestroy(): void {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    Object.values(this.advancedDebounceTimers).forEach(t => clearTimeout(t));
+  }
+
+  get detectedSearchType(): { field: string; label: string } {
+    const q = this.quickQuery().trim();
+    if (/^0\d{9}$/.test(q)) return { field: 'mobileNumber', label: 'Mobile Number' };
+    if (/^\d{13}$/.test(q)) return { field: 'idNo', label: 'ID Number' };
+    if (/^[A-Z]\d{3}\/\d{4}\/\d+\/\d+$/i.test(q)) return { field: 'sgNumber', label: 'SG Number' };
+    if (/^\d{1,15}$/.test(q)) return { field: 'accountNo', label: 'Account / ERF / Meter' };
+    if (/@/.test(q)) return { field: 'emailAddress', label: 'Email Address' };
+    return { field: 'name', label: 'Name / Address' };
+  }
+
+  get currentTabLabel(): string {
+    for (const group of this.tabGroups) {
+      const tab = group.tabs.find(t => t.value === this.activeTab());
+      if (tab) return tab.label;
+    }
+    return 'Account';
+  }
+
+  get currentTabGroup(): string {
+    for (const group of this.tabGroups) {
+      if (group.tabs.some(t => t.value === this.activeTab())) return group.heading;
+    }
+    return '';
+  }
+
+  get currentTabIcon(): string {
+    for (const group of this.tabGroups) {
+      const tab = group.tabs.find(t => t.value === this.activeTab());
+      if (tab) return tab.icon;
+    }
+    return '👤';
+  }
+
+  getAccountId(account: SearchResult | null): number {
+    return account?.account_ID || account?.accountID || 0;
+  }
+
+  getAccountName(account: SearchResult | null): string {
+    const raw = (account as any)?.fullNAME || account?.name || account?.surname_Company || '';
+    return raw.trim() || '-';
+  }
+
+  getAccountNum(account: SearchResult | null): string {
+    return account?.accountNumber || String(account?.accountID || account?.account_ID || '');
+  }
+
+  isAccountActive(account: SearchResult | null): boolean {
+    return (account?.accountStatus || account?.statusDesc || '').toLowerCase() === 'active';
+  }
+
+  formatCurrency(v: any): string {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    if (isNaN(n)) return '-';
+    return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  getObjectEntries(obj: any): { key: string; value: any }[] {
+    if (!obj || typeof obj !== 'object') return [];
+    return Object.entries(obj)
+      .filter(([k]) => !k.startsWith('_'))
+      .map(([key, value]) => ({ key, value }));
+  }
+
+  camelToLabel(key: string): string {
+    return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+  }
+
+  formatAutoValue(val: any): string {
+    if (val === null || val === undefined || val === '') return '-';
+    if (typeof val === 'number') return this.formatCurrency(val);
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    return String(val);
+  }
+
+  getBillingCycleDisplay(): string {
+    const p = this.getAccountProp();
+    const b = this.getAccountBasic();
+    const cycle = p['billingCycle'] || p['billingCycleDesc'] || b['billingCycle'] || b['billingCycleDesc'];
+    if (cycle) return cycle;
+    const cycleDesc = p['cycleDescription'] || b['cycleDescription'];
+    if (cycleDesc) return `1 ${cycleDesc}`;
+    const cycleId = p['billingCycleID'] || b['billingCycleID'];
+    if (cycleId) return `${cycleId} Consumer Account Cycle`;
+    return '-';
+  }
+
+  getRegistrationStatusDisplay(): string {
+    const p = this.getAccountProp();
+    const regStatus = p['registrationStatus'] || p['regStatus'];
+    if (regStatus === true || regStatus === 'true' || regStatus === 1 || regStatus === '1') return 'Registered';
+    if (typeof regStatus === 'string' && regStatus.length > 0) return regStatus;
+    if (p['rollNumber']) return 'Registered';
+    return '-';
+  }
+
+  formatDepositDisplay(v: any): string {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    if (isNaN(n)) return '-';
+    return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatDate(v: any): string {
+    if (!v) return '-';
+    try {
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return String(v);
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    } catch {
+      return String(v);
+    }
+  }
+
+  safeStr(v: any): string {
+    if (v === null || v === undefined || v === '' || v === 'null') return '-';
+    return this.stripHtml(String(v).trim()) || '-';
+  }
+
+  stripHtml(text: string): string {
+    if (!text) return text;
+    return text
+      .replace(/<br\s*\/?>/gi, ', ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/(\s*,\s*)+/g, ', ')
+      .replace(/^\s*,\s*/g, '')
+      .replace(/,\s*$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  isStatusActive(val: any): boolean {
+    if (!val) return false;
+    const s = String(val).trim().toLowerCase();
+    if (!s || s === 'none' || s === '-' || s === 'n/a') return false;
+    if (s.includes('no ') || s.includes('not ') || s === 'inactive' || s === 'none') return false;
+    return true;
+  }
+
+  formatYesNo(v: any): string {
+    if (v === null || v === undefined || v === '') return '-';
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    const s = String(v).trim().toLowerCase();
+    if (s === 'true' || s === 'yes' || s === 'y' || s === '1') return 'Yes';
+    if (s === 'false' || s === 'no' || s === 'n' || s === '0') return 'No';
+    return String(v).trim() || '-';
+  }
+
+  getObjectKeys(obj: any): string[] {
+    if (!obj || typeof obj !== 'object') return [];
+    return Object.keys(obj).sort();
+  }
+
+  isNumericValue(v: any): boolean {
+    if (v === null || v === undefined || v === '') return false;
+    return !isNaN(Number(v)) && typeof v !== 'boolean';
+  }
+
+  isCurrencyField(key: string): boolean {
+    const lower = key.toLowerCase();
+    return lower.includes('value') || lower.includes('amount') || lower.includes('rate') || lower.includes('rebate') || lower.includes('balance') || lower.includes('charge') || lower.includes('cost') || lower.includes('price') || lower.includes('tariff');
+  }
+
+  isDateField(key: string): boolean {
+    const lower = key.toLowerCase();
+    return lower.includes('date') || lower.endsWith('_dt') || lower.endsWith('on');
+  }
+
+  onQuickQueryChange(val: string): void {
+    this.quickQuery.set(val);
+    this.highlightIdx.set(-1);
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (val.trim().length >= 2) {
+      this.showDropdown.set(true);
+      this.dropdownSearching.set(true);
+      this.debounceTimer = setTimeout(() => this.doQuickSearch(val), 300);
+    } else {
+      this.showDropdown.set(false);
+      this.dropdownResults.set([]);
+      this.dropdownSearching.set(false);
+    }
+  }
+
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Request timeout')), ms)),
+    ]);
+  }
+
+  async doQuickSearch(query: string): Promise<void> {
+    if (query.trim().length < 2) {
+      this.dropdownResults.set([]);
+      this.dropdownSearching.set(false);
+      return;
+    }
+    const token = ++this.quickSearchToken;
+    this.dropdownSearching.set(true);
+    const { field } = this.detectedSearchType;
+    const num = query.trim();
+    const seen = new Set<number>();
+    const merged: SearchResult[] = [];
+
+    const body: Record<string, any> = {};
+    if (field === 'accountNo') body['accountID'] = num;
+    else if (field === 'name') body['companyName'] = num;
+    else if (field === 'idNo') body['idRegistrationNumber'] = num;
+    else if (field === 'emailAddress') body['emailAddress'] = num;
+    else if (field === 'mobileNumber') body['mobileNumber'] = num;
+    else if (field === 'sgNumber') body['sgNumber'] = num;
+    else body[field] = num;
+
+    const acType = this.getAutocompleteType(field);
+
+    const processAutocompleteSuggestions = (data: any) => {
+      const suggestions = this.normalizeArray(data);
+      for (const s of suggestions) {
+        if (s.accountId && s.accountId > 0 && !seen.has(s.accountId)) {
+          seen.add(s.accountId);
+          const display = s.displayItem || '';
+          const parts = display.split(' - ');
+          const acctNum = parts[0]?.trim() || '';
+          const rest = parts.slice(1).join(' - ').trim();
+          const nameParts = rest.split(',');
+          const name = nameParts[0]?.trim() || '';
+          const address = nameParts.slice(1).join(',').trim() || '';
+          merged.push({
+            account_ID: s.accountId,
+            accountID: s.accountId,
+            accountNumber: acctNum || String(s.accountId).padStart(12, '0'),
+            name: name,
+            surname_Company: name,
+            locationAddress: address,
+            _fromAutocomplete: true,
+          } as unknown as SearchResult);
+        }
+      }
+    };
+
+    const processResults = (data: any) => {
+      const arr = this.normalizeArray(data);
+      for (const item of arr) {
+        const id = item.account_ID || item.accountID;
+        if (id && !seen.has(id)) { seen.add(id); merged.push(item); }
+      }
+    };
+
+    try {
+      const acPromise = this.withTimeout(firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/autocomplete', { search: num, type: acType })), 5000);
+      let acPromise2: Promise<any> | null = null;
+      if (/^\d{4,}$/.test(num) && field === 'accountNo') {
+        acPromise2 = this.withTimeout(firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/autocomplete', { search: num, type: 'erfNumber' })), 5000);
+      }
+
+      const acResults = await Promise.allSettled(acPromise2 ? [acPromise, acPromise2] : [acPromise]);
+      if (this.quickSearchToken !== token) return;
+
+      for (const r of acResults) {
+        if (r.status === 'fulfilled') processAutocompleteSuggestions(r.value);
+      }
+
+      if (merged.length > 0) {
+        this.dropdownResults.set([...merged]);
+        this.showDropdown.set(true);
+        this.dropdownSearching.set(false);
+        this.enrichAutocompleteResults(merged, token);
+      }
+
+      const enquiryPromise = this.withTimeout(firstValueFrom(this.api.post<any>('/api/platinum/billing-enquiry/enquiry-results', body)), 10000);
+      let enquiryPromise2: Promise<any> | null = null;
+      if (/^\d{4,}$/.test(num) && field === 'accountNo') {
+        enquiryPromise2 = this.withTimeout(firstValueFrom(this.api.post<any>('/api/platinum/billing-enquiry/enquiry-results', { oldAccount: num })), 10000);
+      }
+
+      const enquiryResults = await Promise.allSettled(enquiryPromise2 ? [enquiryPromise, enquiryPromise2] : [enquiryPromise]);
+      if (this.quickSearchToken !== token) return;
+
+      let addedFromEnquiry = false;
+      for (const r of enquiryResults) {
+        if (r.status === 'fulfilled') {
+          const before = merged.length;
+          processResults(r.value);
+          if (merged.length > before) addedFromEnquiry = true;
+        }
+      }
+
+      if (addedFromEnquiry || merged.length > 0) {
+        this.dropdownResults.set([...merged]);
+        this.showDropdown.set(true);
+        this.enrichAutocompleteResults(merged, token);
+      }
+    } catch (e: any) {
+      if (this.quickSearchToken === token && merged.length === 0) this.dropdownResults.set([]);
+    } finally {
+      if (this.quickSearchToken === token) this.dropdownSearching.set(false);
+    }
+  }
+
+  private async enrichAutocompleteResults(results: SearchResult[], token: number): Promise<void> {
+    const autocompleteItems = results.filter((r: any) => r._fromAutocomplete || (!r.name && !r.surname_Company && !(r as any).fullNAME));
+    const allItems = results.slice(0, 10);
+
+    const enrichPromises = autocompleteItems.slice(0, 10).map(async (item) => {
+      try {
+        const id = item.account_ID || item.accountID;
+        if (!id) return;
+        const basic = await this.withTimeout(
+          firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${id}`)), 6000
+        );
+        if (this.quickSearchToken !== token) return;
+        if (basic && !basic._error) {
+          if (basic.fullNAME) { item.name = basic.fullNAME.trim(); (item as any).fullNAME = basic.fullNAME; }
+          if (basic.fullAddress) item.locationAddress = basic.fullAddress;
+          if (basic.deliveryAddress) item.deliveryAddress = basic.deliveryAddress;
+          if (basic.accountStatus) item.accountStatus = basic.accountStatus;
+          if (basic.accountNumber) item.accountNumber = basic.accountNumber;
+          if (basic.accountDesc) item.accountDesc = basic.accountDesc;
+          if (basic.sgNumber) item.sgNumber = basic.sgNumber;
+          if (basic.propertyID) (item as any).propertyID = basic.propertyID;
+          if (basic.unitPartitionID) (item as any).unitPartitionID = basic.unitPartitionID;
+          if (basic.oldAccountCode) item.oldAccountCode = basic.oldAccountCode;
+          if (basic.creditStatusDesc) item['creditStatusDesc'] = basic.creditStatusDesc;
+          delete (item as any)._fromAutocomplete;
+        }
+      } catch {}
+    });
+
+    const balancePromises = allItems.slice(0, 10).map(async (item) => {
+      try {
+        const id = item.account_ID || item.accountID;
+        if (!id) return;
+        const bal = await this.withTimeout(this.fetchAccountBalance(id), 8000);
+        if (this.quickSearchToken !== token) return;
+        if (Array.isArray(bal)) {
+          const total = bal.reduce((sum: number, s: any) => sum + (s.totalOutStanding ?? s.totalOutstandingAmount ?? s.totalOutstanding ?? s.outstandingBalance ?? s.closingBalance ?? s.closeBalance ?? 0), 0);
+          item.outStandingAmount = total;
+        } else if (bal) {
+          const amount = bal.totalOutStanding ?? bal.totalBalance ?? bal.totalOutstanding ?? bal.balance ?? bal.outstandingAmount ?? bal.outStandingAmount ?? bal.closingBalance ?? bal.closeBalance;
+          if (amount != null) item.outStandingAmount = Number(amount);
+        }
+      } catch {}
+    });
+
+    const enrichDone = Promise.allSettled(enrichPromises).then(() => {
+      if (this.quickSearchToken === token) this.dropdownResults.set([...this.dropdownResults()]);
+    });
+    const balDone = Promise.allSettled(balancePromises).then(() => {
+      if (this.quickSearchToken === token) this.dropdownResults.set([...this.dropdownResults()]);
+    });
+    await Promise.allSettled([enrichDone, balDone]);
+  }
+
+  getAutocompleteType(field: string): string {
+    const map: Record<string, string> = {
+      accountNo: 'accountNumber',
+      name: 'nameCompany',
+      idNo: 'idRegistrationNumber',
+      emailAddress: 'email',
+      physicalMeterNumber: 'physicalMeterNumber',
+      oldAccountCode: 'oldAccountCode',
+      locationAddress: 'locationAddress',
+      erfNumber: 'erfNumber',
+      sgNumber: 'erfNumber',
+      mobileNumber: 'mobileNumber',
+    };
+    return map[field] || 'accountNumber';
+  }
+
+  normalizeArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (data?.value && Array.isArray(data.value)) return data.value;
+    if (data?.results && Array.isArray(data.results)) return data.results;
+    if (data?.items && Array.isArray(data.items)) return data.items;
+    if (data && typeof data === 'object' && !data._error) return [data];
+    return [];
+  }
+
+  async handleFullSearch(): Promise<void> {
+    const q = this.quickQuery().trim();
+    const c = this.criteria();
+    const hasQuick = q.length >= 2;
+    const hasAdvanced = Object.values(c).some(v => v && String(v).trim());
+    if (!hasQuick && !hasAdvanced) return;
+
+    if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
+    ++this.quickSearchToken;
+    this.dropdownSearching.set(false);
+    this.showDropdown.set(false);
+    this.dropdownResults.set([]);
+    this.highlightIdx.set(-1);
+
+    this.searching.set(true);
+    this.searchError.set(null);
+    this.hasSearched.set(true);
+    this.balanceCache.clear();
+    const token = ++this.searchToken;
+
+    try {
+      const body: Record<string, any> = {};
+      if (hasQuick) {
+        const { field } = this.detectedSearchType;
+        if (field === 'accountNo') body['accountID'] = q;
+        else if (field === 'name') body['companyName'] = q;
+        else if (field === 'idNo') body['idRegistrationNumber'] = q;
+        else if (field === 'emailAddress') body['emailAddress'] = q;
+        else if (field === 'mobileNumber') body['mobileNumber'] = q;
+        else if (field === 'sgNumber') body['sgNumber'] = q;
+        else body[field] = q;
+      }
+      if (c.accountNo) body['accountID'] = c.accountNo;
+      if (c.oldAccountCode) body['oldAccount'] = c.oldAccountCode;
+      if (c.name) body['companyName'] = c.name;
+      if (c.idNo) body['idRegistrationNumber'] = c.idNo;
+      if (c.locationAddress) body['locationAddress'] = c.locationAddress;
+      if (c.mobileNumber) body['mobileNumber'] = c.mobileNumber;
+      if (c.physicalMeterNumber) body['physicalMeterNumber'] = c.physicalMeterNumber;
+      if (c.emailAddress) body['emailAddress'] = c.emailAddress;
+      if (c.sgNumber) body['sgNumber'] = c.sgNumber;
+      if (c.erfNumber) body['erfNumber'] = c.erfNumber;
+
+      let data: any;
+      try {
+        data = await this.withTimeout(
+          firstValueFrom(this.api.post<any>('/api/platinum/billing-enquiry/enquiry-results', body)),
+          20000
+        );
+      } catch {
+        data = null;
+      }
+      if (this.searchToken !== token) return;
+      let arr = this.normalizeArray(data);
+
+      if (arr.length === 0 && body['accountID']) {
+        const acctId = body['accountID'].replace(/^0+/, '') || body['accountID'];
+        try {
+          const basic = await this.withTimeout(
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${acctId}`)), 8000
+          );
+          if (this.searchToken !== token) return;
+          if (basic && !basic._error) {
+            arr = [{
+              account_ID: basic.account_ID || parseInt(acctId, 10),
+              accountID: basic.account_ID || parseInt(acctId, 10),
+              accountNumber: basic.accountNumber || '',
+              name: (basic.fullNAME || '').trim(),
+              fullNAME: basic.fullNAME,
+              surname_Company: (basic.fullNAME || '').trim(),
+              locationAddress: basic.fullAddress || '',
+              deliveryAddress: basic.deliveryAddress || '',
+              accountStatus: basic.accountStatus || '',
+              accountDesc: basic.accountDesc || '',
+              sgNumber: basic.sgNumber || '',
+              propertyID: basic.propertyID || '',
+              unitPartitionID: basic.unitPartitionID || '',
+              oldAccountCode: basic.oldAccountCode || '',
+              creditStatusDesc: basic.creditStatusDesc || '',
+            }] as any[];
+          }
+        } catch {}
+      }
+
+      const sanitized = arr.map((a: any) => a.contactDetails ? { ...a, contactDetails: this.stripHtml(a.contactDetails) } : a);
+      this.results.set(sanitized);
+      if (sanitized.length === 0) {
+        this.searchError.set('No accounts found matching your search.');
+      } else {
+        this.enrichBalances(sanitized, token);
+      }
+    } catch (e: any) {
+      if (this.searchToken === token) {
+        const msg = e?.error?.message || e?.message || 'Search failed';
+        this.searchError.set(msg);
+        this.results.set([]);
+      }
+    } finally {
+      if (this.searchToken === token) this.searching.set(false);
+    }
+  }
+
+  async enrichBalances(accounts: SearchResult[], token: number): Promise<void> {
+    const toFetch = accounts.filter(a => {
+      const id = a.account_ID || a.accountID;
+      return id && !this.balanceCache.has(id);
+    }).slice(0, 10);
+
+    for (const acct of toFetch) {
+      if (this.searchToken !== token) return;
+      const id = acct.account_ID || acct.accountID;
+      if (!id) continue;
+      try {
+        const bal = await this.fetchAccountBalance(id);
+        if (bal) {
+          let total: number | undefined;
+          if (Array.isArray(bal)) {
+            total = bal.reduce((sum: number, svc: any) => sum + (svc.totalOutStanding ?? svc.totalOutstanding ?? svc.totalOutstandingAmount ?? svc.outstandingBalance ?? svc.closingBalance ?? svc.closeBalance ?? 0), 0);
+          } else {
+            total = bal.totalBalance ?? bal.totalOutstanding ?? bal.totalOutStanding ?? bal.outStandingAmount ?? bal.outstandingBalance ?? bal.closingBalance ?? bal.closeBalance ?? bal.balance;
+          }
+          if (total !== undefined && total !== null) {
+            this.balanceCache.set(id, total);
+          }
+        }
+      } catch {}
+    }
+
+    if (this.searchToken === token) {
+      this.results.update(prev => prev.map(acct => {
+        const id = acct.account_ID || acct.accountID;
+        const cached = id ? this.balanceCache.get(id) : undefined;
+        return cached !== undefined ? { ...acct, outStandingAmount: cached } : acct;
+      }));
+    }
+  }
+
+  selectAccount(account: SearchResult): void {
+    this.selectedAccount.set(account);
+    this.activeTab.set('account');
+    this.showDropdown.set(false);
+    this.mobileTabMenuOpen.set(false);
+    const id = this.getAccountId(account);
+    if (id) {
+      this.clearApiCache(id);
+      this.globalSnapshotLoading.set(true);
+      this.globalSnapshot.set(null);
+      this.riskFlagsLoading.set(true);
+      this.riskFlags.set([]);
+      this.loadHeaderBalance(id);
+      this.loadTabData('account', id);
+    }
+  }
+
+  backToResults(): void {
+    this.selectedAccount.set(null);
+    this.headerBalance.set(null);
+    this.globalSnapshot.set(null);
+    this.riskFlags.set([]);
+    this.tabData.set(null);
+  }
+
+  clearSearch(): void {
+    this.quickQuery.set('');
+    this.criteria.set({});
+    this.results.set([]);
+    this.dropdownResults.set([]);
+    this.hasSearched.set(false);
+    this.searchError.set(null);
+    this.selectedAccount.set(null);
+    this.globalSnapshot.set(null);
+    this.showDropdown.set(false);
+    this.highlightIdx.set(-1);
+    this.showAdvanced.set(false);
+    this.searching.set(false);
+    this.dropdownSearching.set(false);
+    this.advancedSuggestions.set([]);
+    this.activeFieldKey.set(null);
+    this.advancedFieldLoading.set(false);
+    ++this.searchToken;
+    ++this.quickSearchToken;
+    ++this.advancedSearchToken;
+  }
+
+  onQuickKeyDown(event: KeyboardEvent): void {
+    const dr = this.dropdownResults();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.highlightIdx.update(prev => Math.min(prev + 1, Math.min(dr.length - 1, 19)));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.highlightIdx.update(prev => Math.max(prev - 1, -1));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
+      ++this.quickSearchToken;
+      this.dropdownSearching.set(false);
+      this.showDropdown.set(false);
+      const idx = this.highlightIdx();
+      if (idx >= 0 && idx < dr.length) {
+        this.selectAccount(dr[idx]);
+      } else {
+        this.handleFullSearch();
+      }
+    } else if (event.key === 'Escape') {
+      this.showDropdown.set(false);
+      this.highlightIdx.set(-1);
+    }
+  }
+
+  updateCriteria(key: string, value: string): void {
+    this.criteria.update(prev => ({ ...prev, [key]: value }));
+    if (this.advancedDebounceTimers[key]) clearTimeout(this.advancedDebounceTimers[key]);
+    if (value.trim().length >= 2) {
+      this.activeFieldKey.set(key);
+      this.advancedFieldLoading.set(true);
+      this.advancedDebounceTimers[key] = setTimeout(() => this.doAdvancedAutocomplete(key, value), 350);
+    } else {
+      if (this.activeFieldKey() === key) {
+        this.activeFieldKey.set(null);
+        this.advancedSuggestions.set([]);
+        this.advancedFieldLoading.set(false);
+      }
+    }
+  }
+
+  async doAdvancedAutocomplete(fieldKey: string, value: string): Promise<void> {
+    const token = ++this.advancedSearchToken;
+    const acType = this.getAutocompleteType(fieldKey);
+    try {
+      const data = await firstValueFrom(
+        this.api.get<any>('/api/platinum/billing-enquiry/autocomplete', { search: value.trim(), type: acType })
+      );
+      if (this.advancedSearchToken !== token) return;
+      const arr = this.normalizeArray(data);
+      const suggestions = arr
+        .filter((s: any) => s.displayItem && s.accountId)
+        .slice(0, 15)
+        .map((s: any) => ({ displayItem: s.displayItem, accountId: s.accountId }));
+      this.advancedSuggestions.set(suggestions);
+      this.activeFieldKey.set(fieldKey);
+    } catch {
+      if (this.advancedSearchToken === token) {
+        this.advancedSuggestions.set([]);
+      }
+    } finally {
+      if (this.advancedSearchToken === token) {
+        this.advancedFieldLoading.set(false);
+      }
+    }
+  }
+
+  selectAdvancedSuggestion(fieldKey: string, suggestion: { displayItem: string; accountId: number }): void {
+    const display = suggestion.displayItem || '';
+    const parts = display.split(' - ');
+    const val = parts[0]?.trim() || String(suggestion.accountId);
+    this.criteria.update(prev => ({ ...prev, [fieldKey]: val }));
+    this.activeFieldKey.set(null);
+    this.advancedSuggestions.set([]);
+  }
+
+  closeAdvancedSuggestions(): void {
+    this.activeFieldKey.set(null);
+    this.advancedSuggestions.set([]);
+  }
+
+  toggleAdvanced(): void {
+    this.showAdvanced.update(v => !v);
+  }
+
+  setActiveTab(tab: string): void {
+    this.activeTab.set(tab);
+    this.mobileTabMenuOpen.set(false);
+    const account = this.selectedAccount();
+    if (account) {
+      const id = this.getAccountId(account);
+      if (id) this.loadTabData(tab, id);
+    }
+  }
+
+  toggleMobileTabMenu(): void {
+    this.mobileTabMenuOpen.update(v => !v);
+  }
+
+  closeMobileTabMenu(): void {
+    this.mobileTabMenuOpen.set(false);
+  }
+
+  closeDropdown(): void {
+    this.showDropdown.set(false);
+  }
+
+  toggleExpandRow(id: number): void {
+    if (this.expandedRowId() === id) {
+      this.expandedRowId.set(null);
+      this.expandedRowData.set(null);
+    } else {
+      this.expandedRowId.set(id);
+      this.expandedRowData.set(null);
+      this.loadExpandedRowData(id);
+    }
+  }
+
+  async loadExpandedRowData(accountId: number): Promise<void> {
+    this.expandedRowLoading.set(true);
+    try {
+      const [balanceRes, contactRes, servicesRes] = await Promise.allSettled([
+        this.withTimeout(this.fetchAccountBalance(accountId), 15000),
+        this.withTimeout(firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details/${accountId}`)), 12000),
+        this.withTimeout(firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/all-services/${accountId}`)), 12000),
+      ]);
+
+      if (this.expandedRowId() !== accountId) return;
+
+      const allFailed = balanceRes.status === 'rejected' && contactRes.status === 'rejected' && servicesRes.status === 'rejected';
+      if (allFailed) {
+        this.expandedRowData.set({ error: true });
+        return;
+      }
+
+      const balance = balanceRes.status === 'fulfilled'
+        ? (Array.isArray(balanceRes.value) ? balanceRes.value : balanceRes.value ? [balanceRes.value] : [])
+        : [];
+      const contact = contactRes.status === 'fulfilled' ? contactRes.value : null;
+      const services = servicesRes.status === 'fulfilled' ? this.normalizeArray(servicesRes.value) : [];
+      const balanceFailed = balanceRes.status === 'rejected';
+
+      let totalOutstanding = 0;
+      let totalCurrent = 0;
+      let totalArrears = 0;
+      for (const b of balance) {
+        totalOutstanding += b.totalOutStanding ?? b.totalOutstandingAmount ?? 0;
+        totalCurrent += b.current ?? 0;
+        totalArrears += (b.days30 ?? 0) + (b.days60 ?? 0) + (b.days90 ?? 0) + (b.days120 ?? 0) + (b.days150 ?? 0);
+      }
+
+      this.expandedRowData.set({
+        balance,
+        contact,
+        services: services.slice(0, 6),
+        totalOutstanding,
+        totalCurrent,
+        totalArrears,
+        activeServices: services.filter((s: any) => (s.serviceStatus || s.statusDesc || s.status || '').toLowerCase() === 'active').length,
+        totalServices: services.length,
+        balanceFailed,
+        contactFailed: contactRes.status === 'rejected',
+        servicesFailed: servicesRes.status === 'rejected',
+      });
+    } catch {
+      if (this.expandedRowId() === accountId) {
+        this.expandedRowData.set({ error: true });
+      }
+    } finally {
+      if (this.expandedRowId() === accountId) {
+        this.expandedRowLoading.set(false);
+      }
+    }
+  }
+
+  getOutstanding(account: SearchResult): number {
+    return account.outStandingAmount ?? account.outStandingAmt ?? 0;
+  }
+
+  async loadHeaderBalance(accountId: number): Promise<void> {
+    this.headerBalance.set(null);
+    try {
+      const bal = await this.fetchAccountBalance(accountId);
+      if (Array.isArray(bal)) {
+        const total = bal.reduce((sum: number, s: any) => sum + (s.totalOutStanding ?? s.outstandingBalance ?? 0), 0);
+        this.headerBalance.set(total);
+      } else {
+        const total = bal?.totalBalance ?? bal?.totalDue ?? bal?.balance ?? bal?.outstandingBalance ?? null;
+        if (total !== null && total !== undefined) this.headerBalance.set(Number(total));
+      }
+    } catch {}
+  }
+
+  private _loadTabGeneration = 0;
+
+  async loadTabData(tab: string, accountId: number): Promise<void> {
+    const generation = ++this._loadTabGeneration;
+    this.tabLoading.set(true);
+    this.tabError.set(null);
+
+    try {
+      let data: any = null;
+      switch (tab) {
+        case 'account':
+          const acctFinYear = this.userFinYear() || this.getCurrentFinYear();
+          const acctFyParam: Record<string, string> = acctFinYear ? { finYear: acctFinYear } : {};
+          const acctForPRS: any = this.selectedAccount();
+          const acctUnitPartForSearch = acctForPRS?.unitPartitionID || acctForPRS?.unitPartition_ID;
+
+          const fastPromises = Promise.allSettled([
+            this.cachedGet(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/account-info-result/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/get-contact-details/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/cons-unit-by-account`, { AccountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`, acctFyParam),
+            this.cachedGet(`/api/platinum/billing-enquiry/deposit-amount`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-account-management/account-information`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/receipt-prepaid/cons-account-details`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/attp-application-history/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/repayment-plan-status/${accountId}`),
+          ]);
+
+          const slowPromises = Promise.allSettled([
+            this.cachedGet(`/api/platinum/billing-enquiry/property-details-by-account/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/consumption-units/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/sectional-title-scheme`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/property-rates-search`, {
+              finYear: acctFinYear || this.getCurrentFinYear(),
+              accountId: String(Number(accountId) || accountId),
+              ...(acctUnitPartForSearch ? { unitPartitionId: String(Number(acctUnitPartForSearch) || acctUnitPartForSearch) } : {}),
+              pageSize: '50'
+            }),
+            this.cachedGet(`/api/platinum/billing-account-management/account-details`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/handover-info/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/name-info/${accountId}`),
+          ]);
+
+          const [basic, accountInfo, acctContactInfo, acctConsUnitById, acctRates, acctDepositAmt, acctMgmt, acctConsDetails, acctAttpHistory, acctRppStatus] = await fastPromises;
+          const basicVal = basic.status === 'fulfilled' ? (Array.isArray(basic.value) ? basic.value[0] : basic.value) : null;
+          const airVal = accountInfo.status === 'fulfilled' ? (Array.isArray(accountInfo.value) ? accountInfo.value[0] : accountInfo.value) : null;
+          let acctPropVal: any = null;
+          const acctContactVal = acctContactInfo.status === 'fulfilled' ? (Array.isArray(acctContactInfo.value) ? acctContactInfo.value[0] : acctContactInfo.value) : null;
+          let acctConsUnitVal: any = null;
+          const acctConsUnitByIdVal = acctConsUnitById.status === 'fulfilled' ? (Array.isArray(acctConsUnitById.value) ? acctConsUnitById.value[0] : acctConsUnitById.value) : null;
+          if (acctConsUnitByIdVal && !acctConsUnitByIdVal._error) {
+            if (!acctConsUnitVal) acctConsUnitVal = acctConsUnitByIdVal;
+          }
+          const acctRatesVal = acctRates.status === 'fulfilled' ? (Array.isArray(acctRates.value) ? acctRates.value[0] : acctRates.value) : null;
+          const acctMgmtVal = acctMgmt.status === 'fulfilled' ? (Array.isArray(acctMgmt.value) ? acctMgmt.value[0] : acctMgmt.value) : null;
+          let acctSectTitleVal: any = null;
+          const mergedBasic = { ...basicVal, ...airVal };
+          if (acctDepositAmt.status === 'fulfilled' && acctDepositAmt.value != null) {
+            const depVal = acctDepositAmt.value;
+            const depAmount = typeof depVal === 'number' ? depVal : Number(depVal?.totalDeposit ?? depVal?.amount ?? depVal?.depositAmount ?? depVal) || 0;
+            mergedBasic['paidDepositAmount'] = depAmount;
+          }
+          if (acctContactVal) {
+            const phone = acctContactVal.contactNo || acctContactVal.contactNumber || acctContactVal.cellPhoneNo || acctContactVal.cellPhone || acctContactVal.tel_Mobile || acctContactVal.tel_Work || acctContactVal.tel_Home || '';
+            if (phone) mergedBasic['contactNo'] = phone;
+            const em = acctContactVal.emailId || acctContactVal.email || acctContactVal.emailAddress || '';
+            if (em) mergedBasic['emailId'] = em;
+            if (!mergedBasic['tel_Home'] && acctContactVal.tel_Home) mergedBasic['tel_Home'] = acctContactVal.tel_Home;
+            if (!mergedBasic['tel_Work'] && acctContactVal.tel_Work) mergedBasic['tel_Work'] = acctContactVal.tel_Work;
+            if (!mergedBasic['tel_Mobile'] && acctContactVal.tel_Mobile) mergedBasic['tel_Mobile'] = acctContactVal.tel_Mobile;
+            if (!mergedBasic['fax'] && acctContactVal.fax) mergedBasic['fax'] = acctContactVal.fax;
+          }
+          let acctPropFinal = acctPropVal && !acctPropVal._error ? { ...acctPropVal } : {};
+          if (!acctPropVal || acctPropVal._error) {
+            if (basicVal) {
+              if (basicVal.sgNumber) acctPropFinal['sgNumber'] = basicVal.sgNumber;
+              if (basicVal.propertyID) acctPropFinal['propertyId'] = basicVal.propertyID;
+              if (basicVal.unitPartitionID) acctPropFinal['unitPartitionID'] = basicVal.unitPartitionID;
+              if (basicVal.longitude) acctPropFinal['longitude'] = basicVal.longitude;
+              if (basicVal.latitude) acctPropFinal['latitude'] = basicVal.latitude;
+              if (basicVal.fullAddress) acctPropFinal['locationAddress'] = basicVal.fullAddress;
+              if (basicVal.creditStatusDesc) acctPropFinal['propertyStatus'] = basicVal.creditStatusDesc;
+              if (!acctPropFinal['propertyStatus'] && basicVal.accountStatus) acctPropFinal['propertyStatus'] = basicVal.accountStatus;
+              if (basicVal.solvencyDesc) acctPropFinal['solvencyDesc'] = basicVal.solvencyDesc;
+            }
+            if (airVal) {
+              if (airVal.propertyStreet) acctPropFinal['propertyStreet'] = airVal.propertyStreet;
+              if (airVal.zoneDesc) acctPropFinal['zoneDesc'] = airVal.zoneDesc;
+              if (airVal.isMasterProperty) acctPropFinal['isMasterProperty'] = airVal.isMasterProperty;
+              if (airVal.typeOfUseDesc) acctPropFinal['typeOfUseDesc'] = airVal.typeOfUseDesc;
+              if (airVal.owner) acctPropFinal['owner'] = airVal.owner;
+              if (airVal.streetName) acctPropFinal['streetName'] = airVal.streetName;
+              if (airVal.streenNumber) acctPropFinal['streetNumber'] = airVal.streenNumber;
+              if (airVal.town) acctPropFinal['town'] = airVal.town;
+              if (airVal.suburb) acctPropFinal['suburb'] = airVal.suburb;
+              if (airVal.postalCode) acctPropFinal['postalCode'] = airVal.postalCode;
+              if (airVal.sgNumber && !acctPropFinal['sgNumber']) acctPropFinal['sgNumber'] = airVal.sgNumber;
+              if (!acctPropFinal['locationAddress'] && airVal.streetName) {
+                acctPropFinal['locationAddress'] = [airVal.streenNumber, airVal.streetName, airVal.suburb, airVal.town].filter(Boolean).join(', ');
+              }
+            }
+            acctPropFinal['_fallback'] = true;
+          }
+          if (acctConsUnitByIdVal && !acctConsUnitByIdVal._error) {
+            const cuByIdFieldMap: Record<string, string[]> = {
+              'propertyStatus': ['propertyStatus', 'PropertyStatus', 'statusDesc', 'StatusDesc'],
+              'marketValue': ['marketValue', 'MarketValue', 'propertyMarketValue', 'PropertyMarketValue'],
+              'valuationCategory': ['valuationCategory', 'ValuationCategory', 'valuationCat', 'ValuationCat'],
+              'partitionDescription': ['partitionDescription', 'PartitionDescription', 'partitionDesc', 'PartitionDesc', 'description', 'Description'],
+              'partitionMarketValue': ['partitionMarketValue', 'PartitionMarketValue', 'partMarketValue', 'PartMarketValue'],
+              'billingCycleID': ['billingCycleID', 'BillingCycleID', 'billingCycleId'],
+              'cycleDescription': ['cycleDescription', 'CycleDescription', 'billingCycleDesc', 'billingCycle'],
+              'allotmentArea': ['allotmentArea', 'AllotmentArea', 'allotment', 'Allotment'],
+              'town': ['town', 'Town'],
+              'suburb': ['suburb', 'Suburb', 'subSuburb', 'nonStandAddSuburb'],
+              'farmName': ['farmName', 'FarmName', 'farm', 'Farm'],
+              'magisterialDistrict': ['magisterialDistrict', 'MagisterialDistrict', 'magisterialID', 'magDistrict'],
+              'ward': ['ward', 'Ward'],
+              'registrationStatus': ['registrationStatus', 'RegistrationStatus', 'regStatus'],
+              'oldPropertyCode': ['oldPropertyCode', 'OldPropertyCode', 'oldPropCode', 'oldAccountCode'],
+              'sectionalTitleScheme': ['sectionalTitleScheme', 'SectionalTitleScheme', 'sectionalTitleSchemeName', 'sectionalTitle'],
+              'sectionNumber': ['sectionNumber', 'SectionNumber', 'unitNumber', 'UnitNumber'],
+              'propertyCategory': ['propertyCategory', 'PropertyCategory', 'category', 'Category'],
+              'propertyType': ['propertyType', 'PropertyType', 'typeOfUse', 'TypeOfUse', 'typeofUse'],
+              'typeOfUseDesc': ['typeOfUseDesc', 'TypeOfUseDesc'],
+              'accountableOwnerName': ['accountableOwnerName', 'AccountableOwnerName', 'ownerName', 'OwnerName'],
+              'rollNumber': ['rollNumber', 'RollNumber'],
+              'longitude': ['longitude', 'Longitude', 'gpsLong'],
+              'latitude': ['latitude', 'Latitude', 'gpsLat'],
+              'erfNumber': ['erfNumber', 'ErfNumber', 'erf'],
+              'portion': ['portion', 'Portion'],
+              'standSize': ['standSize', 'StandSize'],
+              'unitPartitionID': ['unitPartitionID', 'unitPartition_ID'],
+            };
+            for (const [target, sources] of Object.entries(cuByIdFieldMap)) {
+              if (acctPropFinal[target] != null && acctPropFinal[target] !== '') continue;
+              for (const src of sources) {
+                if (acctConsUnitByIdVal[src] != null && acctConsUnitByIdVal[src] !== '') {
+                  acctPropFinal[target] = acctConsUnitByIdVal[src];
+                  break;
+                }
+              }
+            }
+          }
+          if (acctConsUnitVal && !acctConsUnitVal._error) {
+            const cuFieldMap: Record<string, string[]> = {
+              'propertyStatus': ['propertyStatus', 'PropertyStatus', 'statusDesc', 'StatusDesc'],
+              'marketValue': ['marketValue', 'MarketValue', 'propertyMarketValue', 'PropertyMarketValue'],
+              'valuationCategory': ['valuationCategory', 'ValuationCategory', 'valuationCat', 'ValuationCat'],
+              'partitionDescription': ['partitionDescription', 'PartitionDescription', 'partitionDesc', 'PartitionDesc'],
+              'partitionMarketValue': ['partitionMarketValue', 'PartitionMarketValue', 'partMarketValue', 'PartMarketValue'],
+              'billingCycleID': ['billingCycleID', 'BillingCycleID', 'billingCycleId', 'BillingCycleId'],
+              'cycleDescription': ['cycleDescription', 'CycleDescription', 'billingCycleDesc', 'BillingCycleDesc', 'billingCycle', 'BillingCycle'],
+              'allotmentArea': ['allotmentArea', 'AllotmentArea', 'allotment', 'Allotment'],
+              'town': ['town', 'Town'],
+              'farmName': ['farmName', 'FarmName', 'farm', 'Farm'],
+              'magisterialDistrict': ['magisterialDistrict', 'MagisterialDistrict', 'magDistrict', 'MagDistrict'],
+              'ward': ['ward', 'Ward'],
+              'registrationStatus': ['registrationStatus', 'RegistrationStatus', 'regStatus', 'RegStatus'],
+              'oldPropertyCode': ['oldPropertyCode', 'OldPropertyCode', 'oldPropCode', 'OldPropCode', 'oldAccountCode', 'OldAccountCode'],
+              'sectionalTitleScheme': ['sectionalTitleScheme', 'SectionalTitleScheme', 'sectionalTitle', 'SectionalTitle'],
+              'propertyCategory': ['propertyCategory', 'PropertyCategory', 'category', 'Category'],
+              'propertyType': ['propertyType', 'PropertyType', 'typeOfUse', 'TypeOfUse', 'typeofUse'],
+              'accountableOwnerName': ['accountableOwnerName', 'AccountableOwnerName', 'ownerName', 'OwnerName'],
+              'rollNumber': ['rollNumber', 'RollNumber'],
+              'longitude': ['longitude', 'Longitude', 'gpsLong', 'GpsLong'],
+              'latitude': ['latitude', 'Latitude', 'gpsLat', 'GpsLat'],
+            };
+            for (const [target, sources] of Object.entries(cuFieldMap)) {
+              if (acctPropFinal[target] != null && acctPropFinal[target] !== '') continue;
+              for (const src of sources) {
+                if (acctConsUnitVal[src] != null && acctConsUnitVal[src] !== '') {
+                  acctPropFinal[target] = acctConsUnitVal[src];
+                  break;
+                }
+              }
+            }
+          }
+          if (acctRatesVal && !acctRatesVal._error) {
+            const rtFieldMap: Record<string, string[]> = {
+              'marketValue': ['marketValue', 'MarketValue', 'propertyMarketValue', 'PropertyMarketValue'],
+              'valuationCategory': ['valuationCategory', 'ValuationCategory', 'valuationCat', 'ValuationCat'],
+              'propertyStatus': ['propertyStatus', 'PropertyStatus', 'statusDesc', 'StatusDesc'],
+              'partitionMarketValue': ['partitionMarketValue', 'PartitionMarketValue', 'partMarketValue', 'PartMarketValue'],
+              'partitionDescription': ['partitionDescription', 'PartitionDescription', 'partitionDesc', 'PartitionDesc'],
+              'propertyCategory': ['propertyCategory', 'PropertyCategory', 'category', 'Category'],
+              'cycleDescription': ['billingCycle', 'BillingCycle', 'billingCycleDesc', 'BillingCycleDesc', 'cycleDescription', 'CycleDescription'],
+              'accountableOwnerName': ['accountableOwnerName', 'AccountableOwnerName', 'ownerName', 'OwnerName'],
+              'magisterialDistrict': ['magisterialDistrict', 'MagisterialDistrict', 'magDistrict', 'MagDistrict'],
+              'registrationStatus': ['registrationStatus', 'RegistrationStatus', 'regStatus', 'RegStatus'],
+            };
+            for (const [target, sources] of Object.entries(rtFieldMap)) {
+              if (acctPropFinal[target] != null && acctPropFinal[target] !== '') continue;
+              for (const src of sources) {
+                if (acctRatesVal[src] != null && acctRatesVal[src] !== '') {
+                  acctPropFinal[target] = acctRatesVal[src];
+                  break;
+                }
+              }
+            }
+          }
+          if (acctMgmtVal && !acctMgmtVal._error) {
+            if (acctMgmtVal.cycleDescription && !acctPropFinal['cycleDescription']) {
+              acctPropFinal['cycleDescription'] = acctMgmtVal.cycleDescription;
+            }
+            if (acctMgmtVal.billingCycleID && !acctPropFinal['billingCycleID']) {
+              acctPropFinal['billingCycleID'] = acctMgmtVal.billingCycleID;
+            }
+          }
+          if (acctSectTitleVal && !acctSectTitleVal._error) {
+            const stName = acctSectTitleVal.schemeName || acctSectTitleVal.description || acctSectTitleVal.sectionalTitleSchemeName || acctSectTitleVal.name;
+            if (stName && !acctPropFinal['sectionalTitleScheme']) {
+              acctPropFinal['sectionalTitleScheme'] = stName;
+            }
+          }
+          const acctConsDetailsVal = acctConsDetails.status === 'fulfilled' ? (Array.isArray(acctConsDetails.value) ? acctConsDetails.value[0] : acctConsDetails.value) : null;
+          if (acctConsDetailsVal && !acctConsDetailsVal._error) {
+            const statusFields = [
+              'interestWaiverStatus', 'interestWaiverDesc', 'interestWaiver',
+              'indigentSubsidyStatus', 'indigentSubsidy', 'indigentStatus', 'attpStatus',
+              'consumerRppStatus', 'consumerRPPStatus', 'consumerRpp',
+              'loanRppStatus', 'loanRPPStatus', 'loanRpp',
+              'rebateStatus', 'rebateStatusDesc', 'rebate',
+              'handoverStatus', 'handoverStatusDesc', 'handover',
+              'departmentalAccount', 'departmentalAccountDesc', 'isDepartmental',
+              'incentiveSchemeCode', 'incentiveSchemeDesc',
+              'creditStatus', 'creditStatusDesc',
+              'notificationStatus', 'notificationStatusDesc',
+              'solvencyStatus', 'solvencyDesc',
+            ];
+            for (const k of statusFields) {
+              if (acctConsDetailsVal[k] != null && acctConsDetailsVal[k] !== '' && !mergedBasic[k]) {
+                mergedBasic[k] = acctConsDetailsVal[k];
+              }
+            }
+          }
+          if (airVal && !acctPropFinal['town'] && airVal.town) {
+            acctPropFinal['town'] = airVal.town;
+          }
+          const acctUnitPartId = basicVal?.unitPartitionID || acctPropFinal?.unitPartitionID || acctConsUnitByIdVal?.unitPartitionID || acctConsUnitVal?.unitPartitionID;
+          let acctValuationData: any = null;
+          if (acctUnitPartId) {
+            try {
+              const valByUnit = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-unit`, { unitPartitionID: String(acctUnitPartId) }));
+              if (valByUnit && !valByUnit._error) {
+                acctValuationData = Array.isArray(valByUnit) ? valByUnit[0] : valByUnit;
+                if (acctValuationData?.marketValue && !acctPropFinal['marketValue']) acctPropFinal['marketValue'] = acctValuationData.marketValue;
+                if (acctValuationData?.standMarketValue && !acctPropFinal['marketValue']) acctPropFinal['marketValue'] = acctValuationData.standMarketValue;
+              }
+            } catch (e) { }
+          }
+
+          let acctAttpVal: any[] = [];
+          if (acctAttpHistory.status === 'fulfilled') {
+            const attpRaw = acctAttpHistory.value;
+            acctAttpVal = Array.isArray(attpRaw) ? attpRaw : attpRaw && !attpRaw._error ? [attpRaw] : [];
+          }
+
+          const derivedStatuses: Record<string, string> = {};
+
+          derivedStatuses['handoverStatus'] = 'N/A';
+          const acctActiveIndigent = acctAttpVal.find((r: any) => {
+            const st = (r.attpStatus || r.status || '').toLowerCase();
+            return st.includes('active') || st.includes('approved') || st.includes('registered');
+          });
+          derivedStatuses['indigentSubsidyStatus'] = acctActiveIndigent
+            ? (acctActiveIndigent.attpStatus || acctActiveIndigent.status || 'Active')
+            : (acctAttpVal.length > 0 ? (acctAttpVal[0].attpStatus || acctAttpVal[0].status || '') : '');
+
+          let acctRppStatusVal: any = null;
+          if (acctRppStatus.status === 'fulfilled') {
+            const rppRaw = acctRppStatus.value;
+            if (typeof rppRaw === 'string') {
+              acctRppStatusVal = rppRaw;
+            } else if (Array.isArray(rppRaw)) {
+              acctRppStatusVal = rppRaw;
+            } else if (rppRaw && !rppRaw._error) {
+              acctRppStatusVal = rppRaw;
+            }
+          }
+          if (typeof acctRppStatusVal === 'string') {
+            derivedStatuses['consumerRppStatus'] = acctRppStatusVal || 'N/A';
+            derivedStatuses['loanRppStatus'] = acctRppStatusVal || 'N/A';
+          } else if (Array.isArray(acctRppStatusVal) && acctRppStatusVal.length > 0) {
+            const activeConsumerRpp = acctRppStatusVal.find((r: any) => {
+              const t = (r.planType || r.repaymentPlanType || r.type || '').toLowerCase();
+              return t.includes('consumer') || t.includes('cons');
+            });
+            const activeLoanRpp = acctRppStatusVal.find((r: any) => {
+              const t = (r.planType || r.repaymentPlanType || r.type || '').toLowerCase();
+              return t.includes('loan');
+            });
+            derivedStatuses['consumerRppStatus'] = activeConsumerRpp
+              ? (activeConsumerRpp.statusDesc || activeConsumerRpp.status || activeConsumerRpp.repaymentPlanStatus || 'Active')
+              : 'N/A';
+            derivedStatuses['loanRppStatus'] = activeLoanRpp
+              ? (activeLoanRpp.statusDesc || activeLoanRpp.status || activeLoanRpp.repaymentPlanStatus || 'Active')
+              : 'N/A';
+          } else {
+            derivedStatuses['consumerRppStatus'] = 'N/A';
+            derivedStatuses['loanRppStatus'] = 'N/A';
+          }
+
+          derivedStatuses['interestWaiverStatus'] = 'No Interest Waiver on Account';
+          derivedStatuses['rebateStatus'] = 'No Rebate on Account';
+
+          data = {
+            basic: mergedBasic,
+            accountInfo: airVal,
+            property: acctPropFinal,
+            consUnit: acctConsUnitByIdVal && !acctConsUnitByIdVal._error ? acctConsUnitByIdVal : acctConsUnitVal,
+            ratesDetails: acctRatesVal && !acctRatesVal._error ? acctRatesVal : null,
+            valuationData: acctValuationData,
+            propertyRatesData: [],
+            mgmt: acctMgmtVal && !acctMgmtVal._error ? acctMgmtVal : null,
+            consDetails: acctConsDetailsVal && !acctConsDetailsVal._error ? acctConsDetailsVal : null,
+            mgmtDetails: null,
+            derivedStatuses,
+          };
+
+          {
+            const cuVal = acctConsUnitByIdVal && !acctConsUnitByIdVal._error ? acctConsUnitByIdVal : acctConsUnitVal;
+            const snapSa: any = this.selectedAccount();
+            const snap: Record<string, any> = {};
+            snap['ownerName'] = basicVal?.fullNAME || acctConsDetailsVal?.fullNAME || snapSa?.fullNAME || snapSa?.name || '';
+            snap['address'] = basicVal?.deliveryAddress ||
+              cuVal?.nonStandAddLine1 || snapSa?.fullAddress || snapSa?.address || '';
+            snap['accountType'] = acctConsDetailsVal?.accountDesc || acctMgmtVal?.accountDesc || basicVal?.accountDesc || snapSa?.accountDesc || '';
+            snap['sgNumber'] = cuVal?.sgNumber || snapSa?.sgNumber || '';
+            const sgParts = (snap['sgNumber'] || '').split('/');
+            snap['erfNumber'] = sgParts.length >= 3 ? sgParts[2].replace(/^0+/, '') || '0' : (cuVal?.erfNumber || '');
+            snap['portionNumber'] = sgParts.length >= 4 ? sgParts[3].replace(/^0+/, '') || '0' : '';
+            snap['town'] = acctConsDetailsVal?.town || cuVal?.nonStandAddSuburb || snapSa?.town || '';
+            snap['propertyType'] = this.resolvePropertyType(cuVal?.propertyTypeID, cuVal?.sgNumber, cuVal?.sectionNumber, cuVal?.farmID) || '';
+            snap['propertyCategory'] = acctConsDetailsVal?.zoneDesc || '';
+            snap['propertyTypeOfUse'] = acctConsDetailsVal?.typeOfUseDesc || '';
+            snap['billingCycle'] = acctMgmtVal?.cycleDescription || acctConsDetailsVal?.cycleDescription || cuVal?.billingCycleID || '';
+            snap['marketValue'] = acctValuationData?.marketValue || acctValuationData?.standMarketValue || cuVal?.marketValue || null;
+            snap['status'] = basicVal?.accountStatus || acctConsDetailsVal?.statusDesc || acctMgmtVal?.accountStatus || snapSa?.accountStatus || '';
+            const depRaw = acctDepositAmt.status === 'fulfilled' ? acctDepositAmt.value : null;
+            snap['depositValue'] = depRaw != null && !depRaw?._error ? (typeof depRaw === 'number' ? depRaw : Number(depRaw?.totalDeposit ?? depRaw?.amount ?? depRaw?.depositAmount ?? depRaw) || 0) : null;
+            snap['handoverStatus'] = derivedStatuses['handoverStatus'] || 'N/A';
+            snap['indigentSubsidy'] = derivedStatuses['indigentSubsidyStatus'] || '';
+            snap['consumerRpp'] = derivedStatuses['consumerRppStatus'] || 'N/A';
+            snap['rebateStatus'] = derivedStatuses['rebateStatus'] || 'No Rebate on Account';
+            snap['interestWaiver'] = derivedStatuses['interestWaiverStatus'] || 'No Interest Waiver on Account';
+            this.globalSnapshot.set(snap);
+            this.globalSnapshotLoading.set(false);
+          }
+
+          if (generation === this._loadTabGeneration) {
+            this.tabData.set(data);
+            this.tabLoading.set(false);
+          }
+
+          this.loadLinkedAccounts(accountId);
+
+          slowPromises.then((slowResults) => {
+            if (generation !== this._loadTabGeneration) return;
+            const [acctPropDetails, acctConsUnit, acctSectTitle, acctPropRatesSearch, acctMgmtDetails, acctHandover, acctNameInfo] = slowResults;
+
+            const slowPropVal = acctPropDetails.status === 'fulfilled' ? (Array.isArray(acctPropDetails.value) ? acctPropDetails.value[0] : acctPropDetails.value) : null;
+            if (slowPropVal && !slowPropVal._error) {
+              acctPropVal = slowPropVal;
+            }
+            let slowConsUnitVal = acctConsUnit.status === 'fulfilled' ? (Array.isArray(acctConsUnit.value) ? acctConsUnit.value[0] : acctConsUnit.value) : null;
+            if (slowConsUnitVal && slowConsUnitVal._error) slowConsUnitVal = null;
+            if (slowConsUnitVal && !acctConsUnitVal) acctConsUnitVal = slowConsUnitVal;
+
+            const slowSectTitleVal = acctSectTitle.status === 'fulfilled' ? (Array.isArray(acctSectTitle.value) ? acctSectTitle.value[0] : acctSectTitle.value) : null;
+            if (slowSectTitleVal && !slowSectTitleVal._error) {
+              acctSectTitleVal = slowSectTitleVal;
+              const stName = slowSectTitleVal.schemeName || slowSectTitleVal.description || slowSectTitleVal.sectionalTitleSchemeName || slowSectTitleVal.name;
+              if (stName && !acctPropFinal['sectionalTitleScheme']) acctPropFinal['sectionalTitleScheme'] = stName;
+            }
+
+            if (slowConsUnitVal && !slowConsUnitVal._error) {
+              const cuFieldMap: Record<string, string[]> = {
+                'propertyStatus': ['propertyStatus'], 'marketValue': ['marketValue'], 'town': ['town'],
+                'farmName': ['farmName'], 'registrationStatus': ['registrationStatus'], 'oldPropertyCode': ['oldPropertyCode', 'oldAccountCode'],
+                'longitude': ['longitude'], 'latitude': ['latitude'],
+              };
+              for (const [target, sources] of Object.entries(cuFieldMap)) {
+                if (acctPropFinal[target] != null && acctPropFinal[target] !== '') continue;
+                for (const src of sources) {
+                  if (slowConsUnitVal[src] != null && slowConsUnitVal[src] !== '') { acctPropFinal[target] = slowConsUnitVal[src]; break; }
+                }
+              }
+            }
+
+            if (slowPropVal && !slowPropVal._error) {
+              const propEnrichMap: Record<string, string[]> = {
+                'sgNumber': ['sgNumber'], 'propertyId': ['propertyId'], 'locationAddress': ['locationAddress'],
+                'propertyStatus': ['propertyStatus'], 'zoneDesc': ['zoneDesc'], 'typeOfUseDesc': ['typeOfUseDesc'],
+                'owner': ['owner'], 'town': ['town'], 'suburb': ['suburb'],
+              };
+              for (const [target, sources] of Object.entries(propEnrichMap)) {
+                if (acctPropFinal[target] != null && acctPropFinal[target] !== '') continue;
+                for (const src of sources) {
+                  if (slowPropVal[src] != null && slowPropVal[src] !== '') { acctPropFinal[target] = slowPropVal[src]; break; }
+                }
+              }
+            }
+
+            const acctPropRatesSearchVal = acctPropRatesSearch.status === 'fulfilled' ? acctPropRatesSearch.value : null;
+            let acctPropRatesData: any[] = acctPropRatesSearchVal?.data ? (Array.isArray(acctPropRatesSearchVal.data) ? acctPropRatesSearchVal.data : [acctPropRatesSearchVal.data]) : (Array.isArray(acctPropRatesSearchVal) ? acctPropRatesSearchVal : acctPropRatesSearchVal && !acctPropRatesSearchVal._error ? [acctPropRatesSearchVal] : []);
+
+            const slowMgmtDetailsVal = acctMgmtDetails.status === 'fulfilled' ? (Array.isArray(acctMgmtDetails.value) ? acctMgmtDetails.value[0] : acctMgmtDetails.value) : null;
+            if (slowMgmtDetailsVal && !slowMgmtDetailsVal._error) {
+              derivedStatuses['departmentalAccount'] = slowMgmtDetailsVal.departmentID != null && slowMgmtDetailsVal.departmentID !== 0 ? 'Active' : 'Inactive';
+            }
+
+            let acctHandoverVal: any = null;
+            if (acctHandover.status === 'fulfilled' && acctHandover.value && !acctHandover.value._error) {
+              acctHandoverVal = acctHandover.value;
+            }
+            const acctHoArr = Array.isArray(acctHandoverVal) ? acctHandoverVal : acctHandoverVal ? [acctHandoverVal] : [];
+            const acctActiveHo = acctHoArr.find((h: any) => {
+              const st = (h.handoverStatus || h.status || h.handoverStatusDesc || '').toLowerCase();
+              return st.includes('active') || st.includes('handed') || st.includes('legal') || st.includes('pending');
+            });
+            derivedStatuses['handoverStatus'] = acctActiveHo
+              ? (acctActiveHo.handoverStatus || acctActiveHo.handoverStatusDesc || acctActiveHo.status || 'Handed Over')
+              : (acctHoArr.length > 0 ? (acctHoArr[0].handoverStatus || acctHoArr[0].handoverStatusDesc || 'N/A') : 'N/A');
+
+            const updatedData = {
+              ...data,
+              property: acctPropFinal,
+              consUnit: acctConsUnitByIdVal && !acctConsUnitByIdVal._error ? acctConsUnitByIdVal : acctConsUnitVal,
+              propertyRatesData: acctPropRatesData,
+              mgmtDetails: slowMgmtDetailsVal && !slowMgmtDetailsVal._error ? slowMgmtDetailsVal : null,
+              derivedStatuses: { ...derivedStatuses },
+            };
+            if (generation === this._loadTabGeneration) {
+              this.tabData.set(updatedData);
+            }
+
+            const propV = acctPropVal && !acctPropVal._error ? acctPropVal : null;
+            const cuVal = acctConsUnitByIdVal && !acctConsUnitByIdVal._error ? acctConsUnitByIdVal : acctConsUnitVal;
+            const currentSnap = this.globalSnapshot();
+            if (currentSnap && propV) {
+              const enrichedSnap = { ...currentSnap };
+              if (!enrichedSnap['ownerName'] && (propV.accountableOwnerName || propV.ownerName)) enrichedSnap['ownerName'] = propV.accountableOwnerName || propV.ownerName;
+              if (propV.locationAddress || propV.propertyStreet) enrichedSnap['address'] = enrichedSnap['address'] || propV.locationAddress || propV.propertyStreet;
+              if (propV.sgNumber && !enrichedSnap['sgNumber']) enrichedSnap['sgNumber'] = propV.sgNumber;
+              if (propV.town && !enrichedSnap['town']) enrichedSnap['town'] = propV.town;
+              if (propV.propertyTypeDesc || propV.propertyType) enrichedSnap['propertyType'] = enrichedSnap['propertyType'] || propV.propertyTypeDesc || propV.propertyType;
+              if (propV.propertyCategory) enrichedSnap['propertyCategory'] = enrichedSnap['propertyCategory'] || propV.propertyCategory;
+              enrichedSnap['handoverStatus'] = derivedStatuses['handoverStatus'] || 'N/A';
+              this.globalSnapshot.set(enrichedSnap);
+            }
+
+            const riskDetected: RiskFlag[] = [];
+            if (acctActiveHo) {
+              riskDetected.push({ id: 'handover', label: 'Handed Over / Legal', detail: `${acctActiveHo.handoverStatus || acctActiveHo.status || 'Handed Over'}${acctActiveHo.attorneyName ? ` — Attorney: ${acctActiveHo.attorneyName}` : ''}`, severity: 'critical', icon: '⚖️' });
+            }
+            const activeIndigent = acctAttpVal.find((r: any) => {
+              const st = (r.attpStatus || r.status || '').toLowerCase();
+              return st.includes('active') || st.includes('approved') || st.includes('registered');
+            });
+            if (activeIndigent) {
+              riskDetected.push({ id: 'indigent', label: 'Indigent', detail: `Subsidy active — ${activeIndigent.indigentType || activeIndigent.attpType || '-'}`, severity: 'info', icon: '🛡️' });
+            }
+            const nameVal = acctNameInfo.status === 'fulfilled' ? (Array.isArray(acctNameInfo.value) ? acctNameInfo.value[0] : acctNameInfo.value) : null;
+            if (nameVal && !nameVal._error && (nameVal.deceased || nameVal.isDeceased || nameVal.dateOfDeath || nameVal.deathDate)) {
+              riskDetected.push({ id: 'deceased', label: 'Owner Deceased', detail: nameVal.dateOfDeath || nameVal.deathDate ? `Date of death: ${this.formatDate(nameVal.dateOfDeath || nameVal.deathDate)}` : 'Owner marked as deceased', severity: 'critical', icon: '💀' });
+            }
+            this.fetchAccountBalance(accountId).then((bal: any) => {
+              const items = Array.isArray(bal) ? bal : bal ? [bal] : [];
+              let totalArrears = 0;
+              for (const item of items) {
+                totalArrears += (item.days30 || 0) + (item.days60 || 0) + (item.days90 || 0) + (item.days120 || 0) + (item.days150 || 0) + (item.untill360 || 0);
+              }
+              if (totalArrears > 10000) {
+                const totalOut = items.reduce((s: number, it: any) => s + (it.totalOutStanding || it.totalOutstandingAmount || 0), 0);
+                riskDetected.push({ id: 'high-arrears', label: 'High Arrears', detail: `Arrears (30+ days): R ${this.formatCurrency(totalArrears)} of R ${this.formatCurrency(totalOut)} total`, severity: totalArrears > 50000 ? 'critical' : 'warning', icon: '⚠️' });
+              } else if (totalArrears > 0) {
+                riskDetected.push({ id: 'arrears', label: 'Arrears', detail: `Overdue (30+ days): R ${this.formatCurrency(totalArrears)}`, severity: 'warning', icon: '💰' });
+              }
+              riskDetected.sort((a, b) => {
+                const ord: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+                return (ord[a.severity] || 2) - (ord[b.severity] || 2);
+              });
+              this.riskFlags.set([...riskDetected]);
+              this.riskFlagsLoading.set(false);
+            }).catch(() => {
+              this.riskFlags.set([...riskDetected]);
+              this.riskFlagsLoading.set(false);
+            });
+          });
+
+          return;
+          break;
+
+        case 'balance':
+          try {
+            const balResult = await this.fetchAccountBalance(accountId);
+            data = { balance: Array.isArray(balResult) ? balResult : balResult ? [balResult] : [] };
+          } catch {
+            data = { balance: [] };
+          }
+          break;
+
+        case 'property-debt':
+          data = { propertyDebt: true };
+          this.loadPropertyDebt(accountId);
+          break;
+
+        case 'services':
+          const [allSvc, svcSearch, addBilling, svcNotif] = await Promise.allSettled([
+            this.cachedGet(`/api/platinum/billing-enquiry/all-services/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/services-search-results/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/additional-billing-search-results/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/account-notifications/${accountId}`),
+          ]);
+          data = {
+            services: allSvc.status === 'fulfilled' ? this.normalizeArray(allSvc.value) : [],
+            searchServices: svcSearch.status === 'fulfilled' ? this.normalizeArray(svcSearch.value) : [],
+            additionalBilling: addBilling.status === 'fulfilled' ? this.normalizeArray(addBilling.value) : [],
+            additionalInfo: svcNotif.status === 'fulfilled' ? this.normalizeArray(svcNotif.value).filter((ai: any) => {
+              const hasReceipt = !!(ai.receiptNo || ai.receiptNumber);
+              const hasAmount = !!(ai.receiptAmount && Number(ai.receiptAmount) !== 0);
+              const hasComment = !!(ai.comment || ai.comments || ai.remark);
+              const hasDoc = !!(ai.documentNo || ai.documentNumber || ai.docNo);
+              const hasCard = !!(ai.cardNo || ai.cardNumber);
+              const hasBlock = !!(ai.blockOrUnblock || ai.blockUnblock || ai.action);
+              return hasReceipt || hasAmount || hasComment || hasDoc || hasCard || hasBlock;
+            }) : [],
+          };
+          break;
+
+        case 'property':
+          const [prop, consUnit, consUnitById, rates, meters, transfers, propAcctInfo, propConsAcctDetails, propHandoverInfo, propAcctMgmt] = await Promise.allSettled([
+            this.cachedGet(`/api/platinum/billing-enquiry/property-details-by-account/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/consumption-units/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/cons-unit-by-account`, { AccountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`, { finYear: this.ratesFinYear() || this.getCurrentFinYear() }),
+            this.cachedGet(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/transfer-ownership/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-enquiry/account-info-result/${accountId}`),
+            this.cachedGet(`/api/platinum/receipt-prepaid/cons-account-details`, { accountId: String(accountId) }),
+            this.cachedGet(`/api/platinum/billing-enquiry/handover-info/${accountId}`),
+            this.cachedGet(`/api/platinum/billing-account-management/account-details`, { accountId: String(accountId) }),
+          ]);
+          let propVal = prop.status === 'fulfilled' ? (Array.isArray(prop.value) ? prop.value[0] : prop.value) : null;
+          if (propVal && propVal._error) propVal = null;
+          if (!propVal) {
+            const propAir = propAcctInfo.status === 'fulfilled' ? (Array.isArray(propAcctInfo.value) ? propAcctInfo.value[0] : propAcctInfo.value) : null;
+            const propAcct = this.selectedAccount();
+            if (propAir || propAcct) {
+              const ownerName = propAir?.['owner'] || propAir?.['name'] || propAcct?.['name'] || propAcct?.['surname_Company'] || '';
+              propVal = {
+                propertyStreet: propAir?.['propertyStreet'] || propAcct?.['locationAddress'] || propAcct?.['address'] || '',
+                owner: ownerName,
+                name: ownerName,
+                zoneDesc: propAir?.['zoneDesc'] || '',
+                sgNumber: propAir?.['sgNumber'] || propAcct?.['sgNumber'] || '',
+                typeOfUseDesc: propAir?.['typeOfUseDesc'] || '',
+                isMasterProperty: propAir?.['isMasterProperty'] || '',
+                accountDesc: propAir?.['accountDesc'] || propAcct?.['accountDesc'] || propAcct?.['accountType'] || '',
+                institutionDesc: propAir?.['institutionDesc'] || '',
+                groupCodeDesc: propAir?.['groupCodeDesc'] || '',
+                deliverAddress: propAir?.['deliverAddress'] || propAcct?.['deliveryAddress'] || '',
+                town: propAir?.['town'] || '',
+                suburb: propAir?.['suburb'] || '',
+                streetName: propAir?.['streetName'] || '',
+                streenNumber: propAir?.['streenNumber'] || '',
+                postalCode: propAir?.['postalCode'] || '',
+                propertyId: propAcct?.['propertyID'] || '',
+                _fallback: true,
+              };
+            }
+          }
+          const propConsUnitVal = consUnit.status === 'fulfilled' ? (Array.isArray(consUnit.value) ? consUnit.value[0] : consUnit.value) : null;
+          const propConsUnitByIdVal = consUnitById.status === 'fulfilled' ? (Array.isArray(consUnitById.value) ? consUnitById.value[0] : consUnitById.value) : null;
+          if (propConsUnitByIdVal && !propConsUnitByIdVal._error) {
+          }
+          const propRatesVal = rates.status === 'fulfilled' ? (Array.isArray(rates.value) ? rates.value[0] : rates.value) : null;
+          if (propVal) {
+            const allConsUnitEnrichKeys = ['marketValue', 'propertyMarketValue', 'partitionMarketValue', 'partMarketValue',
+              'valuationCategory', 'valuationCat', 'partitionDescription', 'partitionDesc',
+              'propertyCategory', 'category', 'billingCycle', 'billingCycleID', 'allotmentArea', 'farmName',
+              'magisterialDistrict', 'magisterialID', 'registrationStatus', 'oldPropertyCode', 'oldAccountCode',
+              'sectionalTitleScheme', 'accountableOwnerName', 'ownerName',
+              'suburb', 'subSuburb', 'town', 'latitude', 'longitude', 'gpsLat', 'gpsLong',
+              'propertyStatus', 'propertyStatusDesc', 'allotmentCode', 'allotment',
+              'nonStandAddLine1', 'nonStandAddSuburb', 'nonStandAddTown',
+              'cycleDescription', 'unitPartitionID', 'unitPartition_ID',
+              'standSize', 'propertyType', 'typeOfUse', 'typeofUse', 'typeOfUseDesc',
+              'propertyCategory', 'isMasterProperty', 'masterPropertyCode'];
+            if (propConsUnitByIdVal && !propConsUnitByIdVal._error) {
+              for (const k of allConsUnitEnrichKeys) {
+                if (propConsUnitByIdVal[k] != null && propConsUnitByIdVal[k] !== '' && !propVal[k]) propVal[k] = propConsUnitByIdVal[k];
+              }
+            }
+            if (propConsUnitVal && !propConsUnitVal._error) {
+              for (const k of allConsUnitEnrichKeys) {
+                if (propConsUnitVal[k] != null && propConsUnitVal[k] !== '' && !propVal[k]) propVal[k] = propConsUnitVal[k];
+              }
+            }
+            if (propRatesVal && !propRatesVal._error) {
+              const ratesEnrichKeys = ['marketValue', 'propertyMarketValue', 'partitionMarketValue', 'partMarketValue',
+                'valuationCategory', 'valuationCat', 'partitionDescription', 'partitionDesc',
+                'propertyCategory', 'category', 'billingCycle', 'accountableOwnerName', 'ownerName'];
+              for (const k of ratesEnrichKeys) {
+                if (propRatesVal[k] != null && propRatesVal[k] !== '' && !propVal[k]) propVal[k] = propRatesVal[k];
+              }
+            }
+
+            const earlyConsAcct = propConsAcctDetails.status === 'fulfilled' ? (Array.isArray(propConsAcctDetails.value) ? propConsAcctDetails.value[0] : propConsAcctDetails.value) : null;
+            if (earlyConsAcct && !earlyConsAcct._error) {
+              if (!propVal['town'] && earlyConsAcct.town) propVal['town'] = earlyConsAcct.town;
+              if (!propVal['allotmentArea'] && earlyConsAcct.town) propVal['allotmentArea'] = earlyConsAcct.town;
+              if (!propVal['typeOfUseDesc'] && earlyConsAcct.typeOfUseDesc) propVal['typeOfUseDesc'] = earlyConsAcct.typeOfUseDesc;
+              if (!propVal['zoneDesc'] && earlyConsAcct.zoneDesc) propVal['zoneDesc'] = earlyConsAcct.zoneDesc;
+              if (!propVal['propertyCategory'] && earlyConsAcct.zoneDesc) propVal['propertyCategory'] = earlyConsAcct.zoneDesc;
+            }
+
+            const earlyAcctMgmt = propAcctMgmt.status === 'fulfilled' ? (Array.isArray(propAcctMgmt.value) ? propAcctMgmt.value[0] : propAcctMgmt.value) : null;
+            if (earlyAcctMgmt && !earlyAcctMgmt._error) {
+              if (!propVal['cycleDescription'] && !propVal['billingCycle']) {
+                const acctMgmtInfoVal = await this.cachedGet(`/api/platinum/billing-account-management/account-information`, { accountId: String(accountId) });
+                const mgmtInfo = acctMgmtInfoVal && !acctMgmtInfoVal._error ? acctMgmtInfoVal : null;
+                if (mgmtInfo?.cycleDescription) {
+                  propVal['cycleDescription'] = mgmtInfo.cycleDescription;
+                } else if (earlyAcctMgmt.billingCycleID) {
+                  propVal['billingCycleID'] = earlyAcctMgmt.billingCycleID;
+                }
+              }
+            }
+
+            const cuForStatus = propConsUnitByIdVal || propConsUnitVal;
+            if (cuForStatus && !cuForStatus._error) {
+              if (!propVal['propertyStatus'] || typeof propVal['propertyStatus'] === 'number') {
+                const statusId = cuForStatus.unitStatusID;
+                const statusMap: Record<number, string> = { 1: 'Active', 2: 'Inactive', 3: 'Suspended', 4: 'Closed' };
+                propVal['propertyStatus'] = statusMap[statusId] || (statusId != null ? `Status ${statusId}` : '-');
+              }
+              if (typeof propVal['registrationStatus'] === 'number') {
+                const regId = propVal['registrationStatus'];
+                propVal['registrationStatus'] = regId === 186 ? 'Registered' : (regId > 0 ? `Status ${regId}` : '-');
+              }
+              if ((!propVal['allotmentArea'] || typeof propVal['allotmentArea'] === 'number') && earlyConsAcct?.town) {
+                propVal['allotmentArea'] = earlyConsAcct.town;
+              }
+              if (typeof propVal['magisterialID'] === 'number' && !propVal['magisterialDistrict']) {
+                propVal['magisterialDistrict'] = `District ${propVal['magisterialID']}`;
+              }
+            }
+
+            const basicAcct = await this.cachedGet(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`);
+            if (basicAcct && !basicAcct._error) {
+              if (!propVal['accountableOwnerName'] && !propVal['ownerName']) {
+                const fn = (basicAcct.fullNAME || '').trim();
+                if (fn) propVal['accountableOwnerName'] = fn;
+              }
+            }
+          }
+          let propPartOwnerResult: any = null;
+          const propUnitPartId = propVal?.unitPartitionID || propVal?.unitPartition_ID ||
+            propConsUnitByIdVal?.unitPartitionID || propConsUnitByIdVal?.unitPartition_ID ||
+            propConsUnitVal?.unitPartitionID || propConsUnitVal?.unitPartition_ID;
+          if (propUnitPartId && propVal) {
+            const [propPartDetails, propValuation, propPartOwner] = await Promise.allSettled([
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/partition-details`, { unitPartitionID: propUnitPartId })),
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-unit`, { unitPartitionID: propUnitPartId })),
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/unit-partition-owner`, { unitPartitionID: propUnitPartId })),
+            ]);
+            const ppVal = propPartDetails.status === 'fulfilled' ? (Array.isArray(propPartDetails.value) ? propPartDetails.value[0] : propPartDetails.value) : null;
+            const pvVal = propValuation.status === 'fulfilled' ? (Array.isArray(propValuation.value) ? propValuation.value[0] : propValuation.value) : null;
+            const poVal = propPartOwner.status === 'fulfilled' ? (Array.isArray(propPartOwner.value) ? propPartOwner.value[0] : propPartOwner.value) : null;
+            if (ppVal && !ppVal._error) {
+              const pKeys = ['partitionDescription', 'partitionDesc', 'description', 'partitionMarketValue', 'partMarketValue',
+                'marketValue', 'valuationCategory', 'valuationCat', 'valuationCategoryDesc',
+                'propertyCategory', 'category', 'categoryDesc', 'allotmentArea', 'farmName',
+                'magisterialDistrict', 'registrationStatus', 'billingCycle', 'oldPropertyCode', 'sectionalTitleScheme',
+                'accountableOwnerName', 'ownerName', 'name', 'owner'];
+              for (const k of pKeys) {
+                if (ppVal[k] != null && ppVal[k] !== '' && !propVal[k]) propVal[k] = ppVal[k];
+              }
+              if (!propVal['partitionDescription'] && ppVal['description']) propVal['partitionDescription'] = ppVal['description'];
+              if (!propVal['partitionMarketValue'] && ppVal['marketValue']) propVal['partitionMarketValue'] = ppVal['marketValue'];
+            }
+            if (pvVal && !pvVal._error) {
+              if (!propVal['marketValue'] && !propVal['propertyMarketValue']) {
+                const mv = pvVal['marketValue'] || pvVal['propertyMarketValue'] || pvVal['totalMarketValue'];
+                if (mv != null && mv !== '') propVal['marketValue'] = mv;
+              }
+              if (!propVal['partitionMarketValue'] && !propVal['partMarketValue']) {
+                const pmv = pvVal['partitionMarketValue'] || pvVal['partMarketValue'] || pvVal['marketValue'];
+                if (pmv != null && pmv !== '') propVal['partitionMarketValue'] = pmv;
+              }
+              if (!propVal['valuationCategory'] && !propVal['valuationCat']) {
+                const vc = pvVal['valuationCategory'] || pvVal['valuationCat'] || pvVal['valuationCategoryDesc'] || pvVal['category'];
+                if (vc != null && vc !== '') propVal['valuationCategory'] = vc;
+              }
+            }
+            if (poVal && !poVal._error) {
+              propPartOwnerResult = poVal;
+              if (!propVal['accountableOwnerName'] && !propVal['ownerName']) {
+                const on = poVal['ownerName'] || poVal['name'] || poVal['accountableOwnerName'] || poVal['surname_Company'] || poVal['fullName'];
+                if (on) {
+                  propVal['accountableOwnerName'] = on;
+                } else if (poVal['firstNames'] || poVal['lastName']) {
+                  propVal['accountableOwnerName'] = [poVal['lastName'], poVal['firstNames']].filter(Boolean).join(' ');
+                }
+              }
+            }
+          }
+          let propValuations: any[] = [];
+          const propTabUnitPartIdForVal = propUnitPartId || propConsUnitVal?.unitPartitionID || propConsUnitVal?.unitPartition_ID;
+          if (propTabUnitPartIdForVal) {
+            try {
+              const valByUnit = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-unit`, { unitPartitionID: String(propTabUnitPartIdForVal) }));
+              if (valByUnit && !valByUnit._error) {
+                propValuations = this.normalizeArray(valByUnit);
+              }
+            } catch (e) {
+            }
+          }
+          if (propValuations.length === 0) {
+            const propPropertyId = propVal?.propertyId || propVal?.property_ID || propConsUnitVal?.unit_ID;
+            if (propPropertyId) {
+              try {
+                const valResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/supplementary-valuations`, { propertyId: propPropertyId }));
+                propValuations = this.normalizeArray(valResult);
+              } catch (e) {
+              }
+            }
+          }
+          if (propValuations.length > 0 && propVal) {
+            const sv = propValuations[0];
+            if (!propVal['valuationCategory'] && !propVal['valuationCat']) {
+              const tariff = sv.ratesTariffCode || '';
+              if (tariff) {
+                const tariffParts = tariff.split(' - ');
+                propVal['valuationCategory'] = tariffParts.length > 1 ? tariffParts.slice(1).join(' - ').trim() : tariff;
+              }
+            }
+            if (!propVal['partitionDescription']) {
+              propVal['partitionDescription'] = sv.address || sv.description || '';
+            }
+            if (!propVal['partitionMarketValue'] && !propVal['partMarketValue']) {
+              const smv = sv.standMarketValue || sv.marketValue;
+              if (smv != null && smv !== '') propVal['partitionMarketValue'] = smv;
+            }
+          }
+          let propRebatesLevies: any[] = [];
+          const propTabFinYear = this.ratesFinYear() || this.getCurrentFinYear();
+          const propTabUnitPartId = propUnitPartId || propConsUnitVal?.unitPartitionID || propConsUnitVal?.unitPartition_ID;
+          if (propTabUnitPartId || accountId) {
+            try {
+              const prParams: Record<string, string> = { finYear: propTabFinYear, pageSize: '50' };
+              if (accountId) prParams['accountId'] = String(accountId);
+              if (propTabUnitPartId) prParams['unitPartitionId'] = String(propTabUnitPartId);
+              const prResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-rates-search`, prParams));
+              propRebatesLevies = this.normalizeArray(prResult?.data || prResult);
+              if (propRebatesLevies.length === 0 && propTabUnitPartId) {
+                const partResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-rates-by-partition/${propTabUnitPartId}`, { finYear: propTabFinYear }));
+                propRebatesLevies = this.normalizeArray(partResult?.data || partResult);
+              }
+            } catch (e) {
+            }
+          }
+          let propLinkedMeters: any[] = [];
+          try {
+            const lmResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/unit-linked-meters`, { accountId: String(accountId) }));
+            propLinkedMeters = this.normalizeArray(lmResult);
+          } catch (e) {
+          }
+          const propMetersRaw = meters.status === 'fulfilled' ? this.normalizeArray(meters.value) : [];
+          const meterKey = (m: any) => (m.physicalMeterNo || m.physicalMeterNumber || m.meterNo || m.meterNumber || '').toString().trim();
+          const propMetersMerged = propMetersRaw.map((m: any) => {
+            const mk = meterKey(m);
+            if (!mk) return m;
+            const linked = propLinkedMeters.find((lm: any) => {
+              const lk = meterKey(lm);
+              return lk && lk === mk;
+            });
+            return linked ? { ...linked, ...m } : m;
+          });
+          for (const lm of propLinkedMeters) {
+            const lk = meterKey(lm);
+            if (!lk) continue;
+            const exists = propMetersMerged.find((m: any) => meterKey(m) === lk);
+            if (!exists) propMetersMerged.push(lm);
+          }
+          const propConsAcctVal = propConsAcctDetails.status === 'fulfilled' ? (Array.isArray(propConsAcctDetails.value) ? propConsAcctDetails.value[0] : propConsAcctDetails.value) : null;
+          const propHandoverVal = propHandoverInfo.status === 'fulfilled' ? this.normalizeArray(propHandoverInfo.value) : [];
+          const propAcctMgmtVal = propAcctMgmt.status === 'fulfilled' ? (Array.isArray(propAcctMgmt.value) ? propAcctMgmt.value[0] : propAcctMgmt.value) : null;
+          const acctSnapshot: Record<string, any> = {};
+          const sa = this.selectedAccount() as any;
+          acctSnapshot['accountType'] = propVal?.accountDesc || propConsAcctVal?.accountDesc || propAcctMgmtVal?.accountDesc || sa?.accountDesc || sa?.accountType || '';
+          acctSnapshot['sgNumber'] = propVal?.sgNumber || propConsUnitVal?.sgNumber || sa?.sgNumber || '';
+          acctSnapshot['locationAddress'] = propVal?.locationAddress || propVal?.propertyStreet ||
+            (propVal?.streetNumber ? propVal.streetNumber + ' ' + propVal.streetName + ', ' + propVal.town : propVal?.streetName ? propVal.streetName + ', ' + (propVal?.town || '') : '') ||
+            propConsUnitVal?.nonStandAddLine1 || sa?.locationAddress || sa?.address || '';
+          acctSnapshot['propertyStatus'] = propVal?.propertyStatus || propVal?.statusDesc || propConsAcctVal?.statusDesc || propVal?.accountStatus || sa?.accountStatus || '';
+          acctSnapshot['propertyType'] = propVal?.propertyTypeDesc || propVal?.propertyType || this.resolvePropertyType(propConsUnitVal?.propertyTypeID || propConsUnitByIdVal?.propertyTypeID, propVal?.sgNumber || propConsUnitVal?.sgNumber || propConsUnitByIdVal?.sgNumber, propConsUnitVal?.sectionNumber || propConsUnitByIdVal?.sectionNumber, propConsUnitVal?.farmID || propConsUnitByIdVal?.farmID) || '';
+          acctSnapshot['propertyCategory'] = propVal?.propertyCategory || propVal?.category || propVal?.zoneDesc || propConsAcctVal?.zoneDesc || propConsUnitVal?.zoneDesc || '';
+          acctSnapshot['propertyTypeOfUse'] = propVal?.propertyTypeOfUse || propVal?.typeOfUse || propVal?.typeofUse || propVal?.typeOfUseDesc || propConsAcctVal?.typeOfUseDesc || '';
+          acctSnapshot['accountableOwnerName'] = propVal?.accountableOwnerName || propVal?.ownerName || propPartOwnerResult?.ownerName || propPartOwnerResult?.name ||
+            propPartOwnerResult?.accountableOwnerName || propPartOwnerResult?.surname_Company || propPartOwnerResult?.fullName ||
+            (propPartOwnerResult?.firstNames || propPartOwnerResult?.lastName ? [propPartOwnerResult?.lastName, propPartOwnerResult?.firstNames].filter(Boolean).join(' ') : '') ||
+            propVal?.name || propVal?.owner || sa?.name || '';
+          acctSnapshot['indigentSubsidyStatus'] = propConsAcctVal?.indigentSubsidyStatus || propConsAcctVal?.indigentSubsidy || propConsAcctVal?.indigentStatus || propConsAcctVal?.attpStatus || '';
+          acctSnapshot['consumerRppStatus'] = propConsAcctVal?.consumerRppStatus || propConsAcctVal?.consumerRPPStatus || propConsAcctVal?.consumerRpp || '';
+          acctSnapshot['rebateStatus'] = propConsAcctVal?.rebateStatus || propConsAcctVal?.rebateStatusDesc || propConsAcctVal?.rebate || '';
+          const activeHandover = propHandoverVal.find((h: any) => {
+            const st = (h.handoverStatus || h.status || h.handoverStatusDesc || '').toLowerCase();
+            return st.includes('active') || st.includes('handed') || st.includes('progress');
+          });
+          acctSnapshot['handoverStatus'] = activeHandover ? (activeHandover.handoverStatus || activeHandover.status || 'Handed Over') : (propConsAcctVal?.handoverStatus || propConsAcctVal?.handoverStatusDesc || propConsAcctVal?.handover || '');
+          acctSnapshot['interestWaiverStatus'] = propConsAcctVal?.interestWaiverStatus || propConsAcctVal?.interestWaiverDesc || propConsAcctVal?.interestWaiver || '';
+          acctSnapshot['creditStatus'] = propConsAcctVal?.creditStatusDesc || propAcctMgmtVal?.creditStatusDesc || propConsAcctVal?.creditStatus || '';
+          acctSnapshot['accountStatus'] = propConsAcctVal?.statusDesc || propAcctMgmtVal?.accountStatus || propVal?.accountStatus || sa?.accountStatus || '';
+          acctSnapshot['cycleDescription'] = propAcctMgmtVal?.cycleDescription || propVal?.cycleDescription || propVal?.billingCycle || '';
+          const mergedConsUnit = { ...(propConsUnitByIdVal && !propConsUnitByIdVal._error ? propConsUnitByIdVal : {}), ...(propConsUnitVal && !propConsUnitVal._error ? propConsUnitVal : {}) };
+          data = {
+            property: propVal,
+            consUnit: Object.keys(mergedConsUnit).length > 0 ? mergedConsUnit : propConsUnitVal,
+            partitionOwner: propPartOwnerResult,
+            rates: rates.status === 'fulfilled' ? rates.value : null,
+            meters: propMetersMerged,
+            transfers: transfers.status === 'fulfilled' ? this.normalizeArray(transfers.value) : [],
+            valuations: propValuations,
+            rebatesLevies: propRebatesLevies,
+            accountSnapshot: acctSnapshot,
+          };
+          break;
+
+        case 'contact':
+          const [contactDetails, contactHistory, deliveryHistory, contactBasic, contactAir, additionalEmailsResult] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details-history/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/delivery-address-history/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-info-result/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-account-management/get-additional-emails`, { accountId: String(accountId) })),
+          ]);
+          const contactObj = contactDetails.status === 'fulfilled' ? (Array.isArray(contactDetails.value) ? contactDetails.value[0] : contactDetails.value) : {};
+          const cBasic = contactBasic.status === 'fulfilled' ? (Array.isArray(contactBasic.value) ? contactBasic.value[0] : contactBasic.value) : null;
+          const cAir = contactAir.status === 'fulfilled' ? (Array.isArray(contactAir.value) ? contactAir.value[0] : contactAir.value) : null;
+          const mergedContact: Record<string, any> = { ...contactObj };
+          if (cAir) {
+            if (!mergedContact['town'] && cAir['town']) mergedContact['town'] = cAir['town'];
+            if (!mergedContact['suburb'] && cAir['suburb']) mergedContact['suburb'] = cAir['suburb'];
+            if (!mergedContact['postalCode'] && cAir['postalCode']) mergedContact['postalCode'] = cAir['postalCode'];
+            if (!mergedContact['careOf'] && cAir['careOf']) mergedContact['careOf'] = cAir['careOf'];
+            if (!mergedContact['streetName'] && cAir['streetName']) mergedContact['addressLine1'] = [cAir['streenNumber'], cAir['streetName']].filter(Boolean).join(' ');
+            if (cAir['deliverAddress'] && !mergedContact['deliveryAddressType']) mergedContact['deliveryAddressType'] = cAir['deliverAddress'];
+          }
+          if (cBasic) {
+            if (!mergedContact['postalCode'] && cBasic['postalCode']) mergedContact['postalCode'] = cBasic['postalCode'];
+            if (!mergedContact['emailId'] && cBasic['emailId']) mergedContact['emailId'] = cBasic['emailId'];
+            if (!mergedContact['email'] && !mergedContact['emailId'] && cBasic['emailId']) mergedContact['email'] = cBasic['emailId'];
+            if (!mergedContact['tel_Mobile'] && cBasic['contactNo']) mergedContact['tel_Mobile'] = cBasic['contactNo'];
+            const delAddr = cBasic['deliveryAddress'] || '';
+            if (delAddr) {
+              const lines = delAddr.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+              if (lines.length > 0 && !mergedContact['addressLine1']) mergedContact['addressLine1'] = lines[0];
+              if (lines.length > 1 && !mergedContact['addressLine2']) mergedContact['addressLine2'] = lines[1];
+              if (lines.length > 2 && !mergedContact['addressLine3']) mergedContact['addressLine3'] = lines[2];
+              if (lines.length > 1 && !mergedContact['town']) mergedContact['town'] = lines[lines.length > 3 ? lines.length - 2 : 1];
+            }
+          }
+          const additionalEmails = additionalEmailsResult.status === 'fulfilled' ? this.normalizeArray(additionalEmailsResult.value) : [];
+          if (additionalEmails.length > 0) {
+            additionalEmails.forEach((e: any, i: number) => {
+              const email = e.emailAddress || e.email || e.emailId || '';
+              if (email && !mergedContact[`additionalEmail${i + 1}`]) {
+                mergedContact[`additionalEmail${i + 1}`] = email;
+              }
+            });
+          }
+          data = {
+            contact: mergedContact,
+            history: contactHistory.status === 'fulfilled' ? this.normalizeArray(contactHistory.value) : [],
+            deliveryHistory: deliveryHistory.status === 'fulfilled' ? this.normalizeArray(deliveryHistory.value) : [],
+            additionalEmails,
+          };
+          break;
+
+        case 'handover':
+          const hoFinYear = this.userFinYear() || this.getCurrentFinYear();
+          const [handoverInfo, handoverEnquiry, handoverTxns] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/handover-info/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/handover-account-enquiry/${accountId}`, { finYear: hoFinYear })),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/cons-handover-transaction-detail/${accountId}`, { finYear: hoFinYear })),
+          ]);
+          const hoInfoArr = this.normalizeArray(handoverInfo.status === 'fulfilled' ? handoverInfo.value : null);
+          const hoEnqArr = this.normalizeArray(handoverEnquiry.status === 'fulfilled' ? handoverEnquiry.value : null);
+          const hoTxnArr = this.normalizeArray(handoverTxns.status === 'fulfilled' ? handoverTxns.value : null);
+          const hoSeen = new Set<string>();
+          const hoDeduplicated = [...hoInfoArr, ...hoEnqArr].filter((h: any) => {
+            const key = JSON.stringify({
+              acc: h.handoverAccount ?? h.accountNumber ?? h.account ?? '',
+              amt: h.handoverAmount ?? h.amount ?? '',
+              dt: h.handedOverDate ?? h.handoverDate ?? '',
+              rt: h.runType ?? h.type ?? '',
+              st: h.status ?? h.handoverStatus ?? '',
+              cd: h.dateCreated ?? h.createdDate ?? '',
+            });
+            if (hoSeen.has(key)) return false;
+            hoSeen.add(key);
+            return true;
+          });
+          data = {
+            handovers: hoDeduplicated,
+            transactions: hoTxnArr,
+          };
+          break;
+
+        case 'name':
+          try {
+            const [nameInfoResult, consAcctResult, fullDetailsResult, acctMgmtResult, relatedAcctsResult] = await Promise.allSettled([
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/name-info/${accountId}`)),
+              firstValueFrom(this.api.get<any>(`/api/platinum/cons-accounts/${accountId}`)),
+              firstValueFrom(this.api.get<any>(`/api/platinum/account-full-details/${accountId}`)),
+              this.cachedGet(`/api/platinum/billing-account-management/account-details`, { accountId: String(accountId) }),
+              firstValueFrom(this.api.get<any>(`/api/platinum/accounts-by-name-id`, { accountId: String(accountId) })),
+            ]);
+            let nameVal: any = null;
+            if (nameInfoResult.status === 'fulfilled') {
+              const nr = nameInfoResult.value;
+              nameVal = Array.isArray(nr) ? nr[0] : nr;
+              if (nameVal && nameVal._error) nameVal = null;
+            }
+            let consNameVal: any = null;
+            if (consAcctResult.status === 'fulfilled') {
+              const ca = consAcctResult.value;
+              const resolvedNameId = ca?.nameId || ca?.nameID || ca?.name_ID;
+              if (ca && !ca._error && resolvedNameId) {
+                try {
+                  const cnResult = await firstValueFrom(this.api.get<any>(`/api/platinum/cons-names/${resolvedNameId}`));
+                  if (cnResult && !cnResult._error) {
+                    consNameVal = cnResult;
+                  }
+                } catch (cnErr: any) {
+                }
+              }
+            } else {
+            }
+            if (!consNameVal && fullDetailsResult.status === 'fulfilled') {
+              const fd = fullDetailsResult.value;
+              if (fd && !fd._error) {
+                if (fd.name && !fd.name._error) {
+                  consNameVal = fd.name;
+                }
+              }
+            }
+            if (!consNameVal && acctMgmtResult.status === 'fulfilled') {
+              const mgmt = acctMgmtResult.value;
+              const mgmtObj = Array.isArray(mgmt) ? mgmt[0] : mgmt;
+              const mgmtNameId = mgmtObj?.nameID || mgmtObj?.nameId || mgmtObj?.name_ID;
+              if (mgmtNameId) {
+                try {
+                  const cnResult = await firstValueFrom(this.api.get<any>(`/api/platinum/cons-names/${mgmtNameId}`));
+                  if (cnResult && !cnResult._error) {
+                    consNameVal = cnResult;
+                  }
+                } catch (cnErr: any) {
+                }
+              }
+            }
+            const merged: Record<string, any> = {};
+            if (consNameVal) Object.assign(merged, consNameVal);
+            if (nameVal) Object.assign(merged, nameVal);
+            if (consNameVal) {
+              const consFieldMap: Record<string, string> = {
+                'idNumber': 'idNo_RegistrationNo',
+                'idNo': 'idNo_RegistrationNo',
+                'id_RegistrationNo': 'idNo_RegistrationNo',
+                'surname': 'surname_Company',
+                'surnameCompany': 'surname_Company',
+                'firstName': 'firstNames',
+                'name': 'firstNames',
+                'passportNumber': 'passportNo',
+                'passport': 'passportNo',
+                'country': 'nameCountry',
+                'countryName': 'nameCountry',
+                'countryDesc': 'nameCountry',
+                'gender': 'genderDesc',
+                'genderDescription': 'genderDesc',
+                'ethnicity': 'ethnicDesc',
+                'ethnicityDesc': 'ethnicDesc',
+                'language': 'languageCorrespond',
+                'languageDescription': 'languageCorrespond',
+                'correspondLanguage': 'languageCorrespond',
+                'titleDesc': 'title',
+                'titleDescription': 'title',
+                'dateOfBirth': 'dateOfBirth',
+                'dob': 'dateOfBirth',
+                'nickName': 'nickName',
+                'nickname': 'nickName',
+                'maidenName': 'maidenName',
+                'maiden': 'maidenName',
+                'isFarmer': 'isFarmer',
+                'farmer': 'isFarmer',
+                'isSoleProprietor': 'isSoleProp',
+                'soleProprietor': 'isSoleProp',
+                'employmentStatus': 'employementStatusDesc',
+                'employmentStatusDesc': 'employementStatusDesc',
+                'employerName': 'employer',
+                'contactPersonName': 'contactPerson',
+                'contactTelephone': 'tel_ContactPerson',
+                'occupationDesc': 'occupation',
+                'maritalStatus': 'kinMarriedStatus',
+                'maritalStatusDesc': 'kinMarriedStatus',
+                'marriedStatus': 'kinMarriedStatus',
+                'nextOfKinSurname': 'kinLastName',
+                'nextOfKinName': 'kinFirstName',
+                'nextOfKinRelationship': 'kinRelationShip',
+                'nextOfKinTown': 'kinTown',
+                'nextOfKinSuburb': 'kinSuburb',
+                'nextOfKinStreetName': 'kinStreetName',
+                'nextOfKinStreetNo': 'kinStreetNumber',
+                'nextOfKinTelephone': 'kinTelephone',
+                'nextOfKinMobile': 'kinMobile',
+              };
+              for (const [src, dest] of Object.entries(consFieldMap)) {
+                if (consNameVal[src] != null && consNameVal[src] !== '' && !merged[dest]) {
+                  merged[dest] = consNameVal[src];
+                }
+              }
+            }
+            if (!merged['firstNames'] && !merged['surname_Company'] && !merged['idNo_RegistrationNo']) {
+              const [nameBasic, nameAcctInfo] = await Promise.allSettled([
+                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`)),
+                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-info-result/${accountId}`)),
+              ]);
+              const nb = nameBasic.status === 'fulfilled' ? (Array.isArray(nameBasic.value) ? nameBasic.value[0] : nameBasic.value) : null;
+              const na = nameAcctInfo.status === 'fulfilled' ? (Array.isArray(nameAcctInfo.value) ? nameAcctInfo.value[0] : nameAcctInfo.value) : null;
+              const acct = this.selectedAccount();
+              if (!merged['firstNames']) merged['firstNames'] = nb?.['fullNAME'] || na?.['name'] || acct?.['name'] || acct?.['surname_Company'] || '';
+              if (!merged['initials']) merged['initials'] = nb?.['initials'] || '';
+              if (!merged['idNo_RegistrationNo']) merged['idNo_RegistrationNo'] = acct?.['idRegistrationNumber'] || '';
+              merged['_fallback'] = true;
+            }
+            let relatedAccts: any[] = [];
+            if (relatedAcctsResult.status === 'fulfilled') {
+              const r = relatedAcctsResult.value;
+              if (r && Array.isArray(r.accounts)) {
+                relatedAccts = r.accounts;
+              }
+            }
+            data = { name: merged, relatedAccounts: relatedAccts };
+          } catch (nameErr: any) {
+            data = { name: null, relatedAccounts: [] };
+          }
+          break;
+
+        case 'deposits':
+          const [depositsResult, depositAmtResult, refundsResult, reversalsResult, bankGuaranteeResult, bankStmtNotesResult] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/deposits/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/deposit-amount/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/refunds/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-reversals/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/deposit-bank-guarantee/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/get-eft-bank-statement-notes`, { accountId: String(accountId) })),
+          ]);
+          data = {
+            deposits: depositsResult.status === 'fulfilled' ? this.normalizeArray(depositsResult.value) : [],
+            depositAmount: depositAmtResult.status === 'fulfilled' ? depositAmtResult.value : null,
+            refunds: refundsResult.status === 'fulfilled' ? this.normalizeArray(refundsResult.value) : [],
+            reversals: reversalsResult.status === 'fulfilled' ? this.normalizeArray(reversalsResult.value) : [],
+            bankGuarantees: bankGuaranteeResult.status === 'fulfilled' ? this.normalizeArray(bankGuaranteeResult.value) : [],
+            bankStatementNotes: bankStmtNotesResult.status === 'fulfilled' ? this.normalizeArray(bankStmtNotesResult.value) : [],
+          };
+          break;
+
+        case 'transactions':
+          try {
+            const receiptResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/payment-amount-by-account-ids/${accountId}`, { _t: String(Date.now()) })
+            );
+            const receiptArr = this.normalizeArray(receiptResult);
+            if (receiptArr.length > 0) {
+            }
+            data = { transactions: receiptArr };
+          } catch (e: any) {
+            data = { transactions: [], _error: e?.message || 'Failed to load receipts' };
+          }
+          break;
+
+        case 'payment-plans':
+          const [plans, capital, repayment, ppExtensions, ppPaymentAmounts] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-plans-by-account-id/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-plan-remaining-capital/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/repayment-plan-status/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-extension-search-results/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-amount-by-account-ids/${accountId}`)),
+          ]);
+          data = {
+            plans: plans.status === 'fulfilled' ? this.normalizeArray(plans.value) : [],
+            remainingCapital: capital.status === 'fulfilled' ? capital.value : null,
+            repaymentStatus: repayment.status === 'fulfilled' ? this.normalizeArray(repayment.value) : [],
+            extensions: ppExtensions.status === 'fulfilled' ? this.normalizeArray(ppExtensions.value) : [],
+            paymentAmounts: ppPaymentAmounts.status === 'fulfilled' ? this.normalizeArray(ppPaymentAmounts.value) : [],
+          };
+          break;
+
+        case 'incentives':
+          const [incentiveResult, journalResult] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-incentive/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-incentive-journals/${accountId}`)),
+          ]);
+          data = {
+            incentives: incentiveResult.status === 'fulfilled' ? this.normalizeArray(incentiveResult.value) : [],
+            journals: journalResult.status === 'fulfilled' ? this.normalizeArray(journalResult.value) : [],
+          };
+          break;
+
+        case 'notifications':
+          const [acctNotif, propNotif] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-notifications/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-notification/${accountId}`)),
+          ]);
+          data = {
+            accountNotifications: acctNotif.status === 'fulfilled' ? this.normalizeArray(acctNotif.value) : [],
+            propertyNotifications: propNotif.status === 'fulfilled' ? this.normalizeArray(propNotif.value) : [],
+          };
+          break;
+
+        case 'statements':
+          try {
+            const stmtResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/generated-statements/${accountId}`)
+            );
+            const stmtArr = this.normalizeArray(stmtResult);
+            if (stmtArr.length > 0) {
+            } else {
+            }
+            data = { statements: stmtArr };
+            this.stmtGenerated.set(null);
+            this.stmtSendMode.set(null);
+            this.initStmtYears(stmtArr);
+          } catch (e: any) {
+            data = { statements: [], _error: e?.message || 'Failed to load statements' };
+            this.stmtGenerated.set(null);
+            this.stmtSendMode.set(null);
+          }
+          break;
+
+        case 'clearance':
+          this.expandedClearanceRow.set(null);
+          try {
+            const basic = this.getAccountBasic();
+            const clearPropertyId = basic['propertyID'] || basic['property_ID'] || basic['propertyId'] || '';
+            const clearQueryId = clearPropertyId || accountId;
+            const [clearResult, linkedResult] = await Promise.allSettled([
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/clearance-inquiries/${clearQueryId}`)),
+              firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/linked-accounts-on-property`, { accountId: String(accountId) })),
+            ]);
+            const clearArr = clearResult.status === 'fulfilled' ? this.normalizeArray(clearResult.value) : [];
+            const linkedArr = linkedResult.status === 'fulfilled' ? this.normalizeArray(linkedResult.value) : [];
+            this.clearanceLinkedAccounts.set(linkedArr);
+            data = { clearances: clearArr };
+            if (clearResult.status === 'rejected') {
+              data._error = clearResult.reason?.message || 'Failed to load clearance data';
+            }
+          } catch (e: any) {
+            data = { clearances: [], _error: e?.message || 'Failed to load clearance data' };
+            this.clearanceLinkedAccounts.set([]);
+          }
+          break;
+
+        case 'debtor-notes':
+          try {
+            const notesResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/debtor-note-lists/${accountId}`)
+            );
+            data = { notes: this.normalizeArray(notesResult) };
+          } catch (e: any) {
+            data = { notes: [], _error: e?.message || 'Failed to load debtor notes' };
+          }
+          break;
+
+        case 'section129':
+          try {
+            const s129FinYearParam = this.userFinYear() || this.getCurrentFinYear();
+            const s129Result = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/section129-account-enquiry/${accountId}`, { finYear: s129FinYearParam })
+            );
+            const s129Arr = this.normalizeArray(s129Result);
+            data = { section129: s129Arr };
+            this.s129FinYear.set('');
+            this.s129Month.set('');
+            this.s129Filtered.set(s129Arr);
+            this.initS129Years(s129Arr);
+            this.computeS129Insights(s129Arr);
+          } catch (e: any) {
+            data = { section129: [], _error: e?.message || 'Failed to load Section 129 data' };
+            this.s129FinYear.set('');
+            this.s129Month.set('');
+            this.s129Filtered.set([]);
+          }
+          break;
+
+        case 'linked-accounts':
+          const [linkedSettled] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/linked-accounts-on-property`, { accountId: String(accountId) }))
+          ]);
+          const linkedArr = linkedSettled.status === 'fulfilled' ? this.normalizeArray(linkedSettled.value) : [];
+          linkedArr.sort((a: any, b: any) => {
+            const numA = a.accountNumber || a.accountNo || '';
+            const numB = b.accountNumber || b.accountNo || '';
+            return String(numA).localeCompare(String(numB), undefined, { numeric: true });
+          });
+          data = { linkedAccounts: linkedArr };
+          break;
+
+        case 'debit-orders':
+          const [doResult, doDeduction] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/debit-order-deduction-by-account/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/debit-order-deduction/${accountId}`)),
+          ]);
+          data = {
+            debitOrders: doResult.status === 'fulfilled' ? this.normalizeArray(doResult.value) : [],
+            deductions: doDeduction.status === 'fulfilled' ? this.normalizeArray(doDeduction.value) : [],
+          };
+          break;
+
+        case 'rates':
+          this.initRatesYears();
+          if (!this.ratesFinYear()) {
+            this.ratesFinYear.set(this.userFinYear() || this.getCurrentFinYear());
+          }
+          const ratesFy = this.ratesFinYear() || this.getCurrentFinYear();
+          const ratesFyParam: Record<string, string> = ratesFy ? { finYear: ratesFy } : {};
+          const acctForRates: any = this.selectedAccount();
+          const ratesUnitPartId = acctForRates?.unitPartitionID || acctForRates?.unitPartition_ID;
+          const [ratesDetail, ratesHistory, ratesPropDetails, propRatesSearch, detailedTxns, ratesConsUnitById, ratesConsAcctDetails, ratesServices, ratesMeterPropServices, ratesDebtInquiry] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`, ratesFyParam)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/rates-run-history/${accountId}`, ratesFyParam)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-details-by-account/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-rates-search`, {
+              finYear: ratesFy || this.getCurrentFinYear(),
+              accountId: String(Number(accountId) || accountId),
+              ...(ratesUnitPartId ? { unitPartitionId: String(Number(ratesUnitPartId) || ratesUnitPartId) } : {}),
+              pageSize: '50'
+            })),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/detailed-transaction-results/${accountId}`, ratesFyParam)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/cons-unit-by-account`, { AccountId: String(accountId) })),
+            firstValueFrom(this.api.get<any>(`/api/platinum/receipt-prepaid/cons-account-details`, { accountId: String(accountId) })),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-service-meter-per-property/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/total-balance-debt-inquiry/${accountId}`, { _t: String(Date.now()), financialYear: ratesFy || this.getCurrentFinYear() })),
+          ]);
+          const ratesDetailVal = ratesDetail.status === 'fulfilled' ? (Array.isArray(ratesDetail.value) ? ratesDetail.value[0] : ratesDetail.value) : null;
+          const ratesHistoryVal = ratesHistory.status === 'fulfilled' ? this.normalizeArray(ratesHistory.value) : [];
+          const propDetailsVal = ratesPropDetails.status === 'fulfilled' ? (Array.isArray(ratesPropDetails.value) ? ratesPropDetails.value[0] : ratesPropDetails.value) : null;
+          const ratesConsUnitByIdVal = ratesConsUnitById.status === 'fulfilled' ? (Array.isArray(ratesConsUnitById.value) ? ratesConsUnitById.value[0] : ratesConsUnitById.value) : null;
+          if (ratesConsUnitByIdVal && !ratesConsUnitByIdVal._error) {
+          }
+          const propRatesSearchVal = propRatesSearch.status === 'fulfilled' ? propRatesSearch.value : null;
+          let propRatesData: any[] = propRatesSearchVal?.data ? (Array.isArray(propRatesSearchVal.data) ? propRatesSearchVal.data : [propRatesSearchVal.data]) : (Array.isArray(propRatesSearchVal) ? propRatesSearchVal : propRatesSearchVal && !propRatesSearchVal._error ? [propRatesSearchVal] : []);
+          if (propRatesData.length === 0 && ratesUnitPartId) {
+            try {
+              const partitionResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-rates-by-partition/${ratesUnitPartId}`, ratesFyParam));
+              if (partitionResult && !partitionResult._error) {
+                const partData = partitionResult?.data ? (Array.isArray(partitionResult.data) ? partitionResult.data : [partitionResult.data]) : (Array.isArray(partitionResult) ? partitionResult : [partitionResult]);
+                if (partData.length > 0) propRatesData = partData;
+              }
+            } catch (e) { }
+          }
+          const allDetailedTxns = detailedTxns.status === 'fulfilled' ? this.normalizeArray(detailedTxns.value) : [];
+          const monthOrder = ['july','august','september','october','november','december','january','february','march','april','may','june'];
+          const monthLabels: Record<string,string> = {july:'Jul',august:'Aug',september:'Sep',october:'Oct',november:'Nov',december:'Dec',january:'Jan',february:'Feb',march:'Mar',april:'Apr',may:'May',june:'Jun'};
+          const ratesRow = allDetailedTxns.find((t: any) => (t.serviceDesc || '').toLowerCase().includes('property rate') && t.transGroup === 201);
+          const ratesBillingHistory: any[] = [];
+          if (ratesRow) {
+            for (const m of monthOrder) {
+              const val = ratesRow[m] ?? 0;
+              if (val !== 0) {
+                ratesBillingHistory.push({
+                  month: monthLabels[m] || m,
+                  financialYear: ratesRow.financialYear || '',
+                  levy: val,
+                  serviceDesc: ratesRow.serviceDesc || 'Property Rates'
+                });
+              }
+            }
+          }
+          const ratesRebateRow = allDetailedTxns.find((t: any) => (t.serviceDesc || '').toLowerCase().includes('rate') && (t.serviceDesc || '').toLowerCase().includes('rebate'));
+          if (ratesRebateRow) {
+            for (let i = 0; i < ratesBillingHistory.length; i++) {
+              const m = monthOrder.find(mo => monthLabels[mo] === ratesBillingHistory[i].month);
+              if (m) {
+                ratesBillingHistory[i].rebate = ratesRebateRow[m] ?? 0;
+              }
+            }
+          }
+          const rebateAmt = ratesDetailVal && !ratesDetailVal._error ? (ratesDetailVal.rebateAmount || 0) : 0;
+          if (rebateAmt && ratesBillingHistory.length > 0 && !ratesRebateRow) {
+            const monthlyRebate = rebateAmt / ratesBillingHistory.length;
+            for (const item of ratesBillingHistory) {
+              item.rebate = monthlyRebate;
+            }
+          }
+          let valuationsArr: any[] = [];
+          let valuationDataVal: any = null;
+          let valuationImportVal: any = null;
+          const ratesUnitPartIdForVal = ratesUnitPartId || propDetailsVal?.unitPartitionID || propDetailsVal?.unitPartition_ID;
+          if (ratesUnitPartIdForVal) {
+            try {
+              const valByUnit = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-unit`, { unitPartitionID: String(ratesUnitPartIdForVal) }));
+              if (valByUnit && !valByUnit._error) {
+                const valArr = Array.isArray(valByUnit) ? valByUnit : [valByUnit];
+                valuationsArr = valArr;
+                if (valArr.length > 0) valuationDataVal = valArr[0];
+              }
+            } catch (e) {
+            }
+          }
+          if (valuationsArr.length === 0) {
+            const propId = propDetailsVal?.property_ID || propDetailsVal?.propertyID || propDetailsVal?.propertyId;
+            if (propId) {
+              const [suppVal, valById, valImport] = await Promise.allSettled([
+                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/supplementary-valuations`, { propertyId: String(propId) })),
+                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-id`, { propertyId: String(propId) })),
+                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-import-by-id`, { propertyId: String(propId) })),
+              ]);
+              valuationsArr = suppVal.status === 'fulfilled' ? this.normalizeArray(suppVal.value) : [];
+              valuationDataVal = valById.status === 'fulfilled' && valById.value && !valById.value._error ? (Array.isArray(valById.value) ? valById.value[0] : valById.value) : null;
+              valuationImportVal = valImport.status === 'fulfilled' && valImport.value && !valImport.value._error ? (Array.isArray(valImport.value) ? valImport.value[0] : valImport.value) : null;
+            }
+          }
+
+          const ratesConsUnit = ratesConsUnitByIdVal && !ratesConsUnitByIdVal._error ? ratesConsUnitByIdVal : null;
+          const ratesConsAcctVal = ratesConsAcctDetails.status === 'fulfilled' ? (Array.isArray(ratesConsAcctDetails.value) ? ratesConsAcctDetails.value[0] : ratesConsAcctDetails.value) : null;
+          const ratesConsAcct = ratesConsAcctVal && !ratesConsAcctVal._error ? ratesConsAcctVal : null;
+          const ratesServicesList = ratesServices.status === 'fulfilled' ? this.normalizeArray(ratesServices.value) : [];
+          const meterPropSvcList = ratesMeterPropServices.status === 'fulfilled' ? this.normalizeArray(ratesMeterPropServices.value) : [];
+          const allSvcsCombined = [...ratesServicesList, ...meterPropSvcList];
+          let propRatesSvc = allSvcsCombined.find((s: any) => {
+            const desc = (s.serviceDesc || s.serviceDescription || '').toLowerCase();
+            return desc.includes('property rate');
+          });
+          if (!propRatesSvc) {
+            propRatesSvc = allSvcsCombined.find((s: any) => {
+              const desc = (s.serviceDesc || s.serviceDescription || '').toLowerCase();
+              return desc.includes('rates') && !desc.includes('water') && !desc.includes('elec') && !desc.includes('sewer') && !desc.includes('refuse');
+            });
+          }
+          let activeRatesTariff = propRatesSvc?.tariff || propRatesSvc?.tariffDesc || propRatesSvc?.tariffDescription || propRatesSvc?.ratesTariffDescription || propRatesSvc?.serviceDesc || propRatesSvc?.serviceDescription || '';
+          if (!activeRatesTariff) {
+            const debtInqData = ratesDebtInquiry.status === 'fulfilled' ? this.normalizeArray(ratesDebtInquiry.value) : [];
+            const propRateBalance = debtInqData.find((s: any) => {
+              const desc = (s.serviceDescription || '').toLowerCase();
+              return desc.includes('property rate');
+            });
+            if (propRateBalance) activeRatesTariff = propRateBalance.serviceDescription || '';
+          }
+          data = {
+            ratesDetails: ratesDetailVal && !ratesDetailVal._error ? ratesDetailVal : null,
+            ratesHistory: ratesHistoryVal,
+            ratesBillingHistory: ratesBillingHistory,
+            allDetailedTxns: allDetailedTxns,
+            propertyDetails: propDetailsVal && !propDetailsVal._error ? propDetailsVal : null,
+            valuations: valuationsArr,
+            valuationData: valuationDataVal,
+            valuationImport: valuationImportVal,
+            propertyRatesData: propRatesData,
+            consUnit: ratesConsUnit,
+            consAccountDetails: ratesConsAcct,
+            servicesList: ratesServicesList,
+            activeRatesTariff: activeRatesTariff,
+          };
+          break;
+
+        case 'indigent':
+          try {
+            const indigentResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/attp-application-history/${accountId}`)
+            );
+            const indHistory = this.normalizeArray(indigentResult);
+            data = { indigentHistory: indHistory };
+            this.indigentInsights.set(this.computeIndigentInsights(indHistory));
+          } catch (e: any) {
+            data = { indigentHistory: [], _error: e?.message || 'Failed to load indigent subsidy data' };
+            this.indigentInsights.set(null);
+          }
+          break;
+
+        case 'services-meters':
+          const [meteredSvc, meterReadings, prepaidMeters] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-service-meter-per-property/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-meter-services-for-account`, { accountId: String(accountId) })),
+          ]);
+          const allMeters = meteredSvc.status === 'fulfilled' ? this.normalizeArray(meteredSvc.value) : [];
+          const prepaidList = prepaidMeters.status === 'fulfilled' ? this.normalizeArray(prepaidMeters.value) : [];
+          const prepaidMeterNos = new Set(prepaidList.map((p: any) => (p.prepaidMeterNo || p.meterNumber || p.physicalMeterNumber || p.meterNo || '').toLowerCase()).filter(Boolean));
+          const convMeters = allMeters.filter((m: any) => {
+            const desc = (m.serviceDesc || m.serviceDescription || '').toLowerCase();
+            const mNo = (m.physicalMeterNo || m.meterNo || '').toLowerCase();
+            if (desc.includes('prepaid') || desc.includes('pre-paid') || desc.includes('pre paid')) return false;
+            if (mNo && prepaidMeterNos.has(mNo)) return false;
+            return true;
+          });
+          const finalPrepaid = prepaidList;
+          data = {
+            meters: allMeters,
+            conventionalMeters: convMeters,
+            prepaidMeters: finalPrepaid,
+            meterProperties: meterReadings.status === 'fulfilled' ? this.normalizeArray(meterReadings.value) : [],
+          };
+          this.meterSelectedConv.set(null);
+          this.meterConvHistory.set([]);
+          this.meterConvInsights.set(null);
+          this.meterSelectedPrepaid.set(null);
+          this.meterPrepaidSales.set([]);
+          this.meterPrepaidStats.set(null);
+          if (convMeters.length > 0) {
+            this.selectConvMeter(convMeters[0]);
+          }
+          if (finalPrepaid.length > 0) {
+            this.selectPrepaidMeter(finalPrepaid[0]);
+          }
+          break;
+
+        case 'consumption':
+          const [consumptionMeters, unitLinkedMeters] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`)),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/unit-linked-meters`, { accountId: String(accountId) })),
+          ]);
+          const meterList = consumptionMeters.status === 'fulfilled' ? this.normalizeArray(consumptionMeters.value) : [];
+          const linkedMeters = unitLinkedMeters.status === 'fulfilled' ? this.normalizeArray(unitLinkedMeters.value) : [];
+          const combinedMeters = meterList.length > 0 ? meterList : linkedMeters;
+          data = { meters: combinedMeters };
+          this.consumptionSelectedMeter.set(null);
+          this.consumptionHistory.set([]);
+          this.consumptionChartData.set([]);
+          this.consumptionInsights.set(null);
+          if (combinedMeters.length > 0) {
+            this.selectConsumptionMeter(combinedMeters[0]);
+          }
+          break;
+
+        case 'txn-detailed':
+          this.initSummaryYears();
+          if (!this.detailFinYear()) {
+            this.detailFinYear.set(this.userFinYear() || this.getCurrentFinYear());
+          }
+          const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+          const finMonths = this.detailMonths;
+          const matchMonth = finMonths.find(m => m === currentMonth);
+          if (matchMonth) {
+            this.detailMonth.set(matchMonth);
+            this.exportFromMonth.set('July');
+            this.exportToMonth.set(matchMonth);
+          }
+          this.loadDetailedTransactions();
+          data = { _detailTab: true };
+          break;
+
+        case 'txn-summary':
+          this.initSummaryYears();
+          if (!this.summaryFinYear()) {
+            this.summaryFinYear.set(this.userFinYear() || this.getCurrentFinYear());
+          }
+          await this.loadTransactionSummary(accountId, this.summaryFinYear());
+          data = { _summaryManaged: true };
+          break;
+
+        case 'billed-vs-paid':
+          this.initBvpYears();
+          if (!this.bvpFinYear()) {
+            this.bvpFinYear.set(this.userFinYear() || this.getCurrentFinYear());
+          }
+          const bvpYear = this.bvpFinYear();
+          const [billedVsPaid, billedBalance2, bvpCloseBalance, bvpReceipts] = await Promise.allSettled([
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/billed-vs-paid-amounts`, { accountId: String(accountId), financialYear: bvpYear, _t: String(Date.now()) })),
+            this.fetchAccountBalance(accountId),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/close-balance-detail/${accountId}`, { _t: String(Date.now()) })),
+            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-amount-by-account-ids/${accountId}`, { _t: String(Date.now()) })),
+          ]);
+          const bvpArr = billedVsPaid.status === 'fulfilled' ? this.normalizeArray(billedVsPaid.value) : [];
+          const balArr = billedBalance2.status === 'fulfilled' ? this.normalizeArray(billedBalance2.value) : [];
+          const closeBalArr = bvpCloseBalance.status === 'fulfilled' ? this.normalizeArray(bvpCloseBalance.value) : [];
+          const bvpReceiptArr = bvpReceipts.status === 'fulfilled' ? this.normalizeArray(bvpReceipts.value) : [];
+          if (bvpArr.length > 0) {
+          } else {
+          }
+          if (closeBalArr.length > 0) {
+          }
+          if (balArr.length > 0) {
+          }
+          const enrichedBvp = this.enrichBvpWithReceipts(bvpArr, bvpReceiptArr);
+          data = {
+            billedVsPaid: enrichedBvp,
+            balance: balArr,
+            closeBalance: closeBalArr,
+            receipts: bvpReceiptArr,
+          };
+          break;
+
+        case 'occupiers':
+          try {
+            const occResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/add-occupiers/${accountId}`)
+            );
+            const occArr = this.normalizeArray(occResult);
+            data = { occupiers: occArr };
+            this.occupiersList.set(occArr);
+            this.selectedOccupierIdx.set(null);
+          } catch (e: any) {
+            data = { occupiers: [], _error: e?.message || 'Failed to load occupiers' };
+            this.occupiersList.set([]);
+          }
+          break;
+
+        case 'extensions':
+          try {
+            const extResult = await firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/payment-extension-search-results/${accountId}`)
+            );
+            data = { extensions: this.normalizeArray(extResult) };
+          } catch (e: any) {
+            data = { extensions: [], _error: e?.message || 'Failed to load payment extensions' };
+          }
+          break;
+
+        case 'next-bill':
+          data = { _nextBillTab: true };
+          break;
+
+        default:
+          data = { message: 'Tab not implemented' };
+      }
+
+      if (generation === this._loadTabGeneration) {
+        this.tabData.set(data);
+        if (tab === 'name') {
+          this.relatedAccounts.set(data?.relatedAccounts || []);
+          this.relatedAccountsSearched.set(!!data?.relatedAccounts);
+        }
+        if (tab === 'handover') {
+          this.initHandoverYear();
+          this.handoverPage.set(1);
+        }
+        if (tab === 'linked-accounts') {
+          this.expandedLinkedRow.set(null);
+        }
+      }
+    } catch (e: any) {
+      if (generation === this._loadTabGeneration) {
+        this.tabError.set(e?.error?.message || e?.message || 'Failed to load tab data');
+      }
+    } finally {
+      if (generation === this._loadTabGeneration) {
+        this.tabLoading.set(false);
+      }
+    }
+  }
+
+  async fetchAccountBalance(accountId: number): Promise<any> {
+    const fy = this.userFinYear();
+    const fyParams: Record<string, string> = { _t: String(Date.now()) };
+    if (fy) fyParams['financialYear'] = fy;
+
+    try {
+      const res = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/total-balance-debt-inquiry/${accountId}`, fyParams)
+      );
+      if (res && !res._error) {
+        return Array.isArray(res) ? res : res ? [res] : [];
+      }
+    } catch {
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/close-balance-detail/${accountId}`, fyParams)
+      );
+      if (res && !res._error) {
+        return Array.isArray(res) ? res : res ? [res] : [];
+      }
+    } catch {
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/account-balance/${accountId}`, { _t: String(Date.now()) })
+      );
+      if (res && !res._error) {
+        return Array.isArray(res) ? res : res ? [res] : [];
+      }
+    } catch {
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance/${accountId}`, fyParams)
+      );
+      if (res && !res._error) {
+        return Array.isArray(res) ? res : res ? [res] : [];
+      }
+    } catch {
+    }
+
+    return [];
+  }
+
+  hasCriticalFlags(): boolean {
+    return this.riskFlags().some(f => f.severity === 'critical');
+  }
+
+  getBalanceItems(): any[] {
+    const data = this.tabData();
+    return data?.balance || [];
+  }
+
+  getServicesList(): any[] {
+    const data = this.tabData();
+    const searchSvc = data?.searchServices || [];
+    const allSvc = data?.services || [];
+    return searchSvc.length > 0 ? searchSvc : allSvc;
+  }
+
+  getFilteredReceipts(): any[] {
+    const txns = this.tabData()?.transactions || [];
+    const filter = this.receiptFilter();
+    const dir = this.receiptSortDir();
+    let filtered = txns;
+    if (filter !== 'all') {
+      filtered = txns.filter((t: any) => {
+        const pt = (t.paymentType || '').toLowerCase();
+        if (filter === 'eft') return pt === 'eft';
+        if (filter === 'cash') return pt === 'cash';
+        if (filter === 'card') return pt.includes('card') || pt.includes('credit') || pt.includes('debit');
+        if (filter === 'cancelled') return !!(t.isCancelled || t.cancelReson || t.cancelReason);
+        return true;
+      });
+    }
+    const sorted = [...filtered].sort((a: any, b: any) => {
+      const da = new Date(a.receiptDate || a.transactionDate || a.date || 0).getTime();
+      const db = new Date(b.receiptDate || b.transactionDate || b.date || 0).getTime();
+      return dir === 'desc' ? db - da : da - db;
+    });
+    return sorted;
+  }
+
+  getReceiptPaymentTypes(): { type: string; count: number; total: number }[] {
+    const txns = this.tabData()?.transactions || [];
+    const map: Record<string, { count: number; total: number }> = {};
+    for (const t of txns) {
+      const pt = t.paymentType || 'Unknown';
+      if (!map[pt]) map[pt] = { count: 0, total: 0 };
+      map[pt].count++;
+      map[pt].total += Number(t.receiptAmount || t.amount || t.tenderAmount || 0);
+    }
+    return Object.entries(map).map(([type, v]) => ({ type, ...v })).sort((a, b) => b.total - a.total);
+  }
+
+  getReceiptStats(): { total: number; count: number; avgAmount: number; latestDate: string; oldestDate: string; eftCount: number; cashCount: number; cardCount: number; cancelledCount: number } {
+    const txns = this.tabData()?.transactions || [];
+    let total = 0, eftCount = 0, cashCount = 0, cardCount = 0, cancelledCount = 0;
+    let latestDate = '', oldestDate = '';
+    for (const t of txns) {
+      total += Number(t.receiptAmount || t.amount || t.tenderAmount || 0);
+      const pt = (t.paymentType || '').toLowerCase();
+      if (pt === 'eft') eftCount++;
+      else if (pt === 'cash') cashCount++;
+      else if (pt.includes('card') || pt.includes('credit') || pt.includes('debit')) cardCount++;
+      if (t.isCancelled || t.cancelReson || t.cancelReason) cancelledCount++;
+      const d = t.receiptDate || t.transactionDate || t.date || '';
+      if (d && (!latestDate || d > latestDate)) latestDate = d;
+      if (d && (!oldestDate || d < oldestDate)) oldestDate = d;
+    }
+    return { total, count: txns.length, avgAmount: txns.length ? total / txns.length : 0, latestDate, oldestDate, eftCount, cashCount, cardCount, cancelledCount };
+  }
+
+  getReceiptTimelineGroups(): { label: string; month: string; receipts: any[] }[] {
+    const txns = this.getFilteredReceipts();
+    const groups: Record<string, any[]> = {};
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    for (const t of txns) {
+      const d = new Date(t.receiptDate || t.transactionDate || t.date || 0);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      if (!groups[key]) groups[key] = [];
+      (groups[key] as any).__label = label;
+      groups[key].push(t);
+    }
+    const entries = Object.entries(groups).sort((a, b) => this.receiptSortDir() === 'desc' ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]));
+    return entries.map(([month, receipts]) => ({ label: (receipts as any).__label, month, receipts }));
+  }
+
+  sumReceiptAmounts = (sum: number, t: any) => sum + Number(t.receiptAmount || t.amount || t.tenderAmount || 0);
+
+  getReceiptKey(txn: any): number {
+    if (!txn) return 0;
+    return Number(txn.receiptID || txn.receipt_ID || txn.receiptId || 0);
+  }
+
+  getReceiptNo(txn: any): string {
+    return txn.receiptNo || txn.receiptNumber || txn.receipt_No || '';
+  }
+
+  getReceiptPaymentIcon(type: string): string {
+    const t = (type || '').toLowerCase();
+    if (t === 'eft') return '🏦';
+    if (t === 'cash') return '💵';
+    if (t.includes('card') || t.includes('credit') || t.includes('debit')) return '💳';
+    return '📄';
+  }
+
+  getReceiptStatusClass(txn: any): string {
+    if (txn.isCancelled || txn.cancelReson || txn.cancelReason) return 'rcpt-cancelled';
+    const t = (txn.paymentType || '').toLowerCase();
+    if (t === 'eft') return 'rcpt-eft';
+    if (t === 'cash') return 'rcpt-cash';
+    if (t.includes('card') || t.includes('credit') || t.includes('debit')) return 'rcpt-card';
+    return '';
+  }
+
+  isEftReceipt(txn: any): boolean {
+    return (txn.paymentType || '').toLowerCase() === 'eft';
+  }
+
+  getEftBankDescription(txn: any): string {
+    const no = this.getReceiptNo(txn);
+    const bank = txn.cashBook || '';
+    const noUpper = no.toUpperCase();
+    if (!noUpper.startsWith('EFT')) {
+      if (bank) return `EFT via ${bank}`;
+      return 'EFT Payment';
+    }
+    const parts = no.substring(3).split('/');
+    const dateStr = parts[0] || '';
+    const ref = parts[1] || '';
+    let desc = `EFT`;
+    if (bank) desc += ` via ${bank}`;
+    if (dateStr.length === 8) {
+      const d = dateStr.substring(0, 2);
+      const m = dateStr.substring(2, 4);
+      const y = dateStr.substring(4, 8);
+      desc += ` | Processed: ${d}/${m}/${y}`;
+    }
+    if (ref) desc += ` | Ref: ${ref}`;
+    return desc;
+  }
+
+  async selectReceiptForDetail(txn: any): Promise<void> {
+    const key = this.getReceiptKey(txn);
+    if (this.getReceiptKey(this.receiptSelectedTxn()) === key && key > 0) {
+      this.receiptSelectedTxn.set(null);
+      this.receiptDetailData.set(null);
+      return;
+    }
+    this.receiptSelectedTxn.set(txn);
+    this.receiptDetailData.set(null);
+    this.receiptDetailLoading.set(true);
+    try {
+      const receiptId = key;
+      if (receiptId) {
+        const detail = await firstValueFrom(
+          this.api.get<any>(`/api/platinum/billing-enquiry/receipt-transaction-detail`, { receiptId: String(receiptId) })
+        );
+        const arr = this.normalizeArray(detail);
+        if (arr.length > 0) {
+        }
+        this.receiptDetailData.set({ lines: arr });
+      }
+    } catch (e) {
+      this.receiptDetailData.set({ error: true });
+    } finally {
+      this.receiptDetailLoading.set(false);
+    }
+  }
+
+  async printReceipt(txn: any, event?: Event): Promise<void> {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    const receiptId = this.getReceiptKey(txn);
+    if (!receiptId) {
+      this.toast.error('No receipt ID available for printing');
+      return;
+    }
+    this.receiptPrinting.set(receiptId);
+    try {
+      const response = await fetch('/api/platinum/billing-payment/print-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [Number(receiptId)], receiptNos: [txn.receiptNo || ''], isReprint: true }),
+      });
+      if (!response.ok) throw new Error(`Print failed: ${response.status}`);
+      const blob = await response.blob();
+      if (blob.size < 200) {
+        this.toast.error('Receipt PDF is empty or unavailable');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, '_blank');
+      if (w) {
+        w.addEventListener('load', () => { setTimeout(() => { w.print(); }, 500); });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      this.toast.success('Receipt opened for printing');
+    } catch (e: any) {
+      this.toast.error('Failed to print receipt: ' + (e.message || 'Unknown error'));
+    } finally {
+      this.receiptPrinting.set(null);
+    }
+  }
+
+  getAccountBasic(): any {
+    return this.tabData()?.basic || {};
+  }
+
+  getAccountProp(): any {
+    return this.tabData()?.property || {};
+  }
+
+  getPropertyMarketValue(): number | null {
+    const p = this.tabData()?.property;
+    const c = this.tabData()?.consUnit;
+    const v = p?.marketValue ?? p?.propertyMarketValue ?? c?.marketValue ?? c?.propertyMarketValue ?? null;
+    return (v != null && v !== '') ? v : null;
+  }
+
+  getPartitionMarketValue(): number | null {
+    const p = this.tabData()?.property;
+    const v = p?.partitionMarketValue ?? p?.partMarketValue ?? null;
+    return (v != null && v !== '') ? v : null;
+  }
+
+  buildPropertyDescription(): string {
+    const td = this.tabData();
+    const cu = td?.consUnit;
+    const p = td?.propertyDetails || td?.property;
+    const pr = (td?.propertyRatesData || [])[0];
+    const sg = cu?.sgNumber || p?.sgNumber || pr?.sgNumber || '';
+    const erfNum = cu?.erfNumber || p?.erfNumber || pr?.erfNumber || '';
+    const portion = cu?.portion || p?.portion || '';
+    const farmName = cu?.farmName || p?.farmName || pr?.farmName || '';
+    const sectionalTitle = cu?.sectionalTitleScheme || cu?.sectionalTitleSchemeName || p?.sectionalTitleScheme || pr?.sectionalTitleSchemeName || '';
+    const sectionNumber = cu?.sectionNumber || cu?.unitNumber || p?.sectionNumber || pr?.sectionNumber || '';
+    const town = cu?.town || cu?.nonStandAddTown || p?.town || pr?.town || '';
+    const propType = (cu?.propertyType || cu?.typeOfUse || cu?.typeofUse || p?.propertyType || p?.typeOfUse || pr?.propertyTypeOfUse || '').toString().toUpperCase();
+    if (sectionalTitle || sectionNumber) {
+      const parts: string[] = [];
+      if (sectionNumber) parts.push(`Section ${sectionNumber}`);
+      if (sectionalTitle) parts.push(sectionalTitle);
+      if (town && !sectionalTitle.toLowerCase().includes(town.toLowerCase())) parts.push(town);
+      return parts.join(', ') || '-';
+    }
+    if (farmName && (propType.includes('FARM') || propType.includes('AGR'))) {
+      const parts: string[] = [];
+      if (portion && portion !== '0') parts.push(`Portion ${portion} of`);
+      parts.push(`Farm ${farmName}`);
+      if (town) parts.push(town);
+      return parts.join(' ') || '-';
+    }
+    if (erfNum || sg) {
+      const erf = erfNum || (sg ? sg.split('/')[2]?.replace(/^0+/, '') : '');
+      if (erf) {
+        const parts: string[] = [];
+        if (portion && portion !== '0') {
+          parts.push(`Portion ${portion} of Erf ${erf}`);
+        } else {
+          parts.push(`Erf ${erf}`);
+        }
+        if (town) parts.push(town);
+        return parts.join(', ') || '-';
+      }
+    }
+    return cu?.unitDescription || cu?.description || p?.description || pr?.unitPartitionDescription || '-';
+  }
+
+  getRatesMarketValue(): number | null {
+    const td = this.tabData();
+    const vd = td?.valuationData;
+    const cu = td?.consUnit;
+    const p = td?.propertyDetails;
+    const pr = (td?.propertyRatesData || [])[0];
+    const v = vd?.marketValue ?? vd?.standMarketValue ?? vd?.totalMarketValue ??
+      cu?.marketValue ?? cu?.propertyMarketValue ??
+      p?.marketValue ?? p?.propertyMarketValue ??
+      pr?.marketValue ?? null;
+    return (v != null && v !== '' && v !== 0) ? v : null;
+  }
+
+  getRatesActiveTariff(): string {
+    const td = this.tabData();
+    if (td?.activeRatesTariff) return td.activeRatesTariff;
+    const pr = (td?.propertyRatesData || [])[0];
+    const rd = td?.ratesDetails;
+    const ca = td?.consAccountDetails;
+    return pr?.tariffDescription || pr?.tariffDesc || pr?.ratesTariffDescription ||
+      rd?.tariffDescription || rd?.tariffDesc ||
+      pr?.levyDescription || rd?.levyDescription ||
+      ca?.tariffDescription || ca?.tariffDesc || ca?.ratesTariffDescription || '-';
+  }
+
+  getRatesTotalLevy(): number {
+    const items = this.tabData()?.ratesBillingHistory || [];
+    return items.reduce((sum: number, item: any) => sum + (item.levy || 0), 0);
+  }
+
+  getRatesTotalRebate(): number {
+    const items = this.tabData()?.ratesBillingHistory || [];
+    return items.reduce((sum: number, item: any) => sum + (item.rebate || 0), 0);
+  }
+
+  getAccountPropertyDescription(): string {
+    const td = this.tabData();
+    const cu = td?.consUnit;
+    const p = td?.property;
+    const sg = cu?.sgNumber || p?.sgNumber || '';
+    const erfNum = cu?.erfNumber || p?.erfNumber || '';
+    const portion = cu?.portion || p?.portion || '';
+    const farmName = cu?.farmName || p?.farmName || '';
+    const sectionalTitle = cu?.sectionalTitleScheme || cu?.sectionalTitleSchemeName || p?.sectionalTitleScheme || '';
+    const sectionNumber = cu?.sectionNumber || cu?.unitNumber || p?.sectionNumber || '';
+    const town = cu?.town || cu?.nonStandAddTown || p?.town || '';
+    const propType = (cu?.propertyType || cu?.typeOfUse || cu?.typeofUse || p?.propertyType || p?.typeOfUse || p?.typeOfUseDesc || '').toString().toUpperCase();
+    if (sectionalTitle || sectionNumber) {
+      const parts: string[] = [];
+      if (sectionNumber) parts.push(`Section ${sectionNumber}`);
+      if (sectionalTitle) parts.push(sectionalTitle);
+      if (town && !sectionalTitle.toLowerCase().includes(town.toLowerCase())) parts.push(town);
+      return parts.join(', ') || '-';
+    }
+    if (farmName && (propType.includes('FARM') || propType.includes('AGR'))) {
+      const parts: string[] = [];
+      if (portion && portion !== '0') parts.push(`Portion ${portion} of`);
+      parts.push(`Farm ${farmName}`);
+      if (town) parts.push(town);
+      return parts.join(' ') || '-';
+    }
+    if (erfNum || sg) {
+      const erf = erfNum || (sg ? sg.split('/')[2]?.replace(/^0+/, '') : '');
+      if (erf) {
+        const parts: string[] = [];
+        if (portion && portion !== '0') {
+          parts.push(`Portion ${portion} of Erf ${erf}`);
+        } else {
+          parts.push(`Erf ${erf}`);
+        }
+        if (town) parts.push(town);
+        return parts.join(', ') || '-';
+      }
+    }
+    return cu?.unitDescription || cu?.description || p?.description || '-';
+  }
+
+  getAccountPropertyCategory(): string {
+    const td = this.tabData();
+    return td?.consUnit?.propertyCategory || td?.consUnit?.category ||
+      td?.property?.propertyCategory || td?.property?.category ||
+      td?.property?.zoneDesc || '-';
+  }
+
+  getAccountTypeOfUse(): string {
+    const td = this.tabData();
+    return td?.consUnit?.typeOfUseDesc || td?.consUnit?.typeOfUse || td?.consUnit?.typeofUse ||
+      td?.property?.typeOfUseDesc || td?.property?.typeOfUse || td?.property?.typeofUse ||
+      td?.property?.zoneDesc || '-';
+  }
+
+  resolvePropertyType(propertyTypeID: number | null | undefined, sgNumber: string | null | undefined, sectionNumber: any, farmID: any): string {
+    if (propertyTypeID) {
+      const map: Record<number, string> = { 1: 'Erf', 2: 'Farm', 3: 'Sectional Title', 4: 'Agricultural Holding' };
+      if (map[propertyTypeID]) return map[propertyTypeID];
+    }
+    if (sectionNumber && sectionNumber !== '0' && sectionNumber !== 0) return 'Sectional Title';
+    if (farmID && farmID !== '0' && farmID !== 0) return 'Farm';
+    const sg = (sgNumber || '').toString();
+    if (sg) {
+      if (/^[A-Z]\d{3,}/i.test(sg)) return 'Erf';
+      if (/^T\d/i.test(sg)) return 'Farm';
+    }
+    return '';
+  }
+
+  getAccountActiveTariff(): string {
+    const td = this.tabData();
+    const rd = td?.ratesDetails;
+    const pr = (td?.propertyRatesData || [])[0];
+    return rd?.tariffDescription || rd?.tariffDesc || rd?.ratesTariffDescription || rd?.levyDescription ||
+      pr?.tariffDescription || pr?.tariffDesc || pr?.ratesTariffDescription || pr?.levyDescription || '-';
+  }
+
+  getAccountMarketValue(): number | null {
+    const td = this.tabData();
+    const vd = td?.valuationData;
+    const cu = td?.consUnit;
+    const p = td?.property;
+    const v = vd?.marketValue ?? vd?.standMarketValue ?? vd?.totalMarketValue ??
+      cu?.marketValue ?? cu?.propertyMarketValue ??
+      p?.marketValue ?? p?.propertyMarketValue ?? null;
+    return (v != null && v !== '' && v !== 0) ? v : null;
+  }
+
+  getPropertyRegistrationStatus(): string {
+    const p = this.tabData()?.property;
+    if (!p) return '-';
+    const regStatus = p.registrationStatus || p.regStatus;
+    if (regStatus === true || regStatus === 'true' || regStatus === 1 || regStatus === '1') return 'Registered';
+    if (typeof regStatus === 'string' && regStatus.length > 0) return regStatus;
+    if (typeof regStatus === 'number' && regStatus > 0) return 'Registered';
+    if (p.rollNumber) return 'Registered';
+    return '-';
+  }
+
+  getPartitionOwnerName(): string {
+    const po = this.tabData()?.partitionOwner;
+    if (!po) return '';
+    const direct = po.ownerName || po.name || po.accountableOwnerName || po.surname_Company || po.fullName;
+    if (direct) return direct;
+    if (po.firstNames || po.lastName) return [po.lastName, po.firstNames].filter(Boolean).join(' ');
+    return '';
+  }
+
+  getAccountAir(): any {
+    return this.tabData()?.accountInfo || {};
+  }
+
+  getAccountStatusField(field: string): string {
+    const b = this.getAccountBasic();
+    const a = this.getAccountAir();
+    const td = this.tabData() || {};
+    const m = td.mgmt || {};
+    const c = td.consDetails || {};
+    const d = td.mgmtDetails || {};
+    const ds = td.derivedStatuses || {};
+    const sources = [ds, d, m, c, b, a];
+    const fieldVariants: Record<string, string[]> = {
+      'interestWaiver': ['interestWaiverStatus', 'interestWaiverDesc', 'interestWaiver', 'InterestWaiverStatus', 'InterestWaiverDesc', 'interestWaiverStatusDesc', 'interest_Waiver_Status'],
+      'indigentSubsidy': ['indigentSubsidyStatus', 'indigentSubsidy', 'indigentStatus', 'attpStatus', 'IndigentSubsidyStatus', 'IndigentStatus', 'indigentSubsidyStatusDesc', 'indigent_Subsidy_Status'],
+      'consumerRpp': ['consumerRppStatus', 'consumerRPPStatus', 'consumerRpp', 'ConsumerRPPStatus', 'ConsumerRppStatus', 'consumerRppStatusDesc', 'consumer_RPP_Status'],
+      'loanRpp': ['loanRppStatus', 'loanRPPStatus', 'loanRpp', 'LoanRPPStatus', 'LoanRppStatus', 'loanRppStatusDesc', 'loan_RPP_Status'],
+      'rebate': ['rebateStatus', 'rebateStatusDesc', 'rebate', 'RebateStatus', 'RebateStatusDesc', 'rebate_Status'],
+      'handover': ['handoverStatus', 'handoverStatusDesc', 'handover', 'HandoverStatus', 'HandoverStatusDesc', 'handover_Status'],
+      'departmental': ['departmentalAccount', 'departmentalAccountDesc', 'isDepartmental', 'DepartmentalAccount', 'DepartmentalAccountDesc', 'departmental_Account'],
+    };
+    const variants = fieldVariants[field] || [field];
+    for (const v of variants) {
+      for (const src of sources) {
+        if (src[v] != null && src[v] !== '') return String(src[v]);
+      }
+    }
+    return '-';
+  }
+
+  getNameData(): any {
+    return this.tabData()?.name || {};
+  }
+
+  getNameFullName(): string {
+    const n = this.getNameData();
+    const first = n['firstNames'] || n['firstName'] || n['initials'] || '';
+    const last = n['surname_Company'] || n['surname'] || n['surnameCompany'] || n['lastName'] || n['companyName'] || '';
+    const full = [first, last].filter(Boolean).join(' ').trim();
+    return full || n['name'] || n['fullName'] || n['fullNAME'] || '-';
+  }
+
+  getNameDob(): string {
+    const n = this.getNameData();
+    const dob = n['dateOfBirth'] || n['dob'] || n['birthDate'];
+    if (!dob) return '-';
+    return this.formatDate(dob);
+  }
+
+  getNameKinFullName(): string {
+    const n = this.getNameData();
+    const full = [n['kinFirstName'] || n['nextOfKinName'], n['kinLastName'] || n['nextOfKinSurname']].filter(Boolean).join(' ').trim();
+    return full || '-';
+  }
+
+  async searchRelatedAccounts(): Promise<void> {
+    const accountId = this.getAccountId(this.selectedAccount());
+    if (!accountId) return;
+    this.relatedAccountsLoading.set(true);
+    this.relatedAccountsSearched.set(true);
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/accounts-by-name-id`, { accountId: String(accountId) })
+      );
+      if (result && Array.isArray(result.accounts)) {
+        this.relatedAccounts.set(result.accounts);
+      } else {
+        this.relatedAccounts.set([]);
+      }
+    } catch {
+      this.relatedAccounts.set([]);
+    } finally {
+      this.relatedAccountsLoading.set(false);
+    }
+  }
+
+  selectAccountFromRelated(account: any): void {
+    const mapped: SearchResult = {
+      account_ID: account.account_ID || account.accountID || account.id || 0,
+      accountID: account.accountID || account.account_ID || account.id || 0,
+      accountNumber: account.accountNumber || account.accountNo || '',
+      oldAccountCode: account.oldAccountCode || '',
+      name: account.name || account.surname_Company || account.companyName || '',
+      surname_Company: account.surname_Company || account.name || '',
+      initials: account.initials || '',
+      idRegistrationNumber: account.idRegistrationNumber || '',
+      deliveryAddress: account.deliveryAddress || '',
+      locationAddress: account.locationAddress || '',
+      address: account.address || '',
+      statusDesc: account.statusDesc || account.accountStatus || '',
+      accountStatus: account.accountStatus || account.statusDesc || '',
+      accountDesc: account.accountDesc || account.accountType || '',
+      accountType: account.accountType || account.accountDesc || '',
+      outStandingAmt: account.outStandingAmt || 0,
+      outStandingAmount: account.outStandingAmount || 0,
+      addName: account.addName || '',
+      contactDetails: this.stripHtml(account.contactDetails || ''),
+      unitID: account.unitID || 0,
+      unitPartitionID: account.unitPartitionID || 0,
+      sgNumber: account.sgNumber || '',
+      propertyID: account.propertyID || '',
+    };
+    this.selectAccount(mapped);
+  }
+
+  getCurrentFinYear(): string {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    if (month >= 6) {
+      return `${year}/${year + 1}`;
+    }
+    return `${year - 1}/${year}`;
+  }
+
+  initSummaryYears(): void {
+    if (this.summaryAvailableYears().length > 0) return;
+    const currentFy = this.userFinYear() || this.getCurrentFinYear();
+    const [startYear] = currentFy.split('/').map(Number);
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const y = startYear - i;
+      years.push(`${y}/${y + 1}`);
+    }
+    this.summaryAvailableYears.set(years);
+  }
+
+  initRatesYears(): void {
+    if (this.ratesAvailableYears().length > 0) return;
+    const currentFy = this.userFinYear() || this.getCurrentFinYear();
+    const [startYear] = currentFy.split('/').map(Number);
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const y = startYear - i;
+      years.push(`${y}/${y + 1}`);
+    }
+    this.ratesAvailableYears.set(years);
+  }
+
+  async onRatesYearChange(year: string): Promise<void> {
+    this.ratesFinYear.set(year);
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+    this.tabLoading.set(true);
+    await this.loadTabData('rates', accountId);
+    this.tabLoading.set(false);
+  }
+
+  initBvpYears(): void {
+    if (this.bvpAvailableYears().length > 0) return;
+    const currentFy = this.userFinYear() || this.getCurrentFinYear();
+    const [startYear] = currentFy.split('/').map(Number);
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const y = startYear - i;
+      years.push(`${y}/${y + 1}`);
+    }
+    this.bvpAvailableYears.set(years);
+  }
+
+  async onBvpYearChange(year: string): Promise<void> {
+    this.bvpFinYear.set(year);
+    const acct = this.selectedAccount();
+    const accountId = acct ? this.getAccountId(acct) : null;
+    if (!accountId) return;
+    this.tabLoading.set(true);
+    this.tabError.set(null);
+    try {
+      const [billedVsPaid, billedBalance2, closeBalResult, bvpReceipts] = await Promise.allSettled([
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/billed-vs-paid-amounts`, { accountId: String(accountId), financialYear: year, _t: String(Date.now()) })),
+        this.fetchAccountBalance(accountId),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/close-balance-detail/${accountId}`, { _t: String(Date.now()) })),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/payment-amount-by-account-ids/${accountId}`, { _t: String(Date.now()) })),
+      ]);
+      const bvpArr = billedVsPaid.status === 'fulfilled' ? this.normalizeArray(billedVsPaid.value) : [];
+      const balArr = billedBalance2.status === 'fulfilled' ? this.normalizeArray(billedBalance2.value) : [];
+      const closeBalArr = closeBalResult.status === 'fulfilled' ? this.normalizeArray(closeBalResult.value) : [];
+      const receiptArr = bvpReceipts.status === 'fulfilled' ? this.normalizeArray(bvpReceipts.value) : [];
+      const enrichedBvp = this.enrichBvpWithReceipts(bvpArr, receiptArr);
+      this.tabData.set({ billedVsPaid: enrichedBvp, balance: balArr, closeBalance: closeBalArr, receipts: receiptArr });
+    } catch (e: any) {
+      this.tabError.set(e.message || 'Failed to load billed vs paid data');
+    } finally {
+      this.tabLoading.set(false);
+    }
+  }
+
+  enrichBvpWithReceipts(bvpArr: any[], receipts: any[]): any[] {
+    if (!receipts.length || !bvpArr.length) return bvpArr;
+    const monthMap: Record<string, number> = {
+      'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+      'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+    };
+    const sortedReceipts = [...receipts].sort((a: any, b: any) => {
+      const da = new Date(a.receiptDate || a.date || '').getTime();
+      const db = new Date(b.receiptDate || b.date || '').getTime();
+      return db - da;
+    });
+    return bvpArr.map((row: any) => {
+      const paid = Number(row.paidAmount || 0);
+      if (paid === 0) return row;
+      const month = (row.processingMonth || row.month || '').toLowerCase();
+      const monthNum = monthMap[month] || 0;
+      if (!monthNum) return row;
+      const fy = row.financialYear || '';
+      const fyParts = fy.split('/');
+      let periodYear = 0;
+      if (fyParts.length === 2) {
+        periodYear = monthNum >= 7 ? parseInt(fyParts[0]) : parseInt(fyParts[1]);
+      }
+      const matchedReceipts = sortedReceipts.filter((r: any) => {
+        const amt = Math.abs(Number(r.amount || 0));
+        if (Math.abs(amt - paid) > 0.02) return false;
+        if (periodYear > 0) {
+          const rd = new Date(r.receiptDate || r.date || '');
+          const rm = rd.getMonth() + 1;
+          const ry = rd.getFullYear();
+          if (ry === periodYear && rm === monthNum) return true;
+          if (ry === periodYear && rm === monthNum - 1) return true;
+          if (monthNum === 1 && ry === periodYear - 1 && rm === 12) return true;
+          return false;
+        }
+        return true;
+      });
+      const match = matchedReceipts.length > 0 ? matchedReceipts[0] : null;
+      if (match) {
+        return {
+          ...row,
+          _receiptNo: match.receiptNo || '',
+          _receiptDate: match.receiptDate || match.date || '',
+          _paymentType: match.paymentType || '',
+          _cashier: match.cashier || '',
+          _cashBook: match.cashBook || '',
+          _bankDescription: this.getEftBankDescription(match),
+          _isEft: this.isEftReceipt(match),
+        };
+      }
+      return row;
+    });
+  }
+
+  async loadTransactionSummary(accountId: number, finYear: string): Promise<void> {
+    this.summaryLoading.set(true);
+    this.summaryError.set(null);
+    this.summaryData.set([]);
+    this.summarySource.set('');
+    this._summaryFieldsLogged = false;
+
+    const params: Record<string, string> = { financialYear: finYear };
+    let loaded = false;
+
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/transaction-summary-list/${accountId}`, params)
+      );
+      const arr = this.normalizeArray(result);
+      if (arr.length > 0 && !arr[0]._error) {
+        const hasMonthlyData = this.checkRowHasMonthData(arr[0]);
+        if (hasMonthlyData) {
+          this.summaryData.set(arr);
+          this.summarySource.set('monthly');
+          loaded = true;
+        } else {
+        }
+      }
+    } catch {
+    }
+
+    if (!loaded) {
+      try {
+        const monthlyData = await this.buildSummaryFromBillingPeriods(accountId, finYear);
+        if (monthlyData.length > 0) {
+          this.summaryData.set(monthlyData);
+          this.summarySource.set('monthly');
+          loaded = true;
+        }
+      } catch (e: any) {
+      }
+    }
+
+    if (!loaded) {
+      try {
+        const result = await firstValueFrom(
+          this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance/${accountId}`, { ...params, _t: String(Date.now()) })
+        );
+        const arr = this.normalizeArray(result);
+        if (arr.length > 0 && !arr[0]._error) {
+          this.summaryData.set(arr);
+          this.summarySource.set('aging');
+          loaded = true;
+        }
+      } catch {
+      }
+    }
+
+    if (!loaded) {
+      this.summaryError.set('Failed to load transaction summary');
+    }
+    this.summaryLoading.set(false);
+  }
+
+  private checkRowHasMonthData(row: any): boolean {
+    const monthKeys = ['july','august','september','october','november','december','january','february','march','april','may','june',
+      'July','August','September','October','November','December','January','February','March','April','May','June',
+      'month1','month2','month3','month4','month5','month6','month7','month8','month9','month10','month11','month12',
+      'period1','period2','period3','period4','period5','period6','period7','period8','period9','period10','period11','period12'];
+    const keys = Object.keys(row);
+    return keys.some(k => monthKeys.includes(k));
+  }
+
+  private async buildSummaryFromBillingPeriods(accountId: number, finYear: string): Promise<any[]> {
+    const months = this.detailMonths;
+    const monthFieldMap: Record<string, string> = {
+      'July': 'july', 'August': 'august', 'September': 'september', 'October': 'october',
+      'November': 'november', 'December': 'december', 'January': 'january', 'February': 'february',
+      'March': 'march', 'April': 'april', 'May': 'may', 'June': 'june'
+    };
+
+    const results = await Promise.allSettled(
+      months.map(m => firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+          accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+        })
+      ))
+    );
+
+    const serviceMap = new Map<string, any>();
+    const totals: Record<string, number> = {};
+    months.forEach(m => totals[monthFieldMap[m]] = 0);
+
+    const apiOpenBal: Record<string, number> = {};
+    const apiCloseBal: Record<string, number> = {};
+
+    for (let mi = 0; mi < months.length; mi++) {
+      const res = results[mi];
+      if (res.status !== 'fulfilled') continue;
+      const txns = this.normalizeArray(res.value);
+      const field = monthFieldMap[months[mi]];
+
+      for (const t of txns) {
+        const desc = t.transactionDescription || t.description || '';
+        if (!desc) continue;
+        const descLower = desc.toLowerCase();
+
+        const amount = Number(t.totalAmount ?? t.amount ?? t.debitAmount ?? t.total ?? 0) || 0;
+
+        if (descLower.includes('open') && descLower.includes('balance')) {
+          apiOpenBal[field] = amount;
+          continue;
+        }
+        if (descLower.includes('clos') && descLower.includes('balance')) {
+          apiCloseBal[field] = amount;
+          continue;
+        }
+
+        let serviceDesc = desc;
+        if (desc.toLowerCase().startsWith('levy - ')) serviceDesc = desc.substring(7);
+        else if (desc.toLowerCase().startsWith('levy -')) serviceDesc = desc.substring(6);
+        if (descLower.includes('payment')) serviceDesc = 'Payment';
+
+        if (!serviceMap.has(serviceDesc)) {
+          const entry: any = { description: serviceDesc, financialYear: finYear };
+          months.forEach(m => entry[monthFieldMap[m]] = 0);
+          serviceMap.set(serviceDesc, entry);
+        }
+
+        serviceMap.get(serviceDesc)[field] += amount;
+        totals[field] += amount;
+      }
+    }
+
+    const pivotedRows = Array.from(serviceMap.values());
+    if (pivotedRows.length === 0) return [];
+
+
+    const openingRow: any = { description: 'Opening Balance', financialYear: finYear, _isSpecialRow: true };
+    const closingRow: any = { description: 'Closing Balance', financialYear: finYear, _isSpecialRow: true };
+    months.forEach(m => { openingRow[monthFieldMap[m]] = 0; closingRow[monthFieldMap[m]] = 0; });
+
+    let prevClosing = 0;
+    for (const m of months) {
+      const field = monthFieldMap[m];
+      const ob = apiOpenBal[field];
+      const cb = apiCloseBal[field];
+      if (ob !== undefined) {
+        openingRow[field] = ob;
+      } else {
+        openingRow[field] = prevClosing;
+      }
+      if (cb !== undefined) {
+        closingRow[field] = cb;
+        prevClosing = cb;
+      } else {
+        const computed = openingRow[field] + totals[field];
+        closingRow[field] = computed;
+        prevClosing = computed;
+      }
+    }
+
+    const totalRow: any = { description: 'Total', financialYear: finYear, _isSpecialRow: true, _isTotalRow: true };
+    months.forEach(m => totalRow[monthFieldMap[m]] = totals[monthFieldMap[m]]);
+
+    return [openingRow, ...pivotedRows, totalRow, closingRow];
+  }
+
+  private pivotServiceTypeBalance(rows: any[], finYear: string): any[] {
+    const monthNames = ['July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
+    const monthFieldMap: Record<string, string> = {
+      'July': 'july', 'August': 'august', 'September': 'september', 'October': 'october',
+      'November': 'november', 'December': 'december', 'January': 'january', 'February': 'february',
+      'March': 'march', 'April': 'april', 'May': 'may', 'June': 'june'
+    };
+
+    const serviceMap = new Map<string, any>();
+    const totals: Record<string, number> = {};
+    monthNames.forEach(m => totals[monthFieldMap[m]] = 0);
+
+    for (const row of rows) {
+      const desc = row.serviceDescription || row.serviceDesc || row.description || row.serviceTypeDesc || 'Unknown';
+      const monthNum = Number(row.month || row.periodID || 0);
+      const monthName = monthNum >= 1 && monthNum <= 12 ? monthNames[monthNum - 1] : null;
+      const amount = Number(row.totalAmount || row.amount || row.currentCharge || 0) || 0;
+
+      if (!serviceMap.has(desc)) {
+        const entry: any = { description: desc, financialYear: row.financialYear || finYear };
+        monthNames.forEach(m => entry[monthFieldMap[m]] = 0);
+        serviceMap.set(desc, entry);
+      }
+
+      if (monthName) {
+        const entry = serviceMap.get(desc);
+        entry[monthFieldMap[monthName]] += amount;
+        totals[monthFieldMap[monthName]] += amount;
+      }
+    }
+
+    const pivotedRows = Array.from(serviceMap.values());
+
+    const openingRow: any = { description: 'Opening Balance', financialYear: finYear, _isSpecialRow: true };
+    monthNames.forEach(m => openingRow[monthFieldMap[m]] = 0);
+
+    let runningBalance = 0;
+    for (const m of monthNames) {
+      openingRow[monthFieldMap[m]] = runningBalance;
+      runningBalance += totals[monthFieldMap[m]];
+    }
+
+    const totalRow: any = { description: 'Total', financialYear: finYear, _isSpecialRow: true, _isTotalRow: true };
+    monthNames.forEach(m => totalRow[monthFieldMap[m]] = totals[monthFieldMap[m]]);
+
+    const closingRow: any = { description: 'Closing Balance', financialYear: finYear, _isSpecialRow: true };
+    let closingBalance = 0;
+    for (const m of monthNames) {
+      closingBalance += totals[monthFieldMap[m]];
+      closingRow[monthFieldMap[m]] = closingBalance;
+    }
+
+    return [openingRow, ...pivotedRows, totalRow, closingRow];
+  }
+
+  async onSummaryYearChange(year: string): Promise<void> {
+    this.summaryFinYear.set(year);
+    const acct = this.selectedAccount();
+    const accountId = acct ? this.getAccountId(acct) : null;
+    if (accountId) {
+      await this.loadTransactionSummary(accountId, year);
+    }
+  }
+
+  private _summaryFieldsLogged = false;
+
+  getSummaryMonthValue(row: any, month: string): number {
+    const fieldMap: Record<string, string[]> = {
+      'Jul': ['july', 'July', 'jul', 'Jul', 'month1', 'period1', 'p1', 'month_07', 'month07', 'm1', 'col1', 'amount1', 'julAmount', 'julyAmount', 'julyAmt', 'JULY', 'JUL', 'period_1', 'billingPeriod1'],
+      'Aug': ['august', 'August', 'aug', 'Aug', 'month2', 'period2', 'p2', 'month_08', 'month08', 'm2', 'col2', 'amount2', 'augAmount', 'augustAmount', 'augAmt', 'AUGUST', 'AUG', 'period_2', 'billingPeriod2'],
+      'Sep': ['september', 'September', 'sep', 'Sep', 'month3', 'period3', 'p3', 'month_09', 'month09', 'm3', 'col3', 'amount3', 'sepAmount', 'septemberAmount', 'sepAmt', 'SEPTEMBER', 'SEP', 'period_3', 'billingPeriod3'],
+      'Oct': ['october', 'October', 'oct', 'Oct', 'month4', 'period4', 'p4', 'month_10', 'month10', 'm4', 'col4', 'amount4', 'octAmount', 'octoberAmount', 'octAmt', 'OCTOBER', 'OCT', 'period_4', 'billingPeriod4'],
+      'Nov': ['november', 'November', 'nov', 'Nov', 'month5', 'period5', 'p5', 'month_11', 'month11', 'm5', 'col5', 'amount5', 'novAmount', 'novemberAmount', 'novAmt', 'NOVEMBER', 'NOV', 'period_5', 'billingPeriod5'],
+      'Dec': ['december', 'December', 'dec', 'Dec', 'month6', 'period6', 'p6', 'month_12', 'month12', 'm6', 'col6', 'amount6', 'decAmount', 'decemberAmount', 'decAmt', 'DECEMBER', 'DEC', 'period_6', 'billingPeriod6'],
+      'Jan': ['january', 'January', 'jan', 'Jan', 'month7', 'period7', 'p7', 'month_01', 'month01', 'm7', 'col7', 'amount7', 'janAmount', 'januaryAmount', 'janAmt', 'JANUARY', 'JAN', 'period_7', 'billingPeriod7'],
+      'Feb': ['february', 'February', 'feb', 'Feb', 'month8', 'period8', 'p8', 'month_02', 'month02', 'm8', 'col8', 'amount8', 'febAmount', 'februaryAmount', 'febAmt', 'FEBRUARY', 'FEB', 'period_8', 'billingPeriod8'],
+      'Mar': ['march', 'March', 'mar', 'Mar', 'month9', 'period9', 'p9', 'month_03', 'month03', 'm9', 'col9', 'amount9', 'marAmount', 'marchAmount', 'marAmt', 'MARCH', 'MAR', 'period_9', 'billingPeriod9'],
+      'Apr': ['april', 'April', 'apr', 'Apr', 'month10', 'period10', 'p10', 'month_04', 'month04', 'm10', 'col10', 'amount10', 'aprAmount', 'aprilAmount', 'aprAmt', 'APRIL', 'APR', 'period_10', 'billingPeriod10'],
+      'May': ['may', 'May', 'month11', 'period11', 'p11', 'month_05', 'month05', 'm11', 'col11', 'amount11', 'mayAmount', 'mayAmt', 'MAY', 'period_11', 'billingPeriod11'],
+      'Jun': ['june', 'June', 'jun', 'Jun', 'month12', 'period12', 'p12', 'month_06', 'month06', 'm12', 'col12', 'amount12', 'junAmount', 'juneAmount', 'junAmt', 'JUNE', 'JUN', 'period_12', 'billingPeriod12'],
+    };
+    const candidates = fieldMap[month] || [];
+    for (const key of candidates) {
+      if (row[key] !== undefined && row[key] !== null) return Number(row[key]) || 0;
+    }
+    for (const k of Object.keys(row)) {
+      const kl = k.toLowerCase();
+      if (kl === month.toLowerCase()) return Number(row[k]) || 0;
+      const fullMonthMap: Record<string, string> = { 'jul': 'july', 'aug': 'august', 'sep': 'september', 'oct': 'october', 'nov': 'november', 'dec': 'december', 'jan': 'january', 'feb': 'february', 'mar': 'march', 'apr': 'april', 'may': 'may', 'jun': 'june' };
+      const fullMonth = fullMonthMap[month.toLowerCase()];
+      if (fullMonth && kl.includes(fullMonth)) return Number(row[k]) || 0;
+    }
+    if (!this._summaryFieldsLogged && month === 'Jul') {
+      this._summaryFieldsLogged = true;
+    }
+    return 0;
+  }
+
+  getSummaryDescription(row: any): string {
+    return row.description || row.serviceTypeDesc || row.serviceDescription || row.serviceDesc || row.chargeType || row.descr || '-';
+  }
+
+  getSummaryFinYear(row: any): string {
+    return row.financialYear || row.finYear || row.financial_Year || this.summaryFinYear() || '';
+  }
+
+  getSummaryRowTotal(row: any): number {
+    const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    return months.reduce((sum, m) => sum + this.getSummaryMonthValue(row, m), 0);
+  }
+
+  downloadSummaryCsv(): void {
+    const data = this.summaryData();
+    if (!data.length) return;
+    const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const fullMonths = ['July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
+    const headers = ['Description', 'Financial Year', ...fullMonths];
+    const rows = data.map(row => {
+      const vals = months.map(m => this.getSummaryMonthValue(row, m).toFixed(2));
+      return [
+        this.getSummaryDescription(row),
+        this.getSummaryFinYear(row),
+        ...vals,
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const acctNo = this.getAccountNum(this.selectedAccount());
+    const now = new Date();
+    const fileDate = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+    a.download = `GEORGE_MUNICIPALITY_Transaction_Summary_${acctNo}_${fileDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  getDebtVal(item: any, field: string): number {
+    const fieldMap: Record<string, string[]> = {
+      'totalOutStanding': ['totalOutStanding', 'totalOutstandingAmount', 'totalOutstanding', 'totalBalance', 'total'],
+      'newCharge': ['newCharge', 'newCharges', 'new_charge'],
+      'current': ['current', 'currentAmount', 'currentAccount', 'current_account'],
+      'days30': ['days30', '30days', 'thirtyDays', 'thirty_days'],
+      'days60': ['days60', '60days', 'sixtyDays', 'sixty_days'],
+      'days90': ['days90', '90days', 'ninetyDays', 'ninety_days'],
+      'days120': ['days120', '120days', 'hundredTwentyDays', 'hundred_twenty_days'],
+      'days150': ['days150', '150days', 'hundredFiftyDays', 'hundred_fifty_days'],
+      'days180': ['days180', '180days', 'overHundredEighty', 'hundredEightyPlusDays', 'over_180_days'],
+    };
+    const candidates = fieldMap[field] || [field];
+    for (const key of candidates) {
+      if (item[key] !== undefined && item[key] !== null) return Number(item[key]) || 0;
+    }
+    return 0;
+  }
+
+  getDebtColumnTotal(field: string): number {
+    return this.getBalanceItems().reduce((sum: number, item: any) => sum + this.getDebtVal(item, field), 0);
+  }
+
+  formatDebtAmt(val: number): string {
+    if (val === 0) return '0.00';
+    const abs = Math.abs(val);
+    const parts = abs.toFixed(2).split('.');
+    const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const formatted = intPart + '.' + parts[1];
+    return val < 0 ? `(${formatted})` : formatted;
+  }
+
+  async loadDetailedTransactions() {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    const finYear = this.detailFinYear() || this.userFinYear();
+    const month = this.detailMonth();
+    if (!finYear) return;
+
+    this.detailLoading.set(true);
+    this.detailError.set(null);
+    this.detailTransactions.set([]);
+
+    try {
+      if (month) {
+        const result = await firstValueFrom(
+          this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+            accountId: String(accountId), finYear, billingMonth: month, balanceType: '3', _t: String(Date.now())
+          })
+        );
+        const arr = this.normalizeArray(result);
+        if (arr.length > 0) {
+        }
+        this.detailTransactions.set(arr);
+      } else {
+        const months = this.detailMonths;
+        const results = await Promise.allSettled(
+          months.map(m => firstValueFrom(
+            this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+              accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+            })
+          ))
+        );
+        const allTxns = results.flatMap(r => r.status === 'fulfilled' ? this.normalizeArray(r.value) : []);
+        if (allTxns.length > 0) {
+        }
+        this.detailTransactions.set(allTxns);
+      }
+    } catch (e: any) {
+      this.detailError.set(e?.message || 'Failed to load transactions');
+    } finally {
+      this.detailLoading.set(false);
+    }
+  }
+
+  onDetailFinYearChange(year: string) {
+    this.detailFinYear.set(year);
+    this.loadDetailedTransactions();
+  }
+
+  onDetailMonthChange(month: string) {
+    this.detailMonth.set(month);
+    this.loadDetailedTransactions();
+  }
+
+  async onTxnRowClick(txn: any) {
+    this.detailSelectedTxn.set(txn);
+    this.detailTxnData.set(null);
+    this.detailTxnLoading.set(true);
+
+    const account = this.selectedAccount();
+    const accountId = this.getAccountId(account);
+    const drilldown = (txn.drilldown || '').toLowerCase();
+    const pId = txn.primaryId != null ? String(txn.primaryId) : null;
+    const pIdNum = pId ? parseInt(pId) : 0;
+    const bMonth = txn.billingMonth ?? txn.billingmonth;
+    const bMonthNum = bMonth != null ? parseInt(bMonth) : undefined;
+
+    try {
+      let detail: any = null;
+      const params: Record<string, string> = {};
+      if (pId) params['primaryId'] = pId;
+      if (bMonthNum !== undefined) params['billingMonth'] = String(bMonthNum);
+
+      if (drilldown === 'openbalance' && pId) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/open-balance-detail`, { ...params, _t: String(Date.now()) }));
+      } else if (drilldown === 'closebalance' && pId) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/close-balance-detail`, { ...params, _t: String(Date.now()) }));
+      } else if (drilldown === 'receipt' && pIdNum) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/receipt-transaction-detail`, params));
+      } else if (drilldown === 'levy' && pIdNum) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/levy-transaction-detail`, params));
+      } else if (drilldown === 'rebate' && pId) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/rebate-transaction-detail`, params));
+      } else if (drilldown === 'interest') {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/interest-cons-payment-detail`, {
+          accountId: String(accountId), finYear: this.detailFinYear() || this.userFinYear()
+        }));
+      } else if (drilldown === 'journal' && pId) {
+        detail = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/journal-transaction-details`, {
+          primaryId: pId, accountId: String(accountId)
+        }));
+      }
+
+      if (typeof detail === 'string') {
+        this.detailTxnData.set(detail);
+      } else {
+        this.detailTxnData.set(this.normalizeArray(detail));
+      }
+    } catch (e: any) {
+      this.detailTxnData.set([]);
+    } finally {
+      this.detailTxnLoading.set(false);
+    }
+  }
+
+  closeTxnDetail() {
+    this.detailSelectedTxn.set(null);
+    this.detailTxnData.set(null);
+  }
+
+  getTxnDetailKeys(): string[] {
+    const data = this.detailTxnData();
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return Object.keys(data[0]).filter(k => !k.startsWith('_') && k !== 'id').slice(0, 14);
+  }
+
+  formatDetailKey(key: string): string {
+    return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+  }
+
+  formatDetailVal(val: any): string {
+    if (val == null) return '-';
+    if (typeof val === 'number') return this.formatDebtAmt(val);
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) return this.formatDate(val);
+    return String(val);
+  }
+
+  isDetailValNumeric(val: any): boolean {
+    return typeof val === 'number';
+  }
+
+  isDetailValNegative(val: any): boolean {
+    return typeof val === 'number' && val < 0;
+  }
+
+  getTxnRowClass(txn: any): string {
+    const desc = (txn.transactionDescription || txn.description || '').toLowerCase();
+    if (desc.includes('open balance') || desc.includes('opening balance')) return 'txn-row-opening';
+    if (desc.includes('clos') && desc.includes('balance')) return 'txn-row-closing';
+    if (desc.includes('payment') || txn.drilldown === 'receipt') return 'txn-row-payment';
+    return '';
+  }
+
+  getExportMonthRange(): string[] {
+    const from = this.exportFromMonth();
+    const to = this.exportToMonth();
+    const fromIdx = this.detailMonths.indexOf(from);
+    const toIdx = this.detailMonths.indexOf(to);
+    if (fromIdx < 0 || toIdx < 0) return this.detailMonths;
+    if (fromIdx <= toIdx) return this.detailMonths.slice(fromIdx, toIdx + 1);
+    return [...this.detailMonths.slice(fromIdx), ...this.detailMonths.slice(0, toIdx + 1)];
+  }
+
+  async exportDetailedTransactionsExcel() {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    const finYear = this.detailFinYear() || this.userFinYear();
+    if (!finYear) return;
+
+    const months = this.getExportMonthRange();
+    if (!months.length) return;
+
+    this.exportingCsv.set(true);
+
+    try {
+      const monthResults = await Promise.allSettled(
+        months.map(m => firstValueFrom(
+          this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+            accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+          })
+        ))
+      );
+
+      const basic = this.getAccountBasic();
+      const prop = this.getAccountProp();
+      const acctNo = account['accountNumber'] || account['accountNo'] || String(accountId);
+      const acctName = account['name'] || account['surname_Company'] || basic?.fullNAME || basic?.fullName || '';
+      const acctStatus = basic?.accountStatus || account['accountStatus'] || '';
+      const propertyId = basic?.propertyID || prop?.propertyID || prop?.property_ID || '';
+      const address = basic?.deliveryAddress || prop?.physicalAddress || prop?.address || '';
+      const creditStatus = basic?.creditStatusDesc || '';
+      const fromMonth = this.exportFromMonth();
+      const toMonth = this.exportToMonth();
+      const exportDate = new Date();
+      const exportDateStr = `${String(exportDate.getDate()).padStart(2,'0')}/${String(exportDate.getMonth()+1).padStart(2,'0')}/${exportDate.getFullYear()}`;
+      const exportTimeStr = `${String(exportDate.getHours()).padStart(2,'0')}:${String(exportDate.getMinutes()).padStart(2,'0')}`;
+
+      const csvLines: string[] = [];
+
+      csvLines.push('"GEORGE MUNICIPALITY - DETAILED TRANSACTION REPORT"');
+      csvLines.push('""');
+      csvLines.push(`"Account Number:","${this.csvEsc(acctNo)}","","Account Holder:","${this.csvEsc(acctName)}"`);
+      csvLines.push(`"Account Status:","${this.csvEsc(acctStatus)}","","Credit Status:","${this.csvEsc(creditStatus)}"`);
+      csvLines.push(`"Property ID:","${this.csvEsc(propertyId)}","","Address:","${this.csvEsc(address)}"`);
+      csvLines.push(`"Financial Year:","${this.csvEsc(finYear)}","","Period:","${this.csvEsc(fromMonth)} to ${this.csvEsc(toMonth)}"`);
+      csvLines.push(`"Export Date:","${exportDateStr}","","Time:","${exportTimeStr}"`);
+      csvLines.push('""');
+
+      const dataHeaders = ['Transaction Date', 'Transaction Description', 'Receipt ID / Doc Transaction ID', 'Document Number', 'Tariff', 'Amount', 'Interest', 'VAT', 'Total'];
+
+      let grandTotalAmount = 0;
+      let grandTotalInterest = 0;
+      let grandTotalVat = 0;
+      let grandTotal = 0;
+
+      for (let mi = 0; mi < months.length; mi++) {
+        const res = monthResults[mi];
+        const txns = res.status === 'fulfilled' ? this.normalizeArray(res.value) : [];
+
+        csvLines.push(`"${months[mi].toUpperCase()}",,,,,,,,`);
+        csvLines.push(dataHeaders.map(h => `"${h}"`).join(','));
+
+        if (txns.length === 0) {
+          csvLines.push('"No transactions","","","","","","","",""');
+        } else {
+          let monthAmount = 0, monthInterest = 0, monthVat = 0, monthTotal = 0;
+          for (const t of txns) {
+            const amt = t.amount ?? t.debitAmount ?? 0;
+            const int = t.interestAmount ?? t.interest ?? 0;
+            const vat = t.vatAmount ?? t.vat ?? 0;
+            const tot = t.total ?? t.totalAmount ?? 0;
+            monthAmount += Number(amt) || 0;
+            monthInterest += Number(int) || 0;
+            monthVat += Number(vat) || 0;
+            monthTotal += Number(tot) || 0;
+            csvLines.push([
+              this.formatDate(t.transactionDate || t.date),
+              t.transactionDescription || t.description || '',
+              t.receiptId || t.receiptNo || t.receipt_ID || t.documentTransactionId || '',
+              t.documentNumber || t.docNumber || '',
+              t.tariff || '',
+              amt, int, vat, tot,
+            ].map((v: any) => `"${this.csvEsc(String(v))}"`).join(','));
+          }
+          csvLines.push(`"","","","","Month Total:","${monthAmount.toFixed(2)}","${monthInterest.toFixed(2)}","${monthVat.toFixed(2)}","${monthTotal.toFixed(2)}"`);
+          grandTotalAmount += monthAmount;
+          grandTotalInterest += monthInterest;
+          grandTotalVat += monthVat;
+          grandTotal += monthTotal;
+        }
+        csvLines.push('""');
+      }
+
+      if (months.length > 1) {
+        csvLines.push(`"","","","","GRAND TOTAL:","${grandTotalAmount.toFixed(2)}","${grandTotalInterest.toFixed(2)}","${grandTotalVat.toFixed(2)}","${grandTotal.toFixed(2)}"`);
+        csvLines.push('""');
+      }
+
+      csvLines.push(`"--- End of Report ---"`);
+
+      const csv = csvLines.join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = acctName.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_').substring(0, 30);
+      const fd = new Date();
+      const fdStr = `${fd.getFullYear()}${String(fd.getMonth()+1).padStart(2,'0')}${String(fd.getDate()).padStart(2,'0')}`;
+      a.download = `GEORGE_MUNICIPALITY_Transaction_Detail_${acctNo}_${fdStr}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toast.success(`Exported ${months.length} month(s) of transactions`);
+    } catch (e: any) {
+      this.toast.error('Failed to export transactions');
+    } finally {
+      this.exportingCsv.set(false);
+    }
+  }
+
+  csvEsc(val: string): string {
+    return String(val || '').replace(/"/g, '""');
+  }
+
+  Math = Math;
+
+  getBvpRowBilled(row: any): number {
+    return Number(row.totalBillAmount || row.amount || row.billedAmount || row.billed || row.debit || 0) || 0;
+  }
+
+  getBvpRowPaid(row: any): number {
+    return Number(row.paidAmount || row.paid || row.credit || 0) || 0;
+  }
+
+  getBvpTotalBilled(): number {
+    const rows = this.tabData()?.billedVsPaid || [];
+    if (rows.length) return rows.reduce((s: number, r: any) => s + this.getBvpRowBilled(r), 0);
+    const bal = this.tabData()?.balance || [];
+    return bal.reduce((s: number, r: any) => s + Number(r.totalOutStanding || r.totalOutstanding || 0), 0);
+  }
+
+  getBvpTotalPaid(): number {
+    const rows = this.tabData()?.billedVsPaid || [];
+    if (rows.length) return rows.reduce((s: number, r: any) => s + this.getBvpRowPaid(r), 0);
+    return 0;
+  }
+
+  getBvpActualOutstanding(): number {
+    const closeBal = this.tabData()?.closeBalance || [];
+    if (closeBal.length) {
+      return closeBal.reduce((s: number, r: any) => s + Number(r.closingBalance ?? r.closeBalance ?? r.totalOutStanding ?? r.totalOutstanding ?? r.balance ?? 0), 0);
+    }
+    const bal = this.tabData()?.balance || [];
+    return bal.reduce((s: number, r: any) => s + Number(r.totalOutStanding || r.totalOutstanding || 0), 0);
+  }
+
+  getBvpVariance(): number {
+    const actualOutstanding = this.getBvpActualOutstanding();
+    if (this.tabData()?.closeBalance?.length || this.tabData()?.balance?.length) {
+      return actualOutstanding;
+    }
+    return this.getBvpTotalBilled() - this.getBvpTotalPaid();
+  }
+
+  getBvpCollectionRate(): number {
+    const billed = this.getBvpTotalBilled();
+    if (billed === 0) return 0;
+    const actualOutstanding = this.getBvpActualOutstanding();
+    if (this.tabData()?.closeBalance?.length || this.tabData()?.balance?.length) {
+      const rate = ((billed - actualOutstanding) / billed) * 100;
+      return Math.min(Math.round(rate * 10) / 10, 100);
+    }
+    const rate = (this.getBvpTotalPaid() / billed) * 100;
+    return Math.round(rate * 10) / 10;
+  }
+
+  getBvpBarWidth(row: any, type: 'billed' | 'paid'): number {
+    const billed = this.getBvpRowBilled(row);
+    const paid = this.getBvpRowPaid(row);
+    const max = Math.max(billed, paid, 1);
+    return type === 'billed' ? (billed / max) * 100 : (paid / max) * 100;
+  }
+
+  getBvpAgingTotal(field: string): number {
+    const bal = this.tabData()?.balance || [];
+    if (field === 'total') return bal.reduce((s: number, r: any) => s + Number(r.totalOutStanding || r.totalOutstanding || 0), 0);
+    if (field === 'days150') return bal.reduce((s: number, r: any) => s + Number(r.days150 || 0) + Number(r.untill360 || 0), 0);
+    return bal.reduce((s: number, r: any) => s + Number(r[field] || 0), 0);
+  }
+
+  getBvpInsights(): { icon: string; text: string; type: 'warning' | 'good' | 'info' }[] {
+    const insights: { icon: string; text: string; type: 'warning' | 'good' | 'info' }[] = [];
+    const rate = this.getBvpCollectionRate();
+    const actualOutstanding = this.getBvpActualOutstanding();
+    const billed = this.getBvpTotalBilled();
+    const bal = this.tabData()?.balance || [];
+
+    if (actualOutstanding <= 0 && billed > 0) {
+      insights.push({ icon: '✅', text: 'No outstanding balance — account is fully paid up.', type: 'good' });
+    } else if (rate >= 100) {
+      insights.push({ icon: '🏆', text: 'Excellent! Payments fully cover or exceed billed amounts.', type: 'good' });
+    } else if (rate >= 80) {
+      insights.push({ icon: '👍', text: `Good collection rate at ${rate}%. Outstanding R ${this.formatCurrency(actualOutstanding)}.`, type: 'good' });
+    } else if (rate >= 50) {
+      insights.push({ icon: '⚠️', text: `Collection rate is ${rate}% — R ${this.formatCurrency(actualOutstanding)} outstanding.`, type: 'warning' });
+    } else if (billed > 0) {
+      insights.push({ icon: '🚨', text: `Critical: Only ${rate}% collected. R ${this.formatCurrency(actualOutstanding)} outstanding.`, type: 'warning' });
+    }
+
+    const overdue30 = bal.reduce((s: number, r: any) => s + Number(r.days30 || 0) + Number(r.days60 || 0) + Number(r.days90 || 0) + Number(r.days120 || 0) + Number(r.days150 || 0) + Number(r.untill360 || 0), 0);
+    if (overdue30 > 0) {
+      insights.push({ icon: '📅', text: `R ${this.formatCurrency(overdue30)} in arrears (30+ days overdue) across all services.`, type: 'warning' });
+    }
+
+    return insights;
+  }
+
+  private parseDateToTs(dateStr: string): number {
+    if (!dateStr) return 0;
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number);
+      if (d && m && y) return new Date(y, m - 1, d).getTime();
+    }
+    const ts = new Date(dateStr).getTime();
+    return isNaN(ts) ? 0 : ts;
+  }
+
+  private getMeterReadingParams(meter: any, accountId: number): Record<string, string> {
+    const meterID = String(meter.meterID ?? meter.meter_ID ?? meter.meterId ?? meter.meterNo ?? meter.meterNumber ?? '');
+    return {
+      accountID: String(accountId),
+      meterID,
+      billingPeriodIDFrom: '1',
+      billingPeriodIDTo: '12',
+    };
+  }
+
+  private cleanMeterReadings(merged: any[]): any[] {
+    let hasOpenPeriod = false;
+    const seen = new Set<string>();
+    return merged.map((item: any) => {
+      const bm = (item.billingmonth || item.billingMonth || '').toLowerCase().trim();
+      if (bm.includes('open period') || bm.includes('current')) {
+        const rs = (item.readingStatus || item.levyStatus || '').toLowerCase();
+        if (rs === 'billed' || rs === 'imported' || rs === 'import') {
+          const rd = item.reading2Date || item.reading1Date || '';
+          if (rd) {
+            const parts = rd.split('/');
+            if (parts.length === 3) {
+              const mi = parseInt(parts[1]) - 1;
+              const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+              if (mi >= 0 && mi < 12) {
+                return { ...item, billingmonth: months[mi], billingMonth: months[mi] };
+              }
+            }
+          }
+          return item;
+        }
+        if (hasOpenPeriod) return null;
+        hasOpenPeriod = true;
+        return { ...item, _isOpenPeriod: true };
+      }
+      const fy = (item.financialYear || item.finYear || '').trim();
+      const dedupKey = `${bm}|${fy}`;
+      if (dedupKey !== '|' && seen.has(dedupKey)) return null;
+      if (dedupKey !== '|') seen.add(dedupKey);
+      return item;
+    }).filter((item: any) => item !== null);
+  }
+
+  async selectConsumptionMeter(meter: any) {
+    this.consumptionSelectedMeter.set(meter);
+    this.consumptionHistoryLoading.set(true);
+    this.consumptionHistory.set([]);
+    this.consumptionAllHistory.set([]);
+    this.consumptionChartData.set([]);
+    this.consumptionInsights.set(null);
+    this.consumptionFinYears.set([]);
+    this.consumptionSelectedYears.set([]);
+    this.consumptionSortCol.set('');
+    this.consumptionSortDir.set('desc');
+    this.consumptionMonthFrom.set('');
+    this.consumptionMonthTo.set('');
+    this.consumptionShowMonthFilter.set(false);
+    const account = this.selectedAccount();
+    const accountId = this.getAccountId(account);
+    const baseParams = this.getMeterReadingParams(meter, accountId);
+    try {
+      const currentFy = this.userFinYear() || this.getCurrentFinYear();
+      const [startYear] = currentFy.split('/').map(Number);
+      const fyList: string[] = [];
+      for (let i = 0; i < 5; i++) fyList.push(`${startYear - i}/${startYear - i + 1}`);
+
+      const requests = fyList.map(fy =>
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { ...baseParams, finYear: fy }))
+          .then(res => {
+            const arr = this.normalizeArray(res);
+            return arr;
+          })
+          .catch((err) => { return [] as any[]; })
+      );
+      const results = await Promise.all(requests);
+      const allReadings = results.flat();
+
+      if (allReadings.length === 0) {
+        const barParams = { ...baseParams, financialYear: currentFy };
+        const barRes = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history-barchart`, barParams)).catch((err) => { return []; });
+        const barChart = this.normalizeArray(barRes).map((item: any) => {
+          const pm = item.processingMonth || '';
+          const monthName = pm.includes('-') ? pm.split('-')[0] : pm;
+          return {
+            ...item,
+            billingmonth: item.billingmonth || item.billingMonth || monthName || '',
+            billingMonth: item.billingMonth || item.billingmonth || monthName || '',
+            financialYear: item.financialYear || item.finYear || currentFy,
+          };
+        });
+        if (barChart.length > 0) allReadings.push(...barChart);
+      }
+
+      const cleaned = this.cleanMeterReadings(allReadings);
+      this.consumptionAllHistory.set(cleaned);
+      const years = this.extractConsumptionFinYears(cleaned);
+      this.consumptionFinYears.set(years);
+      const defaultYear = years.find(y => y === currentFy) || (years.length > 0 ? years[0] : '');
+      this.consumptionSelectedYears.set(defaultYear ? [defaultYear] : [...years]);
+      this.applyConsumptionYearFilter();
+    } catch {
+      this.consumptionHistory.set([]);
+      this.consumptionAllHistory.set([]);
+    }
+    this.consumptionHistoryLoading.set(false);
+  }
+
+  extractConsumptionFinYears(readings: any[]): string[] {
+    const yearSet = new Set<string>();
+    readings.forEach((r: any) => {
+      if (r.finYear || r.financialYear) {
+        yearSet.add(r.finYear || r.financialYear);
+        return;
+      }
+      const dateStr = r.reading2Date || r.reading1Date || r.readingDate || r.billingDate || r.date || r.transactionDate || '';
+      if (!dateStr) return;
+      let d: Date;
+      const parts = dateStr.split('/');
+      if (parts.length === 3 && parts[0].length <= 2) {
+        d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      } else {
+        d = new Date(dateStr);
+      }
+      if (isNaN(d.getTime())) return;
+      const month = d.getMonth();
+      const year = d.getFullYear();
+      const fyStart = month >= 6 ? year : year - 1;
+      yearSet.add(`${fyStart}/${fyStart + 1}`);
+    });
+    return Array.from(yearSet).sort().reverse();
+  }
+
+  toggleConsumptionYear(fy: string) {
+    const current = [...this.consumptionSelectedYears()];
+    const idx = current.indexOf(fy);
+    if (idx >= 0) {
+      if (current.length > 1) {
+        current.splice(idx, 1);
+      }
+    } else {
+      current.push(fy);
+    }
+    this.consumptionSelectedYears.set(current);
+    this.applyConsumptionYearFilter();
+  }
+
+  selectAllConsumptionYears() {
+    this.consumptionSelectedYears.set([...this.consumptionFinYears()]);
+    this.applyConsumptionYearFilter();
+  }
+
+  private parseReadingDate(r: any): Date | null {
+    const dateStr = r.reading2Date || r.reading1Date || r.readingDate || r.billingDate || r.date || r.transactionDate || '';
+    if (!dateStr) return null;
+    let d: Date;
+    const parts = dateStr.split('/');
+    if (parts.length === 3 && parts[0].length <= 2) {
+      d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    } else {
+      d = new Date(dateStr);
+    }
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  getReadingFy(r: any): string {
+    if (r.finYear || r.financialYear) return r.finYear || r.financialYear;
+    const d = this.parseReadingDate(r);
+    if (!d) return '';
+    const fyStart = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+    return `${fyStart}/${fyStart + 1}`;
+  }
+
+  applyConsumptionYearFilter() {
+    const all = this.consumptionAllHistory();
+    const selectedYears = this.consumptionSelectedYears();
+    const allYears = selectedYears.length === 0 || selectedYears.length === this.consumptionFinYears().length;
+    let filtered = allYears ? [...all] : all.filter((r: any) => selectedYears.includes(this.getReadingFy(r)));
+
+    const monthFrom = this.consumptionMonthFrom();
+    const monthTo = this.consumptionMonthTo();
+    if (monthFrom || monthTo) {
+      const fromDate = monthFrom ? new Date(monthFrom + '-01') : null;
+      const toDate = monthTo ? new Date(monthTo + '-28') : null;
+      if (toDate) {
+        toDate.setMonth(toDate.getMonth() + 1);
+        toDate.setDate(0);
+      }
+      filtered = filtered.filter((r: any) => {
+        const d = this.parseReadingDate(r);
+        if (!d) return false;
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      });
+    }
+
+    this.consumptionHistory.set(filtered);
+    this.consumptionChartData.set(filtered);
+    this.consumptionInsights.set(this.computeConsumptionInsights(filtered));
+  }
+
+  onConsumptionMonthFromChange(val: string) {
+    this.consumptionMonthFrom.set(val);
+    this.applyConsumptionYearFilter();
+  }
+
+  onConsumptionMonthToChange(val: string) {
+    this.consumptionMonthTo.set(val);
+    this.applyConsumptionYearFilter();
+  }
+
+  clearConsumptionMonthFilter() {
+    this.consumptionMonthFrom.set('');
+    this.consumptionMonthTo.set('');
+    this.applyConsumptionYearFilter();
+  }
+
+  getConsumptionMonthOptions(): { value: string; label: string }[] {
+    const all = this.consumptionAllHistory();
+    const months = new Set<string>();
+    for (const r of all) {
+      const d = this.parseReadingDate(r);
+      if (d) {
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        months.add(ym);
+      }
+    }
+    return Array.from(months).sort().map(ym => {
+      const [y, m] = ym.split('-');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return { value: ym, label: `${monthNames[parseInt(m) - 1]} ${y}` };
+    });
+  }
+
+  private buildConsumptionFilename(ext: string): string {
+    const acct = this.selectedAccount();
+    const accountNo = this.getAccountNum(acct);
+    const accountName = this.getAccountName(acct);
+    const sgNumber = acct?.sgNumber || (this.globalSnapshot() as any)?.sgNumber || '';
+    const clean = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+
+    const selectedYears = this.consumptionSelectedYears();
+    const allYears = selectedYears.length === this.consumptionFinYears().length;
+    let fyPart = '';
+    if (allYears) {
+      fyPart = 'All_Years';
+    } else if (selectedYears.length === 1) {
+      fyPart = `FY${clean(selectedYears[0])}`;
+    } else {
+      fyPart = selectedYears.map(y => `FY${clean(y)}`).join('_');
+    }
+
+    const monthFrom = this.consumptionMonthFrom();
+    const monthTo = this.consumptionMonthTo();
+    let datePart = '';
+    if (monthFrom && monthTo) {
+      datePart = `_${monthFrom}_to_${monthTo}`;
+    } else if (monthFrom) {
+      datePart = `_from_${monthFrom}`;
+    } else if (monthTo) {
+      datePart = `_to_${monthTo}`;
+    }
+
+    const parts = ['MeterReadings', clean(accountNo)];
+    if (accountName && accountName !== '-') parts.push(clean(accountName));
+    if (sgNumber) parts.push(clean(sgNumber));
+    parts.push(fyPart);
+    if (datePart) parts.push(clean(datePart));
+
+    return parts.join('_') + `.${ext}`;
+  }
+
+  computeConsumptionInsights(readings: any[]): any {
+    if (!readings || readings.length === 0) return null;
+    const consumptions = readings
+      .map((r: any) => Number(r.consumption || r.units || r.totalConsumption || 0))
+      .filter((v: number) => !isNaN(v));
+    if (consumptions.length === 0) return null;
+    const total = consumptions.reduce((s: number, v: number) => s + v, 0);
+    const avg = total / consumptions.length;
+    const min = Math.min(...consumptions);
+    const max = Math.max(...consumptions);
+    const stdDev = Math.sqrt(consumptions.reduce((s: number, v: number) => s + Math.pow(v - avg, 2), 0) / consumptions.length);
+    const anomalies: any[] = [];
+    const threshold = avg + (stdDev * 1.5);
+    const lowThreshold = Math.max(avg - (stdDev * 1.5), 0);
+    readings.forEach((r: any, i: number) => {
+      const val = Number(r.consumption || r.units || r.totalConsumption || 0);
+      if (val > threshold && val > 0) {
+        anomalies.push({ index: i, type: 'spike', value: val, pctAbove: Math.round(((val - avg) / avg) * 100), date: r.readingDate || r.billingDate || r.date });
+      } else if (val < lowThreshold && avg > 0 && val >= 0) {
+        anomalies.push({ index: i, type: 'drop', value: val, pctBelow: Math.round(((avg - val) / avg) * 100), date: r.readingDate || r.billingDate || r.date });
+      }
+      if (val === 0 && avg > 5) {
+        if (!anomalies.find((a: any) => a.index === i)) {
+          anomalies.push({ index: i, type: 'zero', value: 0, date: r.readingDate || r.billingDate || r.date });
+        }
+      }
+    });
+    const recent = consumptions.slice(0, Math.min(3, consumptions.length));
+    const older = consumptions.slice(Math.min(3, consumptions.length), Math.min(6, consumptions.length));
+    let trend = 'stable';
+    if (recent.length > 0 && older.length > 0) {
+      const recentAvg = recent.reduce((s: number, v: number) => s + v, 0) / recent.length;
+      const olderAvg = older.reduce((s: number, v: number) => s + v, 0) / older.length;
+      if (olderAvg > 0) {
+        const change = ((recentAvg - olderAvg) / olderAvg) * 100;
+        if (change > 15) trend = 'increasing';
+        else if (change < -15) trend = 'decreasing';
+      }
+    }
+    return { total, avg: Math.round(avg * 100) / 100, min, max, stdDev: Math.round(stdDev * 100) / 100, anomalies, trend, count: consumptions.length };
+  }
+
+  getConsumptionVal(r: any): number {
+    return Number(r.consumption || r.units || r.totalConsumption || 0);
+  }
+
+  getAvgDailyConsumption(r: any): string {
+    if (r.averageDailyConsumption) return String(r.averageDailyConsumption);
+    if (r.avgDaily) return String(r.avgDaily);
+    if (r.dailyAverage) return String(r.dailyAverage);
+    const days = Number(r.readingdays || r.readingDays || r.days || r.numberOfDays || 0);
+    const cons = this.getConsumptionVal(r);
+    if (days > 0 && cons > 0) return (cons / days).toFixed(1);
+    return '-';
+  }
+
+  getChartMaxVal(): number {
+    const data = this.consumptionChartData();
+    if (!data || data.length === 0) return 100;
+    const max = Math.max(...data.map((r: any) => this.getConsumptionVal(r)));
+    return max > 0 ? max : 100;
+  }
+
+  getChartBarHeight(r: any): number {
+    const max = this.getChartMaxVal();
+    const val = this.getConsumptionVal(r);
+    return max > 0 ? (val / max) * 100 : 0;
+  }
+
+  isAnomalyReading(r: any, idx: number): string {
+    const insights = this.consumptionInsights();
+    if (!insights?.anomalies) return '';
+    const match = insights.anomalies.find((a: any) => a.index === idx);
+    return match ? match.type : '';
+  }
+
+  getConsumptionChartLabel(r: any): string {
+    const bm = r.billingmonth || r.billingMonth || '';
+    if (bm) return bm.substring(0, 3);
+    const date = r.reading2Date || r.reading1Date || r.readingDate || r.billingDate || r.date || '';
+    if (!date) return '-';
+    return this.formatDate(date);
+  }
+
+  sortConsumptionBy(col: string) {
+    if (this.consumptionSortCol() === col) {
+      this.consumptionSortDir.set(this.consumptionSortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.consumptionSortCol.set(col);
+      this.consumptionSortDir.set(col === 'consumption' || col === 'reading2' ? 'desc' : 'asc');
+    }
+  }
+
+  getConsSortIcon(col: string): string {
+    if (this.consumptionSortCol() !== col) return '↕';
+    return this.consumptionSortDir() === 'asc' ? '↑' : '↓';
+  }
+
+  isOpenPeriodRow(r: any): boolean {
+    const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+    const rs = (r.readingStatus || '').toLowerCase();
+    const flag = (r.flag || '').toLowerCase();
+    return r._isOpenPeriod || bm.includes('open period') || bm === 'current open period' ||
+      rs.includes('awaiting') || rs.includes('unbilled') || rs.includes('pending') ||
+      flag.includes('awaiting') || flag.includes('unbilled');
+  }
+
+  getConsumptionHistorySorted(): any[] {
+    const data = this.consumptionHistory();
+    if (!data.length) return [];
+    const seen = new Set<string>();
+    const deduped = data.filter(r => {
+      const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+      const fy = (r.financialYear || r.finYear || '').trim();
+      const key = `${bm}|${fy}`;
+      if (key === '|') return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const monthOrder = ['july','august','september','october','november','december','january','february','march','april','may','june'];
+    const getSortKey = (r: any): number => {
+      const fy = (r.financialYear || r.finYear || '').trim();
+      const fyYear = fy ? parseInt(fy.split('/')[0]) || 0 : 0;
+      const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+      const mi = monthOrder.indexOf(bm);
+      return fyYear * 100 + (mi >= 0 ? mi : 50);
+    };
+
+    const sortCol = this.consumptionSortCol();
+    const sortDir = this.consumptionSortDir();
+
+    const getColValue = (r: any, col: string): any => {
+      switch (col) {
+        case 'billingMonth': return (r.billingmonth || r.billingMonth || '').toLowerCase();
+        case 'finYear': return this.getReadingFy(r);
+        case 'oldReadingDate': return this.parseDateToTs(r.reading1Date || r.readingDate || '');
+        case 'oldReading': return Number(r.reading1 || r.previousReading || r.prevReading || 0);
+        case 'newReadingDate': return this.parseDateToTs(r.reading2Date || r.date || '');
+        case 'newReading': return Number(r.reading2 || r.currentReading || r.reading || 0);
+        case 'days': return Number(r.readingdays || r.readingDays || r.days || r.numberOfDays || 0);
+        case 'consumption': return this.getConsumptionVal(r);
+        case 'readingStatus': return (r.readingStatus || r.status || '').toLowerCase();
+        case 'capturer': return (r.capturer || r.capturerName || r.reader || r.meterReader || '').toLowerCase();
+        case 'dailyAvg': {
+          const days = Number(r.readingdays || r.readingDays || r.days || 0);
+          const cons = this.getConsumptionVal(r);
+          return days > 0 ? cons / days : 0;
+        }
+        default: return getSortKey(r);
+      }
+    };
+
+    return [...deduped].sort((a, b) => {
+      const aOpen = this.isOpenPeriodRow(a) ? 0 : 1;
+      const bOpen = this.isOpenPeriodRow(b) ? 0 : 1;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+
+      if (sortCol) {
+        const aVal = getColValue(a, sortCol);
+        const bVal = getColValue(b, sortCol);
+        let cmp = 0;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          cmp = aVal - bVal;
+        } else {
+          cmp = String(aVal).localeCompare(String(bVal));
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
+      return getSortKey(b) - getSortKey(a);
+    });
+  }
+
+  getConsRowClass(r: any): string {
+    const flag = (r.flag || r.levyStatus || '').toLowerCase();
+    if (flag.includes('reversed') || flag.includes('cancel')) return 'cons-row-reversed';
+    if (flag.includes('estimate') || flag.includes('levy')) return 'cons-row-estimate';
+    return '';
+  }
+
+  getOpenMonthsCount(): { open: number; expected: number } {
+    const data = this.consumptionHistory();
+    const open = data.filter(r => {
+      const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+      const rs = (r.readingStatus || '').toLowerCase();
+      const flag = (r.flag || '').toLowerCase();
+      return bm.includes('open period') || rs.includes('awaiting') || rs.includes('unbilled') || rs.includes('pending') || flag.includes('awaiting');
+    }).length;
+    const years = this.consumptionSelectedYears();
+    const expected = years.length * 12;
+    return { open, expected: expected || 12 };
+  }
+
+  initS129Years(records: any[]) {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      years.push(`${currentYear - i}/${currentYear - i + 1}`);
+    }
+    const fromRecords = records
+      .map((r: any) => r.financialYear || r.billingPeriod || '')
+      .filter((y: string) => y && y.includes('/'));
+    const allYears = [...new Set([...years, ...fromRecords])].sort().reverse();
+    this.s129AvailableYears.set(allYears);
+    if (!this.s129FinYear() && allYears.length > 0) {
+      this.s129FinYear.set(allYears[0]);
+    }
+  }
+
+  computeS129Insights(records: any[]) {
+    if (!records || records.length === 0) {
+      this.s129Insights.set(null);
+      return;
+    }
+    const totalNotices = records.length;
+    const totalAmount = records.reduce((sum: number, r: any) => sum + (Number(r.qualifyingAmount || r.amount || r.noticeAmount || 0) || 0), 0);
+    const delivered = records.filter((r: any) => (r.proofOfDeliveryStatus || '').toLowerCase().includes('deliver') || (r.proofOfDeliveryStatus || '').toLowerCase().includes('success'));
+    const pending = records.filter((r: any) => !(r.proofOfDeliveryStatus || '') || (r.proofOfDeliveryStatus || '').toLowerCase().includes('pend'));
+    const authorized = records.filter((r: any) => r.authorisedBy || r.authorizedBy || r.dateAuthorised || r.dateAuthorized);
+    const attorneys = [...new Set(records.map((r: any) => r.attorney || '').filter((a: string) => a))];
+    this.s129Insights.set({
+      totalNotices,
+      totalAmount,
+      deliveredCount: delivered.length,
+      pendingCount: pending.length,
+      authorizedCount: authorized.length,
+      attorneyCount: attorneys.length,
+      attorneys,
+    });
+  }
+
+  filterS129() {
+    const all = this.tabData()?.section129 || [];
+    const fy = this.s129FinYear();
+    const month = this.s129Month();
+    let filtered = all;
+    if (fy) {
+      filtered = filtered.filter((r: any) => {
+        const recFy = r.financialYear || r.billingPeriod || '';
+        return !recFy || recFy === fy;
+      });
+    }
+    if (month) {
+      filtered = filtered.filter((r: any) => {
+        const recMonth = (r.month || r.billingMonth || '').toLowerCase();
+        const issueDate = r.issueDate || r.noticeDate || r.date || r.createdDate || '';
+        if (recMonth && recMonth === month.toLowerCase()) return true;
+        if (issueDate) {
+          const d = new Date(issueDate);
+          const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+          if (!isNaN(d.getTime()) && monthNames[d.getMonth()] === month.toLowerCase()) return true;
+        }
+        return !recMonth && !issueDate;
+      });
+    }
+    this.s129Filtered.set(filtered);
+    this.computeS129Insights(filtered);
+  }
+
+  initStmtYears(statements: any[]) {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      years.push(`${currentYear - i}/${currentYear - i + 1}`);
+    }
+    const fromStmts = statements
+      .map((s: any) => s.financialYear || s.billingPeriod || '')
+      .filter((y: string) => y && y.includes('/'));
+    const allYears = [...new Set([...years, ...fromStmts])].sort().reverse();
+    this.stmtAvailableYears.set(allYears);
+    if (!this.stmtFinYear() && allYears.length > 0) {
+      this.stmtFinYear.set(allYears[0]);
+    }
+  }
+
+  getStmtPayload() {
+    const account = this.selectedAccount();
+    if (!account) return null;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return null;
+    return {
+      accountId,
+      statementType: this.stmtType(),
+      financialYear: this.stmtFinYear(),
+      monthFrom: this.stmtMonthFrom() || undefined,
+      monthTo: this.stmtMonthTo() || undefined,
+      month: this.stmtMonthFrom() || this.stmtMonth() || undefined,
+    };
+  }
+
+  getMonthPeriodId(monthName: string): number {
+    const monthMap: Record<string, number> = {
+      'July': 1, 'August': 2, 'September': 3, 'October': 4, 'November': 5, 'December': 6,
+      'January': 7, 'February': 8, 'March': 9, 'April': 10, 'May': 11, 'June': 12
+    };
+    return monthMap[monthName] || 0;
+  }
+
+  async fetchConfigSetting(keyName: string): Promise<string> {
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>('/api/platinum/billing-enquiry/get-config-setting', { strKeyName: keyName })
+      );
+      if (typeof result === 'string') return result;
+      if (result?.value) return String(result.value);
+      if (result?.settingValue) return String(result.settingValue);
+      return String(result || '');
+    } catch {
+      return '';
+    }
+  }
+
+  async generateStatement() {
+    const stType = this.stmtType();
+    const finYear = this.stmtFinYear();
+    const monthFrom = this.stmtMonthFrom() || this.stmtMonth();
+
+    if (!finYear) {
+      this.toast.error('Please select a financial year');
+      return;
+    }
+    if (!monthFrom) {
+      this.toast.error('Please select a billing month');
+      return;
+    }
+
+    const account = this.selectedAccount();
+    if (!account) {
+      this.toast.error('No account selected');
+      return;
+    }
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+
+    const periodId = this.getMonthPeriodId(monthFrom);
+    if (!periodId) {
+      this.toast.error('Invalid billing month selected');
+      return;
+    }
+
+    const reportName = stType === 'detailed' ? 'BillingTrailrun' : 'BillingAccountStatement';
+    this.stmtGenerating.set(true);
+    this.stmtReportOpening.set(true);
+    this.stmtGenerated.set(null);
+    this.stmtGeneratedLink.set('');
+
+    try {
+      await this.runStatementReport(periodId, Number(accountId), reportName);
+    } catch (e: any) {
+      this.toast.error(e?.message || 'Failed to generate statement');
+    } finally {
+      this.stmtGenerating.set(false);
+      this.stmtReportOpening.set(false);
+    }
+  }
+
+  async runStatementReport(periodId: number, accountId: number, reportName: string) {
+    let reportFilename = '';
+    const templateEndpoint = reportName.toLowerCase() === 'billingaccountstatement'
+      ? '/api/platinum/billing-enquiry/get-billing-template'
+      : '/api/platinum/billing-enquiry/get-detail-billing-template';
+
+    try {
+      const result = await firstValueFrom(this.api.get<any>(templateEndpoint, { accountId: String(accountId), periodId: String(periodId) }));
+      reportFilename = result?.reportFileName || result?.reportfileName || '';
+    } catch (e: any) {
+    }
+
+    let opened = false;
+    if (reportName.toLowerCase() === 'billingaccountstatement') {
+      if (reportFilename === 'GeorgeAccountStatement') {
+        const qs = `AccountID=${accountId}&BillPeriodID=${periodId}`;
+        opened = await this.openBIReport(qs, 'EMS/Embedded/Billing/GeorgeStatement.cpt');
+      } else {
+        const qs = `${reportName}=1&AccountID=${accountId}&PeriodID=${periodId}`;
+        const endpointUrl = `/Reports/ReportPage.aspx?${qs}`;
+        opened = await this.openV1Window(endpointUrl);
+      }
+    } else {
+      if (reportFilename === 'GeorgeDetailAccountStatement') {
+        const qs = `AccountID=${accountId}&BillPeriodID=${periodId}`;
+        opened = await this.openBIReport(qs, 'EMS/Embedded/Billing/GeorgeDetailStatement.cpt');
+      } else {
+        const qs = `${reportName}=1&AccountID=${accountId}&PeriodID=${periodId}`;
+        const endpointUrl = `/Reports/ReportPage.aspx?${qs}`;
+        opened = await this.openV1Window(endpointUrl);
+      }
+    }
+
+    if (opened) {
+      this.stmtGenerated.set({ reportFilename, reportName, opened: true });
+      this.toast.success('Statement report opened in new window');
+    }
+  }
+
+  async openBIReport(queryString: string, viewletPath: string): Promise<boolean> {
+    let biUrl = this.stmtBiEmbeddedUrl();
+    let biUsername = this.stmtBiReportUsername();
+
+    if (!biUrl) {
+      biUrl = await this.fetchConfigSetting('BIEmbeddedURL');
+      this.stmtBiEmbeddedUrl.set(biUrl);
+    }
+    if (!biUsername) {
+      biUsername = await this.fetchConfigSetting('BIReportUsername');
+      this.stmtBiReportUsername.set(biUsername);
+    }
+
+    if (!biUrl) {
+      this.toast.error('BI Embedded URL not configured — contact your administrator');
+      return false;
+    }
+
+    const base = biUrl.trim().replace(/\/+$/g, '');
+    const route = viewletPath.trim().replace(/^\/+/g, '');
+    const url = `${base}/webroot/decision/view/duchamp?viewlet=/${route}&Username=${encodeURIComponent(biUsername)}&${queryString}`;
+    const features = 'width=1200,height=800,top=50,left=50,toolbar=no,menubar=no,scrollbars=yes,resizable=yes';
+    const win = window.open(url, '_blank', features);
+    if (!win) {
+      this.toast.error('Popup blocked — please allow popups for this site and try again');
+      return false;
+    }
+    return true;
+  }
+
+  async openV1Window(redirectLink: string): Promise<boolean> {
+    let baseUrl = this.stmtBaseWebUrl();
+
+    if (!baseUrl) {
+      baseUrl = await this.fetchConfigSetting('BaseWebURL');
+      this.stmtBaseWebUrl.set(baseUrl);
+    }
+
+    if (!baseUrl) {
+      this.toast.error('Base Web URL not configured — contact your administrator');
+      return false;
+    }
+
+    const base = baseUrl.trim().replace(/\/+$/g, '');
+    const route = redirectLink.trim().replace(/^\/+/g, '');
+    const url = `${base}/${route}`;
+    const features = 'width=1200,height=800,top=50,left=50,toolbar=no,menubar=no,scrollbars=yes,resizable=yes';
+    const win = window.open(url, '_blank', features);
+    if (!win) {
+      this.toast.error('Popup blocked — please allow popups for this site and try again');
+      return false;
+    }
+    return true;
+  }
+
+  async generateStatementLink() {
+    const payload = this.getStmtPayload();
+    if (!payload) return;
+    this.stmtGeneratingLink.set(true);
+    this.stmtGeneratedLink.set('');
+    try {
+      const result = await firstValueFrom(
+        this.api.post<any>('/api/platinum/billing-enquiry/generate-statement', payload)
+      );
+      const link = result?.link || result?.url || result?.statementUrl || result?.fileUrl || result?.downloadUrl || '';
+      this.stmtGeneratedLink.set(link);
+      if (link) {
+        this.toast.success('Statement link generated');
+      } else {
+        this.toast.info('Link generated but no URL returned');
+      }
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || 'Failed to generate statement link');
+    } finally {
+      this.stmtGeneratingLink.set(false);
+    }
+  }
+
+  copyStatementLink() {
+    const link = this.stmtGeneratedLink();
+    if (!link) return;
+    navigator.clipboard.writeText(link).then(() => {
+      this.toast.success('Link copied to clipboard');
+    });
+  }
+
+  previewStatement(fileUrl?: string) {
+    if (!fileUrl) {
+      this.toast.error('No preview link available');
+      return;
+    }
+    window.open(`/api/platinum/statement-download?fileUrl=${encodeURIComponent(fileUrl)}&inline=true`, '_blank');
+  }
+
+  async downloadStatement(fileUrl?: string) {
+    if (!fileUrl) {
+      this.toast.error('No download link available');
+      return;
+    }
+
+    try {
+      const exists = await firstValueFrom(
+        this.api.get<any>('/api/platinum/billing-enquiry/check-file-exists', { fileUrl })
+      );
+      if (exists === false || exists === 'false' || exists?.exists === false) {
+        this.toast.error('File not found. The statement may have been moved or deleted.');
+        return;
+      }
+    } catch {
+    }
+
+    window.open(`/api/platinum/statement-download?fileUrl=${encodeURIComponent(fileUrl)}`, '_blank');
+    this.toast.success('Statement download started');
+  }
+
+  openStmtSendPanel(attachment?: {type: string; finYear: string; monthFrom: string; monthTo: string; fileUrl?: string}) {
+    const basic = this.getAccountBasic();
+    const contact = this.tabData()?.contact;
+    const account = this.selectedAccount();
+    const accountName = account?.['name'] || account?.['accountName'] || account?.['surname_Company'] || basic?.['name'] || basic?.['accountName'] || '';
+    const accountNo = account?.['accountNo'] || account?.['accountNumber'] || basic?.['accountNo'] || '';
+
+    const emails: {email: string; label: string; selected: boolean}[] = [];
+    const primaryEmail = contact?.email || contact?.emailAddress || contact?.emailId || contact?.eMail || basic?.emailId || basic?.email || '';
+    if (primaryEmail) emails.push({email: primaryEmail, label: 'Primary Email', selected: true});
+    for (let i = 1; i <= 4; i++) {
+      const addEmail = contact?.[`additionalEmail${i}`] || '';
+      if (addEmail && !emails.find(e => e.email === addEmail)) {
+        emails.push({email: addEmail, label: `Additional Email ${i}`, selected: true});
+      }
+    }
+    this.stmtAvailableEmails.set(emails);
+
+    const phones: {phone: string; label: string; selected: boolean}[] = [];
+    const mobile = contact?.tel_Mobile || contact?.mobileNumber || contact?.cellphone || contact?.cellPhone || basic?.contactNo || '';
+    if (mobile) phones.push({phone: mobile, label: 'Mobile', selected: true});
+    const home = contact?.tel_Home || contact?.homeNumber || '';
+    if (home && home !== mobile) phones.push({phone: home, label: 'Home', selected: false});
+    const work = contact?.tel_Work || contact?.workNumber || '';
+    if (work && work !== mobile && work !== home) phones.push({phone: work, label: 'Work', selected: false});
+    this.stmtAvailablePhones.set(phones);
+
+    const att = attachment || {
+      type: this.stmtType(),
+      finYear: this.stmtFinYear(),
+      monthFrom: this.stmtMonthFrom(),
+      monthTo: this.stmtMonthTo(),
+    };
+    this.stmtAttachment.set(att);
+
+    const periodDesc = this.buildPeriodDescription(att);
+    const typeLabel = att.type === 'detailed' ? 'Detailed Statement' : 'Account Statement';
+
+    this.stmtSubject.set(
+      `${typeLabel} — Account ${accountNo} — ${att.finYear}${att.monthFrom ? ' ' + att.monthFrom : ''}${att.monthTo && att.monthTo !== att.monthFrom ? ' to ' + att.monthTo : ''}`
+    );
+
+    this.stmtMessageBody.set(
+      `Dear ${accountName || 'Valued Customer'},\n\n` +
+      `Please find attached your ${typeLabel} for ${periodDesc}.\n\n` +
+      `Account Number: ${accountNo}\n` +
+      `Financial Year: ${att.finYear}\n\n` +
+      `Should you have any queries regarding your account, please do not hesitate to contact us.\n\n` +
+      `Kind regards,\nFinance Department`
+    );
+
+    const smsName = accountName ? accountName.split(' ')[0] : 'Customer';
+    this.stmtSmsBody.set(
+      `Hi ${smsName}, your ${att.type === 'detailed' ? 'detailed ' : ''}statement (${att.finYear}${att.monthFrom ? ' ' + att.monthFrom : ''}${att.monthTo && att.monthTo !== att.monthFrom ? '-' + att.monthTo : ''}) is available. Account: ${accountNo}`
+    );
+
+    this.stmtSendPanelOpen.set(true);
+    this.stmtSendMode.set('email');
+    this.stmtSendStep.set('compose');
+    this.loadCommHistory();
+  }
+
+  buildPeriodDescription(att: {type: string; finYear: string; monthFrom: string; monthTo: string}): string {
+    if (att.monthFrom && att.monthTo && att.monthFrom !== att.monthTo) {
+      return `${att.monthFrom} to ${att.monthTo} (${att.finYear})`;
+    } else if (att.monthFrom) {
+      return `${att.monthFrom} ${att.finYear}`;
+    }
+    return `the financial year ${att.finYear}`;
+  }
+
+  toggleStmtEmail(index: number) {
+    const emails = [...this.stmtAvailableEmails()];
+    emails[index] = { ...emails[index], selected: !emails[index].selected };
+    this.stmtAvailableEmails.set(emails);
+  }
+
+  toggleStmtPhone(index: number) {
+    const phones = [...this.stmtAvailablePhones()];
+    phones[index] = { ...phones[index], selected: !phones[index].selected };
+    this.stmtAvailablePhones.set(phones);
+  }
+
+  getSelectedEmails(): string[] {
+    return this.stmtAvailableEmails().filter(e => e.selected).map(e => e.email);
+  }
+
+  getSelectedPhones(): string[] {
+    return this.stmtAvailablePhones().filter(p => p.selected).map(p => p.phone);
+  }
+
+  getSmsCharCount(): number {
+    return this.stmtSmsBody().length;
+  }
+
+  async loadCommHistory() {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+    this.stmtCommHistoryLoading.set(true);
+    try {
+      const logs = await firstValueFrom(this.api.get<any[]>(`/api/communication-logs/${accountId}`));
+      this.stmtCommHistory.set(Array.isArray(logs) ? logs : []);
+    } catch {
+      this.stmtCommHistory.set([]);
+    } finally {
+      this.stmtCommHistoryLoading.set(false);
+    }
+  }
+
+  closeStmtSendPanel() {
+    this.stmtSendPanelOpen.set(false);
+    this.stmtSendMode.set(null);
+    this.stmtAttachment.set(null);
+    this.stmtSendStep.set('compose');
+  }
+
+  async sendStatement(method: 'email' | 'sms') {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+
+    const selectedEmails = this.getSelectedEmails();
+    const selectedPhones = this.getSelectedPhones();
+
+    if (method === 'email' && selectedEmails.length === 0) {
+      this.toast.error('Please select at least one email address');
+      return;
+    }
+    if (method === 'sms' && selectedPhones.length === 0) {
+      this.toast.error('Please select at least one phone number');
+      return;
+    }
+    if (method === 'sms' && this.stmtSmsBody().length > 160) {
+      this.toast.error('SMS message must be 160 characters or less');
+      return;
+    }
+
+    const att = this.stmtAttachment();
+    const basic = this.getAccountBasic();
+    const accountName = account?.['name'] || account?.['accountName'] || account?.['surname_Company'] || basic?.['name'] || '';
+    const accountNo = account?.['accountNo'] || account?.['accountNumber'] || basic?.['accountNo'] || '';
+    const recipients = method === 'email' ? selectedEmails.join(', ') : selectedPhones.join(', ');
+
+    this.stmtSending.set(true);
+    try {
+      if (method === 'email') {
+        for (const email of selectedEmails) {
+          await firstValueFrom(
+            this.api.post<any>('/api/platinum/billing-enquiry/send-statement', {
+              accountId,
+              method: 'email',
+              email,
+              phone: '',
+              statementType: att?.type || this.stmtType(),
+              financialYear: att?.finYear || this.stmtFinYear(),
+              monthFrom: att?.monthFrom || this.stmtMonthFrom() || undefined,
+              monthTo: att?.monthTo || this.stmtMonthTo() || undefined,
+              month: att?.monthFrom || this.stmtMonthFrom() || this.stmtMonth() || undefined,
+              fileUrl: att?.fileUrl || undefined,
+              subject: this.stmtSubject(),
+              messageBody: this.stmtMessageBody(),
+            })
+          );
+        }
+      } else {
+        for (const phone of selectedPhones) {
+          await firstValueFrom(
+            this.api.post<any>('/api/platinum/billing-enquiry/send-statement', {
+              accountId,
+              method: 'sms',
+              email: '',
+              phone,
+              statementType: att?.type || this.stmtType(),
+              financialYear: att?.finYear || this.stmtFinYear(),
+              monthFrom: att?.monthFrom || this.stmtMonthFrom() || undefined,
+              monthTo: att?.monthTo || this.stmtMonthTo() || undefined,
+              month: att?.monthFrom || this.stmtMonthFrom() || this.stmtMonth() || undefined,
+              messageBody: this.stmtSmsBody(),
+            })
+          );
+        }
+      }
+
+      try {
+        await firstValueFrom(
+          this.api.post<any>('/api/communication-logs', {
+            accountId,
+            accountNumber: accountNo,
+            accountHolder: accountName,
+            method,
+            recipients,
+            subject: method === 'email' ? this.stmtSubject() : 'SMS Notification',
+            messageBody: method === 'email' ? this.stmtMessageBody() : this.stmtSmsBody(),
+            statementType: att?.type || this.stmtType(),
+            financialYear: att?.finYear || this.stmtFinYear(),
+            periodFrom: att?.monthFrom || this.stmtMonthFrom() || '',
+            periodTo: att?.monthTo || this.stmtMonthTo() || '',
+          })
+        );
+      } catch {
+        console.warn('[sendStatement] Communication log save failed — statement was sent');
+      }
+
+      this.stmtSendStep.set('sent');
+      this.toast.success(`Statement sent via ${method.toUpperCase()} to ${recipients}`);
+      this.loadCommHistory();
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || `Failed to send via ${method}`);
+    } finally {
+      this.stmtSending.set(false);
+    }
+  }
+
+  async viewStatementRow(stmt: any): Promise<void> {
+    const fy = stmt.financialYear || stmt.billingPeriod || stmt.period || this.stmtFinYear();
+    const month = stmt.month || stmt.billingMonth || '';
+    const stType = (stmt.statementType || stmt.type || '').toLowerCase().includes('detail') ? 'detailed' : 'standard';
+
+    if (stmt.fileUrl || stmt.downloadUrl || stmt.url) {
+      this.downloadStatement(stmt.fileUrl || stmt.downloadUrl || stmt.url);
+      return;
+    }
+
+    this.stmtType.set(stType as 'standard' | 'detailed');
+    this.stmtFinYear.set(fy);
+    this.stmtMonthFrom.set(month);
+    this.stmtMonthTo.set(month);
+    this.stmtMonth.set(month);
+    await this.generateStatement();
+  }
+
+  async sendStatementRow(stmt: any): Promise<void> {
+    const fy = stmt.financialYear || stmt.billingPeriod || stmt.period || this.stmtFinYear();
+    const month = stmt.month || stmt.billingMonth || '';
+    const stType = (stmt.statementType || stmt.type || '').toLowerCase().includes('detail') ? 'detailed' : 'standard';
+
+    this.openStmtSendPanel({
+      type: stType,
+      finYear: fy,
+      monthFrom: month,
+      monthTo: month,
+      fileUrl: stmt.fileUrl || stmt.downloadUrl || stmt.url,
+    });
+  }
+
+  regenFromHistory(stmt: any): void {
+    const fy = stmt.financialYear || stmt.billingPeriod || stmt.period || this.stmtFinYear();
+    const month = stmt.month || stmt.billingMonth || '';
+    const stType = (stmt.statementType || stmt.type || '').toLowerCase().includes('detail') ? 'detailed' : 'standard';
+    this.stmtType.set(stType as 'standard' | 'detailed');
+    this.stmtFinYear.set(fy);
+    this.stmtMonthFrom.set(month);
+    this.stmtMonthTo.set(month);
+    this.stmtMonth.set(month);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async _legacySendStatementRow(stmt: any): Promise<void> {
+    const fy = stmt.financialYear || stmt.billingPeriod || stmt.period || this.stmtFinYear();
+    const month = stmt.month || stmt.billingMonth || '';
+    const stType = (stmt.statementType || stmt.type || '').toLowerCase().includes('detail') ? 'detailed' : 'standard';
+
+    this.stmtType.set(stType as 'standard' | 'detailed');
+    this.stmtFinYear.set(fy);
+    this.stmtMonth.set(month);
+
+    const basic = this.getAccountBasic();
+    const contact = this.tabData()?.contact;
+    const email = contact?.email || contact?.emailId || basic?.emailId || basic?.email || '';
+
+    if (email) {
+      this.stmtEmail.set(email);
+      this.stmtSendMode.set('email');
+      await this.sendStatement('email');
+    } else {
+      const phone = contact?.tel_Mobile || contact?.cellPhone || contact?.contactNo || basic?.contactNo || '';
+      if (phone) {
+        this.stmtPhone.set(phone);
+        this.stmtSendMode.set('sms');
+        await this.sendStatement('sms');
+      } else {
+        this.stmtSendMode.set('email');
+        this.toast.error('No email or phone on file — please enter manually and use the generator above');
+      }
+    }
+  }
+
+  async loadCommTemplates(): Promise<void> {
+    if (this.commTemplates().length > 0) return;
+    this.commTemplatesLoading.set(true);
+    try {
+      const data: any = await firstValueFrom(
+        this.api.get('/api/platinum/billing-enquiry/communication-templates')
+      );
+      const items = Array.isArray(data) ? data : (data?.items || data?.value || data?.results || data?.data || []);
+      this.commTemplates.set(items);
+    } catch {
+      this.commTemplates.set([]);
+    } finally {
+      this.commTemplatesLoading.set(false);
+    }
+  }
+
+  openCompose(): void {
+    this.commShowCompose.set(true);
+    this.loadCommTemplates();
+    const basic = this.getAccountBasic();
+    const contact = this.tabData()?.contact;
+    if (this.commMethod() === 'email') {
+      const email = contact?.email || contact?.emailId || contact?.emailAddress || basic?.emailId || basic?.email || '';
+      this.commRecipient.set(email);
+    } else {
+      const phone = contact?.tel_Mobile || contact?.cellPhone || contact?.contactNo || basic?.contactNo || basic?.tel_Mobile || '';
+      this.commRecipient.set(phone);
+    }
+  }
+
+  onCommMethodChange(): void {
+    const basic = this.getAccountBasic();
+    const contact = this.tabData()?.contact;
+    if (this.commMethod() === 'email') {
+      const email = contact?.email || contact?.emailId || contact?.emailAddress || basic?.emailId || basic?.email || '';
+      this.commRecipient.set(email);
+    } else {
+      const phone = contact?.tel_Mobile || contact?.cellPhone || contact?.contactNo || basic?.contactNo || basic?.tel_Mobile || '';
+      this.commRecipient.set(phone);
+    }
+  }
+
+  onCommTemplateChange(): void {
+    const tplId = this.commSelectedTemplate();
+    if (!tplId) return;
+    const tpl = this.commTemplates().find((t: any) => (t.id || t.templateId) === tplId);
+    if (tpl) {
+      this.commSubject.set(tpl.subject || tpl.name || '');
+      this.commMessage.set(tpl.body || tpl.message || tpl.content || '');
+    }
+  }
+
+  async sendNotification(): Promise<void> {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+    if (!this.commRecipient()) {
+      this.toast.error(`Please enter ${this.commMethod() === 'email' ? 'an email address' : 'a phone number'}`);
+      return;
+    }
+    if (!this.commMessage()) {
+      this.toast.error('Please enter a message or select a template');
+      return;
+    }
+    this.commSending.set(true);
+    try {
+      await firstValueFrom(
+        this.api.post<any>('/api/platinum/billing-enquiry/send-notification', {
+          accountId,
+          method: this.commMethod(),
+          recipient: this.commRecipient(),
+          subject: this.commSubject(),
+          message: this.commMessage(),
+          templateId: this.commSelectedTemplate() || undefined,
+        })
+      );
+      this.toast.success(`${this.commMethod() === 'email' ? 'Email' : 'SMS'} sent successfully to ${this.commRecipient()}`);
+      this.commMessage.set('');
+      this.commSubject.set('');
+      this.commSelectedTemplate.set('');
+      this.commShowCompose.set(false);
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || `Failed to send ${this.commMethod()}`);
+    } finally {
+      this.commSending.set(false);
+    }
+  }
+
+  computeIndigentInsights(records: any[]): any {
+    if (!records || records.length === 0) return null;
+    const latest = records[0];
+    const currentStatus = latest.attpStatus || latest.status || '';
+    const currentType = latest.indigentType || latest.attpType || latest.type || '';
+    const appDate = latest.applicationDate || latest.date || '';
+    const totalWriteOff = records.reduce((sum: number, r: any) => sum + (Number(r.totalWriteOffAmount || r.totalWriteOff || 0) || 0), 0);
+    const doNotCut = records.some((r: any) => r.doNotCutDate && r.doNotCutDate !== '' && r.doNotCutDate !== null);
+    const doNotCutRec = records.find((r: any) => r.doNotCutDate && r.doNotCutDate !== '' && r.doNotCutDate !== null);
+    return {
+      currentStatus,
+      currentType,
+      applicationDate: this.formatDate(appDate),
+      totalWriteOff,
+      totalRecords: records.length,
+      doNotCut,
+      doNotCutDate: doNotCutRec ? this.formatDate(doNotCutRec.doNotCutDate) : null,
+    };
+  }
+
+  isPrepaidMeter(m: any): boolean {
+    const desc = (m.serviceDesc || m.serviceDescription || m.serviceType || m.tariffType || '').toLowerCase();
+    return desc.includes('prepaid') || desc.includes('pre-paid') || desc.includes('pre paid');
+  }
+
+  getPrepaidMeterNo(m: any): string {
+    if (!m) return '';
+    return m.prepaidMeterNo || m.meterNumber || m.physicalMeterNo || m.meterNo || m.meter_ID || '';
+  }
+
+  async selectConvMeter(meter: any) {
+    this.meterSelectedConv.set(meter);
+    this.meterConvLoading.set(true);
+    this.meterConvHistory.set([]);
+    this.meterConvInsights.set(null);
+    const account = this.selectedAccount();
+    const accountId = this.getAccountId(account);
+    const baseParams = this.getMeterReadingParams(meter, accountId);
+    try {
+      const currentFy = this.userFinYear() || this.getCurrentFinYear();
+      const [startYear] = currentFy.split('/').map(Number);
+      const fyList: string[] = [];
+      for (let i = 0; i < 3; i++) fyList.push(`${startYear - i}/${startYear - i + 1}`);
+
+      const requests = fyList.map(fy =>
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { ...baseParams, finYear: fy }))
+          .then(res => this.normalizeArray(res))
+          .catch(() => [] as any[])
+      );
+      const results = await Promise.all(requests);
+      const allReadings = results.flat();
+
+      if (allReadings.length === 0) {
+        const barRes = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history-barchart`, baseParams)).catch(() => []);
+        const barChart = this.normalizeArray(barRes);
+        if (barChart.length > 0) allReadings.push(...barChart);
+      }
+
+      const cleaned = this.cleanMeterReadings(allReadings);
+      this.meterConvHistory.set(cleaned);
+      this.meterConvInsights.set(this.computeConsumptionInsights(cleaned));
+    } catch {
+      this.meterConvHistory.set([]);
+    }
+    this.meterConvLoading.set(false);
+  }
+
+  async selectPrepaidMeter(meter: any) {
+    this.meterSelectedPrepaid.set(meter);
+    this.meterPrepaidLoading.set(true);
+    this.meterPrepaidSales.set([]);
+    this.meterPrepaidStats.set(null);
+    const meterId = meter.meterId || meter.meter_id || meter.id || meter.prepaidMeterId || meter.meterID || meter.meter_ID || meter.serviceId || meter.service_ID || meter.meterNo || meter.prepaidMeterNo || '';
+    if (!meterId) {
+      this.meterPrepaidLoading.set(false);
+      return;
+    }
+    try {
+      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, { meterId: String(meterId) }));
+      const sales = this.normalizeArray(res);
+      this.meterPrepaidSales.set(sales);
+      this.meterPrepaidStats.set(this.computePrepaidStats(sales));
+    } catch (err: any) {
+      this.meterPrepaidSales.set([]);
+    }
+    this.meterPrepaidLoading.set(false);
+  }
+
+  computePrepaidStats(sales: any[]): any {
+    if (!sales || sales.length === 0) return null;
+    const amounts = sales.map((s: any) => Number(s.total || s.amount || s.receiptAmount || 0)).filter((v: number) => !isNaN(v) && v > 0);
+    const units = sales.map((s: any) => Number(s.prepaidUnit || s.units || s.prepaidUnits || 0)).filter((v: number) => !isNaN(v) && v > 0);
+    const dates = sales.map((s: any) => s.receiptDate || s.date || s.transactionDate || '').filter((d: string) => d);
+    const totalSpend = amounts.reduce((s: number, v: number) => s + v, 0);
+    const totalUnits = units.reduce((s: number, v: number) => s + v, 0);
+    const avgSpend = amounts.length > 0 ? totalSpend / amounts.length : 0;
+    const avgUnits = units.length > 0 ? totalUnits / units.length : 0;
+    const lastPurchase = dates.length > 0 ? dates[0] : null;
+    const lastAmount = amounts.length > 0 ? amounts[0] : 0;
+    const cancelled = sales.filter((s: any) => (s.canceledStatus || s.cancelledStatus || s.status || '').toLowerCase() === 'yes' || (s.canceledStatus || s.cancelledStatus || s.status || '').toLowerCase() === 'cancelled').length;
+    return { totalSales: sales.length, totalSpend, totalUnits, avgSpend: Math.round(avgSpend * 100) / 100, avgUnits: Math.round(avgUnits * 100) / 100, lastPurchase, lastAmount, cancelled };
+  }
+
+  getConvMeterChartHeight(r: any): number {
+    const history = this.meterConvHistory();
+    if (!history || history.length === 0) return 0;
+    const max = Math.max(...history.map((h: any) => this.getConsumptionVal(h)));
+    const val = this.getConsumptionVal(r);
+    return max > 0 ? (val / max) * 100 : 0;
+  }
+
+  isConvAnomaly(r: any, idx: number): string {
+    const insights = this.meterConvInsights();
+    if (!insights?.anomalies) return '';
+    const match = insights.anomalies.find((a: any) => a.index === idx);
+    return match ? match.type : '';
+  }
+
+  getFilteredServices(category: string): any[] {
+    const all = this.getServicesList();
+    return all.filter((svc: any) => this.getSvcCategory(svc) === category);
+  }
+
+  getActiveFilteredServices(category: string): any[] {
+    return this.getFilteredServices(category).filter((svc: any) => this.isSvcActive(svc));
+  }
+
+  getSvcCategory(svc: any): string {
+    const type = (svc.serviceType || svc.serviceTypeDesc || svc.serviceDesc || svc.serviceDescription || svc.tariffType || '').toLowerCase();
+    const tariff = (svc.tariff || svc.tariffDesc || '').toLowerCase();
+    const combined = type + ' ' + tariff;
+    if (type.includes('basic') || type.includes('disposal') || type.includes('refuse') || type.includes('sanitation')) return 'basic';
+    if (type.includes('pre-paid') || type.includes('pre paid') || type.includes('prepaid')) return 'prepaid';
+    if (combined.includes('property rate') || combined.includes('rates') && !combined.includes('water') && !combined.includes('elec') && !combined.includes('sewer') && !combined.includes('refuse')) return 'rates';
+    if (combined.includes('metered') || combined.includes('effluent')) return 'metered';
+    if (combined.includes('rate')) return 'rates';
+    return 'other';
+  }
+
+  getSvcActiveCount(): number {
+    return this.getServicesList().filter((svc: any) => this.isSvcActive(svc)).length;
+  }
+
+  getSvcCategories(): { key: string; label: string; icon: string }[] {
+    return [
+      { key: 'metered', label: 'Metered Services', icon: '🔧' },
+      { key: 'prepaid', label: 'Pre-Paid Meters', icon: '⚡' },
+      { key: 'basic', label: 'Basic Services', icon: '🏠' },
+      { key: 'rates', label: 'Property Rates', icon: '🏛️' },
+      { key: 'other', label: 'Other Services', icon: '📦' },
+    ];
+  }
+
+  getSvcTypeIcon(svc: any): string {
+    const type = (svc.serviceType || svc.serviceTypeDesc || svc.serviceDesc || svc.serviceDescription || svc.tariffType || '').toLowerCase();
+    if (type.includes('water')) return '💧';
+    if (type.includes('elec')) return '⚡';
+    if (type.includes('sewer') || type.includes('sanit') || type.includes('effluent')) return '🚿';
+    if (type.includes('refuse') || type.includes('disposal')) return '🗑️';
+    if (type.includes('rate')) return '🏛️';
+    return '📋';
+  }
+
+  getSvcType(svc: any): string {
+    return svc.serviceType || svc.serviceTypeDesc || svc.serviceDesc || svc.serviceDescription || '-';
+  }
+
+  isSvcActive(svc: any): boolean {
+    return (svc.serviceStatus || svc.statusDesc || svc.status || '').toLowerCase() === 'active';
+  }
+
+  getSvcMeterDisplay(svc: any): string {
+    const meter = svc.physicalMeterMeterCode || svc.physicalMeterNo || svc.meterNo || svc.meterNumber || '';
+    const code = svc.meterCode || '';
+    if (meter && code) return `${meter} - ${code}`;
+    if (meter) return meter;
+    return '';
+  }
+
+  formatTariffRate(svc: any): string {
+    const parts: string[] = [];
+    const startDate = svc.tariffStartDate || svc.startDate || svc.serviceCommencementDate;
+    const endDate = svc.tariffEndDate || svc.endDate;
+    if (startDate || endDate) {
+      parts.push(`<div class="svc-rate-line"><strong>Start Date · End Date:</strong></div>`);
+      parts.push(`<div class="svc-rate-line">${this.formatDate(startDate)} · ${this.formatDate(endDate)}</div>`);
+    }
+    const tariffRates = svc.tariffRates || svc.tariffRate || svc.rates;
+    if (typeof tariffRates === 'string' && tariffRates.length > 0) {
+      parts.push(`<div class="svc-rate-line svc-rate-detail">${tariffRates.replace(/\n/g, '<br>')}</div>`);
+    } else if (Array.isArray(tariffRates)) {
+      tariffRates.forEach((r: any) => {
+        const label = r.description || r.label || r.name || '';
+        const val = r.rate ?? r.value ?? r.amount ?? '';
+        if (label || val !== '') parts.push(`<div class="svc-rate-line">${label}: ${val}</div>`);
+      });
+    }
+    const interval = svc.interval || svc.tariffInterval;
+    const cost = svc.cost || svc.tariffCost || svc.monthlyCost;
+    const remainder = svc.remainder || svc.tariffRemainder;
+    if (interval !== undefined || cost !== undefined || remainder !== undefined) {
+      parts.push(`<div class="svc-rate-line"><strong>Interval · Cost:</strong></div>`);
+      const vals: string[] = [];
+      if (interval !== undefined) vals.push(`Interval: ${interval}`);
+      if (cost !== undefined) vals.push(`Cost: ${this.formatDebtAmt(Number(cost) || 0)}`);
+      if (remainder !== undefined) vals.push(`Remainder: ${this.formatDebtAmt(Number(remainder) || 0)}`);
+      parts.push(`<div class="svc-rate-line">${vals.join('<br>')}</div>`);
+    }
+    if (parts.length === 0) return '';
+    return parts.join('');
+  }
+
+  async viewServiceBalance(svc: any) {
+    this.svcSelectedService.set(svc);
+    this.svcDrilldownMode.set('balance');
+    this.svcBalanceLoading.set(true);
+    this.svcBalanceData.set([]);
+    this.svcBalanceError.set('');
+    const account = this.selectedAccount();
+    const accountId = this.getAccountId(account);
+    try {
+      const data = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance`, { accountId: String(accountId), financialYear: this.svcBalanceFinYear(), _t: String(Date.now()) }));
+      this.svcBalanceData.set(this.normalizeArray(data));
+    } catch (err: any) {
+      this.svcBalanceData.set([]);
+      this.svcBalanceError.set(err?.message || 'Failed to load service balance data');
+    }
+    this.svcBalanceLoading.set(false);
+  }
+
+  async viewPrepaidPurchaseHistory(svc: any) {
+    this.svcSelectedService.set(svc);
+    this.svcDrilldownMode.set('purchase-history');
+    this.svcPurchaseLoading.set(true);
+    this.svcPurchaseHistory.set([]);
+    this.svcPurchaseStats.set(null);
+    const meterId = svc.meterId || svc.meter_id || svc.id || svc.prepaidMeterId || svc.meterID || svc.meter_ID || svc.serviceId || svc.service_ID || svc.physicalMeterMeterCode || svc.physicalMeterNo || svc.meterNo || svc.meterNumber || '';
+    if (!meterId) {
+      this.svcPurchaseLoading.set(false);
+      return;
+    }
+    try {
+      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, { meterId: String(meterId) }));
+      const sales = this.normalizeArray(res);
+      this.svcPurchaseHistory.set(sales);
+      this.svcPurchaseStats.set(this.computePrepaidStats(sales));
+    } catch (err: any) {
+      this.svcPurchaseHistory.set([]);
+    }
+    this.svcPurchaseLoading.set(false);
+  }
+
+  async changeSvcBalanceFinYear(fy: string) {
+    this.svcBalanceFinYear.set(fy);
+    await this.viewServiceBalance(this.svcSelectedService());
+  }
+
+  getSvcBalanceFinYearOptions(): string[] {
+    const now = new Date();
+    const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return Array.from({ length: 5 }, (_, i) => {
+      const y = startYear - i;
+      return `${y}/${y + 1}`;
+    });
+  }
+
+  getSvcBalanceFiltered(): any[] {
+    const svc = this.svcSelectedService();
+    if (!svc) return [];
+    const svcDesc = svc.serviceDesc || svc.serviceDescription || svc.tariffType || '';
+    const svcTypeId = svc.tariffTypeID || svc.serviceTypeID || svc.serviceType_ID;
+    const filtered = this.svcBalanceData().filter((b: any) =>
+      (svcTypeId && b.serviceTypeID === svcTypeId) ||
+      (b.serviceDescription && svcDesc && b.serviceDescription.toLowerCase() === svcDesc.toLowerCase())
+    );
+    const monthOrder = ['July','August','September','October','November','December','January','February','March','April','May','June'];
+    return [...filtered].sort((a, b) => {
+      const ai = monthOrder.indexOf(a.month);
+      const bi = monthOrder.indexOf(b.month);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  }
+
+  getSvcBalanceTotals(): any {
+    const rows = this.getSvcBalanceFiltered();
+    return rows.reduce((acc: any, r: any) => ({
+      openingBalance: (acc.openingBalance || 0) + (r.openingBalance || 0),
+      amount: (acc.amount || 0) + (r.amount || 0),
+      vat: (acc.vat || 0) + (r.vat || 0),
+      interestAmount: (acc.interestAmount || 0) + (r.interestAmount ?? r.interest ?? 0),
+      totalAmount: (acc.totalAmount || 0) + (r.totalAmount ?? r.total ?? 0),
+      currentInterestAmount: (acc.currentInterestAmount || 0) + (r.currentInterestAmount || 0),
+      currentCharge: (acc.currentCharge || 0) + (r.currentCharge || 0),
+      closingBalance: (acc.closingBalance || 0) + (r.closingBalance ?? r.closingBal ?? 0),
+    }), {});
+  }
+
+  getSvcBalanceChartData(): { month: string; amount: number }[] {
+    return this.getSvcBalanceFiltered()
+      .filter(r => (r.totalAmount || r.amount || 0) > 0)
+      .map(r => ({ month: r.month || '-', amount: r.totalAmount || r.amount || 0 }));
+  }
+
+  getSvcBalanceChartMax(): number {
+    const data = this.getSvcBalanceChartData();
+    if (!data.length) return 1;
+    return Math.max(...data.map(d => d.amount), 1);
+  }
+
+  getSvcBalanceBarHeight(amount: number): number {
+    const max = this.getSvcBalanceChartMax();
+    return max > 0 ? (amount / max) * 100 : 0;
+  }
+
+  getConsChartBarColor(r: any): string {
+    const flag = (r.flag || r.levyStatus || '').toLowerCase();
+    if (flag.includes('reversed') || flag.includes('cancel')) return 'cons-bar-reversed';
+    if (flag.includes('estimate') || flag.includes('levy')) return 'cons-bar-estimate';
+    return 'cons-bar-actual';
+  }
+
+  getConsChartSorted(): any[] {
+    const data = this.consumptionHistory();
+    if (!data.length) return [];
+    const monthOrder = ['july','august','september','october','november','december','january','february','march','april','may','june'];
+    const getSortKey = (r: any): number => {
+      const fy = (r.financialYear || r.finYear || '').trim();
+      const fyYear = fy ? parseInt(fy.split('/')[0]) || 0 : 0;
+      const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+      const mi = monthOrder.indexOf(bm);
+      return fyYear * 100 + (mi >= 0 ? mi : 50);
+    };
+    return [...data]
+      .filter(r => {
+        const bm = (r.billingmonth || r.billingMonth || '').toLowerCase().trim();
+        return !bm.includes('open period') && bm !== 'current open period';
+      })
+      .sort((a, b) => getSortKey(a) - getSortKey(b))
+      .slice(-12);
+  }
+
+  getConsChartMax(): number {
+    const data = this.getConsChartSorted();
+    if (!data.length) return 100;
+    return Math.max(...data.map(r => this.getConsumptionVal(r)), 1);
+  }
+
+  getConsChartBarPct(r: any): number {
+    const max = this.getConsChartMax();
+    const val = this.getConsumptionVal(r);
+    return max > 0 ? (val / max) * 100 : 0;
+  }
+
+  getConsChartMonthLabel(r: any): { mon: string; yr: string } {
+    const bm = r.billingmonth || r.billingMonth || '';
+    const fy = r.financialYear || r.finYear || '';
+    if (bm && fy) {
+      const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const idx = monthNames.findIndex(m => m.toLowerCase() === bm.toLowerCase());
+      if (idx >= 0) {
+        const years = fy.split('/');
+        const year = idx >= 6 ? years[0] : years[1];
+        return { mon: bm.substring(0, 3), yr: year?.slice(-2) || '' };
+      }
+    }
+    if (bm.toLowerCase().includes('open period') || bm.toLowerCase().includes('current')) {
+      return { mon: 'Open', yr: '' };
+    }
+    return { mon: bm.substring(0, 3) || '?', yr: '' };
+  }
+
+  computeMeterIntelligence(allReadings: any[], monthsOverride?: number): any {
+    if (!allReadings || allReadings.length < 3) return null;
+    const SPIKE_HIGH = 1.5;
+    const SPIKE_LOW = 0.4;
+    const STD_DAYS = 30;
+    const months = monthsOverride ?? this.consIntelligenceMonths();
+
+    const processed = allReadings.map((r: any) => {
+      const cons = Number(r.consumption || r.units || r.totalConsumption || 0) || 0;
+      const rdRaw = r.readingdays || r.readingDays || r.days;
+      const rdNum = typeof rdRaw === 'number' ? rdRaw : (rdRaw ? parseInt(rdRaw) : NaN);
+      const readingDays = (!isNaN(rdNum) && rdNum > 0) ? rdNum : 0;
+      const dailyConsumption = readingDays > 0 ? cons / readingDays : 0;
+      return {
+        consumption: cons, readingDays, dailyConsumption,
+        billingMonth: r.billingmonth || r.billingMonth || '',
+        financialYear: r.financialYear || r.finYear || '',
+        flag: r.flag || '', readingStatus: r.readingStatus || '',
+        reading1Date: r.reading1Date || '', reading2Date: r.reading2Date || '',
+        isSpike: false, spikeType: 'none' as string, spikePercent: 0,
+      };
+    });
+
+    const billed = processed.filter(r => {
+      const bm = r.billingMonth.toLowerCase().trim();
+      const rs = r.readingStatus.toLowerCase();
+      const flag = r.flag.toLowerCase();
+      if (flag.includes('reversed') || flag.includes('cancel')) return false;
+      if (bm.includes('open period') || bm === 'current open period') return false;
+      if (rs.includes('awaiting') || rs.includes('unbilled') || rs.includes('pending')) return false;
+      if (flag.includes('awaiting') || flag.includes('unbilled')) return false;
+      if (flag.includes('estimate') || flag.includes('levy')) return false;
+      if (r.readingDays <= 0) return false;
+      return r.consumption > 0;
+    });
+
+    const selectedBilled = billed.slice(0, months);
+    if (selectedBilled.length < 2) return { processed, noData: true };
+
+    const totalConsumption = selectedBilled.reduce((s, r) => s + r.consumption, 0);
+    const totalDays = selectedBilled.reduce((s, r) => s + r.readingDays, 0);
+    const weightedAvgDaily = totalDays > 0 ? totalConsumption / totalDays : 0;
+    const avgMonthlyConsumption = weightedAvgDaily * STD_DAYS;
+
+    const dailyValues = selectedBilled.map(r => r.dailyConsumption);
+    const minDaily = Math.min(...dailyValues);
+    const maxDaily = Math.max(...dailyValues);
+
+    const allWithSpikes = processed.map(r => {
+      if (r.consumption <= 0 || weightedAvgDaily <= 0 || r.readingDays <= 0) return { ...r };
+      const ratio = r.dailyConsumption / weightedAvgDaily;
+      const isHigh = ratio >= SPIKE_HIGH;
+      const isLow = ratio <= SPIKE_LOW && r.dailyConsumption > 0;
+      const pctDev = ((r.dailyConsumption - weightedAvgDaily) / weightedAvgDaily) * 100;
+      return { ...r, isSpike: isHigh || isLow, spikeType: isHigh ? 'high' : isLow ? 'low' : 'none', spikePercent: pctDev };
+    });
+
+    const spikeCount = allWithSpikes.filter(r => r.isSpike).length;
+    const spikes = allWithSpikes.filter(r => r.isSpike);
+
+    const trendChart = allWithSpikes.filter(r => r.consumption > 0).slice(-(months + 4));
+    const trendMax = Math.max(...trendChart.map(r => r.dailyConsumption), weightedAvgDaily * 1.5);
+
+    return {
+      avgDailyConsumption: weightedAvgDaily, avgMonthlyConsumption,
+      minDaily, maxDaily, periodMonths: selectedBilled.length,
+      totalConsumption, totalDays, spikeCount, spikes,
+      allWithSpikes, trendChart, trendMax, noData: false,
+    };
+  }
+
+  parseTariffTiers(svc: any): { label: string; from: number; to: number; rate: number }[] {
+    const costInterVal = svc?.costInterVal || svc?.costInterval || '';
+    if (!costInterVal) return [];
+    const tiers: { label: string; from: number; to: number; rate: number }[] = [];
+    const normalize = (s: string) => s.replace(/[R$,]/g, '').replace(/\s*per\s*(unit|kl|kwh|kilolitre|kilowatt)\s*/gi, '').trim();
+    const lines = String(costInterVal).split(/[\n;|]+/).map(normalize).filter(Boolean);
+    for (const line of lines) {
+      const match = line.match(/([\d,.]+)\s*[-–—]\s*([\d,.]+)\s*[=:@]\s*([\d,.]+)/);
+      if (match) {
+        const from = parseFloat(match[1].replace(/,/g, ''));
+        const to = parseFloat(match[2].replace(/,/g, ''));
+        const rate = parseFloat(match[3].replace(/,/g, ''));
+        if (!isNaN(from) && !isNaN(to) && !isNaN(rate) && rate > 0) {
+          tiers.push({ label: `${from} – ${to}`, from, to, rate });
+        }
+        continue;
+      }
+      const above = line.match(/(?:above|over|>)\s*([\d,.]+)\s*[=:@]\s*([\d,.]+)/i);
+      if (above) {
+        const from = parseFloat(above[1].replace(/,/g, ''));
+        const rate = parseFloat(above[2].replace(/,/g, ''));
+        if (!isNaN(from) && !isNaN(rate) && rate > 0) {
+          tiers.push({ label: `Above ${from}`, from, to: Infinity, rate });
+        }
+        continue;
+      }
+      const upTo = line.match(/(?:up\s*to|first|<=?)\s*([\d,.]+)\s*[=:@]\s*([\d,.]+)/i);
+      if (upTo) {
+        const to = parseFloat(upTo[1].replace(/,/g, ''));
+        const rate = parseFloat(upTo[2].replace(/,/g, ''));
+        if (!isNaN(to) && !isNaN(rate) && rate > 0) {
+          tiers.push({ label: `0 – ${to}`, from: 0, to, rate });
+        }
+        continue;
+      }
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const val = parseFloat(parts[0].replace(/,/g, ''));
+        const rate = parseFloat(parts[parts.length - 1].replace(/,/g, ''));
+        if (!isNaN(val) && !isNaN(rate) && rate > 0) {
+          const lastTo = tiers.length > 0 ? tiers[tiers.length - 1].to : 0;
+          tiers.push({ label: parts[0], from: lastTo === Infinity ? 0 : lastTo, to: val > 0 ? val : Infinity, rate });
+        }
+      }
+    }
+    tiers.sort((a, b) => a.from - b.from);
+    return tiers;
+  }
+
+  computeBillingEstimate(allReadings: any[], meterOverride?: any, vatOverride?: number): any {
+    if (!allReadings || !allReadings.length) return null;
+    const meter = meterOverride ?? this.consumptionSelectedMeter();
+    if (!meter) return null;
+
+    const services = this.getServicesList();
+    let matchedSvc = meter;
+    if (services.length > 0) {
+      const meterDesc = (meter.serviceDesc || meter.serviceDescription || '').toLowerCase();
+      const meterTariff = (meter.tariff || '').toLowerCase();
+      const found = services.find((s: any) => {
+        const sType = (s.serviceType || s.serviceTypeDesc || s.serviceDesc || '').toLowerCase();
+        const sTariff = (s.tariff || '').toLowerCase();
+        if (meterDesc && sType && meterDesc.includes(sType.split(' ')[0])) return true;
+        if (meterTariff && sTariff && meterTariff === sTariff) return true;
+        return false;
+      });
+      if (found) matchedSvc = { ...meter, costInterVal: found.costInterVal, endDate: found.endDate, startDate: found.startDate };
+    }
+
+    const tiers = this.parseTariffTiers(matchedSvc);
+    if (!tiers.length) return null;
+
+    const factor = Number(matchedSvc.tarifffactor || matchedSvc.factorQuantity || 1) || 1;
+    const vatRate = vatOverride ?? this.consBillingVatRate();
+    const STD_DAYS = 30;
+
+    const unbilled = allReadings.filter(item => {
+      const bm = (item.billingmonth || item.billingMonth || '').toLowerCase().trim();
+      const rs = (item.readingStatus || '').toLowerCase();
+      const flag = (item.flag || '').toLowerCase();
+      if (flag.includes('reversed') || flag.includes('cancel')) return false;
+      if (flag.includes('estimate') || flag.includes('levy') || rs.includes('estimate')) return false;
+      if (bm === 'current open period' || bm.includes('open period')) return true;
+      if (rs.includes('awaiting') || rs.includes('unbilled') || rs.includes('pending')) return true;
+      return false;
+    });
+
+    const calcTiered = (consumption: number, readingDays?: number) => {
+      if (consumption <= 0 || !tiers.length) return { breakdown: [], subtotal: 0, isProRated: false };
+      const days = readingDays && readingDays > 0 ? readingDays : STD_DAYS;
+      const dayRatio = days / STD_DAYS;
+      const isProRated = days !== STD_DAYS;
+      const breakdown: { label: string; units: number; rate: number; amount: number; proFrom?: number; proTo?: number }[] = [];
+      let remaining = consumption;
+      for (const tier of tiers) {
+        if (remaining <= 0) break;
+        const proFrom = tier.from * dayRatio;
+        const proTo = tier.to === Infinity ? Infinity : tier.to * dayRatio;
+        const tierCap = proTo === Infinity ? remaining : Math.max(0, proTo - proFrom);
+        const units = Math.min(remaining, tierCap);
+        if (units > 0) {
+          breakdown.push({ label: tier.label, units, rate: tier.rate, amount: units * tier.rate * factor, proFrom: Math.round(proFrom * 100) / 100, proTo: proTo === Infinity ? undefined : Math.round(proTo * 100) / 100 });
+          remaining -= units;
+        }
+      }
+      const subtotal = breakdown.reduce((s, b) => s + b.amount, 0);
+      return { breakdown, subtotal, isProRated };
+    };
+
+    let estimates: any[] = [];
+    if (unbilled.length > 0) {
+      estimates = unbilled.map(r => {
+        const cons = Number(r.consumption || r.units || r.totalConsumption || 0) || 0;
+        if (cons <= 0) return null;
+        const rdRaw = r.readingdays || r.readingDays;
+        const rdNum = typeof rdRaw === 'number' ? rdRaw : (rdRaw ? parseInt(rdRaw) : NaN);
+        const readingDays = (!isNaN(rdNum) && rdNum > 0) ? rdNum : undefined;
+        const { breakdown, subtotal, isProRated } = calcTiered(cons, readingDays);
+        const vatAmount = subtotal * (vatRate / 100);
+        const dailyCons = readingDays ? cons / readingDays : undefined;
+        return {
+          consumption: cons, billingMonth: r.billingmonth || r.billingMonth || 'Current',
+          readingDate: r.reading2Date || r.reading1Date || '',
+          newReading: r.reading2 ?? '-', oldReading: r.reading1 ?? '-',
+          readingDays: readingDays ?? '-', dailyConsumption: dailyCons,
+          isProRated, breakdown, subtotal, vatAmount, total: subtotal + vatAmount, factor,
+        };
+      }).filter(Boolean);
+    }
+
+    const billedHist = allReadings.filter(item => {
+      const bm = (item.billingmonth || item.billingMonth || '').toLowerCase().trim();
+      const flag = (item.flag || '').toLowerCase();
+      if (bm === 'current open period' || bm.includes('open period')) return false;
+      if (flag.includes('reversed') || flag.includes('cancel')) return false;
+      const c = Number(item.consumption || item.units || 0) || 0;
+      return c > 0;
+    });
+    const historicalAvg = billedHist.length >= 2 ? (() => {
+      const recent = billedHist.slice(0, 6);
+      const total = recent.reduce((s: number, r: any) => s + (Number(r.consumption || r.units || 0) || 0), 0);
+      return { avg: total / recent.length, months: recent.length };
+    })() : null;
+
+    let projection: any = null;
+    if (estimates.length === 0 && historicalAvg) {
+      const { breakdown, subtotal } = calcTiered(historicalAvg.avg);
+      const vatAmount = subtotal * (vatRate / 100);
+      projection = { avg: historicalAvg.avg, months: historicalAvg.months, subtotal, vatAmount, total: subtotal + vatAmount };
+    }
+
+    const previousEstimates = allReadings.filter(item => {
+      const bm = (item.billingmonth || item.billingMonth || '').toLowerCase().trim();
+      const flag = (item.flag || '').toLowerCase();
+      if (bm === 'current open period' || bm.includes('open period')) return false;
+      if (flag.includes('reversed') || flag.includes('cancel')) return false;
+      if (!flag.includes('estimate') && !flag.includes('levy')) return false;
+      return (Number(item.consumption || item.units || 0) || 0) > 0;
+    });
+
+    return {
+      hasTiers: tiers.length > 0, estimates, historicalAvg, projection, previousEstimates,
+      tiers, factor, vatRate, STD_DAYS,
+    };
+  }
+
+  getPpInitialDownPayment(): string {
+    const plans = this.tabData()?.plans || [];
+    if (plans.length === 0) return '0.00';
+    return this.formatCurrency(Number(plans[0]?.initialDownPayment ?? plans[0]?.downPayment ?? plans[0]?.depositAmount ?? 0) || 0);
+  }
+
+  getRemainingCapitalEntries(): { label: string; value: string }[] {
+    const rc = this.tabData()?.remainingCapital;
+    if (!rc) return [];
+    if (typeof rc !== 'object') return [{ label: 'Remaining Capital', value: 'R ' + this.formatCurrency(Number(rc) || 0) }];
+    return Object.entries(rc)
+      .filter(([k, v]) => !k.startsWith('_') && v != null && v !== 0)
+      .map(([key, val]) => ({
+        label: key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()),
+        value: typeof val === 'number' ? 'R ' + this.formatCurrency(val) : String(val),
+      }));
+  }
+
+  getRepaymentStatusItems(): { label: string; value: string; isActive: boolean }[] {
+    const items = this.tabData()?.repaymentStatus || [];
+    const labels = ['Interest Waiver', 'Rebate'];
+    return items.map((item: any, i: number) => {
+      const value = typeof item === 'string' ? item : item?.status || item?.description || JSON.stringify(item);
+      const isActive = value && value !== 'N/A' && value !== 'None' && value !== '';
+      return { label: labels[i] || `Status ${i + 1}`, value, isActive };
+    });
+  }
+
+  getDepositTotalAmount(): number {
+    const da = this.tabData()?.depositAmount;
+    if (typeof da === 'number') return da;
+    return Number(da?.totalDeposit ?? da?.amount ?? 0) || 0;
+  }
+
+  getDepositPaidAmt(dep: any): number {
+    return Number(dep.paidAmount ?? dep.paid ?? dep.amountPaid ?? dep.paidAmt ?? 0) || 0;
+  }
+
+  getDepositColumnTotal(field: string): number {
+    const deposits = this.tabData()?.deposits || [];
+    return deposits.reduce((sum: number, dep: any) => {
+      if (field === 'depositAmount') {
+        return sum + (Number(dep.depositAmount ?? dep.deposit ?? dep.amount ?? 0) || 0);
+      }
+      if (field === 'paidAmount') {
+        return sum + this.getDepositPaidAmt(dep);
+      }
+      return sum;
+    }, 0);
+  }
+
+  isSummaryTotalRow(row: any): boolean {
+    const desc = this.getSummaryDescription(row).toLowerCase();
+    return desc === 'total' || desc === 'closing balance' || desc === 'receipts' || desc === 'opening balance';
+  }
+
+  private static readonly SA_PROVINCE_MAP: Record<string, string> = {
+    'C': 'Western Cape', 'T': 'Gauteng', 'N': 'KwaZulu-Natal',
+    'F': 'Free State', 'K': 'Eastern Cape', 'L': 'Limpopo',
+    'J': 'Mpumalanga', 'Q': 'North West', 'B': 'Northern Cape',
+  };
+
+  parseSgNumber(sg: string): { erf: string; portion: string; town: string; province: string; regDiv: string; raw: string } | null {
+    if (!sg) return null;
+    let clean = sg.replace(/\s/g, '');
+
+    const compactMatch = clean.match(/^([A-Za-z])(\d{3})(\d{4})(\d{8})(\d{5})$/);
+    if (compactMatch) {
+      clean = `${compactMatch[1]}${compactMatch[2]}/${compactMatch[3]}/${compactMatch[4]}/${compactMatch[5]}`;
+    }
+
+    const match4 = clean.match(/^([A-Za-z])(\d{3})\/(\d{4})\/(\d+)\/(\d+)$/);
+    if (match4) {
+      const provinceCode = match4[1].toUpperCase();
+      const regDiv = match4[2];
+      const erfNum = parseInt(match4[4], 10);
+      const portionNum = parseInt(match4[5], 10);
+      if (erfNum === 0) return null;
+      return {
+        erf: String(erfNum),
+        portion: portionNum === 0 ? 'Remainder' : String(portionNum),
+        town: this.getRegDivTown(regDiv, provinceCode),
+        province: EnquiriesGeneralComponent.SA_PROVINCE_MAP[provinceCode] || provinceCode,
+        regDiv,
+        raw: sg,
+      };
+    }
+
+    const match3 = clean.match(/^([A-Za-z])(\d{3})\/(\d+)\/(\d+)$/);
+    if (match3) {
+      const provinceCode = match3[1].toUpperCase();
+      const regDiv = match3[2];
+      const erfNum = parseInt(match3[3], 10);
+      const portionNum = parseInt(match3[4], 10);
+      if (erfNum === 0) return null;
+      return {
+        erf: String(erfNum),
+        portion: portionNum === 0 ? 'Remainder' : String(portionNum),
+        town: this.getRegDivTown(regDiv, provinceCode),
+        province: EnquiriesGeneralComponent.SA_PROVINCE_MAP[provinceCode] || provinceCode,
+        regDiv,
+        raw: sg,
+      };
+    }
+
+    return null;
+  }
+
+  private getRegDivTown(regDiv: string, provinceCode: string): string {
+    const knownDivisions: Record<string, string> = {
+      'C027': 'George', 'C028': 'Oudtshoorn', 'C024': 'Mossel Bay',
+      'C030': 'Knysna', 'C032': 'Plettenberg Bay', 'C001': 'Cape Town',
+      'C006': 'Stellenbosch', 'C009': 'Paarl', 'C002': 'Wynberg',
+      'C021': 'Worcester', 'C003': 'Simon\'s Town', 'C026': 'Riversdale',
+      'C029': 'Uniondale', 'C031': 'Humansdorp', 'C025': 'Heidelberg',
+      'T001': 'Johannesburg', 'T002': 'Pretoria', 'N001': 'Durban',
+      'F001': 'Bloemfontein', 'K001': 'East London', 'K002': 'Port Elizabeth',
+    };
+    const key = provinceCode + regDiv;
+    return knownDivisions[key] || '';
+  }
+
+  formatSgBreakdown(sg: string): string {
+    const parsed = this.parseSgNumber(sg);
+    if (!parsed) return sg || '';
+    let result = `Erf ${parsed.erf}`;
+    if (parsed.portion !== 'Remainder') {
+      result += ` Ptn ${parsed.portion}`;
+    } else {
+      result += ' (RE)';
+    }
+    if (parsed.town) {
+      result += `, ${parsed.town}`;
+    }
+    return result;
+  }
+
+  formatSgErf(sg: string, fallbackErf?: string): string {
+    if (!sg) return fallbackErf || '-';
+    const parts = sg.split('/');
+    return parts.length >= 3 ? parts[2].replace(/^0+/, '') || parts[2] : (fallbackErf || '-');
+  }
+
+  formatSgPortion(sg: string): string {
+    if (!sg) return '-';
+    const parts = sg.split('/');
+    return parts.length >= 4 ? parts[3].replace(/^0+/, '') || '0' : '-';
+  }
+
+  formatSgAllotment(sg: string): string {
+    if (!sg) return '-';
+    const parts = sg.split('/');
+    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : '-';
+  }
+
+  formatIntValue(v: any): string {
+    if (v === null || v === undefined || v === '') return '-';
+    return typeof v === 'number' ? v.toLocaleString('en-ZA') : String(v);
+  }
+
+  getNtPropertyCategoryDisplay(id: any, desc?: string): string {
+    if (id === null || id === undefined) return '-';
+    const catMap: Record<number, string> = {
+      1: 'Unknown', 2: 'RES', 3: 'Residential Accommodation', 4: 'State Business',
+      5: 'POWC', 6: 'NMON', 7: 'Creches', 8: 'Guesthouses & B&Bs', 9: 'Flats',
+      10: 'State Residential', 32: 'Residential Vacant', 33: 'PSPV', 34: 'POWP',
+      35: 'POWG', 36: 'POWV', 37: 'PROT', 38: 'MUNG', 40: 'MUNRO', 41: 'MUN'
+    };
+    return catMap[Number(id)] || desc || `Category ${id}`;
+  }
+
+  private linkedRequestToken = 0;
+
+  async loadLinkedAccounts(accountId: number) {
+    const token = ++this.linkedRequestToken;
+    this.linkedAccountsLoading.set(true);
+    this.linkedAccounts.set([]);
+    this.linkedTotalOutstanding.set(0);
+    this.linkedExpandedAcct.set(null);
+    this.linkedServicesMap.set({});
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/linked-accounts-on-property`, { accountId: String(accountId) })
+      );
+      if (this.linkedRequestToken !== token) return;
+      const arr = this.normalizeArray(result);
+      const currentAcctNum = this.selectedAccount()?.['accountNumber'] || '';
+      const linked = arr.filter((a: any) => {
+        const num = a.accountNumber || a.account || '';
+        return num !== currentAcctNum;
+      });
+      linked.sort((a: any, b: any) => {
+        const numA = a.accountNumber || a.accountNo || '';
+        const numB = b.accountNumber || b.accountNo || '';
+        return String(numA).localeCompare(String(numB), undefined, { numeric: true });
+      });
+      if (linked.length > 0) {
+      }
+      this.linkedAccounts.set(linked);
+      const total = linked.reduce((sum: number, a: any) => {
+        return sum + (Number(a.outStandingAmount) || Number(a.outStandingAmt) || Number(a.totalOutstanding) || Number(a.balance) || 0);
+      }, 0);
+      this.linkedTotalOutstanding.set(total);
+    } catch (e) {
+      if (this.linkedRequestToken !== token) return;
+      this.linkedAccounts.set([]);
+    } finally {
+      if (this.linkedRequestToken === token) {
+        this.linkedAccountsLoading.set(false);
+      }
+    }
+  }
+
+  private propDebtRequestToken = 0;
+
+  async loadPropertyDebt(accountId: number) {
+    const token = ++this.propDebtRequestToken;
+    this.propDebtLoading.set(true);
+    this.propDebtAccounts.set([]);
+    this.propDebtTotals.set(null);
+    this.propDebtExpandedAcct.set(null);
+    try {
+      const linkedResult = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/linked-accounts-on-property`, { accountId: String(accountId) })
+      );
+      if (this.propDebtRequestToken !== token) return;
+      let allAccounts = this.normalizeArray(linkedResult);
+      const currentAcctNum = this.selectedAccount()?.['accountNumber'] || '';
+      const currentAcctId = this.getAccountId(this.selectedAccount());
+      const hasCurrent = allAccounts.some((a: any) =>
+        (a.accountNumber || a.account || '') === currentAcctNum ||
+        String(a.account_ID || a.accountID || '') === String(currentAcctId)
+      );
+      if (!hasCurrent) {
+        allAccounts = [{ accountNumber: currentAcctNum, account_ID: currentAcctId, name: this.getAccountName(this.selectedAccount()), accountStatus: this.selectedAccount()?.['accountStatus'] || this.selectedAccount()?.['statusDesc'], accountType: this.selectedAccount()?.['accountDesc'] || this.selectedAccount()?.['accountType'] }, ...allAccounts];
+      }
+
+      const balancePromises = allAccounts.map(async (acct: any) => {
+        const acctId = acct.account_ID || acct.accountID || acct.accountNumber;
+        if (!acctId) return { ...acct, balanceItems: [], balanceError: true };
+        try {
+          const bal = await this.fetchAccountBalance(Number(acctId));
+          const items = Array.isArray(bal) ? bal : bal ? [bal] : [];
+          let acctOutstanding = 0, acctCurrent = 0, acctD30 = 0, acctD60 = 0, acctD90 = 0, acctD120Plus = 0;
+          for (const item of items) {
+            acctOutstanding += Number(item.totalOutStanding || item.totalOutstandingAmount || item.totalOutstanding || 0) || 0;
+            acctCurrent += Number(item.current || item.currentAmount || 0) || 0;
+            acctD30 += Number(item.days30 || 0) || 0;
+            acctD60 += Number(item.days60 || 0) || 0;
+            acctD90 += Number(item.days90 || 0) || 0;
+            acctD120Plus += (Number(item.days120 || 0) || 0) + (Number(item.days150 || 0) || 0) + (Number(item.days180 || item.untill360 || 0) || 0);
+          }
+          return {
+            ...acct,
+            balanceItems: items,
+            balanceError: false,
+            totalOutstanding: acctOutstanding,
+            agingCurrent: acctCurrent,
+            agingD30: acctD30,
+            agingD60: acctD60,
+            agingD90: acctD90,
+            agingD120Plus: acctD120Plus,
+          };
+        } catch {
+          return { ...acct, balanceItems: [], balanceError: true, totalOutstanding: 0, agingCurrent: 0, agingD30: 0, agingD60: 0, agingD90: 0, agingD120Plus: 0 };
+        }
+      });
+
+      const results = await Promise.all(balancePromises);
+      if (this.propDebtRequestToken !== token) return;
+
+      results.sort((a: any, b: any) => {
+        const numA = a.accountNumber || a.accountNo || '';
+        const numB = b.accountNumber || b.accountNo || '';
+        return String(numA).localeCompare(String(numB), undefined, { numeric: true });
+      });
+      this.propDebtAccounts.set(results);
+
+      const totals = results.reduce((acc: any, a: any) => ({
+        outstanding: acc.outstanding + (a.totalOutstanding || 0),
+        current: acc.current + (a.agingCurrent || 0),
+        d30: acc.d30 + (a.agingD30 || 0),
+        d60: acc.d60 + (a.agingD60 || 0),
+        d90: acc.d90 + (a.agingD90 || 0),
+        d120Plus: acc.d120Plus + (a.agingD120Plus || 0),
+        accountCount: acc.accountCount + 1,
+        withDebt: acc.withDebt + ((a.totalOutstanding || 0) > 0 ? 1 : 0),
+      }), { outstanding: 0, current: 0, d30: 0, d60: 0, d90: 0, d120Plus: 0, accountCount: 0, withDebt: 0 });
+      this.propDebtTotals.set(totals);
+    } catch (e) {
+      if (this.propDebtRequestToken !== token) return;
+      this.propDebtAccounts.set([]);
+      this.propDebtTotals.set(null);
+    } finally {
+      if (this.propDebtRequestToken === token) {
+        this.propDebtLoading.set(false);
+      }
+    }
+  }
+
+  togglePropDebtExpand(acctKey: string) {
+    this.propDebtExpandedAcct.set(this.propDebtExpandedAcct() === acctKey ? null : acctKey);
+  }
+
+  async toggleLinkedExpand(acctKey: string, accountId: number | string) {
+    if (this.linkedExpandedAcct() === acctKey) {
+      this.linkedExpandedAcct.set(null);
+      return;
+    }
+    this.linkedExpandedAcct.set(acctKey);
+    const map = this.linkedServicesMap();
+    if (map[acctKey]) return;
+    this.linkedServicesLoading.set(acctKey);
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/all-services/${accountId}`)
+      );
+      const services = this.normalizeArray(result);
+      if (services.length > 0) {
+      }
+      this.linkedServicesMap.set({ ...this.linkedServicesMap(), [acctKey]: services });
+    } catch (e) {
+      this.linkedServicesMap.set({ ...this.linkedServicesMap(), [acctKey]: [] });
+    } finally {
+      this.linkedServicesLoading.set(null);
+    }
+  }
+
+  getLinkedAcctId(acct: any): string {
+    return String(acct.account_ID || acct.accountID || acct.accountNumber || acct.account || '');
+  }
+
+  private getExportOpts(tabName: string, title: string): ExportOptions {
+    const acct = this.selectedAccount();
+    const basic = this.getAccountBasic();
+    return {
+      title,
+      tabName,
+      accountNo: this.getAccountNum(acct),
+      accountName: this.getAccountName(acct),
+      accountStatus: basic?.accountStatus || acct?.accountStatus || acct?.statusDesc || '',
+      address: basic?.deliveryAddress || acct?.deliveryAddress || acct?.locationAddress || '',
+      financialYear: this.userFinYear(),
+    };
+  }
+
+  exportBalanceCsv(): void {
+    const items = this.getBalanceItems();
+    if (!items.length) { this.toast.error('No balance data to export'); return; }
+    const headers = ['Service', 'New Charge', 'Current', '30 Days', '60 Days', '90 Days', '120 Days', '150 Days', '180+ Days', 'Total Outstanding'];
+    const rows = items.map((i: any) => [
+      i.serviceType || i.serviceTypeDesc || i.description || i.serviceDescription || '',
+      this.getDebtVal(i, 'newCharge'), this.getDebtVal(i, 'current'),
+      this.getDebtVal(i, 'days30'), this.getDebtVal(i, 'days60'), this.getDebtVal(i, 'days90'),
+      this.getDebtVal(i, 'days120'), this.getDebtVal(i, 'days150'), this.getDebtVal(i, 'days180'),
+      this.getDebtVal(i, 'totalOutStanding'),
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Balance_Debt', 'BALANCE / DEBT AGING REPORT'), headers, rows);
+    this.toast.success('Balance report exported');
+  }
+
+  exportBalancePdf(): void {
+    const items = this.getBalanceItems();
+    if (!items.length) { this.toast.error('No balance data to export'); return; }
+    const headers = ['Service', 'New Charge', 'Current', '30 Days', '60 Days', '90 Days', '120 Days', '150 Days', '180+ Days', 'Total'];
+    const aligns: ('left' | 'right')[] = ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right'];
+    const rows = items.map((i: any) => [
+      i.serviceType || i.serviceTypeDesc || i.description || i.serviceDescription || '',
+      this.formatCurrency(this.getDebtVal(i, 'newCharge')), this.formatCurrency(this.getDebtVal(i, 'current')),
+      this.formatCurrency(this.getDebtVal(i, 'days30')), this.formatCurrency(this.getDebtVal(i, 'days60')),
+      this.formatCurrency(this.getDebtVal(i, 'days90')), this.formatCurrency(this.getDebtVal(i, 'days120')),
+      this.formatCurrency(this.getDebtVal(i, 'days150')), this.formatCurrency(this.getDebtVal(i, 'days180')),
+      this.formatCurrency(this.getDebtVal(i, 'totalOutStanding')),
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Balance_Debt', 'BALANCE / DEBT AGING REPORT'), headers, rows, aligns);
+  }
+
+  exportPropertyDebtCsv(): void {
+    const accounts = this.propDebtAccounts();
+    if (!accounts.length) { this.toast.error('No property debt data to export'); return; }
+    const headers = ['Account Number', 'Account Name', 'Status', 'Total Outstanding', 'Current', '30 Days', '60 Days', '90 Days', '120+ Days'];
+    const rows = accounts.map((a: any) => [
+      a.accountNumber || a.accountNo || '', a.name || a.accountName || '',
+      a.accountStatus || a.status || '', a.totalOutstanding || 0,
+      a.agingCurrent || 0, a.agingD30 || 0, a.agingD60 || 0, a.agingD90 || 0, a.agingD120Plus || 0,
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Property_Debt', 'PROPERTY DEBT REPORT'), headers, rows);
+    this.toast.success('Property debt report exported');
+  }
+
+  exportPropertyDebtPdf(): void {
+    const accounts = this.propDebtAccounts();
+    if (!accounts.length) { this.toast.error('No property debt data to export'); return; }
+    const headers = ['Account Number', 'Name', 'Status', 'Total Outstanding', 'Current', '30 Days', '60 Days', '90 Days', '120+ Days'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'right', 'right', 'right', 'right', 'right', 'right'];
+    const rows = accounts.map((a: any) => [
+      a.accountNumber || a.accountNo || '', a.name || a.accountName || '',
+      a.accountStatus || a.status || '',
+      this.formatCurrency(a.totalOutstanding || 0), this.formatCurrency(a.agingCurrent || 0),
+      this.formatCurrency(a.agingD30 || 0), this.formatCurrency(a.agingD60 || 0),
+      this.formatCurrency(a.agingD90 || 0), this.formatCurrency(a.agingD120Plus || 0),
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Property_Debt', 'PROPERTY DEBT REPORT'), headers, rows, aligns);
+  }
+
+  exportReceiptsCsv(): void {
+    const txns = this.getFilteredReceipts();
+    if (!txns.length) { this.toast.error('No receipts to export'); return; }
+    const headers = ['Receipt No', 'Date', 'Payment Type', 'Amount', 'Cashier', 'Office', 'Status'];
+    const rows = txns.map((t: any) => [
+      this.getReceiptNo(t), this.formatDate(t.receiptDate || t.transactionDate || t.date),
+      t.paymentType || '', Number(t.receiptAmount || t.amount || t.tenderAmount || 0),
+      t.cashierName || t.cashier || '', t.officeName || t.office || '',
+      (t.isCancelled || t.cancelReson || t.cancelReason) ? 'Cancelled' : 'Active',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Receipts', 'RECEIPT HISTORY REPORT'), headers, rows);
+    this.toast.success('Receipts exported');
+  }
+
+  exportReceiptsPdf(): void {
+    const txns = this.getFilteredReceipts();
+    if (!txns.length) { this.toast.error('No receipts to export'); return; }
+    const headers = ['Receipt No', 'Date', 'Type', 'Amount', 'Cashier', 'Office', 'Status'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'right', 'left', 'left', 'left'];
+    const rows = txns.map((t: any) => [
+      this.getReceiptNo(t), this.formatDate(t.receiptDate || t.transactionDate || t.date),
+      t.paymentType || '', this.formatCurrency(Number(t.receiptAmount || t.amount || t.tenderAmount || 0)),
+      t.cashierName || t.cashier || '', t.officeName || t.office || '',
+      (t.isCancelled || t.cancelReson || t.cancelReason) ? 'Cancelled' : 'Active',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Receipts', 'RECEIPT HISTORY REPORT'), headers, rows, aligns);
+  }
+
+  exportDepositsCsv(): void {
+    const data = this.tabData();
+    const deposits = data?.deposits || [];
+    if (!deposits.length) { this.toast.error('No deposit data to export'); return; }
+    const headers = ['Date', 'Description', 'Amount Paid', 'Interest Accrued', 'Type', 'Status'];
+    const rows = deposits.map((d: any) => [
+      this.formatDate(d.depositDate || d.date || d.datePaid),
+      d.description || d.depositType || d.type || '',
+      Number(d.amountPaid || d.amount || d.depositAmount || 0),
+      Number(d.interestAccrued || d.interest || 0),
+      d.depositType || d.type || '', d.status || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Deposits', 'DEPOSITS REPORT'), headers, rows);
+    this.toast.success('Deposits exported');
+  }
+
+  exportDepositsPdf(): void {
+    const data = this.tabData();
+    const deposits = data?.deposits || [];
+    if (!deposits.length) { this.toast.error('No deposit data to export'); return; }
+    const headers = ['Date', 'Description', 'Amount Paid', 'Interest', 'Type', 'Status'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'right', 'right', 'left', 'left'];
+    const rows = deposits.map((d: any) => [
+      this.formatDate(d.depositDate || d.date || d.datePaid),
+      d.description || d.depositType || d.type || '',
+      this.formatCurrency(Number(d.amountPaid || d.amount || d.depositAmount || 0)),
+      this.formatCurrency(Number(d.interestAccrued || d.interest || 0)),
+      d.depositType || d.type || '', d.status || '',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Deposits', 'DEPOSITS REPORT'), headers, rows, aligns);
+  }
+
+  exportPaymentPlansCsv(): void {
+    const data = this.tabData();
+    const plans = data?.plans || data?.paymentPlans || [];
+    if (!plans.length) { this.toast.error('No payment plan data to export'); return; }
+    const headers = ['Plan Type', 'Start Date', 'End Date', 'Installment Amount', 'Total Amount', 'Remaining', 'Status'];
+    const rows = plans.map((p: any) => [
+      p.planType || p.type || p.arrangementType || p.capitalCostType || '',
+      this.formatDate(p.startDate || p.dateFrom), this.formatDate(p.endDate || p.dateTo),
+      Number(p.installmentAmount || p.installment || p.instalment || 0), Number(p.totalAmount || p.total || p.originalAmount || 0),
+      Number(p.remainingCapital || p.remaining || p.balance || 0), p.status || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Payment_Plans', 'PAYMENT PLANS REPORT'), headers, rows);
+    this.toast.success('Payment plans exported');
+  }
+
+  exportPaymentPlansPdf(): void {
+    const data = this.tabData();
+    const plans = data?.plans || data?.paymentPlans || [];
+    if (!plans.length) { this.toast.error('No payment plan data to export'); return; }
+    const headers = ['Plan Type', 'Start Date', 'End Date', 'Installment', 'Total', 'Remaining', 'Status'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'right', 'right', 'right', 'left'];
+    const rows = plans.map((p: any) => [
+      p.planType || p.type || p.arrangementType || p.capitalCostType || '',
+      this.formatDate(p.startDate || p.dateFrom), this.formatDate(p.endDate || p.dateTo),
+      this.formatCurrency(Number(p.installmentAmount || p.installment || p.instalment || 0)),
+      this.formatCurrency(Number(p.totalAmount || p.total || p.originalAmount || 0)),
+      this.formatCurrency(Number(p.remainingCapital || p.remaining || p.balance || 0)),
+      p.status || '',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Payment_Plans', 'PAYMENT PLANS REPORT'), headers, rows, aligns);
+  }
+
+  getBvpRowLabel(r: any): string {
+    return r.processingMonth || r.month || r.billingMonth || r.period || r.serviceDescription || r.serviceType || r.serviceTypeDesc || r.description || '';
+  }
+
+  exportBilledVsPaidCsv(): void {
+    const rows_data = this.tabData()?.billedVsPaid || [];
+    if (!rows_data.length) { this.toast.error('No billed vs paid data to export'); return; }
+    const headers = ['Period', 'Financial Year', 'Billed Amount', 'Paid Amount', 'Variance', 'Collection Rate %'];
+    const rows = rows_data.map((r: any) => {
+      const billed = this.getBvpRowBilled(r);
+      const paid = this.getBvpRowPaid(r);
+      const variance = billed - paid;
+      const rate = billed > 0 ? Math.round((paid / billed) * 1000) / 10 : 0;
+      return [this.getBvpRowLabel(r), r.financialYear || this.bvpFinYear() || '', billed, paid, variance, rate];
+    });
+    this.exportService.exportCsv(this.getExportOpts('Billed_vs_Paid', 'BILLED VS PAID REPORT'), headers, rows);
+    this.toast.success('Billed vs Paid report exported');
+  }
+
+  exportBilledVsPaidPdf(): void {
+    const rows_data = this.tabData()?.billedVsPaid || [];
+    if (!rows_data.length) { this.toast.error('No billed vs paid data to export'); return; }
+    const headers = ['Period', 'Financial Year', 'Billed Amount', 'Paid Amount', 'Variance', 'Collection Rate %'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'right', 'right', 'right', 'right'];
+    const rows = rows_data.map((r: any) => {
+      const billed = this.getBvpRowBilled(r);
+      const paid = this.getBvpRowPaid(r);
+      const variance = billed - paid;
+      const rate = billed > 0 ? Math.round((paid / billed) * 1000) / 10 : 0;
+      return [this.getBvpRowLabel(r), r.financialYear || this.bvpFinYear() || '',
+        this.formatCurrency(billed), this.formatCurrency(paid),
+        this.formatCurrency(variance), `${rate}%`];
+    });
+    this.exportService.exportPdf(this.getExportOpts('Billed_vs_Paid', 'BILLED VS PAID REPORT'), headers, rows, aligns);
+  }
+
+  exportServicesCsv(): void {
+    const services = this.getServicesList();
+    if (!services.length) { this.toast.error('No services data to export'); return; }
+    const headers = ['Service Description', 'Status', 'Tariff Code', 'Tariff Rate', 'Meter Number', 'Frequency', 'Connection Size'];
+    const rows = services.map((s: any) => [
+      s.serviceDescription || s.description || s.serviceTypeDescription || '',
+      s.status || s.serviceStatus || '', s.tariffCode || s.tariff || '',
+      s.tariffRate || s.rate || '', s.meterNo || s.physicalMeterNo || '',
+      s.frequency || '', s.connectionSize || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Services', 'SERVICES REPORT'), headers, rows);
+    this.toast.success('Services exported');
+  }
+
+  exportServicesPdf(): void {
+    const services = this.getServicesList();
+    if (!services.length) { this.toast.error('No services data to export'); return; }
+    const headers = ['Service Description', 'Status', 'Tariff Code', 'Rate', 'Meter No', 'Frequency'];
+    const rows = services.map((s: any) => [
+      s.serviceDescription || s.description || s.serviceTypeDescription || '',
+      s.status || s.serviceStatus || '', s.tariffCode || s.tariff || '',
+      s.tariffRate || s.rate || '', s.meterNo || s.physicalMeterNo || '', s.frequency || '',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Services', 'SERVICES REPORT'), headers, rows);
+  }
+
+  private getConsumptionExportOpts(): { opts: any; meterNo: string } {
+    const meter = this.consumptionSelectedMeter();
+    const meterNo = meter?.physicalMeterNo || meter?.meterNo || '';
+    const selectedYears = this.consumptionSelectedYears();
+    const fyDisplay = selectedYears.length === this.consumptionFinYears().length ? 'All Years' : selectedYears.map(y => `FY ${y}`).join(', ');
+    const opts = this.getExportOpts('Consumption', 'METER READING HISTORY REPORT');
+    opts.customFilename = this.buildConsumptionFilename('');
+    opts.financialYear = fyDisplay;
+    const extraHeaders: { label: string; value: string }[] = [{ label: 'Meter Number', value: meterNo }];
+    const sgNumber = this.selectedAccount()?.sgNumber || (this.globalSnapshot() as any)?.sgNumber || '';
+    if (sgNumber) extraHeaders.push({ label: 'SG Number', value: sgNumber });
+    const monthFrom = this.consumptionMonthFrom();
+    const monthTo = this.consumptionMonthTo();
+    if (monthFrom || monthTo) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const fmtMonth = (ym: string) => { const [y, m] = ym.split('-'); return `${monthNames[parseInt(m) - 1]} ${y}`; };
+      if (monthFrom && monthTo) extraHeaders.push({ label: 'Date Range', value: `${fmtMonth(monthFrom)} to ${fmtMonth(monthTo)}` });
+      else if (monthFrom) extraHeaders.push({ label: 'From Month', value: fmtMonth(monthFrom) });
+      else if (monthTo) extraHeaders.push({ label: 'To Month', value: fmtMonth(monthTo) });
+    }
+    opts.extraHeaders = extraHeaders;
+    return { opts, meterNo };
+  }
+
+  private getConsumptionExportRows(history: any[]): { headers: string[]; rows: (string | number)[][]; headersShort: string[]; aligns: ('left' | 'right')[] } {
+    const headers = ['FY', 'Billing Month', 'Service', 'Capturer', 'Old Date', 'Old Reading', 'New Date', 'New Reading', 'Days', 'Consumption', 'Levy Status', 'Reading Status'];
+    const headersShort = ['FY', 'Month', 'Service', 'Capturer', 'Old Date', 'Old Rdg', 'New Date', 'New Rdg', 'Days', 'Cons.', 'Levy', 'Status'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'left', 'left', 'right', 'left', 'right', 'right', 'right', 'left', 'left'];
+    const rows = history.map((r: any) => [
+      this.getReadingFy(r) || '',
+      r.billingmonth || r.billingMonth || '',
+      r.serviceDesc || '',
+      r.capturer || r.capturerName || r.reader || r.meterReader || '',
+      this.formatDate(r.reading1Date || r.readingDate),
+      r.reading1 || r.previousReading || '',
+      this.formatDate(r.reading2Date || r.date),
+      r.reading2 || r.currentReading || '',
+      r.readingdays || r.readingDays || r.days || '',
+      this.getConsumptionVal(r),
+      r.levyStatus || '',
+      r.readingStatus || r.status || '',
+    ]);
+    return { headers, rows, headersShort, aligns };
+  }
+
+  exportConsumptionCsv(): void {
+    const history = this.consumptionHistory();
+    if (!history.length) { this.toast.error('No consumption data to export'); return; }
+    const { opts } = this.getConsumptionExportOpts();
+    const { headers, rows } = this.getConsumptionExportRows(history);
+    opts.customFilename = this.buildConsumptionFilename('csv').replace(/\.csv$/, '');
+    this.exportService.exportCsv(opts, headers, rows);
+    this.toast.success('Meter reading history downloaded');
+  }
+
+  exportConsumptionPdf(): void {
+    const history = this.consumptionHistory();
+    if (!history.length) { this.toast.error('No consumption data to export'); return; }
+    const { opts } = this.getConsumptionExportOpts();
+    const { headersShort, rows, aligns } = this.getConsumptionExportRows(history);
+    this.exportService.exportPdf(opts, headersShort, rows, aligns);
+  }
+
+  exportMetersCsv(): void {
+    const data = this.tabData();
+    const meters = data?.meters || data?.meterServices || [];
+    if (!meters.length) { this.toast.error('No meter data to export'); return; }
+    const headers = ['Meter Number', 'Type', 'Status', 'Make', 'Model', 'Digits', 'Multiplier', 'Service'];
+    const rows = meters.map((m: any) => [
+      m.physicalMeterNo || m.meterNo || m.meterNumber || '',
+      m.meterType || m.type || '', m.status || m.meterStatus || '',
+      m.make || '', m.model || '', m.digits || m.noOfDigits || '',
+      m.multiplier || '', m.serviceDescription || m.service || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Meters', 'METER DETAILS REPORT'), headers, rows);
+    this.toast.success('Meters exported');
+  }
+
+  exportContactCsv(): void {
+    const data = this.tabData();
+    const contact = data?.contact || {};
+    const contactHistory = data?.contactHistory || [];
+    const addressHistory = data?.addressHistory || [];
+    const headers = ['Field', 'Value'];
+    const rows: (string | number)[][] = [
+      ['Home Phone', contact.homePhone || contact.homePhoneNo || '-'],
+      ['Work Phone', contact.workPhone || contact.workPhoneNo || '-'],
+      ['Mobile', contact.mobilePhone || contact.cellPhone || contact.cellPhoneNo || '-'],
+      ['Email', contact.emailAddress || contact.email || '-'],
+      ['Fax', contact.fax || contact.faxNo || '-'],
+    ];
+    if (contactHistory.length > 0) {
+      rows.push(['', ''], ['--- Contact Change History ---', '']);
+      rows.push(['Date Changed', 'Field', 'Old Value', 'New Value'] as any);
+      contactHistory.forEach((h: any) => rows.push([
+        this.formatDate(h.dateChanged || h.date), h.fieldChanged || h.field || '',
+        h.oldValue || '', h.newValue || '',
+      ]));
+    }
+    this.exportService.exportCsv(this.getExportOpts('Contact', 'CONTACT DETAILS REPORT'), headers, rows);
+    this.toast.success('Contact details exported');
+  }
+
+  exportLinkedAccountsCsv(): void {
+    const data = this.tabData();
+    const linked = data?.linkedAccounts || [];
+    if (!linked.length) { this.toast.error('No linked accounts to export'); return; }
+    const headers = ['Account Number', 'Name', 'Status', 'Type', 'Outstanding Balance'];
+    const rows = linked.map((a: any) => [
+      a.accountNumber || a.accountNo || '', a.name || a.accountName || a.surname_Company || '',
+      a.accountStatus || a.status || '', a.accountType || a.type || '',
+      Number(a.totalOutstanding || a.outstandingAmount || a.outStandingAmt || 0),
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Linked_Accounts', 'LINKED ACCOUNTS REPORT'), headers, rows);
+    this.toast.success('Linked accounts exported');
+  }
+
+  exportLinkedAccountsPdf(): void {
+    const data = this.tabData();
+    const linked = data?.linkedAccounts || [];
+    if (!linked.length) { this.toast.error('No linked accounts to export'); return; }
+    const headers = ['Account Number', 'Name', 'Status', 'Type', 'Outstanding'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'left', 'right'];
+    const rows = linked.map((a: any) => [
+      a.accountNumber || a.accountNo || '', a.name || a.accountName || a.surname_Company || '',
+      a.accountStatus || a.status || '', a.accountType || a.type || '',
+      this.formatCurrency(Number(a.totalOutstanding || a.outstandingAmount || a.outStandingAmt || 0)),
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Linked_Accounts', 'LINKED ACCOUNTS REPORT'), headers, rows, aligns);
+  }
+
+  readonly FY_MONTHS = ['All', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
+  readonly MONTH_INDEX_MAP: Record<string, number> = { 'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5, 'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11 };
+
+  getFinYearOptionsList(): string[] {
+    const fy = this.userFinYear() || this.getCurrentFinYear();
+    const [start] = fy.split('/').map(Number);
+    const years: string[] = [];
+    for (let i = 0; i < 5; i++) years.push(`${start - i}/${start - i + 1}`);
+    return years;
+  }
+
+  initHandoverYear(): void {
+    if (!this.handoverYear()) {
+      this.handoverYear.set(this.userFinYear() || this.getCurrentFinYear());
+    }
+  }
+
+  getHandoverFiltered(): any[] {
+    const all = this.tabData()?.handovers || [];
+    const selectedYear = this.handoverYear();
+    const selectedMonth = this.handoverMonth();
+    if (!selectedYear) return all;
+    const [yearStart] = selectedYear.split('/').map(Number);
+    return all.filter((h: any) => {
+      const dateStr = h.handedOverDate ?? h.handoverDate ?? h.dateCreated ?? h.createdDate;
+      if (!dateStr) return true;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return true;
+      const fy = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+      if (fy !== (yearStart < 100 ? 2000 + yearStart : yearStart)) return false;
+      if (selectedMonth !== 'All') {
+        const monthIdx = this.MONTH_INDEX_MAP[selectedMonth];
+        if (monthIdx !== undefined && d.getMonth() !== monthIdx) return false;
+      }
+      return true;
+    });
+  }
+
+  getHandoverPageItems(): any[] {
+    const filtered = this.getHandoverFiltered();
+    const page = this.handoverPage();
+    const size = this.handoverPageSize();
+    const start = (page - 1) * size;
+    return filtered.slice(start, start + size);
+  }
+
+  getHandoverTotalPages(): number {
+    return Math.max(1, Math.ceil(this.getHandoverFiltered().length / this.handoverPageSize()));
+  }
+
+  onHandoverYearChange(year: string): void {
+    this.handoverYear.set(year);
+    this.handoverPage.set(1);
+  }
+
+  onHandoverMonthChange(month: string): void {
+    this.handoverMonth.set(month);
+    this.handoverPage.set(1);
+  }
+
+  onHandoverPageSizeChange(size: number): void {
+    this.handoverPageSize.set(size);
+    this.handoverPage.set(1);
+  }
+
+  async rebuildFullAccount(): Promise<void> {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    if (!accountId) return;
+    this.rebuildingAccount.set(true);
+    try {
+      await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/rebuild-full-account`, { accountId: String(accountId) }));
+      this.toast.success('Account rebuilt successfully');
+      await this.loadTabData('account', accountId);
+    } catch (e: any) {
+      this.toast.error(e?.message || 'Failed to rebuild account');
+    } finally {
+      this.rebuildingAccount.set(false);
+    }
+  }
+
+  toggleLinkedRow(idx: number): void {
+    this.expandedLinkedRow.set(this.expandedLinkedRow() === idx ? null : idx);
+  }
+
+  getLinkedCombinedOutstanding(): number {
+    const linked = this.tabData()?.linkedAccounts || [];
+    return linked.reduce((sum: number, a: any) => {
+      const raw = a.totalOutstanding ?? a.outStandingAmount ?? a.outStandingAmt ?? a.outstanding ?? 0;
+      return sum + (typeof raw === 'number' ? raw : (parseFloat(String(raw)) || 0));
+    }, 0);
+  }
+
+  exportHandoverCsv(): void {
+    const handover = this.getHandoverFiltered();
+    if (!handover.length) { this.toast.error('No handover data to export'); return; }
+    const headers = ['Run Type', 'Handover Account', 'Handover Amount', 'Handed Over Date', 'Outstanding Days', 'Outstanding Month', 'Attorney', 'Status', 'Capturer', 'Date Created', 'Reviewed By', 'Termination Reason', 'Termination Date'];
+    const rows = handover.map((h: any) => [
+      h.runType ?? h.type ?? '', h.handoverAccount ?? h.accountNumber ?? h.account ?? '',
+      Number(h.handoverAmount ?? h.amount ?? 0), this.formatDate(h.handedOverDate ?? h.handoverDate),
+      h.outstandingDays ?? h.daysOutstanding ?? '', h.outstandingMonth ?? h.monthsOutstanding ?? '',
+      h.attorney ?? h.attorneyName ?? '', h.status ?? h.handoverStatus ?? '',
+      h.capturer ?? h.capturedBy ?? h.createdBy ?? '', this.formatDate(h.dateCreated ?? h.createdDate ?? h.capturedDate),
+      h.reviewedBy ?? '', h.terminationReason ?? '', this.formatDate(h.terminationDate),
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Handover', 'HANDOVER REPORT'), headers, rows);
+    this.toast.success('Handover data exported');
+  }
+
+  exportHandoverPdf(): void {
+    const handover = this.getHandoverFiltered();
+    if (!handover.length) { this.toast.error('No handover data to export'); return; }
+    const headers = ['Run Type', 'Account', 'Amount', 'Date', 'Attorney', 'Status'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'right', 'left', 'left', 'left'];
+    const rows = handover.map((h: any) => [
+      h.runType ?? h.type ?? '', h.handoverAccount ?? h.accountNumber ?? h.account ?? '',
+      this.formatCurrency(Number(h.handoverAmount ?? h.amount ?? 0)),
+      this.formatDate(h.handedOverDate ?? h.handoverDate),
+      h.attorney ?? h.attorneyName ?? '', h.status ?? h.handoverStatus ?? '',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Handover', 'HANDOVER REPORT'), headers, rows, aligns);
+  }
+
+  exportRatesCsv(): void {
+    const data = this.tabData();
+    const rates = data?.rates || data?.ratesDetails || [];
+    if (!rates.length) { this.toast.error('No rates data to export'); return; }
+    const headers = ['Description', 'Rate Code', 'Tariff', 'Annual Rate', 'Monthly Rate', 'Market Value', 'Rebate'];
+    const rows = rates.map((r: any) => [
+      r.description || r.rateDescription || '', r.rateCode || r.code || '',
+      r.tariff || r.tariffCode || '', r.annualRate || r.annual || '',
+      r.monthlyRate || r.monthly || '', r.marketValue || '', r.rebate || r.rebateAmount || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Rates', 'RATES & VALUATION REPORT'), headers, rows);
+    this.toast.success('Rates exported');
+  }
+
+  exportDebitOrdersCsv(): void {
+    const data = this.tabData();
+    const orders = data?.debitOrders || [];
+    if (!orders.length) { this.toast.error('No debit order data to export'); return; }
+    const headers = ['Bank Name', 'Account Number', 'Deduction Amount', 'Start Date', 'End Date', 'Status'];
+    const rows = orders.map((o: any) => [
+      o.bankName || o.bank || '', o.bankAccountNumber || o.accountNo || '',
+      Number(o.deductionAmount || o.amount || 0),
+      this.formatDate(o.startDate || o.dateFrom), this.formatDate(o.endDate || o.dateTo),
+      o.status || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Debit_Orders', 'DEBIT ORDERS REPORT'), headers, rows);
+    this.toast.success('Debit orders exported');
+  }
+
+  exportClearanceCsv(): void {
+    const data = this.tabData();
+    const clearance = data?.clearances || data?.clearance || [];
+    if (!clearance.length) { this.toast.error('No clearance data to export'); return; }
+    const headers = ['Application No', 'Date', 'Status', 'Expiry Date', 'Type', 'Applicant'];
+    const rows = clearance.map((c: any) => [
+      c.applicationNo || c.clearanceNo || c.certificateNo || '',
+      this.formatDate(c.applicationDate || c.date), c.status || c.clearanceStatus || '',
+      this.formatDate(c.expiryDate || c.expiry), c.type || c.clearanceType || '',
+      c.applicant || c.applicantName || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Clearance', 'CLEARANCE CERTIFICATES REPORT'), headers, rows);
+    this.toast.success('Clearance data exported');
+  }
+
+  exportDebtorNotesCsv(): void {
+    const data = this.tabData();
+    const notes = data?.notes || data?.debtorNotes || [];
+    if (!notes.length) { this.toast.error('No debtor notes to export'); return; }
+    const headers = ['Date', 'User', 'Category', 'Note'];
+    const rows = notes.map((n: any) => [
+      this.formatDate(n.noteDate || n.date || n.createdDate),
+      n.userName || n.user || n.capturer || '', n.category || n.noteType || '',
+      n.noteContent || n.note || n.notes || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Debtor_Notes', 'DEBTOR NOTES REPORT'), headers, rows);
+    this.toast.success('Debtor notes exported');
+  }
+
+  exportSection129Csv(): void {
+    const data = this.tabData();
+    const records = data?.section129 || [];
+    if (!records.length) { this.toast.error('No Section 129 data to export'); return; }
+    const headers = ['Notice Type', 'Issue Date', 'Delivery Method', 'Status', 'Amount', 'Attorney', 'Financial Year'];
+    const rows = records.map((r: any) => [
+      r.noticeType || r.type || '', this.formatDate(r.issueDate || r.noticeDate || r.date || r.createdDate),
+      r.deliveryMethod || r.deliveryType || '', r.proofOfDeliveryStatus || r.status || '',
+      Number(r.qualifyingAmount || r.amount || r.noticeAmount || 0),
+      r.attorney || '', r.financialYear || r.billingPeriod || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Section_129', 'SECTION 129 NOTICES REPORT'), headers, rows);
+    this.toast.success('Section 129 data exported');
+  }
+
+  exportSection129Pdf(): void {
+    const data = this.tabData();
+    const records = data?.section129 || [];
+    if (!records.length) { this.toast.error('No Section 129 data to export'); return; }
+    const headers = ['Notice Type', 'Issue Date', 'Delivery', 'Status', 'Amount', 'Attorney', 'FY'];
+    const aligns: ('left' | 'right')[] = ['left', 'left', 'left', 'left', 'right', 'left', 'left'];
+    const rows = records.map((r: any) => [
+      r.noticeType || r.type || '', this.formatDate(r.issueDate || r.noticeDate || r.date || r.createdDate),
+      r.deliveryMethod || r.deliveryType || '', r.proofOfDeliveryStatus || r.status || '',
+      this.formatCurrency(Number(r.qualifyingAmount || r.amount || r.noticeAmount || 0)),
+      r.attorney || '', r.financialYear || r.billingPeriod || '',
+    ]);
+    this.exportService.exportPdf(this.getExportOpts('Section_129', 'SECTION 129 NOTICES REPORT'), headers, rows, aligns);
+  }
+
+  exportNotificationsCsv(): void {
+    const data = this.tabData();
+    const notifications = data?.notifications || data?.accountNotifications || data?.propertyNotifications || [];
+    if (!notifications.length) { this.toast.error('No notifications to export'); return; }
+    const headers = ['Date', 'Type', 'Method', 'Recipient', 'Subject', 'Status'];
+    const rows = notifications.map((n: any) => [
+      this.formatDate(n.sentDate || n.date || n.createdDate),
+      n.notificationType || n.type || '', n.deliveryMethod || n.method || '',
+      n.recipient || n.emailAddress || n.phoneNumber || '',
+      n.subject || n.title || '', n.status || n.deliveryStatus || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Notifications', 'NOTIFICATIONS REPORT'), headers, rows);
+    this.toast.success('Notifications exported');
+  }
+
+  exportIncentivesCsv(): void {
+    const data = this.tabData();
+    const incentives = data?.incentives || [];
+    if (!incentives.length) { this.toast.error('No incentive data to export'); return; }
+    const headers = ['Scheme', 'Qualification Date', 'Benefit Amount', 'Status', 'Description'];
+    const rows = incentives.map((i: any) => [
+      i.schemeName || i.incentiveScheme || i.scheme || '',
+      this.formatDate(i.qualificationDate || i.date),
+      Number(i.benefitAmount || i.amount || 0), i.status || '',
+      i.description || i.notes || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Incentives', 'INCENTIVES REPORT'), headers, rows);
+    this.toast.success('Incentives exported');
+  }
+
+  exportIndigentCsv(): void {
+    const data = this.tabData();
+    const indigent = data?.indigent || data?.attpHistory || [];
+    if (!indigent.length) { this.toast.error('No indigent data to export'); return; }
+    const headers = ['Application Date', 'Subsidy Type', 'Expiry Date', 'Status', 'Description'];
+    const rows = indigent.map((i: any) => [
+      this.formatDate(i.applicationDate || i.date || i.startDate),
+      i.subsidyType || i.type || i.applicationStatus || '',
+      this.formatDate(i.expiryDate || i.endDate),
+      i.status || i.applicationStatus || '', i.description || i.notes || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Indigent_Subsidy', 'INDIGENT SUBSIDY REPORT'), headers, rows);
+    this.toast.success('Indigent data exported');
+  }
+
+  private normalizeStr(s: string): string {
+    return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  isSameClearanceAccount(clearanceAccountName: string): boolean {
+    if (!clearanceAccountName) return true;
+    const currentName = this.normalizeStr(this.selectedAccount()?.name || '');
+    const clrName = this.normalizeStr(clearanceAccountName);
+    if (!currentName || !clrName) return true;
+    return currentName === clrName;
+  }
+
+  getClearancePreviousAccountNo(clearanceAccountName: string): string {
+    const linked = this.clearanceLinkedAccounts();
+    const clrName = this.normalizeStr(clearanceAccountName);
+    if (!clrName || clrName === '-') return '';
+    const currentNum = String(this.getAccountNum(this.selectedAccount()) || '').replace(/^0+/, '');
+    const prevAcct = linked.find((la: any) => {
+      const laName = this.normalizeStr(la.name || la.accountName || la.fullNAME || '');
+      if (!laName) return false;
+      const matchName = laName.includes(clrName) || clrName.includes(laName);
+      const laNum = String(la.accountNumber || la.account_ID || '').replace(/^0+/, '');
+      return matchName && laNum !== currentNum;
+    });
+    const prevNum = prevAcct?.accountNumber || prevAcct?.account_ID;
+    return prevNum ? String(prevNum).padStart(12, '0') : '';
+  }
+
+  toggleClearanceRow(idx: number): void {
+    this.expandedClearanceRow.set(this.expandedClearanceRow() === idx ? null : idx);
+  }
+
+  getClearanceTypeLabel(typeId: any): string {
+    if (typeId === 1) return 'Transfer';
+    if (typeId === 2) return 'Section 118';
+    return typeId ?? '-';
+  }
+
+  downloadClearanceDoc(scheduleId: any, type: 'cost-schedule' | 'clearance-certificate'): void {
+    if (!scheduleId) return;
+    window.open(`/api/platinum/clearance-document-download?costScheduleId=${scheduleId}&type=${type}`, '_blank');
+  }
+
+  async addOccupier(): Promise<void> {
+    const name = this.occupierAddName().trim();
+    if (!name) return;
+    const accountId = this.getAccountId(this.selectedAccount());
+    if (!accountId) return;
+    this.occupierAddLoading.set(true);
+    try {
+      await firstValueFrom(this.api.post('/api/platinum/billing-enquiry/add-occupier', {
+        accountId, name, idNumber: this.occupierAddId().trim(),
+      }));
+      this.occupierAddName.set('');
+      this.occupierAddId.set('');
+      this.showAddOccupierModal.set(false);
+      this.toast.success('Occupier added successfully');
+      this.loadTabData('occupiers', accountId);
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || 'Failed to add occupier');
+    } finally {
+      this.occupierAddLoading.set(false);
+    }
+  }
+
+  async removeOccupier(occupier: any): Promise<void> {
+    const id = occupier.occupierId || occupier.id || occupier.occupier_ID;
+    if (!id) { this.toast.error('Cannot identify occupier to remove'); return; }
+    if (!confirm(`Remove occupier "${occupier.name || occupier.occupierName || 'this person'}"?`)) return;
+    this.occupierRemoveLoading.set(id);
+    try {
+      await firstValueFrom(this.api.delete('/api/platinum/billing-enquiry/add-occupier', { occupierId: String(id) }));
+      const accountId = this.getAccountId(this.selectedAccount());
+      this.toast.success('Occupier removed');
+      this.loadTabData('occupiers', accountId);
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || 'Failed to remove occupier');
+    } finally {
+      this.occupierRemoveLoading.set(null);
+    }
+  }
+
+  async generateProofOfResidence(): Promise<void> {
+    const accountId = this.getAccountId(this.selectedAccount());
+    if (!accountId) return;
+    this.proofLoading.set(true);
+    try {
+      const [propSettled, nameSettled] = await Promise.allSettled([
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-details-by-account/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/name-info/${accountId}`)),
+      ]);
+      const propResp = propSettled.status === 'fulfilled' ? (Array.isArray(propSettled.value) ? propSettled.value[0] : propSettled.value) : null;
+      const nameResp = nameSettled.status === 'fulfilled' ? (Array.isArray(nameSettled.value) ? nameSettled.value[0] : nameSettled.value) : null;
+      this.proofData.set({ property: propResp, nameInfo: nameResp });
+      this.showProofModal.set(true);
+    } catch (err) {
+      this.toast.error('Failed to load property details for proof of residence');
+    } finally {
+      this.proofLoading.set(false);
+    }
+  }
+
+  private escHtml(str: any): string {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  showPrintOverlay(html: string, title: string): void {
+    this.printOverlayHtml.set(html);
+    this.printOverlayTitle.set(title);
+  }
+
+  closePrintOverlay(): void {
+    this.printOverlayHtml.set(null);
+    this.printOverlayTitle.set('');
+  }
+
+  printOverlayContent(): void {
+    const iframe = document.getElementById('print-overlay-iframe') as HTMLIFrameElement;
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }
+  }
+
+  downloadOverlayContent(): void {
+    const html = this.printOverlayHtml();
+    if (!html) return;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (this.printOverlayTitle() || 'document').replace(/[^a-zA-Z0-9 ]/g, '_') + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  printProofOfResidence(): void {
+    const data = this.proofData();
+    if (!data) return;
+    const acct = this.selectedAccount();
+    const accountNumber = this.escHtml(this.getAccountNum(acct));
+    const ownerName = this.escHtml(data.nameInfo?.name || data.nameInfo?.surname_Company || acct?.name || '');
+    const idNumber = this.escHtml(data.nameInfo?.idRegistrationNumber || data.nameInfo?.idNumber || acct?.idRegistrationNumber || '');
+    const address = this.escHtml(data.property?.propertyStreet || data.property?.streetName || acct?.locationAddress || '');
+    const suburb = this.escHtml(data.property?.suburb || data.property?.subSuburb || '');
+    const town = this.escHtml(data.property?.town || '');
+    const erf = this.escHtml(data.property?.erfNumber || '');
+    const today = new Date();
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+    const fullHtml = `<!DOCTYPE html><html><head><title>Proof of Residence</title><style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+      .proof-container { max-width: 700px; margin: 0 auto; border: 1px solid #333; padding: 30px; }
+      .header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
+      .header h2 { margin: 0; font-size: 18px; }
+      .header p { margin: 4px 0; font-size: 12px; }
+      .date-line { text-align: right; margin: 10px 0 25px; font-weight: bold; }
+      .title { font-size: 18px; font-weight: bold; margin: 20px 0; text-decoration: underline; }
+      .detail { margin: 8px 0 8px 40px; font-size: 14px; }
+      .detail-label { font-weight: bold; display: inline; }
+      .address-block { margin: 15px 0 15px 40px; line-height: 1.8; font-size: 14px; }
+      .body-text { font-size: 14px; margin: 15px 0; line-height: 1.6; }
+      .footer { margin-top: 80px; font-weight: bold; font-size: 14px; }
+      @media print { body { margin: 0; } .proof-container { border: none; } }
+    </style></head><body>
+      <div class="proof-container">
+        <div class="header">
+          <h2>GEORGE MUNICIPALITY</h2>
+          <p>PO Box 19, George, 6530</p>
+          <p>Tel: 044 801 9111 | www.george.gov.za</p>
+        </div>
+        <div class="date-line">Date: ${dateStr}</div>
+        <div class="title">PROOF OF RESIDENCE</div>
+        <div class="body-text">This letter serves to confirm that the following person resides at the address as indicated below:</div>
+        <div class="detail"><span class="detail-label">Full Name:</span> ${ownerName}</div>
+        <div class="detail"><span class="detail-label">ID Number:</span> ${idNumber}</div>
+        <div class="detail"><span class="detail-label">Account Number:</span> ${accountNumber}</div>
+        <div class="address-block">
+          <strong>Physical Address:</strong><br>
+          ${address}<br>
+          ${suburb ? suburb + '<br>' : ''}${town ? town : ''}${erf ? '<br>Erf: ' + erf : ''}
+        </div>
+        <div class="body-text">This confirmation is based on the municipal records at the time of issuing this letter and does not constitute any form of guarantee.</div>
+        <div class="footer">
+          <p>_________________________</p>
+          <p>Authorised Official</p>
+          <p>George Municipality</p>
+        </div>
+      </div>
+    </body></html>`;
+    this.showPrintOverlay(fullHtml, 'Proof of Residence');
+  }
+
+  async generatePropertyLetter(type: 'section49' | 'section78' | 'valuation'): Promise<void> {
+    const accountId = this.getAccountId(this.selectedAccount());
+    if (!accountId) return;
+    this.generatingPropertyLetter.set(type);
+    try {
+      const [propRes, consUnitRes, consUnitByAcctRes, consAcctDetailsRes] = await Promise.allSettled([
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/property-details-by-account/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/consumption-units/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/cons-unit-by-account`, { AccountId: String(accountId) })),
+        firstValueFrom(this.api.get<any>(`/api/platinum/receipt-prepaid/cons-account-details`, { accountId: String(accountId) })),
+      ]);
+      const prop = propRes.status === 'fulfilled' && propRes.value && !propRes.value._error ? (Array.isArray(propRes.value) ? propRes.value[0] : propRes.value) : null;
+      const consUnit = consUnitRes.status === 'fulfilled' ? (Array.isArray(consUnitRes.value) ? consUnitRes.value[0] : consUnitRes.value) : null;
+      const consUnitByAcct = consUnitByAcctRes.status === 'fulfilled' && consUnitByAcctRes.value && !consUnitByAcctRes.value._error ? (Array.isArray(consUnitByAcctRes.value) ? consUnitByAcctRes.value[0] : consUnitByAcctRes.value) : null;
+      const consAcctDetails = consAcctDetailsRes.status === 'fulfilled' && consAcctDetailsRes.value && !consAcctDetailsRes.value._error ? (Array.isArray(consAcctDetailsRes.value) ? consAcctDetailsRes.value[0] : consAcctDetailsRes.value) : null;
+      const letterUnitPartId = this.selectedAccount()?.unitPartitionID || consUnit?.unitPartitionID || consUnit?.unitPartition_ID || consUnitByAcct?.unitPartitionID || consUnitByAcct?.unitPartition_ID;
+      let vals: any[] = [];
+      if (letterUnitPartId) {
+        try {
+          const valByUnit = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/valuation-by-unit`, { unitPartitionID: String(letterUnitPartId) }));
+          if (valByUnit && !valByUnit._error) {
+            vals = this.normalizeArray(valByUnit);
+          }
+        } catch (e) { }
+      }
+      if (vals.length === 0) {
+        const letterPropId = prop?.property_ID || prop?.propertyID || prop?.propertyId || consUnitByAcct?.property_ID || consUnitByAcct?.propertyID;
+        if (letterPropId) {
+          try {
+            const suppVal = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/supplementary-valuations`, { propertyId: String(letterPropId) }));
+            vals = this.normalizeArray(suppVal);
+          } catch (e) { }
+        }
+      }
+      const acct = this.selectedAccount();
+      const ownerName = this.escHtml(prop?.name || prop?.owner || consUnit?.ownerName || consUnitByAcct?.ownerName || consAcctDetails?.ownerName || acct?.name || '');
+      const address = this.escHtml(prop?.propertyStreet || prop?.streetName || consUnitByAcct?.propertyStreet || consAcctDetails?.propertyStreet || acct?.locationAddress || '');
+      const sgNumber = this.escHtml(prop?.sgNumber || consUnit?.sgNumber || consUnitByAcct?.sgNumber || consAcctDetails?.sgNumber || acct?.sgNumber || '');
+      const erfNumber = this.escHtml(prop?.erfNumber || consUnitByAcct?.erfNumber || consUnitByAcct?.erfNo || consAcctDetails?.erfNumber || consAcctDetails?.erfNo || acct?.['erfNumber'] || '');
+      const suburb = this.escHtml(prop?.suburb || prop?.subSuburb || consUnitByAcct?.suburb || consAcctDetails?.suburb || '');
+      const town = this.escHtml(prop?.town || consUnitByAcct?.town || consAcctDetails?.town || '');
+      const marketValue = prop?.marketValue || consUnit?.marketValue || consUnitByAcct?.marketValue || consUnitByAcct?.standMarketValue || consAcctDetails?.marketValue || 0;
+      const standSize = this.escHtml(prop?.standSize || consUnit?.standSize || consUnitByAcct?.standSize || consUnitByAcct?.allotmentArea || consAcctDetails?.standSize || '');
+      const zoning = this.escHtml(prop?.typeOfUse || prop?.typeofUse || prop?.townPlanningZoneType || consUnitByAcct?.typeOfUse || consUnitByAcct?.typeofUse || consUnitByAcct?.townPlanningZoneType || consAcctDetails?.zoneDesc || consAcctDetails?.typeOfUseDesc || '');
+      const today = new Date();
+      const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+      let title = '';
+      let bodyContent = '';
+      if (type === 'section49') {
+        title = 'SECTION 49 LETTER — RATES CLEARANCE';
+        bodyContent = `
+          <div class="body-text">This serves to confirm that the following property has been assessed for rates clearance as required under Section 49 of the Local Government: Municipal Property Rates Act, No. 6 of 2004.</div>
+          <div class="detail"><span class="detail-label">Owner:</span> ${ownerName}</div>
+          <div class="detail"><span class="detail-label">Property Address:</span> ${address}${suburb ? ', ' + suburb : ''}${town ? ', ' + town : ''}</div>
+          <div class="detail"><span class="detail-label">SG Number:</span> ${sgNumber}</div>
+          <div class="detail"><span class="detail-label">Erf Number:</span> ${erfNumber}</div>
+          <div class="detail"><span class="detail-label">Market Value:</span> R ${this.formatCurrency(marketValue)}</div>
+          <div class="detail"><span class="detail-label">Account Number:</span> ${this.escHtml(this.getAccountNum(acct))}</div>
+          <div class="body-text">All rates and taxes as at the date of this certificate have been checked. Please contact the municipality for the current outstanding balance.</div>`;
+      } else if (type === 'section78') {
+        title = 'SECTION 78 LETTER — PROPERTY INFORMATION';
+        bodyContent = `
+          <div class="body-text">In terms of Section 78 of the Local Government: Municipal Property Rates Act, No. 6 of 2004, the following property information is provided:</div>
+          <div class="detail"><span class="detail-label">Owner:</span> ${ownerName}</div>
+          <div class="detail"><span class="detail-label">Property Address:</span> ${address}${suburb ? ', ' + suburb : ''}${town ? ', ' + town : ''}</div>
+          <div class="detail"><span class="detail-label">SG Number:</span> ${sgNumber}</div>
+          <div class="detail"><span class="detail-label">Erf Number:</span> ${erfNumber}</div>
+          <div class="detail"><span class="detail-label">Stand Size:</span> ${standSize ? standSize + ' m²' : '-'}</div>
+          <div class="detail"><span class="detail-label">Zoning / Land Use:</span> ${zoning || '-'}</div>
+          <div class="detail"><span class="detail-label">Market Value:</span> R ${this.formatCurrency(marketValue)}</div>
+          <div class="detail"><span class="detail-label">Account Number:</span> ${this.escHtml(this.getAccountNum(acct))}</div>
+          <div class="body-text">This information is extracted from the municipal valuation roll and property register as at the date of this letter.</div>`;
+      } else {
+        title = 'VALUATION CERTIFICATE';
+        bodyContent = `
+          <div class="body-text">This certificate confirms the property valuation details as recorded in the Municipal Valuation Roll:</div>
+          <div class="detail"><span class="detail-label">Owner:</span> ${ownerName}</div>
+          <div class="detail"><span class="detail-label">Property Address:</span> ${address}${suburb ? ', ' + suburb : ''}${town ? ', ' + town : ''}</div>
+          <div class="detail"><span class="detail-label">SG Number:</span> ${sgNumber}</div>
+          <div class="detail"><span class="detail-label">Erf Number:</span> ${erfNumber}</div>
+          <div class="detail"><span class="detail-label">Market Value:</span> R ${this.formatCurrency(marketValue)}</div>
+          <div class="detail"><span class="detail-label">Stand Size:</span> ${standSize ? standSize + ' m²' : '-'}</div>
+          <div class="detail"><span class="detail-label">Zoning:</span> ${zoning || '-'}</div>`;
+        if (vals.length > 0) {
+          bodyContent += `<table class="val-table"><thead><tr><th>Fin Year</th><th>Market Value</th><th>Category</th><th>Status</th></tr></thead><tbody>`;
+          for (const v of vals) {
+            bodyContent += `<tr><td>${this.escHtml(v.financialYear || '-')}</td><td>R ${this.formatCurrency(v.standMarketValue || v.marketValue || 0)}</td><td>${this.escHtml(v.valuationCategory || v.category || '-')}</td><td>${this.escHtml(v.valuationStatus || v.status || '-')}</td></tr>`;
+          }
+          bodyContent += `</tbody></table>`;
+        }
+        bodyContent += `<div class="body-text">This valuation is as per the current General Valuation Roll and/or Supplementary Valuation Roll.</div>`;
+      }
+
+      const fullHtml = `<!DOCTYPE html><html><head><title>${title}</title><style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .letter-container { max-width: 700px; margin: 0 auto; border: 1px solid #333; padding: 30px; }
+        .header { border-bottom: 2px solid #0f2b46; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
+        .header h2 { margin: 0; font-size: 18px; color: #0f2b46; }
+        .header p { margin: 4px 0; font-size: 12px; color: #555; }
+        .date-line { text-align: right; margin: 10px 0 20px; font-weight: bold; font-size: 13px; }
+        .title { font-size: 16px; font-weight: bold; margin: 20px 0; text-decoration: underline; color: #0f2b46; }
+        .detail { margin: 8px 0 8px 20px; font-size: 13px; }
+        .detail-label { font-weight: bold; display: inline; }
+        .body-text { font-size: 13px; margin: 15px 0; line-height: 1.6; }
+        .val-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; }
+        .val-table th { background: #0f2b46; color: white; padding: 6px 10px; text-align: left; }
+        .val-table td { border: 1px solid #ddd; padding: 5px 10px; }
+        .footer { margin-top: 60px; font-size: 13px; }
+        @media print { body { margin: 0; } .letter-container { border: none; } }
+      </style></head><body>
+        <div class="letter-container">
+          <div class="header"><h2>GEORGE MUNICIPALITY</h2><p>PO Box 19, George, 6530</p><p>Tel: 044 801 9111 | www.george.gov.za</p></div>
+          <div class="date-line">Date: ${dateStr}</div>
+          <div class="title">${title}</div>
+          ${bodyContent}
+          <div class="footer"><p>_________________________</p><p>Authorised Official</p><p>George Municipality</p></div>
+        </div>
+      </body></html>`;
+      this.showPrintOverlay(fullHtml, title);
+    } catch (e: any) {
+      this.toast.error(`Failed to generate ${type} letter: ${e?.message || 'Unknown error'}`);
+    } finally {
+      this.generatingPropertyLetter.set(null);
+    }
+  }
+
+  async calculateNextBillEstimate(): Promise<void> {
+    const accountId = this.getAccountId(this.selectedAccount());
+    if (!accountId) return;
+    this.nbeLoading.set(true);
+    this.nbeError.set(null);
+    this.nbeWarnings.set([]);
+    this.nbeLineItems.set([]);
+    this.nbeCalculated.set(false);
+    const warns: string[] = [];
+
+    try {
+      const now = new Date();
+      const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      this.nbeBillingMonth.set(`${monthNames[now.getMonth()]} ${now.getFullYear()}`);
+
+      const finYearMonths = ['July','August','September','October','November','December','January','February','March','April','May','June'];
+      const [svcRes, meteredRes, ratesRes, addBillingRes] = await Promise.allSettled([
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/services-search-results/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/additional-billing-search-results/${accountId}`)),
+      ]);
+      const services = svcRes.status === 'fulfilled' ? this.normalizeArray(svcRes.value) : [];
+      const meters = meteredRes.status === 'fulfilled' ? this.normalizeArray(meteredRes.value) : [];
+      const ratesDetail = ratesRes.status === 'fulfilled' ? (Array.isArray(ratesRes.value) ? ratesRes.value[0] : ratesRes.value) : null;
+      const addBilling = addBillingRes.status === 'fulfilled' ? this.normalizeArray(addBillingRes.value) : [];
+
+      const activeServices = services.filter((s: any) => {
+        const status = (s.serviceStatus || s.statusDesc || s.status || '').toLowerCase();
+        return !status.includes('inactive') && !status.includes('terminated') && !status.includes('closed');
+      });
+
+      if (!activeServices.length && !meters.length) {
+        this.nbeError.set('No active services found on this account.');
+        this.nbeLoading.set(false);
+        return;
+      }
+
+      const items: any[] = [];
+      const processedKeys = new Set<string>();
+
+      for (const svc of activeServices) {
+        const desc = svc.serviceDescription || svc.serviceDesc || svc.tariffType || svc.description || 'Service';
+        const key = desc.toLowerCase();
+        if (processedKeys.has(key)) continue;
+        processedKeys.add(key);
+
+        const isPrepaid = key.includes('prepaid') || key.includes('pre-paid') || key.includes('token');
+        if (isPrepaid) continue;
+
+        const amount = parseFloat(svc.amount || svc.currentAmount || svc.tariffAmount || svc.monthlyCharge || 0);
+        const isMetered = key.includes('metered') || key.includes('consumption');
+
+        if (isMetered) {
+          const matchedMeter = meters.find((m: any) => {
+            const mDesc = (m.serviceDesc || m.serviceDescription || '').toLowerCase();
+            return mDesc === key || mDesc.includes(key.split(' ')[0]);
+          });
+          if (matchedMeter) {
+            try {
+              const meterID = String(matchedMeter.physicalMeterNo || matchedMeter.physicalMeterNumber || matchedMeter.meterNo || matchedMeter.meterNumber || matchedMeter.meterID || '').replace(/^0+/, '');
+              if (meterID) {
+                const currentFy = this.userFinYear() || this.getCurrentFinYear();
+                const readings: any = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { accountID: String(accountId), meterID, billingPeriodIDFrom: '1', billingPeriodIDTo: '12', finYear: currentFy }));
+                const readingsArr = this.normalizeArray(readings);
+                if (readingsArr.length >= 2) {
+                  const sorted = readingsArr.sort((a: any, b: any) => new Date(b.readingDate || b.date || 0).getTime() - new Date(a.readingDate || a.date || 0).getTime());
+                  const latest = sorted[0];
+                  const prev = sorted[1];
+                  const consumption = Math.abs(parseFloat(latest.consumption || latest.units || 0) || parseFloat(prev.consumption || prev.units || 0) || 0);
+                  const rate = amount > 0 ? amount : parseFloat(svc.tariffRate || svc.rate || '1');
+                  const estimated = consumption * (rate > 0 ? rate : 1);
+                  items.push({ service: desc, type: 'metered', amount: estimated, consumption, rate, meter: meterID });
+                } else {
+                  warns.push(`${desc}: insufficient meter readings for estimate`);
+                  if (amount > 0) items.push({ service: desc, type: 'estimated', amount });
+                }
+              } else if (amount > 0) {
+                items.push({ service: desc, type: 'estimated', amount });
+              }
+            } catch {
+              warns.push(`${desc}: could not fetch meter readings`);
+              if (amount > 0) items.push({ service: desc, type: 'estimated', amount });
+            }
+          } else if (amount > 0) {
+            items.push({ service: desc, type: 'fixed', amount });
+          }
+        } else {
+          if (amount > 0) items.push({ service: desc, type: 'fixed', amount });
+          else warns.push(`${desc}: no amount available`);
+        }
+      }
+
+      for (const ab of addBilling) {
+        const desc = ab.description || ab.serviceDescription || ab.additionalBillingDescription || 'Additional Billing';
+        const amt = parseFloat(ab.amount || ab.billingAmount || 0);
+        if (amt > 0 && !processedKeys.has(desc.toLowerCase())) {
+          processedKeys.add(desc.toLowerCase());
+          items.push({ service: desc, type: 'additional', amount: amt });
+        }
+      }
+
+      if (ratesDetail && !ratesDetail._error) {
+        const rateAmt = parseFloat(ratesDetail.monthlyRate || ratesDetail.monthlyAmount || ratesDetail.rateAmount || 0);
+        if (rateAmt > 0 && !processedKeys.has('property rates')) {
+          processedKeys.add('property rates');
+          items.push({ service: 'Property Rates', type: 'rates', amount: rateAmt });
+        }
+      }
+
+      if (items.length === 0) {
+        this.nbeError.set('Could not estimate any services. Insufficient data available.');
+        this.nbeLoading.set(false);
+        return;
+      }
+
+      this.nbeLineItems.set(items);
+      this.nbeWarnings.set(warns);
+      this.nbeCalculated.set(true);
+    } catch (e: any) {
+      this.nbeError.set(e?.message || 'Failed to calculate estimate');
+    } finally {
+      this.nbeLoading.set(false);
+    }
+  }
+
+  get nbeSubtotal(): number {
+    return this.nbeLineItems().reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
+  }
+
+  get nbeVat(): number {
+    return this.nbeSubtotal * 0.15;
+  }
+
+  get nbeTotal(): number {
+    return this.nbeSubtotal + this.nbeVat;
+  }
+
+  exportOccupiersCsv(): void {
+    const occupiers = this.occupiersList();
+    if (!occupiers.length) { this.toast.error('No occupiers to export'); return; }
+    const headers = ['Name', 'ID Number'];
+    const rows = occupiers.map((o: any) => [
+      o.name || o.occupierName || o.surname || '',
+      o.idNumber || o.idRegistrationNumber || o.idNo || '',
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Occupiers', 'OCCUPIERS REPORT'), headers, rows);
+    this.toast.success('Occupiers exported');
+  }
+
+  exportExtensionsCsv(): void {
+    const extensions = this.tabData()?.extensions || [];
+    if (!extensions.length) { this.toast.error('No extension data to export'); return; }
+    const headers = ['Extension Status', 'Description', 'Commencement Date', 'Termination Date', 'Captured By', 'Capture Date'];
+    const rows = extensions.map((e: any) => [
+      e.extensionStatus || e.status || e.statusDesc || '',
+      e.extensionDescription || e.description || e.extensionType || e.type || '',
+      this.formatDate(e.commencementDate || e.startDate),
+      this.formatDate(e.terminationDate || e.endDate),
+      e.capturedBy || e.capturerName || e.capturer || '',
+      this.formatDate(e.captureDate || e.dateCaptured),
+    ]);
+    this.exportService.exportCsv(this.getExportOpts('Payment_Extensions', 'PAYMENT EXTENSIONS REPORT'), headers, rows);
+    this.toast.success('Extensions exported');
+  }
+}

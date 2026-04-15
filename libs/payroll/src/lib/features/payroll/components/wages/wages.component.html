@@ -1,0 +1,269 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Wages Capture</h1>
+    <p class="page-subtitle">Capture and manage wage transactions for Rate Based employees</p>
+  </div>
+</div>
+
+<div class="wages-toolbar">
+  <div class="toolbar-left">
+    <div class="form-group toolbar-field">
+      <label>Payroll Cycle</label>
+      <select class="form-control" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()">
+        <option value="">— Select Cycle —</option>
+        @for (c of cycles; track c.id) {
+          <option [value]="c.id">{{ c.name }} ({{ c.cycle_type }})</option>
+        }
+      </select>
+    </div>
+    @if (currentPeriod) {
+      <div class="period-badge">
+        <app-icon name="calendar" [size]="14"></app-icon>
+        {{ getPeriodLabel() }}
+        <span class="period-status" [class]="'ps-' + (currentPeriod.status || '').toLowerCase()">{{ currentPeriod.status }}</span>
+      </div>
+    }
+  </div>
+</div>
+
+@if (selectedCycleId && currentPeriod) {
+  <div class="wages-add-section">
+    <div class="section-heading">Add a new Wages (* ID to be generated)</div>
+    <div class="add-form-grid">
+      <div class="add-form-left">
+        <div class="form-row-inline">
+          <div class="form-group employee-search-group">
+            <label>Employee<span class="required">*</span></label>
+            <div class="employee-search-wrap">
+              <input class="form-control" type="text"
+                [(ngModel)]="employeeSearchText"
+                (input)="onEmployeeSearchInput()"
+                (focus)="onEmployeeSearchFocus()"
+                (blur)="onEmployeeSearchBlur()"
+                placeholder="Type ID, code, name or surname..."
+                autocomplete="off">
+              @if (employeeDropdownOpen && filteredEmployees.length > 0) {
+                <div class="employee-dropdown">
+                  @for (emp of filteredEmployees; track emp.id) {
+                    <div class="employee-dropdown-item" [class.selected]="selectedEmployee?.id === emp.id" (mousedown)="selectEmployee(emp)">
+                      <span class="emp-dd-id">{{ emp.id }}</span>
+                      <span class="emp-dd-code">{{ emp.employee_code }}</span>
+                      <span class="emp-dd-name">{{ emp.first_name }} {{ emp.surname }}</span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (employeeDropdownOpen && employeeSearchText && filteredEmployees.length === 0) {
+                <div class="employee-dropdown">
+                  <div class="employee-dropdown-empty">No matching employees</div>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Payroll Period<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="getPeriodLabel()" readonly>
+          </div>
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label>Employee Code<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="selectedEmployee?.employee_code || ''" readonly>
+          </div>
+          <div class="form-group">
+            <label>Salary Transaction<span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="addForm.salary_head_id" [disabled]="!selectedEmployee || employeeSalaryHeadsLoading">
+              <option value="">{{ employeeSalaryHeadsLoading ? 'Loading...' : '— Select —' }}</option>
+              @for (h of employeeSalaryHeads; track h.id) {
+                <option [value]="h.id">{{ h.name }} ({{ h.code }})</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label>ID Number<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="selectedEmployee?.id_number || ''" readonly>
+          </div>
+          <div class="form-group">
+            <label>{{ unitLabel }}<span class="required">*</span></label>
+            <input class="form-control" type="number" [(ngModel)]="addForm.unit" step="0.5" min="0">
+          </div>
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label>First Name<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="selectedEmployee?.first_name || ''" readonly>
+          </div>
+          <div class="form-group">
+            <label>{{ addRateLabel }}</label>
+            <input class="form-control readonly-field" [value]="addRate | number:'1.2-4'" readonly>
+          </div>
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label>Last Name<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="selectedEmployee?.surname || ''" readonly>
+          </div>
+          <div class="form-group">
+            <label>Total</label>
+            <input class="form-control readonly-field" [value]="addTotal | number:'1.2-2'" readonly>
+          </div>
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label>Cycle<span class="required">*</span></label>
+            <input class="form-control readonly-field" [value]="currentCycle?.name || ''" readonly>
+          </div>
+          <div class="form-group"></div>
+        </div>
+      </div>
+    </div>
+    <div class="add-form-actions">
+      <button class="btn btn-primary" (click)="submitAdd()" [disabled]="addLoading">
+        @if (addLoading) { Saving... } @else { Submit }
+      </button>
+      <button class="btn btn-secondary" (click)="cancelAdd()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="wages-grid-section">
+    <div class="wages-actions-bar">
+      <div class="filter-group">
+        <select class="form-control form-control-sm" [(ngModel)]="statusFilter" (ngModelChange)="loadTransactions()">
+          <option value="">All Statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+          <option value="PROCESSED">Processed</option>
+        </select>
+      </div>
+      @if (selectedCount > 0) {
+        <div class="bulk-actions">
+          <span class="selected-label">{{ selectedCount }} selected</span>
+          <button class="btn btn-sm btn-approve" (click)="approveSelected()"><app-icon name="check" [size]="12"></app-icon> Approve</button>
+          <button class="btn btn-sm btn-reject" (click)="rejectSelected()"><app-icon name="x" [size]="12"></app-icon> Reject</button>
+        </div>
+      }
+    </div>
+
+    @if (txLoading) {
+      <div class="loading">Loading transactions...</div>
+    } @else if (transactions.length === 0) {
+      <div class="empty-state">
+        <p>No records to display.</p>
+      </div>
+    } @else {
+      <div class="table-card">
+        <div class="table-wrap">
+          <table class="wages-table">
+            <thead>
+              <tr>
+                <th style="width: 36px;"><input type="checkbox" (change)="toggleSelectAll($event)"></th>
+                <th>Id</th>
+                <th>Employee Number</th>
+                <th>Employee Code</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Cycle</th>
+                <th>Payroll Period</th>
+                <th>Salary Transaction</th>
+                <th class="text-right">Unit</th>
+                <th class="text-right">Rate</th>
+                <th class="text-right">Total</th>
+                <th>Status</th>
+                <th style="width: 100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (tx of transactions; track tx.id) {
+                <tr>
+                  <td><input type="checkbox" [(ngModel)]="tx._selected" [disabled]="tx.status !== 'PENDING'"></td>
+                  <td>{{ tx.id }}</td>
+                  <td>{{ tx.employee_id }}</td>
+                  <td>{{ tx.employee_code }}</td>
+                  <td>{{ tx.first_name }}</td>
+                  <td>{{ tx.surname }}</td>
+                  <td>{{ currentCycle?.name || '' }}</td>
+                  <td>{{ getPeriodLabel() }}</td>
+                  <td>
+                    <span class="head-name">{{ tx.head_name }}</span>
+                  </td>
+                  <td class="text-right">{{ getTxUnit(tx) | number:'1.2-2' }}</td>
+                  <td class="text-right">{{ getTxRate(tx) | number:'1.2-4' }}</td>
+                  <td class="text-right">{{ getTxTotal(tx) | number:'1.2-2' }}</td>
+                  <td><span class="status-pill" [ngClass]="getStatusClass(tx.status)">{{ tx.status }}</span></td>
+                  <td>
+                    @if (tx.status === 'PENDING') {
+                      <button class="btn btn-sm btn-action-edit" (click)="openEditTransaction(tx)" title="Edit">Edit</button>
+                      <button class="btn btn-sm btn-action-delete" (click)="deleteTx(tx)" title="Delete">Delete</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  </div>
+} @else if (selectedCycleId && !currentPeriod) {
+  <div class="empty-state" style="margin-top: 40px;">
+    <h3>No open period</h3>
+    <p>There is no open or trial period for this payroll cycle. Generate periods first.</p>
+  </div>
+} @else {
+  <div class="empty-state" style="margin-top: 40px;">
+    <h3>Select a payroll cycle</h3>
+    <p>Choose a payroll cycle above to start capturing wages</p>
+  </div>
+}
+
+@if (showEditModal) {
+  <div class="modal-overlay visible" (click)="closeEditModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Wage Transaction</h3>
+        <button class="modal-close" (click)="closeEditModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>SALARY TRANSACTION <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="editForm.salary_head_id">
+              @for (h of editEmployeeSalaryHeads; track h.id) {
+                <option [value]="h.id">{{ h.name }} ({{ h.code }})</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>{{ editUnitLabel }} <span class="required">*</span></label>
+            <input class="form-control" type="number" [(ngModel)]="editForm.unit" step="0.5" min="0">
+          </div>
+          <div class="form-group">
+            <label>{{ editRateLabel }}</label>
+            <input class="form-control readonly-field" [value]="editRate | number:'1.2-4'" readonly>
+          </div>
+          <div class="form-group">
+            <label>TOTAL</label>
+            <input class="form-control readonly-field" [value]="editTotal | number:'1.2-2'" readonly>
+          </div>
+          <div class="form-group">
+            <label>REFERENCE</label>
+            <input class="form-control" [(ngModel)]="editForm.reference_no" placeholder="Optional ref number">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>NOTES</label>
+            <input class="form-control" [(ngModel)]="editForm.notes" placeholder="Optional notes">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="submitEdit()" [disabled]="editLoading">
+          @if (editLoading) { Saving... } @else { <app-icon name="check" [size]="14"></app-icon> Update }
+        </button>
+        <button class="btn" (click)="closeEditModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+}

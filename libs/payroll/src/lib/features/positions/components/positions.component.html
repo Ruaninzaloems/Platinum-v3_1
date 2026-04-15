@@ -1,0 +1,516 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Positions</h1>
+      <p class="page-subtitle">Manage funded positions, SCOA setup and business rules</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" [size]="14"></app-icon> Add Position</button>
+  </div>
+
+  <div class="list-summary">
+    <div class="summary-stat">
+      <span class="summary-number">{{ totalCount }}</span>
+      <span class="summary-label">Total Positions</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-funded">{{ fundedCount }}</span>
+      <span class="summary-label">Funded</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-vacant">{{ vacantCount }}</span>
+      <span class="summary-label">Vacant</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-number summary-filled">{{ filledCount }}</span>
+      <span class="summary-label">Filled</span>
+    </div>
+  </div>
+
+  <div class="list-toolbar">
+    <div class="search-box">
+      <app-icon name="search" [size]="14"></app-icon>
+      <input class="search-input" placeholder="Search by code, title, department, job profile or incumbent..."
+             [(ngModel)]="searchTerm" (ngModelChange)="filterPositions()">
+    </div>
+    <span class="result-count">{{ filteredPositions.length }} of {{ positions.length }} positions</span>
+  </div>
+
+  @if (loading) {
+    <div class="loading">Loading positions...</div>
+  } @else {
+    <div class="list-card">
+      @if (filteredPositions.length === 0) {
+        <div class="empty-state"><h3>No positions found</h3><p>{{ positions.length === 0 ? 'Click "Add Position" to create one' : 'Try adjusting your search' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">Id</th>
+                <th class="col-code">Code</th>
+                <th class="col-title">Title</th>
+                <th class="col-dept">Department</th>
+                <th class="col-jp">Job Profile</th>
+                <th class="col-grade">Grade</th>
+                <th class="col-status">Status</th>
+                <th class="col-incumbent">Incumbent</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of pagedPositions; track p.id; let i = $index) {
+                <tr class="jp-row" (click)="openDetail(p, (page - 1) * limit + i)">
+                  <td style="width: 60px;">{{ p.id }}</td>
+                  <td class="col-code"><span class="code-badge">{{ p.position_code || '-' }}</span></td>
+                  <td class="col-title"><span class="title-text">{{ p.title }}</span></td>
+                  <td class="col-dept">{{ p.department_name || '-' }}</td>
+                  <td class="col-jp">{{ p.job_title || '-' }}</td>
+                  <td class="col-grade">{{ p.grade_name || '-' }}</td>
+                  <td class="col-status">
+                    <span class="status-pill" [ngClass]="getStatusClass(p.status)">{{ p.status || '-' }}</span>
+                  </td>
+                  <td class="col-incumbent">
+                    @if (p.incumbent_id) {
+                      <span class="incumbent-name">{{ p.incumbent_first_name }} {{ p.incumbent_surname }}</span>
+                    } @else {
+                      <span class="vacant-text">Vacant</span>
+                    }
+                  </td>
+                  <td>
+                    <div style="display: flex; gap: 4px;">
+                      <button class="btn btn-sm" (click)="openDetail(p, (page - 1) * limit + i); $event.stopPropagation()" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                      <button class="btn btn-sm" (click)="deleteFromList(p); $event.stopPropagation()" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (filteredPositions.length > limit) {
+          <div class="table-footer">
+            <app-pagination [total]="filteredPositions.length" [page]="page" [limit]="limit" (pageChange)="page = $event"></app-pagination>
+          </div>
+        }
+      }
+    </div>
+  }
+}
+
+@if (view === 'detail') {
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <button class="btn btn-sm" (click)="goBack()" title="Back to list"><app-icon name="arrow-left" [size]="14"></app-icon> Back</button>
+      <div class="detail-title-block">
+        <h1 class="page-title" style="margin: 0;">{{ pageTitle }}</h1>
+        @if (position.id) {
+          <div class="detail-meta">
+            <span class="text-muted">ID: {{ position.id }}</span>
+            <span class="text-muted">Code: {{ position.position_code || '-' }}</span>
+            <span class="status-pill" [ngClass]="getStatusClass(position.status)">{{ position.status || '-' }}</span>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="detail-header-right">
+      <div class="detail-nav">
+        <input class="form-control" style="width: 180px; font-size: 13px;" placeholder="Search code or title..."
+               [(ngModel)]="headerSearch" (keyup.enter)="searchHeader()">
+        <button class="btn btn-sm" [disabled]="currentIndex <= 0" (click)="navigatePrev()" title="Previous"><app-icon name="chevron-left" [size]="14"></app-icon></button>
+        <span class="text-muted" style="font-size: 12px;">{{ currentIndex + 1 }} / {{ filteredPositions.length }}</span>
+        <button class="btn btn-sm" [disabled]="currentIndex >= filteredPositions.length - 1" (click)="navigateNext()" title="Next"><app-icon name="chevron-right" [size]="14"></app-icon></button>
+      </div>
+      @if (mode === 'view') {
+        <button class="btn btn-primary" (click)="enterEdit()"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+      }
+      @if (isEditable) {
+        <button class="btn btn-primary" (click)="save()"><app-icon name="check" [size]="14"></app-icon> Submit</button>
+        <button class="btn" (click)="mode === 'create' ? goBack() : mode = 'view'">Cancel</button>
+      }
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'position'" (click)="activeTab = 'position'">Position</button>
+    @if (position.id) {
+      <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">Position History</button>
+    }
+  </div>
+
+  <div class="detail-body">
+    @if (activeTab === 'position') {
+      <div class="card detail-card">
+        <div class="section-title">Position Details</div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+          <div class="form-group">
+            <label>Title <span class="required">*</span></label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.title" placeholder="e.g. Senior Accountant">
+            } @else {
+              <div class="field-value">{{ position.title || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Position Code <span class="required">*</span></label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.position_code" placeholder="e.g. POS001">
+            } @else {
+              <div class="field-value">{{ position.position_code || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Start Date <span class="required">*</span></label>
+            @if (isEditable) {
+              <app-date-input [(ngModel)]="position.start_date"></app-date-input>
+            } @else {
+              <div class="field-value">{{ position.start_date | dateSa }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>End Date <span class="required">*</span></label>
+            @if (isEditable) {
+              <app-date-input [(ngModel)]="position.end_date"></app-date-input>
+            } @else {
+              <div class="field-value">{{ position.end_date | dateSa }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Unique Identifier</label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.unique_identifier" placeholder="Unique ID">
+            } @else {
+              <div class="field-value">{{ position.unique_identifier || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Hierarchy Code</label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.hierarchy_code" placeholder="Hierarchy code">
+            } @else {
+              <div class="field-value">{{ position.hierarchy_code || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Advert Reference</label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.advert_ref" placeholder="Advert ref">
+            } @else {
+              <div class="field-value">{{ position.advert_ref || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Circular Number</label>
+            @if (isEditable) {
+              <input class="form-control" [(ngModel)]="position.circular_number" placeholder="Circular number">
+            } @else {
+              <div class="field-value">{{ position.circular_number || '-' }}</div>
+            }
+          </div>
+        </div>
+
+        <div class="radio-section">
+          <div class="radio-group">
+            <label class="radio-group-label">Manager Type</label>
+            <div class="radio-options">
+              @if (isEditable) {
+                <label class="radio-label"><input type="radio" name="manager_type" [value]="0" [checked]="position.manager_type === 0" (change)="onManagerTypeChange(0)"> None</label>
+                <label class="radio-label"><input type="radio" name="manager_type" [value]="1" [checked]="position.manager_type === 1" (change)="onManagerTypeChange(1)"> Department (HOD)</label>
+                <label class="radio-label"><input type="radio" name="manager_type" [value]="2" [checked]="position.manager_type === 2" (change)="onManagerTypeChange(2)"> Division</label>
+              } @else {
+                <div class="field-value">{{ position.manager_type === 1 ? 'Department (HOD)' : position.manager_type === 2 ? 'Division' : 'None' }}</div>
+              }
+            </div>
+          </div>
+          <div class="radio-group">
+            <label class="radio-group-label">Funding</label>
+            <div class="radio-options">
+              @if (isEditable) {
+                <label class="radio-label"><input type="radio" name="funded" [value]="true" [checked]="position.funded === true" (change)="position.funded = true; cdr.detectChanges()"> Funded</label>
+                <label class="radio-label"><input type="radio" name="funded" [value]="false" [checked]="position.funded === false" (change)="position.funded = false; cdr.detectChanges()"> Unfunded</label>
+              } @else {
+                <div class="field-value">{{ position.funded ? 'Funded' : 'Unfunded' }}</div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="checkbox-row">
+          @if (isEditable) {
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="position.performance_assessment"> Performance Assessment</label>
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="position.non_employee"> Non-Employee</label>
+          } @else {
+            <span class="tag" [class.tag-yes]="position.performance_assessment" [class.tag-no]="!position.performance_assessment">Performance: {{ position.performance_assessment ? 'Yes' : 'No' }}</span>
+            <span class="tag" [class.tag-yes]="!position.non_employee" [class.tag-no]="position.non_employee">{{ position.non_employee ? 'Non-Employee' : 'Employee' }}</span>
+            <span class="tag" [class.tag-yes]="position.funded" [class.tag-no]="!position.funded">{{ position.funded ? 'Funded' : 'Unfunded' }}</span>
+          }
+        </div>
+      </div>
+
+      <div class="card detail-card">
+        <div class="section-title">SCOA Setup</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Department <span class="required">*</span></label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.department_id" (ngModelChange)="onDepartmentChange()">
+                <option [ngValue]="null">-- Select --</option>
+                @for (d of departments; track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.department_name || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.division_id" (ngModelChange)="onDivisionChange()">
+                <option [ngValue]="null">-- Select --</option>
+                @for (d of filteredDivisions(); track d.id) { <option [ngValue]="d.id">{{ d.code ? d.code + ' - ' : '' }}{{ d.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.division_name || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Division SCOA Function Code</label>
+            <div class="field-value readonly">{{ divisionScoaFunctionCode }}</div>
+          </div>
+          <div class="form-group">
+            <label>Sub Function</label>
+            @if (isEditable) {
+              <app-scoa-drilldown
+                [finYear]="currentFinYear"
+                [(value)]="position.scoa_function_id"
+                [meta]="position._scoa_function_meta"
+                (metaChange)="position._scoa_function_meta = $event; cdr.detectChanges()"
+                [apiBase]="'/gl/external/scoa-function-tree'"
+                placeholder="-- Select Sub Function --"
+              ></app-scoa-drilldown>
+            } @else {
+              <div class="field-value">{{ position._scoa_function_meta?.item?.scoaDesc || position._scoa_function_meta?.item?.scoaShortDesc || position.scoa_function_id || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>SCOA Project</label>
+            <div class="field-value readonly">{{ resolvedProjectName || position.scoa_project_id || '-' }}</div>
+          </div>
+          <div class="form-group">
+            <label>SCOA Region</label>
+            <div class="field-value readonly">{{ resolvedRegionName || position.scoa_region_id || '-' }}</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>SCOA Expense Item</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.scoa_item_id">
+                <option [ngValue]="null">-- Select --</option>
+                @for (i of scoaItems; track i.id) { <option [ngValue]="i.id">{{ i.code }} - {{ i.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ resolveScoaName(scoaItems, position.scoa_item_id) }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Percentage</label>
+            <div class="field-value readonly">100%</div>
+          </div>
+          <div class="form-group"></div>
+        </div>
+      </div>
+
+      <div class="card detail-card">
+        <div class="section-title">Business Rules</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Job Profile</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.job_profile_id" (ngModelChange)="onJobProfileChange()">
+                <option [ngValue]="null">-- Select --</option>
+                @for (jp of jobProfiles; track jp.id) { <option [ngValue]="jp.id">{{ jp.job_description_code ? jp.job_description_code + ' - ' : '' }}{{ jp.job_title }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.job_title || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Salary Transaction Group</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.salary_transaction_group_id" [disabled]="businessRulesLocked">
+                <option [ngValue]="null">-- Select --</option>
+                @for (g of salaryTransactionGroups; track g.id) { <option [ngValue]="g.id">{{ g.code ? g.code + ' - ' : '' }}{{ g.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.salary_transaction_group_name || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Employee Type</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.employee_type_id" [disabled]="businessRulesLocked">
+                <option [ngValue]="null">-- Select --</option>
+                @for (t of employeeTypes; track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.employee_type_name || '-' }}</div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Employee Subtype</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.employee_subtype_id" [disabled]="businessRulesLocked">
+                <option [ngValue]="null">-- Select --</option>
+                @for (s of filteredSubtypes(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.employee_subtype_name || '-' }}</div>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Condition of Service</label>
+            @if (isEditable) {
+              <select class="form-control" [(ngModel)]="position.condition_of_service_id">
+                <option [ngValue]="null">-- Select --</option>
+                @for (c of conditionsOfService; track c.id) { <option [ngValue]="c.id">{{ c.code ? c.code + ' - ' : '' }}{{ c.name }}</option> }
+              </select>
+            } @else {
+              <div class="field-value">{{ position.condition_of_service_name || '-' }}</div>
+            }
+          </div>
+          @if (isUpperLimitProfile) {
+            <div class="form-group">
+              <label>Upper Limit</label>
+              <div class="field-value">UL #{{ selectedJobProfile.upper_limit_id || '-' }}</div>
+            </div>
+          } @else {
+            <div class="form-group">
+              <label>Task Grade</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="position.task_grade_id" [disabled]="businessRulesLocked">
+                  <option [ngValue]="null">-- Select --</option>
+                  @for (g of taskGrades; track g.id) { <option [ngValue]="g.id">{{ g.grade_code ? g.grade_code + ' - ' : '' }}{{ g.grade_name }}</option> }
+                </select>
+              } @else {
+                <div class="field-value">{{ position.grade_code ? position.grade_code + ' - ' : '' }}{{ position.grade_name || '-' }}</div>
+              }
+            </div>
+          }
+        </div>
+        @if (isUpperLimitProfile) {
+          <div class="form-row">
+            <div class="form-group">
+              <label>Upper Limit Value Type</label>
+              @if (isEditable) {
+                <select class="form-control" [(ngModel)]="position.upper_limit_value_type">
+                  <option [ngValue]="null">-- Select --</option>
+                  <option value="MINIMUM">Minimum ({{ selectedJobProfile.upper_limit_minimum | number:'1.2-2' }})</option>
+                  <option value="MIDPOINT">Midpoint ({{ selectedJobProfile.upper_limit_midpoint | number:'1.2-2' }})</option>
+                  <option value="MAXIMUM">Maximum ({{ selectedJobProfile.upper_limit_maximum | number:'1.2-2' }})</option>
+                </select>
+              } @else {
+                <div class="field-value">{{ position.upper_limit_value_type || '-' }}</div>
+              }
+            </div>
+            <div class="form-group">
+              <label>Upper Limit Values</label>
+              <div class="field-value" style="font-size: 11px; line-height: 1.6;">
+                Min: {{ selectedJobProfile.upper_limit_minimum | number:'1.2-2' }} |
+                Mid: {{ selectedJobProfile.upper_limit_midpoint | number:'1.2-2' }} |
+                Max: {{ selectedJobProfile.upper_limit_maximum | number:'1.2-2' }}
+              </div>
+            </div>
+          </div>
+        }
+
+        <div class="checkbox-row">
+          @if (isEditable) {
+            <label class="checkbox-label"><input type="checkbox" [(ngModel)]="position.lock_fields"> Lock Fields</label>
+          } @else {
+            <span class="tag" [class.tag-yes]="position.lock_fields" [class.tag-no]="!position.lock_fields">Lock Fields: {{ position.lock_fields ? 'Yes' : 'No' }}</span>
+          }
+        </div>
+      </div>
+
+      @if (position.incumbent_id) {
+        <div class="card detail-card">
+          <div class="section-title">Current Incumbent</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Employee</label>
+              <div class="field-value">{{ position.incumbent_first_name }} {{ position.incumbent_surname }}</div>
+            </div>
+            <div class="form-group">
+              <label>Employee Code</label>
+              <div class="field-value">{{ position.incumbent_code || '-' }}</div>
+            </div>
+          </div>
+        </div>
+      }
+    }
+
+    @if (activeTab === 'history') {
+      <div class="card detail-card history-section">
+        <div class="section-title">
+          Position History
+          <span class="history-count">{{ history.length }} record(s)</span>
+        </div>
+        @if (history.length === 0) {
+          <div class="empty-state" style="padding: 32px 0;"><p>No history records</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th>Position</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Job Profile</th>
+                  <th>Advert Ref</th>
+                  <th>Circular No</th>
+                  <th>Emp. No</th>
+                  <th>Employee</th>
+                  <th>Grade</th>
+                  <th>Status</th>
+                  <th>Type</th>
+                  <th>Captured</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (h of history; track h.id) {
+                  <tr>
+                    <td>{{ h.position_code || '-' }}</td>
+                    <td class="date-cell">{{ h.start_date | dateSa }}</td>
+                    <td class="date-cell">{{ h.end_date | dateSa }}</td>
+                    <td>{{ h.job_profile_title || '-' }}</td>
+                    <td>{{ h.advert_ref || '-' }}</td>
+                    <td>{{ h.circular_number || '-' }}</td>
+                    <td>{{ h.incumbent_code || '-' }}</td>
+                    <td>{{ h.incumbent_name || '-' }}</td>
+                    <td>{{ h.grade_name || '-' }}</td>
+                    <td><span class="status-pill" [ngClass]="getStatusClass(h.status)">{{ h.status || '-' }}</span></td>
+                    <td><span class="change-pill" [ngClass]="'change-' + (h.change_type || '').toLowerCase()">{{ h.change_type }}</span></td>
+                    <td class="date-cell">{{ h.captured_at | dateSa }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

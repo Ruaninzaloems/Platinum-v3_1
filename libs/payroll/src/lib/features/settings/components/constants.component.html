@@ -1,0 +1,51 @@
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Constants</h1>
+      <p class="page-subtitle">View and manage system constants and lookup tables</p>
+    </div>
+  </div>
+
+  <div class="constants-page">
+    <div class="form-section-title"><app-icon name="database" [size]="16"></app-icon> Constants Lookup</div>
+    <div class="table-selector">
+      <label>Select Table</label>
+      <select class="form-control" [(ngModel)]="selectedTable" (ngModelChange)="onTableChange()">
+        <option value="">-- Select a table --</option>
+        @for (t of tables; track t.table) {
+          <option [value]="t.table">{{ t.label }}</option>
+        }
+      </select>
+    </div>
+
+    @if (loadingData) {
+      <div class="loading"><div class="spinner"></div>Loading data...</div>
+    } @else if (selectedTable && rows.length > 0) {
+      <div class="table-info">{{ rows.length }} record(s)</div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              @for (col of columns; track col) {
+                <th>{{ formatHeader(col) }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows; track row.id ?? $index) {
+              <tr>
+                @for (col of columns; track col) {
+                  <td>{{ formatCell(row[col]) }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (selectedTable && rows.length === 0) {
+      <div class="empty-state">No records found in this table.</div>
+    }
+  </div>
+}

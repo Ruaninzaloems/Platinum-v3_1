@@ -1,0 +1,455 @@
+<div class="afs-versions-container">
+
+  @if (!hasCompilationContext()) {
+    <mat-card class="no-context-card">
+      <mat-card-content>
+        <div class="empty-state">
+          <mat-icon class="empty-icon">lock_outline</mat-icon>
+          <h2>No Active Compilation</h2>
+          <p>Create or select a compilation to manage AFS versions.</p>
+          <a mat-raised-button color="primary" routerLink="/compilations">Go to Compilations</a>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (hasCompilationContext() && !loading()) {
+    @if (gateStatus(); as gates) {
+      <mat-card class="gate-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>verified</mat-icon>
+          <mat-card-title>Governance Gate Checks</mat-card-title>
+          <mat-card-subtitle>Gates must pass at the appropriate lifecycle stage</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="gate-grid">
+            <div class="gate-item" [class.gate-pass]="gates.G2.passed" [class.gate-fail]="!gates.G2.passed">
+              <mat-icon>{{ gates.G2.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G2</span>
+              <span class="gate-desc">{{ gates.G2.label }}</span>
+            </div>
+            <div class="gate-item" [class.gate-pass]="gates.G4.passed" [class.gate-fail]="!gates.G4.passed">
+              <mat-icon>{{ gates.G4.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G4</span>
+              <span class="gate-desc">{{ gates.G4.label }}</span>
+              @if (gates.G4['detail']) {
+                <span class="gate-detail">({{ gates.G4['detail'] }})</span>
+              }
+            </div>
+            <div class="gate-item" [class.gate-pass]="gates.G7.passed" [class.gate-fail]="!gates.G7.passed">
+              <mat-icon>{{ gates.G7.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G7</span>
+              <span class="gate-desc">{{ gates.G7.label }}</span>
+              @if (gates.G7['detail']) {
+                <span class="gate-detail">({{ gates.G7['detail'] }})</span>
+              }
+            </div>
+            <div class="gate-item" [class.gate-pass]="gates.G8.passed" [class.gate-fail]="!gates.G8.passed">
+              <mat-icon>{{ gates.G8.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G8</span>
+              <span class="gate-desc">{{ gates.G8.label }}</span>
+              @if (gates.G8['obStatus']) {
+                <span class="gate-detail">({{ gates.G8['obStatus'] }})</span>
+              }
+            </div>
+            <div class="gate-item" [class.gate-pass]="gates.G9.passed" [class.gate-fail]="!gates.G9.passed">
+              <mat-icon>{{ gates.G9.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G9</span>
+              <span class="gate-desc">{{ gates.G9.label }}</span>
+              @if (gates.G9['compilationStatus']) {
+                <span class="gate-detail">({{ gates.G9['compilationStatus'] }})</span>
+              }
+            </div>
+            <div class="gate-item" [class.gate-pass]="gates.G11.passed" [class.gate-fail]="!gates.G11.passed">
+              <mat-icon>{{ gates.G11.passed ? 'check_circle' : 'cancel' }}</mat-icon>
+              <span class="gate-label">G11</span>
+              <span class="gate-desc">{{ gates.G11.label }}</span>
+              @if (gates.G11['reviewStatus']) {
+                <span class="gate-detail">({{ gates.G11['reviewStatus'] }})</span>
+              }
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <mat-card class="actions-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>build_circle</mat-icon>
+        <mat-card-title>Version Actions</mat-card-title>
+        <mat-card-subtitle>
+          @if (currentDraft(); as draft) {
+            Active draft: v{{ draft.versionNumber }}
+            @if (draft.reviewStatus) {
+              — {{ getReviewStatusLabel(draft.reviewStatus) }}
+            }
+          } @else if (currentLocked(); as locked) {
+            Locked version: v{{ locked.versionNumber }}
+          } @else {
+            No active version
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="action-buttons">
+          @if (!currentDraft()) {
+            @if (canPrepare) {
+              <button mat-raised-button color="primary"
+                [disabled]="actionInProgress() || !gateStatus()?.canCreateDraft"
+                [matTooltip]="!gateStatus()?.canCreateDraft ? 'Gates G2, G4, G7, and G9 must pass before creating a draft' : 'Snapshot current compilation data into a new draft version'"
+                (click)="createDraft()">
+                <mat-icon>add_circle</mat-icon>
+                Create Draft Snapshot
+              </button>
+            }
+          }
+
+          @if (currentDraft(); as draft) {
+            @if (draft.reviewStatus === null || draft.reviewStatus === 'DRAFT') {
+              @if (canPrepare) {
+                <button mat-raised-button color="primary"
+                  [disabled]="actionInProgress() || !gateStatus()?.canSubmitForReview"
+                  [matTooltip]="!gateStatus()?.canSubmitForReview ? 'Gates G4 and G7 must pass before submitting for review' : 'Submit this draft for reviewer approval'"
+                  (click)="submitForReview()">
+                  <mat-icon>send</mat-icon>
+                  Submit for Review
+                </button>
+              }
+
+              @if (draft.returnReason) {
+                <div class="return-reason-banner">
+                  <mat-icon class="return-icon">undo</mat-icon>
+                  <div class="return-content">
+                    <span class="return-label">Returned by reviewer:</span>
+                    <span class="return-text">{{ draft.returnReason }}</span>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (draft.reviewStatus === 'SUBMITTED') {
+              @if (canReview) {
+                <button mat-raised-button color="primary"
+                  [disabled]="actionInProgress()"
+                  matTooltip="Approve this version for locking"
+                  (click)="approveReview()">
+                  <mat-icon>check_circle</mat-icon>
+                  Approve Review
+                </button>
+              }
+              @if (canReturnToPrep) {
+                <button mat-stroked-button color="warn"
+                  [disabled]="actionInProgress()"
+                  matTooltip="Return to preparer with feedback"
+                  (click)="openReturnDialog()">
+                  <mat-icon>undo</mat-icon>
+                  Return to Preparer
+                </button>
+              }
+              @if (!canReview && !canReturnToPrep) {
+                <div class="info-banner">
+                  <mat-icon>info</mat-icon>
+                  <span>This version is awaiting reviewer approval.</span>
+                </div>
+              }
+            }
+
+            @if (returnDialogOpen()) {
+              <div class="return-dialog">
+                <mat-icon class="warn-icon">undo</mat-icon>
+                <span class="return-dialog-title">Return to Preparer</span>
+                <mat-form-field class="return-reason-field" appearance="outline">
+                  <mat-label>Return Reason (required)</mat-label>
+                  <textarea matInput
+                    rows="3"
+                    [ngModel]="returnReasonText()"
+                    (ngModelChange)="returnReasonText.set($event)"
+                    placeholder="Describe what needs to be corrected..."></textarea>
+                </mat-form-field>
+                <div class="return-dialog-actions">
+                  <button mat-raised-button color="warn"
+                    [disabled]="actionInProgress() || !returnReasonText().trim()"
+                    (click)="confirmReturn()">
+                    <mat-icon>undo</mat-icon>
+                    Confirm Return
+                  </button>
+                  <button mat-stroked-button (click)="cancelReturn()">Cancel</button>
+                </div>
+              </div>
+            }
+
+            @if (draft.reviewStatus === 'APPROVED') {
+              @if (canApprove) {
+                @if (!lockConfirmationPending()) {
+                  <button mat-raised-button color="primary"
+                    [disabled]="actionInProgress() || !gateStatus()?.canLock"
+                    [matTooltip]="!gateStatus()?.canLock ? 'All gates must pass before locking' : 'Freeze this version — no further changes allowed'"
+                    (click)="startLockConfirmation()">
+                    <mat-icon>lock</mat-icon>
+                    Lock Version v{{ draft.versionNumber }}
+                  </button>
+                }
+
+                @if (lockConfirmationPending()) {
+                  <div class="lock-confirmation">
+                    <mat-icon class="warn-icon">warning</mat-icon>
+                    <span class="confirm-text">Locking is permanent. This will become the official AFS version. Any previously locked version will be superseded.</span>
+                    @if (draft.reviewedBy && draft.reviewedAt) {
+                      <div class="approval-chain-summary">
+                        <mat-icon class="small-icon">verified</mat-icon>
+                        <span>Approved on {{ draft.reviewedAt | date:'medium' }}</span>
+                      </div>
+                    }
+                    @if (isSingleUserApproval(draft)) {
+                      <div class="stale-lock-warning">
+                        <mat-icon class="stale-warn-icon">person</mat-icon>
+                        <span class="stale-warn-text">This version was approved under single-user mode (four-eyes check bypassed). The locked version metadata will record this.</span>
+                      </div>
+                    }
+                    @if (draft.isPotentiallyStale) {
+                      <div class="stale-lock-warning">
+                        <mat-icon class="stale-warn-icon">schedule</mat-icon>
+                        <span class="stale-warn-text">This draft snapshot was created before later compilation changes. Locking will freeze the draft-time snapshot, not the current live compilation.</span>
+                      </div>
+                    }
+                    <button mat-raised-button color="warn" (click)="confirmLock()" [disabled]="actionInProgress()">
+                      <mat-icon>lock</mat-icon>
+                      Confirm Lock
+                    </button>
+                    <button mat-stroked-button (click)="cancelLockConfirmation()">Cancel</button>
+                  </div>
+                }
+              }
+              @if (!canApprove) {
+                <div class="info-banner approved-banner">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>Review approved. An approver must lock this version.</span>
+                </div>
+              }
+            }
+
+            @if (canPrepare) {
+              <button mat-stroked-button color="warn"
+                [disabled]="actionInProgress()"
+                matTooltip="Discard this draft (tombstone — it will not be deleted)"
+                (click)="discardDraft()">
+                <mat-icon>delete_outline</mat-icon>
+                Discard Draft
+              </button>
+            }
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="versions-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>history</mat-icon>
+        <mat-card-title>Version History</mat-card-title>
+        <mat-card-subtitle>{{ versions().length }} version(s) created</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (versions().length === 0) {
+          <div class="empty-state small">
+            <mat-icon>inventory_2</mat-icon>
+            <p>No versions yet. Create a draft snapshot to begin.</p>
+          </div>
+        }
+
+        @for (version of versions(); track version.id) {
+          <div class="version-row" [class.expanded]="expandedVersionId() === version.id"
+               [class.status-draft]="version.status === 'draft'"
+               [class.status-locked]="version.status === 'locked'"
+               [class.status-superseded]="version.status === 'superseded'"
+               [class.status-discarded]="version.status === 'discarded'">
+            <div class="version-header" (click)="toggleExpanded(version.id)">
+              <div class="version-badge">
+                <mat-icon>{{ getStatusIcon(version.status) }}</mat-icon>
+                <span class="version-number">v{{ version.versionNumber }}</span>
+              </div>
+              <span class="version-status-chip" [attr.data-status]="version.status">{{ version.status | uppercase }}</span>
+              @if (version.reviewStatus && version.status === 'draft') {
+                <span class="review-status-chip" [class]="getReviewStatusColor(version.reviewStatus)">
+                  {{ getReviewStatusLabel(version.reviewStatus) }}
+                </span>
+              }
+              @if (version.isPotentiallyStale && version.status === 'draft') {
+                <span class="stale-chip" [matTooltip]="version.staleReason || 'Draft may not reflect latest compilation data'">
+                  <mat-icon class="small-icon">schedule</mat-icon>
+                  STALE
+                </span>
+              }
+              <span class="version-date">{{ version.createdAt | date:'medium' }}</span>
+              <span class="version-schema">Schema {{ version.snapshotSchemaVersion }}</span>
+              @if (version.exportCount > 0) {
+                <span class="export-badge">
+                  <mat-icon class="small-icon">download</mat-icon>
+                  {{ version.exportCount }} export(s)
+                </span>
+              }
+              <mat-icon class="expand-icon">{{ expandedVersionId() === version.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </div>
+
+            @if (expandedVersionId() === version.id) {
+              <div class="version-detail">
+                <mat-divider></mat-divider>
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Compilation Status at Creation</span>
+                    <span class="detail-value">{{ version.compilationStatusAtCreation || '—' }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Draft Version</span>
+                    <span class="detail-value">{{ version.compilationDraftVersion }}</span>
+                  </div>
+                  @if (version.reviewStatus) {
+                    <div class="detail-item">
+                      <span class="detail-label">Review Status</span>
+                      <span class="detail-value">{{ getReviewStatusLabel(version.reviewStatus) }}</span>
+                    </div>
+                  }
+                  @if (version.submittedForReviewAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Submitted for Review</span>
+                      <span class="detail-value">{{ version.submittedForReviewAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.reviewedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Reviewed At</span>
+                      <span class="detail-value">{{ version.reviewedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.reviewComment) {
+                    <div class="detail-item">
+                      <span class="detail-label">Review Comment</span>
+                      <span class="detail-value">{{ version.reviewComment }}</span>
+                    </div>
+                  }
+                  @if (version.returnReason) {
+                    <div class="detail-item detail-return">
+                      <span class="detail-label">Return Reason</span>
+                      <span class="detail-value return-value">{{ version.returnReason }}</span>
+                    </div>
+                  }
+                  @if (version.lockedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Locked At</span>
+                      <span class="detail-value">{{ version.lockedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.discardedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Discarded At</span>
+                      <span class="detail-value">{{ version.discardedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.supersededAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Superseded At</span>
+                      <span class="detail-value">{{ version.supersededAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.firstExportedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">First Exported</span>
+                      <span class="detail-value">{{ version.firstExportedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.lastExportedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Last Exported</span>
+                      <span class="detail-value">{{ version.lastExportedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.snapshotCapturedAt) {
+                    <div class="detail-item">
+                      <span class="detail-label">Snapshot Captured At</span>
+                      <span class="detail-value">{{ version.snapshotCapturedAt | date:'medium' }}</span>
+                    </div>
+                  }
+                  @if (version.isPotentiallyStale && version.staleReason) {
+                    <div class="detail-item detail-stale">
+                      <span class="detail-label">Staleness</span>
+                      <span class="detail-value stale-value">{{ version.staleReason }}</span>
+                    </div>
+                  }
+                  @if (version.compilationSummary?.completenessPercentage != null) {
+                    <div class="detail-item">
+                      <span class="detail-label">Completeness</span>
+                      <span class="detail-value">{{ version.compilationSummary.completenessPercentage }}%</span>
+                    </div>
+                  }
+                  @if (version.compilationSummary?.totalLineItems != null) {
+                    <div class="detail-item">
+                      <span class="detail-label">Total Line Items</span>
+                      <span class="detail-value">{{ version.compilationSummary.totalLineItems }}</span>
+                    </div>
+                  }
+                  @if (version.reportHeaderMetadata?.municipalityName) {
+                    <div class="detail-item">
+                      <span class="detail-label">Municipality</span>
+                      <span class="detail-value">{{ version.reportHeaderMetadata.municipalityName }}</span>
+                    </div>
+                  }
+                </div>
+
+                @if (version.reviewCycleHistory && version.reviewCycleHistory.length > 0) {
+                  <mat-divider></mat-divider>
+                  <div class="cycle-history-section">
+                    <div class="cycle-history-header" (click)="toggleCycleHistory()">
+                      <mat-icon class="small-icon">{{ cycleHistoryExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                      <span class="cycle-history-title">Review Cycle History ({{ version.reviewCycleHistory.length }} cycle(s))</span>
+                    </div>
+                    @if (cycleHistoryExpanded()) {
+                      <div class="cycle-timeline">
+                        @for (cycle of version.reviewCycleHistory; track cycle.cycle) {
+                          <div class="cycle-entry" [class.cycle-returned]="!!cycle.returnedAt" [class.cycle-approved]="!!cycle.approvedAt">
+                            <div class="cycle-number">Cycle {{ cycle.cycle }}</div>
+                            <div class="cycle-events">
+                              @if (cycle.submittedAt) {
+                                <div class="cycle-event">
+                                  <mat-icon class="small-icon">send</mat-icon>
+                                  <span>Submitted {{ cycle.submittedAt | date:'medium' }}</span>
+                                </div>
+                              }
+                              @if (cycle.approvedAt) {
+                                <div class="cycle-event approved-event">
+                                  <mat-icon class="small-icon">check_circle</mat-icon>
+                                  <span>Approved {{ cycle.approvedAt | date:'medium' }}</span>
+                                  @if (cycle.approveComment) {
+                                    <span class="cycle-comment">— {{ cycle.approveComment }}</span>
+                                  }
+                                  @if (cycle.fourEyesBypassed) {
+                                    <span class="four-eyes-bypass-badge">single-user mode</span>
+                                  }
+                                </div>
+                              }
+                              @if (cycle.returnedAt) {
+                                <div class="cycle-event returned-event">
+                                  <mat-icon class="small-icon">undo</mat-icon>
+                                  <span>Returned {{ cycle.returnedAt | date:'medium' }}</span>
+                                  @if (cycle.returnReason) {
+                                    <span class="cycle-comment">— {{ cycle.returnReason }}</span>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

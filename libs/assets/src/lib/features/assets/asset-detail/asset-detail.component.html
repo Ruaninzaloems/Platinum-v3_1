@@ -1,0 +1,1651 @@
+    @if (loading()) {
+      <div style="display:flex;justify-content:center;padding:60px"><mat-spinner diameter="40"></mat-spinner></div>
+    } @else if (asset()) {
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <a routerLink="/assets" style="color:#64748b;font-size:13px;display:flex;align-items:center;gap:4px;text-decoration:none"><mat-icon style="font-size:16px">arrow_back</mat-icon>Asset Register</a>
+            <mat-icon style="font-size:16px;color:#cbd5e1">chevron_right</mat-icon>
+            <span style="font-size:13px;font-weight:600;color:#1e293b">{{asset().assetId}}</span>
+          </div>
+          <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">{{asset().description}}</h1>
+          <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
+            <span style="font-size:12px;color:#64748b">{{asset().categoryName}}</span>
+            <span style="width:4px;height:4px;border-radius:50%;background:#cbd5e1"></span>
+            <span style="font-size:12px;color:#64748b">{{asset().assetTypeName}}</span>
+            <span style="width:4px;height:4px;border-radius:50%;background:#cbd5e1"></span>
+            <span class="mscoa-tag" style="font-size:10px">{{asset().measurementType}}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span [class]="getStatusClass(asset().status)">{{asset().status}}</span>
+          <button mat-stroked-button style="border-color:#e2e8f0" (click)="toggleEdit()" [disabled]="hasPendingEdit() && !editing()">
+            <mat-icon>{{editing() ? 'close' : 'edit'}}</mat-icon> {{editing() ? 'Cancel' : 'Edit'}}
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:4px">
+          <mat-icon style="font-size:14px">account_tree</mat-icon> mSCOA:
+        </span>
+        <span class="mscoa-tag">Item: {{asset().mscoaItem}}</span>
+        <span class="mscoa-tag">Func: {{asset().mscoaFunction}}</span>
+        <span class="mscoa-tag">Fund: {{asset().mscoaFund}}</span>
+        @if (asset().mscoaProject) { <span class="mscoa-tag">Proj: {{asset().mscoaProject}}</span> }
+        <span class="mscoa-tag">Rgn: {{asset().mscoaRegion}}</span>
+        <span class="mscoa-tag">Cost: {{asset().mscoaCosting}}</span>
+        <span class="mscoa-tag">MSC: {{asset().mscoaMsc}}</span>
+      </div>
+
+      @if (hasPendingEdit() && !editing()) {
+        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+          <mat-icon style="color:#d97706;font-size:20px;flex-shrink:0">pending_actions</mat-icon>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400e">Edit Pending Approval</div>
+            <div style="font-size:12px;color:#b45309;margin-top:2px">This asset has a pending edit awaiting approval in the Workflow Inbox. Editing is disabled until the approval is resolved.</div>
+          </div>
+        </div>
+      }
+
+      @if (editing()) {
+        <div class="card-container" style="margin-bottom:16px;border:2px solid #3b82f6">
+          <div style="padding:20px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#3b82f6;font-size:20px">edit</mat-icon> Edit Asset
+              </h3>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                @for (s of editFormSteps; track s.key) {
+                  <button (click)="editStep = s.key"
+                    [style.background]="editStep === s.key ? '#0f2b46' : '#f1f5f9'"
+                    [style.color]="editStep === s.key ? 'white' : '#64748b'"
+                    style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid #e2e8f0;cursor:pointer;white-space:nowrap">
+                    {{s.label}}
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (editStep === 'details') {
+              <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#0f2b46;border-bottom:2px solid #0f2b46;padding-bottom:6px">Asset Details</div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">IDs &amp; Reference</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Asset Register ID</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="asset().assetId" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Parent Asset Register ID</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.parentAssetId" />
+                </div>
+                <div class="detail-field">
+                  <label>Municipal Asset ID</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.municipalAssetId" />
+                </div>
+                <div class="detail-field">
+                  <label>Main Asset Register ID</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.mainAssetId" />
+                </div>
+                <div class="detail-field">
+                  <label>Barcode</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.barcode" />
+                </div>
+                <div class="detail-field">
+                  <label>Old Barcode</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.oldBarcode" />
+                </div>
+                <div class="detail-field" style="grid-column:span 3">
+                  <label>Main Asset Description</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.mainAssetDescription" />
+                </div>
+                <div class="detail-field" style="grid-column:span 3">
+                  <label>Asset Description *</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.description" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Classification Hierarchy</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Asset Type *</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editTypeId" (ngModelChange)="onEditTypeChange($event)">
+                    <option [ngValue]="0">Select type...</option>
+                    @for (t of editAssetTypes(); track t.assetTypeId) { <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Category *</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editCategoryId" (ngModelChange)="onEditCategoryChange($event)" [disabled]="!ef.editTypeId">
+                    <option [ngValue]="0">Select category...</option>
+                    @for (c of editFilteredCategories(); track c.assetCategoryId) { <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Sub-Category</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editSubCategoryId" (ngModelChange)="onEditSubCategoryChange($event)" [disabled]="!ef.editCategoryId">
+                    <option [ngValue]="0">Select sub-category...</option>
+                    @for (sc of editFilteredSubCategories(); track sc.assetSubCategoryId) { <option [ngValue]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field" style="grid-column:span 3">
+                  <label>Asset Class * <span style="font-size:11px;color:#94a3b8;font-weight:400">(auto-fills Useful Life, Depreciation Method &amp; Status)</span></label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editClassId" (ngModelChange)="onEditClassChange($event)" [disabled]="!ef.editTypeId || !ef.editCategoryId">
+                    <option [ngValue]="0">{{getEditClassPlaceholder()}}</option>
+                    @for (cls of editFilteredClasses(); track cls.assetClass_ID) { <option [ngValue]="cls.assetClass_ID">{{cls.assetClassDesc}} ({{cls.usefulLifeInMonths}} months)</option> }
+                  </select>
+                </div>
+              </div>
+              @if (editNoClassMessage()) {
+                <div style="margin:8px 0;padding:10px 14px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#d97706;font-size:18px">warning</mat-icon>
+                  <span style="font-size:13px;color:#92400e">{{editNoClassMessage()}}</span>
+                  <a routerLink="/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
+                </div>
+              }
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Status &amp; Valuation</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Asset Status</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editStatusId" (ngModelChange)="ef.editStatusId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (s of editAssetStatuses(); track s.assetStatusId) { <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Measurement Type</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editMeasurementTypeId" (ngModelChange)="ef.editMeasurementTypeId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (mt of editMeasurementTypes(); track mt.measurementTypeId) { <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Financial Status</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editFinancialStatusId" (ngModelChange)="ef.editFinancialStatusId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (fs of editFinancialStatuses(); track fs.id) { <option [ngValue]="fs.id">{{fs.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Asset Condition</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editConditionId" (ngModelChange)="ef.editConditionId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (c of editAssetConditions(); track c.assetCondition_ID) { <option [ngValue]="c.assetCondition_ID">{{c.assetConditionDesc}}</option> }
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">CIDMS Classification</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>CIDMS Sub Component Type</label>
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    @if (ef.editCidmsSubComponentTypeId || ef.cidmsComponentTypeId || ef.cidmsAccountingGroupId || ef.cidmsAssetTypeId) {
+                      <span style="font-size:12px;color:#1e293b;padding:5px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" [title]="ef.editCidmsSubComponentTypeDesc || ef.cidmsComponentType || ef.cidmsAssetType || ef.cidmsAccountingGroup || ''">
+                        {{ ef.editCidmsSubComponentTypeDesc || ef.cidmsComponentType || ef.cidmsAssetType || ef.cidmsAssetGroupType || ef.cidmsAssetClass || ef.cidmsSubAccountingGroup || ef.cidmsAccountingGroup || ('ID: ' + ef.editCidmsSubComponentTypeId) }}
+                      </span>
+                      <button type="button" (click)="clearCidmsSelection()" style="flex-shrink:0;padding:4px 8px;border:1px solid #fca5a5;border-radius:6px;background:#fff;color:#dc2626;font-size:12px;cursor:pointer">Clear</button>
+                    }
+                    @if (!ef.editCidmsSubComponentTypeId && !ef.cidmsComponentTypeId && !ef.cidmsAccountingGroupId && !ef.cidmsAssetTypeId) {
+                      <span style="font-size:12px;color:#94a3b8;padding:5px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;flex:1">— Not selected —</span>
+                    }
+                    <button type="button" (click)="openCidmsPicker()" style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border:1px solid #0f2b46;border-radius:6px;background:#0f2b46;color:#fff;font-size:12px;cursor:pointer">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">account_tree</mat-icon>
+                      Select...
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Component Type</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsComponentType" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Accounting Group</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsAccountingGroup" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Sub Accounting Group</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsSubAccountingGroup" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Asset Class</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsAssetClass" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Group Type</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsAssetGroupType" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>CIDMS Asset Type</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.cidmsAssetType" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Infrastructure / Non-Infrastructure</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.infrastructureType" />
+                </div>
+                <div class="detail-field">
+                  <label>Nature of Addition</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.natureOfAddition">
+                    <option value="">Select...</option>
+                    <option value="Purchase">Purchase</option>
+                    <option value="Donation">Donation</option>
+                    <option value="Transfer from WIP">Transfer from WIP</option>
+                    <option value="Transfer from Inventory">Transfer from Inventory</option>
+                    <option value="Construction">Construction</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Asset Grading (CIDMS)</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Criticality Grade</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editCriticalityGradeId" (ngModelChange)="ef.editCriticalityGradeId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (g of editCriticalityGrades(); track g.id) { <option [ngValue]="g.id">{{g.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Performance Grade</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editPerformanceGradeId" (ngModelChange)="ef.editPerformanceGradeId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (g of editPerformanceGrades(); track g.id) { <option [ngValue]="g.id">{{g.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Utilisation Grade</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editUtilisationGradeId" (ngModelChange)="ef.editUtilisationGradeId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (g of editUtilisationGrades(); track g.id) { <option [ngValue]="g.id">{{g.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Infrastructure Health Grade</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editHealthGradeId" (ngModelChange)="ef.editHealthGradeId=$event">
+                    <option [ngValue]="0">Select...</option>
+                    @for (g of editHealthGrades(); track g.id) { <option [ngValue]="g.id">{{g.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Consequence of Failure</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.consequenceOfFailure" />
+                </div>
+                <div class="detail-field">
+                  <label>Risk</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.risk">
+                    <option value="">Select...</option>
+                    <option value="Very Low">Very Low</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Cash / Non-Cash Generating</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.cashGenerating">
+                    <option value="">Select...</option>
+                    <option value="Yes">Yes - Cash Generating</option>
+                    <option value="No">No - Non-Cash Generating</option>
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Basic Municipal Service</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.basicMunicipalityService">
+                    <option value="">Select...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Key Dates</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Acquisition Date *</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.acquisitionDate" />
+                </div>
+                <div class="detail-field">
+                  <label>Commissioning Date</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.commissioningDate" />
+                </div>
+                <div class="detail-field">
+                  <label>In Service / Ready for Use Date</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.inServiceDate" />
+                </div>
+                <div class="detail-field">
+                  <label>Verification Date</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.verificationDate" />
+                </div>
+                <div class="detail-field">
+                  <label>Verification Done By</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.verificationDoneBy" (ngModelChange)="ef.verificationDoneBy=$event">
+                    <option [ngValue]="0">Select employee...</option>
+                    @for (e of editEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Capturer</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.capturerName" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Last Modified By</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.modifierName" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Year Constructed</label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.yearConstructed" min="1900" max="2030" />
+                </div>
+                <div class="detail-field">
+                  <label>Forecast Replacement Year</label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.forecastReplacementYear" min="2020" max="2100" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Useful Life</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+                <div class="detail-field">
+                  <label>Useful Life (Total Months) <span style="font-size:11px;color:#94a3b8;font-weight:400">(set by asset class)</span></label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.usefulLifeTotal" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Remaining Useful Life (Months)</label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.remainingUsefulLifeTotal" min="0" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Dimensions &amp; Physical</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>UOM</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.uom" />
+                </div>
+                <div class="detail-field">
+                  <label>Quantity</label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.quantity" />
+                </div>
+                <div class="detail-field">
+                  <label>Dim 1</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.dim1" />
+                </div>
+                <div class="detail-field">
+                  <label>Dim 2</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.dim2" />
+                </div>
+                <div class="detail-field">
+                  <label>Dim 3</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.dim3" />
+                </div>
+                <div class="detail-field">
+                  <label>Dimension Quantity</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.dimensionQuantity" />
+                </div>
+                <div class="detail-field">
+                  <label>Construction Material</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.constructionMaterial" />
+                </div>
+                <div class="detail-field">
+                  <label>Diameter</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.diameter" />
+                </div>
+                <div class="detail-field">
+                  <label>Capacity</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.capacity" />
+                </div>
+              </div>
+            }
+
+            @if (editStep === 'financial') {
+              <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#0f2b46;border-bottom:2px solid #0f2b46;padding-bottom:6px">Financial Information</div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Cost &amp; Depreciation</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Cost Closing Balance (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="costClosingCalc()" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Acquisition / Purchase Cost (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.acquisitionCost" />
+                </div>
+                <div class="detail-field">
+                  <label>Residual Value (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.residualValue" />
+                </div>
+                <div class="detail-field">
+                  <label>Accumulated Depreciation Closing Balance (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="depClosingCalc()" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Depreciation - Current Year (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.depreciationCurrentYear" />
+                </div>
+                <div class="detail-field">
+                  <label>Depreciation Offset (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.depreciationOffset" />
+                </div>
+                <div class="detail-field">
+                  <label>Deemed Cost (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.deemedCost" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Impairment</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Accumulated Impairment Closing Balance (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="impClosingCalc()" readonly />
+                </div>
+                <div class="detail-field">
+                  <label>Impairment - Current Year (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.impairmentCurrentYear" />
+                </div>
+                <div class="detail-field">
+                  <label>Reversal of Impairment Loss (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.impairmentReversalAmount" />
+                </div>
+                <div class="detail-field">
+                  <label>Impairment Date</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.impairmentDate" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Revaluation</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Revaluation Date</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.revaluationDate" />
+                </div>
+                <div class="detail-field">
+                  <label>Movement in Revaluation Reserve (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.movementInRevaluationReserve" />
+                </div>
+                <div class="detail-field">
+                  <label>Revaluation - Current Year (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.revaluationValue" />
+                </div>
+                <div class="detail-field">
+                  <label>Revaluation Reserve Closing Balance (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.revaluationReserveClosingBalance" />
+                </div>
+                <div class="detail-field">
+                  <label>Asset Value - Carrying Amount (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="carryingCalc()" readonly />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Replacement Cost &amp; Maintenance</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Current Replacement Cost (CRC) (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.currentReplacementCost" />
+                </div>
+                <div class="detail-field">
+                  <label>Depreciated Replacement Cost (DRC) (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.depreciatedReplacementCost" />
+                </div>
+                <div class="detail-field">
+                  <label>Annualised Maintenance % of CRC</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.annualisedMaintenanceCrc" />
+                </div>
+                <div class="detail-field">
+                  <label>Annual Maintenance Budget Need (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.annualMaintenanceBudgetNeed" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Funding Sources</div>
+              @if (fundingLoading()) {
+                <div style="padding:12px;color:#64748b;font-size:13px">Loading funding sources...</div>
+              } @else {
+                @if (fundingRows().length > 0) {
+                  <div style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+                    @for (row of fundingRows(); track row.assetFundingSourceId; let idx = $index) {
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e2e8f0" [style.background]="idx % 2 === 0 ? '#f8fafc' : 'white'">
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <mat-icon style="font-size:16px;color:#3b82f6">account_balance</mat-icon>
+                          <span style="font-size:13px;color:#1e293b">{{row.fundingSourceDesc}}</span>
+                        </div>
+                        @if (deleteFundingConfirmId === row.assetFundingSourceId) {
+                          <div style="display:flex;align-items:center;gap:6px">
+                            <span style="font-size:12px;color:#ef4444">Remove?</span>
+                            <button (click)="deleteFunding(row.assetFundingSourceId)" style="background:#ef4444;color:white;border:none;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer">Yes</button>
+                            <button (click)="cancelDeleteFunding()" style="background:#e2e8f0;color:#475569;border:none;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer">No</button>
+                          </div>
+                        } @else {
+                          <button (click)="confirmDeleteFunding(row.assetFundingSourceId)" style="background:none;border:none;cursor:pointer;color:#ef4444;display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 8px;border-radius:4px">
+                            <mat-icon style="font-size:14px">remove_circle</mat-icon> Remove
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+                <div style="display:flex;gap:8px;align-items:center">
+                  <select style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="newFundingSourceId" (ngModelChange)="newFundingSourceId=$event">
+                    <option [ngValue]="null">Select funding source to add...</option>
+                    @for (fs of getAvailableFundingSources(); track fs.fundingSourceId) { <option [ngValue]="fs.fundingSourceId">{{fs.fundingSourceDesc}}</option> }
+                  </select>
+                  <button (click)="addFundingSource()" [disabled]="!newFundingSourceId || fundingSaving()" style="padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap">
+                    <mat-icon style="font-size:16px">add</mat-icon> {{fundingSaving() ? 'Adding...' : 'Add'}}
+                  </button>
+                </div>
+              }
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Insurance &amp; Warranty</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Insurance Cover</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.insuranceCover">
+                    <option value="">Select...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Insured Amount (R)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.insuredAmount" />
+                </div>
+                <div class="detail-field">
+                  <label>Insurance Policy No</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.insurancePolicyNo" />
+                </div>
+                <div class="detail-field">
+                  <label>Warranty</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.warranty">
+                    <option value="">Select...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
+            }
+
+            @if (editStep === 'ownership') {
+              <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#0f2b46;border-bottom:2px solid #0f2b46;padding-bottom:6px">Asset Ownership</div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Department &amp; Custodian</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Department</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editDepartmentId" (ngModelChange)="onEditDepartmentChange($event)">
+                    <option [ngValue]="0">Select department...</option>
+                    @for (d of editDepartments(); track d.id) { <option [ngValue]="d.id">{{d.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Division</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.divisionId" (ngModelChange)="ef.divisionId=$event">
+                    <option [ngValue]="0">Select division...</option>
+                    @for (dv of editFilteredDivisions(); track dv.id) { <option [ngValue]="dv.id">{{dv.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Custodian (Employee)</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editCustodianId" (ngModelChange)="ef.editCustodianId=$event">
+                    <option [ngValue]="0">Select custodian...</option>
+                    @for (e of editEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Custodian ID Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.custodianIdNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Asset Ownership</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.assetOwnership" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Donor Information</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Donor ID / Registration / Parastatal Code</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.donorRegNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Donor Name / Company / Parastatal</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.donorName" />
+                </div>
+                <div class="detail-field">
+                  <label>Date Donated</label>
+                  <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.dateDonated" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Identification &amp; Serial Numbers</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Serial Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.serialNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Registration Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.registrationNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Unit Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.unitNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Make</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.make" />
+                </div>
+                <div class="detail-field">
+                  <label>Model</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.model" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Property / Land Details</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Deed Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.deedNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Erf / Farm Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.erfNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Portion Number</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.portionNumber" />
+                </div>
+                <div class="detail-field">
+                  <label>Erf Size (m²)</label>
+                  <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.erfSize" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Supplier</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+                <div class="detail-field">
+                  <label>Supplier Name</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.supplierName" />
+                </div>
+                <div class="detail-field">
+                  <label>Supplier Code</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.supplierCode" />
+                </div>
+              </div>
+            }
+
+            @if (editStep === 'location') {
+              <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#0f2b46;border-bottom:2px solid #0f2b46;padding-bottom:6px">Asset Location</div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">SG Key / Survey General</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>SG Key (Survey General Number)</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.sgKey" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">GIS / Coordinates</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Latitude</label>
+                  <input type="number" step="0.000001" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.latitude" />
+                </div>
+                <div class="detail-field">
+                  <label>Longitude</label>
+                  <input type="number" step="0.000001" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.longitude" />
+                </div>
+                <div class="detail-field">
+                  <label>GIS Feature</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.gisFeature" />
+                </div>
+                <div class="detail-field">
+                  <label>Well Known Text (WKT)</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.wellKnownText" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Address</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Town *</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editTownId" (ngModelChange)="onEditTownChange($event)">
+                    <option [ngValue]="0">Select town...</option>
+                    @for (t of editTowns(); track t.id) { <option [ngValue]="t.id">{{t.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Suburb</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editSuburbId" (ngModelChange)="onEditSuburbChange($event)" [disabled]="!ef.editTownId">
+                    <option [ngValue]="0">Select suburb...</option>
+                    @for (s of editSuburbs(); track s.id) { <option [ngValue]="s.id">{{s.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Ward</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editWardId" (ngModelChange)="ef.editWardId=$event">
+                    <option [ngValue]="0">Select ward...</option>
+                    @for (w of editWards(); track w.id) { <option [ngValue]="w.id">{{w.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Street Address</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editStreetId" (ngModelChange)="onEditStreetChange($event)" [disabled]="!ef.editSuburbId">
+                    <option [ngValue]="0">Select street...</option>
+                    @for (st of editStreets(); track st.id) { <option [ngValue]="st.id">{{st.description}}</option> }
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Building / Floor Area / Room</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Building</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editBuildingId" (ngModelChange)="onEditBuildingChange($event)">
+                    <option [ngValue]="0">Select building...</option>
+                    @for (b of editBuildings(); track b.id) { <option [ngValue]="b.id">{{b.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Floor Area</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editFloorId" (ngModelChange)="onEditFloorChange($event)" [disabled]="!ef.editBuildingId">
+                    <option [ngValue]="0">Select floor...</option>
+                    @for (f of editFloors(); track f.id) { <option [ngValue]="f.id">{{f.description}}</option> }
+                  </select>
+                </div>
+                <div class="detail-field">
+                  <label>Room</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editRoomId" (ngModelChange)="ef.editRoomId=$event" [disabled]="!ef.editFloorId">
+                    <option [ngValue]="0">Select room...</option>
+                    @for (r of editRooms(); track r.id) { <option [ngValue]="r.id">{{r.description}}</option> }
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Additional Location Information</div>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field">
+                  <label>Invoice No</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.invoiceNo" />
+                </div>
+                <div class="detail-field">
+                  <label>Disposal Doc No</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.disposalDocNo" />
+                </div>
+                <div class="detail-field">
+                  <label>Payment No</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.paymentNo" />
+                </div>
+                <div class="detail-field">
+                  <label>Room Responsible Person</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.roomResponsiblePerson" />
+                </div>
+                <div class="detail-field">
+                  <label>IT Hardware Responsible Person</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.itHardwareResponsiblePerson" />
+                </div>
+                <div class="detail-field">
+                  <label>Funding Description</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.fundingDescription" />
+                </div>
+                <div class="detail-field" style="grid-column:span 3">
+                  <label>Location Description</label>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="ef.locationDescription" />
+                </div>
+              </div>
+
+              <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Reason for Change</div>
+              <div class="detail-grid" style="grid-template-columns:1fr">
+                <div class="detail-field">
+                  <label>Reason for Change * <span style="font-size:11px;color:#ef4444;font-weight:400">(required before saving)</span></label>
+                  <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:60px;resize:vertical" [(ngModel)]="ef.reasonForChange"></textarea>
+                </div>
+              </div>
+            }
+
+            <div style="display:flex;gap:8px;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+              <div style="font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:4px">
+                <mat-icon style="font-size:14px">info</mat-icon> Fields marked with * are required
+              </div>
+              <div style="display:flex;gap:8px">
+                <button mat-stroked-button style="border-color:#e2e8f0" (click)="toggleEdit()">Cancel</button>
+                @if (editStep !== 'details') {
+                  <button mat-stroked-button (click)="prevEditStep()">
+                    <mat-icon>arrow_back</mat-icon> Previous
+                  </button>
+                }
+                @if (editStep !== 'location') {
+                  <button mat-flat-button style="background:#3b82f6;color:white" (click)="nextEditStep()">
+                    Next <mat-icon>arrow_forward</mat-icon>
+                  </button>
+                }
+                @if (editStep === 'location') {
+                  <button mat-flat-button style="background:#0f2b46;color:white" [disabled]="editSaving()" (click)="saveEdit()">
+                    @if (editSaving()) { <ng-container>Saving...</ng-container> }
+                    @else { <ng-container><mat-icon>save</mat-icon> Save Changes</ng-container> }
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showTransfer()) {
+        <div class="card-container" style="margin-bottom:16px;border:2px solid #f59e0b">
+          <div style="padding:20px">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#f59e0b;font-size:20px">swap_horiz</mat-icon> Transfer Asset
+            </h3>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+              <div class="detail-field">
+                <label>Transfer To Department</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="transferForm.department">
+                  <option value="">Select department...</option>
+                  <option value="Corporate Services">Corporate Services</option>
+                  <option value="Community Services">Community Services</option>
+                  <option value="Infrastructural Planning & Development">Infrastructural Planning & Development</option>
+                  <option value="Budget & Treasury">Budget & Treasury</option>
+                  <option value="Strategic Management">Strategic Management</option>
+                  <option value="Office of the Municipal Manager">Office of the Municipal Manager</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Transfer To Location</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="transferForm.location">
+                  <option value="">Select location...</option>
+                  <option value="Butterworth">Butterworth</option>
+                  <option value="Ngqamakwe">Ngqamakwe</option>
+                  <option value="Centane">Centane</option>
+                  <option value="Khanya">Khanya</option>
+                </select>
+              </div>
+              <div class="detail-field" style="grid-column: span 2">
+                <label>Reason for Transfer</label>
+                <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:60px" [(ngModel)]="transferForm.reason"></textarea>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+              <button mat-stroked-button style="border-color:#e2e8f0" (click)="showTransfer.set(false)">Cancel</button>
+              <button mat-flat-button style="background:#f59e0b;color:white" (click)="submitTransfer()">
+                <mat-icon>send</mat-icon> Submit for Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showDisposal()) {
+        <div class="card-container" style="margin-bottom:16px;border:2px solid #ef4444">
+          <div style="padding:20px">
+            <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="color:#ef4444;font-size:20px">delete_sweep</mat-icon> Asset Disposal
+            </h3>
+            <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+              <div class="detail-field">
+                <label>Disposal Method *</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="disposalForm.method">
+                  <option value="">Select method...</option>
+                  <option value="Sale">Sale (Auction/Tender)</option>
+                  <option value="Donation">Donation</option>
+                  <option value="Scrapping">Scrapping</option>
+                  <option value="Trade-in">Trade-in</option>
+                  <option value="Theft/Loss">Theft/Loss Write-off</option>
+                </select>
+              </div>
+              <div class="detail-field">
+                <label>Disposal Date *</label>
+                <input type="date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="disposalForm.date" />
+              </div>
+              <div class="detail-field">
+                <label>Disposal Proceeds (R)</label>
+                <input type="number" step="0.01" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="disposalForm.value" />
+              </div>
+              <div class="detail-field" style="grid-column: span 3">
+                <label>Reason / Comments *</label>
+                <textarea style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-height:60px" [(ngModel)]="disposalForm.reason"></textarea>
+              </div>
+            </div>
+            @if (disposalForm.date) {
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-top:12px">
+                <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Disposal Summary</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px">
+                  <div><span style="color:#64748b">Carrying Amount:</span> <strong>R {{asset().carryingAmount | number:'1.2-2'}}</strong></div>
+                  <div><span style="color:#64748b">Proceeds:</span> <strong>R {{disposalForm.value | number:'1.2-2'}}</strong></div>
+                  <div><span [style.color]="getDisposalPLPreviewColor()">Profit/(Loss): <strong>R {{getDisposalPLPreview() | number:'1.2-2'}}</strong></span></div>
+                </div>
+              </div>
+            }
+            <div style="font-size:12px;color:#ef4444;background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:8px">
+              <mat-icon style="font-size:14px;vertical-align:middle">warning</mat-icon>
+              This action requires MFMA S.14 approval. A workflow will be initiated for authorization.
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+              <button mat-stroked-button style="border-color:#e2e8f0" (click)="showDisposal.set(false)">Cancel</button>
+              <button mat-flat-button style="background:#ef4444;color:white" (click)="submitDisposal()">
+                <mat-icon>send</mat-icon> Submit for Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div style="background:white;border-radius:12px;border:1px solid #e2e8f0">
+        <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;overflow-x:auto;padding:0 8px">
+          @for (tab of visibleTabs(); track tab.key) {
+            <button (click)="activeTab.set(tab.key)"
+              [style.color]="activeTab() === tab.key ? '#0f2b46' : '#64748b'"
+              [style.border-bottom]="activeTab() === tab.key ? '2px solid #0f2b46' : '2px solid transparent'"
+              [style.font-weight]="activeTab() === tab.key ? '600' : '400'"
+              style="padding:12px 18px;font-size:13px;background:none;border:none;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:color 0.15s">
+              {{tab.label}}
+            </button>
+          }
+        </div>
+
+        @if (activeTab() === 'details') {
+          <div style="padding:24px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+              <div class="form-card">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#3b82f6;font-size:20px">info</mat-icon> General Information
+                </h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Asset ID</label><span>{{asset().assetId}}</span></div>
+                  <div class="detail-field"><label>Barcode</label><span>{{asset().barcode || 'N/A'}}</span></div>
+                  <div class="detail-field"><label>Category</label><span>{{asset().categoryName}}</span></div>
+                  <div class="detail-field"><label>Sub-Category</label><span>{{asset().subCategoryName}}</span></div>
+                  <div class="detail-field"><label>Asset Class</label><span>{{asset().assetClassName}}</span></div>
+                  <div class="detail-field"><label>Asset Type</label><span>{{asset().assetTypeName}}</span></div>
+                  <div class="detail-field"><label>GRAP Standard</label><span class="legislation-ref">{{asset().grapStandard}}</span></div>
+                  <div class="detail-field"><label>Measurement Model</label><span class="mscoa-tag">{{asset().measurementType}}</span></div>
+                  <div class="detail-field"><label>Status</label><span [class]="getStatusClass(asset().status)">{{asset().status}}</span></div>
+                  <div class="detail-field"><label>Condition</label><span>{{asset().condition}}</span></div>
+                  <div class="detail-field"><label>Department</label><span>{{getDepartmentDisplayName(asset().municipalDepartmentId || asset().departmentId)}}</span></div>
+                  <div class="detail-field"><label>Division</label><span>{{getDivisionDisplayName(asset().divisionId)}}</span></div>
+                  <div class="detail-field"><label>Location</label><span>{{asset().locationName}}</span></div>
+                  <div class="detail-field"><label>Ward</label><span>{{asset().ward || 'N/A'}}</span></div>
+                  <div class="detail-field"><label>Custodian</label><span>{{asset().custodian}}</span></div>
+                  <div class="detail-field"><label>Ownership</label><span>{{asset().assetOwnership}}</span></div>
+                  @if (asset().serialNumber) { <div class="detail-field"><label>Serial Number</label><span>{{asset().serialNumber}}</span></div> }
+                  @if (asset().registrationNumber) { <div class="detail-field"><label>Registration</label><span>{{asset().registrationNumber}}</span></div> }
+                  @if (asset().make) { <div class="detail-field"><label>Make</label><span>{{asset().make}}</span></div> }
+                  @if (asset().model) { <div class="detail-field"><label>Model</label><span>{{asset().model}}</span></div> }
+                </div>
+              </div>
+
+              <div class="form-card">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#10b981;font-size:20px">payments</mat-icon> Financial Summary
+                </h3>
+                <div class="detail-grid">
+                  <div class="detail-field"><label>Acquisition Date</label><span>{{formatDate(asset().acquisitionDate)}}</span></div>
+                  <div class="detail-field"><label>Cost Closing Balance</label><span class="value-cell">R {{costClosingCalc() | number:'1.2-2'}}</span></div>
+                  <div class="detail-field"><label>Acc. Depreciation</label><span class="value-cell" style="color:#ef4444">R {{depClosingCalc() | number:'1.2-2'}}</span></div>
+                  <div class="detail-field"><label>Acc. Impairment</label><span class="value-cell" style="color:#f59e0b">R {{impClosingCalc() | number:'1.2-2'}}</span></div>
+                  <div class="detail-field"><label>Carrying Amount</label><span class="value-cell" style="color:#10b981;font-weight:700">R {{carryingCalc() | number:'1.2-2'}}</span></div>
+                  <div class="detail-field"><label>Residual Value</label><span class="value-cell">R {{asset().residualValue | number:'1.2-2'}}</span></div>
+                  <div class="detail-field"><label>Useful Life</label><span>{{formatUsefulLife(asset().usefulLife)}} years</span></div>
+                  <div class="detail-field"><label>Remaining Useful Life</label><span>{{formatUsefulLife(asset().remainingUsefulLife)}} years</span></div>
+                  <div class="detail-field"><label>Depreciation Method</label><span>{{asset().depreciationMethod}}</span></div>
+                  <div class="detail-field"><label>UoM</label><span>{{asset().uom}}</span></div>
+                  @if (hasRevaluationData()) {
+                    <div class="detail-field"><label>Revaluation Reserve</label><span class="value-cell" style="color:#8b5cf6">R {{asset().accumulatedRevaluationsClosing | number:'1.2-2'}}</span></div>
+                    @if (asset().revaluationDate) { <div class="detail-field"><label>Last Revaluation</label><span>{{formatDate(asset().revaluationDate)}}</span></div> }
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (asset().criticalityGrade || asset().performanceGrade) {
+              <div class="form-card" style="margin-top:24px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#f59e0b;font-size:20px">speed</mat-icon> Performance Grading
+                </h3>
+                <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                  <div class="detail-field"><label>Criticality</label><span>{{asset().criticalityGradeDesc || asset().criticalityGrade}}</span></div>
+                  <div class="detail-field"><label>Performance</label><span>{{asset().performanceGradeDesc || asset().performanceGrade}}</span></div>
+                  <div class="detail-field"><label>Utilisation</label><span>{{asset().utilisationGradeDesc || asset().utilisationGrade}}</span></div>
+                  <div class="detail-field"><label>Health</label><span>{{asset().healthGradeDesc || asset().infrastructureHealthGrade}}</span></div>
+                  <div class="detail-field"><label>Consequence of Failure</label><span>{{asset().consequenceOfFailureDesc || asset().consequenceOfFailure}}</span></div>
+                  <div class="detail-field"><label>Risk</label><span>{{asset().risk}}</span></div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeTab() === 'cost') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#3b82f6;font-size:20px">account_balance</mat-icon> Cost Movement Schedule (GRAP 17)
+              </h3>
+              <div style="overflow-x:auto">
+                <table class="data-table" style="min-width:600px">
+                  <thead><tr><th style="width:60%">Description</th><th style="text-align:right">Amount (R)</th></tr></thead>
+                  <tbody>
+                    <tr><td>Cost Opening Balance</td><td class="value-cell">{{sched('costOpeningBalance') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Acquisitions</td><td class="value-cell">{{sched('acquisitions') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Disposals</td><td class="value-cell" style="color:#ef4444">({{sched('disposalsCost') | number:'1.2-2'}})</td></tr>
+                    <tr><td>Transfers In</td><td class="value-cell">{{sched('transfersIn') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Transfers Out</td><td class="value-cell" style="color:#ef4444">({{sched('transfersOut') | number:'1.2-2'}})</td></tr>
+                    <tr><td>Fair Value Adjustment</td><td class="value-cell">{{sched('fairValueAdjustments') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Revaluation</td><td class="value-cell">{{sched('revaluations') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Refurbishment Debit</td><td class="value-cell">{{sched('refurbDebit') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Refurbishment Credit</td><td class="value-cell" style="color:#ef4444">({{sched('refurbCredit') | number:'1.2-2'}})</td></tr>
+                    <tr><td>Correction of Error</td><td class="value-cell">{{sched('correctionOfError') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Additional Cost</td><td class="value-cell">{{sched('additionalCost') | number:'1.2-2'}}</td></tr>
+                    <tr style="font-weight:700;border-top:2px solid #1e293b"><td>Cost Closing Balance</td><td class="value-cell">{{costClosingCalc() | number:'1.2-2'}}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            @if (transferTxns().length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#06b6d4;font-size:20px">receipt_long</mat-icon> Posted Transfer Transactions
+                </h3>
+                @for (tx of transferTxns(); track tx.id) {
+                  <div style="border:1px solid #a5f3fc;border-radius:8px;padding:16px;margin-bottom:12px;background:#ecfeff">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                      <div style="width:32px;height:32px;border-radius:50%;background:#06b6d4;display:flex;align-items:center;justify-content:center">
+                        <mat-icon style="font-size:16px;color:white">swap_horiz</mat-icon>
+                      </div>
+                      <div>
+                        <div style="font-size:14px;font-weight:600;color:#1e293b">Asset Transfer</div>
+                        <div style="font-size:12px;color:#64748b">{{formatTransactionDate(tx.transaction_date)}} · Posted by {{tx.posted_by_name || 'System'}}</div>
+                      </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #a5f3fc">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">From Department</div>
+                        <div style="font-size:14px;font-weight:600;color:#1e293b">{{getTransactionDetail(tx, 'from_department') || 'N/A'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #a5f3fc">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">To Department</div>
+                        <div style="font-size:14px;font-weight:600;color:#06b6d4">{{getTransactionDetail(tx, 'to_department') || 'N/A'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #a5f3fc">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">From Location</div>
+                        <div style="font-size:14px;font-weight:600;color:#1e293b">{{getTransactionDetail(tx, 'from_location') || 'N/A'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #a5f3fc">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">To Location</div>
+                        <div style="font-size:14px;font-weight:600;color:#06b6d4">{{getTransactionDetail(tx, 'to_location') || 'N/A'}}</div>
+                      </div>
+                    </div>
+                    @if (getTransactionDetail(tx, 'reason')) {
+                      <div style="margin-top:8px;font-size:12px;color:#64748b"><span style="font-weight:600">Reason:</span> {{getTransactionDetail(tx, 'reason')}}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeTab() === 'depreciation') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#8b5cf6;font-size:20px">trending_down</mat-icon> Depreciation Schedule
+              </h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+                <div style="padding:16px;background:#f8fafc;border-radius:8px;border-left:3px solid #3b82f6">
+                  <div style="font-size:11px;color:#64748b;text-transform:uppercase">Cost Closing</div>
+                  <div style="font-size:20px;font-weight:700;color:#1e293b">R {{costClosingCalc() | number:'1.0-0'}}</div>
+                </div>
+                <div style="padding:16px;background:#f8fafc;border-radius:8px;border-left:3px solid #ef4444">
+                  <div style="font-size:11px;color:#64748b;text-transform:uppercase">Acc. Depreciation</div>
+                  <div style="font-size:20px;font-weight:700;color:#ef4444">R {{depClosingCalc() | number:'1.0-0'}}</div>
+                </div>
+                <div style="padding:16px;background:#f8fafc;border-radius:8px;border-left:3px solid #10b981">
+                  <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying Amount</div>
+                  <div style="font-size:20px;font-weight:700;color:#10b981">R {{carryingCalc() | number:'1.0-0'}}</div>
+                </div>
+                <div style="padding:16px;background:#f8fafc;border-radius:8px;border-left:3px solid #f59e0b">
+                  <div style="font-size:11px;color:#64748b;text-transform:uppercase">Remaining Life</div>
+                  <div style="font-size:20px;font-weight:700;color:#1e293b">{{formatUsefulLife(schedRul())}} yrs</div>
+                </div>
+              </div>
+              <div style="height:16px;background:#f1f5f9;border-radius:8px;overflow:hidden;margin-bottom:8px">
+                <div [style.width.%]="getDepPercent()" style="height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b);border-radius:8px"></div>
+              </div>
+              <div style="font-size:12px;color:#64748b;text-align:center;margin-bottom:24px">{{formatDepPercent()}} depreciated</div>
+
+              <h4 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px">Accumulated Depreciation Movement</h4>
+              <div style="overflow-x:auto">
+                <table class="data-table" style="min-width:600px">
+                  <thead><tr><th style="width:60%">Description</th><th style="text-align:right">Amount (R)</th></tr></thead>
+                  <tbody>
+                    <tr><td>Opening Balance</td><td class="value-cell">{{sched('depOpeningBalance') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Depreciation Charge</td><td class="value-cell">{{sched('depreciation') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Depreciation Adjustments</td><td class="value-cell" style="color:#ef4444">({{sched('depreciationAdjustments') | number:'1.2-2'}})</td></tr>
+                    <tr><td>Refurbishment Depreciation</td><td class="value-cell" style="color:#ef4444">({{sched('refurbDepreciation') | number:'1.2-2'}})</td></tr>
+                    <tr style="font-weight:700;border-top:2px solid #1e293b"><td>Closing Balance</td><td class="value-cell">{{depClosingCalc() | number:'1.2-2'}}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            @if (depreciationTxns().length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#8b5cf6;font-size:20px">receipt_long</mat-icon> Posted Depreciation Transactions
+                </h3>
+                @for (tx of depreciationTxns(); track tx.id) {
+                  <div style="border:1px solid #ddd6fe;border-radius:8px;padding:16px;margin-bottom:12px;background:#f5f3ff">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#8b5cf6;display:flex;align-items:center;justify-content:center">
+                          <mat-icon style="font-size:16px;color:white">trending_down</mat-icon>
+                        </div>
+                        <div>
+                          <div style="font-size:14px;font-weight:600;color:#1e293b">Depreciation
+                            @if (getTransactionDetail(tx, 'type') === 'catch-up') {
+                              <span style="font-size:11px;background:#f59e0b;color:white;padding:2px 8px;border-radius:10px;margin-left:6px">Catch-up</span>
+                            }
+                          </div>
+                          <div style="font-size:12px;color:#64748b">{{formatTransactionDate(tx.transaction_date)}} · Posted by {{tx.posted_by_name || 'System'}}</div>
+                        </div>
+                      </div>
+                      <span style="font-size:16px;font-weight:700;color:#8b5cf6">R {{tx.amount | number:'1.2-2'}}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #ddd6fe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying Before</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.carrying_amount_before | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #ddd6fe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying After</div>
+                        <div style="font-size:15px;font-weight:600;color:#10b981">R {{tx.carrying_amount_after | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #ddd6fe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Acc. Dep Before</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.acc_depreciation_before | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #ddd6fe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Acc. Dep After</div>
+                        <div style="font-size:15px;font-weight:600;color:#ef4444">R {{tx.acc_depreciation_after | number:'1.2-2'}}</div>
+                      </div>
+                    </div>
+                    @if (getTransactionDetail(tx, 'days')) {
+                      <div style="margin-top:8px;font-size:12px;color:#64748b"><span style="font-weight:600">Days:</span> {{getTransactionDetail(tx, 'days')}}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeTab() === 'revaluation' && hasRevaluationData()) {
+            <div style="padding:24px">
+              <div class="form-card">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 8px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#8b5cf6;font-size:20px">auto_graph</mat-icon> Revaluation Reserve (GRAP 17.39-42)
+                </h3>
+                <div style="font-size:12px;color:#64748b;margin-bottom:16px">
+                  Revaluation surplus is credited to Other Comprehensive Income (Revaluation Reserve). Deficit is first charged against the reserve, then to surplus/deficit.
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+                  <div style="padding:16px;background:#f5f3ff;border-radius:8px;border-left:3px solid #8b5cf6">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase">Revaluation Reserve</div>
+                    <div style="font-size:20px;font-weight:700;color:#8b5cf6">R {{sched('revalClosingBalance') | number:'1.0-0'}}</div>
+                  </div>
+                  <div style="padding:16px;background:#f0fdf4;border-radius:8px;border-left:3px solid #10b981">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase">Movement</div>
+                    <div style="font-size:20px;font-weight:700;color:#10b981">R {{sched('movementInRevaluationReserve') | number:'1.0-0'}}</div>
+                  </div>
+                  <div style="padding:16px;background:#fffbeb;border-radius:8px;border-left:3px solid #f59e0b">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase">Depreciation Offset</div>
+                    <div style="font-size:20px;font-weight:700;color:#f59e0b">R {{sched('depreciationOffset') | number:'1.0-0'}}</div>
+                  </div>
+                </div>
+
+                <div style="overflow-x:auto">
+                  <table class="data-table" style="min-width:600px">
+                    <thead><tr><th style="width:60%">Revaluation Reserve Movement</th><th style="text-align:right">Amount (R)</th></tr></thead>
+                    <tbody>
+                      <tr><td>Opening Balance</td><td class="value-cell">{{sched('revalOpeningBalance') | number:'1.2-2'}}</td></tr>
+                      <tr><td>Revaluation Reserve - Revaluations</td><td class="value-cell">{{sched('revalReserveRevaluation') | number:'1.2-2'}}</td></tr>
+                      <tr><td>Revaluation Reserve - Impairments</td><td class="value-cell" style="color:#ef4444">({{sched('revalReserveImpairment') | number:'1.2-2'}})</td></tr>
+                      <tr><td>Revaluation Reserve - Impairment Reversals</td><td class="value-cell">{{sched('revalReserveImpairmentReversal') | number:'1.2-2'}}</td></tr>
+                      <tr><td>Revaluation Reserve - Disposals</td><td class="value-cell" style="color:#ef4444">({{sched('revalReserveDisposal') | number:'1.2-2'}})</td></tr>
+                      <tr><td>Depreciation Offset</td><td class="value-cell" style="color:#ef4444">({{sched('depreciationOffset') | number:'1.2-2'}})</td></tr>
+                      @if (sched('refurbRevaluationValue') !== 0) {
+                        <tr><td>Refurbishment Revaluation</td><td class="value-cell" style="color:#ef4444">({{sched('refurbRevaluationValue') | number:'1.2-2'}})</td></tr>
+                      }
+                      <tr><td>Movement in Revaluation Reserve</td><td class="value-cell">{{sched('movementInRevaluationReserve') | number:'1.2-2'}}</td></tr>
+                      <tr style="font-weight:700;border-top:2px solid #1e293b"><td>Closing Balance</td><td class="value-cell">{{sched('revalClosingBalance') | number:'1.2-2'}}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                @if (asset().revaluationDate) {
+                  <div style="margin-top:16px;padding:12px;background:#f5f3ff;border-radius:8px;display:flex;gap:16px;flex-wrap:wrap">
+                    <div style="font-size:12px"><span style="color:#64748b">Revaluation Date:</span> <strong>{{formatDate(asset().revaluationDate)}}</strong></div>
+                    <div style="font-size:12px"><span style="color:#64748b">Revalued Amount:</span> <strong>R {{asset().revaluationValue | number:'1.2-2'}}</strong></div>
+                    <div style="font-size:12px"><span style="color:#64748b">Deemed Cost:</span> <strong>{{asset().deemedCost || 'No'}}</strong></div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            @if (revaluationTxns().length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#3b82f6;font-size:20px">receipt_long</mat-icon> Posted Revaluation Transactions
+                </h3>
+                @for (tx of revaluationTxns(); track tx.id) {
+                  <div style="border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin-bottom:12px;background:#eff6ff">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center">
+                          <mat-icon style="font-size:16px;color:white">auto_graph</mat-icon>
+                        </div>
+                        <div>
+                          <div style="font-size:14px;font-weight:600;color:#1e293b">Revaluation</div>
+                          <div style="font-size:12px;color:#64748b">{{formatTransactionDate(tx.transaction_date)}} · Posted by {{tx.posted_by_name || 'System'}}</div>
+                        </div>
+                      </div>
+                      <span style="font-size:16px;font-weight:700;color:#3b82f6">R {{tx.amount | number:'1.2-2'}}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #bfdbfe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying Before</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.carrying_amount_before | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #bfdbfe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Fair Value (After)</div>
+                        <div style="font-size:15px;font-weight:600;color:#10b981">R {{tx.carrying_amount_after | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #bfdbfe">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Surplus / Deficit</div>
+                        <div style="font-size:15px;font-weight:600;color:#8b5cf6">R {{getTransactionDetail(tx, 'surplus_deficit')}}</div>
+                      </div>
+                    </div>
+                    @if (getTransactionDetail(tx, 'valuer')) {
+                      <div style="margin-top:8px;font-size:12px;color:#64748b"><span style="font-weight:600">Valuer:</span> {{getTransactionDetail(tx, 'valuer')}}</div>
+                    }
+                    @if (getTransactionDetail(tx, 'comments')) {
+                      <div style="margin-top:4px;font-size:12px;color:#64748b"><span style="font-weight:600">Comments:</span> {{getTransactionDetail(tx, 'comments')}}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+        }
+
+        @if (activeTab() === 'impairment') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#ef4444;font-size:20px">warning</mat-icon> Impairment Schedule (GRAP 21/26)
+              </h3>
+              <div style="overflow-x:auto">
+                <table class="data-table" style="min-width:600px">
+                  <thead><tr><th style="width:60%">Description</th><th style="text-align:right">Amount (R)</th></tr></thead>
+                  <tbody>
+                    <tr><td>Opening Balance</td><td class="value-cell">{{sched('impOpeningBalance') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Impairment Loss</td><td class="value-cell" style="color:#ef4444">({{sched('impairment') | number:'1.2-2'}})</td></tr>
+                    <tr><td>Impairment Reversal</td><td class="value-cell">{{sched('impairmentReversal') | number:'1.2-2'}}</td></tr>
+                    <tr><td>Impairment Surplus</td><td class="value-cell">{{sched('impairmentSurplus') | number:'1.2-2'}}</td></tr>
+                    <tr style="font-weight:700;border-top:2px solid #1e293b"><td>Closing Balance</td><td class="value-cell">{{impClosingCalc() | number:'1.2-2'}}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            @if (impairmentTxns().length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#ef4444;font-size:20px">receipt_long</mat-icon> Posted Impairment Transactions
+                </h3>
+                @for (tx of impairmentTxns(); track tx.id) {
+                  <div style="border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:12px;background:#fef2f2">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#ef4444;display:flex;align-items:center;justify-content:center">
+                          <mat-icon style="font-size:16px;color:white">{{getTransactionIcon(tx.transaction_type)}}</mat-icon>
+                        </div>
+                        <div>
+                          <div style="font-size:14px;font-weight:600;color:#1e293b">{{getTransactionLabel(tx.transaction_type)}}</div>
+                          <div style="font-size:12px;color:#64748b">{{formatTransactionDate(tx.transaction_date)}} · Posted by {{tx.posted_by_name || 'System'}}</div>
+                        </div>
+                      </div>
+                      <span style="font-size:16px;font-weight:700;color:#ef4444">R {{tx.amount | number:'1.2-2'}}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fecaca">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying Before</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.carrying_amount_before | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fecaca">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying After</div>
+                        <div style="font-size:15px;font-weight:600;color:#10b981">R {{tx.carrying_amount_after | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fecaca">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Acc. Depreciation</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.acc_depreciation_after | number:'1.2-2'}}</div>
+                      </div>
+                    </div>
+                    @if (getTransactionDetail(tx, 'reason')) {
+                      <div style="margin-top:8px;font-size:12px;color:#64748b"><span style="font-weight:600">Reason:</span> {{getTransactionDetail(tx, 'reason')}}</div>
+                    }
+                    @if (getTransactionDetail(tx, 'recoverable_amount')) {
+                      <div style="margin-top:4px;font-size:12px;color:#64748b"><span style="font-weight:600">Recoverable Amount:</span> R {{getTransactionDetail(tx, 'recoverable_amount')}}</div>
+                    }
+                    @if (getTransactionDetail(tx, 'impairment_type')) {
+                      <div style="margin-top:4px;font-size:12px;color:#64748b"><span style="font-weight:600">Type:</span> {{getTransactionDetail(tx, 'impairment_type')}}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeTab() === 'disposal') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#06b6d4;font-size:20px">receipt_long</mat-icon> Disposal Information
+              </h3>
+              <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="detail-field"><label>Disposal Value</label><span class="value-cell">R {{asset().disposalValue | number:'1.2-2'}}</span></div>
+                <div class="detail-field"><label>Disposal Proceeds</label><span class="value-cell">R {{asset().disposalProceeds | number:'1.2-2'}}</span></div>
+                <div class="detail-field"><label>Profit / (Loss)</label><span class="value-cell" [style.color]="getDisposalPLColor()">R {{asset().disposalProfitLoss | number:'1.2-2'}}</span></div>
+              </div>
+              @if (asset().disposalDate) {
+                <div style="margin-top:12px;padding:12px;background:#f1f5f9;border-radius:8px">
+                  <div style="font-size:12px"><span style="color:#64748b">Disposal Date:</span> <strong>{{formatDate(asset().disposalDate)}}</strong></div>
+                  @if (asset().disposalReason) { <div style="font-size:12px;margin-top:4px"><span style="color:#64748b">Reason:</span> <strong>{{asset().disposalReason}}</strong></div> }
+                </div>
+              } @else if (disposalTxns().length === 0) {
+                <div style="margin-top:12px;padding:20px;background:#f8fafc;border-radius:8px;text-align:center;color:#94a3b8">
+                  No disposal recorded for this asset
+                </div>
+              }
+            </div>
+
+            @if (disposalTxns().length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#f59e0b;font-size:20px">receipt_long</mat-icon> Posted Disposal Transactions
+                </h3>
+                @for (tx of disposalTxns(); track tx.id) {
+                  <div style="border:1px solid #fed7aa;border-radius:8px;padding:16px;margin-bottom:12px;background:#fff7ed">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center">
+                          <mat-icon style="font-size:16px;color:white">delete_sweep</mat-icon>
+                        </div>
+                        <div>
+                          <div style="font-size:14px;font-weight:600;color:#1e293b">Asset Disposal</div>
+                          <div style="font-size:12px;color:#64748b">{{formatTransactionDate(tx.transaction_date)}} · Posted by {{tx.posted_by_name || 'System'}}</div>
+                        </div>
+                      </div>
+                      <span style="font-size:16px;font-weight:700;color:#f59e0b">R {{tx.amount | number:'1.2-2'}}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fed7aa">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying Before</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{tx.carrying_amount_before | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fed7aa">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Carrying After</div>
+                        <div style="font-size:15px;font-weight:600;color:#ef4444">R {{tx.carrying_amount_after | number:'1.2-2'}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fed7aa">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Proceeds</div>
+                        <div style="font-size:15px;font-weight:600;color:#10b981">R {{getTransactionDetail(tx, 'proceeds')}}</div>
+                      </div>
+                      <div style="padding:10px;background:white;border-radius:6px;border:1px solid #fed7aa">
+                        <div style="font-size:11px;color:#64748b;text-transform:uppercase">Profit / (Loss)</div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">R {{getTransactionDetail(tx, 'profit_loss')}}</div>
+                      </div>
+                    </div>
+                    @if (getTransactionDetail(tx, 'method')) {
+                      <div style="margin-top:8px;font-size:12px;color:#64748b"><span style="font-weight:600">Method:</span> {{getTransactionDetail(tx, 'method')}}</div>
+                    }
+                    @if (getTransactionDetail(tx, 'reason')) {
+                      <div style="margin-top:4px;font-size:12px;color:#64748b"><span style="font-weight:600">Reason:</span> {{getTransactionDetail(tx, 'reason')}}</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeTab() === 'location') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#06b6d4;font-size:20px">place</mat-icon> Asset Location
+              </h3>
+              <div class="detail-grid" style="margin-bottom:16px">
+                <div class="detail-field"><label>Town</label><span>{{asset().locationName}}</span></div>
+                <div class="detail-field"><label>Ward</label><span>{{asset().ward || 'N/A'}}</span></div>
+                <div class="detail-field"><label>Building</label><span>{{asset().building || 'N/A'}}</span></div>
+                <div class="detail-field"><label>Floor</label><span>{{asset().floor || 'N/A'}}</span></div>
+                <div class="detail-field"><label>Room</label><span>{{asset().room || 'N/A'}}</span></div>
+                <div class="detail-field"><label>Suburb</label><span>{{asset().suburb || 'N/A'}}</span></div>
+                <div class="detail-field"><label>Latitude</label><span>{{formatCoord(asset().latitude)}}</span></div>
+                <div class="detail-field"><label>Longitude</label><span>{{formatCoord(asset().longitude)}}</span></div>
+                <div class="detail-field"><label>Department</label><span>{{getDepartmentDisplayName(asset().municipalDepartmentId || asset().departmentId)}}</span></div>
+                <div class="detail-field"><label>Division</label><span>{{getDivisionDisplayName(asset().divisionId)}}</span></div>
+              </div>
+              @if (asset().latitude && asset().longitude) {
+                <button (click)="openLocationMap()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#e8f5e9;border:1px solid #a7d7a9;border-radius:6px;color:#2e7d32;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='#c8e6c9'" onmouseout="this.style.background='#e8f5e9'">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">map</mat-icon>
+                  View on Map
+                </button>
+              } @else {
+                <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#f1f5f9;border-radius:6px;color:#94a3b8;font-size:12px">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">location_off</mat-icon>
+                  No GPS coordinates
+                </div>
+              }
+
+              @if (showLocationMapModal()) {
+                <div style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center" (click)="closeLocationMap()">
+                  <div style="background:white;border-radius:12px;width:min(900px,90vw);height:min(600px,80vh);display:flex;flex-direction:column;overflow:hidden" (click)="$event.stopPropagation()">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;flex-shrink:0">
+                      <div>
+                        <div style="font-size:15px;font-weight:600;color:#1e293b">{{asset().description}}</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px">
+                          <mat-icon style="font-size:13px;vertical-align:middle;margin-right:2px">place</mat-icon>
+                          {{formatCoord(asset().latitude)}}, {{formatCoord(asset().longitude)}}
+                        </div>
+                      </div>
+                      <button mat-icon-button (click)="closeLocationMap()"><mat-icon>close</mat-icon></button>
+                    </div>
+                    <div style="flex:1;position:relative">
+                      <div id="asset-location-map" style="width:100%;height:100%"></div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'funding') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#3b82f6;font-size:20px">account_balance_wallet</mat-icon> Funding Sources
+                </h3>
+              </div>
+              @if (fundingLoading()) {
+                <div style="text-align:center;padding:20px"><mat-spinner diameter="24"></mat-spinner></div>
+              } @else {
+                @if (fundingRows().length > 0) {
+                  <div style="margin-bottom:16px">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px">
+                      <thead>
+                        <tr>
+                          <th style="padding:8px 12px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;background:#f8fafc">Funding Source</th>
+                          <th style="padding:8px 12px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;background:#f8fafc">Financial Year</th>
+                          <th style="padding:8px 12px;text-align:right;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;background:#f8fafc">Amount (R)</th>
+                          <th style="padding:8px 12px;text-align:center;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;background:#f8fafc">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (f of fundingRows(); track f.assetFundingSourceId) {
+                          <tr style="border-bottom:1px solid #f1f5f9">
+                            <td style="padding:8px 12px;color:#1e293b;font-weight:500">{{f.fundingSourceDesc || '—'}}</td>
+                            <td style="padding:8px 12px;color:#475569">{{f.finYear || '—'}}</td>
+                            <td style="padding:8px 12px;color:#475569;text-align:right">{{f.amount != null ? (f.amount | number:'1.2-2') : '—'}}</td>
+                            <td style="padding:8px 12px;text-align:center">
+                              @if (deleteFundingConfirmId === f.assetFundingSourceId) {
+                                <button style="background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px" (click)="deleteFunding(f.assetFundingSourceId)">Confirm</button>
+                                <button style="background:none;border:1px solid #e2e8f0;color:#64748b;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer" (click)="cancelDeleteFunding()">Cancel</button>
+                              } @else {
+                                <button style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:0 4px" (click)="confirmDeleteFunding(f.assetFundingSourceId)">
+                                  <mat-icon style="font-size:16px;vertical-align:middle">delete_outline</mat-icon>
+                                </button>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <div style="font-size:13px;color:#94a3b8;margin-bottom:16px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px">
+                    No funding sources linked to this asset
+                  </div>
+                }
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:12px;border-top:1px solid #f1f5f9">
+                  <select style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;min-width:220px" [(ngModel)]="newFundingSourceId">
+                    <option [ngValue]="null">Select funding source...</option>
+                    @for (fs of getAvailableFundingSources(); track fs.fundingSourceId) {
+                      <option [ngValue]="fs.fundingSourceId">{{fs.fundingSourceDesc}}</option>
+                    }
+                  </select>
+                  <button mat-flat-button style="background:#0f2b46;color:white;font-size:13px" [disabled]="!newFundingSourceId || fundingSaving()" (click)="addFundingSource()">
+                    @if (fundingSaving()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px;vertical-align:middle"></mat-spinner> }
+                    <mat-icon style="font-size:16px;vertical-align:middle">add</mat-icon> Add Funding Source
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'documents') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0;display:flex;align-items:center;gap:8px">
+                  <mat-icon style="color:#3b82f6;font-size:20px">folder</mat-icon> Documents ({{documents().length}})
+                </h3>
+                <button mat-flat-button style="background:#0f2b46;color:white" (click)="uploadDocument()"><mat-icon>upload</mat-icon> Upload</button>
+              </div>
+              @if (showUploadForm()) {
+                <div style="border:1px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:12px;background:#f8fafc">
+                  <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:8px">Upload Document</div>
+                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:8px" [(ngModel)]="newDocName" placeholder="Document name..." />
+                  <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button mat-stroked-button (click)="showUploadForm.set(false)">Cancel</button>
+                    <button mat-flat-button style="background:#0f2b46;color:white" (click)="confirmUpload()"><mat-icon>upload</mat-icon> Upload</button>
+                  </div>
+                </div>
+              }
+              @if (pendingDeleteDoc()) {
+                <div style="border:1px solid #ef4444;border-radius:8px;padding:12px;margin-bottom:12px;background:#fef2f2;display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:13px;color:#991b1b">Delete "{{pendingDeleteDoc()}}"?</span>
+                  <div style="display:flex;gap:8px">
+                    <button mat-stroked-button (click)="pendingDeleteDoc.set(null)">Cancel</button>
+                    <button mat-flat-button style="background:#ef4444;color:white" (click)="confirmDeleteDoc()">Delete</button>
+                  </div>
+                </div>
+              }
+              @if (documents().length > 0) {
+                @for (doc of documents(); track doc.name) {
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px">
+                    <mat-icon style="color:#3b82f6;font-size:28px">{{getDocIcon(doc.type)}}</mat-icon>
+                    <div style="flex:1">
+                      <div style="font-size:13px;font-weight:500;color:#1e293b">{{doc.name}}</div>
+                      <div style="font-size:11px;color:#94a3b8">{{doc.size}} · {{doc.date}}</div>
+                    </div>
+                    <button mat-icon-button><mat-icon style="color:#64748b">download</mat-icon></button>
+                    <button mat-icon-button (click)="deleteDocument(doc.name)"><mat-icon style="color:#ef4444">delete</mat-icon></button>
+                  </div>
+                }
+              } @else if (!showUploadForm()) {
+                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:40px;text-align:center;color:#94a3b8;cursor:pointer" (click)="uploadDocument()">
+                  <mat-icon style="font-size:48px;margin-bottom:8px">cloud_upload</mat-icon>
+                  <div style="font-size:14px">Drop files here or click to attach documents</div>
+                  <div style="font-size:12px;margin-top:4px">Supports PDF, Images, Excel, Word</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'audit') {
+          <div style="padding:24px">
+            <div class="form-card">
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 16px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#8b5cf6;font-size:20px">history</mat-icon> Verification Audit Trail
+              </h3>
+              @if (groupedAuditSessions().length > 0) {
+                @for (session of groupedAuditSessions(); track session.key) {
+                  <div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;overflow:hidden">
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;cursor:pointer" (click)="toggleAuditSession(session.key)">
+                      <div style="width:32px;height:32px;border-radius:50%;background:#8b5cf6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <mat-icon style="font-size:16px;color:white">verified</mat-icon>
+                      </div>
+                      <div style="flex:1">
+                        <div style="font-size:13px;font-weight:600;color:#1e293b">{{session.registerName}}</div>
+                        <div style="font-size:12px;color:#64748b">
+                          {{session.changedByName || 'System'}} · {{session.changedAt | date:'yyyy-MM-dd HH:mm'}}
+                          · {{session.fields.length}} field(s) changed
+                        </div>
+                      </div>
+                      <mat-icon style="color:#64748b;transition:transform 0.2s" [style.transform]="expandedAuditSessionId() === session.key ? 'rotate(180deg)' : 'rotate(0)'">expand_more</mat-icon>
+                    </div>
+                    @if (expandedAuditSessionId() === session.key) {
+                      <div style="padding:0 16px 12px">
+                        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
+                          <thead>
+                            <tr style="background:#f1f5f9">
+                              <th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0">Field</th>
+                              <th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0">Before</th>
+                              <th style="padding:6px 10px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0">After</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (f of session.fields; track f.auditTrailId) {
+                              <tr>
+                                <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;font-weight:500;color:#334155">{{f.fieldName}}</td>
+                                <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#ef4444">{{f.oldValue || '—'}}</td>
+                                <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#10b981">{{f.newValue || '—'}}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+                }
+              } @else {
+                <div style="color:#94a3b8;text-align:center;padding:24px">
+                  <mat-icon style="font-size:40px;margin-bottom:8px">receipt_long</mat-icon>
+                  <div>No verification audit entries recorded yet</div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+<app-cidms-picker [isOpen]="showCidmsPicker()" (selected)="onCidmsPickerSelected($event)" (closed)="showCidmsPicker.set(false)"></app-cidms-picker>

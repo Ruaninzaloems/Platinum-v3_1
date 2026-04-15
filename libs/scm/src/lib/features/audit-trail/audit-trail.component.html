@@ -1,0 +1,292 @@
+    <div class="audit-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.notification-error]="notificationError()">
+          <mat-icon>{{notificationError() ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+        </div>
+      }
+
+      @if (currentView() === 'list') {
+        <div class="tab-nav">
+          <button class="tab-btn active">Audit Log</button>
+          <button class="tab-btn" (click)="currentView.set('user-activity')">User Activity</button>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-tile" [matTooltip]="kpiSummary().totalEntries + ' total audit log entries'">
+            <mat-icon>security</mat-icon>
+            <span class="kpi-value">{{kpiSummary().totalEntries}}</span>
+            <span class="kpi-label">Total Entries</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="kpiSummary().todayActions + ' actions recorded today'">
+            <mat-icon>today</mat-icon>
+            <span class="kpi-value">{{kpiSummary().todayActions}}</span>
+            <span class="kpi-label">Today's Actions</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="kpiSummary().uniqueUsers + ' unique users with activity'">
+            <mat-icon>people</mat-icon>
+            <span class="kpi-value">{{kpiSummary().uniqueUsers}}</span>
+            <span class="kpi-label">Active Users</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="'Most active module: ' + kpiSummary().mostActiveModule">
+            <mat-icon>widgets</mat-icon>
+            <span class="kpi-value">{{kpiSummary().mostActiveModule}}</span>
+            <span class="kpi-label">Most Active Module</span>
+          </div>
+          <div class="kpi-tile" [matTooltip]="kpiSummary().exportCount + ' exports performed'">
+            <mat-icon>file_download</mat-icon>
+            <span class="kpi-value">{{kpiSummary().exportCount}}</span>
+            <span class="kpi-label">Exports</span>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput placeholder="Search audit log..." [(ngModel)]="searchQuery" (keyup.enter)="loadEntries()">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Action" [(ngModel)]="filterAction" (selectionChange)="loadEntries()">
+              <mat-option value="">All Actions</mat-option>
+              <mat-option value="login">Login</mat-option>
+              <mat-option value="create">Create</mat-option>
+              <mat-option value="update">Update</mat-option>
+              <mat-option value="approve">Approve</mat-option>
+              <mat-option value="reject">Reject</mat-option>
+              <mat-option value="submit">Submit</mat-option>
+              <mat-option value="delete">Delete</mat-option>
+              <mat-option value="publish">Publish</mat-option>
+              <mat-option value="award">Award</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-select placeholder="Module" [(ngModel)]="filterModule" (selectionChange)="loadEntries()">
+              <mat-option value="">All Modules</mat-option>
+              @for (mod of availableModules(); track mod) {
+                <mat-option [value]="mod">{{mod | titlecase}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="showFilters.set(!showFilters())">
+            <mat-icon>{{showFilters() ? 'expand_less' : 'tune'}}</mat-icon> Filters
+          </button>
+
+          <button mat-stroked-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon> Clear
+          </button>
+
+          <button mat-flat-button color="primary" (click)="exportAuditLog()">
+            <mat-icon>file_download</mat-icon> Export
+          </button>
+        </div>
+
+        @if (showFilters()) {
+          <div class="advanced-filters">
+            <mat-form-field appearance="outline">
+              <mat-label>Entity Type</mat-label>
+              <mat-select [(ngModel)]="filterEntityType" (selectionChange)="loadEntries()">
+                <mat-option value="">All Entity Types</mat-option>
+                @for (et of availableEntityTypes(); track et) {
+                  <mat-option [value]="et">{{formatEntityType(et)}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>User</mat-label>
+              <mat-select [(ngModel)]="filterUserId" (selectionChange)="loadEntries()">
+                <mat-option value="">All Users</mat-option>
+                @for (u of availableUsers(); track u.id) {
+                  <mat-option [value]="u.id">{{u.name}}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date From</mat-label>
+              <input matInput [matDatepicker]="filterFromPicker" [(ngModel)]="filterDateFrom" (dateChange)="loadEntries()">
+              <mat-datepicker-toggle matIconSuffix [for]="filterFromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterFromPicker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Date To</mat-label>
+              <input matInput [matDatepicker]="filterToPicker" [(ngModel)]="filterDateTo" (dateChange)="loadEntries()">
+              <mat-datepicker-toggle matIconSuffix [for]="filterToPicker"></mat-datepicker-toggle>
+              <mat-datepicker #filterToPicker></mat-datepicker>
+            </mat-form-field>
+          </div>
+        }
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>User</th>
+                <th>Module</th>
+                <th>Entity Type</th>
+                <th>Entity ID</th>
+                <th>Description</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of entries(); track entry.id) {
+                <tr class="data-row" (click)="entry.entityId ? viewEntityTimeline(entry.entityType, entry.entityId) : null">
+                  <td class="timestamp-cell">{{formatTimestamp(entry.timestamp)}}</td>
+                  <td>
+                    <span class="action-badge" [class]="'action-' + entry.action">
+                      <mat-icon class="action-icon">{{getActionIcon(entry.action)}}</mat-icon>
+                      {{entry.action | titlecase}}
+                    </span>
+                  </td>
+                  <td class="user-cell">{{entry.userName}}</td>
+                  <td><span class="module-chip">{{entry.module | titlecase}}</span></td>
+                  <td>{{formatEntityType(entry.entityType)}}</td>
+                  <td>
+                    @if (entry.entityId) {
+                      <span class="ref-cell entity-link" (click)="$event.stopPropagation(); viewEntityTimeline(entry.entityType, entry.entityId)">{{entry.entityId}}</span>
+                    } @else {
+                      <span class="muted">—</span>
+                    }
+                  </td>
+                  <td class="desc-cell">{{entry.description}}</td>
+                  <td class="ip-cell">{{entry.ipAddress}}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    <mat-icon>search_off</mat-icon>
+                    <span>No audit entries found matching your criteria</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="page-info">Page {{currentPage()}} of {{totalPages()}} &middot; {{totalEntries()}} total entries</span>
+          <div class="page-buttons">
+            <button mat-icon-button [disabled]="currentPage() <= 1" (click)="changePage(currentPage() - 1)">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <span class="page-num">{{currentPage()}}</span>
+            <button mat-icon-button [disabled]="currentPage() >= totalPages()" (click)="changePage(currentPage() + 1)">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (currentView() === 'user-activity') {
+        <div class="tab-nav">
+          <button class="tab-btn" (click)="currentView.set('list')">Audit Log</button>
+          <button class="tab-btn active">User Activity</button>
+        </div>
+
+        <div class="filters-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Select User</mat-label>
+            <mat-select [(ngModel)]="selectedUserId" (selectionChange)="loadUserActivity()">
+              @for (u of availableUsers(); track u.id) {
+                <mat-option [value]="u.id">{{u.name}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        @if (selectedUserId && userEntries().length > 0) {
+          <div class="detail-card">
+            <h3><mat-icon>person</mat-icon> Activity for {{getUserName(selectedUserId)}}</h3>
+            <div class="timeline">
+              @for (entry of userEntries(); track entry.id) {
+                <div class="timeline-item">
+                  <div class="timeline-dot" [class]="'dot-' + entry.action"></div>
+                  <div class="timeline-connector"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-header">
+                      <span class="action-badge action-sm" [class]="'action-' + entry.action">
+                        <mat-icon class="action-icon">{{getActionIcon(entry.action)}}</mat-icon>
+                        {{entry.action | titlecase}}
+                      </span>
+                      <span class="timeline-module">{{entry.module | titlecase}}</span>
+                      @if (entry.entityId) {
+                        <span class="ref-cell entity-link" (click)="viewEntityTimeline(entry.entityType, entry.entityId)">{{entry.entityId}}</span>
+                      }
+                    </div>
+                    <div class="timeline-desc">{{entry.description}}</div>
+                    <div class="timeline-meta">{{formatTimestamp(entry.timestamp)}} &middot; IP: {{entry.ipAddress}}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else if (selectedUserId && userEntries().length === 0) {
+          <div class="detail-card">
+            <div class="empty-state">
+              <mat-icon>person_off</mat-icon>
+              <span>No activity found for this user</span>
+            </div>
+          </div>
+        } @else {
+          <div class="detail-card">
+            <div class="empty-state">
+              <mat-icon>person_search</mat-icon>
+              <span>Select a user to view their activity</span>
+            </div>
+          </div>
+        }
+      }
+
+      @if (currentView() === 'entity-timeline') {
+        <div class="detail-header">
+          <button mat-icon-button (click)="backToList()"><mat-icon>arrow_back</mat-icon></button>
+          <div class="detail-title-section">
+            <h2>Entity Timeline</h2>
+            <div class="detail-meta">
+              <span class="module-chip">{{formatEntityType(timelineEntityType())}}</span>
+              <span class="ref-cell">{{timelineEntityId()}}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <h3><mat-icon>history</mat-icon> Chronological History</h3>
+          @if (entityTimeline().length > 0) {
+            <div class="timeline">
+              @for (entry of entityTimeline(); track entry.id) {
+                <div class="timeline-item">
+                  <div class="timeline-dot" [class]="'dot-' + entry.action"></div>
+                  <div class="timeline-connector"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-header">
+                      <span class="action-badge action-sm" [class]="'action-' + entry.action">
+                        <mat-icon class="action-icon">{{getActionIcon(entry.action)}}</mat-icon>
+                        {{entry.action | titlecase}}
+                      </span>
+                      <span class="timeline-user">{{entry.userName}}</span>
+                    </div>
+                    <div class="timeline-desc">{{entry.description}}</div>
+                    <div class="timeline-meta">{{formatTimestamp(entry.timestamp)}} &middot; IP: {{entry.ipAddress}}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="empty-state">
+              <mat-icon>history_toggle_off</mat-icon>
+              <span>No history found for this entity</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
+      }
+    </div>

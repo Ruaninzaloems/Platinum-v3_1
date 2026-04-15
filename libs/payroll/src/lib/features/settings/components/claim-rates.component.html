@@ -1,0 +1,83 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Claim Rates</h1>
+    <p class="page-subtitle">Configure travel and subsistence claim rates</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ rates.length }}</span>
+    <span class="summary-label">Total Rates</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ claimTypeCount }}</span>
+    <span class="summary-label">Claim Types</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search claim rates..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredRates.length }} results</span>
+  </div>
+  <button class="btn btn-primary" (click)="openModal()">
+    <app-icon name="plus" [size]="16"></app-icon> Add Rate
+  </button>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr><th>Claim Type</th><th>Description</th><th style="text-align:right">Rate</th><th>Unit</th><th>Effective Date</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          @if (filteredRates.length === 0) {
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">No claim rates found</td></tr>
+          } @else {
+            @for (r of filteredRates; track r.id) {
+              <tr>
+                <td style="font-weight:500">{{ r.claim_type || '-' }}</td>
+                <td>{{ r.description || '-' }}</td>
+                <td style="text-align:right">{{ formatRate(r.rate) }}</td>
+                <td>{{ r.rate_unit || '-' }}</td>
+                <td>{{ r.effective_date | dateSa }}</td>
+                <td><button class="action-btn" (click)="openModal(r)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editItem.id ? 'Edit Claim Rate: ' + editItem.claim_type : 'Add Claim Rate' }}</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="dollar" [size]="16"></app-icon> {{ editItem.id ? 'Edit Rate' : 'New Rate' }}</div>
+          <div class="form-group"><label>Claim Type *</label><input class="form-control" [(ngModel)]="editItem.claim_type" placeholder="e.g. TRAVEL, SUBSISTENCE"></div>
+          <div class="form-group"><label>Description</label><input class="form-control" [(ngModel)]="editItem.description" placeholder="e.g. Per kilometre rate"></div>
+          <div class="form-group"><label>Rate *</label><input class="form-control" type="number" [(ngModel)]="editItem.rate" min="0" step="0.01"></div>
+          <div class="form-group"><label>Rate Unit</label><input class="form-control" [(ngModel)]="editItem.rate_unit" placeholder="e.g. per km, per day, flat"></div>
+          <div class="form-group"><label>Effective Date *</label><app-date-input [(ngModel)]="editItem.effective_date"></app-date-input></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">{{ editItem.id ? 'Update' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+}

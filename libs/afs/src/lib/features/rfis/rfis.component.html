@@ -1,0 +1,68 @@
+<h2 mat-dialog-title>New RFI</h2>
+<mat-dialog-content>
+  <div class="form-grid">
+    <mat-form-field appearance="outline" style="grid-column: 1 / -1">
+      <mat-label>Subject</mat-label>
+      <input matInput [(ngModel)]="data.subject" required>
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="grid-column: 1 / -1">
+      <mat-label>AGSA Reference</mat-label>
+      <input matInput [(ngModel)]="data.externalReference" placeholder="e.g. RFI-AGSA-001">
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="grid-column: 1 / -1">
+      <mat-label>Description</mat-label>
+      <textarea matInput [(ngModel)]="data.description" rows="3"></textarea>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Priority</mat-label>
+      <mat-select [(ngModel)]="data.priority">
+        <mat-option value="High">High</mat-option>
+        <mat-option value="Medium">Medium</mat-option>
+        <mat-option value="Low">Low</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Assigned To</mat-label>
+      <input matInput [(ngModel)]="data.assignedTo">
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Due Date</mat-label>
+      <input matInput [matDatepicker]="picker" [(ngModel)]="data.dueDate">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <div style="margin-top: 12px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px;">attach_file</mat-icon>
+      <span style="font-weight: 500; font-size: 13px;">Attachments</span>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <input type="file" multiple #fileInput style="display: none;" (change)="onFilesSelected($event)">
+      <button mat-stroked-button type="button" (click)="fileInput.click()">
+        <mat-icon>cloud_upload</mat-icon> Choose Files
+      </button>
+    </div>
+    @if (pendingFiles.length > 0) {
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        @for (f of pendingFiles; track f.name) {
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 8px; background: #f5f5f5; border-radius: 4px;">
+            <mat-icon style="font-size: 16px; width: 16px; height: 16px;">insert_drive_file</mat-icon>
+            <span style="flex: 1;">{{ f.name }}</span>
+            <button mat-icon-button style="width: 24px; height: 24px;" (click)="removePendingFile(f)">
+              <mat-icon style="font-size: 14px; width: 14px; height: 14px;">close</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+    }
+    @if (uploading) {
+      <div style="font-size: 12px; color: var(--platinum-text-muted); margin-top: 4px;">Uploading files...</div>
+    }
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancel</button>
+  <button mat-flat-button class="btn-primary" [disabled]="!data.subject || uploading" (click)="save()">Create</button>
+</mat-dialog-actions>

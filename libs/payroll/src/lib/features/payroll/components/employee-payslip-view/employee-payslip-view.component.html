@@ -1,0 +1,500 @@
+@if (!showPayslip) {
+  <div class="page-header">
+    <h2>Employee Payslip View</h2>
+    @if (currentPeriod) {
+      <span class="period-badge">
+        <app-icon name="calendar" [size]="14"></app-icon>
+        {{ getPeriodLabel() }} &mdash; Period {{ currentPeriod.period_number }}
+      </span>
+    }
+  </div>
+
+  <div class="controls-bar">
+    <select [(ngModel)]="selectedCycleId" (change)="onCycleChange()">
+      <option value="">-- Select Payroll Cycle --</option>
+      @for (c of cycles; track c.id) {
+        <option [value]="c.id">{{ c.name }}</option>
+      }
+    </select>
+    <input type="text" class="search-input" placeholder="Search by name, code, or ID number..."
+           [(ngModel)]="employeeSearch" (keyup.enter)="onSearchChange()">
+    <button class="btn btn-primary" (click)="onSearchChange()">
+      <app-icon name="search" [size]="14"></app-icon> Search
+    </button>
+  </div>
+
+  @if (!selectedCycleId) {
+    <div class="empty-state">
+      <app-icon name="users" [size]="40"></app-icon>
+      <div class="empty-title">Select a Payroll Cycle</div>
+      <div class="empty-desc">Choose a payroll cycle to view employees and their payslips</div>
+    </div>
+  } @else if (employeesLoading) {
+    <div class="loading"><div class="spinner"></div> Loading employees...</div>
+  } @else if (employees.length === 0) {
+    <div class="empty-state">
+      <app-icon name="users" [size]="40"></app-icon>
+      <div class="empty-title">No Employees Found</div>
+      <div class="empty-desc">No active employees found for this cycle{{ employeeSearch ? ' matching your search' : '' }}</div>
+    </div>
+  } @else {
+    <div class="employee-grid">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" (click)="toggleSort('id')">Employee # <span class="sort-icon">{{ sortIcon('id') }}</span></th>
+            <th class="sortable" (click)="toggleSort('employee_code')">Employee Code <span class="sort-icon">{{ sortIcon('employee_code') }}</span></th>
+            <th class="sortable" (click)="toggleSort('id_number')">ID Number <span class="sort-icon">{{ sortIcon('id_number') }}</span></th>
+            <th class="sortable" (click)="toggleSort('surname')">Last Name <span class="sort-icon">{{ sortIcon('surname') }}</span></th>
+            <th class="sortable" (click)="toggleSort('first_name')">First Name <span class="sort-icon">{{ sortIcon('first_name') }}</span></th>
+            <th class="sortable" (click)="toggleSort('division_name')">Division <span class="sort-icon">{{ sortIcon('division_name') }}</span></th>
+            <th class="sortable" (click)="toggleSort('job_title')">Job Title <span class="sort-icon">{{ sortIcon('job_title') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (emp of employees; track emp.id; let i = $index) {
+            <tr class="clickable" [class.selected]="selectedEmployee?.id === emp.id" (click)="selectEmployee(emp, i)">
+              <td><strong>{{ emp.id }}</strong></td>
+              <td>{{ emp.employee_code }}</td>
+              <td>{{ emp.id_number }}</td>
+              <td>{{ emp.surname }}</td>
+              <td>{{ emp.first_name }}</td>
+              <td>{{ emp.division_name || emp.department_name || '-' }}</td>
+              <td>{{ emp.job_title || '-' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (employeePagination.totalPages > 1) {
+      <div class="pagination-bar">
+        <span>Showing {{ (employeePagination.page - 1) * employeePagination.limit + 1 }}-{{ Math.min(employeePagination.page * employeePagination.limit, employeePagination.total) }} of {{ employeePagination.total }}</span>
+        <div class="pagination-controls">
+          <button [disabled]="employeePagination.page <= 1" (click)="goToEmployeePage(employeePagination.page - 1)">&lsaquo;</button>
+          @for (p of getVisiblePages(); track p) {
+            <button [class.active]="employeePagination.page === p" (click)="goToEmployeePage(p)">{{ p }}</button>
+          }
+          <button [disabled]="employeePagination.page >= employeePagination.totalPages" (click)="goToEmployeePage(employeePagination.page + 1)">&rsaquo;</button>
+        </div>
+      </div>
+    }
+  }
+} @else {
+  <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
+    <button class="btn-back" (click)="backToList()">
+      <app-icon name="chevronLeft" [size]="14"></app-icon> Back to List
+    </button>
+    @if (currentPeriod) {
+      <span class="period-badge">
+        <app-icon name="calendar" [size]="14"></app-icon>
+        {{ getPeriodLabel() }}
+      </span>
+    }
+  </div>
+
+  @if (payslipLoading) {
+    <div class="loading"><div class="spinner"></div> Calculating payslip...</div>
+  } @else if (payslipData) {
+    <div class="payslip-container">
+      <div class="payslip-header">
+        <div class="emp-info">
+          <h3>{{ payslipData.employee.first_name }} {{ payslipData.employee.surname }}
+            @if (payslipData.salaryStructure?.source) {
+              <span class="salary-source-badge"
+                    [class.upper-limit]="payslipData.salaryStructure.source === 'UPPER_LIMIT'"
+                    [class.task-grade]="payslipData.salaryStructure.source === 'TASK_GRADE'"
+                    [class.fixed]="payslipData.salaryStructure.source === 'FIXED'">
+                {{ payslipData.salaryStructure.source === 'UPPER_LIMIT' ? 'Upper Limit' : payslipData.salaryStructure.source === 'TASK_GRADE' ? 'Task Grade' : 'Fixed' }}
+              </span>
+            }
+          </h3>
+          <p>{{ payslipData.employee.employee_code }} &bull; {{ payslipData.employee.position_title || 'No Position' }} &bull; {{ payslipData.employee.department_name || '' }}</p>
+        </div>
+        <div class="nav-controls">
+          <button class="nav-btn" [disabled]="selectedEmployeeIndex <= 0" (click)="navigateEmployee(-1)">
+            <app-icon name="chevronLeft" [size]="12"></app-icon> Previous
+          </button>
+          <input type="text" class="go-input" placeholder="Code / #" [(ngModel)]="goToInput" (keyup.enter)="goToEmployee()">
+          <button class="nav-btn" (click)="goToEmployee()">Go</button>
+          <button class="nav-btn" [disabled]="selectedEmployeeIndex >= employees.length - 1" (click)="navigateEmployee(1)">
+            Next <app-icon name="chevronRight" [size]="12"></app-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="payslip-layout">
+        <div class="payslip-main">
+          <div class="tab-bar">
+            <button class="tab-btn" [class.active]="activeTab === 'earnings'" (click)="switchTab('earnings')">Earnings</button>
+            <button class="tab-btn" [class.active]="activeTab === 'deductions'" (click)="switchTab('deductions')">Deductions</button>
+            <button class="tab-btn" [class.active]="activeTab === 'company'" (click)="switchTab('company')">Company Contributions</button>
+            <button class="tab-btn" [class.active]="activeTab === 'fringe'" (click)="switchTab('fringe')">Fringe Benefits</button>
+          </div>
+
+          <div class="payslip-tab-content">
+            @if (activeTab === 'earnings') {
+              <div class="tab-panel">
+                <div class="section-header">
+                  <h4>Earnings</h4>
+                  <button class="add-btn" (click)="openAddTransaction('EARNING')">+ Add</button>
+                </div>
+                <div class="line-items">
+                  @for (item of payslipData.earnings; track $index) {
+                    <div class="line-item">
+                      <span class="item-name">
+                        {{ item.head_name }}
+                        @if (item.is_system || item.is_system_generated) {
+                          <span class="system-badge">sys</span>
+                        }
+                      </span>
+                      <span class="item-amount">
+                        {{ formatCurrency(item.amount) }}
+                        @if (!item.is_system && item.est_id) {
+                          <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+                <div class="section-total">
+                  <span>Total Earnings</span>
+                  <span>{{ formatCurrency(payslipData.summary.total_earnings ?? payslipData.summary.gross_earnings) }}</span>
+                </div>
+              </div>
+            }
+
+            @if (activeTab === 'deductions') {
+              <div class="tab-panel">
+                <div class="section-header">
+                  <h4>Deductions</h4>
+                  <button class="add-btn" (click)="openAddTransaction('DEDUCTION')">+ Add</button>
+                </div>
+                <div class="line-items">
+                  @for (item of payslipData.deductions; track $index) {
+                    <div class="line-item">
+                      <span class="item-name">
+                        {{ item.head_name }}
+                        @if (item.is_system) {
+                          <span class="system-badge">sys</span>
+                        }
+                        @if (item.head_code === 'PAYE') {
+                          <span class="paye-link" (click)="openPayeBreakdown()">View breakdown</span>
+                        }
+                      </span>
+                      <span class="item-amount">
+                        {{ formatCurrency(item.amount) }}
+                        @if (!item.is_system && item.est_id) {
+                          <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+                <div class="section-total">
+                  <span>Total Deductions</span>
+                  <span>{{ formatCurrency(payslipData.summary.total_deductions) }}</span>
+                </div>
+              </div>
+            }
+
+            @if (activeTab === 'company') {
+              <div class="tab-panel">
+                <div class="section-header">
+                  <h4>Company Contributions</h4>
+                  <button class="add-btn" (click)="openAddTransaction('COMPANY_CONTRIBUTION')">+ Add</button>
+                </div>
+                <div class="line-items">
+                  @for (item of payslipData.company_contributions; track $index) {
+                    <div class="line-item">
+                      <span class="item-name">
+                        {{ item.head_name }}
+                        @if (item.is_system) {
+                          <span class="system-badge">sys</span>
+                        }
+                      </span>
+                      <span class="item-amount">
+                        {{ formatCurrency(item.amount) }}
+                        @if (!item.is_system && item.est_id) {
+                          <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+                <div class="section-total">
+                  <span>Total Company Contributions</span>
+                  <span>{{ formatCurrency(payslipData.summary.company_contributions) }}</span>
+                </div>
+              </div>
+            }
+
+            @if (activeTab === 'fringe') {
+              <div class="tab-panel">
+                <div class="section-header">
+                  <h4>Fringe Benefits</h4>
+                  <button class="add-btn" (click)="openAddTransaction('FRINGE_BENEFIT')">+ Add</button>
+                </div>
+                <div class="line-items">
+                  @if (payslipData.fringe_benefits.length === 0) {
+                    <div class="empty-tab">No fringe benefits</div>
+                  }
+                  @for (item of payslipData.fringe_benefits; track $index) {
+                    <div class="line-item">
+                      <span class="item-name">
+                        {{ item.head_name }}
+                        @if (item.is_system) {
+                          <span class="system-badge">sys</span>
+                        }
+                      </span>
+                      <span class="item-amount">
+                        {{ formatCurrency(item.amount) }}
+                        @if (!item.is_system && item.est_id) {
+                          <button class="remove-btn" (click)="removeTransaction(item)" title="Remove">&times;</button>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+                <div class="section-total">
+                  <span>Total Fringe Benefits</span>
+                  <span>{{ formatCurrency(getFringeBenefitTotal()) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="summary-panel">
+          <h4 class="summary-title">Summary</h4>
+          <div class="summary-row">
+            <span class="summary-label">Total Earnings</span>
+            <span class="summary-value">{{ formatCurrency(payslipData.summary.total_earnings ?? payslipData.summary.gross_earnings) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Fringe Benefits</span>
+            <span class="summary-value">{{ formatCurrency(payslipData.summary.total_fringe_benefits ?? getFringeBenefitTotal()) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Deductions</span>
+            <span class="summary-value deductions">- {{ formatCurrency(payslipData.summary.total_deductions) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Company Contributions</span>
+            <span class="summary-value">{{ formatCurrency(payslipData.summary.company_contributions) }}</span>
+          </div>
+          <div class="summary-divider"></div>
+          <div class="summary-row highlight">
+            <span class="summary-label">Nett Pay</span>
+            <span class="summary-value nett">{{ formatCurrency(payslipData.summary.nett_pay) }}</span>
+          </div>
+          <div class="summary-row highlight">
+            <span class="summary-label">Total Cost to Company</span>
+            <span class="summary-value ctc">{{ formatCurrency(payslipData.summary.total_cost_to_company) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+@if (showPayeModal) {
+  <div class="modal-overlay" (click)="closePayeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>PAYE Calculation Breakdown</h3>
+        <button class="modal-close" (click)="closePayeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        @if (payeLoading) {
+          <div class="loading"><div class="spinner"></div> Loading...</div>
+        } @else if (payeBreakdown) {
+          <table class="paye-detail-table">
+            <tr>
+              <td>Tax Year</td>
+              <td>{{ payeBreakdown.tax_year }}</td>
+            </tr>
+            <tr>
+              <td>Employee Age</td>
+              <td>{{ payeBreakdown.age }} years</td>
+            </tr>
+            <tr>
+              <td>Periods Per Year</td>
+              <td>{{ payeBreakdown.periods_per_year }}</td>
+            </tr>
+            <tr>
+              <td>Salary Source</td>
+              <td>{{ payeBreakdown.salary_source }}</td>
+            </tr>
+            @if (payeBreakdown.total_package) {
+              <tr>
+                <td>Total Package (Annual)</td>
+                <td>{{ formatCurrency(payeBreakdown.total_package) }}</td>
+              </tr>
+            }
+            <tr>
+              <td>Basic Salary (Annual)</td>
+              <td>{{ formatCurrency(payeBreakdown.basic_annual) }}</td>
+            </tr>
+            <tr>
+              <td>Monthly Taxable Income</td>
+              <td>{{ formatCurrency(payeBreakdown.monthly_taxable_income) }}</td>
+            </tr>
+            <tr class="highlight">
+              <td>Annual Taxable Income</td>
+              <td>{{ formatCurrency(payeBreakdown.annual_taxable_income) }}</td>
+            </tr>
+            @if (payeBreakdown.applied_bracket) {
+              <tr>
+                <td>Tax Bracket Applied</td>
+                <td>Bracket {{ payeBreakdown.applied_bracket.bracket_number }}</td>
+              </tr>
+              <tr class="sub">
+                <td>Income Range</td>
+                <td>{{ formatCurrency(payeBreakdown.applied_bracket.min_income) }} &ndash; {{ formatCurrency(payeBreakdown.applied_bracket.max_income) }}</td>
+              </tr>
+              <tr class="sub">
+                <td>Base Tax + Marginal Rate</td>
+                <td>{{ formatCurrency(payeBreakdown.applied_bracket.base_tax) }} + {{ payeBreakdown.applied_bracket.rate }}%</td>
+              </tr>
+            }
+            <tr>
+              <td>Annual Tax (before rebates)</td>
+              <td>{{ formatCurrency(payeBreakdown.annual_tax_before_rebates) }}</td>
+            </tr>
+            @for (rebate of payeBreakdown.rebates; track rebate.type) {
+              <tr class="sub">
+                <td>{{ rebate.type }} Rebate</td>
+                <td>-{{ formatCurrency(rebate.amount) }}</td>
+              </tr>
+            }
+            <tr>
+              <td>Total Rebates</td>
+              <td>-{{ formatCurrency(payeBreakdown.total_rebates) }}</td>
+            </tr>
+            <tr>
+              <td>Annual Tax (after rebates)</td>
+              <td>{{ formatCurrency(payeBreakdown.annual_tax_after_rebates) }}</td>
+            </tr>
+            <tr>
+              <td>Monthly PAYE (before credits)</td>
+              <td>{{ formatCurrency(payeBreakdown.monthly_paye_before_credits) }}</td>
+            </tr>
+            <tr>
+              <td>Medical Tax Credits ({{ payeBreakdown.dependant_count }} dependant{{ payeBreakdown.dependant_count !== 1 ? 's' : '' }})</td>
+              <td>-{{ formatCurrency(payeBreakdown.medical_tax_credits) }}</td>
+            </tr>
+            <tr class="highlight">
+              <td>Final Monthly PAYE</td>
+              <td>{{ formatCurrency(payeBreakdown.final_monthly_paye) }}</td>
+            </tr>
+          </table>
+        } @else {
+          <div class="empty-state">
+            <div class="empty-title">Unable to load PAYE breakdown</div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="closePayeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showAddTxModal) {
+  <div class="modal-overlay" (click)="closeAddTxModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingTxId ? 'Update' : 'Add' }} {{ addTxSection === 'EARNING' ? 'Earning' : addTxSection === 'DEDUCTION' ? 'Deduction' : addTxSection === 'COMPANY_CONTRIBUTION' ? 'Company Contribution' : 'Transaction' }}</h3>
+        <button class="modal-close" (click)="closeAddTxModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        @if (addTxLoading) {
+          <div class="loading"><div class="spinner"></div> Loading available transactions...</div>
+        } @else {
+          <div class="form-group">
+            <label>Salary Transaction</label>
+            <select [(ngModel)]="addTxForm.salary_head_id" (ngModelChange)="onSalaryHeadChange()" [disabled]="!!editingTxId">
+              <option value="">-- Select Transaction --</option>
+              @for (t of availableTransactions; track t.id) {
+                <option [value]="t.id">{{ t.irp5_code || '-' }} - {{ t.name }}</option>
+              }
+            </select>
+          </div>
+
+          @if (addTxForm.salary_head_id) {
+            <div class="existing-tx-section">
+              <label class="existing-tx-label">Existing Transactions</label>
+              @if (existingTxLoading) {
+                <div class="loading" style="padding:10px"><div class="spinner"></div> Loading...</div>
+              } @else if (existingTransactions.length === 0) {
+                <div style="padding:10px 12px;font-size:12px;color:#94a3b8">No existing transactions for this salary head</div>
+              } @else {
+                <table class="existing-tx-table">
+                  <thead>
+                    <tr>
+                      <th>Amount</th>
+                      <th>Entry Date</th>
+                      <th>Reference</th>
+                      <th>Run</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (etx of existingTransactions; track etx.id) {
+                      <tr [class.editing]="editingTxId === etx.id">
+                        <td>{{ formatCurrency(etx.captured_amount) }}</td>
+                        <td>{{ etx.entry_date ? (etx.entry_date | date:'yyyy-MM-dd') : '-' }}</td>
+                        <td>{{ etx.reference_no || '-' }}</td>
+                        <td>{{ etx.every_month ? 'Every Month' : (etx.period_name || 'This Period') }}</td>
+                        <td class="action-cell">
+                          <button class="action-btn edit-btn" (click)="editExistingTx(etx)" title="Edit">&#9998;</button>
+                          <button class="action-btn delete-btn" (click)="deleteExistingTx(etx)" title="Delete">&times;</button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </div>
+          }
+
+          @if (editingTxId) {
+            <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:#f59e0b;font-weight:500">Editing transaction</span>
+              <button class="btn" style="padding:2px 8px;font-size:11px" (click)="cancelEdit()">Cancel Edit</button>
+            </div>
+          }
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Amount (Rand) - Monthly</label>
+              <input type="number" step="0.01" [(ngModel)]="addTxForm.amount" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label>Entry Date</label>
+              <input type="date" [(ngModel)]="addTxForm.entry_date">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Reference No (optional)</label>
+              <input type="text" [(ngModel)]="addTxForm.reference_no" placeholder="Optional reference">
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:8px">
+              <div class="checkbox-group">
+                <input type="checkbox" id="everyMonth" [(ngModel)]="addTxForm.every_month">
+                <label for="everyMonth" style="margin:0;color:#334155">Every Month (permanent)</label>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="closeAddTxModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitAddTransaction()" [disabled]="addTxLoading">{{ editingTxId ? 'Update' : 'Add' }} Transaction</button>
+      </div>
+    </div>
+  </div>
+}

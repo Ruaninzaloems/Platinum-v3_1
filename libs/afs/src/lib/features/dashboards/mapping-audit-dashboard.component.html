@@ -1,0 +1,109 @@
+@if (loading) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <div class="skeleton skeleton-title" style="width:300px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton skeleton-subtitle" style="width:220px;height:14px;border-radius:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:80px 0">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  </div>
+} @else if (error) {
+  <div class="page-container">
+    <div class="error-container">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <h3>Unable to load mapping audit</h3>
+      <p>{{ error }}</p>
+      <button mat-flat-button color="primary" (click)="loadData()">
+        <mat-icon>refresh</mat-icon> Retry
+      </button>
+    </div>
+  </div>
+} @else if (data) {
+  <div class="page-container">
+    <div class="page-header">
+      <div>
+        <h1>Mapping Audit</h1>
+        <p class="subtitle">mSCOA to GRAP mapping coverage and rule status</p>
+      </div>
+      <div class="page-actions">
+        <button mat-stroked-button (click)="loadData()" matTooltip="Refresh mapping audit">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <app-kpi-tile title="Total Rules" [value]="data.totalRules" icon="rule" color="primary"></app-kpi-tile>
+      <app-kpi-tile title="Coverage" [value]="data.coveragePercent + '%'" icon="pie_chart" color="info"></app-kpi-tile>
+      <app-kpi-tile title="Confirmed" [value]="data.confirmedMappings" icon="verified" color="success"></app-kpi-tile>
+      <app-kpi-tile title="Pending" [value]="data.pendingConfirmation" icon="pending" color="warning"></app-kpi-tile>
+      <app-kpi-tile title="Unmapped" [value]="data.unmappedAccounts" icon="link_off" [color]="data.unmappedAccounts > 0 ? 'danger' : 'success'"></app-kpi-tile>
+    </div>
+
+    <mat-card class="coverage-card">
+      <div class="coverage-header">
+        <span class="coverage-label">Mapping Coverage</span>
+        <span class="coverage-value">{{ data.coveragePercent }}%</span>
+      </div>
+      <mat-progress-bar mode="determinate" [value]="data.coveragePercent"
+        [color]="data.coveragePercent >= 80 ? 'primary' : data.coveragePercent >= 50 ? 'accent' : 'warn'">
+      </mat-progress-bar>
+    </mat-card>
+
+    <div class="breakdown-grid">
+      <mat-card class="detail-card">
+        <div class="card-title"><mat-icon>category</mat-icon> By Type</div>
+        <div class="breakdown-list">
+          @for (entry of typeEntries; track entry[0]) {
+            <div class="breakdown-row">
+              <span class="breakdown-label">{{ formatLabel(entry[0]) }}</span>
+              <span class="breakdown-count">{{ entry[1] }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+      <mat-card class="detail-card">
+        <div class="card-title"><mat-icon>stacked_bar_chart</mat-icon> By Status</div>
+        <div class="breakdown-list">
+          @for (entry of statusEntries; track entry[0]) {
+            <div class="breakdown-row">
+              <span class="chip" [class]="'chip-' + entry[0]">{{ formatLabel(entry[0]) }}</span>
+              <span class="breakdown-count">{{ entry[1] }}</span>
+            </div>
+          }
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="section-title">
+      <mat-icon>table_chart</mat-icon> Mapping Rules
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>GL Account</th>
+            <th>mSCOA Item</th>
+            <th>Target Line Item</th>
+            <th>Type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rule of data.rules; track rule.id) {
+            <tr>
+              <td class="name-cell">{{ rule.glAccountCode }} {{ rule.glAccountName ? '— ' + rule.glAccountName : '' }}</td>
+              <td>{{ rule.mscoaItemCode || '—' }}</td>
+              <td>{{ rule.lineItemLabel || '—' }}</td>
+              <td><span class="chip chip-blue">{{ formatLabel(rule.mappingType) }}</span></td>
+              <td><span class="chip" [class]="'chip-' + rule.status">{{ formatLabel(rule.status) }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

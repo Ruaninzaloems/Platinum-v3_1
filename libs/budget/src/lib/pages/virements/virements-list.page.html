@@ -1,0 +1,406 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1>Virement Management</h1>
+    <button mat-raised-button color="primary" (click)="openCreateDialog()">
+      <mat-icon>swap_horiz</mat-icon> New Virement
+    </button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-icon draft"><mat-icon>edit_note</mat-icon></div>
+      <div class="kpi-body"><span class="kpi-value">{{ draftCount }}</span><span class="kpi-label">Drafts</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon pending"><mat-icon>hourglass_empty</mat-icon></div>
+      <div class="kpi-body"><span class="kpi-value">{{ pendingCount }}</span><span class="kpi-label">Pending Approval</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon approved"><mat-icon>check_circle</mat-icon></div>
+      <div class="kpi-body"><span class="kpi-value">{{ approvedCount }}</span><span class="kpi-label">Posted</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon rejected"><mat-icon>cancel</mat-icon></div>
+      <div class="kpi-body"><span class="kpi-value">{{ rejectedCount }}</span><span class="kpi-label">Rejected</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon total"><mat-icon>account_balance</mat-icon></div>
+      <div class="kpi-body"><span class="kpi-value amount">{{ formatCurrency(totalAmount) }}</span><span class="kpi-label">Total Posted</span></div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <mat-form-field appearance="outline">
+      <mat-label>Status Filter</mat-label>
+      <mat-select [(ngModel)]="filterStatus" (ngModelChange)="loadVirements()">
+        <mat-option value="">All Statuses</mat-option>
+        <mat-option value="Draft">Draft</mat-option>
+        <mat-option value="Submitted">Submitted</mat-option>
+        <mat-option value="DeptHeadApproved">Dept Head Approved</mat-option>
+        <mat-option value="BudgetOfficeApproved">Budget Office Approved</mat-option>
+        <mat-option value="CFOApproved">CFO Approved</mat-option>
+        <mat-option value="MMApproved">MM Approved</mat-option>
+        <mat-option value="Posted">Posted</mat-option>
+        <mat-option value="Rejected">Rejected</mat-option>
+        <mat-option value="Returned">Returned</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>From Segment</th>
+          <th>To Segment</th>
+          <th>Type</th>
+          <th class="amount">Amount</th>
+          <th>Status</th>
+          <th>Approval Level</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let v of virements" (click)="viewDetail(v)" class="clickable-row">
+          <td class="mono">VIR-{{ v.id | number:'3.0-0' }}</td>
+          <td class="mono segment-cell">{{ v.fromSegmentString || '—' }}</td>
+          <td class="mono segment-cell">{{ v.toSegmentString || '—' }}</td>
+          <td><span class="type-badge" [ngClass]="'type-' + (v.budgetType || 'operational').toLowerCase()">{{ v.budgetType || 'Operational' }}</span></td>
+          <td class="amount mono">{{ formatCurrency(v.amount) }}</td>
+          <td><span class="status-badge" [ngClass]="'status-' + v.status.toLowerCase()">{{ getStatusLabel(v.status) }}</span></td>
+          <td>
+            <span *ngIf="v.currentApprovalLevel">{{ getApprovalLevelLabel(v.currentApprovalLevel) }}</span>
+            <span *ngIf="!v.currentApprovalLevel" class="na">—</span>
+          </td>
+          <td>{{ v.createdOn | date:'dd MMM yyyy' }}</td>
+          <td class="action-cell" (click)="$event.stopPropagation()">
+            <button mat-icon-button (click)="viewDetail(v)" matTooltip="View Details"><mat-icon>visibility</mat-icon></button>
+            <button mat-icon-button *ngIf="v.status === 'Draft'" (click)="submitVirement(v)" matTooltip="Submit"><mat-icon>send</mat-icon></button>
+            <button mat-icon-button color="primary" *ngIf="canApprove(v)" (click)="approveVirement(v)" matTooltip="Approve"><mat-icon>thumb_up</mat-icon></button>
+            <button mat-icon-button color="warn" *ngIf="canApprove(v)" (click)="openRejectDialog(v)" matTooltip="Reject"><mat-icon>thumb_down</mat-icon></button>
+          </td>
+        </tr>
+        <tr *ngIf="virements.length === 0">
+          <td colspan="9" class="empty">No virement requests found. Click "New Virement" to create one.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CREATE VIREMENT DIALOG -->
+<div class="dialog-overlay" *ngIf="showCreateDialog" (click)="showCreateDialog = false">
+  <div class="dialog-panel create-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>New Virement Request</h2>
+      <button mat-icon-button (click)="showCreateDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+
+    <div class="stepper-bar">
+      <div class="step" [class.active]="createStep === 0" [class.done]="createStep > 0" (click)="createStep = 0">
+        <span class="step-num">1</span><span class="step-label">SCOA Selection</span>
+      </div>
+      <div class="step-line" [class.done]="createStep > 0"></div>
+      <div class="step" [class.active]="createStep === 1" [class.done]="createStep > 1" (click)="createStep > 0 ? createStep = 1 : null">
+        <span class="step-num">2</span><span class="step-label">Amount & Motivation</span>
+      </div>
+      <div class="step-line" [class.done]="createStep > 1"></div>
+      <div class="step" [class.active]="createStep === 2" [class.done]="createStep > 2" (click)="createStep > 1 ? createStep = 2 : null">
+        <span class="step-num">3</span><span class="step-label">Policy Check</span>
+      </div>
+      <div class="step-line" [class.done]="createStep > 2"></div>
+      <div class="step" [class.active]="createStep === 3">
+        <span class="step-num">4</span><span class="step-label">Confirm</span>
+      </div>
+    </div>
+
+    <div class="dialog-body">
+      <!-- STEP 0: SCOA Selection -->
+      <div *ngIf="createStep === 0" class="step-content">
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Budget Version</mat-label>
+            <mat-select [(ngModel)]="newVirement.budgetVersionId">
+              <mat-option *ngFor="let v of versions" [value]="v.id">{{ v.versionName }} ({{ v.versionType }})</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="form-row">
+          <mat-radio-group [(ngModel)]="newVirement.budgetType" class="budget-type-radio">
+            <mat-radio-button value="Operational">Operational</mat-radio-button>
+            <mat-radio-button value="Capital">Capital</mat-radio-button>
+          </mat-radio-group>
+        </div>
+
+        <div class="scoa-columns">
+          <div class="scoa-col">
+            <h3 class="scoa-col-title"><mat-icon>arrow_back</mat-icon> FROM (Source Vote)</h3>
+            <mat-form-field appearance="outline" class="full-width" *ngFor="let seg of [
+              {label: 'Item', model: 'fromScoaItemId', list: scoaItems},
+              {label: 'Fund', model: 'fromScoaFundId', list: scoaFunds},
+              {label: 'Function', model: 'fromScoaFunctionId', list: scoaFunctions},
+              {label: 'Project', model: 'fromScoaProjectId', list: scoaProjects},
+              {label: 'Region', model: 'fromScoaRegionId', list: scoaRegions},
+              {label: 'Costing', model: 'fromScoaCostingId', list: scoaCostings},
+              {label: 'MSC', model: 'fromScoaMscId', list: scoaMscs}
+            ]">
+              <mat-label>{{ seg.label }}</mat-label>
+              <mat-select [(ngModel)]="newVirement[seg.model]" (ngModelChange)="loadFromBudget()">
+                <mat-option *ngFor="let s of seg.list" [value]="s.id">{{ s.code }} — {{ s.description }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <div class="budget-summary-box" *ngIf="fromBudgetSummary">
+              <h4>Source Budget Summary</h4>
+              <div class="summary-row"><span>Original Budget</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.originalBudget) }}</span></div>
+              <div class="summary-row"><span>Prior Virements</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.priorVirements) }}</span></div>
+              <div class="summary-row"><span>Adjustments</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.adjustments) }}</span></div>
+              <div class="summary-row total"><span>Current Budget</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.currentBudget) }}</span></div>
+              <div class="summary-row"><span>Actual to Date</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.actual) }}</span></div>
+              <div class="summary-row available"><span>Available Budget</span><span class="amount mono">{{ formatCurrency(fromBudgetSummary.availableBudget) }}</span></div>
+            </div>
+          </div>
+
+          <div class="scoa-divider"><mat-icon>swap_horiz</mat-icon></div>
+
+          <div class="scoa-col">
+            <h3 class="scoa-col-title"><mat-icon>arrow_forward</mat-icon> TO (Destination Vote)</h3>
+            <mat-form-field appearance="outline" class="full-width" *ngFor="let seg of [
+              {label: 'Item', model: 'toScoaItemId', list: scoaItems},
+              {label: 'Fund', model: 'toScoaFundId', list: scoaFunds},
+              {label: 'Function', model: 'toScoaFunctionId', list: scoaFunctions},
+              {label: 'Project', model: 'toScoaProjectId', list: scoaProjects},
+              {label: 'Region', model: 'toScoaRegionId', list: scoaRegions},
+              {label: 'Costing', model: 'toScoaCostingId', list: scoaCostings},
+              {label: 'MSC', model: 'toScoaMscId', list: scoaMscs}
+            ]">
+              <mat-label>{{ seg.label }}</mat-label>
+              <mat-select [(ngModel)]="newVirement[seg.model]" (ngModelChange)="loadToBudget()">
+                <mat-option *ngFor="let s of seg.list" [value]="s.id">{{ s.code }} — {{ s.description }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <div class="budget-summary-box" *ngIf="toBudgetSummary">
+              <h4>Destination Budget Summary</h4>
+              <div class="summary-row"><span>Original Budget</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.originalBudget) }}</span></div>
+              <div class="summary-row"><span>Prior Virements</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.priorVirements) }}</span></div>
+              <div class="summary-row"><span>Adjustments</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.adjustments) }}</span></div>
+              <div class="summary-row total"><span>Current Budget</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.currentBudget) }}</span></div>
+              <div class="summary-row"><span>Actual to Date</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.actual) }}</span></div>
+              <div class="summary-row available"><span>Available Budget</span><span class="amount mono">{{ formatCurrency(toBudgetSummary.availableBudget) }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Amount & Motivation -->
+      <div *ngIf="createStep === 1" class="step-content">
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Transfer Amount (R)</mat-label>
+            <input matInput type="number" [(ngModel)]="newVirement.amount" min="0" />
+          </mat-form-field>
+        </div>
+
+        <div class="impact-preview" *ngIf="fromBudgetSummary && toBudgetSummary && newVirement.amount > 0">
+          <h4>Budget Impact Preview</h4>
+          <div class="impact-cols">
+            <div class="impact-col from">
+              <span class="impact-label">FROM Available</span>
+              <span class="amount mono">{{ formatCurrency(fromBudgetSummary.availableBudget) }}</span>
+              <mat-icon>arrow_downward</mat-icon>
+              <span class="amount mono new-amount" [class.negative]="fromBudgetSummary.availableBudget - newVirement.amount < 0">{{ formatCurrency(fromBudgetSummary.availableBudget - newVirement.amount) }}</span>
+            </div>
+            <div class="impact-col to">
+              <span class="impact-label">TO Available</span>
+              <span class="amount mono">{{ formatCurrency(toBudgetSummary.availableBudget) }}</span>
+              <mat-icon>arrow_upward</mat-icon>
+              <span class="amount mono new-amount positive">{{ formatCurrency(toBudgetSummary.availableBudget + newVirement.amount) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Motivation / Justification</mat-label>
+            <textarea matInput [(ngModel)]="newVirement.motivation" rows="4" placeholder="Provide detailed motivation for this budget transfer..."></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- STEP 2: Policy Check -->
+      <div *ngIf="createStep === 2" class="step-content">
+        <div class="policy-check-section">
+          <h3>Policy Validation Results</h3>
+          <div *ngIf="!policyValidation" class="loading-msg">Validating against virement policies...</div>
+          <div *ngIf="policyValidation">
+            <div class="policy-result" [class.pass]="policyValidation.isValid" [class.fail]="!policyValidation.isValid">
+              <mat-icon>{{ policyValidation.isValid ? 'check_circle' : 'error' }}</mat-icon>
+              <span>{{ policyValidation.isValid ? 'All policy checks passed' : 'Policy violations detected' }}</span>
+            </div>
+            <div *ngIf="policyValidation.violations?.length > 0" class="violation-list">
+              <div *ngFor="let viol of policyValidation.violations" class="violation-item">
+                <mat-icon color="warn">warning</mat-icon>
+                <div class="violation-detail">
+                  <strong>{{ viol.ruleName }}</strong>
+                  <p>{{ viol.message }}</p>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="policyValidation.requiresCouncilApproval" class="council-warning">
+              <mat-icon>gavel</mat-icon>
+              <span>This virement exceeds thresholds and <strong>requires Council approval</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Confirm -->
+      <div *ngIf="createStep === 3" class="step-content">
+        <h3>Review &amp; Submit</h3>
+        <div class="confirm-grid">
+          <div class="confirm-section">
+            <h4>From (Source)</h4>
+            <div class="confirm-segments">
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaItemId">{{ getSegmentDesc(newVirement.fromScoaItemId, scoaItems) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaFundId">{{ getSegmentDesc(newVirement.fromScoaFundId, scoaFunds) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaFunctionId">{{ getSegmentDesc(newVirement.fromScoaFunctionId, scoaFunctions) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaProjectId">{{ getSegmentDesc(newVirement.fromScoaProjectId, scoaProjects) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaRegionId">{{ getSegmentDesc(newVirement.fromScoaRegionId, scoaRegions) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaCostingId">{{ getSegmentDesc(newVirement.fromScoaCostingId, scoaCostings) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.fromScoaMscId">{{ getSegmentDesc(newVirement.fromScoaMscId, scoaMscs) }}</span>
+            </div>
+          </div>
+          <div class="confirm-section">
+            <h4>To (Destination)</h4>
+            <div class="confirm-segments">
+              <span class="scoa-tag" *ngIf="newVirement.toScoaItemId">{{ getSegmentDesc(newVirement.toScoaItemId, scoaItems) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaFundId">{{ getSegmentDesc(newVirement.toScoaFundId, scoaFunds) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaFunctionId">{{ getSegmentDesc(newVirement.toScoaFunctionId, scoaFunctions) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaProjectId">{{ getSegmentDesc(newVirement.toScoaProjectId, scoaProjects) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaRegionId">{{ getSegmentDesc(newVirement.toScoaRegionId, scoaRegions) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaCostingId">{{ getSegmentDesc(newVirement.toScoaCostingId, scoaCostings) }}</span>
+              <span class="scoa-tag" *ngIf="newVirement.toScoaMscId">{{ getSegmentDesc(newVirement.toScoaMscId, scoaMscs) }}</span>
+            </div>
+          </div>
+          <div class="confirm-section">
+            <h4>Transfer Details</h4>
+            <div class="confirm-detail"><span>Budget Type</span><span class="type-badge" [ngClass]="'type-' + newVirement.budgetType.toLowerCase()">{{ newVirement.budgetType }}</span></div>
+            <div class="confirm-detail"><span>Amount</span><span class="amount mono">{{ formatCurrency(newVirement.amount) }}</span></div>
+            <div class="confirm-detail"><span>Motivation</span><span>{{ newVirement.motivation }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button mat-button (click)="showCreateDialog = false">Cancel</button>
+      <button mat-button *ngIf="createStep > 0" (click)="prevStep()">Back</button>
+      <button mat-raised-button color="primary" *ngIf="createStep < 3" (click)="nextStep()">Next</button>
+      <button mat-raised-button color="primary" *ngIf="createStep === 3" (click)="createVirement()">
+        <mat-icon>send</mat-icon> Submit Virement
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL DIALOG -->
+<div class="dialog-overlay" *ngIf="showDetailDialog" (click)="showDetailDialog = false">
+  <div class="dialog-panel detail-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>Virement VIR-{{ selectedVirement?.id | number:'3.0-0' }}</h2>
+      <span class="status-badge" *ngIf="selectedVirement" [ngClass]="'status-' + selectedVirement.status.toLowerCase()">{{ getStatusLabel(selectedVirement.status) }}</span>
+      <button mat-icon-button (click)="showDetailDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+
+    <div class="dialog-body" *ngIf="selectedVirement">
+      <div class="detail-sections">
+        <div class="detail-section">
+          <h3>Transfer Details</h3>
+          <div class="detail-row"><span class="detail-label">Budget Type</span><span class="type-badge" [ngClass]="'type-' + (selectedVirement.budgetType || 'operational').toLowerCase()">{{ selectedVirement.budgetType || 'Operational' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Amount</span><span class="amount mono">{{ formatCurrency(selectedVirement.amount) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Motivation</span><span>{{ selectedVirement.motivation }}</span></div>
+          <div class="detail-row" *ngIf="selectedVirement.policyReference"><span class="detail-label">Policy Reference</span><span>{{ selectedVirement.policyReference }}</span></div>
+          <div class="detail-row"><span class="detail-label">Created By</span><span>{{ selectedVirement.createdBy }} on {{ selectedVirement.createdOn | date:'dd MMM yyyy HH:mm' }}</span></div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedVirement.fromBudgetSummary">
+          <h3>From (Source) Budget</h3>
+          <div class="detail-row"><span class="detail-label">Segment</span><span class="mono">{{ selectedVirement.fromSegmentString }}</span></div>
+          <div class="detail-row"><span class="detail-label">Original Budget</span><span class="amount mono">{{ formatCurrency(selectedVirement.fromBudgetSummary.originalBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Current Budget</span><span class="amount mono">{{ formatCurrency(selectedVirement.fromBudgetSummary.currentBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Available</span><span class="amount mono">{{ formatCurrency(selectedVirement.fromBudgetSummary.availableBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">New Available</span><span class="amount mono" [class.negative]="selectedVirement.fromBudgetSummary.newAvailableBudget < 0">{{ formatCurrency(selectedVirement.fromBudgetSummary.newAvailableBudget) }}</span></div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedVirement.toBudgetSummary">
+          <h3>To (Destination) Budget</h3>
+          <div class="detail-row"><span class="detail-label">Segment</span><span class="mono">{{ selectedVirement.toSegmentString }}</span></div>
+          <div class="detail-row"><span class="detail-label">Original Budget</span><span class="amount mono">{{ formatCurrency(selectedVirement.toBudgetSummary.originalBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Current Budget</span><span class="amount mono">{{ formatCurrency(selectedVirement.toBudgetSummary.currentBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Available</span><span class="amount mono">{{ formatCurrency(selectedVirement.toBudgetSummary.availableBudget) }}</span></div>
+          <div class="detail-row"><span class="detail-label">New Available</span><span class="amount mono positive">{{ formatCurrency(selectedVirement.toBudgetSummary.newAvailableBudget) }}</span></div>
+        </div>
+      </div>
+
+      <div class="approval-chain-section" *ngIf="approvalChain?.steps?.length > 0">
+        <h3>Approval Chain</h3>
+        <div class="approval-timeline">
+          <div *ngFor="let step of approvalChain.steps" class="approval-step" [class.current]="step.isCurrent" [class.done]="step.status === 'Approved'" [class.rejected]="step.status === 'Rejected'">
+            <div class="step-indicator">
+              <mat-icon *ngIf="step.status === 'Approved'">check_circle</mat-icon>
+              <mat-icon *ngIf="step.status === 'Rejected'">cancel</mat-icon>
+              <mat-icon *ngIf="step.status === 'Pending' && step.isCurrent">radio_button_checked</mat-icon>
+              <mat-icon *ngIf="step.status === 'Pending' && !step.isCurrent">radio_button_unchecked</mat-icon>
+            </div>
+            <div class="step-detail">
+              <strong>{{ step.levelName }}</strong>
+              <span class="step-status" [ngClass]="'step-' + step.status.toLowerCase()">{{ step.status }}</span>
+              <span *ngIf="step.approvedBy" class="step-meta">{{ step.approvedBy }} — {{ step.approvedOn | date:'dd MMM yyyy HH:mm' }}</span>
+              <span *ngIf="step.comment" class="step-comment">"{{ step.comment }}"</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-actions" *ngIf="canApprove(selectedVirement)">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Approval Comment</mat-label>
+          <input matInput [(ngModel)]="approvalComment" placeholder="Optional comment..." />
+        </mat-form-field>
+        <div class="action-buttons">
+          <button mat-raised-button color="primary" (click)="approveVirement(selectedVirement)">
+            <mat-icon>thumb_up</mat-icon> Approve ({{ getApprovalLevelLabel(selectedVirement.currentApprovalLevel || 1) }})
+          </button>
+          <button mat-raised-button color="warn" (click)="openRejectDialog(selectedVirement)">
+            <mat-icon>thumb_down</mat-icon> Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT DIALOG -->
+<div class="dialog-overlay" *ngIf="showRejectDialog" (click)="showRejectDialog = false">
+  <div class="dialog-panel reject-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>Reject Virement</h2>
+      <button mat-icon-button (click)="showRejectDialog = false"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dialog-body">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Rejection Reason</mat-label>
+        <textarea matInput [(ngModel)]="rejectComment" rows="3" placeholder="Provide the reason for rejection..."></textarea>
+      </mat-form-field>
+    </div>
+    <div class="dialog-actions">
+      <button mat-button (click)="showRejectDialog = false">Cancel</button>
+      <button mat-raised-button color="warn" (click)="confirmReject()" [disabled]="!rejectComment">
+        <mat-icon>thumb_down</mat-icon> Confirm Rejection
+      </button>
+    </div>
+  </div>
+</div>

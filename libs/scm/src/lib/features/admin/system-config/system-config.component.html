@@ -1,0 +1,452 @@
+    <div class="config-page">
+      @if (notification()) {
+        <div class="notification-bar" [class.error-bar]="notificationType() === 'error'" [class.success-bar]="notificationType() === 'success'">
+          <mat-icon>{{notificationType() === 'error' ? 'error' : 'check_circle'}}</mat-icon>
+          <span>{{notification()}}</span>
+          <button class="notif-close" (click)="clearNotification()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+
+      <div class="page-header">
+        <div class="header-left">
+          <mat-icon class="header-icon">settings</mat-icon>
+          <div>
+            <h1>SCM Threshold Settings</h1>
+            <p class="header-sub">Configure procurement boundaries, preference points, and compliance rules</p>
+          </div>
+        </div>
+        <div class="header-meta">
+          <div class="meta-item">
+            <span class="meta-label">Version</span>
+            <span class="meta-value">{{configVersion()}}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Last Modified</span>
+            <span class="meta-value">{{formatDate(lastModified())}}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Applies To</span>
+            <span class="meta-value">{{applicableTo()}}</span>
+          </div>
+        </div>
+      </div>
+
+      <mat-tab-group class="config-tabs" animationDuration="200ms">
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon>tune</mat-icon>
+            <span class="tab-label-text">Process Boundaries</span>
+          </ng-template>
+
+          <div class="tab-content">
+            <div class="section-actions">
+              <button mat-flat-button class="btn-primary" (click)="addBoundary()">
+                <mat-icon>add</mat-icon> Add Boundary
+              </button>
+              <button mat-flat-button class="btn-save" (click)="saveThresholds()" [disabled]="saving()">
+                <mat-icon>{{saving() ? 'hourglass_empty' : 'save'}}</mat-icon> Save Changes
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="config-table">
+                <thead>
+                  <tr>
+                    <th>Method</th>
+                    <th>Label</th>
+                    <th>Range From (R)</th>
+                    <th>Range To (R)</th>
+                    <th>Min Quotes</th>
+                    <th>Scoring</th>
+                    <th>Advert Days</th>
+                    <th>Committees</th>
+                    <th>Enabled</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (b of boundaries(); track b.id; let i = $index) {
+                    <tr [class.disabled-row]="!b.enabled">
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <input matInput [(ngModel)]="b.method" placeholder="method_key">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field wide-field">
+                          <input matInput [(ngModel)]="b.label" placeholder="Display Label">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <input matInput type="number" [(ngModel)]="b.rangeFrom" min="0">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <input matInput type="number" [(ngModel)]="b.rangeTo" [placeholder]="'No limit'">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field narrow-field">
+                          <input matInput type="number" [(ngModel)]="b.minQuotes" min="0">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <mat-select [(ngModel)]="b.scoring">
+                            <mat-option [value]="null">None</mat-option>
+                            <mat-option value="80/20">80/20</mat-option>
+                            <mat-option value="90/10">90/10</mat-option>
+                            <mat-option value="auto">Auto</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field narrow-field">
+                          <input matInput type="number" [(ngModel)]="b.advertDays" min="0">
+                        </mat-form-field>
+                      </td>
+                      <td class="toggle-cell">
+                        <mat-slide-toggle [(ngModel)]="b.committees" color="primary"></mat-slide-toggle>
+                      </td>
+                      <td class="toggle-cell">
+                        <mat-slide-toggle [(ngModel)]="b.enabled" color="primary"></mat-slide-toggle>
+                      </td>
+                      <td>
+                        <button mat-icon-button class="delete-btn" (click)="deleteBoundary(i)" matTooltip="Delete boundary">
+                          <mat-icon>delete_outline</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="preview-section">
+              <h3 class="preview-title">
+                <mat-icon>preview</mat-icon> Effective Thresholds Preview
+              </h3>
+              <div class="boundary-preview-grid">
+                @for (b of enabledBoundaries(); track b.id) {
+                  <div class="boundary-card" [class.no-limit]="b.rangeTo === null">
+                    <div class="boundary-card-header">
+                      <mat-icon>{{getBoundaryIcon(b.method)}}</mat-icon>
+                      <span class="boundary-label">{{b.label}}</span>
+                    </div>
+                    <div class="boundary-range">
+                      {{formatCurrency(b.rangeFrom)}} — {{b.rangeTo !== null ? formatCurrency(b.rangeTo) : 'No Limit'}}
+                    </div>
+                    <div class="boundary-details">
+                      @if (b.minQuotes > 0) {
+                        <span class="detail-chip">
+                          <mat-icon>format_list_numbered</mat-icon> {{b.minQuotes}} quotes
+                        </span>
+                      }
+                      @if (b.scoring) {
+                        <span class="detail-chip scoring">
+                          <mat-icon>score</mat-icon> {{b.scoring}}
+                        </span>
+                      }
+                      @if (b.advertDays > 0) {
+                        <span class="detail-chip advert">
+                          <mat-icon>campaign</mat-icon> {{b.advertDays}} days
+                        </span>
+                      }
+                      @if (b.committees) {
+                        <span class="detail-chip committee">
+                          <mat-icon>groups</mat-icon> Committees
+                        </span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon>balance</mat-icon>
+            <span class="tab-label-text">Preference Points</span>
+          </ng-template>
+
+          <div class="tab-content">
+            <div class="section-actions">
+              <button mat-flat-button class="btn-primary" (click)="addPreferencePoint()">
+                <mat-icon>add</mat-icon> Add Threshold
+              </button>
+              <button mat-flat-button class="btn-save" (click)="savePreferencePoints()" [disabled]="saving()">
+                <mat-icon>{{saving() ? 'hourglass_empty' : 'save'}}</mat-icon> Save Changes
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="config-table">
+                <thead>
+                  <tr>
+                    <th>Max Value (R)</th>
+                    <th>System</th>
+                    <th>Price Weight</th>
+                    <th>B-BBEE Weight</th>
+                    <th>Description</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of preferencePoints(); track p.id; let i = $index) {
+                    <tr>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <input matInput type="number" [(ngModel)]="p.maxValue" [placeholder]="'Unlimited'">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field">
+                          <mat-select [(ngModel)]="p.system">
+                            <mat-option value="80/20">80/20</mat-option>
+                            <mat-option value="90/10">90/10</mat-option>
+                          </mat-select>
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field narrow-field">
+                          <input matInput type="number" [(ngModel)]="p.priceWeight" min="0" max="100">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field narrow-field">
+                          <input matInput type="number" [(ngModel)]="p.bbbeeWeight" min="0" max="100">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <mat-form-field appearance="outline" class="compact-field wide-field">
+                          <input matInput [(ngModel)]="p.description" placeholder="Description">
+                        </mat-form-field>
+                      </td>
+                      <td>
+                        <button mat-icon-button class="delete-btn" (click)="deletePreferencePoint(i)" matTooltip="Delete threshold">
+                          <mat-icon>delete_outline</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="preview-section">
+              <h3 class="preview-title">
+                <mat-icon>info</mat-icon> Preference Point Summary
+              </h3>
+              <div class="pref-preview-grid">
+                @for (p of preferencePoints(); track p.id) {
+                  <mat-card class="pref-card">
+                    <div class="pref-system-badge" [class.system-80]="p.system === '80/20'" [class.system-90]="p.system === '90/10'">
+                      {{p.system}}
+                    </div>
+                    <div class="pref-range">
+                      {{p.maxValue !== null ? '≤ ' + formatCurrency(p.maxValue) : 'Above threshold'}}
+                    </div>
+                    <div class="pref-weights">
+                      <div class="weight-bar">
+                        <div class="weight-fill price" [style.width.%]="p.priceWeight">Price {{p.priceWeight}}%</div>
+                        <div class="weight-fill bbbee" [style.width.%]="p.bbbeeWeight">B-BBEE {{p.bbbeeWeight}}%</div>
+                      </div>
+                    </div>
+                    <p class="pref-desc">{{p.description}}</p>
+                  </mat-card>
+                }
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon>gavel</mat-icon>
+            <span class="tab-label-text">Special Methods</span>
+          </ng-template>
+
+          <div class="tab-content">
+            <div class="section-actions">
+              <button mat-flat-button class="btn-save" (click)="saveSpecialMethods()" [disabled]="saving()">
+                <mat-icon>{{saving() ? 'hourglass_empty' : 'save'}}</mat-icon> Save Changes
+              </button>
+            </div>
+
+            <div class="special-methods-grid">
+              @for (sm of specialMethods(); track sm.id) {
+                <mat-card class="special-method-card" [class.method-disabled]="!sm.enabled">
+                  <div class="sm-header">
+                    <mat-icon class="sm-icon">{{getSpecialMethodIcon(sm.method)}}</mat-icon>
+                    <div class="sm-title-block">
+                      <h4>{{sm.label}}</h4>
+                      <p class="sm-desc">{{sm.description}}</p>
+                    </div>
+                  </div>
+                  <div class="sm-toggles">
+                    <div class="sm-toggle-row">
+                      <span>Enabled</span>
+                      <mat-slide-toggle [(ngModel)]="sm.enabled" color="primary"></mat-slide-toggle>
+                    </div>
+                    <div class="sm-toggle-row">
+                      <span>Requires Motivation</span>
+                      <mat-slide-toggle [(ngModel)]="sm.requiresMotivation" color="accent"></mat-slide-toggle>
+                    </div>
+                    <div class="sm-toggle-row">
+                      <span>Requires AO Approval</span>
+                      <mat-slide-toggle [(ngModel)]="sm.requiresAOApproval" color="accent"></mat-slide-toggle>
+                    </div>
+                    <div class="sm-toggle-row">
+                      <span>Requires Council Report</span>
+                      <mat-slide-toggle [(ngModel)]="sm.requiresCouncilReport" color="accent"></mat-slide-toggle>
+                    </div>
+                  </div>
+                  @if (sm.reasons && sm.reasons.length > 0) {
+                    <div class="sm-reasons">
+                      <span class="reasons-label">Valid Reasons:</span>
+                      <div class="reasons-chips">
+                        @for (r of sm.reasons; track r) {
+                          <span class="reason-chip">{{formatReason(r)}}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </mat-card>
+              }
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon>security</mat-icon>
+            <span class="tab-label-text">Anti-Split Detection</span>
+          </ng-template>
+
+          <div class="tab-content">
+            <div class="section-actions">
+              <button mat-flat-button class="btn-save" (click)="saveAntiSplit()" [disabled]="saving()">
+                <mat-icon>{{saving() ? 'hourglass_empty' : 'save'}}</mat-icon> Save Changes
+              </button>
+            </div>
+
+            @if (antiSplit()) {
+              <div class="anti-split-panel">
+                <mat-card class="anti-split-card">
+                  <div class="as-header">
+                    <mat-icon class="as-icon">shield</mat-icon>
+                    <div>
+                      <h3>Anti-Split Order Detection</h3>
+                      <p class="as-desc">{{antiSplit()!.description}}</p>
+                    </div>
+                    <mat-slide-toggle [(ngModel)]="antiSplit()!.enabled" color="primary" class="as-main-toggle"></mat-slide-toggle>
+                  </div>
+
+                  <div class="as-settings-grid" [class.as-disabled]="!antiSplit()!.enabled">
+                    <div class="as-field">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Lookback Days</mat-label>
+                        <input matInput type="number" [(ngModel)]="antiSplit()!.lookbackDays" min="1">
+                        <mat-icon matSuffix matTooltip="Number of days to look back for split order patterns">help_outline</mat-icon>
+                      </mat-form-field>
+                    </div>
+                    <div class="as-field">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Max Transactions Per Supplier</mat-label>
+                        <input matInput type="number" [(ngModel)]="antiSplit()!.maxTransactionsPerSupplier" min="1">
+                        <mat-icon matSuffix matTooltip="Maximum transactions to same supplier before flagging">help_outline</mat-icon>
+                      </mat-form-field>
+                    </div>
+                    <div class="as-field">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Cumulative Threshold Multiplier</mat-label>
+                        <input matInput type="number" [(ngModel)]="antiSplit()!.cumulativeThresholdMultiplier" min="0" step="0.1">
+                        <mat-icon matSuffix matTooltip="Multiplier applied to cumulative value for threshold comparison">help_outline</mat-icon>
+                      </mat-form-field>
+                    </div>
+                    <div class="as-toggle-field">
+                      <div class="as-toggle-row">
+                        <div class="toggle-info">
+                          <mat-icon>business</mat-icon>
+                          <span>Flag Same Cost Centre</span>
+                        </div>
+                        <mat-slide-toggle [(ngModel)]="antiSplit()!.flagSameCostCentre" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+                    <div class="as-toggle-field">
+                      <div class="as-toggle-row">
+                        <div class="toggle-info">
+                          <mat-icon>store</mat-icon>
+                          <span>Flag Same Supplier</span>
+                        </div>
+                        <mat-slide-toggle [(ngModel)]="antiSplit()!.flagSameSupplier" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+                  </div>
+                </mat-card>
+              </div>
+            }
+          </div>
+        </mat-tab>
+
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon>category</mat-icon>
+            <span class="tab-label-text">Categories</span>
+          </ng-template>
+
+          <div class="tab-content">
+            <div class="categories-grid">
+              @for (cat of categories(); track cat.id) {
+                <mat-card class="category-card">
+                  <div class="cat-header">
+                    <mat-icon class="cat-icon">{{getCategoryIcon(cat.id)}}</mat-icon>
+                    <div>
+                      <h4>{{cat.label}}</h4>
+                      <p class="cat-desc">{{cat.description}}</p>
+                    </div>
+                  </div>
+                  <div class="cat-overrides">
+                    <span class="overrides-label">Boundary Overrides:</span>
+                    @if (getCategoryOverrides(cat.id).length > 0) {
+                      @for (ov of getCategoryOverrides(cat.id); track ov.boundaryLabel) {
+                        <div class="override-item">
+                          <span class="override-boundary">{{ov.boundaryLabel}}</span>
+                          <div class="override-details">
+                            @for (detail of ov.details; track detail) {
+                              <span class="override-chip">{{detail}}</span>
+                            }
+                          </div>
+                        </div>
+                      }
+                    } @else {
+                      <p class="no-overrides">No category-specific overrides configured</p>
+                    }
+                  </div>
+                </mat-card>
+              }
+            </div>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
+      <div class="legislative-footer">
+        <mat-icon>account_balance</mat-icon>
+        <div class="leg-content">
+          <div class="leg-refs">
+            <span class="leg-item">{{legislativeRef().act}}</span>
+            <span class="leg-sep">|</span>
+            <span class="leg-item">{{legislativeRef().regulations}}</span>
+            <span class="leg-sep">|</span>
+            <span class="leg-item">{{legislativeRef().pppfa}}</span>
+          </div>
+          <p class="leg-note">{{legislativeRef().note}}</p>
+        </div>
+      </div>
+    </div>

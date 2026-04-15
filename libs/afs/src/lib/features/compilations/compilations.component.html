@@ -1,0 +1,71 @@
+<h2 mat-dialog-title>New Compilation</h2>
+<mat-dialog-content>
+  @if (created) {
+    <div class="success-message">
+      <mat-icon class="success-icon">check_circle</mat-icon>
+      <span>Compilation created successfully</span>
+    </div>
+  } @else {
+    <div class="form-grid">
+      <mat-form-field matTooltip="Enter a descriptive name for this AFS compilation">
+        <mat-label>Name</mat-label>
+        <input matInput [(ngModel)]="data.name" placeholder="e.g. FY2024 Annual AFS" [disabled]="saving">
+      </mat-form-field>
+      <mat-form-field matTooltip="Select the AFS template to base this compilation on">
+        <mat-label>Template</mat-label>
+        <mat-select [(ngModel)]="data.templateId" [disabled]="saving">
+          @for (t of templates; track t.id) {
+            <mat-option [value]="t.id">{{ t.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field matTooltip="Select the financial year for this compilation">
+        <mat-label>Financial Year</mat-label>
+        <mat-select [(ngModel)]="data.financialYearId" (selectionChange)="onFinancialYearChange()" [disabled]="saving">
+          @for (fy of financialYears; track fy.id) {
+            <mat-option [value]="fy.id">{{ fy.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <div class="period-row">
+        <mat-form-field matTooltip="First month to include in this compilation (required)">
+          <mat-label>Period From</mat-label>
+          <mat-select [(ngModel)]="data.periodFrom" [disabled]="periodMonths.length === 0 || saving">
+            @for (m of periodMonths; track m.value) {
+              <mat-option [value]="m.value">{{ m.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field matTooltip="Last month to include in this compilation (required)">
+          <mat-label>Period To</mat-label>
+          <mat-select [(ngModel)]="data.periodTo" [disabled]="periodMonths.length === 0 || saving">
+            @for (m of periodMonths; track m.value) {
+              <mat-option [value]="m.value">{{ m.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+    @if (errorMessage) {
+      <div class="error-message">
+        <mat-icon class="error-icon">error</mat-icon>
+        <span>{{ errorMessage }}</span>
+      </div>
+    }
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  @if (created) {
+    <button mat-flat-button class="btn-primary" (click)="close()">Close</button>
+  } @else {
+    <button mat-button (click)="close()" [disabled]="saving" matTooltip="Cancel and close this dialog">Cancel</button>
+    <button mat-flat-button class="btn-primary" [disabled]="!isFormValid() || saving" (click)="save()" matTooltip="Create the new AFS compilation">
+      @if (saving) {
+        <mat-spinner diameter="20" class="btn-spinner"></mat-spinner>
+        <span>Creating...</span>
+      } @else {
+        Create
+      }
+    </button>
+  }
+</mat-dialog-actions>

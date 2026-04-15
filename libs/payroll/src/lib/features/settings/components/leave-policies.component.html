@@ -1,0 +1,99 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Leave Policies</h1>
+    <p class="page-subtitle">Configure leave accrual and allocation policies</p>
+  </div>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ policies.length }}</span>
+    <span class="summary-label">Total Policies</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ annualCount }}</span>
+    <span class="summary-label">Annual Accrual</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-inactive">{{ monthlyCount }}</span>
+    <span class="summary-label">Monthly Accrual</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search leave policies..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+    <span class="result-count">{{ filteredPolicies.length }} results</span>
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th>Leave Type</th><th>Accrual Method</th><th style="text-align:right">Accrual Amount</th>
+            <th style="text-align:right">Max Balance</th><th style="text-align:right">Carry Over Limit</th>
+            <th style="text-align:center">Cycle (Months)</th><th style="text-align:center">Medical Cert After Days</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filteredPolicies.length === 0) {
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">No leave policies found</td></tr>
+          } @else {
+            @for (p of filteredPolicies; track p.id) {
+              <tr>
+                <td style="font-weight:500">{{ p.leave_type_name || '-' }}</td>
+                <td><span class="badge badge-info">{{ p.accrual_method || '-' }}</span></td>
+                <td style="text-align:right">{{ formatNum(p.accrual_amount) }}</td>
+                <td style="text-align:right">{{ formatNum(p.max_balance) }}</td>
+                <td style="text-align:right">{{ formatNum(p.carry_over_limit) }}</td>
+                <td style="text-align:center">{{ p.cycle_months || '-' }}</td>
+                <td style="text-align:center">{{ p.requires_medical_cert_after_days != null ? p.requires_medical_cert_after_days : '-' }}</td>
+                <td><button class="action-btn" (click)="openEditModal(p)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button></td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Leave Policy: {{ editItem.leave_type_name || 'Policy' }}</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid" style="gap:16px">
+          <div class="form-section-title" style="grid-column:1/-1"><app-icon name="shield" [size]="16"></app-icon> Accrual Settings</div>
+          <div class="form-group">
+            <label>Accrual Method</label>
+            <select class="form-control" [(ngModel)]="editItem.accrual_method">
+              <option value="ANNUAL">Annual</option>
+              <option value="MONTHLY">Monthly</option>
+              <option value="DAILY">Daily</option>
+              <option value="ONCE_OFF">Once Off</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Accrual Amount</label><input class="form-control" type="number" [(ngModel)]="editItem.accrual_amount" min="0" step="0.5"></div>
+          <div class="form-group"><label>Max Balance</label><input class="form-control" type="number" [(ngModel)]="editItem.max_balance" min="0" step="0.5"></div>
+          <div class="form-group"><label>Carry Over Limit</label><input class="form-control" type="number" [(ngModel)]="editItem.carry_over_limit" min="0" step="0.5"></div>
+          <div class="form-group"><label>Cycle (Months)</label><input class="form-control" type="number" [(ngModel)]="editItem.cycle_months" min="1" max="60"></div>
+          <div class="form-group"><label>Medical Cert After Days</label><input class="form-control" type="number" [(ngModel)]="editItem.requires_medical_cert_after_days" min="0"><span class="form-hint">Number of consecutive days after which a medical certificate is required</span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false">Cancel</button>
+        <button class="btn btn-primary" (click)="save()">Update Policy</button>
+      </div>
+    </div>
+  </div>
+}

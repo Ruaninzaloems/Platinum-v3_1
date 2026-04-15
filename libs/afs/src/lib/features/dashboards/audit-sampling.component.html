@@ -1,0 +1,246 @@
+<div class="audit-sampling">
+  <div class="header-bar">
+    <div class="header-left">
+      <mat-icon class="header-icon">security</mat-icon>
+      <div>
+        <h2 class="page-title">Audit Sampling</h2>
+        <p class="page-subtitle">Risk-ranked accounts from rolled-up GL for audit focus areas</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="exportCsv()" [disabled]="!accounts.length" matTooltip="Export as CSV">
+        <mat-icon>download</mat-icon> Export CSV
+      </button>
+    </div>
+  </div>
+
+  <div class="filters-bar">
+    <mat-form-field appearance="outline" class="filter-field fy-field">
+      <mat-label>Financial Year</mat-label>
+      <mat-select [(ngModel)]="financialYearId" (selectionChange)="onFilterChange()">
+        @for (fy of financialYears; track fy.id) {
+          <mat-option [value]="fy.id">{{ fy.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Reporting Period</mat-label>
+      <mat-select [(ngModel)]="selectedPeriod" (selectionChange)="onReportingPeriodChange()">
+        @for (p of reportingPeriodOptions; track p.value) {
+          <mat-option [value]="p.value">{{ p.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Risk Level</mat-label>
+      <mat-select [(ngModel)]="filterRisk" (selectionChange)="applyFilter()">
+        <mat-option value="">All Levels</mat-option>
+        <mat-option value="high">High Risk</mat-option>
+        <mat-option value="medium">Medium Risk</mat-option>
+        <mat-option value="low">Low Risk</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Item Type</mat-label>
+      <mat-select [(ngModel)]="filterItemType" (selectionChange)="applyFilter()">
+        @for (it of itemTypeOptions; track it.value) {
+          <mat-option [value]="it.value">{{ it.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field search-field">
+      <mat-label>Search account code or description</mat-label>
+      <input matInput [(ngModel)]="filterSearch" (input)="applyFilter()" placeholder="e.g. Deposits, IA001...">
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+  </div>
+
+  @if (loading) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Calculating risk scores...</p>
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error }}</p>
+      <button mat-stroked-button (click)="loadData()">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error && accounts.length > 0) {
+    <div class="summary-strip">
+      <div class="summary-card">
+        <div class="summary-value">{{ summary.totalAccounts }}</div>
+        <div class="summary-label">Total Accounts</div>
+      </div>
+      <div class="summary-card risk-high">
+        <div class="summary-value">{{ summary.highRisk }}</div>
+        <div class="summary-label">High Risk</div>
+      </div>
+      <div class="summary-card risk-medium">
+        <div class="summary-value">{{ summary.mediumRisk }}</div>
+        <div class="summary-label">Medium Risk</div>
+      </div>
+      <div class="summary-card risk-low">
+        <div class="summary-value">{{ summary.lowRisk }}</div>
+        <div class="summary-label">Low Risk</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="sampling-table">
+        <thead>
+          <tr>
+            <th class="col-risk">Risk</th>
+            <th class="col-score">Score</th>
+            <th class="col-code">mSCOA Item Code</th>
+            <th class="col-desc">Account Description</th>
+            <th class="col-type">Item Type</th>
+            <th class="col-count">Txn Count</th>
+            <th class="col-amount">Net Amount</th>
+            <th class="col-months">Period Spread</th>
+            <th class="col-action">Drill</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (account of filteredAccounts; track account.scoaItemCode) {
+            <tr class="data-row" [class.row-high]="account.riskLevel === 'high'"
+                [class.row-medium]="account.riskLevel === 'medium'"
+                [class.row-low]="account.riskLevel === 'low'"
+                (click)="openDrill(account)">
+              <td class="col-risk">
+                <span class="risk-indicator" [class]="'risk-' + account.riskLevel"
+                      [matTooltip]="'Materiality: ' + account.riskFactors.materiality + ' | Volume: ' + account.riskFactors.volume + ' | Concentration: ' + account.riskFactors.concentration">
+                  <mat-icon class="risk-icon">{{ getRiskIcon(account.riskLevel) }}</mat-icon>
+                </span>
+              </td>
+              <td class="col-score">
+                <div class="score-bar-container">
+                  <div class="score-bar" [class]="'bar-' + account.riskLevel" [style.width.%]="account.riskScore"></div>
+                  <span class="score-label">{{ account.riskScore }}</span>
+                </div>
+              </td>
+              <td class="col-code mono">{{ account.scoaItemCode }}</td>
+              <td class="col-desc">{{ account.accountDescription }}</td>
+              <td class="col-type">
+                <span class="type-chip" [style.border-color]="getCategoryColor(account.itemType)">{{ account.category }}</span>
+              </td>
+              <td class="col-count">{{ formatNumber(account.transactionCount) }}</td>
+              <td class="col-amount" [class.negative-amount]="account.netAmount < 0">{{ formatCurrency(account.netAmount) }}</td>
+              <td class="col-months">
+                <div class="period-dots">
+                  @for (p of allPeriods; track p) {
+                    <span class="period-dot" [class.active]="account.activePeriods.includes(p)"
+                          [matTooltip]="'P' + p">
+                    </span>
+                  }
+                </div>
+                <span class="months-label">{{ account.activeMonths }}/12</span>
+              </td>
+              <td class="col-action">
+                <button mat-icon-button matTooltip="Drill through to source transactions"
+                        (click)="openDrill(account); $event.stopPropagation()">
+                  <mat-icon>zoom_in</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (!loading && !error && accounts.length === 0 && financialYearId) {
+    <div class="empty-state">
+      <mat-icon>security</mat-icon>
+      <h3>No Audit Sampling Data</h3>
+      <p>No rolled-up GL data found. Sync data from the Data Sync tab first.</p>
+    </div>
+  }
+
+  @if (drillOpen) {
+    <div class="drill-overlay" (click)="closeDrill()">
+      <div class="drill-panel" (click)="$event.stopPropagation()">
+        <div class="drill-header">
+          <div>
+            <h3>Source Transactions</h3>
+            <p class="drill-subtitle">
+              {{ drillAccount?.scoaItemCode }} - {{ drillAccount?.accountDescription }}
+              <span class="drill-risk-chip" [class]="'risk-' + drillAccount?.riskLevel">
+                Risk Score: {{ drillAccount?.riskScore }}
+              </span>
+            </p>
+          </div>
+          <button mat-icon-button (click)="closeDrill()" aria-label="Close drill-through panel"><mat-icon>close</mat-icon></button>
+        </div>
+
+        <div class="drill-stats">
+          <span><strong>{{ formatNumber(drillTotal) }}</strong> transactions</span>
+          <span>Dr <strong>{{ formatCurrency(drillAccount?.totalDebit || 0) }}</strong></span>
+          <span>Cr <strong>{{ formatCurrency(drillAccount?.totalCredit || 0) }}</strong></span>
+          <span>Net <strong>{{ formatCurrency(drillAccount?.netAmount || 0) }}</strong></span>
+        </div>
+
+        @if (drillLoading) {
+          <div class="drill-loading">
+            <mat-spinner diameter="30"></mat-spinner>
+          </div>
+        }
+
+        @if (!drillLoading && drillData.length > 0) {
+          <div class="drill-table-container">
+            <table class="drill-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Doc #</th>
+                  <th>Description</th>
+                  <th>Reference</th>
+                  <th>Function</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of drillData; track d.id) {
+                  <tr>
+                    <td class="mono">{{ d.postingDate | date:'dd/MM/yyyy' }}</td>
+                    <td class="mono">{{ d.documentNumber }}</td>
+                    <td class="desc-cell">{{ d.transactionDescription }}</td>
+                    <td>{{ d.referenceNumber }}</td>
+                    <td>{{ d.scoaFunctionShortDesc }}</td>
+                    <td class="amount-cell">{{ d.glDebit ? formatCurrency(d.glDebit) : '' }}</td>
+                    <td class="amount-cell">{{ d.glCredit ? formatCurrency(d.glCredit) : '' }}</td>
+                    <td class="amount-cell" [class.negative-amount]="d.amount < 0">{{ formatCurrency(d.amount) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="drill-pagination">
+            <button mat-stroked-button [disabled]="drillPage <= 1" (click)="drillPageChange(-1)">
+              <mat-icon>chevron_left</mat-icon> Previous
+            </button>
+            <span>Page {{ drillPage }} of {{ Math.ceil(drillTotal / drillLimit) || 1 }}</span>
+            <button mat-stroked-button [disabled]="drillPage * drillLimit >= drillTotal" (click)="drillPageChange(1)">
+              Next <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        }
+
+        @if (!drillLoading && drillData.length === 0) {
+          <div class="drill-empty">No source transactions found.</div>
+        }
+      </div>
+    </div>
+  }
+</div>
