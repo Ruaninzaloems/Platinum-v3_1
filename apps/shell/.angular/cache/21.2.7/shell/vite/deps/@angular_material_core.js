@@ -17,24 +17,22 @@ import {
   MatOption,
   MatOptionModule,
   MatOptionSelectionChange,
+  MatPseudoCheckboxModule,
   _countGroupLabelsBeforeOption,
   _getOptionScrollPosition
-} from "./chunk-5ZKFBKJ6.js";
-import {
-  MatPseudoCheckboxModule
-} from "./chunk-WM3EXYBR.js";
+} from "./chunk-EDG4TCBX.js";
 import {
   MatPseudoCheckbox
 } from "./chunk-YAYKX4UG.js";
+import {
+  _MatInternalFormField
+} from "./chunk-TWRAJWD3.js";
 import {
   MatRippleLoader
 } from "./chunk-YXWMUXKJ.js";
 import {
   MatRippleModule
 } from "./chunk-QZMO4ISH.js";
-import {
-  _MatInternalFormField
-} from "./chunk-TWRAJWD3.js";
 import {
   MAT_RIPPLE_GLOBAL_OPTIONS,
   MatRipple,
@@ -43,12 +41,12 @@ import {
   RippleState,
   defaultRippleAnimationConfig
 } from "./chunk-XA3YIP7V.js";
-import "./chunk-6QXU2PPA.js";
-import "./chunk-3UUS4QCM.js";
-import "./chunk-3KO4LJWO.js";
 import {
   _StructuralStylesLoader
 } from "./chunk-Q63QE2M5.js";
+import "./chunk-6QXU2PPA.js";
+import "./chunk-3UUS4QCM.js";
+import "./chunk-3KO4LJWO.js";
 import "./chunk-WV7NP6Q4.js";
 import "./chunk-JUJEZ4FJ.js";
 import {
