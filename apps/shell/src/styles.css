@@ -41,3 +41,10 @@ a {
 .mat-mdc-snack-bar-container .mdc-snackbar__surface {
   border-radius: 8px !important;
 }
+
+.mdc-floating-label,
+.mat-mdc-floating-label,
+mat-label,
+.mat-mdc-form-field label {
+  text-transform: none !important;
+}

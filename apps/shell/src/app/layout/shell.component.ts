@@ -689,11 +689,11 @@ export class ShellComponent implements OnInit, OnDestroy {
     {
       title: 'Payroll', icon: 'payments',
       items: [
-        { label: 'Payroll Overview', icon: 'dashboard', route: '/payroll' },
-        { label: 'Payroll Run', icon: 'play_circle', route: '/payroll/run' },
-        { label: 'Payslip View', icon: 'receipt_long', route: '/payroll/payslip-view' },
-        { label: 'Wages', icon: 'monetization_on', route: '/payroll/wages' },
-        { label: 'Claims', icon: 'request_quote', route: '/payroll/claims' },
+        { label: 'Payroll Overview', icon: 'dashboard', route: '' },
+        { label: 'Payroll Run', icon: 'play_circle', route: '/run' },
+        { label: 'Payslip View', icon: 'receipt_long', route: '/payslip-view' },
+        { label: 'Wages', icon: 'monetization_on', route: '/wages' },
+        { label: 'Claims', icon: 'request_quote', route: '/claims' },
         { label: 'Salary Structure', icon: 'tune', route: '/salary-structure' }
       ]
     },

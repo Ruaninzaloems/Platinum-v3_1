@@ -1,0 +1,54 @@
+:root {
+  --platinum-primary: #0f2b46;
+  --platinum-primary-light: #1a3a5c;
+  --platinum-primary-dark: #091d30;
+  --platinum-accent: #c9a84c;
+  --platinum-accent-light: #d5b866;
+  --platinum-accent-dark: #a97d24;
+
+  --platinum-surface: #f8f9fb;
+  --platinum-surface-alt: #f1f5f9;
+  --platinum-surface-warm: #fafbfc;
+
+  --platinum-text: #1e293b;
+  --platinum-text-secondary: #64748b;
+  --platinum-text-muted: #94a3b8;
+
+  --platinum-success: #4caf50;
+  --platinum-success-light: #e8f5e9;
+  --platinum-success-pastel: #c8e6c9;
+  --platinum-warning: #f59e0b;
+  --platinum-warning-light: #fff8e1;
+  --platinum-warning-pastel: #ffecb3;
+  --platinum-danger: #ef5350;
+  --platinum-danger-light: #ffebee;
+  --platinum-danger-pastel: #ffcdd2;
+  --platinum-info: #42a5f5;
+  --platinum-info-light: #e3f2fd;
+  --platinum-info-pastel: #bbdefb;
+
+  --platinum-teal: #26a69a;
+  --platinum-teal-light: #e0f2f1;
+  --platinum-purple: #7e57c2;
+  --platinum-purple-light: #ede7f6;
+  --platinum-indigo: #5c6bc0;
+  --platinum-indigo-light: #e8eaf6;
+  --platinum-pink: #ec407a;
+  --platinum-pink-light: #fce4ec;
+  --platinum-amber: #ffb300;
+  --platinum-amber-light: #fff8e1;
+  --platinum-cyan: #26c6da;
+  --platinum-cyan-light: #e0f7fa;
+
+  --platinum-border: #e8ecf1;
+  --platinum-border-light: #f0f3f7;
+  --platinum-card-shadow: 0 1px 3px rgba(15, 43, 70, 0.04), 0 1px 2px rgba(15, 43, 70, 0.02);
+  --platinum-card-shadow-hover: 0 4px 12px rgba(15, 43, 70, 0.08), 0 2px 4px rgba(15, 43, 70, 0.04);
+  --platinum-card-radius: 12px;
+
+  --platinum-gradient-blue: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  --platinum-gradient-green: linear-gradient(135deg, #e8f5e9 0%, #e0f7fa 100%);
+  --platinum-gradient-warm: linear-gradient(135deg, #fff8e1 0%, #fce4ec 100%);
+  --platinum-gradient-cool: linear-gradient(135deg, #e8eaf6 0%, #e3f2fd 100%);
+}
+

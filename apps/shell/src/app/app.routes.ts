@@ -8,6 +8,13 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
     canActivate: [authGuard],
     children: [
+      { path: 'pos-view', redirectTo: 'pos', pathMatch: 'full' },
+      { path: 'scm-view', redirectTo: 'scm', pathMatch: 'full' },
+      { path: 'payroll-view', redirectTo: 'payroll', pathMatch: 'full' },
+      { path: 'idp-view', redirectTo: 'idp', pathMatch: 'full' },
+      { path: 'insights-view', redirectTo: 'ins', pathMatch: 'full' },
+      { path: 'budget-view', redirectTo: 'budget', pathMatch: 'full' },
+      { path: 'afs-view', redirectTo: 'afs', pathMatch: 'full' },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'assets', loadChildren: () => import('@platinumv3/assets').then(m => m.ASSETS_ROUTES) },
       { path: 'scm', loadChildren: () => import('@platinumv3/scm').then(m => m.SCM_ROUTES) },
@@ -17,13 +24,6 @@ export const routes: Routes = [
       { path: 'budget', loadChildren: () => import('@platinumv3/budget').then(m => m.BUDGET_ROUTES) },
       { path: 'afs', loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
       { path: 'ins', loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
-      { path: 'pos-view', redirectTo: 'pos', pathMatch: 'full' },
-      { path: 'scm-view', redirectTo: 'scm', pathMatch: 'full' },
-      { path: 'payroll-view', redirectTo: 'payroll', pathMatch: 'full' },
-      { path: 'idp-view', redirectTo: 'idp', pathMatch: 'full' },
-      { path: 'insights-view', redirectTo: 'ins', pathMatch: 'full' },
-      { path: 'budget-view', redirectTo: 'budget', pathMatch: 'full' },
-      { path: 'afs-view', redirectTo: 'afs', pathMatch: 'full' },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

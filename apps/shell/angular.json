@@ -21,7 +21,12 @@
             ],
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
-              "src/styles.css"
+              "src/styles.css",
+              "../../libs/payroll/src/lib/_payroll-global.css",
+              "../../libs/scm/src/lib/_scm-global.scss",
+              "../../libs/idp/src/lib/_idp-global.scss",
+              "../../libs/afs/src/lib/_afs-global.scss",
+              "../../libs/budget/src/lib/_budget-global.scss"
             ],
             "scripts": [],
             "allowedCommonJsDependencies": ["chart.js", "xlsx", "leaflet"]
