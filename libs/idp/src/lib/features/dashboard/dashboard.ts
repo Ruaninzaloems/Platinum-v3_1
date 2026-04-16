@@ -182,6 +182,12 @@ import { DashboardData, PriorityFramework, ProjectRanking } from '../../core/mod
       </div>
     </div>
 
+    <div class="empty-state" *ngIf="!loading() && !data()">
+      <span class="material-icon" style="font-size:48px;color:#cbd5e1;display:block;margin-bottom:12px">dashboard</span>
+      <h2 style="margin:0 0 8px;font-size:18px;color:#1e293b">IDP Dashboard</h2>
+      <p style="color:#64748b;font-size:14px;margin:0 0 4px">{{ errorMessage() || 'No IDP cycle data available.' }}</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">Ensure the IDP API is running and an active cycle exists.</p>
+    </div>
     <div class="loading" *ngIf="loading()">
       <span class="material-icon spin">refresh</span> Loading dashboard...
     </div>
@@ -235,11 +241,16 @@ import { DashboardData, PriorityFramework, ProjectRanking } from '../../core/mod
     .rank-num { font-weight: 700; color: var(--platinum-primary); width: 28px; }
     .rank-name { flex: 1; color: var(--platinum-text); }
     .rank-score { font-weight: 600; color: var(--platinum-accent); }
+    .empty-state { text-align: center; padding: 80px 20px; }
+    .loading { text-align: center; padding: 80px 20px; color: var(--platinum-text-secondary, #64748b); font-size: 14px; }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class DashboardComponent implements OnInit {
   data = signal<DashboardData | null>(null);
   loading = signal(true);
+  errorMessage = signal<string>('');
   activeFramework = signal<PriorityFramework | null>(null);
   topRanked = signal<ProjectRanking[]>([]);
 
@@ -250,7 +261,10 @@ export class DashboardComponent implements OnInit {
       if (cycle) {
         this.api.getDashboard(cycle.id).subscribe({
           next: d => { this.data.set(d); this.loading.set(false); },
-          error: () => this.loading.set(false)
+          error: (err) => {
+            this.errorMessage.set('Failed to load dashboard data: ' + (err?.message || err?.statusText || 'Unknown error'));
+            this.loading.set(false);
+          }
         });
 
         this.api.getFrameworks().subscribe({
@@ -267,8 +281,12 @@ export class DashboardComponent implements OnInit {
           error: () => {}
         });
       } else {
+        this.errorMessage.set('No active IDP cycle found.');
         this.loading.set(false);
       }
+    }).catch(err => {
+      this.errorMessage.set('Failed to load IDP cycles: ' + (err?.message || 'Network error'));
+      this.loading.set(false);
     });
   }
 
