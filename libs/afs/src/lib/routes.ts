@@ -29,6 +29,8 @@ export const AFS_ROUTES: Routes = [
   { path: 'admin/validation-rules', loadComponent: () => import('./features/admin/validation-rules.component').then(m => m.ValidationRulesComponent) },
   { path: 'mscoa', loadComponent: () => import('./features/mscoa/mscoa.component').then(m => m.MscoaComponent) },
   { path: 'general-information', loadComponent: () => import('./features/general-information/general-information.component').then(m => m.GeneralInformationComponent) },
+  { path: 'abbreviations', redirectTo: 'general-information', pathMatch: 'full' },
+  { path: 'mappings/fullscreen', redirectTo: 'mapping-studio', pathMatch: 'full' },
   { path: 'accounting-policies', loadComponent: () => import('./features/accounting-policies/accounting-policies.component').then(m => m.AccountingPoliciesComponent) },
   { path: 'integrity', loadComponent: () => import('./features/dashboard/integrity-checks.component').then(m => m.IntegrityChecksComponent) },
   { path: 'tb-import-workbench', loadComponent: () => import('./features/tb-import-workbench/tb-import-workbench.component').then(m => m.TbImportWorkbenchComponent) },

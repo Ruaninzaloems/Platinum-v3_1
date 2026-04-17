@@ -103,7 +103,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
         <nav class="nav-list" style="flex:1;overflow-y:auto;padding:8px">
           @if (activeModule() === 'assets') {
             @for (item of assetNavItems; track item.label) {
-              <a class="nav-link" [routerLink]="item.route" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: item.route === '/dashboard'}">
+              <a class="nav-link" [routerLink]="item.route" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: item.route === '/assets/dashboard'}">
                 <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
                 @if (!sidenavCollapsed()) { <span>{{item.label}}</span> }
               </a>
@@ -505,7 +505,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   setModule(mod: AppModule) {
     this.activeModule.set(mod);
     const routeMap: Record<AppModule, string> = {
-      assets: '/dashboard',
+      assets: '/assets/dashboard',
       scm: '/scm',
       pos: '/pos',
       payroll: '/payroll',
@@ -528,7 +528,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   assetNavItems: NavItem[] = [
-    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+    { label: 'Dashboard', icon: 'dashboard', route: '/assets/dashboard' },
     { label: 'Asset Records', icon: 'inventory_2', route: '/assets/assets' },
     { label: 'Acquisitions', icon: 'add_business', route: '/assets/acquisitions' },
     { label: 'Capital Projects (WIP)', icon: 'construction', route: '/assets/wip' },
