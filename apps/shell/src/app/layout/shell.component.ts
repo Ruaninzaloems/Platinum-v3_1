@@ -34,7 +34,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs';
 
 @Component({
   selector: 'app-shell',
@@ -44,7 +44,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
     <div class="shell">
       <aside class="app-sidenav" [class.collapsed]="sidenavCollapsed() && activeModule() === 'assets'">
         <div class="sidenav-header">
-          <div class="brand">
+          <a class="brand" routerLink="/dashboard" style="cursor:pointer;text-decoration:none;color:inherit" matTooltip="Go to main dashboard">
             <div class="brand-icon"><mat-icon>shield</mat-icon></div>
             @if (!sidenavCollapsed() || activeModule() !== 'assets') {
               <div>
@@ -63,13 +63,13 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
                     <span class="brand-module">Budget</span>
                   } @else if (activeModule() === 'afs') {
                     <span class="brand-module">AFS</span>
-                  } @else {
+                  } @else if (activeModule() === 'assets') {
                     <span class="brand-module">Assets</span>
                   }
                 </div>
               </div>
             }
-          </div>
+          </a>
           @if (!sidenavCollapsed() || activeModule() !== 'assets') {
             <div class="module-grid">
               <button class="module-chip" [class.active]="activeModule() === 'assets'" (click)="setModule('assets')">
@@ -109,7 +109,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </a>
             }
           } @else if (activeModule() === 'scm') {
-            <a class="nav-link" routerLink="/scm" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/scm/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -133,7 +133,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </div>
             }
           } @else if (activeModule() === 'pos') {
-            <a class="nav-link" routerLink="/pos" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/pos" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}" [matTooltip]="'Home'">
               <mat-icon class="nav-icon">home</mat-icon>
               <span>Home</span>
             </a>
@@ -157,7 +157,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </div>
             }
           } @else if (activeModule() === 'payroll') {
-            <a class="nav-link" routerLink="/payroll" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/payroll/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -181,7 +181,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </div>
             }
           } @else if (activeModule() === 'idp') {
-            <a class="nav-link" routerLink="/idp" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/idp/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -209,7 +209,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </div>
             }
           } @else if (activeModule() === 'insights') {
-            <a class="nav-link" routerLink="/ins" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/ins/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -245,7 +245,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               <span>Audit Trail</span>
             </a>
           } @else if (activeModule() === 'budget') {
-            <a class="nav-link" routerLink="/budget" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/budget/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -291,7 +291,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               </div>
             }
           } @else if (activeModule() === 'afs') {
-            <a class="nav-link" routerLink="/afs" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+            <a class="nav-link" routerLink="/afs/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
@@ -454,7 +454,7 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
 })
 export class ShellComponent implements OnInit, OnDestroy {
   sidenavCollapsed = signal(false);
-  activeModule = signal<AppModule>('assets');
+  activeModule = signal<AppModule>('home');
   private expandedGroups = signal<Set<string>>(new Set());
   private routeSub!: Subscription;
 
@@ -491,8 +491,9 @@ export class ShellComponent implements OnInit, OnDestroy {
   });
 
   private syncModuleFromUrl(url: string) {
-    let mod: AppModule = 'assets';
-    if (url.startsWith('/scm')) mod = 'scm';
+    let mod: AppModule = 'home';
+    if (url.startsWith('/assets')) mod = 'assets';
+    else if (url.startsWith('/scm')) mod = 'scm';
     else if (url.startsWith('/pos')) mod = 'pos';
     else if (url.startsWith('/payroll')) mod = 'payroll';
     else if (url.startsWith('/idp')) mod = 'idp';
@@ -505,11 +506,12 @@ export class ShellComponent implements OnInit, OnDestroy {
   setModule(mod: AppModule) {
     this.activeModule.set(mod);
     const routeMap: Record<AppModule, string> = {
+      home: '/dashboard',
       assets: '/assets/dashboard',
-      scm: '/scm',
+      scm: '/scm/dashboard',
       pos: '/pos',
-      payroll: '/payroll',
-      idp: '/idp',
+      payroll: '/payroll/dashboard',
+      idp: '/idp/dashboard',
       insights: '/ins',
       budget: '/budget',
       afs: '/afs'
@@ -528,7 +530,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   assetNavItems: NavItem[] = [
-    { label: 'Dashboard', icon: 'dashboard', route: '/assets/dashboard' },
+    { label: 'Assets Dashboard', icon: 'dashboard', route: '/assets/dashboard' },
     { label: 'Asset Records', icon: 'inventory_2', route: '/assets/assets' },
     { label: 'Acquisitions', icon: 'add_business', route: '/assets/acquisitions' },
     { label: 'Capital Projects (WIP)', icon: 'construction', route: '/assets/wip' },
