@@ -1,7 +1,7 @@
 <div class="app-shell">
   <aside class="app-sidenav" [class.collapsed]="sidebarCollapsed()" [class.mobile-open]="mobileSidebarOpen()">
     <div class="sidenav-header">
-      <a routerLink="/" class="brand" (click)="mobileSidebarOpen.set(false)" data-testid="link-home-logo">
+      <a routerLink="/pos" class="brand" (click)="mobileSidebarOpen.set(false)" data-testid="link-home-logo">
         <div class="brand-icon">
           <span class="material-icons">account_balance</span>
         </div>
@@ -94,7 +94,7 @@
 
     <div class="breadcrumb-bar">
       <div class="breadcrumb-trail">
-        <a class="breadcrumb-home" routerLink="/">
+        <a class="breadcrumb-home" routerLink="/pos">
           <span class="material-icons" style="font-size: 16px;">home</span>
         </a>
         @for (crumb of breadcrumbs(); track crumb.label; let last = $last) {

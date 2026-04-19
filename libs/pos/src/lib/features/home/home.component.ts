@@ -18,14 +18,14 @@ export class HomeComponent {
   site = this.auth.site;
 
   quickLinks = [
-    { label: 'POS Receipting', route: '/pos', icon: 'point_of_sale', desc: 'Setup, transact and day-end reconciliation', color: 'blue' },
-    { label: 'View Receipts', route: '/view-receipts', icon: 'description', desc: 'Search and reprint receipts', color: 'purple' },
-    { label: 'Billing Dashboard', route: '/billing-dashboard', icon: 'bar_chart', desc: 'View billing statistics & alerts', color: 'amber' },
-    { label: 'General Enquiries', route: '/enquiries/general', icon: 'manage_search', desc: 'Look up account details', color: 'indigo' },
-    { label: 'Direct Deposits', route: '/direct-deposits/manual', icon: 'account_balance', desc: 'Allocate EFT payments', color: 'teal' },
-    { label: 'Communications', route: '/communications', icon: 'forum', desc: 'Client communications', color: 'blue' },
-    { label: 'Supervisor', route: '/supervisor', icon: 'admin_panel_settings', desc: 'Review cashier submissions', color: 'red' },
-    { label: 'Debt Management', route: '/debt/section129', icon: 'gavel', desc: 'Section 129 and debt recovery', color: 'purple' },
+    { label: 'POS Receipting', route: '/pos/pos', icon: 'point_of_sale', desc: 'Setup, transact and day-end reconciliation', color: 'blue' },
+    { label: 'View Receipts', route: '/pos/view-receipts', icon: 'description', desc: 'Search and reprint receipts', color: 'purple' },
+    { label: 'Billing Dashboard', route: '/pos/billing-dashboard', icon: 'bar_chart', desc: 'View billing statistics & alerts', color: 'amber' },
+    { label: 'General Enquiries', route: '/pos/enquiries/general', icon: 'manage_search', desc: 'Look up account details', color: 'indigo' },
+    { label: 'Direct Deposits', route: '/pos/direct-deposits/manual', icon: 'account_balance', desc: 'Allocate EFT payments', color: 'teal' },
+    { label: 'Communications', route: '/pos/communications', icon: 'forum', desc: 'Client communications', color: 'blue' },
+    { label: 'Supervisor', route: '/pos/supervisor', icon: 'admin_panel_settings', desc: 'Review cashier submissions', color: 'red' },
+    { label: 'Debt Management', route: '/pos/debt/section129', icon: 'gavel', desc: 'Section 129 and debt recovery', color: 'purple' },
   ];
 
   navigate(route: string): void {
