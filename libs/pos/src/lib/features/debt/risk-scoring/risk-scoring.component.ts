@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RISK_COLORS } from '../../../core/services/debt-config';
-import { TabMode } from '../../../core/models/debt.models';
+import { RISK_COLORS } from '../../../services/debt-config';
+import { TabMode } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-risk-scoring',
@@ -27,6 +27,10 @@ export class RiskScoringComponent implements OnInit {
   scoreResult = signal<any>(null);
   factors = signal<any[]>([]);
 
+  fetchingAccount = signal(false);
+  accountDataLoaded = signal(false);
+  accountError = signal('');
+
   paymentHistory = signal('50');
   arrearDays = signal('0');
   lastPaymentDays = signal('30');
@@ -36,6 +40,12 @@ export class RiskScoringComponent implements OnInit {
   locationRisk = signal('50');
   waterArrears = signal('0');
   electricityArrears = signal('0');
+  ratesArrears = signal('0');
+  sewerageArrears = signal('0');
+  refuseArrears = signal('0');
+
+  serviceBreakdown = signal<any[]>([]);
+  balanceDetails = signal<any[]>([]);
 
   dashScores = signal<any[]>([]);
   dashTotal = signal(0);
@@ -87,6 +97,38 @@ export class RiskScoringComponent implements OnInit {
     return Math.min(100, f.normalizedScore || f.normalized_score || 0);
   }
 
+  formatCurrency(val: number): string {
+    return 'R ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  async fetchAccountData(): Promise<void> {
+    const acct = this.accountNo().trim();
+    if (!acct) { this.toast.error('Enter an account number first'); return; }
+    this.fetchingAccount.set(true);
+    this.accountError.set('');
+    this.accountDataLoaded.set(false);
+    try {
+      const data = await firstValueFrom(this.api.get<any>(`/api/debt-scoring/account-data/${encodeURIComponent(acct)}`));
+      this.totalArrears.set(String(data.totalArrears || 0));
+      this.arrearDays.set(String(data.oldestArrearDays || 0));
+      this.lastPaymentDays.set(String(data.lastPaymentDays || 30));
+      this.waterArrears.set(String(data.waterArrears || 0));
+      this.electricityArrears.set(String(data.electricityArrears || 0));
+      this.ratesArrears.set(String(data.ratesArrears || 0));
+      this.sewerageArrears.set(String(data.sewerageArrears || 0));
+      this.refuseArrears.set(String(data.refuseArrears || 0));
+      this.indigentStatus.set(data.indigentStatus ? 'true' : 'false');
+      this.serviceBreakdown.set(data.serviceBreakdown || []);
+      this.balanceDetails.set(data.balanceDetails || []);
+      this.accountDataLoaded.set(true);
+      this.toast.success('Account data loaded from Platinum');
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.message || 'Failed to fetch account data';
+      this.accountError.set(msg);
+      this.toast.error(msg);
+    } finally { this.fetchingAccount.set(false); }
+  }
+
   async handleScore(): Promise<void> {
     if (!this.accountNo().trim()) { this.toast.error('Account number required'); return; }
     this.scoring.set(true);
@@ -105,9 +147,15 @@ export class RiskScoringComponent implements OnInit {
         locationRisk: parseFloat(this.locationRisk()) || 50,
         waterArrears: parseFloat(this.waterArrears()) || 0,
         electricityArrears: parseFloat(this.electricityArrears()) || 0,
+        ratesArrears: parseFloat(this.ratesArrears()) || 0,
+        sewerageArrears: parseFloat(this.sewerageArrears()) || 0,
+        refuseArrears: parseFloat(this.refuseArrears()) || 0,
         serviceTypes: [
           ...(parseFloat(this.waterArrears()) > 0 ? ['water'] : []),
           ...(parseFloat(this.electricityArrears()) > 0 ? ['electricity'] : []),
+          ...(parseFloat(this.ratesArrears()) > 0 ? ['rates'] : []),
+          ...(parseFloat(this.sewerageArrears()) > 0 ? ['sewerage'] : []),
+          ...(parseFloat(this.refuseArrears()) > 0 ? ['refuse'] : []),
         ],
       }));
       this.scoreResult.set(result);
@@ -115,7 +163,8 @@ export class RiskScoringComponent implements OnInit {
       this.factors.set(Array.isArray(fs) ? fs : []);
       this.toast.success(`Risk: ${result.riskCategory || result.risk_category} (${result.overallScore || result.overall_score || 0})`);
     } catch (err: any) {
-      this.toast.error(err?.message || 'Scoring failed');
+      const msg = err?.error?.message || err?.message || 'Scoring failed';
+      this.toast.error(msg);
     } finally { this.scoring.set(false); }
   }
 
@@ -124,13 +173,25 @@ export class RiskScoringComponent implements OnInit {
     if (lines.length === 0) { this.toast.error('Enter account numbers'); return; }
     this.scoring.set(true);
     try {
-      const accounts = lines.map(accountNo => ({ accountNo, paymentHistory: 50, arrearAge: 90, lastPaymentDays: 60, totalArrears: 5000, debtSize: 5000, indigentStatus: false, previousLegalActions: 0, locationRisk: 50, serviceTypes: ['water', 'electricity'] }));
+      const accounts = lines.map(accountNo => ({
+        accountNo,
+        paymentHistory: 50,
+        arrearAge: 90,
+        lastPaymentDays: 60,
+        totalArrears: 5000,
+        debtSize: 5000,
+        indigentStatus: false,
+        previousLegalActions: 0,
+        locationRisk: 50,
+        serviceTypes: ['water', 'electricity']
+      }));
       await firstValueFrom(this.api.post<any>('/api/debt-scoring/score-bulk', { accounts }));
       this.toast.success(`${lines.length} accounts scored`);
       this.bulkInput.set('');
       this.loadDashboard();
-    } catch (err: any) { this.toast.error(err?.message || 'Bulk scoring failed'); }
-    finally { this.scoring.set(false); }
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || err?.message || 'Bulk scoring failed');
+    } finally { this.scoring.set(false); }
   }
 
   async loadDashboard(): Promise<void> {
@@ -141,8 +202,9 @@ export class RiskScoringComponent implements OnInit {
       const data = await firstValueFrom(this.api.get<any>('/api/debt-scoring/scores', params));
       this.dashScores.set(data?.scores || []);
       this.dashTotal.set(data?.total || 0);
-    } catch (err: any) { this.toast.error(err?.message || 'Failed to load scores'); }
-    finally { this.dashLoading.set(false); }
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || err?.message || 'Failed to load scores');
+    } finally { this.dashLoading.set(false); }
   }
 
   async loadWeights(): Promise<void> {
@@ -153,8 +215,9 @@ export class RiskScoringComponent implements OnInit {
       const edit: Record<string, number> = {};
       for (const [k, v] of Object.entries(w || {})) edit[k] = (v as any).weight;
       this.editWeights.set(edit);
-    } catch (err: any) { this.toast.error(err?.message || 'Failed to load weights'); }
-    finally { this.weightsLoading.set(false); }
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || err?.message || 'Failed to load weights');
+    } finally { this.weightsLoading.set(false); }
   }
 
   async handleSaveWeights(): Promise<void> {
@@ -163,8 +226,9 @@ export class RiskScoringComponent implements OnInit {
       await firstValueFrom(this.api.put<any>('/api/debt-scoring/weights', this.editWeights()));
       await this.loadWeights();
       this.toast.success('Weights saved');
-    } catch (err: any) { this.toast.error(err?.message || 'Failed to save weights'); }
-    finally { this.weightsSaving.set(false); }
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || err?.message || 'Failed to save weights');
+    } finally { this.weightsSaving.set(false); }
   }
 
   updateEditWeight(key: string, value: number): void {

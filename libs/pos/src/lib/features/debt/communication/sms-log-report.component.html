@@ -14,15 +14,11 @@
       </div>
       <div class="filter-group">
         <label class="filter-label">Date From</label>
-        <input type="date" class="filter-input"
-               [value]="dateFrom()" (input)="dateFrom.set($any($event.target).value)"
-               data-testid="input-date-from" />
+        <app-date-input inputClass="filter-input" [value]="dateFrom()" (valueChange)="dateFrom.set($event)" testId="input-date-from" />
       </div>
       <div class="filter-group">
         <label class="filter-label">Date To</label>
-        <input type="date" class="filter-input"
-               [value]="dateTo()" (input)="dateTo.set($any($event.target).value)"
-               data-testid="input-date-to" />
+        <app-date-input inputClass="filter-input" [value]="dateTo()" (valueChange)="dateTo.set($event)" testId="input-date-to" />
       </div>
       <div class="filter-group">
         <label class="filter-label">Status</label>

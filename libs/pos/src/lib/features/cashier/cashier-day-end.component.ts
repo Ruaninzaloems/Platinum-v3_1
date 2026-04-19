@@ -6,6 +6,9 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
 import { firstValueFrom } from 'rxjs';
+import * as XLSX from 'xlsx-js-style';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface DenominationDef {
   key: string;
@@ -360,7 +363,7 @@ export class CashierDayEndComponent implements OnInit {
           cashBookId = 1;
         }
       } catch (cbErr: any) {
-        console.warn('[DayEnd] cashbook-list fetch failed, using fallback:', cbErr?.message);
+        console.error('[DayEnd] cashbook-list fetch failed:', cbErr?.message);
         cashBookId = 1;
       }
 
@@ -528,5 +531,219 @@ export class CashierDayEndComponent implements OnInit {
 
   formatCurrency(amount: number): string {
     return amount.toFixed(2);
+  }
+
+  exportingCardExcel = false;
+  exportingCardPdf = false;
+
+  private get exportMeta() {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return {
+      date: `${dd}/${mm}/${yyyy}`,
+      cashier: this.sessionCashierName() || this.user()?.userName || '—',
+      office: this.sessionOfficeName() || '—',
+      fileName: `credit-card-receipts-${dd}${mm}${yyyy}`,
+    };
+  }
+
+  exportCardReceiptsExcel(): void {
+    if (this.exportingCardExcel) return;
+    this.exportingCardExcel = true;
+    try {
+      const items = this.cardList();
+      const meta = this.exportMeta;
+      const NAVY = '0F2B46';
+      const GOLD = 'C9A84C';
+      const WHITE = 'FFFFFF';
+      const LIGHT = 'F8FAFC';
+      const BORDER = { style: 'thin', color: { rgb: 'CBD5E1' } } as any;
+
+      const headerStyle = (bg = NAVY, color = WHITE, bold = true): any => ({
+        font: { bold, color: { rgb: color }, sz: 11 },
+        fill: { patternType: 'solid', fgColor: { rgb: bg } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER },
+      });
+      const cellStyle = (bold = false, right = false, bg = WHITE): any => ({
+        font: { sz: 10, bold, color: { rgb: '1E293B' } },
+        fill: { patternType: 'solid', fgColor: { rgb: bg } },
+        alignment: { horizontal: right ? 'right' : 'left', vertical: 'center' },
+        border: { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER },
+      });
+
+      const rows: any[][] = [];
+      // Title block
+      rows.push([{ v: 'George Municipality — Credit Card Receipts', s: headerStyle(NAVY, GOLD) }, ...Array(7).fill({ v: '', s: headerStyle(NAVY, GOLD) })]);
+      rows.push([{ v: `Report Date: ${meta.date}`, s: headerStyle('1E3A5F', WHITE, false) }, ...Array(7).fill({ v: '', s: headerStyle('1E3A5F', WHITE, false) })]);
+      rows.push([{ v: `Cashier: ${meta.cashier}   |   Office: ${meta.office}`, s: headerStyle('1E3A5F', WHITE, false) }, ...Array(7).fill({ v: '', s: headerStyle('1E3A5F', WHITE, false) })]);
+      rows.push([{ v: '', s: {} }, ...Array(7).fill({ v: '', s: {} })]);
+      // Column headers
+      const cols = ['No', 'Account / Invoice', 'Receipt No', 'Date', 'Cancelled', 'Card No', 'Expiry', 'Amount (R)'];
+      rows.push(cols.map(c => ({ v: c, s: headerStyle(NAVY, WHITE) })));
+      // Data
+      items.forEach((item, i) => {
+        const bg = i % 2 === 0 ? WHITE : LIGHT;
+        rows.push([
+          { v: i + 1, s: cellStyle(false, false, bg) },
+          { v: item.accountNumber || item.accountId || item.invoiceNumber || '-', s: cellStyle(false, false, bg) },
+          { v: item.receiptNo || item.receipt_no || '-', s: cellStyle(false, false, bg) },
+          { v: this.formatDate(item), s: cellStyle(false, false, bg) },
+          { v: this.isCancelled(item) ? 'Yes' : 'No', s: cellStyle(false, false, bg) },
+          { v: item.cardNo || item.cardNumber || '-', s: cellStyle(false, false, bg) },
+          { v: item.expiryDate || item.cardExpiryDate || '-', s: cellStyle(false, false, bg) },
+          { v: (item.amount || 0).toFixed(2), s: { ...cellStyle(true, true, bg), font: { bold: true, sz: 10, color: { rgb: '1E293B' } } } },
+        ]);
+      });
+      // Total row
+      rows.push([
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: '', s: headerStyle(NAVY, WHITE, false) },
+        { v: 'Total:', s: { ...headerStyle(NAVY, GOLD), alignment: { horizontal: 'right', vertical: 'center' } } },
+        { v: `R ${this.totalCreditAmt().toFixed(2)}`, s: { ...headerStyle(NAVY, GOLD), alignment: { horizontal: 'right', vertical: 'center' } } },
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
+        { s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: 5 } },
+      ];
+      ws['!cols'] = [{ wch: 5 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 14 }];
+      ws['!rows'] = [{ hpt: 22 }, { hpt: 16 }, { hpt: 16 }, { hpt: 8 }, { hpt: 18 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Credit Card Receipts');
+      XLSX.writeFile(wb, `${meta.fileName}.xlsx`);
+      this.toast.show(`Excel exported — ${items.length} record${items.length !== 1 ? 's' : ''}.`, 'success');
+    } catch (e: any) {
+      this.toast.show('Failed to export Excel. Please try again.', 'error');
+      console.error('[exportCardExcel]', e);
+    } finally {
+      this.exportingCardExcel = false;
+    }
+  }
+
+  exportCardReceiptsPdf(): void {
+    if (this.exportingCardPdf) return;
+    this.exportingCardPdf = true;
+    try {
+      const items = this.cardList();
+      const meta = this.exportMeta;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const NAVY: [number, number, number] = [15, 43, 70];
+      const GOLD: [number, number, number] = [201, 168, 76];
+      const WHITE: [number, number, number] = [255, 255, 255];
+      const W = doc.internal.pageSize.getWidth();
+
+      // Header bar
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 0, W, 22, 'F');
+      doc.setFillColor(...GOLD);
+      doc.rect(0, 22, W, 1.5, 'F');
+
+      // Municipality name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(...WHITE);
+      doc.text('GEORGE MUNICIPALITY', 12, 10);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(200, 210, 220);
+      doc.text('Municipal Point-of-Sale System', 12, 16);
+
+      // Report title (right-aligned)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...GOLD);
+      doc.text('CREDIT CARD RECEIPTS REPORT', W - 12, 10, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(200, 210, 220);
+      doc.text(`Generated: ${meta.date}`, W - 12, 16, { align: 'right' });
+
+      // Meta info block
+      const Y = 28;
+      doc.setFillColor(248, 250, 252);
+      doc.rect(12, Y, W - 24, 14, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(12, Y, W - 24, 14, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...NAVY);
+      const col1 = 16, col2 = W / 2;
+      doc.text('Cashier:', col1, Y + 5);
+      doc.text('Office:', col2, Y + 5);
+      doc.text('Report Date:', col1, Y + 11);
+      doc.text('Total Records:', col2, Y + 11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(meta.cashier, col1 + 18, Y + 5);
+      doc.text(meta.office, col2 + 14, Y + 5);
+      doc.text(meta.date, col1 + 24, Y + 11);
+      doc.text(String(items.length), col2 + 26, Y + 11);
+
+      // Table
+      autoTable(doc, {
+        startY: Y + 18,
+        head: [['No', 'Account / Invoice', 'Receipt No', 'Date', 'Cancelled', 'Card No', 'Expiry', 'Amount (R)']],
+        body: items.length > 0
+          ? items.map((item, i) => [
+              i + 1,
+              item.accountNumber || item.accountId || item.invoiceNumber || '-',
+              item.receiptNo || item.receipt_no || '-',
+              this.formatDate(item),
+              this.isCancelled(item) ? 'Yes' : 'No',
+              item.cardNo || item.cardNumber || '-',
+              item.expiryDate || item.cardExpiryDate || '-',
+              `R ${(item.amount || 0).toFixed(2)}`,
+            ])
+          : [['', 'No records to display', '', '', '', '', '', '']],
+        foot: [['', '', '', '', '', '', 'TOTAL', `R ${this.totalCreditAmt().toFixed(2)}`]],
+        showFoot: 'lastPage',
+        headStyles: { fillColor: NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
+        footStyles: { fillColor: NAVY, textColor: GOLD, fontStyle: 'bold', fontSize: 9, halign: 'right' },
+        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { cellWidth: 38 },
+          2: { cellWidth: 32 },
+          3: { cellWidth: 38 },
+          4: { halign: 'center', cellWidth: 18 },
+          5: { cellWidth: 28 },
+          6: { cellWidth: 18 },
+          7: { halign: 'right', fontStyle: 'bold', cellWidth: 24 },
+        },
+        margin: { left: 12, right: 12 },
+        didDrawPage: (data: any) => {
+          // Footer on each page
+          const pageH = doc.internal.pageSize.getHeight();
+          doc.setFillColor(...NAVY);
+          doc.rect(0, pageH - 10, W, 10, 'F');
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.setTextColor(...WHITE);
+          doc.text('George Municipality — Confidential', 12, pageH - 4);
+          doc.text(`Page ${data.pageNumber}`, W - 12, pageH - 4, { align: 'right' });
+        },
+      });
+
+      doc.save(`${meta.fileName}.pdf`);
+      this.toast.show(`PDF exported — ${items.length} record${items.length !== 1 ? 's' : ''}.`, 'success');
+    } catch (e: any) {
+      this.toast.show('Failed to export PDF. Please try again.', 'error');
+      console.error('[exportCardPdf]', e);
+    } finally {
+      this.exportingCardPdf = false;
+    }
   }
 }

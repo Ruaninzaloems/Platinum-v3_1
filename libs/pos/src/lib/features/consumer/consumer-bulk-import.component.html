@@ -1,0 +1,91 @@
+<div class="bulk-import" data-testid="consumer-bulk-import">
+  <app-page-header title="Bulk Import" subtitle="Import consumer data from CSV files in the correct dependency order"></app-page-header>
+
+  <div class="import-cards">
+    @for (template of templates; track template.key) {
+      @let state = importStates()[template.key];
+      <div class="import-card" [class.done]="state.status === 'done'">
+        <button class="card-toggle" (click)="toggleCard(template.key)" [attr.data-testid]="'card-' + template.key">
+          <span class="material-icons" [style.color]="state.status === 'done' ? '#4caf50' : 'var(--platinum-accent, #c9a84c)'">
+            {{ state.status === 'done' ? 'check_circle' : 'description' }}
+          </span>
+          <div class="toggle-text">
+            <h4>{{ template.label }}</h4>
+            @if (template.dependsOn.length > 0) {
+              <p>Depends on: {{ template.dependsOn.join(', ') }}</p>
+            }
+          </div>
+          @if (state.status === 'done') {
+            <span class="status-done">{{ state.successCount }} OK / {{ state.failCount }} Failed</span>
+          }
+          @if (state.status === 'processing') {
+            <span class="spinner spinner-sm spinner-dark"></span>
+          }
+          <span class="material-icons" style="font-size:20px;color:#94a3b8">{{ expandedCards().has(template.key) ? 'expand_less' : 'expand_more' }}</span>
+        </button>
+
+        @if (expandedCards().has(template.key)) {
+          <div class="card-body">
+            <div class="field-descriptions">
+              <h5><span class="material-icons">info</span> Field Descriptions</h5>
+              <div class="field-list">
+                @for (h of template.headers; track h) {
+                  <div class="field-desc">
+                    <span class="fname" [class.req]="template.required.includes(h)">{{ h }}{{ template.required.includes(h) ? ' *' : '' }}</span>
+                    — {{ template.descriptions[h] }}
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="btn-outline" (click)="downloadTemplate(template)" [attr.data-testid]="'button-download-' + template.key">
+                <span class="material-icons">download</span> Download Template
+              </button>
+              <label class="btn-outline file-label" [attr.data-testid]="'button-upload-' + template.key">
+                <span class="material-icons">upload</span> Upload CSV
+                <input type="file" accept=".csv" (change)="onFileSelect(template.key, $event)" />
+              </label>
+            </div>
+
+            @if (state.fileName) {
+              <div class="file-info">
+                <span class="material-icons">description</span>
+                {{ state.fileName }} — {{ state.parsedRows.length }} rows parsed
+              </div>
+            }
+
+            @if (state.validationErrors.length > 0) {
+              <div class="validation-errors">
+                <h5><span class="material-icons">error</span> Validation Errors ({{ state.validationErrors.length }})</h5>
+                <div class="error-list">
+                  @for (err of state.validationErrors.slice(0, 20); track $index) {
+                    <div class="error-line">Row {{ err.row }}: {{ err.field }} — {{ err.message }}</div>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (state.parsedRows.length > 0 && state.status !== 'processing' && state.status !== 'done') {
+              @let check = canProcess(template.key);
+              @if (!check.allowed) {
+                <div class="dep-warning">
+                  <span class="material-icons">warning</span> {{ check.reason }}
+                </div>
+              }
+              <button class="btn-primary" style="width:100%" [disabled]="!check.allowed || getValidRowCount(template.key) === 0" (click)="processImport(template.key)" [attr.data-testid]="'button-process-' + template.key">
+                <span class="material-icons">upload</span> Process {{ getValidRowCount(template.key) }} Valid Rows
+              </button>
+            }
+
+            @if (state.status === 'error') {
+              <div class="import-error">
+                Import failed: {{ state.results[0]?.error || 'Unknown error' }}
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

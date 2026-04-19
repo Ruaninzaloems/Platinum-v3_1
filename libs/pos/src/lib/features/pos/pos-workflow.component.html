@@ -46,32 +46,88 @@
   </div>
 
   <div class="workflow-content">
-    @if (checkingSession()) {
+    <!-- LOADING STATE -->
+    @if (sessionState() === 'loading') {
       <div class="checking-session">
         <div class="spinner"></div>
         <p>Checking session status...</p>
       </div>
-    } @else {
-      @if (activeTab() === 'setup') {
-        <app-cashier-setup
-          [embedded]="true"
-          (sessionStarted)="onSessionStarted()">
-        </app-cashier-setup>
-      }
+    }
 
+    <!-- PENDING APPROVAL STATE -->
+    @if (sessionState() === 'pending-approval') {
+      <div class="status-block pending-block" data-testid="pending-dayend-block">
+        <div class="status-icon-wrapper pending-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <h2 class="status-title">Day-End Pending Supervisor Verification</h2>
+        <p class="status-message">{{ pendingMessage() }}</p>
+        <div class="status-badge-row">
+          <span class="status-badge pending-badge" data-testid="text-pending-status">
+            {{ pendingStatusLabel() }}
+          </span>
+        </div>
+        <div class="status-actions">
+          <button class="btn-primary" (click)="checkExistingSession()" data-testid="btn-refresh-status">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh Status
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- RETURNED STATE — Day-End resubmission with return reason banner -->
+    @if (sessionState() === 'returned') {
+      @if (!returnBannerDismissed()) {
+        <div class="return-banner" data-testid="return-banner">
+          <div class="return-banner-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="return-banner-content">
+            <strong>Day-End Returned by Supervisor</strong>
+            <p>Your day-end reconciliation has been returned. Please review the reason below and resubmit your day-end.</p>
+            <div class="return-reason-box" data-testid="text-return-reason">
+              <span class="return-reason-label">Supervisor's Reason:</span>
+              <span class="return-reason-text">{{ returnReason() }}</span>
+            </div>
+          </div>
+          <button class="return-banner-close" (click)="dismissReturnBanner()" data-testid="btn-dismiss-return" aria-label="Dismiss">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      }
+      <app-cashier-day-end></app-cashier-day-end>
+    }
+
+    <!-- NEEDS RECONCILE STATE -->
+    @if (sessionState() === 'needs-reconcile') {
+      <div class="reconcile-banner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>{{ reconcileMessage() || 'You need to submit your day-end reconciliation before you can process new transactions.' }}</span>
+      </div>
+      <app-cashier-day-end></app-cashier-day-end>
+    }
+
+    <!-- ACTIVE SESSION — Direct to POS Receipting -->
+    @if (sessionState() === 'active') {
       @if (activeTab() === 'transact') {
         <app-pos (dayEndRequested)="goToDayEnd()"></app-pos>
       }
-
       @if (activeTab() === 'day-end') {
-        @if (needsReconcile()) {
-          <div class="reconcile-banner">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <span>{{ reconcileMessage() || 'You need to submit your day-end reconciliation before you can process new transactions.' }}</span>
-          </div>
-        }
         <app-cashier-day-end></app-cashier-day-end>
       }
+    }
+
+    <!-- NO SESSION — Cashier Setup -->
+    @if (sessionState() === 'no-session') {
+      <app-cashier-setup
+        [embedded]="true"
+        (sessionStarted)="onSessionStarted()"
+        (dayEndPendingDetected)="onDayEndPendingDetected($event)">
+      </app-cashier-setup>
     }
   </div>
 </div>

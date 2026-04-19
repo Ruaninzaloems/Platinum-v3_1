@@ -87,45 +87,58 @@
         </div>
       } @else {
         <div class="table-container card">
-          <table>
+          <table class="resizable-table" #historyTable>
+            <colgroup>
+              <col [style.width.px]="colWidths()[0]">
+              <col [style.width.px]="colWidths()[1]">
+              <col [style.width.px]="colWidths()[2]">
+              <col [style.width.px]="colWidths()[3]">
+              <col [style.width.px]="colWidths()[4]">
+              <col [style.width.px]="colWidths()[5]">
+              <col [style.width.px]="colWidths()[6]">
+              <col [style.width.px]="colWidths()[7]">
+              <col [style.width.px]="colWidths()[8]">
+              <col [style.width.px]="colWidths()[9]">
+              <col [style.width.px]="colWidths()[10]">
+            </colgroup>
             <thead>
               <tr>
-                <th>Job ID</th>
-                <th>File Date</th>
-                <th>Date Captured</th>
-                <th>Description</th>
-                <th>Reference</th>
-                <th>Process</th>
-                <th>Method</th>
-                <th class="text-right">Amount</th>
-                <th>Status</th>
-                <th class="text-right">Records</th>
+                <th class="resizable-th">Job ID<span class="col-resize-handle" (mousedown)="onResizeStart($event, 0)"></span></th>
+                <th class="resizable-th">File Date<span class="col-resize-handle" (mousedown)="onResizeStart($event, 1)"></span></th>
+                <th class="resizable-th">Date Captured<span class="col-resize-handle" (mousedown)="onResizeStart($event, 2)"></span></th>
+                <th class="resizable-th">Description<span class="col-resize-handle" (mousedown)="onResizeStart($event, 3)"></span></th>
+                <th class="resizable-th">Reference<span class="col-resize-handle" (mousedown)="onResizeStart($event, 4)"></span></th>
+                <th class="resizable-th">Process<span class="col-resize-handle" (mousedown)="onResizeStart($event, 5)"></span></th>
+                <th class="resizable-th">Method<span class="col-resize-handle" (mousedown)="onResizeStart($event, 6)"></span></th>
+                <th class="resizable-th text-right">Amount<span class="col-resize-handle" (mousedown)="onResizeStart($event, 7)"></span></th>
+                <th class="resizable-th">Status<span class="col-resize-handle" (mousedown)="onResizeStart($event, 8)"></span></th>
+                <th class="resizable-th text-right">Records<span class="col-resize-handle" (mousedown)="onResizeStart($event, 9)"></span></th>
                 <th class="text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               @for (item of filteredHistory(); track trackByJobId($index, item)) {
                 <tr class="clickable-row" (click)="openDetails(item)" [attr.data-testid]="'row-job-' + item.directDepositJob_ID">
-                  <td class="font-mono" [attr.data-testid]="'text-job-id-' + item.directDepositJob_ID">{{ item.directDepositJob_ID }}</td>
-                  <td>{{ formatDate(item.fileDate) }}</td>
-                  <td>{{ formatDate(item.dateCaptured) }}</td>
-                  <td class="truncate-cell">{{ item.fileName || '-' }}</td>
-                  <td class="truncate-cell">{{ item.paymentReference || '-' }}</td>
-                  <td>
-                    <span class="badge" [ngClass]="getProcessBadgeClass(item.process)">{{ item.process }}</span>
+                  <td class="font-mono cell-clip" [attr.data-testid]="'text-job-id-' + item.directDepositJob_ID">{{ item.directDepositJob_ID }}</td>
+                  <td class="cell-clip">{{ formatDate(item.fileDate) }}</td>
+                  <td class="cell-clip">{{ formatDate(item.dateCaptured) }}</td>
+                  <td class="cell-clip" [title]="item.fileName || '-'">{{ item.fileName || '-' }}</td>
+                  <td class="cell-clip" [title]="item.paymentReference || '-'">{{ item.paymentReference || '-' }}</td>
+                  <td class="cell-clip">
+                    <span class="badge" [ngClass]="getProcessBadgeClass(item.process)" [title]="item.process">{{ item.process }}</span>
                   </td>
-                  <td>
+                  <td class="cell-clip">
                     @if (isManual(item)) {
                       <span class="badge badge-default">Manual</span>
                     } @else {
                       <span class="badge badge-info">Bulk</span>
                     }
                   </td>
-                  <td class="text-right font-mono">{{ formatCurrency(item.allocatedAmount) }}</td>
-                  <td>
-                    <span class="badge" [ngClass]="getStatusBadgeClass(item.job_Status)" [attr.data-testid]="'badge-status-' + item.directDepositJob_ID">{{ item.job_Status }}</span>
+                  <td class="text-right font-mono cell-clip">{{ formatCurrency(item.allocatedAmount) }}</td>
+                  <td class="cell-clip">
+                    <span class="badge" [ngClass]="getStatusBadgeClass(item.job_Status)" [attr.data-testid]="'badge-status-' + item.directDepositJob_ID" [title]="item.job_Status">{{ item.job_Status }}</span>
                   </td>
-                  <td class="text-right">{{ item.records }}</td>
+                  <td class="text-right cell-clip">{{ item.records }}</td>
                   <td class="text-center" (click)="$event.stopPropagation()">
                     <div class="action-buttons">
                       <button class="btn-outline icon-btn-sm" (click)="openDetails(item)" title="View Details" [attr.data-testid]="'button-view-' + item.directDepositJob_ID">
@@ -234,8 +247,9 @@
                           </button>
                         } @else if (acc.receiptIdOnly || acc.receiptId || acc.receipt_ID) {
                           @if (acc.resolvingReceiptNo) {
-                            <span class="text-muted" style="font-size:0.75rem">Loading...</span>
+                            <span class="text-muted" style="font-size:0.75rem">Resolving…</span>
                           } @else {
+                            <span class="font-mono" style="font-size:0.8rem;opacity:0.6" title="Receipt ID — number resolving">ID:{{ acc.receiptIdOnly || acc.receiptId || acc.receipt_ID }}</span>
                             <button class="btn-print-receipt" title="Print receipt" (click)="printReceipt(acc)" data-testid="btn-print-receipt-id">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             </button>

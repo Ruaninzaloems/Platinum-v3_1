@@ -29,7 +29,7 @@
   @if (activeTab() === 'day-end') {
     <div class="stats-row">
       <div class="stat-card">
-        <span class="stat-label">Pending Approval</span>
+        <span class="stat-label">Submitted for Review</span>
         <span class="stat-value" data-testid="text-pending-count">{{ pendingCount() }}</span>
       </div>
       <div class="stat-card">
@@ -70,10 +70,10 @@
           <div class="filter-group">
             <label class="form-label">Status</label>
             <select class="form-select" [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)" data-testid="select-filter-status">
-              <option value="All">All Statuses</option>
-              <option value="PENDING_APPROVAL">Pending Approval</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="RETURNED">Returned</option>
+              <option value="ACTIONABLE">Submitted & Returned</option>
+              <option value="All">All Active</option>
+              <option value="SUBMITTED">Submitted Only</option>
+              <option value="RETURNED">Returned Only</option>
               <option value="NOT_SUBMITTED">Not Submitted</option>
             </select>
           </div>
@@ -82,6 +82,21 @@
             <input class="form-input" placeholder="Search cashier name..." [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" data-testid="input-search" />
           </div>
         </div>
+        @if (filterStatus() === 'COMPLETED' || filterStatus() === 'All') {
+          <div class="filter-row filter-row-dates">
+            <div class="filter-group">
+              <label class="form-label">Date From</label>
+              <app-date-input [value]="filterDateFrom()" (valueChange)="filterDateFrom.set($event)" testId="input-date-from"></app-date-input>
+            </div>
+            <div class="filter-group">
+              <label class="form-label">Date To</label>
+              <app-date-input [value]="filterDateTo()" (valueChange)="filterDateTo.set($event)" testId="input-date-to"></app-date-input>
+            </div>
+            <div class="filter-group filter-group-info">
+              <span class="filter-info-text">Showing {{ filteredShifts().length }} record(s)</span>
+            </div>
+          </div>
+        }
       </div>
 
       @if (isLoadingShifts()) {
@@ -103,7 +118,8 @@
                 <th>Status</th>
                 <th>System Total</th>
                 <th>Declared</th>
-                <th>Variance</th>
+                <th>Shortage</th>
+                <th>Surplus</th>
                 <th>Receipts</th>
                 <th>Actions</th>
               </tr>
@@ -119,19 +135,28 @@
                   <td><span class="badge" [ngClass]="getStatusBadgeClass(shift.status)">{{ getStatusLabel(shift.status) }}</span></td>
                   <td class="amount-cell">{{ formatCurrency(shift.systemTotals.total) }}</td>
                   <td class="amount-cell">{{ shift.declaredTotals ? formatCurrency(shift.declaredTotals.total) : '-' }}</td>
-                  <td class="amount-cell" [class.variance-negative]="(shift.variance?.total || 0) < 0" [class.variance-positive]="(shift.variance?.total || 0) > 0">
-                    {{ shift.variance ? formatCurrency(shift.variance.total) : '-' }}
+                  <td class="amount-cell" [class.variance-negative]="shift.shortage > 0">
+                    {{ shift.shortage > 0 ? formatCurrency(shift.shortage) : '-' }}
+                  </td>
+                  <td class="amount-cell" [class.variance-positive]="shift.surplus > 0">
+                    {{ shift.surplus > 0 ? formatCurrency(shift.surplus) : '-' }}
                   </td>
                   <td>{{ shift.transactionCount }}</td>
                   <td>
-                    @if (shift.status === 'PENDING_APPROVAL') {
+                    @if (shift.status === 'SUBMITTED') {
                       <button class="btn-primary btn-sm" (click)="handleReview(shift)" [attr.data-testid]="'button-review-' + shift.id">
                         Review
                       </button>
-                    } @else if (shift.status === 'COMPLETED') {
-                      <span class="text-muted">✓ Done</span>
+                    } @else if (shift.status === 'COMPLETED' || shift.status === 'APPROVED') {
+                      <button class="btn-outline btn-sm" (click)="handleReview(shift)" [attr.data-testid]="'button-view-' + shift.id">
+                        View
+                      </button>
                     } @else if (shift.status === 'RETURNED') {
-                      <span class="badge badge-danger">Returned</span>
+                      <button class="btn-outline btn-sm" style="border-color:#dc2626;color:#dc2626" (click)="handleReview(shift)" [attr.data-testid]="'button-view-returned-' + shift.id">
+                        View
+                      </button>
+                    } @else if (shift.status === 'NOT_SUBMITTED') {
+                      <span class="text-muted" style="font-size:0.8rem">No session</span>
                     }
                   </td>
                 </tr>
@@ -140,13 +165,233 @@
           </table>
         </div>
       }
+
+      <div class="historic-section card" data-testid="section-historic">
+        <div class="historic-header" (click)="toggleHistoric()">
+          <div class="historic-title-row">
+            <span class="historic-chevron">{{ historicExpanded() ? '▾' : '▸' }}</span>
+            <div class="historic-title-text">
+              <h3 class="historic-title">Reconciliation History</h3>
+              <span class="historic-subtitle">Shortage/surplus tracking and reconciliation audit trail</span>
+            </div>
+            @if (historicReconciles().length > 0) {
+              <span class="historic-count">{{ historicReconciles().length }}</span>
+            }
+          </div>
+        </div>
+
+        @if (historicLoading()) {
+          <div class="loading-state" style="padding:1.5rem">
+            <div class="spinner"></div>
+            <p>Loading historic reconciles...</p>
+          </div>
+        }
+
+        @if (historicExpanded() && !historicLoading()) {
+          @if (historicReconciles().length === 0) {
+            <div class="empty-state" style="padding:2rem">
+              <p>No reconciliation records found.</p>
+            </div>
+          } @else {
+            <div class="hg-summary-cards" data-testid="historic-summary-cards">
+              <div class="hg-summary-card hg-summary-shortage" (click)="historicVarianceFilter.set(historicVarianceFilter() === 'shortage' ? 'all' : 'shortage'); historicPage.set(1)" [class.hg-summary-active]="historicVarianceFilter() === 'shortage'" data-testid="card-total-shortage">
+                <span class="hg-summary-label">Total Shortage</span>
+                <span class="hg-summary-value">{{ formatCurrency(historicTotals().shortageAmt) }}</span>
+                <span class="hg-summary-count">{{ historicTotals().shortageCount }} session{{ historicTotals().shortageCount !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="hg-summary-card hg-summary-surplus" (click)="historicVarianceFilter.set(historicVarianceFilter() === 'surplus' ? 'all' : 'surplus'); historicPage.set(1)" [class.hg-summary-active]="historicVarianceFilter() === 'surplus'" data-testid="card-total-surplus">
+                <span class="hg-summary-label">Total Surplus</span>
+                <span class="hg-summary-value">{{ formatCurrency(historicTotals().surplusAmt) }}</span>
+                <span class="hg-summary-count">{{ historicTotals().surplusCount }} session{{ historicTotals().surplusCount !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="hg-summary-card hg-summary-variance" data-testid="card-net-variance">
+                <span class="hg-summary-label">Net Variance</span>
+                <span class="hg-summary-value" [class.variance-negative]="historicTotals().variance < 0" [class.variance-positive]="historicTotals().variance > 0">{{ formatCurrency(Math.abs(historicTotals().variance)) }} {{ historicTotals().variance < 0 ? 'Short' : historicTotals().variance > 0 ? 'Over' : '' }}</span>
+                <span class="hg-summary-count">{{ historicFiltered().length }} total records</span>
+              </div>
+              <div class="hg-summary-card hg-summary-balanced" (click)="historicVarianceFilter.set(historicVarianceFilter() === 'balanced' ? 'all' : 'balanced'); historicPage.set(1)" [class.hg-summary-active]="historicVarianceFilter() === 'balanced'" data-testid="card-balanced">
+                <span class="hg-summary-label">Balanced</span>
+                <span class="hg-summary-value">{{ historicTotals().balancedCount }}</span>
+                <span class="hg-summary-count">No variance</span>
+              </div>
+            </div>
+
+            <div class="hg-toolbar" data-testid="historic-toolbar">
+              <div class="hg-toolbar-left">
+                <div class="hg-search-box">
+                  <span class="hg-search-icon">⌕</span>
+                  <input class="hg-search-input" placeholder="Search cashier or reviewer..."
+                    [ngModel]="historicSearch()" (ngModelChange)="historicSearch.set($event); historicPage.set(1)"
+                    data-testid="input-historic-search" />
+                  @if (historicSearch()) {
+                    <button class="hg-search-clear" (click)="historicSearch.set(''); historicPage.set(1)">✕</button>
+                  }
+                </div>
+                <div class="hg-date-filter">
+                  <app-date-input [value]="historicDateFrom()" (valueChange)="historicDateFrom.set($event); historicPage.set(1)" testId="input-historic-date-from" placeholder="From date"></app-date-input>
+                  <span class="hg-date-sep">–</span>
+                  <app-date-input [value]="historicDateTo()" (valueChange)="historicDateTo.set($event); historicPage.set(1)" testId="input-historic-date-to" placeholder="To date"></app-date-input>
+                </div>
+                @if (historicSearch() || historicDateFrom() || historicDateTo() || historicVarianceFilter() !== 'all') {
+                  <button class="hg-clear-btn" (click)="historicClearFilters()" data-testid="button-historic-clear-filters">Clear Filters</button>
+                }
+              </div>
+              <div class="hg-toolbar-right">
+                <span class="hg-result-count" data-testid="text-historic-count">{{ historicFiltered().length }} of {{ historicReconciles().length }} records</span>
+                <button class="hg-export-btn" (click)="exportHistoricCsv()" data-testid="button-historic-export" title="Export to CSV">
+                  ↓ Export
+                </button>
+              </div>
+            </div>
+
+            <div class="hg-table-wrap">
+              <table class="hg-table">
+                <thead>
+                  <tr>
+                    <th class="hg-th hg-th-sortable" (click)="historicSort('cashierName')" data-testid="th-historic-cashier">
+                      <span>Cashier</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'cashierName' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th">Status</th>
+                    <th class="hg-th hg-th-sortable hg-th-right" (click)="historicSort('systemTotal')">
+                      <span>System Total</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'systemTotal' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable hg-th-right" (click)="historicSort('totalAmt')">
+                      <span>Declared Total</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'totalAmt' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable hg-th-right" (click)="historicSort('shortageAmt')">
+                      <span>Shortage</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'shortageAmt' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable hg-th-right" (click)="historicSort('surplusAmt')">
+                      <span>Surplus</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'surplusAmt' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable hg-th-right" (click)="historicSort('variance')">
+                      <span>Variance</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'variance' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable" (click)="historicSort('reconcileDate')">
+                      <span>Date</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'reconcileDate' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th hg-th-sortable" (click)="historicSort('reviewerName')">
+                      <span>Reviewed By</span>
+                      <span class="hg-sort-icon">{{ historicSortCol() === 'reviewerName' ? (historicSortDir() === 'asc' ? '↑' : '↓') : '⇅' }}</span>
+                    </th>
+                    <th class="hg-th">Reports</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (rec of historicPaged(); track rec.reconcileId || rec.posCashierId) {
+                    <tr class="hg-row" [attr.data-testid]="'row-historic-' + rec.posCashierId"
+                        [class.hg-row-shortage]="rec.shortageAmt > 0"
+                        [class.hg-row-surplus]="rec.surplusAmt > 0">
+                      <td class="hg-td">
+                        <span class="hg-cashier-name">{{ rec.cashierName }}</span>
+                      </td>
+                      <td class="hg-td">
+                        <span class="badge" [class.badge-verified]="rec.status === 'VERIFIED'" [class.badge-submitted]="rec.status === 'SUBMITTED'" [class.badge-completed]="rec.status === 'COMPLETED'">{{ rec.status || 'VERIFIED' }}</span>
+                      </td>
+                      <td class="hg-td hg-td-amount">{{ formatCurrency(rec.systemTotal || (rec.totalAmt + (rec.shortageAmt || 0) - (rec.surplusAmt || 0))) }}</td>
+                      <td class="hg-td hg-td-amount">{{ formatCurrency(rec.totalAmt) }}</td>
+                      <td class="hg-td hg-td-amount" [class.variance-negative]="rec.shortageAmt > 0">
+                        {{ rec.shortageAmt > 0 ? formatCurrency(rec.shortageAmt) : '-' }}
+                      </td>
+                      <td class="hg-td hg-td-amount" [class.variance-positive]="rec.surplusAmt > 0">
+                        {{ rec.surplusAmt > 0 ? formatCurrency(rec.surplusAmt) : '-' }}
+                      </td>
+                      <td class="hg-td hg-td-amount" [class.variance-negative]="(rec.variance ?? ((rec.surplusAmt || 0) - (rec.shortageAmt || 0))) < 0" [class.variance-positive]="(rec.variance ?? ((rec.surplusAmt || 0) - (rec.shortageAmt || 0))) > 0">
+                        {{ formatCurrency(rec.variance ?? ((rec.surplusAmt || 0) - (rec.shortageAmt || 0))) }}
+                      </td>
+                      <td class="hg-td">{{ formatDate(rec.reconcileDate) }}</td>
+                      <td class="hg-td">{{ rec.reviewerName || '-' }}</td>
+                      <td class="hg-td">
+                        <div class="report-btn-group">
+                          <button class="btn-report" (click)="printCashReport(rec)" [disabled]="reportGenerating() === rec.posCashierId + '-cash'" [attr.data-testid]="'btn-cash-report-' + rec.posCashierId" title="Cash Report (Platinum)">
+                            @if (reportGenerating() === rec.posCashierId + '-cash') { <span class="spinner-sm"></span> } @else { 🧾 }
+                            <span>Cash</span>
+                          </button>
+                          <button class="btn-report" (click)="printDepositSlip(rec)" [disabled]="reportGenerating() === rec.posCashierId + '-deposit'" [attr.data-testid]="'btn-deposit-slip-' + rec.posCashierId" title="Deposit Slip (Platinum)">
+                            @if (reportGenerating() === rec.posCashierId + '-deposit') { <span class="spinner-sm"></span> } @else { 🏦 }
+                            <span>Deposit</span>
+                          </button>
+                          <button class="btn-report btn-report-custom" (click)="generateCustomCashReportForRec(rec)" [disabled]="reportGenerating() === rec.posCashierId + '-custom-cash'" [attr.data-testid]="'btn-custom-cash-' + rec.posCashierId" title="Generate Detailed Cash Report">
+                            @if (reportGenerating() === rec.posCashierId + '-custom-cash') { <span class="spinner-sm"></span> } @else { 📊 }
+                            <span>Detailed Cash</span>
+                          </button>
+                          <button class="btn-report btn-report-custom" (click)="generateCustomDepositSlipForRec(rec)" [disabled]="reportGenerating() === rec.posCashierId + '-custom-deposit'" [attr.data-testid]="'btn-custom-deposit-' + rec.posCashierId" title="Generate Detailed Deposit Slip">
+                            @if (reportGenerating() === rec.posCashierId + '-custom-deposit') { <span class="spinner-sm"></span> } @else { 📋 }
+                            <span>Detailed Deposit</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="hg-totals-row">
+                    <td class="hg-td hg-td-totals-label" colspan="2">Totals (filtered)</td>
+                    <td class="hg-td hg-td-amount hg-td-total">{{ formatCurrency(historicTotals().systemTotal) }}</td>
+                    <td class="hg-td hg-td-amount hg-td-total">{{ formatCurrency(historicTotals().totalAmt) }}</td>
+                    <td class="hg-td hg-td-amount hg-td-total" [class.variance-negative]="historicTotals().shortageAmt > 0">
+                      {{ historicTotals().shortageAmt > 0 ? formatCurrency(historicTotals().shortageAmt) : '-' }}
+                    </td>
+                    <td class="hg-td hg-td-amount hg-td-total" [class.variance-positive]="historicTotals().surplusAmt > 0">
+                      {{ historicTotals().surplusAmt > 0 ? formatCurrency(historicTotals().surplusAmt) : '-' }}
+                    </td>
+                    <td class="hg-td hg-td-amount hg-td-total" [class.variance-negative]="historicTotals().variance < 0" [class.variance-positive]="historicTotals().variance > 0">
+                      {{ formatCurrency(historicTotals().variance) }}
+                    </td>
+                    <td class="hg-td" colspan="3"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div class="hg-pagination" data-testid="historic-pagination">
+              <div class="hg-pagination-left">
+                <span class="hg-pagination-info">
+                  Showing {{ ((historicPage() - 1) * historicPageSize()) + 1 }}–{{ Math.min(historicPage() * historicPageSize(), historicFiltered().length) }}
+                  of {{ historicFiltered().length }}
+                </span>
+              </div>
+              <div class="hg-pagination-center">
+                <button class="hg-page-btn" [disabled]="historicPage() === 1" (click)="historicGoPage(historicPage() - 1)" data-testid="button-historic-prev">‹</button>
+                @for (p of historicPageNumbers(); track p) {
+                  @if (p === '...') {
+                    <span class="hg-page-ellipsis">…</span>
+                  } @else {
+                    <button class="hg-page-btn" [class.hg-page-active]="p === historicPage()" (click)="historicGoPage(p)">{{ p }}</button>
+                  }
+                }
+                <button class="hg-page-btn" [disabled]="historicPage() === historicTotalPages()" (click)="historicGoPage(historicPage() + 1)" data-testid="button-historic-next">›</button>
+              </div>
+              <div class="hg-pagination-right">
+                <select class="hg-page-size-select" [ngModel]="historicPageSize()" (ngModelChange)="historicChangePageSize(+$event)" data-testid="select-historic-page-size">
+                  <option [value]="10">10 / page</option>
+                  <option [value]="25">25 / page</option>
+                  <option [value]="50">50 / page</option>
+                  <option [value]="100">100 / page</option>
+                </select>
+              </div>
+            </div>
+          }
+        }
+      </div>
     }
 
     @if (reconMode() === 'CASH_OFFICE') {
-      @if (perOfficeList().length === 0) {
+      @if (perOfficeListLoading()) {
         <div class="loading-state">
           <div class="spinner"></div>
           <p>Loading cash offices...</p>
+        </div>
+      } @else if (perOfficeList().length === 0) {
+        <div class="empty-state" data-testid="empty-per-office">
+          <p style="color:#6b7280;text-align:center;padding:2rem 0">No cash office reconciliation records found. Day-end submissions may be configured per cashier for this site.</p>
         </div>
       } @else {
         <div class="office-grid">
@@ -168,6 +413,16 @@
         @if (perOfficeData()) {
           <div class="card office-detail">
             <h3>{{ perOfficeData().cashBookName || 'Cash Office' }}</h3>
+            @if (perOfficeData().validationResult && !perOfficeData().validationResult.isValid) {
+              <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px 16px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                  <span style="color:#dc2626;font-weight:600;">Configuration Error</span>
+                </div>
+                @for (err of perOfficeData().validationResult.errors; track $index) {
+                  <p style="color:#991b1b;font-size:0.85rem;margin:4px 0 0;">{{ err }}</p>
+                }
+              </div>
+            }
             @if (perOfficeData().cashierSummary?.length > 0) {
               <div class="table-container">
                 <table>
@@ -195,6 +450,9 @@
                         <td class="amount-cell">{{ formatCurrency(cs.totalAmount || cs.total || 0) }}</td>
                         <td>
                           <div class="action-buttons">
+                            <button class="btn-outline btn-sm" (click)="handlePerOfficeReview(cs)" [attr.data-testid]="'button-view-office-cashier-' + (cs.cashierId || cs.id || $index)">
+                              View
+                            </button>
                             <button class="btn-outline btn-sm" (click)="handlePerOfficeVerifyCashier(cs.cashierId || cs.id || cs.cashier_ID)" [disabled]="perOfficeVerifying() === (cs.cashierId || cs.id || cs.cashier_ID)" [attr.data-testid]="'button-verify-cashier-' + (cs.cashierId || cs.id || $index)">
                               @if (perOfficeVerifying() === (cs.cashierId || cs.id || cs.cashier_ID)) { <span class="spinner spinner-sm"></span> } @else { Verify }
                             </button>
@@ -269,150 +527,452 @@
   }
 
   @if (selectedShift()) {
-    <div class="dialog-overlay" (click)="closeReview()">
-      <div class="dialog-content dialog-xl" (click)="$event.stopPropagation()">
-        <div class="dialog-header">
-          <h2>Review: {{ selectedShift()!.cashierName }}</h2>
-          <button class="btn-close" (click)="closeReview()" data-testid="button-close-review">✕</button>
-        </div>
-
-        @if (reviewLoading()) {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading review data...</p>
+    <div class="review-fullscreen">
+      <div class="review-fs-header">
+        <div class="review-fs-title-row">
+          <button class="review-fs-back" (click)="closeReview()" data-testid="button-close-review">← Back</button>
+          <div class="review-fs-title-info">
+            <h2 data-testid="text-review-cashier">{{ selectedShift()!.cashierName }}</h2>
+            <span class="review-fs-subtitle">{{ selectedShift()!.cashOffice || '' }} · {{ formatDate(selectedShift()!.startTime) }}</span>
           </div>
-        } @else if (reviewData()) {
-          <div class="review-content">
-            <div class="review-summary">
-              <div class="summary-item">
-                <span class="summary-label">System Total</span>
-                <span class="summary-value">{{ formatCurrency(selectedShift()!.systemTotals.total) }}</span>
+          <span class="badge review-fs-status-badge" [ngClass]="getStatusBadgeClass(selectedShift()!.status)">{{ getStatusLabel(selectedShift()!.status) }}</span>
+        </div>
+      </div>
+
+      @if (reviewLoading()) {
+        <div class="loading-state" style="padding:3rem">
+          <div class="spinner"></div>
+          <p>Loading session details...</p>
+        </div>
+      } @else if (reviewData()) {
+        <div class="review-fs-body">
+          <div class="review-fs-summary-row">
+            <div class="review-fs-stat">
+              <span class="review-fs-stat-label">System Total</span>
+              <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.systemTotals.total) }}</span>
+            </div>
+            <div class="review-fs-stat">
+              <span class="review-fs-stat-label">Cash</span>
+              <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.systemTotals.cash) }}</span>
+            </div>
+            <div class="review-fs-stat">
+              <span class="review-fs-stat-label">Card</span>
+              <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.systemTotals.card) }}</span>
+            </div>
+            @if (selectedShift()!.systemTotals.cheque > 0) {
+              <div class="review-fs-stat">
+                <span class="review-fs-stat-label">Cheque</span>
+                <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.systemTotals.cheque) }}</span>
               </div>
-              @if (selectedShift()!.declaredTotals) {
-                <div class="summary-item">
-                  <span class="summary-label">Declared Total</span>
-                  <span class="summary-value">{{ formatCurrency(selectedShift()!.declaredTotals!.total) }}</span>
+            }
+            @if (selectedShift()!.systemTotals.postal > 0) {
+              <div class="review-fs-stat">
+                <span class="review-fs-stat-label">Postal Order</span>
+                <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.systemTotals.postal) }}</span>
+              </div>
+            }
+          </div>
+          <div class="review-fs-summary-row" style="margin-top:0.5rem">
+            @if (selectedShift()!.declaredTotals) {
+              <div class="review-fs-stat">
+                <span class="review-fs-stat-label">Declared Total</span>
+                <span class="review-fs-stat-value">{{ formatCurrency(selectedShift()!.declaredTotals!.total) }}</span>
+              </div>
+            }
+            @if (selectedShift()!.shortage > 0) {
+              <div class="review-fs-stat review-fs-stat-warn">
+                <span class="review-fs-stat-label">Shortage</span>
+                <span class="review-fs-stat-value variance-negative">{{ formatCurrency(selectedShift()!.shortage) }}</span>
+              </div>
+            }
+            @if (selectedShift()!.surplus > 0) {
+              <div class="review-fs-stat">
+                <span class="review-fs-stat-label">Surplus</span>
+                <span class="review-fs-stat-value variance-positive">{{ formatCurrency(selectedShift()!.surplus) }}</span>
+              </div>
+            }
+            <div class="review-fs-stat">
+              <span class="review-fs-stat-label">Receipts</span>
+              <span class="review-fs-stat-value">{{ selectedShift()!.transactionCount }}</span>
+            </div>
+          </div>
+
+          <div class="consolidated-report-bar">
+            <button class="export-btn export-btn-consolidated" (click)="exportConsolidatedPdf()" [disabled]="reportGenerating() === 'consolidated'" data-testid="button-consolidated-pdf">
+              @if (reportGenerating() === 'consolidated') { <span class="spinner spinner-sm"></span> }
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Download Full Consolidated Report (PDF)
+            </button>
+          </div>
+
+          <div class="review-fs-tabs">
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'cash'" (click)="setReceiptTab('cash')">
+              Cash ({{ reviewData()!.cashReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'card'" (click)="setReceiptTab('card')">
+              Card ({{ reviewData()!.cardReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'cheque'" (click)="setReceiptTab('cheque')">
+              Cheque ({{ reviewData()!.chequeReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'postal'" (click)="setReceiptTab('postal')">
+              Postal ({{ reviewData()!.postalReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'dropbox'" (click)="setReceiptTab('dropbox')">
+              Drop Box ({{ reviewData()!.dropboxReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'offline'" (click)="setReceiptTab('offline')">
+              Offline ({{ reviewData()!.offlineReceipts.length }})
+            </button>
+            <button class="review-fs-tab" [class.active]="reviewTab() === 'system-vs-cashier'" (click)="setReceiptTab('system-vs-cashier')" data-testid="tab-system-vs-cashier">
+              System vs Cashier ({{ reviewData()!.systemVsCashier.length }})
+            </button>
+            @if (reviewData()!.cancelledReceipts.length > 0) {
+              <button class="review-fs-tab" [class.active]="reviewTab() === 'cancelled'" (click)="setReceiptTab('cancelled')" data-testid="tab-cancelled-receipts" style="color: var(--platinum-danger, #dc3545);">
+                Cancelled ({{ reviewData()!.cancelledReceipts.length }})
+              </button>
+            }
+          </div>
+
+          <div class="review-fs-table-area">
+            <div class="export-toolbar">
+              <div class="export-toolbar-left">
+                <span class="export-toolbar-label">{{ getTabLabel(reviewTab()) }} Receipts</span>
+                <span class="export-toolbar-count">{{ receiptFullList().length || (reviewTab() === 'system-vs-cashier' ? reviewData()!.systemVsCashier.length : reviewTab() === 'cancelled' ? reviewData()!.cancelledReceipts.length : 0) }} records</span>
+                <div class="receipt-search-box">
+                  <svg class="receipt-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input class="receipt-search-input" placeholder="Search receipt no, account, name..." [ngModel]="receiptSearchQuery()" (ngModelChange)="receiptSearchQuery.set($event); receiptPage.set(1)" data-testid="input-receipt-search" />
+                  @if (receiptSearchQuery()) {
+                    <button class="receipt-search-clear" (click)="receiptSearchQuery.set(''); receiptPage.set(1)" data-testid="button-receipt-search-clear">×</button>
+                  }
                 </div>
-              }
-              @if (selectedShift()!.variance) {
-                <div class="summary-item">
-                  <span class="summary-label">Variance</span>
-                  <span class="summary-value" [class.variance-negative]="(selectedShift()!.variance!.total) < 0" [class.variance-positive]="(selectedShift()!.variance!.total) > 0">
-                    {{ formatCurrency(selectedShift()!.variance!.total) }}
-                  </span>
-                </div>
-              }
+              </div>
+              <div class="export-toolbar-right">
+                <button class="export-btn export-btn-excel" (click)="exportReceiptsToExcel()" data-testid="button-export-excel">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                  Export Excel
+                </button>
+                <button class="export-btn export-btn-pdf" (click)="exportReceiptsToPdf()" data-testid="button-export-pdf">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  Export PDF
+                </button>
+              </div>
             </div>
 
-            <div class="tab-list review-tabs">
-              <button class="tab-item" [class.active]="reviewTab() === 'cash'" (click)="reviewTab.set('cash')">Cash Receipts ({{ reviewData()!.cashReceipts.length }})</button>
-              <button class="tab-item" [class.active]="reviewTab() === 'card'" (click)="reviewTab.set('card')">Card Receipts ({{ reviewData()!.cardReceipts.length }})</button>
-              <button class="tab-item" [class.active]="reviewTab() === 'system-vs-cashier'" (click)="reviewTab.set('system-vs-cashier')" data-testid="tab-system-vs-cashier">System vs Cashier ({{ reviewData()!.systemVsCashier.length }})</button>
-            </div>
-
-            <div class="receipt-list">
-              @if (reviewTab() === 'cash') {
-                @if (reviewData()!.cashReceipts.length === 0) {
-                  <p class="text-muted" style="text-align:center;padding:1rem">No cash receipts</p>
-                } @else {
-                  <div class="table-container">
-                    <table>
-                      <thead><tr><th>#</th><th>Receipt No</th><th>Account</th><th>Amount</th><th>Date</th><th>Actions</th></tr></thead>
-                      <tbody>
-                        @for (r of reviewData()!.cashReceipts; track $index) {
-                          <tr>
-                            <td>{{ $index + 1 }}</td>
-                            <td class="font-mono">{{ r.receiptNo || r.receipt_no || '-' }}</td>
-                            <td class="font-mono">{{ r.accountNumber || r.accountId || '-' }}</td>
-                            <td class="amount-cell">{{ formatCurrency(r.amount || r.totalAmount || 0) }}</td>
-                            <td>{{ formatDate(r.receiptDate || r.date || '') }}</td>
+            @if (reviewTab() === 'cash' || reviewTab() === 'card' || reviewTab() === 'cheque' || reviewTab() === 'postal' || reviewTab() === 'dropbox' || reviewTab() === 'offline') {
+              @let receiptList = receiptPaged();
+              @let fullList = receiptFullList();
+              @if (fullList.length === 0) {
+                <div class="review-fs-empty">
+                  No {{ reviewTab() }} receipts found for this session
+                  @if (receiptValidationError()) {
+                    <div class="receipt-api-note">{{ receiptValidationError() }}</div>
+                  }
+                </div>
+              } @else {
+                <div class="table-container">
+                  <table class="receipt-table" data-testid="table-review-receipts">
+                    <thead>
+                      <tr>
+                        <th class="th-narrow">#</th>
+                        <th class="sortable-th" (click)="toggleReceiptSort('receiptNo')">Receipt No <span class="sort-icon">{{ receiptSortCol() === 'receiptNo' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="sortable-th" (click)="toggleReceiptSort('account')">Account <span class="sort-icon">{{ receiptSortCol() === 'account' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="sortable-th" (click)="toggleReceiptSort('holder')">Account Holder <span class="sort-icon">{{ receiptSortCol() === 'holder' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="amount-cell sortable-th" (click)="toggleReceiptSort('paid')">Paid <span class="sort-icon">{{ receiptSortCol() === 'paid' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="amount-cell sortable-th" (click)="toggleReceiptSort('tendered')">Tendered <span class="sort-icon">{{ receiptSortCol() === 'tendered' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="amount-cell sortable-th" (click)="toggleReceiptSort('change')">Change <span class="sort-icon">{{ receiptSortCol() === 'change' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        @if (reviewTab() === 'card') {
+                          <th class="sortable-th" (click)="toggleReceiptSort('cardNo')">Card No <span class="sort-icon">{{ receiptSortCol() === 'cardNo' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                          <th class="sortable-th" (click)="toggleReceiptSort('expiry')">Expiry <span class="sort-icon">{{ receiptSortCol() === 'expiry' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        }
+                        @if (reviewTab() === 'cheque') {
+                          <th class="sortable-th" (click)="toggleReceiptSort('chequeNo')">Cheque No <span class="sort-icon">{{ receiptSortCol() === 'chequeNo' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                          <th class="sortable-th" (click)="toggleReceiptSort('branch')">Bank Branch <span class="sort-icon">{{ receiptSortCol() === 'branch' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        }
+                        <th class="sortable-th" (click)="toggleReceiptSort('date')">Date <span class="sort-icon">{{ receiptSortCol() === 'date' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        <th class="sortable-th" (click)="toggleReceiptSort('status')">Status <span class="sort-icon">{{ receiptSortCol() === 'status' ? (receiptSortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span></th>
+                        @if (reviewTab() === 'cash' && (selectedShift()!.status === 'SUBMITTED')) {
+                          <th>Actions</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (r of receiptList; track $index) {
+                        <tr [attr.data-testid]="'row-receipt-' + $index" [class.voided-row]="r.isCancelled === true || r.isCancelled === 1">
+                          <td class="td-narrow">{{ (receiptPage() - 1) * receiptPageSize() + $index + 1 }}</td>
+                          <td class="font-mono">{{ r.receiptNo || r.receipt_no || r.receiptNumber || '-' }}</td>
+                          <td class="font-mono">{{ r.accountNumber || r.accountNo || r.accountId || '-' }}</td>
+                          <td>{{ r.accHolderName || r.accountName || r.name || '-' }}</td>
+                          <td class="amount-cell">{{ formatCurrency(r.paidAmount ?? r.amount ?? r.totalAmount ?? 0) }}</td>
+                          <td class="amount-cell">{{ formatCurrency(r.tenderAmount ?? 0) }}</td>
+                          <td class="amount-cell">{{ formatCurrency(r.changeAmount ?? 0) }}</td>
+                          @if (reviewTab() === 'card') {
+                            <td class="font-mono">{{ r.cardNo ? ('****' + r.cardNo.slice(-4)) : '-' }}</td>
+                            <td>{{ r.cardExpiryDate || '-' }}</td>
+                          }
+                          @if (reviewTab() === 'cheque') {
+                            <td class="font-mono">{{ r.chequeNo || '-' }}</td>
+                            <td>{{ r.bankBranch || r.bankBrachCode || '-' }}</td>
+                          }
+                          <td>{{ formatDate(r.dateCaptured || r.receiptDate || r.date || '') }}</td>
+                          <td>
+                            @if (r.isCancelled === true || r.isCancelled === 1) {
+                              <span class="badge badge-danger">Voided</span>
+                            } @else {
+                              <span class="badge badge-success">Valid</span>
+                            }
+                          </td>
+                          @if (reviewTab() === 'cash' && (selectedShift()!.status === 'SUBMITTED')) {
                             <td>
                               @if (directCancelId() === (r.id || r.receiptId)) {
                                 <div class="cancel-inline">
                                   <input class="form-input" placeholder="Cancel reason..." [ngModel]="directCancelReason()" (ngModelChange)="directCancelReason.set($event)" />
-                                  <button class="btn-danger btn-sm" (click)="handleDirectCancel(r.id || r.receiptId, directCancelReason())" [disabled]="!directCancelReason()">Confirm</button>
-                                  <button class="btn-outline btn-sm" (click)="directCancelId.set(null); directCancelReason.set('')">Cancel</button>
+                                  <button class="btn-danger btn-sm" (click)="handleDirectCancel(r.id || r.receiptId, directCancelReason())" [disabled]="!directCancelReason() || directCancelProcessing()">
+                                    @if (directCancelProcessing()) { <span class="spinner spinner-sm"></span> } Confirm
+                                  </button>
+                                  <button class="btn-outline btn-sm" (click)="directCancelId.set(null); directCancelReason.set('')" [disabled]="directCancelProcessing()">×</button>
                                 </div>
                               } @else if (!(r.isCancelled === 1 || r.isCancelled === true)) {
-                                <button class="btn-outline btn-sm btn-text-danger" (click)="directCancelId.set(r.id || r.receiptId); directCancelReason.set('')">Cancel Receipt</button>
+                                <button class="btn-outline btn-sm btn-text-danger" (click)="directCancelId.set(r.id || r.receiptId); directCancelReason.set('')">Cancel</button>
                               } @else {
-                                <span class="badge badge-danger">Voided</span>
+                                <span class="text-muted text-sm">—</span>
                               }
                             </td>
-                          </tr>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr class="receipt-totals-row">
+                        <td colspan="4" class="text-right"><strong>Totals (all {{ fullList.length }} receipts)</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(fullList, 'paidAmount')) }}</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(fullList, 'tenderAmount')) }}</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(fullList, 'changeAmount')) }}</strong></td>
+                        @if (reviewTab() === 'card') {
+                          <td colspan="2"></td>
                         }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              }
-              @if (reviewTab() === 'card') {
-                @if (reviewData()!.cardReceipts.length === 0) {
-                  <p class="text-muted" style="text-align:center;padding:1rem">No card receipts</p>
-                } @else {
-                  <div class="table-container">
-                    <table>
-                      <thead><tr><th>#</th><th>Receipt No</th><th>Account</th><th>Amount</th><th>Date</th></tr></thead>
-                      <tbody>
-                        @for (r of reviewData()!.cardReceipts; track $index) {
-                          <tr>
-                            <td>{{ $index + 1 }}</td>
-                            <td class="font-mono">{{ r.receiptNo || r.receipt_no || '-' }}</td>
-                            <td class="font-mono">{{ r.accountNumber || r.accountId || '-' }}</td>
-                            <td class="amount-cell">{{ formatCurrency(r.amount || r.totalAmount || 0) }}</td>
-                            <td>{{ formatDate(r.receiptDate || r.date || '') }}</td>
-                          </tr>
+                        @if (reviewTab() === 'cheque') {
+                          <td colspan="2"></td>
                         }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              }
-              @if (reviewTab() === 'system-vs-cashier') {
-                @if (reviewData()!.systemVsCashier.length === 0) {
-                  <p class="text-muted" style="text-align:center;padding:1rem">No system vs cashier comparison data</p>
-                } @else {
-                  <div class="table-container">
-                    <table>
-                      <thead><tr><th>#</th><th>Description</th><th>System Amount</th><th>Cashier Amount</th><th>Variance</th></tr></thead>
-                      <tbody>
-                        @for (r of reviewData()!.systemVsCashier; track $index) {
-                          <tr [attr.data-testid]="'row-sys-vs-cashier-' + $index">
-                            <td>{{ $index + 1 }}</td>
-                            <td>{{ r.description || r.paymentType || r.type || r.name || '-' }}</td>
-                            <td class="amount-cell">{{ formatCurrency(r.systemAmount || r.systemTotal || r.system || 0) }}</td>
-                            <td class="amount-cell">{{ formatCurrency(r.cashierAmount || r.cashierTotal || r.cashier || 0) }}</td>
-                            <td class="amount-cell" [class.variance-negative]="(r.variance || r.difference || 0) < 0" [class.variance-positive]="(r.variance || r.difference || 0) > 0">
-                              {{ formatCurrency(r.variance || r.difference || 0) }}
-                            </td>
-                          </tr>
+                        <td></td>
+                        <td></td>
+                        @if (reviewTab() === 'cash' && (selectedShift()!.status === 'SUBMITTED')) {
+                          <td></td>
                         }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              }
-            </div>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
 
-            <div class="review-actions">
-              <div class="return-section">
-                <label class="form-label">Return Reason</label>
-                <input class="form-input" placeholder="Enter reason for returning..." [ngModel]="returnReason()" (ngModelChange)="returnReason.set($event)" data-testid="input-return-reason" />
+                @if (fullList.length > receiptPageSize()) {
+                  <div class="rcpt-pagination">
+                    <div class="rcpt-pag-left">
+                      <span class="rcpt-pag-info">Showing {{ (receiptPage() - 1) * receiptPageSize() + 1 }}–{{ Math.min(receiptPage() * receiptPageSize(), fullList.length) }} of {{ fullList.length }} receipts</span>
+                    </div>
+                    <div class="rcpt-pag-center">
+                      <button class="hg-page-btn" [disabled]="receiptPage() === 1" (click)="receiptPage.set(receiptPage() - 1)">‹ Prev</button>
+                      @for (p of receiptPageNumbers(); track $index) {
+                        @if (p === '...') {
+                          <span class="hg-page-ellipsis">…</span>
+                        } @else {
+                          <button class="hg-page-btn" [class.hg-page-active]="p === receiptPage()" (click)="receiptPage.set(+p)">{{ p }}</button>
+                        }
+                      }
+                      <button class="hg-page-btn" [disabled]="receiptPage() === receiptTotalPages()" (click)="receiptPage.set(receiptPage() + 1)">Next ›</button>
+                    </div>
+                    <div class="rcpt-pag-right">
+                      <select class="hg-page-size-select" [ngModel]="receiptPageSize()" (ngModelChange)="setReceiptPageSize(+$event)">
+                        <option [value]="25">25 / page</option>
+                        <option [value]="50">50 / page</option>
+                        <option [value]="100">100 / page</option>
+                        <option [value]="200">200 / page</option>
+                      </select>
+                    </div>
+                  </div>
+                }
+              }
+            }
+
+            @if (reviewTab() === 'system-vs-cashier') {
+              @if (reviewData()!.systemVsCashier.length === 0) {
+                <div class="review-fs-empty">No system vs cashier comparison data</div>
+              } @else {
+                <div class="table-container">
+                  <table class="receipt-table svc-table" data-testid="table-sys-vs-cashier">
+                    <colgroup>
+                      <col style="width: 50px;" />
+                      <col style="width: 35%;" />
+                      <col style="width: 20%;" />
+                      <col style="width: 20%;" />
+                      <col style="width: 20%;" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th class="th-narrow">#</th>
+                        <th class="th-description">Description</th>
+                        <th class="amount-cell">System Amount</th>
+                        <th class="amount-cell">Cashier Amount</th>
+                        <th class="amount-cell">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (r of reviewData()!.systemVsCashier; track $index) {
+                        <tr [attr.data-testid]="'row-sys-vs-cashier-' + $index">
+                          <td class="td-narrow">{{ $index + 1 }}</td>
+                          <td class="td-description">{{ r.title || r.description || r.paymentType || r.type || r.name || '-' }}</td>
+                          <td class="amount-cell">{{ formatCurrency(r.systemTotal ?? r.systemAmount ?? r.system ?? 0) }}</td>
+                          <td class="amount-cell">{{ formatCurrency(r.cashierTotal ?? r.cashierAmount ?? r.cashier ?? 0) }}</td>
+                          <td class="amount-cell" [class.variance-negative]="(r.totalDifference ?? r.variance ?? r.difference ?? 0) < 0" [class.variance-positive]="(r.totalDifference ?? r.variance ?? r.difference ?? 0) > 0">
+                            {{ formatCurrency(r.totalDifference ?? r.variance ?? r.difference ?? 0) }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr class="receipt-totals-row">
+                        <td></td>
+                        <td class="td-description text-right"><strong>Totals</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(reviewData()!.systemVsCashier, 'systemTotal')) }}</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(reviewData()!.systemVsCashier, 'cashierTotal')) }}</strong></td>
+                        <td class="amount-cell"><strong>{{ formatCurrency(receiptListTotal(reviewData()!.systemVsCashier, 'totalDifference')) }}</strong></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              }
+            }
+
+            @if (reviewTab() === 'cancelled') {
+              <div class="table-container">
+                <table class="receipt-table" data-testid="table-cancelled-receipts">
+                  <thead>
+                    <tr>
+                      <th class="th-narrow">#</th>
+                      <th>Receipt No</th>
+                      <th>Account</th>
+                      <th>Account Holder</th>
+                      <th class="amount-cell">Amount</th>
+                      <th>Captured</th>
+                      <th>Cancelled</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of reviewData()!.cancelledReceipts; track $index) {
+                      <tr [attr.data-testid]="'row-cancelled-' + $index" class="row-cancelled">
+                        <td class="td-narrow">{{ $index + 1 }}</td>
+                        <td class="font-mono">{{ r.receiptNo || '-' }}</td>
+                        <td class="font-mono">{{ r.accountId || '-' }}</td>
+                        <td>{{ r.accHolderName || '-' }}</td>
+                        <td class="amount-cell">{{ formatCurrency(r.paidAmount || 0) }}</td>
+                        <td>{{ formatDate(r.dateCaptured || '') }}</td>
+                        <td>{{ formatDate(r.canceledDate || '') }}</td>
+                        <td>{{ r.reasonForCancel || '-' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
               </div>
-              <div class="action-buttons">
-                <button class="btn-outline" (click)="handlePrintCashReport(selectedShift()!.id)" data-testid="button-print-cash-report">Print Cash Report</button>
-                <button class="btn-outline" (click)="handlePrintDepositSlip(selectedShift()!.id)" data-testid="button-print-deposit-slip">Print Deposit Slip</button>
-                <button class="btn-danger" (click)="handleReturn()" [disabled]="actionLoading() || !returnReason()" data-testid="button-return">
-                  @if (actionLoading()) { <span class="spinner spinner-sm"></span> } Return
-                </button>
-                <button class="btn-primary btn-approve" (click)="handleApprove(selectedShift()!.id)" [disabled]="actionLoading()" data-testid="button-approve">
-                  @if (actionLoading()) { <span class="spinner spinner-sm"></span> } Approve
-                </button>
-              </div>
-            </div>
+            }
           </div>
-        }
-      </div>
+
+          <div class="review-fs-footer">
+            @if (selectedShift()!.status === 'SUBMITTED') {
+              <div class="review-fs-return-row">
+                <label class="form-label">Return Reason</label>
+                <input class="form-input" placeholder="Enter reason for returning this reconciliation..." [ngModel]="returnReason()" (ngModelChange)="returnReason.set($event)" data-testid="input-return-reason" />
+              </div>
+              <div class="review-fs-action-bar">
+                <div class="review-fs-action-spacer"></div>
+                <button class="btn-danger" (click)="handleReturn()" [disabled]="actionLoading() || !returnReason()" data-testid="button-return">
+                  @if (actionLoading() === 'return') { <span class="spinner spinner-sm"></span> } Return
+                </button>
+                <button class="btn-primary btn-approve" (click)="handleApprove()" [disabled]="actionLoading()" data-testid="button-approve">
+                  @if (actionLoading() === 'approve') { <span class="spinner spinner-sm"></span> } Approve
+                </button>
+              </div>
+            } @else if (selectedShift()!.status === 'RETURNED') {
+              <div class="approved-banner" style="background:#fef2f2;border-color:#fecaca" data-testid="banner-returned">
+                <span class="material-icons" style="color:#dc2626;font-size:1.25rem">undo</span>
+                <span style="color:#991b1b">This day-end has been returned to the cashier.
+                  @if (selectedShift()!.returnReason) { Reason: <strong>{{ selectedShift()!.returnReason }}</strong> }
+                </span>
+              </div>
+              <div class="review-fs-action-bar">
+                <div class="review-fs-action-spacer"></div>
+                <button class="btn-outline" (click)="closeReview()" data-testid="button-done-returned">Done</button>
+              </div>
+            } @else if (selectedShift()!.status === 'VERIFIED') {
+              <div class="approved-banner" data-testid="banner-verified">
+                <span class="material-icons" style="color:#16a34a;font-size:1.25rem">verified</span>
+                <span>Day-end verified and posted to ledger successfully.</span>
+              </div>
+              @if (generatingApprovalPdfs()) {
+                <div class="review-fs-action-bar" style="justify-content:center;gap:8px;color:#0f2b46;font-size:0.875rem">
+                  <span class="spinner spinner-sm"></span>
+                  <span>Generating approval documents...</span>
+                </div>
+              } @else {
+                <div class="review-fs-action-bar" style="flex-wrap:wrap;gap:6px">
+                  @if (approvalCashReportUrl()) {
+                    <a [href]="approvalCashReportUrl()" download="cash-report.pdf" class="btn-primary" style="text-decoration:none" data-testid="button-download-cash-report">
+                      <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">download</span>Download Cash Report
+                    </a>
+                  } @else {
+                    <button class="btn-outline" (click)="handlePrintCashReport()" data-testid="button-print-cash-report">
+                      <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">print</span>Cash Report
+                    </button>
+                  }
+                  @if (approvalDepositSlipUrl()) {
+                    <a [href]="approvalDepositSlipUrl()" download="deposit-slip.pdf" class="btn-primary" style="text-decoration:none" data-testid="button-download-deposit-slip">
+                      <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">download</span>Download Deposit Slip
+                    </a>
+                  } @else {
+                    <button class="btn-outline" (click)="handlePrintDepositSlip()" data-testid="button-print-deposit-slip">
+                      <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">receipt_long</span>Deposit Slip
+                    </button>
+                  }
+                  <div style="border-left:1px solid #e5e7eb;height:28px;margin:0 4px"></div>
+                  <button class="btn-outline btn-custom-report" (click)="generateCustomCashReport()" [disabled]="reportGenerating() === 'custom-cash'" data-testid="button-custom-cash-report">
+                    @if (reportGenerating() === 'custom-cash') { <span class="spinner spinner-sm"></span> }
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">summarize</span>Detailed Cash Report
+                  </button>
+                  <button class="btn-outline btn-custom-report" (click)="generateCustomDepositSlip()" [disabled]="reportGenerating() === 'custom-deposit'" data-testid="button-custom-deposit-slip">
+                    @if (reportGenerating() === 'custom-deposit') { <span class="spinner spinner-sm"></span> }
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">account_balance</span>Detailed Deposit Slip
+                  </button>
+                  <div class="review-fs-action-spacer"></div>
+                  <button class="btn-outline" (click)="closeReview()" data-testid="button-done-verified">Done</button>
+                </div>
+              }
+            } @else if (selectedShift()!.status === 'APPROVED' || selectedShift()!.status === 'COMPLETED') {
+              <div class="approved-banner" data-testid="banner-approved">
+                <span class="material-icons" style="color:#16a34a;font-size:1.25rem">check_circle</span>
+                <span>Day-end verified and posted to ledger. Reports are now available.</span>
+              </div>
+              <div class="review-fs-action-bar" style="flex-wrap:wrap;gap:6px">
+                <button class="btn-outline" (click)="handlePrintCashReport()" data-testid="button-print-cash-report">
+                  <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">print</span>Print Cash Report
+                </button>
+                <button class="btn-outline" (click)="handlePrintDepositSlip()" data-testid="button-print-deposit-slip">
+                  <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">receipt_long</span>Print Deposit Slip
+                </button>
+                <div style="border-left:1px solid #e5e7eb;height:28px;margin:0 4px"></div>
+                <button class="btn-outline btn-custom-report" (click)="generateCustomCashReport()" [disabled]="reportGenerating() === 'custom-cash'" data-testid="button-custom-cash-report-2">
+                  @if (reportGenerating() === 'custom-cash') { <span class="spinner spinner-sm"></span> }
+                  <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">summarize</span>Detailed Cash Report
+                </button>
+                <button class="btn-outline btn-custom-report" (click)="generateCustomDepositSlip()" [disabled]="reportGenerating() === 'custom-deposit'" data-testid="button-custom-deposit-slip-2">
+                  @if (reportGenerating() === 'custom-deposit') { <span class="spinner spinner-sm"></span> }
+                  <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">account_balance</span>Detailed Deposit Slip
+                </button>
+                <div class="review-fs-action-spacer"></div>
+                <button class="btn-outline" (click)="closeReview()" data-testid="button-done">Done</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   }
 </div>

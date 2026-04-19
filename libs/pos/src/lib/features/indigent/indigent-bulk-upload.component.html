@@ -1,0 +1,196 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Bulk Upload — Indigent Applications</h1>
+      <p class="page-subtitle">Import account numbers to create applications. Applications enter the normal approval pipeline (Verification → Authorization).</p>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="config-panel">
+      <h2 class="section-title">Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label">Indigent Type</label>
+        @if (loading()) {
+          <select class="form-select" disabled data-testid="select-indigent-type">
+            <option>Loading types...</option>
+          </select>
+        } @else if (indigentTypes().length === 0) {
+          <select class="form-select" disabled data-testid="select-indigent-type">
+            <option>No types available</option>
+          </select>
+        } @else {
+          <select [(ngModel)]="selectedIndigentTypeId" class="form-select" data-testid="select-indigent-type">
+            @for (type of indigentTypes(); track type.indigentTypeId) {
+              <option [ngValue]="type.indigentTypeId">{{ type.indigentTypeName }}</option>
+            }
+          </select>
+        }
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Financial Year</label>
+        <select [(ngModel)]="selectedFinancialYear" (ngModelChange)="onFinancialYearChange()" class="form-select" data-testid="select-financial-year">
+          @for (fy of financialYearOptions; track fy) {
+            <option [value]="fy">{{ fy }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="dates-grid">
+        <div class="form-group">
+          <label class="form-label">Application Date</label>
+          <app-date-input [value]="fmtDateInput(applicationDate)" (valueChange)="onDateChange('applicationDate', $event)" testId="input-application-date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Commencement Date</label>
+          <app-date-input [value]="fmtDateInput(commencementDate)" (valueChange)="onDateChange('commencementDate', $event)" testId="input-commencement-date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reapplication Date</label>
+          <app-date-input [value]="fmtDateInput(reApplicationDate)" (valueChange)="onDateChange('reApplicationDate', $event)" testId="input-reapplication-date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Termination Date</label>
+          <app-date-input [value]="fmtDateInput(terminationDate)" (valueChange)="onDateChange('terminationDate', $event)" testId="input-termination-date" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Remarks</label>
+        <textarea [(ngModel)]="remarks" class="form-input" rows="2" placeholder="Optional remarks for all imported applications" data-testid="input-remarks"></textarea>
+      </div>
+
+      <div class="info-box">
+        <svg class="info-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+        <div>
+          <strong>Approval Flow:</strong> Applications are created with status <em>Application (134)</em> and must go through Verification → Authorization before becoming Active (140). The billing system uses the commencement and termination dates to determine when rebates are posted.
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-panel">
+      <div class="upload-panel-header">
+        <h2 class="section-title">Import Account Numbers</h2>
+        <button class="btn btn-outline btn-sm" (click)="downloadTemplate()" data-testid="button-download-template">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download Template
+        </button>
+      </div>
+
+      <div class="upload-methods">
+        <div class="upload-method">
+          <label class="form-label">Upload CSV File</label>
+          <div class="file-drop-zone" (click)="fileInput.click()">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            <span>Click to upload CSV or TXT file</span>
+            <span class="file-hint">One account number per line, or comma/semicolon separated</span>
+          </div>
+          <input #fileInput type="file" accept=".csv,.txt,.xls,.xlsx" (change)="onFileSelected($event)" style="display:none" data-testid="input-file-upload" />
+        </div>
+
+        <div class="divider-or"><span>OR</span></div>
+
+        <div class="upload-method">
+          <label class="form-label">Paste Account Numbers</label>
+          <textarea [(ngModel)]="pasteText" class="form-input paste-area" rows="4" placeholder="Paste account numbers here — one per line or comma separated" data-testid="input-paste-accounts"></textarea>
+          <button (click)="onPasteImport()" class="btn btn-secondary btn-sm" data-testid="button-parse-paste">Parse Pasted Numbers</button>
+        </div>
+      </div>
+
+      @if (csvFileName()) {
+        <div class="file-info">
+          <span class="file-badge">{{ csvFileName() }}</span>
+        </div>
+      }
+
+      @if (accountNumbers().length > 0) {
+        <div class="accounts-preview">
+          <div class="accounts-header">
+            <h3 class="accounts-title">{{ accountNumbers().length }} Account(s) Loaded</h3>
+            <button (click)="clearAccounts()" class="btn btn-ghost btn-sm" data-testid="button-clear-accounts">Clear All</button>
+          </div>
+          <div class="accounts-list">
+            @for (acc of accountNumbers(); track acc; let i = $index) {
+              <div class="account-chip" [attr.data-testid]="'chip-account-' + acc">
+                <span>{{ acc }}</span>
+                <button (click)="removeAccount(acc)" class="chip-remove" title="Remove">&times;</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="actions-bar">
+        <button
+          (click)="submitBulkUpload()"
+          [disabled]="submitting() || accountNumbers().length === 0 || !selectedIndigentTypeId"
+          class="btn btn-primary btn-lg"
+          data-testid="button-submit-bulk">
+          @if (submitting()) {
+            <span class="spinner"></span> Processing...
+          } @else {
+            Submit {{ accountNumbers().length }} Application(s) for Approval
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+
+  @if (results()) {
+    <div class="results-panel">
+      <h2 class="section-title">Import Results</h2>
+      <div class="results-summary">
+        <div class="stat-card stat-success">
+          <div class="stat-value">{{ results()!.totalActivated }}</div>
+          <div class="stat-label">Created</div>
+        </div>
+        <div class="stat-card stat-error">
+          <div class="stat-value">{{ results()!.totalFailed }}</div>
+          <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card stat-total">
+          <div class="stat-value">{{ results()!.totalRequested }}</div>
+          <div class="stat-label">Total</div>
+        </div>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Account Number</th>
+            <th>Account ID</th>
+            <th>Application ID</th>
+            <th>Status</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of results()!.results; track r.accountNumber) {
+            <tr [class.row-success]="r.success" [class.row-error]="!r.success">
+              <td>{{ r.accountNumber }}</td>
+              <td>{{ r.accountId || '—' }}</td>
+              <td>{{ r.applicationId || '—' }}</td>
+              <td>
+                <span [class]="r.success ? 'badge badge-success' : 'badge badge-error'">
+                  {{ r.success ? 'Created' : 'Failed' }}
+                </span>
+              </td>
+              <td>{{ r.message }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      @if (results()!.totalActivated > 0) {
+        <div class="next-steps">
+          <p>Applications have been created and will appear in the <strong>Verification</strong> and <strong>Authorization</strong> queues for approval.</p>
+          <button (click)="goToAuthorization()" class="btn btn-primary" data-testid="button-go-authorization">
+            Go to Authorization Queue
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>

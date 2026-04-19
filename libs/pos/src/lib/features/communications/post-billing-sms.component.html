@@ -1,0 +1,449 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-row">
+      <div class="header-left">
+        <div class="header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <div class="page-title" data-testid="text-page-title">Post-Billing SMS Campaign</div>
+          <div class="page-subtitle">Send arrears notifications to debtors after billing runs</div>
+        </div>
+      </div>
+      <div class="step-indicators">
+        <div class="step-ind" [class.active]="step() === 'select'" [class.done]="step() !== 'select'">
+          <span class="step-num">1</span> Select Run
+        </div>
+        <svg class="step-arrow" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg>
+        <div class="step-ind" [class.active]="step() === 'compose'" [class.done]="step() === 'review' || step() === 'sending' || step() === 'done'">
+          <span class="step-num">2</span> Compose
+        </div>
+        <svg class="step-arrow" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg>
+        <div class="step-ind" [class.active]="step() === 'review'" [class.done]="step() === 'sending' || step() === 'done'">
+          <span class="step-num">3</span> Review & Send
+        </div>
+        <svg class="step-arrow" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg>
+        <div class="step-ind" [class.active]="step() === 'sending' || step() === 'done'">
+          <span class="step-num">4</span> Results
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-body">
+
+    <!-- STEP 1: Select Billing Run -->
+    @if (step() === 'select') {
+      <div class="card" data-testid="panel-select-run">
+        <div class="panel-header">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Select a Billing Run
+          </h3>
+          <button class="btn-ghost-sm" (click)="loadRuns()" [disabled]="runsLoading()" data-testid="button-refresh-runs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="panel-body">
+          @if (runsLoading()) {
+            <div class="loading-center">
+              <div class="spinner"></div>
+              <span>Loading billing runs from Platinum...</span>
+            </div>
+          } @else if (runs().length === 0) {
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:#94a3b8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <p>No billing runs found. Complete a Section 129 trial run first to generate the arrears list.</p>
+            </div>
+          } @else {
+            <div class="runs-grid">
+              @for (run of runs(); track run.runId) {
+                <button class="run-card" [class.selected]="selectedRunId() === run.runId"
+                  (click)="selectRun(run.runId)"
+                  [attr.data-testid]="'btn-run-' + run.runId">
+                  <div class="run-card-top">
+                    <span class="run-id">#{{ run.runId }}</span>
+                    <span class="run-type-badge" [class.trial]="run.runType === 'Trial'" [class.final]="run.runType === 'Final'">
+                      {{ run.runType || 'Run' }}
+                    </span>
+                  </div>
+                  <div class="run-desc">{{ run.description || 'Billing Run' }}</div>
+                  <div class="run-meta">
+                    <span>{{ formatRunDate(run.runDate) }}</span>
+                    <span class="run-dot">·</span>
+                    <span>{{ run.totalAccounts }} accounts</span>
+                  </div>
+                  @if (run.billingCycle) {
+                    <div class="run-cycle">{{ run.billingCycle }}</div>
+                  }
+                  @if (selectedRunId() === run.runId) {
+                    <div class="run-check">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:16px;height:16px"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  }
+                </button>
+              }
+            </div>
+          }
+        </div>
+        @if (runs().length > 0) {
+          <div class="panel-footer">
+            <div class="footer-info">
+              @if (selectedRunId()) {
+                <span class="selected-label">Run #{{ selectedRunId() }} selected</span>
+              } @else {
+                <span class="hint-label">Select a run to continue</span>
+              }
+            </div>
+            <button class="btn-primary" [disabled]="!selectedRunId() || accountsLoading()" (click)="goToCompose()" data-testid="button-load-accounts">
+              @if (accountsLoading()) {
+                <div class="spinner-sm"></div> Loading...
+              } @else {
+                Load Accounts
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              }
+            </button>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- STEP 2: Compose SMS -->
+    @if (step() === 'compose') {
+      <div class="compose-layout" data-testid="panel-compose">
+        <div class="compose-left">
+          <div class="card">
+            <div class="panel-header">
+              <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Accounts in Arrears
+                <span class="count-badge">{{ filteredAccounts.length }}</span>
+              </h3>
+              <div class="panel-actions">
+                <button class="btn-ghost-sm" (click)="goBack()" data-testid="button-back-to-runs">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                  Back
+                </button>
+              </div>
+            </div>
+
+            <div class="filter-bar">
+              <div class="filter-group">
+                <label>Institution</label>
+                <div class="institution-filter-wrap">
+                  <select [(ngModel)]="selectedInstitutionId" (ngModelChange)="onInstitutionChange()" data-testid="select-institution" class="filter-select"
+                    [disabled]="institutionsLoading()">
+                    <option [ngValue]="null">All Institutions</option>
+                    @for (inst of institutions(); track inst.id) {
+                      <option [ngValue]="inst.id">{{ inst.name }}</option>
+                    }
+                  </select>
+                  @if (selectedInstitutionId) {
+                    <button class="clear-filter-btn" (click)="clearInstitutionFilter()" title="Clear institution filter" data-testid="button-clear-institution">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="filter-group">
+                <label>Min. Ageing</label>
+                <select [(ngModel)]="minAgeingFilter" data-testid="select-min-ageing" class="filter-select">
+                  <option [ngValue]="1">30+ Days</option>
+                  <option [ngValue]="2">60+ Days</option>
+                  <option [ngValue]="3">90+ Days</option>
+                  <option [ngValue]="4">120+ Days</option>
+                  <option [ngValue]="5">150+ Days</option>
+                  <option [ngValue]="6">180+ Days</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Min. Amount (R)</label>
+                <input type="number" [(ngModel)]="minAmountFilter" min="0" step="100" class="filter-input" data-testid="input-min-amount" placeholder="0.00" />
+              </div>
+              <div class="filter-group filter-search">
+                <label>Search</label>
+                <input type="text" [(ngModel)]="searchQuery" class="filter-input" data-testid="input-search-accounts" placeholder="Account number or name..." />
+              </div>
+            </div>
+
+            @if (contactsEnriching()) {
+              <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;font-size:12px;color:var(--platinum-primary)">
+                <span class="spinner" style="width:14px;height:14px"></span>
+                <span>{{ contactsEnrichProgress() }}</span>
+              </div>
+            }
+            @if (!contactsEnriching() && contactsEnrichProgress()) {
+              <div style="font-size:12px;color:#388e3c;padding:0.25rem 0">{{ contactsEnrichProgress() }}</div>
+            }
+
+            <div class="stats-bar">
+              <div class="stat-item">
+                <span class="stat-value">{{ filteredAccounts.length }}</span>
+                <span class="stat-label">Total</span>
+              </div>
+              <div class="stat-item stat-green">
+                <span class="stat-value">{{ smsEligible.length }}</span>
+                <span class="stat-label">With Phone</span>
+              </div>
+              <div class="stat-item stat-amber">
+                <span class="stat-value">{{ noPhoneCount }}</span>
+                <span class="stat-label">No Phone</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ formatCurrency(totalOutstanding) }}</span>
+                <span class="stat-label">Outstanding</span>
+              </div>
+            </div>
+
+            <div class="accounts-table-wrap">
+              <table class="accounts-table" data-testid="table-accounts">
+                <thead>
+                  <tr>
+                    <th style="width:32px"><input type="checkbox" [checked]="allFilteredSelected" (change)="toggleSelectAll($event)" data-testid="checkbox-select-all" /></th>
+                    <th>Account</th>
+                    <th>Name</th>
+                    <th class="text-right">Outstanding</th>
+                    <th>Ageing</th>
+                    <th>Phone</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (acc of filteredAccounts; track acc.accountId) {
+                    <tr [class.no-phone]="!acc.hasCell" (click)="toggleAccount(acc)" style="cursor:pointer"
+                      [attr.data-testid]="'row-account-' + acc.accountNumber">
+                      <td (click)="$event.stopPropagation()">
+                        <input type="checkbox" [checked]="acc.selected" (change)="toggleAccount(acc)" />
+                      </td>
+                      <td><span class="mono">{{ acc.accountNumber }}</span></td>
+                      <td>{{ acc.accountName || '—' }}</td>
+                      <td class="text-right amount-cell">{{ formatCurrency(acc.outstandingAmount) }}</td>
+                      <td>
+                        <span class="age-badge" [class.age-30]="acc.ageingId===1" [class.age-60]="acc.ageingId===2" [class.age-90]="acc.ageingId>=3">
+                          {{ acc.ageingLabel }}
+                        </span>
+                      </td>
+                      <td>
+                        @if (acc.hasCell) {
+                          <span class="phone-ok">{{ acc.cellNumber }}</span>
+                        } @else {
+                          <span class="phone-missing">No phone</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                  @if (filteredAccounts.length === 0) {
+                    <tr><td colspan="6" class="empty-row">No accounts match the current filters</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="compose-right">
+          <div class="card">
+            <div class="panel-header">
+              <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Compose SMS
+              </h3>
+              <span class="char-count" [class.over]="characterCount > 160">{{ characterCount }} / 160 chars</span>
+            </div>
+            <div class="compose-body">
+              <div class="placeholders-bar">
+                <span class="placeholders-label">Insert:</span>
+                <button class="ph-btn" (click)="insertPlaceholder('{name}')" data-testid="button-ph-name">{{ '{' }}name{{ '}' }}</button>
+                <button class="ph-btn" (click)="insertPlaceholder('{accountNo}')" data-testid="button-ph-account">{{ '{' }}accountNo{{ '}' }}</button>
+                <button class="ph-btn" (click)="insertPlaceholder('{amount}')" data-testid="button-ph-amount">{{ '{' }}amount{{ '}' }}</button>
+                <button class="ph-btn" (click)="insertPlaceholder('{days}')" data-testid="button-ph-days">{{ '{' }}days{{ '}' }}</button>
+                <button class="ph-btn" (click)="insertPlaceholder('{date}')" data-testid="button-ph-date">{{ '{' }}date{{ '}' }}</button>
+              </div>
+              <textarea class="sms-textarea" [(ngModel)]="smsTemplate" rows="6" placeholder="Type your SMS message here..." data-testid="textarea-sms"></textarea>
+
+              @if (characterCount > 160) {
+                <div class="char-warning">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Message exceeds 160 characters — may count as multiple SMS credits per recipient
+                </div>
+              }
+
+              <div class="preview-section">
+                <div class="preview-label">Preview (first eligible account)</div>
+                <div class="sms-preview" data-testid="text-sms-preview">
+                  @if (previewMessage) {
+                    {{ previewMessage }}
+                  } @else {
+                    <span class="muted">No eligible accounts to preview</span>
+                  }
+                </div>
+              </div>
+
+              @if (smsCredits() !== null) {
+                <div class="credits-info">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  SMS Credits Available: <strong>{{ smsCredits() }}</strong>
+                </div>
+              }
+
+              <div class="ageing-summary">
+                <div class="summary-title">Selected Accounts Breakdown</div>
+                @for (g of ageingSummary; track g.label) {
+                  <div class="summary-row">
+                    <span class="summary-label">{{ g.label }}</span>
+                    <span class="summary-count">{{ g.count }} accounts</span>
+                    <span class="summary-amount">{{ formatCurrency(g.amount) }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="panel-footer">
+              <button class="btn-outline" (click)="goBack()" data-testid="button-back-compose">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                Back
+              </button>
+              <button class="btn-primary" [disabled]="smsEligible.length === 0 || !smsTemplate.trim()" (click)="goToReview()" data-testid="button-go-review">
+                Review & Send ({{ smsEligible.length }})
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: Review & Send -->
+    @if (step() === 'review') {
+      <div class="card review-card" data-testid="panel-review">
+        <div class="panel-header">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Review & Confirm
+          </h3>
+        </div>
+        <div class="review-body">
+          <div class="review-summary-grid">
+            <div class="review-stat">
+              <div class="review-stat-value text-primary">{{ smsEligible.length }}</div>
+              <div class="review-stat-label">SMS Recipients</div>
+            </div>
+            <div class="review-stat">
+              <div class="review-stat-value text-amber">{{ noPhoneCount }}</div>
+              <div class="review-stat-label">Skipped (No Phone)</div>
+            </div>
+            <div class="review-stat">
+              <div class="review-stat-value">{{ formatCurrency(totalOutstanding) }}</div>
+              <div class="review-stat-label">Total Outstanding</div>
+            </div>
+            <div class="review-stat">
+              <div class="review-stat-value text-green">{{ characterCount }} chars</div>
+              <div class="review-stat-label">Message Length</div>
+            </div>
+          </div>
+
+          <div class="review-msg-box">
+            <div class="review-msg-label">SMS Message Template</div>
+            <div class="review-msg-content">{{ smsTemplate }}</div>
+          </div>
+
+          <div class="review-preview-box">
+            <div class="review-msg-label">Sample Preview</div>
+            <div class="review-msg-content preview-text">{{ previewMessage }}</div>
+          </div>
+
+          <div class="review-warn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div>
+              <strong>This action will send {{ smsEligible.length }} SMS messages immediately.</strong>
+              Each message will be personalised with the account holder's details. This cannot be undone.
+            </div>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn-outline" (click)="goBack()" data-testid="button-back-review">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            Back to Compose
+          </button>
+          <button class="btn-send" (click)="sendAllSms()" data-testid="button-send-all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Send {{ smsEligible.length }} SMS Messages
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- STEP 4: Sending / Done -->
+    @if (step() === 'sending' || step() === 'done') {
+      <div class="card" data-testid="panel-results">
+        <div class="panel-header">
+          <h3>
+            @if (step() === 'sending') {
+              <div class="spinner-sm"></div> Sending SMS...
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#16a34a"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Campaign Complete
+            }
+          </h3>
+          @if (step() === 'done') {
+            <div class="panel-actions">
+              <button class="btn-ghost-sm" (click)="exportResultsCsv()" data-testid="button-export-results">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export CSV
+              </button>
+            </div>
+          }
+        </div>
+        <div class="results-body">
+          <div class="progress-section-lg">
+            <div class="progress-stats">
+              <span>{{ sendProgress().current }} / {{ sendProgress().total }}</span>
+              <span>
+                <span class="text-green">{{ sendProgress().succeeded }} sent</span>
+                @if (sendProgress().failed > 0) {
+                  · <span class="text-red">{{ sendProgress().failed }} failed</span>
+                }
+              </span>
+            </div>
+            <div class="progress-bar-lg">
+              <div class="progress-fill-lg" [class.complete]="step() === 'done'"
+                [style.width.%]="sendProgress().total > 0 ? (sendProgress().current / sendProgress().total * 100) : 0"></div>
+            </div>
+          </div>
+
+          <div class="results-summary-grid">
+            <div class="result-card result-sent">
+              <div class="result-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="result-value">{{ sendProgress().succeeded }}</div>
+              <div class="result-label">Successfully Sent</div>
+            </div>
+            <div class="result-card result-failed">
+              <div class="result-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              </div>
+              <div class="result-value">{{ sendProgress().failed }}</div>
+              <div class="result-label">Failed</div>
+            </div>
+            <div class="result-card result-skipped">
+              <div class="result-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="result-value">{{ noPhoneCount }}</div>
+              <div class="result-label">No Phone (Skipped)</div>
+            </div>
+          </div>
+
+          @if (step() === 'done') {
+            <div class="done-actions">
+              <button class="btn-primary" (click)="startNewCampaign()" data-testid="button-new-campaign">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Campaign
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

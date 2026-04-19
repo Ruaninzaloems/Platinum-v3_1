@@ -38,11 +38,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Date From</label>
-          <input class="form-input" type="date" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event); onFilterChange()" data-testid="input-date-from" />
+          <app-date-input [value]="dateFrom()" (valueChange)="dateFrom.set($event); onFilterChange()" testId="input-date-from" />
         </div>
         <div class="form-group">
           <label class="form-label">Date To</label>
-          <input class="form-input" type="date" [ngModel]="dateTo()" (ngModelChange)="dateTo.set($event); onFilterChange()" data-testid="input-date-to" />
+          <app-date-input [value]="dateTo()" (valueChange)="dateTo.set($event); onFilterChange()" testId="input-date-to" />
         </div>
       </div>
     </div>

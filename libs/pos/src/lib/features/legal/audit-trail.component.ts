@@ -1,18 +1,19 @@
 import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DateInputComponent } from '../../shared/components/date-input.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { AUDIT_ACTION_TYPES } from '../../core/services/debt-config';
-import { isCourtReady } from '../../core/services/validation.service';
-import { formatTimestamp } from '../../core/services/format.service';
+import { AUDIT_ACTION_TYPES } from '../../services/debt-config';
+import { isCourtReady } from '../../services/validation.service';
+import { formatTimestamp } from '../../services/format.service';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-audit-trail',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './audit-trail.component.html',
   styleUrl: './audit-trail.component.css'
 })

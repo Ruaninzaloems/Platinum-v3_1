@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -34,7 +34,7 @@ interface AllocationRecord {
   templateUrl: './allocation-history.component.html',
   styleUrl: './allocation-history.component.css'
 })
-export class AllocationHistoryComponent implements OnInit {
+export class AllocationHistoryComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private auth = inject(AuthService);
@@ -67,6 +67,46 @@ export class AllocationHistoryComponent implements OnInit {
   jobAccountDetails = signal<any[] | null>(null);
 
   private posItemNoteCache: Record<number, string> = {};
+
+  colWidths = signal<number[]>([70, 96, 110, 150, 200, 170, 80, 110, 170, 70, 80]);
+  private resizeColIndex = -1;
+  private resizeStartX = 0;
+  private resizeStartW = 0;
+  private boundMouseMove = this.onResizeMove.bind(this);
+  private boundMouseUp = this.onResizeEnd.bind(this);
+
+  onResizeStart(e: MouseEvent, colIndex: number): void {
+    e.preventDefault();
+    e.stopPropagation();
+    this.resizeColIndex = colIndex;
+    this.resizeStartX = e.clientX;
+    this.resizeStartW = this.colWidths()[colIndex];
+    document.addEventListener('mousemove', this.boundMouseMove);
+    document.addEventListener('mouseup', this.boundMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  private onResizeMove(e: MouseEvent): void {
+    const delta = e.clientX - this.resizeStartX;
+    const newWidth = Math.max(50, this.resizeStartW + delta);
+    const widths = [...this.colWidths()];
+    widths[this.resizeColIndex] = newWidth;
+    this.colWidths.set(widths);
+  }
+
+  private onResizeEnd(): void {
+    this.resizeColIndex = -1;
+    document.removeEventListener('mousemove', this.boundMouseMove);
+    document.removeEventListener('mouseup', this.boundMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('mousemove', this.boundMouseMove);
+    document.removeEventListener('mouseup', this.boundMouseUp);
+  }
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / this.pageSize)));
 
@@ -126,7 +166,7 @@ export class AllocationHistoryComponent implements OnInit {
         financialYear: this.financialYear(),
         process: this.processFilter() !== 'All' ? this.processFilter() : null,
         billingMonth: monthId,
-        orderby: 'fileDate',
+        orderby: 'directDepositJob_ID',
         page: this.page(),
         pageSize: this.pageSize,
         shortDirection: 'desc',
@@ -303,6 +343,19 @@ export class AllocationHistoryComponent implements OnInit {
           }
           if (!merged.receiptNumber && !merged.receiptNo) {
             merged.receiptNumber = merged.receipt_No || merged.receipt_Number || '';
+          }
+          // Platinum sometimes returns the internal receipt ID in the receiptNumber field
+          // (a plain integer like 508557).  Real receipt numbers always contain letters or
+          // separators (e.g. "C-12345/26").  Detect this and promote to receiptId so we
+          // can resolve the actual human-readable number via pos-multi-receipt-print.
+          const isNumericId = (v: any) => v && /^\d+$/.test(String(v).trim());
+          if (isNumericId(merged.receiptNumber)) {
+            merged.receiptId = merged.receiptId || merged.receiptNumber;
+            merged.receiptNumber = '';
+          }
+          if (isNumericId(merged.receiptNo)) {
+            merged.receiptId = merged.receiptId || merged.receiptNo;
+            merged.receiptNo = '';
           }
           if (!merged.receiptNumber && !merged.receiptNo && merged.receiptId) {
             merged.receiptIdOnly = merged.receiptId;

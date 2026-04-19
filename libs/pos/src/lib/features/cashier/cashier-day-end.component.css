@@ -232,6 +232,60 @@
   margin-bottom: 0.5rem;
 }
 
+.section-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.export-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+.export-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.export-btn:not(:disabled):active { transform: translateY(0); }
+
+.export-btn-excel {
+  background: #1a7a4a;
+  color: #fff;
+  border-color: #1a7a4a;
+}
+.export-btn-excel:not(:disabled):hover {
+  background: #15673e;
+  border-color: #15673e;
+}
+
+.export-btn-pdf {
+  background: var(--platinum-primary, #0f2b46);
+  color: #c9a84c;
+  border-color: var(--platinum-primary, #0f2b46);
+}
+.export-btn-pdf:not(:disabled):hover {
+  background: #0a1e33;
+  border-color: #0a1e33;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 .section-title {
   font-size: 0.875rem;
   font-weight: 700;
@@ -608,6 +662,9 @@
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 .cancel-receipt-badge {
   display: inline-flex;

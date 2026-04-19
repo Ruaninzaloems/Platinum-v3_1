@@ -1,0 +1,579 @@
+@if (mode === 'panel') {
+  <div class="panel-overlay" (click)="onClose()" data-testid="panel-overlay">
+    <div class="panel-container" (click)="$event.stopPropagation()" data-testid="panel-application-detail">
+      <div class="panel-header">
+        <h2 class="panel-title" data-testid="text-panel-title">
+          Application #{{ applicationId }}
+        </h2>
+        <div class="panel-header-actions">
+          <div class="download-menu-wrapper" style="position:relative">
+            <button class="btn-pdf-download" (click)="toggleDownloadMenu()" [disabled]="downloading()" data-testid="btn-download-pdf-menu">
+              @if (downloading()) {
+                <span class="spinner-inline"></span> Generating...
+              } @else {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Downloads
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+              }
+            </button>
+            @if (downloadMenuOpen()) {
+              <div class="download-menu-backdrop" (click)="closeDownloadMenu()" style="position:fixed;inset:0;z-index:99"></div>
+              <div class="download-menu" style="position:absolute;top:100%;right:0;margin-top:6px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(15,43,70,0.18);min-width:260px;z-index:100;overflow:hidden" data-testid="menu-downloads">
+                <button class="download-menu-item" (click)="downloadPdfType('application')" [disabled]="!!downloadingType()" data-testid="btn-download-application" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font-size:13px;color:var(--platinum-primary);cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--platinum-accent)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span>Application PDF</span>
+                  @if (downloadingType() === 'application') { <span class="spinner-inline" style="margin-left:auto"></span> }
+                </button>
+                <button class="download-menu-item" (click)="downloadPdfType('site-verification')" [disabled]="!!downloadingType()" data-testid="btn-download-site-verification" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font-size:13px;color:var(--platinum-primary);cursor:pointer;border-top:1px solid #f1f5f9">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--platinum-accent)"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  <span>Site Verification PDF</span>
+                  @if (downloadingType() === 'site-verification') { <span class="spinner-inline" style="margin-left:auto"></span> }
+                </button>
+                <button class="download-menu-item" (click)="downloadPdfType('doc-verification')" [disabled]="!!downloadingType()" data-testid="btn-download-doc-verification" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font-size:13px;color:var(--platinum-primary);cursor:pointer;border-top:1px solid #f1f5f9">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--platinum-accent)"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                  <span>Document Verification PDF</span>
+                  @if (downloadingType() === 'doc-verification') { <span class="spinner-inline" style="margin-left:auto"></span> }
+                </button>
+                <button class="download-menu-item" (click)="downloadPdfType('authorization')" [disabled]="!!downloadingType()" data-testid="btn-download-authorization" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font-size:13px;color:var(--platinum-primary);cursor:pointer;border-top:1px solid #f1f5f9">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:#16a34a"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span>Authorization Letter</span>
+                  @if (downloadingType() === 'authorization') { <span class="spinner-inline" style="margin-left:auto"></span> }
+                </button>
+                <button class="download-menu-item" (click)="downloadPdfType('termination')" [disabled]="!!downloadingType()" data-testid="btn-download-termination" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font-size:13px;color:var(--platinum-primary);cursor:pointer;border-top:1px solid #f1f5f9">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:#dc2626"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  <span>Termination Letter</span>
+                  @if (downloadingType() === 'termination') { <span class="spinner-inline" style="margin-left:auto"></span> }
+                </button>
+              </div>
+            }
+          </div>
+          @if (canSubmitForVerification) {
+            <button class="btn btn-primary btn-sm" (click)="submitForVerification()" [disabled]="submittingForVerification()" data-testid="button-submit-for-verification" style="display:inline-flex;align-items:center;gap:6px">
+              @if (submittingForVerification()) {
+                <span class="spinner-inline"></span> Submitting…
+              } @else {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Submit for Verification
+              }
+            </button>
+          }
+          <button class="btn-close" (click)="onClose()" data-testid="button-close-detail-panel">&times;</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <ng-container *ngTemplateOutlet="detailContent" />
+      </div>
+    </div>
+  </div>
+}
+
+@if (mode === 'page') {
+  <div class="page-container" data-testid="page-application-detail">
+    <ng-container *ngTemplateOutlet="detailContent" />
+  </div>
+}
+
+<ng-template #detailContent>
+  @if (loading()) {
+    <div class="loading-center">
+      <span class="spinner spinner-lg"></span>
+      <p>Loading application details...</p>
+    </div>
+  } @else if (!detail()) {
+    <div class="empty-state">
+      <p>Application not found.</p>
+    </div>
+  } @else {
+    <div class="tab-bar" data-testid="tabs-detail">
+      @for (tab of tabs; track tab.key) {
+        <button
+          class="tab-btn"
+          [class.active]="activeTab === tab.key"
+          (click)="selectTab(tab.key)"
+          [attr.data-testid]="'tab-' + tab.key">
+          {{ tab.label }}
+        </button>
+      }
+    </div>
+
+    @if (activeTab === 'summary') {
+      <div class="section" data-testid="section-summary">
+        <div class="summary-header">
+          <span class="badge" [class]="getStatusBadgeClass(app!.appStatusName)" data-testid="badge-status">
+            {{ app!.appStatusName }}
+          </span>
+          <span class="badge badge-info" data-testid="badge-type">{{ app!.indigentTypeName }}</span>
+        </div>
+        <div class="summary-tracks" data-testid="section-parallel-tracks" style="display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 16px 0;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+          <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#64748b;font-weight:600">Site Verification Track</span>
+            <span class="badge" [class]="siteTrackBadge.cssClass" data-testid="badge-site-track" style="align-self:flex-start">{{ siteTrackBadge.label }}</span>
+          </div>
+          <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;border-left:1px solid #e2e8f0;padding-left:12px">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#64748b;font-weight:600">Document Verification Track</span>
+            <span class="badge" [class]="docTrackBadge.cssClass" data-testid="badge-doc-track" style="align-self:flex-start">{{ docTrackBadge.label }}</span>
+          </div>
+        </div>
+        @if (currentSlaInfo) {
+          <div class="summary-header">
+            <span class="badge" [class]="getSlaRagClass(currentSlaInfo.ragStatus)" data-testid="badge-sla-summary">
+              SLA: {{ currentSlaInfo.daysElapsed }}d / {{ currentSlaInfo.slaTargetDays }}d
+            </span>
+          </div>
+        }
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Application ID</span>
+            <span class="detail-value font-mono" data-testid="text-app-id">{{ app!.applicationId }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Account ID</span>
+            <span class="detail-value font-mono" data-testid="text-account-id">{{ app!.accountId }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Application Date</span>
+            <span class="detail-value" data-testid="text-app-date">{{ fmtDate(app!.applicationDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Re-Application Date</span>
+            <span class="detail-value" data-testid="text-reapp-date">{{ fmtDate(app!.reApplicationDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Household Income</span>
+            <span class="detail-value font-mono" data-testid="text-income">{{ fmtCurrency(app!.householdIncome) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Monthly Subsidy</span>
+            <span class="detail-value font-mono" data-testid="text-subsidy">{{ fmtCurrency(app!.monthlySubsidy) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Qualifying Units</span>
+            <span class="detail-value" data-testid="text-units">{{ app!.qualifyingUnits }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Once-Off Write-Off</span>
+            <span class="detail-value font-mono" data-testid="text-writeoff">{{ fmtCurrency(app!.onceWriteOff) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Do-Not-Cut Date</span>
+            <span class="detail-value" data-testid="text-dnc-date">{{ fmtDate(app!.doNotCutDate) }}</span>
+            <button class="btn btn-outline btn-xs" (click)="openDncModal()" data-testid="button-update-dnc">Update</button>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Social Grant No.</span>
+            <span class="detail-value" data-testid="text-grant">{{ app!.socialGrantNumber || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Date Captured</span>
+            <span class="detail-value" data-testid="text-captured">{{ fmtDate(app!.dateCaptured) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Review Date</span>
+            <span class="detail-value" data-testid="text-review-date">{{ fmtDate(app!.reviewDate) }}</span>
+          </div>
+        </div>
+        @if (app!.remarks) {
+          <div class="remarks-box" data-testid="text-remarks">
+            <span class="detail-label">Remarks</span>
+            <p>{{ app!.remarks }}</p>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'occupiers') {
+      <div class="section" data-testid="section-occupiers">
+        @if (occupiers.length === 0) {
+          <div class="empty-state">
+            <p>No occupiers recorded.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>ID Number</th>
+                  <th>Employer</th>
+                  <th>Income Source</th>
+                  <th class="text-right">Income</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (occ of occupiers; track occ.occupierId) {
+                  <tr [attr.data-testid]="'row-occupier-' + occ.occupierId">
+                    <td>{{ occ.fullName }}</td>
+                    <td class="font-mono">{{ occ.idNumber || occ.passportNumber || '—' }}</td>
+                    <td>{{ occ.employerName }}</td>
+                    <td>{{ occ.incomeSourceName }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(occ.incomeAmount) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" class="text-right"><strong>Total Income</strong></td>
+                  <td class="text-right font-mono" data-testid="text-total-occupier-income"><strong>{{ fmtCurrency(totalOccupierIncome) }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'tenant') {
+      <div class="section" data-testid="section-tenant">
+        @if (!tenant) {
+          <div class="empty-state">
+            <p>No tenant information recorded.</p>
+          </div>
+        } @else {
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Full Name</span>
+              <span class="detail-value" data-testid="text-tenant-name">{{ tenant.fullName || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">ID Number</span>
+              <span class="detail-value font-mono" data-testid="text-tenant-id">{{ tenant.idNumber || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Passport Number</span>
+              <span class="detail-value" data-testid="text-tenant-passport">{{ tenant.passportNumber || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Cell Phone</span>
+              <span class="detail-value" data-testid="text-tenant-phone">{{ tenant.cellPhone || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Email</span>
+              <span class="detail-value" data-testid="text-tenant-email">{{ tenant.email || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Is Tenant</span>
+              <span class="detail-value" data-testid="text-tenant-flag">{{ tenant.isTenant ? 'Yes' : 'No' }}</span>
+            </div>
+            <div class="detail-item col-span-2">
+              <span class="detail-label">Physical Address</span>
+              <span class="detail-value" data-testid="text-tenant-address">{{ tenant.physicalAddress || '—' }}</span>
+            </div>
+            <div class="detail-item col-span-2">
+              <span class="detail-label">Postal Address</span>
+              <span class="detail-value" data-testid="text-tenant-postal">{{ tenant.postalAddress || '—' }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'verification') {
+      <div class="section" data-testid="section-verification">
+        @if (verifications.length === 0) {
+          <div class="empty-state">
+            <p>No verification history.</p>
+          </div>
+        } @else {
+          <div class="timeline">
+            @for (ver of verifications; track ver.verificationId) {
+              <div class="timeline-item" [attr.data-testid]="'timeline-ver-' + ver.verificationId">
+                <div class="timeline-dot" [class.success]="ver.verificationOutcomeName === 'Qualify'" [class.failed]="ver.verificationOutcomeName !== 'Qualify'"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="timeline-date">{{ fmtDate(ver.homeVisitDate) }}</span>
+                    <span class="badge" [class]="ver.verificationOutcomeName === 'Qualify' ? 'badge-success' : 'badge-warning'">
+                      {{ ver.verificationOutcomeName }}
+                    </span>
+                  </div>
+                  <div class="timeline-details">
+                    <div class="detail-grid compact">
+                      <div class="detail-item">
+                        <span class="detail-label">Officer</span>
+                        <span class="detail-value">{{ ver.verificationOfficer }}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Contractor</span>
+                        <span class="detail-value">{{ ver.contractorName }}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Home Visit</span>
+                        <span class="detail-value">{{ ver.homeVisitOutcomeName }}</span>
+                      </div>
+                      @if (ver.doNotCutExtDate) {
+                        <div class="detail-item">
+                          <span class="detail-label">DNC Extension</span>
+                          <span class="detail-value">{{ fmtDate(ver.doNotCutExtDate) }}</span>
+                        </div>
+                      }
+                    </div>
+                    @if (ver.remarks) {
+                      <p class="timeline-remarks">{{ ver.remarks }}</p>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'communications') {
+      <div class="section" data-testid="section-communications">
+        <div class="summary-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <h4 style="margin:0;font-size:14px;font-weight:600">Communication History</h4>
+            @if (currentSlaInfo) {
+              <span class="badge" [class]="getSlaRagClass(currentSlaInfo.ragStatus)" data-testid="badge-sla">
+                SLA: {{ currentSlaInfo.daysElapsed }}d / {{ currentSlaInfo.slaTargetDays }}d
+              </span>
+              <span class="badge badge-info" data-testid="badge-ball-with">
+                Ball with: {{ currentSlaInfo.ballWith === 'applicant' ? 'Applicant' : 'Municipality' }}
+              </span>
+            }
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" (click)="openDocRequestModal()" data-testid="button-request-docs">Request Documents</button>
+            <button class="btn btn-outline btn-sm" (click)="exportCommunicationsCsv()" [disabled]="commLogs().length === 0" data-testid="button-export-comms">Export CSV</button>
+          </div>
+        </div>
+        @if (commLoading()) {
+          <div class="loading-center" style="padding:24px"><span class="spinner"></span> Loading communication history...</div>
+        } @else if (commLogs().length === 0) {
+          <div class="empty-state"><p>No communication history found for this account.</p></div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Channel</th>
+                  <th>Recipients</th>
+                  <th>Subject</th>
+                  <th>Message Preview</th>
+                  <th>Status</th>
+                  <th>Sent By</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (log of commLogs(); track log.id) {
+                  <tr [attr.data-testid]="'row-comm-' + log.id">
+                    <td>{{ fmtDate(log.createdAt) }}</td>
+                    <td><span class="badge" [class]="log.method === 'email' ? 'badge-info' : log.method === 'sms' ? 'badge-success' : 'badge-grey'">{{ log.method }}</span></td>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">{{ log.recipients }}</td>
+                    <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis">{{ log.subject }}</td>
+                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#64748b" [title]="log.messageBody">{{ log.messageBody?.substring(0, 120) }}{{ (log.messageBody?.length || 0) > 120 ? '...' : '' }}</td>
+                    <td><span class="badge" [class]="log.status === 'sent' ? 'badge-success' : 'badge-danger'">{{ log.status }}</span></td>
+                    <td>{{ log.sentByName }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'documents') {
+      <div class="tab-section">
+        <div class="section-header">
+          <h3 class="section-title">Uploaded Documents ({{ documents().length }})</h3>
+          <div class="section-actions">
+            <button class="btn btn-outline btn-sm" (click)="loadDocuments()" [disabled]="documentsLoading()" data-testid="button-refresh-docs">
+              @if (documentsLoading()) { <span class="spinner-inline"></span> } Refresh
+            </button>
+          </div>
+        </div>
+        @if (documentsLoading()) {
+          <div class="loading-center" style="padding:24px"><span class="spinner"></span> Loading documents...</div>
+        } @else if (documentsError()) {
+          <div class="empty-state" data-testid="docs-error" style="border:1px solid #fecaca;background:#fef2f2;color:#991b1b;padding:16px;border-radius:8px">
+            <p style="margin:0 0 8px 0;font-weight:600">Could not load documents from Platinum API</p>
+            <p style="margin:0;font-size:13px">{{ documentsError() }}</p>
+            <button class="btn btn-outline btn-sm" (click)="loadDocuments()" style="margin-top:12px" data-testid="button-retry-docs">Retry</button>
+          </div>
+        } @else if (documents().length === 0) {
+          <div class="empty-state"><p>No documents have been uploaded for this application yet.</p></div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Document Name</th>
+                  <th>Type</th>
+                  <th>Size</th>
+                  <th>Uploaded</th>
+                  <th class="text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (doc of documents(); track (doc.documentId || doc.DocumentId)) {
+                  <tr [attr.data-testid]="'row-doc-' + (doc.documentId || doc.DocumentId)">
+                    <td>{{ doc.fileName || doc.documentName || '—' }}</td>
+                    <td>{{ doc.documentTypeName || '—' }}</td>
+                    <td>{{ fmtFileSize(doc.fileSize) }}</td>
+                    <td>{{ fmtDate(doc.dateCaptured) }}</td>
+                    <td class="text-center">
+                      <button class="btn btn-outline btn-xs" (click)="downloadAttachment(doc)" [disabled]="doc._downloading" [attr.data-testid]="'btn-download-doc-' + (doc.documentId || doc.DocumentId)">
+                        @if (doc._downloading) { <span class="spinner-inline"></span> Downloading… }
+                        @else {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          Download
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (activeTab === 'qualifying') {
+      <div class="section" data-testid="section-qualifying">
+        @if (qualifyingUnits.length === 0) {
+          <div class="empty-state">
+            <p>No qualifying units recorded.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Unit Name</th>
+                  <th>Occupant Number</th>
+                  <th class="text-right">Household Income</th>
+                  <th class="text-right">Subsidy</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (unit of qualifyingUnits; track unit.qualifyingUnitDetailId) {
+                  <tr [attr.data-testid]="'row-unit-' + unit.qualifyingUnitDetailId">
+                    <td>{{ unit.unitName }}</td>
+                    <td>{{ unit.occupantNumber }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(unit.householdIncome) }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(unit.subsidy) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-right"><strong>Total Subsidy</strong></td>
+                  <td class="text-right font-mono" data-testid="text-total-subsidy"><strong>{{ fmtCurrency(totalSubsidyAmount) }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  }
+</ng-template>
+
+@if (docRequestModalOpen && app) {
+  <div class="modal-overlay" (click)="closeDocRequestModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Request Outstanding Documents</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDocRequestModal()" data-testid="button-close-doc-request">&#x2715;</button>
+      </div>
+      <div class="modal-body" style="padding:20px 24px">
+        <div class="detail-grid" style="margin-bottom:16px">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value">#{{ app.applicationId }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ app.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account Holder</span><span class="detail-value">{{ app.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Indigent Type</span><span class="detail-value">{{ app.indigentTypeName }}</span></div>
+        </div>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:20px">
+          <div style="font-weight:600;font-size:14px;color:var(--platinum-primary);margin-bottom:4px">Outstanding Documents</div>
+          <p style="font-size:12px;color:#64748b;margin-bottom:12px">Select the documents that still need to be submitted by the applicant.</p>
+          @if (docRequestDocs.length === 0) {
+            <div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px">
+              <span style="display:block;font-size:24px;margin-bottom:6px">&#128196;</span>
+              No required documents configured for this indigent type.
+            </div>
+          } @else {
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              @for (doc of docRequestDocs; track doc.key) {
+                <label class="toggle-item" style="margin:0;padding:8px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer" [style.border-color]="doc.selected ? 'var(--platinum-accent)' : '#e2e8f0'" [style.background]="doc.selected ? '#fffbeb' : '#fff'" [attr.data-testid]="'toggle-doc-' + doc.key">
+                  <input type="checkbox" [(ngModel)]="doc.selected" />
+                  <span style="font-size:13px">{{ doc.label }}</span>
+                  @if (doc.previouslyRequested) {
+                    <span class="badge badge-warning" style="font-size:9px;margin-left:auto;white-space:nowrap">Prev. Requested</span>
+                  }
+                </label>
+              }
+            </div>
+            <div style="margin-top:10px;font-size:12px;color:#64748b">
+              {{ docRequestSelectedCount }} of {{ docRequestDocs.length }} selected
+            </div>
+          }
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div class="field-group">
+            <span class="field-label">Response Deadline (days)</span>
+            <input type="number" class="field-input" [(ngModel)]="docRequestDeadlineDays" min="1" max="90" data-testid="input-doc-deadline" />
+            <span class="field-hint">Days the applicant has to submit documents.</span>
+          </div>
+          <div class="field-group">
+            <span class="field-label">Deadline Date</span>
+            <input type="text" class="field-input" [value]="docRequestDeadlineDisplay" readonly style="background:#f8fafc;color:#64748b" data-testid="text-deadline-date" />
+            <span class="field-hint">Calculated from today + deadline days.</span>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <span class="field-label">Additional Message (optional)</span>
+          <textarea class="field-textarea" [(ngModel)]="docRequestCustomMessage" rows="3" placeholder="Add a custom message to include in the notification..." data-testid="input-doc-message" style="resize:vertical"></textarea>
+          <span class="field-hint">This message will be appended to the standard document request notification.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDocRequestModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitDocRequest()" [disabled]="docRequestSelectedCount === 0" data-testid="button-send-doc-request">
+          Send Request{{ docRequestSelectedCount > 0 ? ' (' + docRequestSelectedCount + ')' : '' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (dncModalOpen && app) {
+  <div class="modal-overlay" (click)="closeDncModal()">
+    <div class="modal-content" style="max-width:30rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Do-Not-Cut Protection</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDncModal()" data-testid="button-close-detail-dnc-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value">#{{ app.applicationId }}</span></div>
+          <div class="detail-item"><span class="detail-label">Current Do-Not-Cut</span><span class="detail-value">{{ fmtDate(app.doNotCutDate) }}</span></div>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">New Do-Not-Cut Date</span>
+          <div class="input-with-action">
+            <app-date-input [value]="dncDate" (valueChange)="dncDate = $event" testId="input-detail-dnc-date" inputClass="field-input" />
+            <button class="btn btn-ghost btn-sm" (click)="clearDncDate()" data-testid="button-detail-clear-dnc">Clear</button>
+          </div>
+          <span class="field-hint">Leave empty or click Clear to remove do-not-cut protection</span>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Reason *</span>
+          <textarea class="field-textarea" [(ngModel)]="dncReason" rows="3" placeholder="Reason for updating do-not-cut date..." data-testid="input-detail-dnc-reason"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDncModal()" data-testid="button-cancel-detail-dnc">Cancel</button>
+        <button class="btn btn-primary" (click)="submitDncUpdate()" [disabled]="dncSubmitting() || !dncReason" data-testid="button-detail-submit-dnc">
+          @if (dncSubmitting()) { <span class="spinner"></span> }
+          {{ dncDate ? 'Update Date' : 'Remove Protection' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

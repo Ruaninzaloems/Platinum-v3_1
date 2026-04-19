@@ -1,0 +1,312 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-icon">⚖</div>
+      <div>
+        <h1 class="page-title" data-testid="text-page-title">Handover Authorization</h1>
+        <p class="page-subtitle">Review and authorize pending handover submissions and termination requests</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="fin-year-row">
+        <label class="fin-year-label">Financial Year</label>
+        <select class="select select-sm" [(ngModel)]="finYear" (ngModelChange)="onYearChange()" data-testid="select-fin-year">
+          @for (y of finYears; track y) { <option [value]="y">{{ y }}</option> }
+        </select>
+      </div>
+      <button class="btn btn-outline btn-sm" (click)="loadHandovers()" [disabled]="loading()" data-testid="button-refresh">
+        @if (loading()) { <span class="spinner"></span> }
+        Refresh
+      </button>
+      <button class="btn btn-outline btn-sm" (click)="handleCancel()" data-testid="button-back">← Back</button>
+    </div>
+  </div>
+
+  <div class="auth-tabs">
+    <button class="auth-tab" [class.active]="activeTab === 'handover'" (click)="activeTab = 'handover'" data-testid="tab-handover-auth">
+      Handover Authorization
+      @if (rows.length > 0) { <span class="tab-badge">{{ rows.length }}</span> }
+    </button>
+    <button class="auth-tab" [class.active]="activeTab === 'termination'" (click)="activeTab = 'termination'" data-testid="tab-termination-auth">
+      Termination Approval
+      @if (terminationRows.length > 0) { <span class="tab-badge tab-badge-danger">{{ terminationRows.length }}</span> }
+    </button>
+  </div>
+
+  @if (activeTab === 'handover') {
+    <div class="card">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading pending handover authorizations...</p>
+        </div>
+      } @else if (rows.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">✓</div>
+          <p class="empty-title" data-testid="text-no-pending">No Pending Authorizations</p>
+          <p class="empty-desc">There are no handover submissions awaiting authorization. All handovers have been processed.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:9rem">Review</th>
+                <th style="width:12.5rem">Notes</th>
+                <th>Handover ID</th>
+                <th>Status</th>
+                <th>Option</th>
+                <th>Attorney</th>
+                <th>Actioned By</th>
+                <th>Date Created</th>
+                <th class="text-right">Accounts</th>
+                <th class="text-right">Amount</th>
+                <th class="text-center">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows; track row.handover.handoverId || row.handover.id; let idx = $index) {
+                <tr [class]="getRowClass(row.review)" [attr.data-testid]="'row-handover-auth-' + (row.handover.handoverId || row.handover.id)">
+                  <td>
+                    <select class="field-select-sm" [ngModel]="row.review || '__none__'" (ngModelChange)="updateReview(idx, $event === '__none__' ? '' : $event)" [attr.data-testid]="'select-review-' + (row.handover.handoverId || row.handover.id)">
+                      <option value="__none__">Select...</option>
+                      <option value="Approve">✓ Approve</option>
+                      <option value="Decline">✕ Decline</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input class="field-input-sm" [ngModel]="row.notes" (ngModelChange)="updateNotes(idx, $event)" placeholder="Authorization notes..." maxlength="250" [attr.data-testid]="'input-notes-' + (row.handover.handoverId || row.handover.id)" />
+                  </td>
+                  <td>
+                    <span class="font-mono font-medium" [attr.data-testid]="'text-handoverid-' + (row.handover.handoverId || row.handover.id)">{{ row.handover.handoverId || row.handover.id }}</span>
+                  </td>
+                  <td>
+                    <span class="badge" [class]="getStatusBadgeClass(row.handover.status)" [attr.data-testid]="'badge-status-' + (row.handover.handoverId || row.handover.id)">⚠ {{ row.handover.status }}</span>
+                  </td>
+                  <td class="text-muted text-capitalize">{{ row.handover.handoverOption || '—' }}</td>
+                  <td class="text-muted">{{ row.handover.attorneyName || row.handover.attorney || '—' }}</td>
+                  <td class="text-muted">{{ row.handover.actionedBy || row.handover.capturedBy || '—' }}</td>
+                  <td class="text-muted">{{ formatDate(row.handover.dateCreated || row.handover.dateCaptured) }}</td>
+                  <td class="text-right font-medium">{{ row.handover.totalAccounts?.toLocaleString() || row.handover.accountCount?.toLocaleString() || '—' }}</td>
+                  <td class="text-right font-medium col-amount">{{ formatAmount(row.handover.totalAmount || row.handover.amount) }}</td>
+                  <td class="text-center">
+                    <div class="detail-btns">
+                      <button class="btn-icon" title="View handover details" (click)="toggleDetails(row.handover.handoverId || row.handover.id)" [class.active]="expandedId() === (row.handover.handoverId || row.handover.id)" [attr.data-testid]="'button-details-' + (row.handover.handoverId || row.handover.id)">
+                        &#9432;
+                      </button>
+                      <button class="btn-icon" title="View account list" (click)="viewAccounts(row.handover.handoverId || row.handover.id)" [class.active]="accountsId() === (row.handover.handoverId || row.handover.id)" [attr.data-testid]="'button-accounts-' + (row.handover.handoverId || row.handover.id)">
+                        &#128196;
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                @if (expandedId() === (row.handover.handoverId || row.handover.id)) {
+                  <tr class="detail-row">
+                    <td colspan="11">
+                      <div class="detail-panel">
+                        <div class="detail-panel-header">
+                          <span class="detail-panel-title">Handover #{{ row.handover.handoverId || row.handover.id }} — Details &amp; Parameters</span>
+                        </div>
+                        <div class="filter-chips">
+                          @for (chip of getHandoverDetailChips(row.handover); track $index) {
+                            <span class="filter-chip" [attr.data-testid]="'detail-chip-' + $index">{{ chip }}</span>
+                          }
+                        </div>
+                        <div class="detail-grid">
+                          <div class="detail-item">
+                            <span class="detail-label">Handover Option</span>
+                            <span class="detail-value text-capitalize">{{ row.handover.handoverOption || '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Attorney</span>
+                            <span class="detail-value">{{ row.handover.attorneyName || row.handover.attorney || '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Billing Cycle</span>
+                            <span class="detail-value">{{ row.handover.billingCycle || '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Section 129 Run</span>
+                            <span class="detail-value">{{ row.handover.section129RunId ? '#' + row.handover.section129RunId : '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Total Accounts</span>
+                            <span class="detail-value font-medium">{{ (row.handover.totalAccounts || row.handover.accountCount)?.toLocaleString() || '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Total Amount</span>
+                            <span class="detail-value font-medium">{{ formatAmount(row.handover.totalAmount || row.handover.amount) }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Created By</span>
+                            <span class="detail-value">{{ row.handover.actionedBy || row.handover.capturedBy || '—' }}</span>
+                          </div>
+                          <div class="detail-item">
+                            <span class="detail-label">Date Created</span>
+                            <span class="detail-value">{{ formatDate(row.handover.dateCreated || row.handover.dateCaptured) }}</span>
+                          </div>
+                          @if (row.handover.notes || row.handover.description) {
+                            <div class="detail-item" style="grid-column: span 2">
+                              <span class="detail-label">Notes</span>
+                              <span class="detail-value">{{ row.handover.notes || row.handover.description }}</span>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+
+                @if (accountsId() === (row.handover.handoverId || row.handover.id)) {
+                  <tr class="detail-row">
+                    <td colspan="11">
+                      <div class="accounts-panel">
+                        <div class="detail-panel-header">
+                          <span class="detail-panel-title">Handover #{{ row.handover.handoverId || row.handover.id }} — Account Details</span>
+                        </div>
+                        @if (accountsLoading()) {
+                          <div class="accounts-loading">
+                            <span class="spinner"></span>
+                            <span>Loading accounts from Platinum...</span>
+                          </div>
+                        } @else if (handoverAccounts().length === 0) {
+                          <div class="accounts-empty">No account details found for this handover.</div>
+                        } @else {
+                          <div class="accounts-table-wrap">
+                            <table class="accounts-table">
+                              <thead>
+                                <tr>
+                                  <th>Account No</th>
+                                  <th>Account Name</th>
+                                  <th>Address</th>
+                                  <th>Status</th>
+                                  <th class="text-right">Outstanding Days</th>
+                                  <th class="text-right">Handed Over Amount</th>
+                                  <th class="text-right">Outstanding Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (acc of handoverAccounts(); track $index) {
+                                  <tr [attr.data-testid]="'row-ho-account-' + $index">
+                                    <td class="font-mono">{{ acc.accountNo || acc.accountNumber || acc.accountId || '—' }}</td>
+                                    <td>{{ acc.accountName || acc.consumerName || acc.name || '—' }}</td>
+                                    <td class="text-muted td-address">{{ acc.address || acc.propertyAddress || '—' }}</td>
+                                    <td>
+                                      <span class="badge badge-secondary">{{ acc.status || '—' }}</span>
+                                    </td>
+                                    <td class="text-right">{{ acc.outstandingDays || acc.arrearDays || 0 }}</td>
+                                    <td class="text-right font-medium">{{ formatAmount(acc.handedOverAmount || acc.handoverAmount) }}</td>
+                                    <td class="text-right font-medium">{{ formatAmount(acc.outstandingAmount || acc.totalBalance || acc.balanceDue) }}</td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (rows.length > 0) {
+      <div class="footer-bar">
+        <div class="footer-info">
+          <span class="text-muted" data-testid="text-pending-count">{{ rows.length }} pending authorization(s)</span>
+          @if (decisionsCount > 0) {
+            <span class="badge badge-secondary" data-testid="badge-decisions-count">{{ decisionsCount }} decision(s) made</span>
+          }
+        </div>
+        <div class="footer-buttons">
+          <button class="btn btn-outline btn-sm" (click)="handleCancel()" [disabled]="submitting()" data-testid="button-cancel">Cancel</button>
+          <button class="btn btn-primary btn-sm" (click)="handleSubmit()" [disabled]="submitting() || decisionsCount === 0" data-testid="button-submit">
+            @if (submitting()) { <span class="spinner"></span> Submitting... } @else { Submit Authorization }
+          </button>
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'termination') {
+    <div class="card">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading pending termination requests...</p>
+        </div>
+      } @else if (terminationRows.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">✓</div>
+          <p class="empty-title" data-testid="text-no-pending-terminations">No Pending Termination Requests</p>
+          <p class="empty-desc">There are no termination requests awaiting supervisor approval.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:9rem">Decision</th>
+                <th style="width:12.5rem">Notes</th>
+                <th>Handover ID</th>
+                <th>Account</th>
+                <th>Attorney</th>
+                <th>Status</th>
+                <th>Handover Date</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of terminationRows; track row.handover.handoverId || row.handover.id; let idx = $index) {
+                <tr [class]="getRowClass(row.decision)" [attr.data-testid]="'row-term-auth-' + (row.handover.handoverId || row.handover.id)">
+                  <td>
+                    <select class="field-select-sm" [ngModel]="row.decision || '__none__'" (ngModelChange)="updateTerminationDecision(idx, $event === '__none__' ? '' : $event)" [attr.data-testid]="'select-term-decision-' + (row.handover.handoverId || row.handover.id)">
+                      <option value="__none__">Select...</option>
+                      <option value="Approve">✓ Approve</option>
+                      <option value="Decline">✕ Decline</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input class="field-input-sm" [ngModel]="row.notes" (ngModelChange)="updateTerminationNotes(idx, $event)" placeholder="Approval notes..." maxlength="250" [attr.data-testid]="'input-term-notes-' + (row.handover.handoverId || row.handover.id)" />
+                  </td>
+                  <td>
+                    <span class="font-mono font-medium">{{ row.handover.handoverId || row.handover.id }}</span>
+                  </td>
+                  <td class="font-mono">{{ row.handover.accountNo || row.handover.accountNumber || '—' }}</td>
+                  <td class="text-muted">{{ row.handover.attorneyName || row.handover.attorney || '—' }}</td>
+                  <td>
+                    <span class="badge badge-amber">{{ row.handover.status }}</span>
+                  </td>
+                  <td class="text-muted">{{ formatDate(row.handover.handoverDate || row.handover.dateCreated) }}</td>
+                  <td class="text-right font-medium col-amount">{{ formatAmount(row.handover.handedOverAmount || row.handover.totalAmount || row.handover.amount) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (terminationRows.length > 0) {
+      <div class="footer-bar">
+        <div class="footer-info">
+          <span class="text-muted" data-testid="text-pending-term-count">{{ terminationRows.length }} pending termination(s)</span>
+          @if (terminationDecisionsCount > 0) {
+            <span class="badge badge-secondary" data-testid="badge-term-decisions-count">{{ terminationDecisionsCount }} decision(s) made</span>
+          }
+        </div>
+        <div class="footer-buttons">
+          <button class="btn btn-outline btn-sm" (click)="handleCancel()" [disabled]="submittingTerminations()" data-testid="button-cancel-term">Cancel</button>
+          <button class="btn btn-primary btn-sm" (click)="handleSubmitTerminations()" [disabled]="submittingTerminations() || terminationDecisionsCount === 0" data-testid="button-submit-terminations">
+            @if (submittingTerminations()) { <span class="spinner"></span> Submitting... } @else { Submit Termination Decisions }
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

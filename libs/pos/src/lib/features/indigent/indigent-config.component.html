@@ -1,0 +1,1923 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Indigent Configuration</h1>
+      <p class="page-subtitle">Manage indigent types, contractors, decline reasons, and income sources</p>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'types'" (click)="setTab('types')" data-testid="tab-types">Indigent Types</button>
+    <button class="tab-btn" [class.active]="activeTab === 'contractors'" (click)="setTab('contractors')" data-testid="tab-contractors">Contractors</button>
+    <button class="tab-btn" [class.active]="activeTab === 'reasons'" (click)="setTab('reasons')" data-testid="tab-reasons">Decline Reasons</button>
+    <button class="tab-btn" [class.active]="activeTab === 'providers'" (click)="setTab('providers')" data-testid="tab-providers">Site Verification Providers</button>
+    <button class="tab-btn" [class.active]="activeTab === 'incomesources'" (click)="setTab('incomesources')" data-testid="tab-incomesources">Income Sources</button>
+    <button class="tab-btn" [class.active]="activeTab === 'employers'" (click)="setTab('employers')" data-testid="tab-employers">Employers</button>
+    <button class="tab-btn" [class.active]="activeTab === 'occupiertypes'" (click)="setTab('occupiertypes')" data-testid="tab-occupiertypes">Occupier Types</button>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-center">
+      <span class="spinner spinner-lg"></span>
+      <p>Loading configuration...</p>
+    </div>
+  } @else {
+    @if (activeTab === 'types') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Indigent Types & Rules</h2>
+          <div style="display:flex;gap:8px;">
+            <a href="/api/downloads/Platinum_API_Spec.xlsx" download class="btn btn-outline btn-sm" data-testid="button-download-spec" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Platinum API Spec
+            </a>
+            <button class="btn btn-primary btn-sm" (click)="openTypeModal()" data-testid="button-add-type">Add Type</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (typesLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load indigent types from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-types">Retry</button>
+            </div>
+          } @else if (indigentTypes().length === 0) {
+            <div class="empty-state"><p>No indigent types configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th class="text-center">Reapply Period</th>
+                    <th class="text-center">Write-Off Cycle</th>
+                    <th class="text-center">Site Verification</th>
+                    <th class="text-center">Max Attempts</th>
+                    <th class="text-center">Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (t of indigentTypes(); track t.indigentTypeId) {
+                    <tr [attr.data-testid]="'row-type-' + t.indigentTypeId">
+                      <td class="font-medium">{{ t.indigentTypeName }}</td>
+                      <td class="text-center">
+                        @if (t.reApplicationPeriod && t.reApplicationPeriod > 0) {
+                          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+                            <span class="font-mono" style="font-size:0.875rem;font-weight:600">{{ t.reApplicationPeriod }} months</span>
+                            <span class="badge badge-muted" style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.03em">{{ t.reapplicationBaseDate === 'approval' ? 'From Approval' : 'From Application' }}</span>
+                          </div>
+                        } @else {
+                          <span style="color:#94a3b8;font-size:0.8rem">No reapply</span>
+                        }
+                      </td>
+                      <td class="text-center">
+                        @if (t.enableContinuousWriteOff && (t.continuousWriteOffIntervalMonths || t.writeOffCycleMonths)) {
+                          <span class="font-mono" style="font-size:0.875rem;font-weight:600">{{ t.continuousWriteOffIntervalMonths || t.writeOffCycleMonths }} months</span>
+                        } @else {
+                          <span style="color:#94a3b8;font-size:0.8rem">Disabled</span>
+                        }
+                      </td>
+                      <td class="text-center">
+                        @if (t.enableSiteVerification || t.verificationRequired) {
+                          <span class="badge badge-info" style="font-size:0.7rem">Required</span>
+                        } @else {
+                          <span style="color:#94a3b8;font-size:0.8rem">Not required</span>
+                        }
+                      </td>
+                      <td class="text-center font-mono">{{ (t.enableSiteVerification || t.verificationRequired) ? (t.maxVerificationAttempts ?? 0) : '—' }}</td>
+                      <td class="text-center"><span class="badge" [class]="t.isActive ? 'badge-success' : 'badge-muted'">{{ t.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td>
+                        <div style="display:inline-flex;align-items:center;gap:0.5rem">
+                          <button class="btn btn-outline btn-sm" (click)="openTypeModal(t)" [attr.data-testid]="'button-edit-type-' + t.indigentTypeId">Edit</button>
+                          <button class="btn btn-sm"
+                            [class.btn-outline]="t.isActive"
+                            [style.color]="t.isActive ? '#b91c1c' : '#166534'"
+                            [style.borderColor]="t.isActive ? '#fecaca' : '#86efac'"
+                            [style.background]="t.isActive ? '#fef2f2' : '#f0fdf4'"
+                            [disabled]="togglingTypeId() === t.indigentTypeId"
+                            (click)="requestToggleTypeActive(t)"
+                            [attr.data-testid]="'button-toggle-active-type-' + t.indigentTypeId">
+                            {{ togglingTypeId() === t.indigentTypeId ? '...' : (t.isActive ? 'Deactivate' : 'Activate') }}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'contractors') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Site Verification Contractors</h2>
+          <button class="btn btn-primary btn-sm" (click)="openContractorModal()" data-testid="button-add-contractor">Add Contractor</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (contractorsLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load contractors from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-contractors">Retry</button>
+            </div>
+          } @else if (contractors().length === 0) {
+            <div class="empty-state"><p>No contractors configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Contact Person</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of contractors(); track c.contractorId ?? $index) {
+                    <tr [attr.data-testid]="'row-contractor-' + c.contractorId">
+                      <td class="font-medium">{{ c.contractorName }}</td>
+                      <td>{{ c.contactPerson || '—' }}</td>
+                      <td>{{ c.contactPhone || '—' }}</td>
+                      <td>{{ c.contactEmail || '—' }}</td>
+                      <td><span class="badge" [class]="c.isActive ? 'badge-success' : 'badge-muted'">{{ c.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td>
+                        <button class="btn btn-outline btn-sm" (click)="openContractorModal(c)" [attr.data-testid]="'button-edit-contractor-' + c.contractorId">Edit</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'reasons') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Decline Reasons</h2>
+          <button class="btn btn-primary btn-sm" (click)="openReasonModal()" data-testid="button-add-reason">Add Reason</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (reasonsLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load decline reasons from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-reasons">Retry</button>
+            </div>
+          } @else if (declineReasons().length === 0) {
+            <div class="empty-state"><p>No decline reasons configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Reason</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of declineReasons(); track r.declineReasonId ?? $index) {
+                    <tr [attr.data-testid]="'row-reason-' + r.declineReasonId">
+                      <td class="font-mono">{{ r.declineReasonId }}</td>
+                      <td>{{ r.declineReasonName }}</td>
+                      <td>
+                        <button class="btn btn-outline btn-sm" (click)="openReasonModal(r)" [attr.data-testid]="'button-edit-reason-' + r.declineReasonId">Edit</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'providers') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Site Verification Providers</h2>
+          <button class="btn btn-primary btn-sm" (click)="openProviderModal()" data-testid="button-add-provider">Add Provider</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (providersLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load verification providers from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-providers">Retry</button>
+            </div>
+          } @else if (providers().length === 0) {
+            <div class="empty-state"><p>No verification providers configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>API Endpoint</th>
+                    <th>Timeout</th>
+                    <th>Fallback</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of providers(); track p.providerId ?? $index) {
+                    <tr [attr.data-testid]="'row-provider-' + p.providerId">
+                      <td class="font-medium">{{ p.providerName }}</td>
+                      <td>{{ p.providerType }}</td>
+                      <td class="font-mono text-sm">{{ p.apiEndpoint || '—' }}</td>
+                      <td>{{ p.timeoutSeconds || 30 }}s</td>
+                      <td>{{ p.fallbackEnabled ? 'Yes' : 'No' }}</td>
+                      <td><span class="badge" [class]="p.isActive ? 'badge-success' : 'badge-muted'">{{ p.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td>
+                        <button class="btn btn-outline btn-sm" (click)="openProviderModal(p)" [attr.data-testid]="'button-edit-provider-' + p.providerId">Edit</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'incomesources') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Income Sources</h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            @if (incomeSources().length === 0) {
+              <button class="btn btn-accent btn-sm" (click)="seedDefaultIncomeSources()" [disabled]="seeding()" data-testid="button-seed-income-sources">
+                {{ seeding() ? 'Creating...' : 'Load SA Defaults' }}
+              </button>
+            }
+            <button class="btn btn-primary btn-sm" (click)="openIncomeSourceModal()" data-testid="button-add-income-source">Add Income Source</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (incomeSourcesLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load income sources from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-income-sources">Retry</button>
+            </div>
+          } @else if (incomeSources().length === 0 && !seeding()) {
+            <div class="empty-state"><p>No income sources configured. Click "Load SA Defaults" to create standard South African income sources.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Income Source</th>
+                    <th>Status</th>
+                    <th>Validation</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (is of incomeSources(); track is.incomeSourceId ?? $index) {
+                    <tr [attr.data-testid]="'row-income-source-' + is.incomeSourceId">
+                      <td class="font-mono">{{ is.incomeSourceId }}</td>
+                      <td class="font-medium">{{ is.incomeSourceName }}</td>
+                      <td><span class="badge" [class]="is.isActive ? 'badge-success' : 'badge-muted'">{{ is.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td><span class="badge" [class]="is.excludeFromValidation ? 'badge-warning' : 'badge-success'">{{ is.excludeFromValidation ? 'Excluded' : 'Included' }}</span></td>
+                      <td>
+                        <button class="btn btn-outline btn-sm" (click)="openIncomeSourceModal(is)" [attr.data-testid]="'button-edit-income-source-' + is.incomeSourceId">Edit</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'employers') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Employers</h2>
+          <button class="btn btn-primary btn-sm" (click)="openEmployerModal()" data-testid="button-add-employer">Add Employer</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (employersLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load employers from Platinum API.</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-employers">Retry</button>
+            </div>
+          } @else if (employers().length === 0) {
+            <div class="empty-state"><p>No employers configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Code</th>
+                    <th>Employer Name</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of employers(); track e.employerId ?? $index) {
+                    <tr [attr.data-testid]="'row-employer-' + e.employerId">
+                      <td class="font-mono">{{ e.employerId }}</td>
+                      <td class="font-mono" style="font-size:0.8rem">{{ e.employerCode || '-' }}</td>
+                      <td class="font-medium">{{ e.employerName }}</td>
+                      <td><span class="badge" [class]="e.isActive ? 'badge-success' : 'badge-muted'">{{ e.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td>
+                        <button class="btn btn-outline btn-sm" (click)="openEmployerModal(e)" [attr.data-testid]="'button-edit-employer-' + e.employerId">Edit</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab === 'occupiertypes') {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Occupier Types</h2>
+          <button class="btn btn-primary btn-sm" (click)="openOccupierTypeModal()" data-testid="button-add-occupier-type">Add Occupier Type</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          @if (occupierTypesLoadFailed()) {
+            <div class="empty-state" style="color: var(--platinum-danger, #dc3545)">
+              <p>Failed to load occupier types from Platinum API. This is a known issue (Bug 17).</p>
+              <button class="btn btn-outline btn-sm" style="margin-top: 8px" (click)="loadData()" data-testid="button-retry-occupier-types">Retry</button>
+            </div>
+          } @else if (occupierTypes().length === 0) {
+            <div class="empty-state"><p>No occupier types configured.</p></div>
+          } @else {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Occupier Type</th>
+                    <th>Status</th>
+                    <th>Household Income</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ot of occupierTypes(); track ot.occupierTypeId) {
+                    <tr [attr.data-testid]="'row-occupier-type-' + ot.occupierTypeId">
+                      <td class="font-mono">{{ ot.occupierTypeId }}</td>
+                      <td class="font-medium">{{ ot.name }}</td>
+                      <td><span class="badge" [class]="ot.isActive ? 'badge-success' : 'badge-muted'">{{ ot.isActive ? 'Active' : 'Inactive' }}</span></td>
+                      <td><span class="badge" [class]="ot.includeInHouseholdIncome ? 'badge-success' : 'badge-warning'">{{ ot.includeInHouseholdIncome ? 'Included' : 'Excluded' }}</span></td>
+                      <td>
+                        <div style="display:flex;gap:4px;">
+                          <button class="btn btn-outline btn-sm" (click)="openOccupierTypeModal(ot)" [attr.data-testid]="'button-edit-occupier-type-' + ot.occupierTypeId">Edit</button>
+                          @if (ot.isActive) {
+                            <button class="btn btn-outline btn-sm" style="color:#dc2626" (click)="deleteOccupierType(ot.occupierTypeId)" [attr.data-testid]="'button-delete-occupier-type-' + ot.occupierTypeId">Deactivate</button>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+        <div style="padding:12px 16px; background:#f8f9fa; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#666;">
+          <strong>How it works:</strong> When "Included" is ticked, the occupier's income will count towards the total household income used for qualification checks. When "Excluded", their income is ignored during qualification.
+        </div>
+      </div>
+    }
+  }
+</div>
+
+@if (typeModalOpen) {
+  <div class="modal-overlay" (click)="closeTypeModal()">
+    <div class="modal-content modal-xl" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <h3 class="modal-title">{{ editType.indigentTypeId ? 'Edit' : 'Add' }} Indigent Type</h3>
+          <p class="modal-subtitle">Configure qualification criteria, policy tests, reporting and automation rules</p>
+        </div>
+        <button class="btn btn-ghost btn-icon" (click)="closeTypeModal()">✕</button>
+      </div>
+      <div class="modal-body-2col">
+        <!-- Left sidebar nav -->
+        <nav class="modal-side-nav">
+          <div class="modal-nav-section">
+            <span class="modal-nav-section-label">Setup</span>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-basic')">
+              <span class="material-icons">info</span> Basic Details
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-advanced')">
+              <span class="material-icons">tune</span> Advanced Settings
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-writeoff')">
+              <span class="material-icons">money_off</span> Debt Write-Off
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-general')">
+              <span class="material-icons">settings</span> General Settings
+            </button>
+          </div>
+          <div class="modal-nav-section">
+            <span class="modal-nav-section-label">Qualification Tests</span>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-std-tests')">
+              <span class="material-icons">verified_user</span> Standard Tests
+              <span class="modal-nav-count cnt-green">{{ getEnabledCount(editType.standardQualificationTests) }}/9</span>
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-mun-tests')">
+              <span class="material-icons">policy</span> Municipal Tests
+              <span class="modal-nav-count cnt-blue">{{ getEnabledCount(editType.municipalPolicyTests) }}/15</span>
+            </button>
+          </div>
+          <div class="modal-nav-section">
+            <span class="modal-nav-section-label">Automation</span>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-reminders')">
+              <span class="material-icons">notifications</span> Reminders
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-autoterminate')">
+              <span class="material-icons">auto_delete</span> Auto-Termination
+            </button>
+          </div>
+          <div class="modal-nav-section">
+            <span class="modal-nav-section-label">Configuration</span>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-seniors')">
+              <span class="material-icons">elderly</span> Senior Exemptions
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-reports')">
+              <span class="material-icons">description</span> Qual. Reports
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-documents')">
+              <span class="material-icons">description</span> Documents &amp; Referrals
+            </button>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-subrules')">
+              <span class="material-icons">account_tree</span> Sub-Rules
+            </button>
+          </div>
+          <div class="modal-nav-section">
+            <span class="modal-nav-section-label">Communications</span>
+            <button class="modal-nav-item" (click)="scrollToSection('sec-comms')">
+              <span class="material-icons">mail</span> Communication Engine
+              <span class="modal-nav-count" [class.cnt-green]="editType.enableIndigentCommunications" [class.cnt-grey]="!editType.enableIndigentCommunications">{{ getEnabledCommCount() }}/9</span>
+            </button>
+          </div>
+        </nav>
+        <!-- Scrollable content area -->
+        <div class="modal-scroll-area" id="type-modal-scroll">
+          <div class="modal-section" id="sec-basic">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-navy"><span class="material-icons">info</span></div>
+              <span class="modal-section-title">Basic Details</span>
+            </div>
+            <div class="form-grid">
+              <div class="field-group col-span-4">
+                <span class="field-label">Type Name *</span>
+                <input class="field-input" [(ngModel)]="editType.indigentTypeName" placeholder="e.g. Tenant, Domestic, NGO" data-testid="input-type-name" />
+                <span class="field-hint">A short, descriptive name for this indigent category as it should appear in lists and reports.</span>
+              </div>
+            </div>
+
+            <div class="modal-subsection-title">Validity Periods</div>
+            <div class="form-grid">
+              <div class="field-group col-span-2">
+                <span class="field-label">Application Period (months)</span>
+                <div class="input-with-suffix">
+                  <input type="number" min="1" class="field-input" [(ngModel)]="editType.applicationPeriod" data-testid="input-application-period" />
+                  <span class="input-suffix">months</span>
+                </div>
+                <span class="field-hint">How long an approved application remains valid before the debtor must reapply.</span>
+              </div>
+              <div class="field-group col-span-2">
+                <span class="field-label">Reapply Period (months)</span>
+                <div class="input-with-suffix">
+                  <input type="number" min="1" class="field-input" [(ngModel)]="editType.reApplicationPeriod" data-testid="input-reapplication-period" />
+                  <span class="input-suffix">months</span>
+                </div>
+                <span class="field-hint">Window in which the debtor must submit their reapplication after the validity period.</span>
+              </div>
+              <div class="field-group col-span-4">
+                <span class="field-label">Calculate Reapply From</span>
+                <select class="field-input" [(ngModel)]="editType.reapplicationBaseDate" data-testid="select-reapplication-base-date">
+                  <option value="application">Application Date</option>
+                  <option value="approval">Approval Date</option>
+                </select>
+                <span class="field-hint">When set to <strong>Approval Date</strong>, the reapplication period is calculated from the date the application is authorised — not from the original application date. Useful when applications may be pending for extended periods before approval.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-section" id="sec-reminders">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-blue"><span class="material-icons">notifications</span></div>
+              <span class="modal-section-title">Reapplication Reminders</span>
+            </div>
+        <p class="field-hint">Configure when and how debtors are reminded to reapply before their indigent registration expires.</p>
+
+        <div class="reminder-section" data-testid="section-reminders">
+          <div class="reminder-channels">
+            <span class="field-label" style="margin-bottom: 0.5rem; display: block;">Notification Channels</span>
+            <div class="toggle-row" style="margin-top: 0; border-top: none; padding-top: 0;">
+              <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.reApplicationReminderEmail" data-testid="toggle-reminder-email" /><span class="material-icons" style="font-size: 16px;">email</span><span>Email</span></label>
+              <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.reApplicationReminderSms" data-testid="toggle-reminder-sms" /><span class="material-icons" style="font-size: 16px;">sms</span><span>SMS</span></label>
+              <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.reApplicationReminderWhatsapp" data-testid="toggle-reminder-whatsapp" /><span class="material-icons" style="font-size: 16px;">chat</span><span>WhatsApp</span></label>
+            </div>
+          </div>
+
+          <div class="reminder-days-config">
+            <span class="field-label" style="margin-bottom: 0.5rem; display: block;">Reminder Schedule (days before expiry)</span>
+            @if (editType.reApplicationReminderDays.length > 0) {
+              <div class="reminder-tags">
+                @for (day of editType.reApplicationReminderDays; track $index) {
+                  <div class="reminder-tag" [attr.data-testid]="'reminder-day-' + day">
+                    <span class="material-icons" style="font-size: 14px;">notifications</span>
+                    <span>{{ day }} days</span>
+                    <button class="tag-remove" (click)="removeReminderDay($index)" title="Remove">✕</button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="field-hint">No reminders configured. Add at least one reminder interval.</p>
+            }
+            <div class="add-reminder-row">
+              <input type="number" class="field-input" [(ngModel)]="newReminderDay" placeholder="Days before expiry" min="1" data-testid="input-new-reminder-day" style="max-width: 180px;" />
+              <button class="btn btn-outline btn-sm" (click)="addReminderDay()" data-testid="button-add-reminder">
+                <span class="material-icons">add</span> Add Reminder
+              </button>
+            </div>
+          </div>
+        </div>
+          </div><!-- /sec-reminders -->
+
+          <div class="modal-section" id="sec-autoterminate">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-red"><span class="material-icons">auto_delete</span></div>
+              <span class="modal-section-title">Auto-Termination on Expiry</span>
+            </div>
+            <p class="field-hint">When enabled, expired registrations are automatically terminated after a grace period. The debtor is notified at each reminder interval and again on termination. All communications are logged.</p>
+
+        <div class="reminder-section" data-testid="section-auto-terminate">
+          <div class="toggle-row" style="margin-top: 0; border-top: none; padding-top: 0;">
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editType.autoTerminateOnExpiry" data-testid="toggle-auto-terminate" />
+              <span class="material-icons" style="font-size: 16px;">auto_delete</span>
+              <span>Enable Auto-Termination</span>
+            </label>
+          </div>
+
+          @if (editType.autoTerminateOnExpiry) {
+            <div class="form-grid" style="margin-top: 0.75rem;">
+              <div class="field-group">
+                <span class="field-label">Termination Trigger</span>
+                <select class="field-input" [(ngModel)]="editType.autoTerminationTrigger" data-testid="select-auto-term-trigger">
+                  <option value="reapply_expiry">End of Reapplication Period</option>
+                  <option value="financial_year_end">End of Financial Year</option>
+                  <option value="both">Both (whichever comes first)</option>
+                </select>
+                <p class="field-hint">Choose when auto-termination should be triggered. "End of Reapplication Period" terminates when the reapply date expires. "End of Financial Year" terminates at the close of the current financial year (30 June). "Both" terminates at whichever date comes first.</p>
+              </div>
+              <div class="field-group">
+                <span class="field-label">Grace Period (days after trigger)</span>
+                <input type="number" class="field-input" [(ngModel)]="editType.autoTerminateGraceDays" min="0" max="365" data-testid="input-grace-days" />
+                <p class="field-hint">How many days after the trigger date to wait before auto-terminating. Set to 0 for immediate termination.</p>
+              </div>
+            </div>
+
+            <div class="reminder-channels" style="margin-top: 0.75rem;">
+              <span class="field-label" style="margin-bottom: 0.5rem; display: block;">Termination Notification Channels</span>
+              <div class="toggle-row" style="margin-top: 0; border-top: none; padding-top: 0;">
+                <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.autoTerminateNotifyEmail" data-testid="toggle-term-notify-email" /><span class="material-icons" style="font-size: 16px;">email</span><span>Email</span></label>
+                <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.autoTerminateNotifySms" data-testid="toggle-term-notify-sms" /><span class="material-icons" style="font-size: 16px;">sms</span><span>SMS</span></label>
+                <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.autoTerminateNotifyWhatsapp" data-testid="toggle-term-notify-whatsapp" /><span class="material-icons" style="font-size: 16px;">chat</span><span>WhatsApp</span></label>
+              </div>
+              <p class="field-hint">Channels used to notify the debtor when auto-termination occurs. Separate from reminder channels above.</p>
+            </div>
+
+            <div class="auto-term-workflow" style="margin-top: 1rem; padding: 0.75rem; background: #f0f4f8; border-radius: 8px; border-left: 3px solid var(--platinum-accent);">
+              <span class="field-label" style="display: block; margin-bottom: 0.5rem;">Auto-Termination Workflow</span>
+              <div style="font-size: 0.8rem; color: #555; line-height: 1.6;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <span class="material-icons" style="font-size: 14px; color: var(--platinum-accent);">schedule</span>
+                  <span>Reminder sent at {{ editType.reApplicationReminderDays.length > 0 ? editType.reApplicationReminderDays.join(', ') + ' days before expiry' : 'no reminders configured' }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <span class="material-icons" style="font-size: 14px; color: #e67e22;">warning</span>
+                  @if (editType.autoTerminationTrigger === 'reapply_expiry') {
+                    <span>Reapplication period expires → grace period of {{ editType.autoTerminateGraceDays }} day(s) starts</span>
+                  } @else if (editType.autoTerminationTrigger === 'financial_year_end') {
+                    <span>Financial year ends (30 June) → grace period of {{ editType.autoTerminateGraceDays }} day(s) starts</span>
+                  } @else {
+                    <span>Reapplication period expires OR financial year ends (whichever first) → grace period of {{ editType.autoTerminateGraceDays }} day(s) starts</span>
+                  }
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <span class="material-icons" style="font-size: 14px; color: #e74c3c;">auto_delete</span>
+                  <span>After {{ editType.autoTerminateGraceDays }} day(s): auto-terminate + notify debtor + log communication</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="material-icons" style="font-size: 14px; color: #27ae60;">verified</span>
+                  <span>Full audit trail stored — all reminders and termination actions logged</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+          </div><!-- /sec-autoterminate -->
+
+
+          <div class="modal-section" id="sec-writeoff">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-gold"><span class="material-icons">money_off</span></div>
+              <span class="modal-section-title">Debt Write-Off</span>
+            </div>
+            <p class="field-hint">Configure how account debt is written off for approved indigent beneficiaries. The ATTP Write-Off document type will be used for all write-off transactions.</p>
+
+            <div class="form-grid">
+              <div class="field-group">
+                <span class="field-label">Write Off Debt on Approval</span>
+                <select class="field-select" [(ngModel)]="editType.writeOffApprovalMode" data-testid="select-writeoff-approval-mode">
+                  <option value="disabled">Disabled — No write-off on approval</option>
+                  <option value="first_application">First Application Only — Write off once on first approval, never again</option>
+                  <option value="per_financial_year">Per Financial Year — Write off on every approval per financial year</option>
+                </select>
+                <span class="field-hint">
+                  @if (editType.writeOffApprovalMode === 'disabled') {
+                    Debt will not be written off when an indigent application is approved
+                  } @else if (editType.writeOffApprovalMode === 'first_application') {
+                    Debt is written off only on the first application approval — subsequent re-applications will not trigger a write-off
+                  } @else {
+                    Debt is written off on every approval or re-application within each financial year
+                  }
+                </span>
+              </div>
+
+              @if (editType.writeOffApprovalMode === 'per_financial_year') {
+                <div class="field-group">
+                  <span class="field-label">Max Financial Years for Write-Off</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.writeOffMaxFinancialYears" min="1" max="99" placeholder="Unlimited" data-testid="input-writeoff-max-years" />
+                  <span class="field-hint">Optional — limit how many financial years a beneficiary can receive write-offs. Leave empty for unlimited.</span>
+                </div>
+              }
+            </div>
+
+            <div class="modal-section-hd" style="margin-top:1rem">
+              <span class="modal-section-title" style="font-size:0.85rem">Write-Off Scope</span>
+            </div>
+            <p class="field-hint">Determine which outstanding debt is included in the write-off calculation</p>
+            <div class="form-grid">
+              <div class="field-group">
+                <span class="field-label">Debt Scope</span>
+                <select class="field-select" [(ngModel)]="editType.writeOffScope" data-testid="select-writeoff-scope">
+                  <option value="all_debits">All Debits — Write off all outstanding debit balances on the account</option>
+                  <option value="all_services">All Services — Write off outstanding debt across all service types</option>
+                  <option value="monthly_debits">Monthly Debits — Write off only current month's debit charges</option>
+                  <option value="ageing_bracket">Ageing Bracket — Write off debt within a specific ageing range</option>
+                </select>
+                <span class="field-hint">
+                  @if (editType.writeOffScope === 'all_debits') {
+                    All outstanding debit balances on the account will be written off
+                  } @else if (editType.writeOffScope === 'all_services') {
+                    Outstanding debt across all municipal service types (water, electricity, rates, etc.) will be written off
+                  } @else if (editType.writeOffScope === 'monthly_debits') {
+                    Only the current month's debit charges will be written off — prior arrears remain
+                  } @else {
+                    Only debt within the specified ageing range (days outstanding) will be written off
+                  }
+                </span>
+              </div>
+
+              @if (editType.writeOffScope === 'ageing_bracket') {
+                <div class="field-group">
+                  <span class="field-label">Minimum Days Outstanding</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.writeOffAgeingMinDays" min="0" max="3650" placeholder="0" data-testid="input-writeoff-ageing-min" />
+                  <span class="field-hint">Include debt older than this many days (e.g. 30 for 30+ days)</span>
+                </div>
+                <div class="field-group">
+                  <span class="field-label">Maximum Days Outstanding</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.writeOffAgeingMaxDays" min="0" max="3650" placeholder="No limit" data-testid="input-writeoff-ageing-max" />
+                  <span class="field-hint">Include debt up to this many days old — leave empty for no upper limit</span>
+                </div>
+              }
+            </div>
+
+            <div class="modal-subsection-title">Financial Year-End Write-Off</div>
+            <div class="form-grid">
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.enableFinancialYearEndWriteOff" data-testid="toggle-fy-end-writeoff" />
+                  <span class="toggle-label">Write Off at Financial Year-End (30 June)</span>
+                </label>
+                <span class="field-hint">Automatically write off all outstanding debt for active beneficiaries at the end of each financial year (30 June). This runs as a bulk process during year-end closing.</span>
+              </div>
+            </div>
+
+            <div class="modal-subsection-title">Continuous Write-Off</div>
+            <div class="form-grid">
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.enableContinuousWriteOff" data-testid="toggle-continuous-writeoff" />
+                  <span class="toggle-label">Enable Continuous Write-Off</span>
+                </label>
+                <span class="field-hint">Periodically write off accumulated debt for active beneficiaries (e.g. every 12 months for seniors exempted from renewal)</span>
+              </div>
+            </div>
+
+            @if (editType.enableContinuousWriteOff) {
+              <div class="form-grid" style="margin-top:0.75rem">
+                <div class="field-group">
+                  <span class="field-label">Continuous Write-Off Interval (months)</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.continuousWriteOffIntervalMonths" min="1" max="60" data-testid="input-continuous-writeoff-interval" />
+                  <span class="field-hint">How often debt is written off for active beneficiaries</span>
+                </div>
+              </div>
+            }
+
+            <div class="form-grid" style="margin-top:0.75rem">
+              <div class="field-group">
+                <span class="field-label">Write-Off Document Type</span>
+                <select class="field-select" [(ngModel)]="editType.writeOffDocumentTypeId" data-testid="select-writeoff-doctype">
+                  <option [ngValue]="null">-- Select Document Type --</option>
+                  @for (dt of docTypes(); track dt.documentTypeId ?? $index) {
+                    <option [ngValue]="dt.documentTypeId">{{ dt.documentTypeName }}</option>
+                  }
+                </select>
+                <span class="field-hint">ATTP document type used to record write-off transactions</span>
+              </div>
+
+            </div>
+
+            <div class="modal-section-hd" style="margin-top:1rem">
+              <span class="modal-section-title" style="font-size:0.85rem">Write-Off Notifications</span>
+            </div>
+            <p class="field-hint">Notify beneficiaries when debt is written off from their account</p>
+            <div class="form-grid">
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.writeOffNotifyEmail" data-testid="toggle-writeoff-notify-email" />
+                  <span class="toggle-label">Email Notification</span>
+                </label>
+              </div>
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.writeOffNotifySms" data-testid="toggle-writeoff-notify-sms" />
+                  <span class="toggle-label">SMS Notification</span>
+                </label>
+              </div>
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.writeOffNotifyWhatsapp" data-testid="toggle-writeoff-notify-whatsapp" />
+                  <span class="toggle-label">WhatsApp Notification</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="modal-section-hd" style="margin-top:1rem">
+              <span class="modal-section-title" style="font-size:0.85rem">Handover & Repayment Plans</span>
+            </div>
+            <p class="field-hint">Control how handed-over accounts and active repayment/payment plans are handled when an indigent application is approved</p>
+            <div class="form-grid">
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.writeOffHandoverDebt" data-testid="toggle-writeoff-handover-debt" />
+                  <span class="toggle-label">Write Off Handed-Over Debt</span>
+                </label>
+                <span class="field-hint">Include debt that has been handed over to attorneys in the write-off when an indigent application is approved</span>
+              </div>
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.terminateHandoverOnApproval" data-testid="toggle-terminate-handover" />
+                  <span class="toggle-label">Terminate Handover on Approval</span>
+                </label>
+                <span class="field-hint">Automatically terminate the handover (recall from attorney) when an indigent application is approved</span>
+              </div>
+              <div class="field-group field-group-toggle">
+                <label class="toggle-row">
+                  <input type="checkbox" [(ngModel)]="editType.terminateRepaymentPlanOnApproval" data-testid="toggle-terminate-repayment" />
+                  <span class="toggle-label">Terminate Repayment Plan on Approval</span>
+                </label>
+                <span class="field-hint">Automatically terminate any active repayment or payment plan arrangements when an indigent application is approved</span>
+              </div>
+            </div>
+
+            @if (editType.writeOffHandoverDebt || editType.terminateHandoverOnApproval || editType.terminateRepaymentPlanOnApproval) {
+              <div class="info-banner info-banner-blue" style="margin-top:0.75rem" data-testid="banner-handover-writeoff">
+                <span class="material-icons">gavel</span>
+                <div>
+                  <strong>Automated Debt Recovery Actions</strong>
+                  <p>On indigent approval, the system will:
+                    @if (editType.writeOffHandoverDebt) { <br/>• Write off all debt currently handed over to attorneys }
+                    @if (editType.terminateHandoverOnApproval) { <br/>• Terminate the handover and recall the account from the attorney (via <code>handover-terminate</code> API) }
+                    @if (editType.terminateRepaymentPlanOnApproval) { <br/>• Cancel any active repayment/payment plan arrangements on the account }
+                  </p>
+                </div>
+              </div>
+            }
+
+            @if (editType.exemptSeniorsFromRenewal && editType.enableContinuousWriteOff) {
+              <div class="info-banner info-banner-gold" style="margin-top:1rem" data-testid="banner-senior-writeoff">
+                <span class="material-icons">elderly</span>
+                <div>
+                  <strong>Senior Continuous Write-Off Active</strong>
+                  <p>Seniors aged {{ editType.seniorExemptionAge || 65 }}+ with extended periods will have debt written off every {{ editType.continuousWriteOffIntervalMonths }} months automatically. A dashboard notification will alert when write-offs are due.</p>
+                </div>
+              </div>
+            }
+          </div><!-- /sec-writeoff -->
+
+          <div class="modal-section" id="sec-std-tests">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-navy"><span class="material-icons">verified_user</span></div>
+              <span class="modal-section-title">Standard Qualification Tests</span>
+              <span class="modal-section-chip chip-green">{{ getEnabledCount(editType.standardQualificationTests) }}/{{ (editType.standardQualificationTests || []).length }} Active</span>
+            </div>
+            <p class="field-hint">Core qualification criteria applied during eligibility assessment. These are the standard tests common to all indigent programmes.</p>
+            <div class="verification-mode-legend">
+              <div class="legend-item"><span class="legend-badge badge-auto-legend">Auto / Third Party</span> <span class="legend-text">System verifies automatically using account, property, and name data from Platinum, or via Third Party Bureau for external checks</span></div>
+              <div class="legend-item"><span class="legend-badge badge-manual-legend">Manual</span> <span class="legend-text">User verifies during application by reviewing supporting documents (payslips, ID, affidavits)</span></div>
+              <div class="legend-item"><span class="legend-badge badge-both-legend">Both</span> <span class="legend-text">System auto-verifies AND user must manually confirm the result</span></div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <button class="btn btn-outline btn-sm" (click)="toggleAllTests(editType.standardQualificationTests, true)" data-testid="button-enable-all-standard">Enable All</button>
+              <button class="btn btn-outline btn-sm" (click)="toggleAllTests(editType.standardQualificationTests, false)" data-testid="button-disable-all-standard">Disable All</button>
+            </div>
+            <div class="policy-tests-grid" data-testid="section-standard-tests">
+              @for (test of editType.standardQualificationTests; track test.testId) {
+                <div class="policy-test-card test-standard" [class.policy-test-enabled]="test.enabled" [class.policy-test-disabled]="!test.enabled" [attr.data-testid]="'standard-test-' + test.testId">
+                  <div class="policy-test-header">
+                    <label class="toggle-switch">
+                      <input type="checkbox" [(ngModel)]="test.enabled" [attr.data-testid]="'toggle-standard-' + test.testId" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                    <div class="policy-test-info">
+                      <span class="policy-test-name"><span class="test-category-badge cat-standard">Standard</span>{{ test.testName }}</span>
+                      <span class="policy-test-desc">{{ test.description }}</span>
+                    </div>
+                    <div class="policy-test-actions">
+                      <select class="validation-mode-select" [(ngModel)]="test.validationMode" [attr.data-testid]="'mode-standard-' + test.testId" [title]="test.validationMode === 'manual' ? 'User manually verifies with supporting documents during application' : test.validationMode === 'api' ? 'Auto-verified using system data or Third Party Bureau during qualification check' : 'Auto-verified by system AND requires manual confirmation'">
+                        <option value="manual">Manual</option>
+                        <option value="api">Auto / Third Party</option>
+                        <option value="both">Both</option>
+                      </select>
+                      <span class="badge" [class.badge-error]="test.severity === 'blocking'" [class.badge-warning]="test.severity === 'warning'" style="text-transform: capitalize;">{{ test.severity }}</span>
+                    </div>
+                  </div>
+                  @if (test.enabled && test.configValue !== undefined) {
+                    @if (test.testId === 'age_requirement') {
+                      <div class="policy-test-config" style="display:flex;gap:1rem;align-items:flex-end">
+                        <div>
+                          <span class="field-label">Min Age (years)</span>
+                          <input type="number" class="field-input" [(ngModel)]="test.configValue" (ngModelChange)="syncTestToLegacy(test.testId, 'standard')" style="max-width: 120px;" min="0" [attr.data-testid]="'input-standard-' + test.testId + '-min'" />
+                        </div>
+                        <div>
+                          <span class="field-label">Max Age (years)</span>
+                          <input type="number" class="field-input" [(ngModel)]="test.configValueMax" (ngModelChange)="syncTestToLegacy(test.testId, 'standard')" style="max-width: 120px;" min="0" [attr.data-testid]="'input-standard-' + test.testId + '-max'" />
+                        </div>
+                      </div>
+                    } @else if (test.testId === 'income_limit') {
+                      <div class="policy-test-config">
+                        <span class="field-label">Maximum Income Limit (R)</span>
+                        <input type="number" class="field-input" [(ngModel)]="test.configValue" (ngModelChange)="syncTestToLegacy(test.testId, 'standard')" style="max-width: 150px;" [attr.data-testid]="'input-standard-income-limit'" />
+                      </div>
+                      <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f8f9fc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <label class="toggle-item" style="margin-bottom: 0.5rem;">
+                          <input type="checkbox" [(ngModel)]="editType.enableIncomeSlidingScale" data-testid="toggle-income-sliding-scale" />
+                          <span style="font-weight: 600;">Enable Percentage Sliding Scale</span>
+                        </label>
+                        <p class="field-hint" style="margin-bottom: 0.5rem;">When enabled, subsidy approval percentage is determined by income brackets. Higher income = lower subsidy percentage.</p>
+                        @if (editType.enableIncomeSlidingScale) {
+                          <div style="margin-top: 0.5rem;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                              <thead>
+                                <tr style="background: var(--platinum-primary); color: white;">
+                                  <th style="padding: 6px 10px; text-align: left; border-radius: 6px 0 0 0;">Category</th>
+                                  <th style="padding: 6px 10px; text-align: left;">Up to Income (R)</th>
+                                  <th style="padding: 6px 10px; text-align: center;">Subsidy %</th>
+                                  <th style="padding: 6px 10px; text-align: center; border-radius: 0 6px 0 0; width: 60px;"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (bracket of editType.incomeSlidingScale; track $index) {
+                                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 4px 6px;">
+                                      <input type="text" class="field-input" [(ngModel)]="bracket.category" placeholder="e.g. Full Subsidy" style="max-width: 160px;" [attr.data-testid]="'input-bracket-category-' + $index" />
+                                    </td>
+                                    <td style="padding: 4px 6px;">
+                                      <input type="number" class="field-input" [(ngModel)]="bracket.maxIncome" (blur)="sortIncomeBrackets()" style="max-width: 140px;" min="0" [attr.data-testid]="'input-bracket-income-' + $index" />
+                                    </td>
+                                    <td style="padding: 4px 6px; text-align: center;">
+                                      <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        <input type="number" class="field-input" [(ngModel)]="bracket.subsidyPercent" style="max-width: 80px; text-align: center;" min="0" max="100" [attr.data-testid]="'input-bracket-percent-' + $index" />
+                                        <span style="color: #666;">%</span>
+                                      </div>
+                                    </td>
+                                    <td style="padding: 4px 6px; text-align: center;">
+                                      <button class="btn-icon" (click)="removeIncomeBracket($index)" style="color: #e74c3c;" [attr.data-testid]="'button-remove-bracket-' + $index" title="Remove bracket">
+                                        <span class="material-icons" style="font-size: 18px;">delete</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                }
+                                @if (editType.incomeSlidingScale.length === 0) {
+                                  <tr><td colspan="4" style="padding: 12px; text-align: center; color: #999; font-style: italic;">No brackets configured. Add at least one bracket below.</td></tr>
+                                }
+                              </tbody>
+                            </table>
+                            <button class="btn btn-outline" (click)="addIncomeBracket()" style="margin-top: 0.5rem; font-size: 0.8rem;" data-testid="button-add-income-bracket">
+                              <span class="material-icons" style="font-size: 16px; vertical-align: middle;">add</span> Add Bracket
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <div class="policy-test-config">
+                        <span class="field-label">Threshold {{ test.configUnit ? '(' + test.configUnit + ')' : '' }}</span>
+                        <input type="number" class="field-input" [(ngModel)]="test.configValue" (ngModelChange)="syncTestToLegacy(test.testId, 'standard')" style="max-width: 150px;" [attr.data-testid]="'input-standard-' + test.testId" />
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          </div><!-- /sec-std-tests -->
+
+          <div class="modal-section" id="sec-mun-tests">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-amber"><span class="material-icons">policy</span></div>
+              <span class="modal-section-title">Additional Municipal Policy Tests</span>
+              <span class="modal-section-chip chip-blue">{{ getEnabledCount(editType.municipalPolicyTests) }}/{{ (editType.municipalPolicyTests || []).length }} Active</span>
+            </div>
+            <p class="field-hint">Municipality-specific policy validations. These are additional tests your municipality can switch on/off based on local by-laws and council resolutions. Includes employment checks, asset limits, bureau integrations, and auto-qualification overrides.</p>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <button class="btn btn-outline btn-sm" (click)="toggleAllTests(editType.municipalPolicyTests, true)" data-testid="button-enable-all-municipal">Enable All</button>
+              <button class="btn btn-outline btn-sm" (click)="toggleAllTests(editType.municipalPolicyTests, false)" data-testid="button-disable-all-municipal">Disable All</button>
+            </div>
+            <div class="policy-tests-grid" data-testid="section-municipal-tests">
+          @for (test of editType.municipalPolicyTests; track test.testId) {
+            <div class="policy-test-card test-municipal" [class.policy-test-enabled]="test.enabled" [class.policy-test-disabled]="!test.enabled" [attr.data-testid]="'municipal-test-' + test.testId">
+              <div class="policy-test-header">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="test.enabled" [attr.data-testid]="'toggle-municipal-' + test.testId" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="policy-test-info">
+                  <span class="policy-test-name"><span class="test-category-badge cat-municipal">Municipal</span>{{ test.testName }}</span>
+                  <span class="policy-test-desc">{{ test.description }}</span>
+                </div>
+                <div class="policy-test-actions">
+                  <select class="validation-mode-select" [(ngModel)]="test.validationMode" [attr.data-testid]="'mode-municipal-' + test.testId" [title]="test.validationMode === 'manual' ? 'User manually verifies with supporting documents during application' : test.validationMode === 'api' ? 'Auto-verified using system data or Third Party Bureau during qualification check' : 'Auto-verified by system AND requires manual confirmation'">
+                    <option value="manual">Manual</option>
+                    <option value="api">Auto / Third Party</option>
+                    <option value="both">Both</option>
+                  </select>
+                  <span class="badge" [class.badge-error]="test.severity === 'blocking'" [class.badge-warning]="test.severity === 'warning'" style="text-transform: capitalize;">{{ test.severity }}</span>
+                </div>
+              </div>
+              @if (test.enabled && test.configValue !== undefined) {
+                <div class="policy-test-config">
+                  <span class="field-label">Threshold {{ test.configUnit ? '(' + test.configUnit + ')' : '' }}</span>
+                  <input type="number" class="field-input" [(ngModel)]="test.configValue" (ngModelChange)="syncTestToLegacy(test.testId, 'municipal')" style="max-width: 150px;" [attr.data-testid]="'input-municipal-' + test.testId" />
+                </div>
+              }
+            </div>
+          }
+            </div>
+          </div><!-- /sec-mun-tests -->
+
+
+          <div class="modal-section" id="sec-seniors">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-amber"><span class="material-icons">elderly</span></div>
+              <span class="modal-section-title">Senior Exemptions</span>
+            </div>
+            <div class="toggle-row">
+              <label class="toggle-item"><input type="checkbox" [(ngModel)]="editType.exemptSeniorsFromRenewal" data-testid="toggle-senior-exempt" /><span>Enable Extended Period for Seniors</span></label>
+            </div>
+            <p class="field-hint">When enabled, applicants at or above the senior age threshold will receive an extended application period instead of the standard period.</p>
+            <div class="form-grid" style="margin-top: 0.75rem;">
+              <div class="field-group">
+                <span class="field-label">Senior Age Threshold</span>
+                <input type="number" class="field-input" [(ngModel)]="editType.seniorExemptionAge" min="0" max="120" data-testid="input-senior-age" />
+                <span class="field-hint">Age at which the extended period applies (default: 65)</span>
+              </div>
+              <div class="field-group">
+                <span class="field-label">Extended Period (months)</span>
+                <input type="number" class="field-input" [(ngModel)]="editType.seniorExtendedPeriod" min="0" max="120" data-testid="input-senior-extended-period" />
+                <span class="field-hint">Application validity period for qualifying seniors (e.g. 24 = 2 years, 36 = 3 years)</span>
+              </div>
+            </div>
+          </div><!-- /sec-seniors -->
+
+
+          <div class="modal-section" id="sec-reports">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-blue"><span class="material-icons">description</span></div>
+              <span class="modal-section-title">Qualification Reports &amp; Communication</span>
+            </div>
+            <p class="field-hint">Configure automatic report generation, rejection letters, and communication channels for qualification results. Reports can include Third Party Bureau data for official validity.</p>
+
+        @if (editType.reportConfig) {
+          <div class="report-config-grid" data-testid="section-report-config">
+            <div class="report-config-row">
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.generatePdfOnQualification" data-testid="toggle-report-pdf" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px; color: #3b82f6;">picture_as_pdf</span>
+                  <span>Generate PDF on Qualification</span>
+                </div>
+              </div>
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.generateRejectionLetter" data-testid="toggle-rejection-letter" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px; color: #ef4444;">block</span>
+                  <span>Generate Rejection Letter on Decline</span>
+                </div>
+              </div>
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.includesBureauReport" data-testid="toggle-bureau-report" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px; color: #8b5cf6;">verified</span>
+                  <span>Include Bureau Report (Third Party/XDS)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section-title" style="font-size: 12px; margin-top: 1rem;">Application Signature</div>
+            <p class="field-hint">When enabled, applicants must sign a declaration confirming the information provided is correct before the application can be finalised.</p>
+            <div class="report-config-row">
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.requireApplicantSignature" data-testid="toggle-require-signature" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px; color: #0f766e;">draw</span>
+                  <span>Require Applicant Signature</span>
+                </div>
+              </div>
+            </div>
+
+            @if (editType.reportConfig.requireApplicantSignature) {
+              <div class="report-config-row" style="margin-top:0.5rem">
+                <div class="report-config-item">
+                  <label class="toggle-switch">
+                    <input type="checkbox"
+                      [checked]="(editType.reportConfig.signatureMethods || []).includes('draw')"
+                      (change)="toggleSignatureMethod('draw', $any($event.target).checked)"
+                      data-testid="toggle-signature-method-draw" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="report-config-label">
+                    <span class="material-icons" style="font-size: 16px; color: #0f766e;">gesture</span>
+                    <span>Allow Drawn Signature</span>
+                  </div>
+                </div>
+                <div class="report-config-item">
+                  <label class="toggle-switch">
+                    <input type="checkbox"
+                      [checked]="(editType.reportConfig.signatureMethods || []).includes('type')"
+                      (change)="toggleSignatureMethod('type', $any($event.target).checked)"
+                      data-testid="toggle-signature-method-type" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="report-config-label">
+                    <span class="material-icons" style="font-size: 16px; color: #0f766e;">keyboard</span>
+                    <span>Allow Typed Signature</span>
+                  </div>
+                </div>
+              </div>
+              <div class="report-config-row">
+                <div class="report-config-item">
+                  <label class="toggle-switch">
+                    <input type="checkbox" [(ngModel)]="editType.reportConfig.requireSignatureConsent" data-testid="toggle-require-consent" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="report-config-label">
+                    <span class="material-icons" style="font-size: 16px; color: #b45309;">fact_check</span>
+                    <span>Require Consent Acknowledgement</span>
+                  </div>
+                </div>
+                <div class="report-config-item">
+                  <label class="toggle-switch">
+                    <input type="checkbox" [(ngModel)]="editType.reportConfig.attachSignedDeclarationPdf" data-testid="toggle-attach-declaration-pdf" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="report-config-label">
+                    <span class="material-icons" style="font-size: 16px; color: #1d4ed8;">picture_as_pdf</span>
+                    <span>Attach Signed Declaration PDF to Documents</span>
+                  </div>
+                </div>
+              </div>
+              @if (editType.reportConfig.requireSignatureConsent) {
+                <div class="field-group" style="margin-top:0.75rem">
+                  <span class="field-label">Consent Statement</span>
+                  <textarea class="field-input" rows="3"
+                    [(ngModel)]="editType.reportConfig.signatureConsentText"
+                    placeholder="The text the applicant must accept before signing…"
+                    data-testid="input-signature-consent-text"></textarea>
+                </div>
+              }
+            }
+
+            <div class="form-section-title" style="font-size: 12px; margin-top: 1rem;">Auto-Send Channels</div>
+            <p class="field-hint">When enabled, qualification results are automatically dispatched via the selected channels.</p>
+            <div class="report-config-row">
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.autoEmailResult" data-testid="toggle-auto-email" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px;">email</span>
+                  <span>Email</span>
+                </div>
+              </div>
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.autoSmsResult" data-testid="toggle-auto-sms" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px;">sms</span>
+                  <span>SMS (via link)</span>
+                </div>
+              </div>
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.autoWhatsappResult" data-testid="toggle-auto-whatsapp" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px;">chat</span>
+                  <span>WhatsApp (via link)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section-title" style="font-size: 12px; margin-top: 1rem;">Bulk Qualification</div>
+            <p class="field-hint">Allow batch processing of qualification checks across multiple accounts simultaneously.</p>
+            <div class="report-config-row">
+              <div class="report-config-item">
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="editType.reportConfig.allowBulkQualification" data-testid="toggle-bulk-qualification" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="report-config-label">
+                  <span class="material-icons" style="font-size: 16px;">dynamic_feed</span>
+                  <span>Allow Bulk Qualification</span>
+                </div>
+              </div>
+              @if (editType.reportConfig.allowBulkQualification) {
+                <div class="field-group" style="max-width: 200px;">
+                  <span class="field-label">Max Batch Size</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.reportConfig.bulkMaxBatchSize" min="1" max="500" data-testid="input-bulk-batch-size" />
+                </div>
+              }
+            </div>
+
+            <div class="form-section-title" style="font-size: 12px; margin-top: 1rem;">Report Customisation</div>
+            <div class="field-group" style="margin-top: 0.5rem;">
+              <span class="field-label">Report Header Text</span>
+              <input class="field-input" [(ngModel)]="editType.reportConfig.reportHeaderText" data-testid="input-report-header" />
+            </div>
+            <div class="field-group" style="margin-top: 0.75rem;">
+              <span class="field-label">Rejection Letter Template</span>
+              <textarea class="field-textarea" rows="5" [(ngModel)]="editType.reportConfig.rejectionLetterTemplate" data-testid="input-rejection-template" placeholder="Use {applicantName}, {accountNo} as placeholders"></textarea>
+              <p class="field-hint">Placeholders: &#123;applicantName&#125;, &#123;accountNo&#125;, &#123;qualificationDate&#125;, &#123;indigentType&#125;</p>
+            </div>
+          </div>
+        }
+          </div><!-- /sec-reports -->
+
+          <div class="modal-section" id="sec-workflow-steps">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-purple"><span class="material-icons">route</span></div>
+              <span class="modal-section-title">Workflow Steps</span>
+            </div>
+            <div class="info-banner info-blue" style="margin-bottom:12px">
+              <span class="material-icons" style="font-size:16px">info</span>
+              <span>Configure which steps are required in the indigent application workflow. Disabled steps are skipped — applications move directly to the next enabled step.</span>
+            </div>
+            <div class="workflow-steps-visual" style="display:flex;align-items:center;gap:8px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px;flex-wrap:wrap">
+              <div class="workflow-step" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:#0f2b46;color:white;border-radius:6px;font-size:12px;font-weight:600">
+                <span class="material-icons" style="font-size:14px">assignment</span> Application
+              </div>
+              <span class="material-icons" style="font-size:16px;color:#94a3b8">arrow_forward</span>
+              <div class="workflow-step" [style.background]="editType.enableSiteVerification ? '#0f2b46' : '#e2e8f0'" [style.color]="editType.enableSiteVerification ? 'white' : '#94a3b8'" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;transition:all 0.2s">
+                <span class="material-icons" style="font-size:14px">fact_check</span> Site Verification
+                @if (!editType.enableSiteVerification) { <span style="font-size:10px;font-style:italic">(skipped)</span> }
+              </div>
+              <span class="material-icons" style="font-size:16px;color:#94a3b8">arrow_forward</span>
+              <div class="workflow-step" [style.background]="editType.enableDocumentVerification ? '#0f2b46' : '#e2e8f0'" [style.color]="editType.enableDocumentVerification ? 'white' : '#94a3b8'" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;transition:all 0.2s">
+                <span class="material-icons" style="font-size:14px">verified_user</span> Document Verification
+                @if (!editType.enableDocumentVerification) { <span style="font-size:10px;font-style:italic">(skipped)</span> }
+              </div>
+              <span class="material-icons" style="font-size:16px;color:#94a3b8">arrow_forward</span>
+              <div class="workflow-step" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:#0f2b46;color:white;border-radius:6px;font-size:12px;font-weight:600">
+                <span class="material-icons" style="font-size:14px">verified</span> Authorization
+              </div>
+            </div>
+            <div class="toggle-row" style="gap:16px;flex-wrap:wrap">
+              <label class="toggle-item" style="padding-top:0">
+                <input type="checkbox" [(ngModel)]="editType.enableSiteVerification" data-testid="toggle-enable-site-verification" />
+                <span class="material-icons" style="font-size:16px;color:#3b82f6">fact_check</span>
+                <span>Enable Site Verification Step</span>
+              </label>
+              <label class="toggle-item" style="padding-top:0">
+                <input type="checkbox" [(ngModel)]="editType.enableDocumentVerification" data-testid="toggle-enable-doc-verification-workflow" />
+                <span class="material-icons" style="font-size:16px;color:#22c55e">verified_user</span>
+                <span>Enable Document Verification Step</span>
+              </label>
+            </div>
+            @if (editType.enableSiteVerification) {
+              <div class="form-grid" style="margin-top:12px">
+                <div class="field-group">
+                  <span class="field-label">Max Site Verification Attempts</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.maxVerificationAttempts" min="1" max="10" data-testid="input-max-verification-attempts" />
+                  <span class="field-hint">Maximum number of site visit attempts before the application is escalated</span>
+                </div>
+              </div>
+            }
+            @if (!editType.enableSiteVerification && !editType.enableDocumentVerification) {
+              <div class="info-banner info-amber" style="margin-top:12px">
+                <span class="material-icons" style="font-size:16px">warning</span>
+                <span>Both verification steps are disabled. Applications will go directly from capture to authorization.</span>
+              </div>
+            }
+          </div><!-- /sec-workflow-steps -->
+
+
+          <div class="modal-section" id="sec-documents">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-blue"><span class="material-icons">schedule</span></div>
+              <span class="modal-section-title">Verification SLA &amp; Allocation</span>
+            </div>
+            <div class="form-row" style="margin-bottom:12px">
+              <div class="field-group" style="flex:1">
+                <span class="field-label">SLA Days (due date)</span>
+                <input type="number" class="field-input" [(ngModel)]="editType.verificationSLADays" min="1" max="365" data-testid="input-sla-days" />
+              </div>
+              <div class="field-group" style="flex:1">
+                <span class="field-label">Allocation Method</span>
+                <select class="field-select" [(ngModel)]="editType.allocationMethod" data-testid="select-allocation-method">
+                  <option value="manual">Manual</option>
+                  <option value="round_robin">Round Robin</option>
+                  <option value="load_balanced">Load Balanced</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-section-header" style="margin-top:16px">
+              <div class="modal-section-icon icon-blue"><span class="material-icons">description</span></div>
+              <span class="modal-section-title">Document Requirements</span>
+            </div>
+            <div class="toggle-row" style="margin-bottom:12px">
+              <label class="toggle-item">
+                <input type="checkbox" [(ngModel)]="editType.enableDocumentVerification" data-testid="toggle-enable-doc-verification" />
+                <span>Enable Document Verification Step</span>
+              </label>
+            </div>
+            @if (editType.enableDocumentVerification) {
+              <div class="info-banner info-blue" style="margin-bottom:12px">
+                <span class="material-icons" style="font-size:16px">info</span>
+                <span>When enabled, uploaded documents must be reviewed and verified before the application can be authorized. Use the referral workflow below to configure where applications can be referred.</span>
+              </div>
+              <div class="referral-workflow-config" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px">
+                <div style="font-weight:600;font-size:13px;color:var(--platinum-primary);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                  <span class="material-icons" style="font-size:16px">share</span>
+                  Referral Workflow — Document Verifier Can Refer To:
+                </div>
+                <div class="toggle-row" style="gap:8px;flex-wrap:wrap;margin-bottom:16px">
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.enableReferToCapturer" data-testid="toggle-refer-capturer" />
+                    <span class="material-icons" style="font-size:14px;color:#f59e0b">person</span>
+                    <span>Capturer (resubmission)</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.enableReferToContractor" data-testid="toggle-refer-contractor" />
+                    <span class="material-icons" style="font-size:14px;color:#3b82f6">engineering</span>
+                    <span>Contractor (site inspection)</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.enableReferToSupervisor" data-testid="toggle-refer-supervisor" />
+                    <span class="material-icons" style="font-size:14px;color:#8b5cf6">admin_panel_settings</span>
+                    <span>Supervisor (approval)</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.enableReferToSteeringCommittee" data-testid="toggle-refer-steering" />
+                    <span class="material-icons" style="font-size:14px;color:#ef4444">groups</span>
+                    <span>Steering Committee</span>
+                  </label>
+                </div>
+                <div style="font-weight:600;font-size:13px;color:var(--platinum-primary);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                  <span class="material-icons" style="font-size:16px">admin_panel_settings</span>
+                  Supervisor Can Refer To:
+                </div>
+                <div class="toggle-row" style="gap:8px;flex-wrap:wrap">
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.supervisorCanReferToCapturer" data-testid="toggle-sup-refer-capturer" />
+                    <span class="material-icons" style="font-size:14px;color:#f59e0b">person</span>
+                    <span>Capturer</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.supervisorCanReferToContractor" data-testid="toggle-sup-refer-contractor" />
+                    <span class="material-icons" style="font-size:14px;color:#3b82f6">engineering</span>
+                    <span>Contractor</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.supervisorCanReferToDocVerifier" data-testid="toggle-sup-refer-docverifier" />
+                    <span class="material-icons" style="font-size:14px;color:#22c55e">verified_user</span>
+                    <span>Document Verifier</span>
+                  </label>
+                  <label class="toggle-item">
+                    <input type="checkbox" [(ngModel)]="editType.referralWorkflow.supervisorCanReferToSteeringCommittee" data-testid="toggle-sup-refer-steering" />
+                    <span class="material-icons" style="font-size:14px;color:#ef4444">groups</span>
+                    <span>Steering Committee</span>
+                  </label>
+                </div>
+              </div>
+            }
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px">
+              <p class="text-muted" style="font-size:12px;margin:0">
+                Document types listed here are what the user will see on the application's Documents step for this indigent type. Each is marked Required or Optional.
+              </p>
+              <button type="button" class="btn btn-primary btn-sm" (click)="openAddDocTypeForEditingType()" data-testid="button-add-doc-type-for-type">
+                <span class="material-icons" style="font-size:16px;vertical-align:middle">add</span>
+                Add Document Type
+              </button>
+            </div>
+            @if (docsLinkedToEditingType().length === 0) {
+              <div style="padding:12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:13px;color:#92400e" data-testid="warn-no-doc-types-linked">
+                No document types are linked to this indigent type yet. Click <strong>Add Document Type</strong> above to create one.
+              </div>
+            } @else {
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Document Type</th>
+                      <th style="width:120px">Required</th>
+                      <th style="width:100px">Active</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (dt of docsLinkedToEditingType(); track dt.documentTypeId) {
+                      <tr [attr.data-testid]="'row-linked-doc-' + dt.documentTypeId">
+                        <td class="font-medium">{{ dt.documentTypeName }}</td>
+                        <td>
+                          @if (dt.isRequired) {
+                            <span class="badge badge-red">Required</span>
+                          } @else {
+                            <span class="badge badge-grey">Optional</span>
+                          }
+                        </td>
+                        <td>
+                          @if (dt.isActive !== false) {
+                            <span class="badge badge-green">Active</span>
+                          } @else {
+                            <span class="badge badge-grey">Inactive</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div><!-- /sec-documents -->
+
+          <div class="modal-section" id="sec-subrules">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-violet"><span class="material-icons">account_tree</span></div>
+              <span class="modal-section-title">Sub-Rules (Property Category + Name Type)</span>
+            </div>
+        <div class="sub-rules-section" data-testid="section-sub-rules">
+          @if (typeSubRules.length > 0) {
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Property Category</th>
+                    <th>Name Type</th>
+                    <th style="width:60px">Remove</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (sr of typeSubRules; track $index) {
+                    <tr [attr.data-testid]="'row-subrule-' + $index">
+                      <td>{{ sr.propertyCategoryName || sr.propertyCategoryId }}</td>
+                      <td>{{ sr.nameTypeName || getNameTypeName(sr.nameTypeId) || sr.nameTypeId }}</td>
+                      <td>
+                        <button class="btn btn-danger btn-sm btn-icon" (click)="removeSubRule($index)" [attr.data-testid]="'button-remove-subrule-' + $index">✕</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          <div class="add-sub-rule-row">
+            <div class="field-group" style="flex:2">
+              <span class="field-label">Property Category</span>
+              <select class="field-input" [(ngModel)]="newSubRule.propertyCategoryId" (ngModelChange)="onCategorySelect($event)" data-testid="select-subrule-category">
+                <option [value]="0" disabled>Select category...</option>
+                @for (cat of propertyCategories(); track cat.id) {
+                  <option [value]="cat.id">{{ cat.name }} ({{ cat.id }})</option>
+                }
+              </select>
+            </div>
+            <div class="field-group" style="flex:2">
+              <span class="field-label">Name Type</span>
+              @if (nameTypes().length > 0) {
+                <select class="field-input" [(ngModel)]="newSubRule.nameTypeId" (ngModelChange)="onNameTypeSelect($event)" data-testid="select-subrule-nametype">
+                  <option [value]="0" disabled>Select name type...</option>
+                  @for (nt of nameTypes(); track nt.id) {
+                    <option [value]="nt.id">{{ nt.name }} ({{ nt.id }})</option>
+                  }
+                </select>
+              } @else {
+                <input type="number" class="field-input" [(ngModel)]="newSubRule.nameTypeId" placeholder="Name Type ID" data-testid="input-subrule-nametype-id" />
+              }
+            </div>
+            <button class="btn btn-outline btn-sm align-end" (click)="addSubRule()" data-testid="button-add-subrule">Add</button>
+          </div>
+        </div>
+          </div><!-- /sec-subrules -->
+
+          <div class="modal-section" id="sec-comms">
+            <div class="modal-section-hd">
+              <div class="modal-section-icon icon-navy"><span class="material-icons">mail</span></div>
+              <span class="modal-section-title">Communication Engine</span>
+            </div>
+            <p class="field-hint">Configure automatic lifecycle notifications for indigent applicants. When enabled, the system will dispatch email/SMS at each lifecycle event.</p>
+            <div class="form-grid" style="margin-top:12px">
+              <div class="field-group col-span-2">
+                <label class="toggle-item">
+                  <input type="checkbox" [(ngModel)]="editType.enableIndigentCommunications" data-testid="toggle-enable-comms" />
+                  <span class="toggle-label"><strong>Enable Indigent Communications</strong></span>
+                </label>
+                <p class="field-hint">Master toggle — when off, no automatic notifications will be sent for this indigent type.</p>
+              </div>
+              @if (editType.enableIndigentCommunications) {
+                <div class="field-group col-span-2">
+                  <span class="field-label">SLA Target Days</span>
+                  <input type="number" class="field-input" [(ngModel)]="editType.applicationSlaTargetDays" style="max-width:8rem" data-testid="input-sla-target-days" />
+                  <p class="field-hint">Number of days within which applications should be processed. Used for SLA tracking (RAG indicators). Default: 30 days.</p>
+                </div>
+                <div class="field-group col-span-2" style="margin-top:8px">
+                  <span class="modal-section-title" style="font-size:0.85rem">CC / Stakeholder List</span>
+                  <p class="field-hint">These recipients will be CC'd on all lifecycle notifications for this indigent type.</p>
+                  @if (editType.ccStakeholders?.length) {
+                    <table class="mini-table" style="margin-top:8px">
+                      <thead><tr><th>Name</th><th>Email</th><th style="width:60px"></th></tr></thead>
+                      <tbody>
+                        @for (cc of editType.ccStakeholders; track $index) {
+                          <tr [attr.data-testid]="'row-cc-' + $index">
+                            <td>{{ cc.name }}</td>
+                            <td>{{ cc.email }}</td>
+                            <td><button class="btn btn-ghost btn-xs" (click)="removeCcStakeholder($index)" [attr.data-testid]="'button-remove-cc-' + $index">✕</button></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
+                  <div class="form-grid" style="margin-top:8px">
+                    <div class="field-group">
+                      <span class="field-label">Name</span>
+                      <input class="field-input" [(ngModel)]="newCcName" placeholder="Stakeholder name" data-testid="input-cc-name" />
+                    </div>
+                    <div class="field-group">
+                      <span class="field-label">Email</span>
+                      <input class="field-input" [(ngModel)]="newCcEmail" placeholder="email@municipality.gov.za" data-testid="input-cc-email" />
+                    </div>
+                    <div class="field-group align-end">
+                      <button class="btn btn-outline btn-sm" (click)="addCcStakeholder()" data-testid="button-add-cc">Add CC</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-group col-span-2" style="margin-top:12px">
+                  <span class="modal-section-title" style="font-size:0.85rem">Per-Event Channel Configuration &amp; Templates</span>
+                  <p class="field-hint">Enable email/SMS channels per lifecycle event and customise message templates with merge fields: <code>{{ '{{applicantName}}' }}</code>, <code>{{ '{{accountNumber}}' }}</code>, <code>{{ '{{applicationDate}}' }}</code>, <code>{{ '{{applicationId}}' }}</code>, <code>{{ '{{indigentTypeName}}' }}</code>, <code>{{ '{{missingDocuments}}' }}</code>, <code>{{ '{{monthlySubsidy}}' }}</code>, <code>{{ '{{terminationReason}}' }}</code>, <code>{{ '{{deadline}}' }}</code>, <code>{{ '{{reApplicationDate}}' }}</code>, <code>{{ '{{daysRemaining}}' }}</code>, <code>{{ '{{verificationOutcome}}' }}</code>, <code>{{ '{{declineReason}}' }}</code>.</p>
+                  <table class="mini-table" style="margin-top:8px">
+                    <thead>
+                      <tr>
+                        <th>Lifecycle Event</th>
+                        <th style="width:60px;text-align:center">Email</th>
+                        <th style="width:60px;text-align:center">SMS</th>
+                        <th style="width:100px;text-align:center">Template</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (evt of ['application_received','documents_outstanding','verification_scheduled','verification_completed','authorization_approved','authorization_declined','reapplication_reminder','reapplication_received','termination_notice']; track evt) {
+                        <tr [attr.data-testid]="'row-comm-event-' + evt">
+                          <td>{{ lifecycleEventLabels[evt] }}</td>
+                          <td style="text-align:center">
+                            <input type="checkbox" [checked]="getTemplate($any(evt)).emailEnabled" (change)="toggleTemplateChannel($any(evt), 'emailEnabled')" [attr.data-testid]="'toggle-email-' + evt" />
+                          </td>
+                          <td style="text-align:center">
+                            <input type="checkbox" [checked]="getTemplate($any(evt)).smsEnabled" (change)="toggleTemplateChannel($any(evt), 'smsEnabled')" [attr.data-testid]="'toggle-sms-' + evt" />
+                          </td>
+                          <td style="text-align:center">
+                            <button class="btn btn-ghost btn-xs" (click)="openTemplateEditor($any(evt))" [attr.data-testid]="'button-edit-template-' + evt">Edit</button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div><!-- /sec-comms -->
+
+          @if (editingTemplateEvent) {
+            <div class="modal-overlay" style="z-index:1100" (click)="closeTemplateEditor()">
+              <div class="modal-content" style="max-width:36rem" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                  <h3 class="modal-title">Edit Template — {{ lifecycleEventLabels[editingTemplateEvent] }}</h3>
+                  <button class="btn btn-ghost btn-icon" (click)="closeTemplateEditor()" data-testid="button-close-template-editor">✕</button>
+                </div>
+                <div class="modal-body">
+                  <div class="field-group">
+                    <span class="field-label">Subject Line</span>
+                    <input class="field-input" [(ngModel)]="getTemplate(editingTemplateEvent).subject" data-testid="input-template-subject" />
+                  </div>
+                  <div class="field-group mt-1">
+                    <span class="field-label">Message Body</span>
+                    <textarea class="field-textarea" [(ngModel)]="getTemplate(editingTemplateEvent).body" rows="12" data-testid="input-template-body"></textarea>
+                    <p class="field-hint">Use merge fields: <code>{{ '{{applicantName}}' }}</code>, <code>{{ '{{accountNumber}}' }}</code>, <code>{{ '{{applicationId}}' }}</code>, etc.</p>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-primary" (click)="closeTemplateEditor()" data-testid="button-done-template">Done</button>
+                </div>
+              </div>
+            </div>
+          }
+        </div><!-- /modal-scroll-area -->
+      </div><!-- /modal-body-2col -->
+      @if (saveFailedFields().length > 0) {
+        <div class="save-failed-panel" data-testid="save-failed-panel" style="margin:0 1.5rem 1rem;padding:1rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:18px;">⚠</span>
+            <strong style="color:#991b1b;font-size:14px;">Save Failed — {{ saveFailedFields().length }} setting(s) NOT persisted by Platinum API</strong>
+          </div>
+          <p style="color:#7f1d1d;font-size:12px;margin:0 0 8px;">The Platinum API accepted the request but did NOT save these fields. This is an API issue — the API endpoint needs to be updated to support these fields.</p>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#fee2e2;">
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #fca5a5;">Setting</th>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #fca5a5;">Value Sent</th>
+                <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #fca5a5;">API Returned</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ff of saveFailedFields(); track ff.field) {
+                <tr>
+                  <td style="padding:4px 8px;border-bottom:1px solid #fecaca;font-weight:500;color:#991b1b;">{{ ff.label }}</td>
+                  <td style="padding:4px 8px;border-bottom:1px solid #fecaca;color:#166534;font-family:monospace;">{{ ff.sent }}</td>
+                  <td style="padding:4px 8px;border-bottom:1px solid #fecaca;color:#991b1b;font-family:monospace;">{{ ff.received }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (saveFailedRecommendation()) {
+            <p style="color:#1e40af;font-size:11px;margin:8px 0 0;padding:6px 8px;background:#eff6ff;border-radius:4px;">
+              <strong>Action Required:</strong> {{ saveFailedRecommendation() }}
+              <br><span style="color:#6b7280;">API Endpoint: POST /api/BillingATTP/save-indigent-type-rules</span>
+            </p>
+          }
+        </div>
+      }
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeTypeModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveType()" [disabled]="submitting()" data-testid="button-save-type">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (contractorModalOpen) {
+  <div class="modal-overlay" (click)="closeContractorModal()">
+    <div class="modal-content" style="max-width:32rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editContractor.contractorId ? 'Edit' : 'Add' }} Contractor</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeContractorModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Contractor Name *</span>
+          <input class="field-input" [(ngModel)]="editContractor.contractorName" data-testid="input-contractor-name" />
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Contact Person</span>
+          <input class="field-input" [(ngModel)]="editContractor.contactPerson" data-testid="input-contractor-contact" />
+        </div>
+        <div class="form-grid-2 mt-1">
+          <div class="field-group">
+            <span class="field-label">Phone</span>
+            <input class="field-input" [(ngModel)]="editContractor.contactPhone" data-testid="input-contractor-phone" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Email</span>
+            <input class="field-input" [(ngModel)]="editContractor.contactEmail" data-testid="input-contractor-email" />
+          </div>
+        </div>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editContractor.isActive" data-testid="toggle-contractor-active" /><span>Active</span></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeContractorModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveContractor()" [disabled]="submitting()" data-testid="button-save-contractor">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (providerModalOpen) {
+  <div class="modal-overlay" (click)="closeProviderModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editProvider.providerId ? 'Edit' : 'Add' }} Site Verification Provider</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeProviderModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="field-group col-span-2">
+            <span class="field-label">Provider Name *</span>
+            <input class="field-input" [(ngModel)]="editProvider.providerName" data-testid="input-provider-name" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Provider Type</span>
+            <select class="field-select" [(ngModel)]="editProvider.providerType">
+              <option value="">Select type</option>
+              <option value="DHA">Department of Home Affairs</option>
+              <option value="SASSA">SASSA</option>
+              <option value="SARS">SARS</option>
+              <option value="CreditBureau">Credit Bureau</option>
+              <option value="DeedsOffice">Deeds Office</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <span class="field-label">API Endpoint</span>
+            <input class="field-input" [(ngModel)]="editProvider.apiEndpoint" placeholder="https://" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">API Credentials</span>
+            <input type="password" class="field-input" [(ngModel)]="editProvider.apiCredentials" (input)="providerCredentialsChanged = true" placeholder="Leave blank to keep unchanged" data-testid="input-provider-credentials" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Timeout (seconds)</span>
+            <input type="number" class="field-input" [(ngModel)]="editProvider.timeoutSeconds" data-testid="input-provider-timeout" />
+          </div>
+          <div class="field-group col-span-2">
+            <span class="field-label">Field Mapping (JSON)</span>
+            <textarea class="field-textarea" [(ngModel)]="editProvider.fieldMapping" rows="3" placeholder='{"idNumber": "id_number", "fullName": "name"}' data-testid="input-provider-fieldmapping"></textarea>
+          </div>
+        </div>
+        <div class="form-section-title">Contact Information</div>
+        <div class="form-grid">
+          <div class="field-group">
+            <span class="field-label">Contact Person</span>
+            <input class="field-input" [(ngModel)]="editProvider.contactPerson" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Email</span>
+            <input type="email" class="field-input" [(ngModel)]="editProvider.contactEmail" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Phone</span>
+            <input class="field-input" [(ngModel)]="editProvider.contactPhone" />
+          </div>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle-item"><input type="checkbox" [(ngModel)]="editProvider.isActive" /><span>Active</span></label>
+          <label class="toggle-item"><input type="checkbox" [(ngModel)]="editProvider.fallbackEnabled" /><span>Fallback Enabled</span></label>
+          <label class="toggle-item"><input type="checkbox" [(ngModel)]="editProvider.offlineMode" /><span>Offline Mode</span></label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeProviderModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveProvider()" [disabled]="submitting()" data-testid="button-save-provider">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (reasonModalOpen) {
+  <div class="modal-overlay" (click)="closeReasonModal()">
+    <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editReason.declineReasonId ? 'Edit' : 'Add' }} Decline Reason</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeReasonModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Decline Reason Name *</span>
+          <input class="field-input" [(ngModel)]="editReason.declineReasonName" data-testid="input-reason-name" />
+        </div>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editReason.isActive" data-testid="toggle-reason-active" /><span>Active</span></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeReasonModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveReason()" [disabled]="submitting()" data-testid="button-save-reason">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (docTypeModalOpen) {
+  <div class="modal-overlay" (click)="closeDocTypeModal()">
+    <div class="modal-content" style="max-width:30rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editDocType.documentTypeId ? 'Edit' : 'Add' }} Document Type</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDocTypeModal()" data-testid="button-close-doctype-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Document Type Name *</span>
+          <input class="field-input" [(ngModel)]="editDocType.documentTypeName" placeholder="e.g. Proof of Income, ID Copy" data-testid="input-doctype-name" />
+          <span class="field-hint">The label shown to the cashier on the application's Documents step.</span>
+        </div>
+        <div class="field-group">
+          <span class="field-label">Linked Indigent Type *</span>
+          <select class="field-select" [(ngModel)]="editDocType.indigentTypeId" data-testid="select-doctype-indigent-type">
+            <option [ngValue]="null" disabled>Select indigent type…</option>
+            @for (t of indigentTypes(); track t.indigentTypeId) {
+              <option [ngValue]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+            }
+          </select>
+          <span class="field-hint">This document type will appear on the application Documents step for the chosen indigent type only.</span>
+        </div>
+        <label class="toggle-item mt-1">
+          <input type="checkbox" [(ngModel)]="editDocType.isRequired" data-testid="toggle-doctype-required" />
+          <span><strong>Required</strong> &mdash; the application cannot be saved until at least one file is uploaded for this document type.</span>
+        </label>
+        <label class="toggle-item mt-1">
+          <input type="checkbox" [(ngModel)]="editDocType.isActive" data-testid="toggle-doctype-active" />
+          <span><strong>Active</strong> &mdash; show this document on the application. Uncheck to hide without deleting.</span>
+        </label>
+        <div style="margin-top:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e3a8a">
+          <strong>Note:</strong> Maximum file size and allowed file types are enforced by the Platinum Inzalo EMS API and apply to all document types. They cannot be set per-document type from this screen.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDocTypeModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveDocType()" [disabled]="submitting() || !editDocType.documentTypeName || !editDocType.indigentTypeId" data-testid="button-save-doctype">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (incomeSourceModalOpen) {
+  <div class="modal-overlay" (click)="closeIncomeSourceModal()">
+    <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editIncomeSource.incomeSourceId ? 'Edit' : 'Add' }} Income Source</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeIncomeSourceModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Income Source Name *</span>
+          <input class="field-input" [(ngModel)]="editIncomeSource.incomeSourceName" data-testid="input-income-source-name" />
+        </div>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editIncomeSource.isActive" data-testid="toggle-income-source-active" /><span>Active</span></label>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editIncomeSource.excludeFromValidation" data-testid="input-income-source-exclude" /><span>Exclude from income validation</span></label>
+        <p class="field-hint" style="margin-top:4px;font-size:0.75rem;color:#666;">When enabled, amounts from this income source will not count towards the household income limit during qualification checks.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeIncomeSourceModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveIncomeSource()" [disabled]="submitting()" data-testid="button-save-income-source">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (employerModalOpen) {
+  <div class="modal-overlay" (click)="closeEmployerModal()">
+    <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editEmployer.employerId ? 'Edit' : 'Add' }} Employer</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeEmployerModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Employer Name *</span>
+          <input class="field-input" [(ngModel)]="editEmployer.employerName" placeholder="e.g. City of Cape Town" data-testid="input-employer-name" />
+        </div>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editEmployer.isActive" data-testid="toggle-employer-active" /><span>Active</span></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeEmployerModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveEmployer()" [disabled]="submitting()" data-testid="button-save-employer">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (occupierTypeModalOpen) {
+  <div class="modal-overlay" (click)="closeOccupierTypeModal()">
+    <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ editOccupierType.occupierTypeId ? 'Edit' : 'Add' }} Occupier Type</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeOccupierTypeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <span class="field-label">Occupier Type Name *</span>
+          <input class="field-input" [(ngModel)]="editOccupierType.name" placeholder="e.g. Owner, Spouse, Child" data-testid="input-occupier-type-name" />
+        </div>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editOccupierType.isActive" data-testid="toggle-occupier-type-active" /><span>Active</span></label>
+        <label class="toggle-item mt-1"><input type="checkbox" [(ngModel)]="editOccupierType.includeInHouseholdIncome" data-testid="toggle-occupier-type-income" /><span>Include in Household Income</span></label>
+        <p class="field-hint" style="margin-top:4px;font-size:0.75rem;color:#666;">When enabled, the monthly income of occupiers with this type will be included in the total household income calculation during qualification checks.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeOccupierTypeModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveOccupierType()" [disabled]="submitting()" data-testid="button-save-occupier-type">
+          @if (submitting()) { <span class="spinner"></span> } Save
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (toggleConfirmType(); as confirmType) {
+  <div class="confirm-overlay" (click)="cancelToggleConfirm()" data-testid="modal-confirm-toggle-overlay">
+    <div class="confirm-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="confirm-toggle-title">
+      <div class="confirm-header">
+        <div class="confirm-icon"
+             [style.background]="confirmType.isActive ? '#fef2f2' : '#f0fdf4'"
+             [style.color]="confirmType.isActive ? '#b91c1c' : '#166534'">
+          <span class="material-icons">{{ confirmType.isActive ? 'pause_circle' : 'play_circle' }}</span>
+        </div>
+        <div class="confirm-heading">
+          <h2 id="confirm-toggle-title">{{ confirmType.isActive ? 'Deactivate' : 'Activate' }} indigent type</h2>
+          <p>Please confirm this status change</p>
+        </div>
+      </div>
+
+      <div class="confirm-body">
+        <p class="confirm-lead">
+          You are about to <strong>{{ confirmType.isActive ? 'deactivate' : 'activate' }}</strong> the indigent type
+          <strong>&ldquo;{{ confirmType.indigentTypeName }}&rdquo;</strong>.
+        </p>
+        <div class="confirm-note" [class.confirm-note--warn]="confirmType.isActive" [class.confirm-note--ok]="!confirmType.isActive">
+          <span class="material-icons">{{ confirmType.isActive ? 'warning' : 'check_circle' }}</span>
+          <span>
+            @if (confirmType.isActive) {
+              While deactivated, this type will not be available for new applications. Existing beneficiaries are not affected.
+            } @else {
+              Once activated, this type will be available for selection on new indigent applications.
+            }
+          </span>
+        </div>
+      </div>
+
+      <div class="confirm-footer">
+        <button type="button" class="confirm-btn confirm-btn--ghost" (click)="cancelToggleConfirm()" data-testid="button-cancel-toggle-confirm">Cancel</button>
+        <button type="button"
+          class="confirm-btn"
+          [class.confirm-btn--danger]="confirmType.isActive"
+          [class.confirm-btn--success]="!confirmType.isActive"
+          (click)="confirmToggleTypeActive()"
+          data-testid="button-confirm-toggle">
+          {{ confirmType.isActive ? 'Deactivate' : 'Activate' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,516 @@
+<div class="consumer-onboarding" data-testid="consumer-onboarding">
+  <app-page-header title="Consumer Onboarding Wizard" subtitle="Step-by-step setup of property, partition, owner, account, and services"></app-page-header>
+
+  @if (success()) {
+    <div class="alert alert-success" data-testid="text-onboarding-success">
+      <span class="material-icons">check_circle</span>
+      <span>{{ success() }}</span>
+      <button class="alert-close" (click)="success.set('')"><span class="material-icons">close</span></button>
+    </div>
+  }
+  @if (error()) {
+    <div class="alert alert-error" data-testid="text-onboarding-error">
+      <span class="material-icons">error</span>
+      <span>{{ error() }}</span>
+      <button class="alert-close" (click)="error.set('')"><span class="material-icons">close</span></button>
+    </div>
+  }
+
+  <div class="step-indicator" data-testid="step-indicator">
+    @for (step of steps; track step.key; let i = $index) {
+      <div
+        class="step-item"
+        [class.active]="currentStep() === i"
+        [class.done]="completedSteps().has(step.key)"
+        [class.clickable]="i <= currentStep() || (i > 0 && completedSteps().has(steps[i - 1].key))"
+        (click)="goToStep(i)"
+        [attr.data-testid]="'step-' + step.key"
+      >
+        <div class="step-circle">
+          @if (completedSteps().has(step.key) && currentStep() !== i) {
+            <span class="material-icons step-check">check</span>
+          } @else {
+            <span class="material-icons step-icon">{{ step.icon }}</span>
+          }
+        </div>
+        <span class="step-label">{{ step.label }}</span>
+      </div>
+      @if (i < steps.length - 1) {
+        <div class="step-connector" [class.done]="completedSteps().has(step.key)"></div>
+      }
+    }
+  </div>
+
+  <app-card [title]="'Step ' + (currentStep() + 1) + ': ' + currentStepDef.label" [subtitle]="currentStepDef.description">
+    @switch (currentStepDef.key) {
+
+      @case ('property') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Unit Number is auto-allocated by the system when the property is created.
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label required">Property Type</label>
+              @if (propertyTypes().length > 0) {
+                <select class="form-select" [ngModel]="propertyForm().propertyTypeId" (ngModelChange)="propertyForm.set({...propertyForm(), propertyTypeId: $event})" data-testid="select-property-type">
+                  <option value="">-- Select --</option>
+                  @for (pt of propertyTypes(); track pt.propertyTypeId || pt.id) {
+                    <option [value]="pt.propertyTypeId || pt.id">{{ pt.description || pt.name }}</option>
+                  }
+                </select>
+              } @else {
+                <select class="form-select" disabled data-testid="select-property-type-unavailable">
+                  <option>Property types unavailable — reload page</option>
+                </select>
+                <span class="form-error">Failed to load property types from Platinum</span>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <input class="form-input" [ngModel]="propertyForm().description" (ngModelChange)="propertyForm.set({...propertyForm(), description: $event})" placeholder="Property description" data-testid="input-unit-description" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address / Additional Info</label>
+            <input class="form-input" [ngModel]="propertyForm().address" (ngModelChange)="propertyForm.set({...propertyForm(), address: $event})" placeholder="Street address" data-testid="input-unit-address" />
+          </div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Town</label>
+              <select class="form-select" [ngModel]="propertyForm().townId" (ngModelChange)="onTownChange($event)" data-testid="select-unit-town">
+                @for (t of towns(); track t.id) {
+                  <option [value]="t.id">{{ t.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Suburb</label>
+              <select class="form-select" [ngModel]="propertyForm().suburbId" (ngModelChange)="propertyForm.set({...propertyForm(), suburbId: $event})" data-testid="select-unit-suburb">
+                <option value="">-- Select --</option>
+                @for (s of suburbs(); track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Postal Code</label>
+              <input class="form-input" [ngModel]="propertyForm().postalCode" (ngModelChange)="propertyForm.set({...propertyForm(), postalCode: $event})" placeholder="Code" data-testid="input-unit-postal" />
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">ERF Number</label>
+              <input class="form-input" [ngModel]="propertyForm().erfNumber" (ngModelChange)="propertyForm.set({...propertyForm(), erfNumber: $event})" placeholder="ERF number" data-testid="input-unit-erf" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">SG Number</label>
+              <input class="form-input" [ngModel]="propertyForm().sgNumber" (ngModelChange)="propertyForm.set({...propertyForm(), sgNumber: $event})" placeholder="SG number" data-testid="input-unit-sg" />
+            </div>
+          </div>
+          <button class="btn-primary" style="width:100%" [disabled]="submitting()" (click)="submitProperty()" data-testid="button-submit-property">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Property &amp; Continue
+          </button>
+        </div>
+      }
+
+      @case ('partition') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Unit ID: <strong>{{ unitId() }}</strong>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label required">Partition Number</label>
+              <input class="form-input" [ngModel]="partitionForm().partitionNumber" (ngModelChange)="partitionForm.set({...partitionForm(), partitionNumber: $event})" placeholder="e.g. P001" data-testid="input-partition-number" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Partition Type</label>
+              <input class="form-input" [ngModel]="partitionForm().partitionType" (ngModelChange)="partitionForm.set({...partitionForm(), partitionType: $event})" placeholder="e.g. Main" data-testid="input-partition-type" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <input class="form-input" [ngModel]="partitionForm().description" (ngModelChange)="partitionForm.set({...partitionForm(), description: $event})" placeholder="Partition description" data-testid="input-partition-description" />
+          </div>
+          <button class="btn-primary" style="width:100%" [disabled]="submitting() || !partitionForm().partitionNumber.trim()" (click)="submitPartition()" data-testid="button-submit-partition">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Partition &amp; Continue
+          </button>
+        </div>
+      }
+
+      @case ('owner') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Partition ID: <strong>{{ partitionId() }}</strong>
+          </div>
+
+          @if (selectedName()) {
+            <div class="selected-name-badge">
+              <div class="name-detail">
+                <span class="material-icons">check_circle</span>
+                <div>
+                  <h5>Owner: {{ selectedName().surname || selectedName().surnameCompany || selectedName().name }} {{ selectedName().firstName || '' }}</h5>
+                  <p>ID: {{ selectedName().idNumber || selectedName().idNoRegistrationNo || selectedName().id || 'N/A' }}</p>
+                </div>
+              </div>
+              <button class="btn-outline" style="padding:6px 14px;min-height:auto;font-size:12px" (click)="clearSelectedName()" data-testid="button-change-owner-name">Change</button>
+            </div>
+          } @else {
+            <ng-container *ngTemplateOutlet="nameSearch; context: { label: 'Partition Owner', forOwner: true }"></ng-container>
+          }
+
+          <div class="form-group">
+            <label class="form-label">Owner Type</label>
+            <select class="form-select" [ngModel]="ownerType()" (ngModelChange)="ownerType.set($event)" data-testid="select-owner-type">
+              <option value="Primary">Primary</option>
+              <option value="Secondary">Secondary</option>
+              <option value="Joint">Joint</option>
+            </select>
+          </div>
+          <button class="btn-primary" style="width:100%" [disabled]="submitting() || !selectedName()" (click)="submitOwner()" data-testid="button-submit-owner">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Owner &amp; Continue
+          </button>
+        </div>
+      }
+
+      @case ('account') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Partition ID: <strong>{{ partitionId() }}</strong> &nbsp;|&nbsp; Unit ID: <strong>{{ unitId() }}</strong>
+          </div>
+
+          @if (accountName()) {
+            <div class="selected-name-badge">
+              <div class="name-detail">
+                <span class="material-icons">check_circle</span>
+                <div>
+                  <h5>Account Holder: {{ accountName().surname || accountName().surnameCompany || accountName().name }} {{ accountName().firstName || '' }}</h5>
+                  <p>ID: {{ accountName().idNumber || accountName().idNoRegistrationNo || accountName().id || 'N/A' }}</p>
+                </div>
+              </div>
+              <button class="btn-outline" style="padding:6px 14px;min-height:auto;font-size:12px" (click)="accountName.set(null); clearSelectedName()" data-testid="button-change-account-name">Change</button>
+            </div>
+          } @else {
+            <ng-container *ngTemplateOutlet="nameSearch; context: { label: 'Account Holder', forOwner: false }"></ng-container>
+          }
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Account Number</label>
+              <input class="form-input" [ngModel]="accountForm().accountNumber" (ngModelChange)="accountForm.set({...accountForm(), accountNumber: $event})" placeholder="Auto-generated if empty" data-testid="input-account-number" />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Account Type</label>
+              @if (accountTypes().length > 0) {
+                <select class="form-select" [ngModel]="accountForm().accountTypeId" (ngModelChange)="accountForm.set({...accountForm(), accountTypeId: $event})" data-testid="select-account-type">
+                  <option value="">-- Select --</option>
+                  @for (at of accountTypes(); track at.accountTypeId || at.id) {
+                    <option [value]="at.accountTypeId || at.id">{{ at.description || at.name }}</option>
+                  }
+                </select>
+              } @else {
+                <select class="form-select" disabled data-testid="select-account-type-unavailable">
+                  <option>Account types unavailable — reload page</option>
+                </select>
+                <span class="form-error">Failed to load account types from Platinum</span>
+              }
+            </div>
+          </div>
+          @if (isSundryDebtor()) {
+            <div class="alert alert-warning" data-testid="text-sundry-debtor-warning">
+              <span class="material-icons">warning</span>
+              <span>Sundry Debtor accounts cannot have services linked to them. The Services step will be skipped.</span>
+            </div>
+          }
+          <button class="btn-primary" style="width:100%" [disabled]="submitting() || !accountName() || !accountForm().accountTypeId" (click)="submitAccount()" data-testid="button-submit-account">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Account &amp; Continue
+          </button>
+        </div>
+      }
+
+      @case ('contact') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Account ID: <strong>{{ accountId() }}</strong>
+            @if (selectedAccountType()) {
+              &nbsp;|&nbsp; Type: <strong>{{ selectedAccountType().description || selectedAccountType().name }}</strong>
+            }
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label required">Contact Type</label>
+              <select class="form-select" [ngModel]="contactForm().contactType" (ngModelChange)="contactForm.set({...contactForm(), contactType: $event})" data-testid="select-contact-type">
+                <option value="Email">Email</option>
+                <option value="Phone">Phone</option>
+                <option value="Mobile">Mobile</option>
+                <option value="Fax">Fax</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Contact Value</label>
+              <input class="form-input" [ngModel]="contactForm().contactValue" (ngModelChange)="contactForm.set({...contactForm(), contactValue: $event})" placeholder="e.g. user&#64;email.com" data-testid="input-contact-value" />
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;cursor:pointer">
+            <input type="checkbox" [ngModel]="contactForm().isPrimary" (ngModelChange)="contactForm.set({...contactForm(), isPrimary: $event})" data-testid="checkbox-contact-primary" />
+            Primary contact
+          </label>
+          <button class="btn-primary" style="width:100%" [disabled]="submitting() || !contactForm().contactValue.trim()" (click)="submitContact()" data-testid="button-submit-contact">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Contact &amp; Continue
+          </button>
+        </div>
+      }
+
+      @case ('services') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Account ID: <strong>{{ accountId() }}</strong>
+            @if (selectedAccountType()) {
+              &nbsp;|&nbsp; Type: <strong>{{ selectedAccountType().description || selectedAccountType().name }}</strong>
+            }
+          </div>
+
+          @if (isSundryDebtor()) {
+            <div class="alert alert-warning" data-testid="text-sundry-debtor-block">
+              <span class="material-icons">block</span>
+              <span>Sundry Debtor accounts (Type 6) cannot have services. You may skip to Additional Billing or finish the wizard.</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-outline" style="flex:1" (click)="nextStep()" data-testid="button-skip-services">
+                <span class="material-icons">skip_next</span> Skip to Additional Billing
+              </button>
+              <button class="btn-success" style="flex:1" (click)="markComplete('services'); markComplete('billing'); success.set('Onboarding complete!')" data-testid="button-finish-no-services">
+                <span class="material-icons">done_all</span> Finish Onboarding
+              </button>
+            </div>
+          } @else {
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label required">Tariff Type</label>
+                @if (tariffTypes().length > 0) {
+                  <select class="form-select" [ngModel]="serviceForm().tariffTypeId" (ngModelChange)="onTariffTypeChange($event)" data-testid="select-tariff-type">
+                    <option value="">-- Select --</option>
+                    @for (tt of tariffTypes(); track tt.tariffTypeId || tt.id) {
+                      <option [value]="tt.tariffTypeId || tt.id">{{ tt.description || tt.name }}</option>
+                    }
+                  </select>
+                } @else {
+                  <select class="form-select" disabled data-testid="select-tariff-type-unavailable">
+                    <option>Tariff types unavailable — reload page</option>
+                  </select>
+                  <span class="form-error">Failed to load tariff types from Platinum</span>
+                }
+              </div>
+              <div class="form-group">
+                <label class="form-label required">Tariff</label>
+                @if (filteredTariffs().length > 0) {
+                  <select class="form-select" [ngModel]="serviceForm().tariffId" (ngModelChange)="serviceForm.set({...serviceForm(), tariffId: $event})" data-testid="select-tariff">
+                    <option value="">-- Select --</option>
+                    @for (t of filteredTariffs(); track t.tariffId || t.id) {
+                      <option [value]="t.tariffId || t.id">{{ t.description || t.name || t.tariffCode }}</option>
+                    }
+                  </select>
+                } @else if (serviceForm().tariffTypeId && tariffs().length === 0) {
+                  <select class="form-select" disabled data-testid="select-tariff-unavailable">
+                    <option>Tariffs unavailable — reload page</option>
+                  </select>
+                  <span class="form-error">Failed to load tariffs from Platinum</span>
+                } @else if (serviceForm().tariffTypeId) {
+                  <select class="form-select" disabled data-testid="select-tariff-no-match">
+                    <option>No tariffs for selected type</option>
+                  </select>
+                } @else {
+                  <select class="form-select" disabled data-testid="select-tariff-disabled">
+                    <option>Select a tariff type first</option>
+                  </select>
+                }
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Service Mode</label>
+                @if (serviceModes().length > 0) {
+                  <select class="form-select" [ngModel]="serviceForm().serviceModeId" (ngModelChange)="serviceForm.set({...serviceForm(), serviceModeId: $event})" data-testid="select-service-mode">
+                    <option value="">-- Select --</option>
+                    @for (sm of serviceModes(); track sm.serviceModeId || sm.id) {
+                      <option [value]="sm.serviceModeId || sm.id">{{ sm.description || sm.name }}</option>
+                    }
+                  </select>
+                } @else {
+                  <select class="form-select" disabled data-testid="select-service-mode-unavailable">
+                    <option>Service modes unavailable — reload page</option>
+                  </select>
+                  <span class="form-error">Failed to load service modes from Platinum</span>
+                }
+              </div>
+              <div class="form-group">
+                <label class="form-label required">Service Requested Date</label>
+                <input type="date" class="form-input" [ngModel]="serviceForm().serviceRequestedDate" (ngModelChange)="serviceForm.set({...serviceForm(), serviceRequestedDate: $event})" data-testid="input-service-requested-date" />
+                <span class="form-hint">Future date = Pending status, today or past = Active</span>
+              </div>
+            </div>
+
+            @if (isMeteredService()) {
+              <div class="context-bar" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">
+                <span class="material-icons">info</span> This service mode requires a meter number.
+              </div>
+            }
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" [class.required]="isMeteredService()">Meter Number</label>
+                <input class="form-input" [ngModel]="serviceForm().meterNumber" (ngModelChange)="serviceForm.set({...serviceForm(), meterNumber: $event})" placeholder="Meter number" data-testid="input-service-meter" />
+                @if (selectedTariffType()) {
+                  @if ((selectedTariffType().tariffTypeId || selectedTariffType().id) === 1 || (selectedTariffType().tariffTypeId || selectedTariffType().id) === 5) {
+                    <span class="form-hint">Tariff Type 1/5: Meter stored as Connection Size Meter</span>
+                  }
+                }
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <input class="form-input" [ngModel]="serviceForm().description" (ngModelChange)="serviceForm.set({...serviceForm(), description: $event})" placeholder="Service description" data-testid="input-service-description" />
+              </div>
+            </div>
+
+            <div class="context-bar" style="background:#f0fdf4;border-color:#86efac;color:#15803d">
+              <span class="material-icons">auto_fix_high</span>
+              Auto-applied: Frequency = 12/12, Installment Months = 12. Status auto-set based on requested date.
+            </div>
+
+            <button class="btn-primary" style="width:100%" [disabled]="submitting() || !serviceForm().tariffTypeId || !serviceForm().tariffId || !serviceForm().serviceRequestedDate || (isMeteredService() && !serviceForm().meterNumber.trim())" (click)="submitService()" data-testid="button-submit-service">
+              @if (submitting()) { <span class="spinner spinner-sm"></span> }
+              <span class="material-icons">check</span> Save Service &amp; Continue
+            </button>
+          }
+        </div>
+      }
+
+      @case ('billing') {
+        <div class="step-content">
+          <div class="context-bar">
+            <span class="material-icons">info</span> Account ID: <strong>{{ accountId() }}</strong>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label required">Billing Type</label>
+              <input class="form-input" [ngModel]="billingForm().billingType" (ngModelChange)="billingForm.set({...billingForm(), billingType: $event})" placeholder="e.g. Levy, Surcharge" data-testid="input-billing-type" />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Amount</label>
+              <input type="number" class="form-input" [ngModel]="billingForm().amount" (ngModelChange)="billingForm.set({...billingForm(), amount: $event})" placeholder="0.00" data-testid="input-billing-amount" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <input class="form-input" [ngModel]="billingForm().description" (ngModelChange)="billingForm.set({...billingForm(), description: $event})" placeholder="Billing description" data-testid="input-billing-description" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Frequency</label>
+            <select class="form-select" [ngModel]="billingForm().frequency" (ngModelChange)="billingForm.set({...billingForm(), frequency: $event})" data-testid="select-billing-frequency">
+              <option value="Monthly">Monthly</option>
+              <option value="Quarterly">Quarterly</option>
+              <option value="Annually">Annually</option>
+              <option value="Once-off">Once-off</option>
+            </select>
+          </div>
+          <button class="btn-primary" style="width:100%" [disabled]="submitting() || !billingForm().billingType.trim() || !billingForm().amount" (click)="submitBilling()" data-testid="button-submit-billing">
+            @if (submitting()) { <span class="spinner spinner-sm"></span> }
+            <span class="material-icons">check</span> Save Billing &amp; Finish
+          </button>
+        </div>
+      }
+    }
+
+    <div class="step-footer">
+      <button class="btn-outline" [disabled]="currentStep() === 0" (click)="prevStep()" data-testid="button-prev-step">
+        <span class="material-icons">chevron_left</span> Back
+      </button>
+      @if (completedSteps().has('billing')) {
+        <button class="btn-success" (click)="resetWizard()" data-testid="button-new-onboarding">
+          <span class="material-icons">add</span> New Onboarding
+        </button>
+      }
+    </div>
+  </app-card>
+</div>
+
+<ng-template #nameSearch let-label="label" let-forOwner="forOwner">
+  <div class="name-search-panel">
+    <h4>{{ label }}</h4>
+    <div class="hint-box">
+      <span class="material-icons">info</span>
+      <span>Step 1: Search by ID number or surname. Step 2: If no match, create new.</span>
+    </div>
+    <div class="search-row">
+      <input class="form-input" [ngModel]="nameSearchQuery()" (ngModelChange)="nameSearchQuery.set($event)" (keydown.enter)="searchNames()" placeholder="Search by ID number or surname..." data-testid="input-name-search" />
+      <button class="btn-primary" style="min-width:44px;padding:0 12px" [disabled]="nameSearching() || !nameSearchQuery().trim()" (click)="searchNames()" data-testid="button-name-search">
+        @if (nameSearching()) { <span class="spinner spinner-sm"></span> } @else { <span class="material-icons">search</span> }
+      </button>
+    </div>
+    @if (nameSearchResults().length > 0) {
+      <div class="name-results">
+        @for (name of nameSearchResults(); track $index) {
+          <button class="name-result-item" (click)="selectNameForContext(name, forOwner)" [attr.data-testid]="'button-select-name-' + $index">
+            <div class="name-info">
+              <h5>{{ name.surname || name.surnameCompany || name.name }} {{ name.firstName || '' }}</h5>
+              <p>ID: {{ name.idNumber || name.idNoRegistrationNo || 'N/A' }} {{ name.title ? '| ' + name.title : '' }}</p>
+            </div>
+            <span class="material-icons" style="font-size:18px;color:#94a3b8">arrow_forward</span>
+          </button>
+        }
+      </div>
+    }
+    @if (nameSearchPerformed() && nameSearchResults().length === 0 && !showCreateNameForm()) {
+      <button class="btn-outline" style="width:100%" (click)="showCreateNameForm.set(true); nameContext.set(forOwner ? 'owner' : 'account')" data-testid="button-create-new-name">
+        <span class="material-icons">add</span> No match — Create New Name
+      </button>
+    }
+    @if (showCreateNameForm()) {
+      <div class="create-name-section">
+        <h5>Create New Name</h5>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">SA ID Number</label>
+            <input class="form-input" [class.form-input-error]="idValidationError()" [ngModel]="newName().idNumber" (ngModelChange)="newName.set({...newName(), idNumber: $event}); validateSaId($event)" placeholder="13-digit SA ID number" maxlength="13" data-testid="input-new-name-id" />
+            @if (idValidationError()) {
+              <span class="form-error">{{ idValidationError() }}</span>
+            }
+          </div>
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <select class="form-select" [ngModel]="newName().title" (ngModelChange)="newName.set({...newName(), title: $event})" data-testid="select-new-name-title">
+              <option value="">-- Select --</option>
+              <option value="Mr">Mr</option>
+              <option value="Mrs">Mrs</option>
+              <option value="Ms">Ms</option>
+              <option value="Dr">Dr</option>
+              <option value="Prof">Prof</option>
+              <option value="Rev">Rev</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required">Surname</label>
+            <input class="form-input" [ngModel]="newName().surname" (ngModelChange)="newName.set({...newName(), surname: $event})" placeholder="Surname" data-testid="input-new-name-surname" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">First Name</label>
+            <input class="form-input" [ngModel]="newName().firstName" (ngModelChange)="newName.set({...newName(), firstName: $event})" placeholder="First Name" data-testid="input-new-name-firstname" />
+          </div>
+        </div>
+        <button class="btn-primary" style="width:100%" [disabled]="submitting() || !newName().surname.trim() || !!idValidationError()" (click)="createNewName()" data-testid="button-create-name-submit">
+          @if (submitting()) { <span class="spinner spinner-sm"></span> }
+          <span class="material-icons">add</span> Create Name
+        </button>
+      </div>
+    }
+  </div>
+</ng-template>

@@ -1,0 +1,415 @@
+<div class="ageing-page">
+
+  <!-- Breadcrumb -->
+  <div class="breadcrumb" data-testid="breadcrumb-ageing">
+    <span class="material-icons">home</span>
+    <span class="sep">›</span>
+    <span>Analytics</span>
+    <span class="sep">›</span>
+    <span class="active">Account Ageing Summary</span>
+  </div>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-title-block">
+      <span class="material-icons page-icon">table_chart</span>
+      <div>
+        <h1 class="page-title">Account Ageing Summary</h1>
+        <p class="page-subtitle">View outstanding balances grouped by ageing period</p>
+      </div>
+    </div>
+    @if (results().length > 0) {
+      <button class="btn-export" (click)="exportCsv()" data-testid="btn-export-csv">
+        <span class="material-icons">download</span>
+        Export CSV
+      </button>
+    }
+  </div>
+
+  <!-- Filter Panel -->
+  <div class="filter-panel" data-testid="filter-panel">
+
+    <!-- Period Selection -->
+    <div class="filter-section-label">
+      <span class="material-icons">event</span>
+      Billing Period
+      <span class="required-badge">Required</span>
+    </div>
+    <div class="filter-grid-3">
+
+      <!-- Financial Year -->
+      <div class="filter-group">
+        <label class="filter-label" for="sel-fin-year">Financial Year</label>
+        <select
+          id="sel-fin-year"
+          class="filter-input"
+          [ngModel]="finYear()"
+          (ngModelChange)="onFinYearChange($event)"
+          data-testid="select-fin-year"
+        >
+          @for (yr of availableYears(); track yr) {
+            <option [value]="yr">{{ yr }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Billing Period (from Platinum API) -->
+      <div class="filter-group">
+        <label class="filter-label" for="sel-period">Billing Period</label>
+        <select
+          id="sel-period"
+          class="filter-input"
+          [ngModel]="selectedPeriodId()"
+          (ngModelChange)="selectedPeriodId.set($event)"
+          [disabled]="periodsLoading()"
+          data-testid="select-period"
+        >
+          @if (periodsLoading()) {
+            <option value="">Loading periods...</option>
+          } @else if (billingPeriods().length === 0) {
+            <option value="">No periods available</option>
+          } @else {
+            @for (p of billingPeriods(); track p.period_ID) {
+              <option [value]="p.period_ID.toString()">{{ p.processingMonth }} (ID: {{ p.period_ID }})</option>
+            }
+          }
+        </select>
+      </div>
+
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Main Filters Row -->
+    <div class="filter-section-label">
+      <span class="material-icons">tune</span>
+      Report Options
+    </div>
+    <div class="filter-grid-4">
+
+      <!-- Account Number -->
+      <div class="filter-group">
+        <label class="filter-label" for="input-account">
+          Account Number
+          <span class="optional-badge">Optional</span>
+        </label>
+        <input
+          id="input-account"
+          type="text"
+          class="filter-input"
+          [ngModel]="accountId()"
+          (ngModelChange)="accountId.set($event.replace(/\D/g,''))"
+          placeholder="Leave blank for all accounts"
+          data-testid="input-account-id"
+        />
+        <span class="input-hint">Enter an account ID to filter to one account</span>
+      </div>
+
+      <!-- Report Type -->
+      <div class="filter-group">
+        <label class="filter-label" for="sel-report-type">Report Type</label>
+        <select
+          id="sel-report-type"
+          class="filter-input"
+          [ngModel]="reportType()"
+          (ngModelChange)="reportType.set($event)"
+          data-testid="select-report-type"
+        >
+          @for (opt of reportTypeOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Balance Type -->
+      <div class="filter-group">
+        <label class="filter-label" for="sel-balance-type">Balance Type</label>
+        <select
+          id="sel-balance-type"
+          class="filter-input"
+          [ngModel]="balanceType()"
+          (ngModelChange)="balanceType.set($event)"
+          data-testid="select-balance-type"
+        >
+          @for (opt of balanceTypeOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Billing Cycle -->
+      <div class="filter-group">
+        <label class="filter-label" for="sel-billing-cycle">Billing Cycle</label>
+        <select
+          id="sel-billing-cycle"
+          class="filter-input"
+          [ngModel]="billingCycle()"
+          (ngModelChange)="billingCycle.set($event)"
+          data-testid="select-billing-cycle"
+        >
+          <option value="0">All cycles</option>
+          @for (c of billingCycles(); track c.id) {
+            <option [value]="c.id.toString()">{{ c.name }}</option>
+          }
+        </select>
+      </div>
+
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Advanced Filters Toggle -->
+    <button
+      class="advanced-toggle"
+      (click)="showAdvanced.set(!showAdvanced())"
+      data-testid="btn-toggle-advanced"
+    >
+      <span class="material-icons">{{ showAdvanced() ? 'expand_less' : 'expand_more' }}</span>
+      Advanced Filters
+      @if (hasAdvancedFilters()) {
+        <span class="active-badge">Active</span>
+      }
+    </button>
+
+    @if (showAdvanced()) {
+      <div class="filter-grid-4 advanced-grid">
+
+        <!-- Account Grouping -->
+        <div class="filter-group">
+          <label class="filter-label" for="sel-acct-group">Account Grouping</label>
+          <select
+            id="sel-acct-group"
+            class="filter-input"
+            [ngModel]="accountGroupingId()"
+            (ngModelChange)="accountGroupingId.set($event)"
+            data-testid="select-account-grouping"
+          >
+            <option value="0">All groupings</option>
+            @for (g of accountGroupings(); track g.id) {
+              <option [value]="g.id.toString()">{{ g.name }}</option>
+            }
+          </select>
+          <span class="input-hint">Institution / grouping filter</span>
+        </div>
+
+        <!-- Town -->
+        <div class="filter-group">
+          <label class="filter-label" for="input-town">Town</label>
+          <select
+            id="input-town"
+            class="filter-select"
+            [ngModel]="townId()"
+            (ngModelChange)="onTownChange($event)"
+            data-testid="select-town-id"
+          >
+            <option value="0">All towns</option>
+            @for (t of towns(); track t.id) {
+              <option [value]="t.id.toString()">{{ t.name }}</option>
+            }
+          </select>
+          <span class="input-hint">Filter by town</span>
+        </div>
+
+        <!-- Suburb -->
+        <div class="filter-group">
+          <label class="filter-label" for="input-suburb">Suburb</label>
+          <select
+            id="input-suburb"
+            class="filter-select"
+            [ngModel]="suburbId()"
+            (ngModelChange)="suburbId.set($event)"
+            [disabled]="townId() === '0' || suburbs().length === 0"
+            data-testid="select-suburb-id"
+          >
+            <option value="0">{{ townId() === '0' ? 'Select a town first' : 'All suburbs' }}</option>
+            @for (s of suburbs(); track s.id) {
+              <option [value]="s.id.toString()">{{ s.name }}</option>
+            }
+          </select>
+          <span class="input-hint">Loads after town is selected</span>
+        </div>
+
+        <!-- Election Ward -->
+        <div class="filter-group">
+          <label class="filter-label" for="input-ward">Election Ward</label>
+          <select
+            id="input-ward"
+            class="filter-select"
+            [ngModel]="electionWardId()"
+            (ngModelChange)="electionWardId.set($event)"
+            data-testid="select-ward-id"
+          >
+            <option value="0">All wards</option>
+            @for (w of wards(); track w.id) {
+              <option [value]="w.id.toString()">{{ w.name }}</option>
+            }
+          </select>
+          <span class="input-hint">Filter by election ward</span>
+        </div>
+
+        <!-- Service Status -->
+        <div class="filter-group">
+          <label class="filter-label" for="input-svc-status">Service Status</label>
+          <select
+            id="input-svc-status"
+            class="filter-select"
+            [ngModel]="serviceStatusId()"
+            (ngModelChange)="serviceStatusId.set($event)"
+            data-testid="select-service-status-id"
+          >
+            @for (s of serviceStatuses; track s.id) {
+              <option [value]="s.id.toString()">{{ s.name }}</option>
+            }
+          </select>
+          <span class="input-hint">Filter by account service status</span>
+        </div>
+
+        <!-- Include Service/Tariff Columns -->
+        <div class="filter-group toggle-group">
+          <label class="filter-label">Service &amp; Tariff Columns</label>
+          <label class="toggle-switch" data-testid="toggle-service-tariff">
+            <input
+              type="checkbox"
+              [checked]="doServiceStatusAndTariff() === '1'"
+              (change)="doServiceStatusAndTariff.set($any($event.target).checked ? '1' : '0')"
+            />
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+            <span class="toggle-label">
+              {{ doServiceStatusAndTariff() === '1' ? 'Include (slower)' : 'Skip (faster)' }}
+            </span>
+          </label>
+          <span class="input-hint">Populates service/tariff detail columns</span>
+        </div>
+
+      </div>
+    }
+
+    <!-- Action Buttons -->
+    <div class="filter-actions">
+      <button
+        class="btn-run"
+        [disabled]="!periodValid || loading()"
+        (click)="runReport()"
+        data-testid="btn-run-report"
+      >
+        @if (loading()) {
+          <span class="spinner"></span>
+          Loading...
+        } @else {
+          <span class="material-icons">play_arrow</span>
+          Run Report
+        }
+      </button>
+      <button class="btn-clear" (click)="clearFilters()" [disabled]="loading()" data-testid="btn-clear-filters">
+        <span class="material-icons">restart_alt</span>
+        Clear
+      </button>
+      @if (periodId()) {
+        <span class="period-summary">
+          Period: <strong>{{ selectedMonth() }} {{ finYear() }}</strong>
+          <span class="period-id-chip">{{ periodId() }}</span>
+        </span>
+      }
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  @if (error()) {
+    <div class="error-banner" data-testid="error-banner">
+      <span class="material-icons">error_outline</span>
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Results Summary Bar -->
+  @if (hasSearched() && !loading()) {
+    <div class="results-summary" data-testid="results-summary">
+      @if (results().length > 0) {
+        <span class="material-icons summary-icon">check_circle</span>
+        <span>
+          <strong>{{ results().length }}</strong> record{{ results().length !== 1 ? 's' : '' }} for
+          <strong>{{ selectedMonth() }} {{ finYear() }}</strong>
+          @if (accountId()) { · Account <strong>{{ accountId() }}</strong> }
+          @if (billingCycle() !== '0') { · Cycle <strong>{{ billingCycle() }}</strong> }
+        </span>
+      } @else {
+        <span class="material-icons summary-icon no-data-icon">info</span>
+        <span>No records found for the selected filters.</span>
+      }
+    </div>
+  }
+
+  <!-- Loading Progress -->
+  @if (loading()) {
+    <div class="loading-progress-container" data-testid="loading-progress">
+      <div class="loading-progress-header">
+        <span class="material-icons loading-spin">hourglass_top</span>
+        <span class="loading-progress-title">{{ loadingMessage() }}</span>
+        <span class="loading-elapsed">{{ elapsedSeconds() }}s</span>
+      </div>
+      <div class="loading-progress-track">
+        <div class="loading-progress-fill" [style.width.%]="progressPercent()"></div>
+      </div>
+      @if (!accountId()) {
+        <p class="loading-hint">
+          <span class="material-icons" style="font-size:14px;vertical-align:middle">info</span>
+          Querying all accounts can take up to 2 minutes. Use an Account Number for faster results.
+        </p>
+      }
+    </div>
+  }
+
+  <!-- Results Table -->
+  @if (!loading() && results().length > 0) {
+    <div class="table-wrapper" data-testid="results-table-wrapper">
+      <table class="results-table" data-testid="results-table">
+        <thead>
+          <tr>
+            @for (col of columns(); track col) {
+              <th [class.num-col]="isCurrencyColumn(col)" [attr.data-testid]="'col-header-' + col">
+                {{ formatColumnHeader(col) }}
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of results(); track $index) {
+            <tr [attr.data-testid]="'row-ageing-' + $index" [class.total-row]="row['serviceDescription'] === '** TOTAL **'">
+              @for (col of columns(); track col) {
+                <td
+                  [class.num-col]="isCurrencyColumn(col)"
+                  [class.negative]="typeof row[col] === 'number' && row[col] < 0"
+                  [class.positive]="typeof row[col] === 'number' && row[col] > 0 && isCurrencyColumn(col)"
+                  [attr.data-testid]="'cell-' + col + '-' + $index"
+                >
+                  {{ formatCell(row[col]) }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (hasSearched() && !loading() && results().length === 0 && !error()) {
+    <div class="empty-state" data-testid="empty-state">
+      <span class="material-icons empty-icon">search_off</span>
+      <h3>No data found</h3>
+      <p>No ageing records matched your filters. Try a different period or adjust the filters.</p>
+    </div>
+  }
+
+  <!-- Initial State -->
+  @if (!hasSearched() && !loading()) {
+    <div class="initial-state" data-testid="initial-state">
+      <span class="material-icons initial-icon">table_chart</span>
+      <h3>Select a period and run the report</h3>
+      <p>Choose a <strong>Financial Year</strong> and <strong>Month</strong>, then click <strong>Run Report</strong>.</p>
+    </div>
+  }
+
+</div>

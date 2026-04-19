@@ -1,0 +1,208 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Indigent Register</h1>
+      <p class="page-subtitle">Complete register of all indigent applications and statuses</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportCsv()" [disabled]="exporting()" data-testid="button-export">
+        @if (exporting()) { <span class="spinner"></span> Exporting... } @else {
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export Excel
+        }
+      </button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field-group search-field">
+      <span class="field-label">Search</span>
+      <input class="field-input" [(ngModel)]="searchText" placeholder="Account, name or ID number..." (keyup.enter)="onSearch()" data-testid="input-search" />
+    </div>
+    <div class="field-group">
+      <span class="field-label">Status</span>
+      <select class="field-select" [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()" data-testid="select-status-filter">
+        <option value="">All Statuses</option>
+        @for (s of statusOptions; track s) {
+          <option [value]="s">{{ s }}</option>
+        }
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Indigent Type</span>
+      <select class="field-select" [(ngModel)]="filterType" (ngModelChange)="onFilterChange()" data-testid="select-type-filter">
+        <option value="">All Types</option>
+        @for (t of indigentTypes(); track t.indigentTypeId) {
+          <option [value]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+        }
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Town</span>
+      <select class="field-select" [(ngModel)]="filterTown" (ngModelChange)="onFilterChange()" data-testid="select-town-filter">
+        <option value="">All Towns</option>
+        @for (t of towns(); track t.id) {
+          <option [value]="t.name">{{ t.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Page Size</span>
+      <select class="field-select page-size-select" [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChange()" data-testid="select-page-size">
+        @for (ps of pageSizeOptions; track ps) {
+          <option [ngValue]="ps">{{ ps }}</option>
+        }
+      </select>
+    </div>
+    <button class="btn btn-ghost btn-sm align-end" (click)="clearFilters()" data-testid="button-clear-filters">Clear</button>
+    <div class="toolbar-info">
+      <span class="count-badge" data-testid="text-total-count">{{ totalCount() }} records</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading register...</p>
+        </div>
+      } @else if (register().length === 0) {
+        <div class="empty-state">
+          <p>No records found matching your criteria.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>App ID</th>
+                <th>Account</th>
+                <th>Account Holder</th>
+                <th>ID Number</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Application Date</th>
+                <th>Reapplication Date</th>
+                <th>Do-Not-Cut Date</th>
+                <th class="text-right">Income</th>
+                <th class="text-center">Subsidy %</th>
+                <th class="text-right">Monthly Subsidy</th>
+                <th class="text-right">Write-Off</th>
+                <th>Address</th>
+                <th>Town</th>
+                <th>Last Verified</th>
+                <th class="text-right">Occupiers</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of register(); track item.applicationId) {
+                <tr [attr.data-testid]="'row-reg-' + item.applicationId">
+                  <td class="font-mono">{{ item.applicationId }}</td>
+                  <td class="font-mono">{{ item.accountNumber }}</td>
+                  <td>{{ item.accountHolderName }}</td>
+                  <td class="font-mono">{{ item.idNumber || '—' }}</td>
+                  <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                  <td>
+                    @if (getStatusRoute(item)) {
+                      <span class="badge badge-clickable" [class]="getStatusBadge(item)" (click)="navigateToProcess(item, $event)" [title]="'Go to ' + item.appStatusName + ' queue'" [attr.data-testid]="'link-status-' + item.applicationId">
+                        {{ item.appStatusName }}
+                        <svg class="badge-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                      </span>
+                    } @else {
+                      <span class="badge" [class]="getStatusBadge(item)">{{ item.appStatusName }}</span>
+                    }
+                  </td>
+                  <td>{{ fmtDate(item.applicationDate) }}</td>
+                  <td>{{ fmtDate(item.reApplicationDate) }}</td>
+                  <td>{{ fmtDate(item.doNotCutDate) }}</td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.householdIncome) }}</td>
+                  <td class="text-center">
+                    @if (item.qualifiedSubsidyPercentage != null) {
+                      <span class="badge" [style.background]="item.qualifiedSubsidyPercentage >= 100 ? '#e8f5e9' : item.qualifiedSubsidyPercentage > 0 ? '#fff3e0' : '#fce4ec'" [style.color]="item.qualifiedSubsidyPercentage >= 100 ? '#1b5e20' : item.qualifiedSubsidyPercentage > 0 ? '#e65100' : '#c62828'" style="font-weight: 600; padding: 2px 8px; border-radius: 4px;" [attr.data-testid]="'text-subsidy-pct-' + item.applicationId">{{ item.qualifiedSubsidyPercentage }}%</span>
+                    } @else {
+                      <span style="color: #999;">—</span>
+                    }
+                  </td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.monthlySubsidy) }}</td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.totalWriteOff) }}</td>
+                  <td class="text-truncate" [title]="item.propertyAddress">{{ item.propertyAddress || '—' }}</td>
+                  <td>{{ item.town || '—' }}</td>
+                  <td>{{ fmtDate(item.lastVerificationDate) }}</td>
+                  <td class="text-right">{{ item.occupierCount }}</td>
+                  <td class="actions-cell">
+                    <div class="actions-row">
+                      <button class="btn btn-ghost btn-icon" (click)="viewApplication(item)" title="View Detail" [attr.data-testid]="'button-view-' + item.applicationId">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                      <button class="btn btn-outline btn-xs" (click)="openDncModal(item, $event)" [attr.data-testid]="'button-dnc-' + item.applicationId">DNC</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="pagination-info" data-testid="text-pagination-info">Page {{ page }} of {{ totalPages }} ({{ totalCount() }} records)</span>
+          <div class="pagination-buttons">
+            <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="page <= 1" data-testid="button-prev-page">‹ Prev</button>
+            <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="page >= totalPages" data-testid="button-next-page">Next ›</button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+@if (selectedApplicationId() !== null) {
+  <div class="modal-overlay" (click)="closeDetail()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Application Detail</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDetail()" data-testid="button-close-detail">✕</button>
+      </div>
+      <div class="modal-body">
+        <app-application-detail-view [applicationId]="selectedApplicationId()!" />
+      </div>
+    </div>
+  </div>
+}
+
+@if (dncModalOpen && dncItem) {
+  <div class="modal-overlay" (click)="closeDncModal()">
+    <div class="modal-content" style="max-width:30rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Do-Not-Cut Protection</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDncModal()" data-testid="button-close-reg-dnc-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value">#{{ dncItem.applicationId }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ dncItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Current Do-Not-Cut</span><span class="detail-value">{{ dncItem.doNotCutDate ? fmtDate(dncItem.doNotCutDate) : 'Not set' }}</span></div>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">New Do-Not-Cut Date</span>
+          <div class="input-with-action">
+            <app-date-input [value]="dncDate" (valueChange)="dncDate = $event" testId="input-dnc-date" inputClass="field-input" />
+            <button class="btn btn-ghost btn-sm" (click)="clearDncDate()" data-testid="button-clear-dnc">Clear</button>
+          </div>
+          <span class="field-hint">Leave empty or click Clear to remove do-not-cut protection</span>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Reason *</span>
+          <textarea class="field-textarea" [(ngModel)]="dncReason" rows="3" placeholder="Reason for updating do-not-cut date..." data-testid="input-dnc-reason"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDncModal()" data-testid="button-cancel-reg-dnc">Cancel</button>
+        <button class="btn btn-primary" (click)="submitDncUpdate()" [disabled]="submitting() || !dncReason" data-testid="button-submit-dnc">
+          @if (submitting()) { <span class="spinner"></span> }
+          {{ dncDate ? 'Update Date' : 'Remove Protection' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

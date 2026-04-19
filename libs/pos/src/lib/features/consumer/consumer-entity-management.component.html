@@ -1,0 +1,145 @@
+<div class="entity-management" data-testid="consumer-entity-management">
+  <app-page-header title="Entity Management" subtitle="Search, view, and edit consumer entities"></app-page-header>
+
+  @if (success()) {
+    <div class="alert alert-success" data-testid="text-entity-success">
+      <span class="material-icons">check_circle</span>
+      <span>{{ success() }}</span>
+      <button class="alert-close" (click)="success.set('')"><span class="material-icons">close</span></button>
+    </div>
+  }
+  @if (error()) {
+    <div class="alert alert-error" data-testid="text-entity-error">
+      <span class="material-icons">error</span>
+      <span>{{ error() }}</span>
+      <button class="alert-close" (click)="error.set('')"><span class="material-icons">close</span></button>
+    </div>
+  }
+
+  <div class="tab-nav">
+    @for (tab of tabs; track tab.key) {
+      <button class="tab-btn" [class.active]="activeTab() === tab.key" (click)="switchTab(tab.key)" [attr.data-testid]="'tab-' + tab.key">
+        <span class="material-icons" style="font-size:16px;margin-right:4px">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  <div class="entity-layout">
+    <app-card title="Search {{ activeTabDef.label }}">
+      <div class="search-panel">
+        @for (field of activeTabDef.searchFields; track field.key) {
+          <div class="form-group">
+            <label class="form-label">{{ field.label }}</label>
+            <input class="form-input" [placeholder]="field.placeholder" [ngModel]="searchParams()[field.key] || ''" (ngModelChange)="updateSearchParam(field.key, $event)" (keydown.enter)="search()" [attr.data-testid]="'input-search-' + field.key" />
+          </div>
+        }
+        <button class="btn-primary" style="width:100%" [disabled]="searching()" (click)="search()" data-testid="button-entity-search">
+          @if (searching()) { <span class="spinner spinner-sm"></span> } @else { <span class="material-icons">search</span> }
+          Search
+        </button>
+
+        @if (results().length > 0) {
+          <div class="result-list">
+            <div class="result-count">{{ results().length }} result(s)</div>
+            <div class="result-items">
+              @for (record of results(); track $index) {
+                <button class="result-item" [class.selected]="selectedRecord() === record" (click)="selectRecord(record)" [attr.data-testid]="'button-select-record-' + $index">
+                  <h5>{{ getRecordTitle(record) }}</h5>
+                  <p>{{ getRecordSubtitle(record) }}</p>
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </app-card>
+
+    @if (selectedRecord()) {
+      <app-card>
+        <div class="detail-panel">
+          <div class="detail-header">
+            <div>
+              <h3>{{ getRecordTitle(selectedRecord()) }}</h3>
+              <p class="detail-subtitle">{{ getRecordSubtitle(selectedRecord()) }}</p>
+            </div>
+            <div class="detail-actions">
+              @if (!editing()) {
+                <button class="btn-outline" (click)="startEdit()" data-testid="button-edit-record">
+                  <span class="material-icons">edit</span> Edit
+                </button>
+              } @else {
+                <button class="btn-outline" (click)="cancelEdit()" data-testid="button-cancel-edit">
+                  <span class="material-icons">close</span> Cancel
+                </button>
+                <button class="btn-primary" [disabled]="saving()" (click)="saveEdit()" data-testid="button-save-edit">
+                  @if (saving()) { <span class="spinner spinner-sm"></span> } @else { <span class="material-icons">save</span> }
+                  Save
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="field-grid">
+            @for (entry of getFieldEntries(editing() ? editData() : selectedRecord()); track entry.key) {
+              <div class="field-item">
+                <span class="field-key">{{ entry.key }}</span>
+                @if (editing()) {
+                  <input class="form-input" [ngModel]="entry.value" (ngModelChange)="updateEditField(entry.key, $event)" [attr.data-testid]="'input-edit-' + entry.key" />
+                } @else {
+                  <span class="field-value">{{ entry.value }}</span>
+                }
+              </div>
+            }
+          </div>
+
+          @if (getRelatedPanels().length > 0) {
+            <div class="related-section">
+              <h4>Related Data</h4>
+              @for (panel of getRelatedPanels(); track panel.key) {
+                <div class="related-panel">
+                  <button class="related-toggle" (click)="loadRelated(panel.key)" [attr.data-testid]="'button-related-' + panel.key">
+                    <span class="material-icons">{{ panel.icon }}</span>
+                    <span class="toggle-label">{{ panel.label }}</span>
+                    @if (loadingRelated().has(panel.key)) {
+                      <span class="spinner spinner-sm spinner-dark"></span>
+                    } @else if (relatedData()[panel.key]) {
+                      <span class="count-badge">{{ relatedData()[panel.key].length }}</span>
+                    }
+                    <span class="material-icons" style="font-size:18px;color:#94a3b8">{{ expandedRelated().has(panel.key) ? 'expand_less' : 'expand_more' }}</span>
+                  </button>
+                  @if (expandedRelated().has(panel.key) && relatedData()[panel.key]) {
+                    <div class="related-body">
+                      @if (relatedData()[panel.key].length === 0) {
+                        <p style="font-size:0.75rem;color:#94a3b8;font-style:italic;margin:0">No {{ panel.label.toLowerCase() }} found</p>
+                      } @else {
+                        @for (item of relatedData()[panel.key]; track $index) {
+                          <div class="related-item">
+                            @for (entry of getFieldEntries(item).slice(0, 6); track entry.key) {
+                              <div class="related-field">
+                                <span class="rfield-key">{{ entry.key }}:</span>
+                                <span class="rfield-value">{{ entry.value }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </app-card>
+    } @else {
+      <app-card>
+        <div class="empty-detail">
+          <span class="material-icons">manage_search</span>
+          <h3>Search &amp; Select</h3>
+          <p>Use the search panel to find records, then select one to view or edit</p>
+        </div>
+      </app-card>
+    }
+  </div>
+</div>

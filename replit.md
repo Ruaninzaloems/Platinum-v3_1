@@ -136,7 +136,7 @@ SHELL (apps/shell/) — Login · Auth · Nav · Router outlet · port 5000
       ├── AFS        (libs/afs/)
       ├── ASSETS     (libs/assets/)
       ├── IDP        (libs/idp/)
-      ├── POS        (libs/pos/)
+      ├── POS        (libs/pos/) — synced 2026-04-19 from Municipal-Receipting-POS-2 main; 107 TS files, 60+ routes including new consumer/* and indigent/* features. Requires jspdf, jspdf-autotable, qrcode, exceljs, xlsx-js-style.
       ├── SCM        (libs/scm/)
       ├── BUDGET     (libs/budget/)
       ├── PAYROLL    (libs/payroll/)

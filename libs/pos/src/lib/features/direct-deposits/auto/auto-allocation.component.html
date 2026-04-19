@@ -21,11 +21,11 @@
     <div class="filters-grid">
       <div class="filter-group">
         <label class="form-label">From Date</label>
-        <input type="date" class="form-input" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" data-testid="input-from-date" />
+        <app-date-input [value]="fromDate()" (valueChange)="fromDate.set($event)" testId="input-from-date" />
       </div>
       <div class="filter-group">
         <label class="form-label">To Date</label>
-        <input type="date" class="form-input" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" data-testid="input-to-date" />
+        <app-date-input [value]="toDate()" (valueChange)="toDate.set($event)" testId="input-to-date" />
       </div>
       <div class="filter-actions">
         <button class="btn-primary" (click)="fetchUnprocessed()" [disabled]="loading()" data-testid="button-fetch-unprocessed">

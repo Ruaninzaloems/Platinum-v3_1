@@ -5,14 +5,16 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TERMINATION_REASONS, PAGE_SIZE } from '../../../core/services/debt-config';
-import { formatCurrency, formatDate } from '../../../core/services/format.service';
-import { Attorney, HandoverRecord } from '../../../core/models/debt.models';
+import { AuthService } from '../../../core/services/auth.service';
+import { TERMINATION_REASONS, PAGE_SIZE } from '../../../services/debt-config';
+import { formatCurrency, formatDate } from '../../../services/format.service';
+import { DateInputComponent } from '../../../shared/components/date-input.component';
+import { Attorney, HandoverRecord } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-handover-termination',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './handover-termination.component.html',
   styleUrls: ['./handover-termination.component.css']
 })
@@ -20,6 +22,7 @@ export class HandoverTerminationComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private auth = inject(AuthService);
 
   handovers = signal<HandoverRecord[]>([]);
   attorneys = signal<Attorney[]>([]);
@@ -41,6 +44,13 @@ export class HandoverTerminationComponent implements OnInit {
   TERMINATION_REASONS = TERMINATION_REASONS;
   formatCurrency = formatCurrency;
   formatDate = formatDate;
+
+  private readonly NON_TERMINABLE = ['terminated', 'cancelled', 'closed', 'termination pending', 'pending termination', 'termination approved'];
+
+  get finYear(): string {
+    const u = this.auth.user();
+    return u?.finYear || `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`;
+  }
 
   uniqueStatuses = computed(() => {
     const statuses = new Set(this.handovers().map(h => h.status));
@@ -88,13 +98,18 @@ export class HandoverTerminationComponent implements OnInit {
     this.loading.set(true);
     try {
       const [handoverData, attorneyData] = await Promise.all([
-        firstValueFrom(this.api.get<HandoverRecord[]>('/api/platinum/billing-debt/handover-list')),
+        firstValueFrom(this.api.get<HandoverRecord[]>('/api/platinum/billing-debt/handover-list', { finYear: this.finYear })),
         firstValueFrom(this.api.get<Attorney[]>('/api/platinum/billing-debt/attorney-list')),
       ]);
-      this.handovers.set(Array.isArray(handoverData) ? handoverData : []);
+      const all = Array.isArray(handoverData) ? handoverData : [];
+      const terminable = all.filter(h => {
+        const s = (h.status || '').toLowerCase();
+        return !this.NON_TERMINABLE.some(nt => s.includes(nt));
+      });
+      this.handovers.set(terminable);
       this.attorneys.set(Array.isArray(attorneyData) ? attorneyData : []);
     } catch (e: any) {
-      this.toast.error(e?.message || 'Failed to load handover data.');
+      this.toast.error(e?.error?.message || e?.message || 'Failed to load handover data.');
     } finally {
       this.loading.set(false);
     }
@@ -142,8 +157,7 @@ export class HandoverTerminationComponent implements OnInit {
     try {
       const result = await firstValueFrom(this.api.post<any>('/api/platinum/billing-debt/handover-terminate', {
         handoverIds: Array.from(this.selectedIds()),
-        reason: this.terminationReason(),
-        notes: this.terminationNotes(),
+        terminationReason: this.terminationReason() + (this.terminationNotes() ? ' — ' + this.terminationNotes() : ''),
       }));
       this.toast.success(result.message || `${this.selectedIds().size} handover(s) submitted for termination approval.`);
       this.selectedIds.set(new Set());
@@ -151,7 +165,7 @@ export class HandoverTerminationComponent implements OnInit {
       this.terminationNotes.set('');
       await this.loadData();
     } catch (e: any) {
-      this.toast.error(e?.message || 'Failed to submit termination.');
+      this.toast.error(e?.error?.message || e?.message || 'Failed to submit termination.');
     } finally {
       this.submitting.set(false);
     }

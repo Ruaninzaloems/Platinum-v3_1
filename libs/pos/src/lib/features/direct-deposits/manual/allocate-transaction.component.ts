@@ -144,6 +144,7 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
   postComplete = signal(false);
   postErrors = signal<string[]>([]);
   completedLines = signal<any[]>([]);
+  completedLinesTotal = computed(() => this.completedLines().reduce((sum, l) => sum + (l.amount || 0), 0));
 
   showSubmitConfirm = signal(false);
   showBackConfirm = signal(false);
@@ -282,8 +283,7 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
         );
         if (activeJob && activeJob.jobId && (activeJob.status === 'PROCESSING' || activeJob.status === 'QUEUED' || activeJob.status === 'COMPLETED')) {
           if (activeJob.status === 'COMPLETED' && (activeJob.errors || []).length === 0) {
-            this.toast.show('This deposit has already been allocated.', 'info');
-            this.goBack();
+            this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
             return;
           } else if (activeJob.status === 'PROCESSING' || activeJob.status === 'QUEUED') {
             this.toast.show('This deposit is being allocated by another user. Please wait.', 'info');
@@ -296,6 +296,13 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
         this.api.get('/api/platinum/direct-deposit-allocation/get-pos-item-details', { posItemId: String(this.posItemId()) })
       );
       const item = result?.posItem || result || {};
+
+      // Guard: if Platinum says this deposit is already allocated, redirect back silently
+      if (item.billingAllocated || item.dateAllocated) {
+        this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
+        return;
+      }
+
       this.transaction.set({
         posItem_ID: item.posItem_ID || this.posItemId(),
         dateOfTransaction: item.dateOfTransaction || '',
@@ -420,19 +427,32 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
 
     const addAccountHit = (item: any, source?: string) => {
       const accId = item.account_ID || item.accountID || item.id;
-      if (accId && !seen.has(accId)) {
-        seen.add(accId);
-        results.push({
-          accountId: accId,
-          accountNo: item.accountNumber || item.accountNo || String(accId).padStart(12, '0'),
-          name: item.surname_Company || [item.initials, item.lastName].filter(Boolean).join(' ') || item.name || item.accountDesc || item.typeOfUseDesc || '',
-          oldAccountCode: item.oldAccountCode || '',
-          outstandingAmount: item.outStandingAmt || item.outStandingAmount || item.outstandingAmount || 0,
-          type: 'ACCOUNT',
-          description: source || undefined,
-          rawData: { ...item, _allocationType: allocType },
-        });
+      if (!accId) return;
+      const resolvedName = item.surname_Company || [item.initials, item.lastName].filter(Boolean).join(' ') || item.name || item.accountDesc || item.typeOfUseDesc || '';
+      const resolvedAmount = item.outStandingAmt ?? item.outStandingAmount ?? item.outstandingAmount ?? 0;
+      if (seen.has(accId)) {
+        // Update existing entry (may have come from autocomplete with no name/amount)
+        const existing = results.find(r => r.accountId === accId);
+        if (existing) {
+          if (!existing.name && resolvedName) existing.name = resolvedName;
+          if (!existing.outstandingAmount && resolvedAmount) existing.outstandingAmount = resolvedAmount;
+          if (!existing.oldAccountCode && item.oldAccountCode) existing.oldAccountCode = item.oldAccountCode;
+          if (source && !existing.description) existing.description = source;
+          existing.rawData = { ...existing.rawData, ...item, _allocationType: allocType, _fromAutocomplete: false };
+        }
+        return;
       }
+      seen.add(accId);
+      results.push({
+        accountId: accId,
+        accountNo: item.accountNumber || item.accountNo || String(accId).padStart(12, '0'),
+        name: resolvedName,
+        oldAccountCode: item.oldAccountCode || '',
+        outstandingAmount: resolvedAmount,
+        type: 'ACCOUNT',
+        description: source || undefined,
+        rawData: { ...item, _allocationType: allocType },
+      });
     };
 
     const addAutocompleteHit = (s: any) => {
@@ -664,25 +684,27 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
     const autocompleteItems = results.filter(r => r.rawData?._fromAutocomplete);
     if (autocompleteItems.length === 0) return;
 
-    for (const item of autocompleteItems.slice(0, 5)) {
-      if (token !== this.searchVersion) return;
-      try {
-        const detail = await this.searchWithTimeout(
-          this.api.post('/api/platinum/billing-payment/search-accounts', { accountNo: item.accountNo })
-        );
+    await Promise.allSettled(
+      autocompleteItems.slice(0, 5).map(async (item) => {
         if (token !== this.searchVersion) return;
-        const arr = this.normalizeArray(detail);
-        if (arr.length > 0) {
-          const full = arr[0];
-          const name = [full.initials, full.lastName].filter(Boolean).join(' ') || full.surname_Company || full.name || '';
-          if (name) item.name = name;
-          if (full.outStandingAmt != null) item.outstandingAmount = full.outStandingAmt;
-          else if (full.outStandingAmount != null) item.outstandingAmount = full.outStandingAmount;
-          if (full.oldAccountCode) item.oldAccountCode = full.oldAccountCode;
-          item.rawData = { ...item.rawData, ...full, _allocationType: item.rawData?._allocationType || 'ACCOUNT' };
-        }
-      } catch {}
-    }
+        try {
+          const detail = await this.searchWithTimeout(
+            this.api.post('/api/platinum/billing-payment/search-accounts', { accountNo: item.accountNo })
+          );
+          if (token !== this.searchVersion) return;
+          const arr = this.normalizeArray(detail);
+          if (arr.length > 0) {
+            const full = arr[0];
+            const name = [full.initials, full.lastName].filter(Boolean).join(' ') || full.surname_Company || full.name || '';
+            if (name) item.name = name;
+            if (full.outStandingAmt != null) item.outstandingAmount = full.outStandingAmt;
+            else if (full.outStandingAmount != null) item.outstandingAmount = full.outStandingAmount;
+            if (full.oldAccountCode) item.oldAccountCode = full.oldAccountCode;
+            item.rawData = { ...item.rawData, ...full, _allocationType: item.rawData?._allocationType || 'ACCOUNT' };
+          }
+        } catch {}
+      })
+    );
 
     if (token === this.searchVersion) {
       this.searchResults.set([...results].slice(0, 15));
@@ -1085,6 +1107,19 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
     }
   }
 
+  returnToCashbook(): void {
+    const rem = this.remaining();
+    if (rem <= 0) return;
+    this.lines.update(prev => [...prev, {
+      accountNo: 'CASHBOOK-RTN',
+      accountId: 0,
+      name: 'Cashbook Return',
+      amount: rem,
+      allocationType: 'CASHBOOK',
+      description: 'Returned to Cashbook (Unallocated)',
+    }]);
+  }
+
   requestClearAllLines(): void {
     if (this.lines().length === 0) return;
     this.showClearLinesConfirm.set(true);
@@ -1098,19 +1133,6 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
 
   cancelClearAllLines(): void {
     this.showClearLinesConfirm.set(false);
-  }
-
-  returnToCashbook(): void {
-    const rem = this.remaining();
-    if (rem <= 0) return;
-    this.lines.update(prev => [...prev, {
-      accountNo: 'CASHBOOK-RTN',
-      accountId: 0,
-      name: 'Cashbook Return',
-      amount: rem,
-      allocationType: 'CASHBOOK',
-      description: 'Returned to Cashbook (Unallocated)',
-    }]);
   }
 
   requestSubmit(): void {
@@ -1170,9 +1192,9 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
       const tx = this.transaction()!;
 
       if (tx.billingAllocated) {
-        this.toast.error('This deposit has already been allocated. It cannot be allocated again.');
         this.posting.set(false);
         this.postingStatus.set('');
+        this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: tx.posItem_ID } });
         return;
       }
 

@@ -23,17 +23,47 @@
       <div class="card">
         <div class="card-body">
           <h3 class="section-title" data-testid="text-score-title">Score Single Account</h3>
-          <div class="form-group">
-            <label class="form-label">Account Number</label>
-            <input class="form-input" [ngModel]="accountNo()" (ngModelChange)="accountNo.set($event)" placeholder="Enter account number..." data-testid="input-account-no" />
+
+          <div class="account-lookup-row">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Account Number</label>
+              <input class="form-input" [ngModel]="accountNo()" (ngModelChange)="accountNo.set($event)" placeholder="Enter account number..." data-testid="input-account-no" />
+            </div>
+            <button class="btn btn-accent btn-fetch" (click)="fetchAccountData()" [disabled]="fetchingAccount() || !accountNo().trim()" data-testid="button-fetch-account">
+              @if (fetchingAccount()) { <span class="spinner-sm"></span> Fetching... } @else { &#128269; Fetch from Platinum }
+            </button>
           </div>
+
+          @if (accountError()) {
+            <div class="alert-error" data-testid="text-account-error">{{ accountError() }}</div>
+          }
+          @if (accountDataLoaded()) {
+            <div class="alert-success" data-testid="text-account-loaded">&#10003; Account data loaded from Platinum — fields auto-populated below</div>
+          }
+
+          @if (serviceBreakdown().length > 0) {
+            <div class="section-label">Service Arrears Breakdown (from Platinum)</div>
+            <div class="service-breakdown">
+              @for (svc of serviceBreakdown(); track $index) {
+                <div class="svc-chip" [attr.data-testid]="'svc-chip-' + $index">
+                  <span class="svc-desc">{{ svc.serviceDescription || svc.serviceType || svc.description || 'Service' }}</span>
+                  <span class="svc-amt">{{ formatCurrency(svc.totalOutStanding || svc.outstandingAmount || svc.balance || svc.amount || 0) }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="section-label">Risk Factor Inputs</div>
           <div class="form-grid-2">
-            <div class="form-group"><label class="form-label">Payment History Score (0-100)</label><input class="form-input" type="number" [ngModel]="paymentHistory()" (ngModelChange)="paymentHistory.set($event)" data-testid="input-payment-history" /></div>
+            <div class="form-group"><label class="form-label">Total Arrears (R)</label><input class="form-input" type="number" [ngModel]="totalArrears()" (ngModelChange)="totalArrears.set($event)" data-testid="input-total-arrears" /></div>
             <div class="form-group"><label class="form-label">Arrear Age (days)</label><input class="form-input" type="number" [ngModel]="arrearDays()" (ngModelChange)="arrearDays.set($event)" data-testid="input-arrear-days" /></div>
             <div class="form-group"><label class="form-label">Days Since Last Payment</label><input class="form-input" type="number" [ngModel]="lastPaymentDays()" (ngModelChange)="lastPaymentDays.set($event)" data-testid="input-last-payment" /></div>
-            <div class="form-group"><label class="form-label">Total Arrears (R)</label><input class="form-input" type="number" [ngModel]="totalArrears()" (ngModelChange)="totalArrears.set($event)" data-testid="input-total-arrears" /></div>
+            <div class="form-group"><label class="form-label">Payment History Score (0-100)</label><input class="form-input" type="number" [ngModel]="paymentHistory()" (ngModelChange)="paymentHistory.set($event)" data-testid="input-payment-history" /></div>
             <div class="form-group"><label class="form-label">Water Arrears (R)</label><input class="form-input" type="number" [ngModel]="waterArrears()" (ngModelChange)="waterArrears.set($event)" data-testid="input-water-arrears" /></div>
             <div class="form-group"><label class="form-label">Electricity Arrears (R)</label><input class="form-input" type="number" [ngModel]="electricityArrears()" (ngModelChange)="electricityArrears.set($event)" data-testid="input-electricity-arrears" /></div>
+            <div class="form-group"><label class="form-label">Rates Arrears (R)</label><input class="form-input" type="number" [ngModel]="ratesArrears()" (ngModelChange)="ratesArrears.set($event)" data-testid="input-rates-arrears" /></div>
+            <div class="form-group"><label class="form-label">Sewerage Arrears (R)</label><input class="form-input" type="number" [ngModel]="sewerageArrears()" (ngModelChange)="sewerageArrears.set($event)" data-testid="input-sewerage-arrears" /></div>
+            <div class="form-group"><label class="form-label">Refuse Arrears (R)</label><input class="form-input" type="number" [ngModel]="refuseArrears()" (ngModelChange)="refuseArrears.set($event)" data-testid="input-refuse-arrears" /></div>
             <div class="form-group"><label class="form-label">Indigent Status</label>
               <select class="form-select" [ngModel]="indigentStatus()" (ngModelChange)="indigentStatus.set($event)" data-testid="select-indigent"><option value="false">No</option><option value="true">Yes</option></select>
             </div>
@@ -76,10 +106,37 @@
                 </div>
               </div>
             }
+          } @else if (accountDataLoaded()) {
+            <h3 class="section-title">Account Data Summary</h3>
+            <div class="data-summary">
+              <div class="summary-row"><span class="summary-label">Account</span><span class="summary-value">{{ accountNo() }}</span></div>
+              <div class="summary-row"><span class="summary-label">Total Arrears</span><span class="summary-value summary-highlight">{{ formatCurrency(+totalArrears()) }}</span></div>
+              <div class="summary-row"><span class="summary-label">Oldest Arrear</span><span class="summary-value">{{ arrearDays() }} days</span></div>
+              <div class="summary-row"><span class="summary-label">Last Payment</span><span class="summary-value">{{ lastPaymentDays() }} days ago</span></div>
+              <div class="summary-row"><span class="summary-label">Indigent</span><span class="summary-value">{{ indigentStatus() === 'true' ? 'Yes' : 'No' }}</span></div>
+              @if (+waterArrears() > 0) {
+                <div class="summary-row"><span class="summary-label">Water</span><span class="summary-value">{{ formatCurrency(+waterArrears()) }}</span></div>
+              }
+              @if (+electricityArrears() > 0) {
+                <div class="summary-row"><span class="summary-label">Electricity</span><span class="summary-value">{{ formatCurrency(+electricityArrears()) }}</span></div>
+              }
+              @if (+ratesArrears() > 0) {
+                <div class="summary-row"><span class="summary-label">Rates</span><span class="summary-value">{{ formatCurrency(+ratesArrears()) }}</span></div>
+              }
+              @if (+sewerageArrears() > 0) {
+                <div class="summary-row"><span class="summary-label">Sewerage</span><span class="summary-value">{{ formatCurrency(+sewerageArrears()) }}</span></div>
+              }
+              @if (+refuseArrears() > 0) {
+                <div class="summary-row"><span class="summary-label">Refuse</span><span class="summary-value">{{ formatCurrency(+refuseArrears()) }}</span></div>
+              }
+            </div>
+            <p class="help-text" style="margin-top: 0.75rem; text-align: center;">Data loaded from Platinum — click "Calculate Risk Score" to submit for scoring</p>
           } @else {
             <div class="empty-state-centered">
-              <span class="empty-icon">&#127919;</span>
-              <p>Enter account details and click Score to see risk analysis</p>
+              <span class="empty-icon">&#128269;</span>
+              <p><strong>Step 1:</strong> Enter an account number and click "Fetch from Platinum"</p>
+              <p style="margin-top:0.25rem"><strong>Step 2:</strong> Review or adjust the auto-populated data</p>
+              <p style="margin-top:0.25rem"><strong>Step 3:</strong> Click "Calculate Risk Score" to submit</p>
             </div>
           }
         </div>

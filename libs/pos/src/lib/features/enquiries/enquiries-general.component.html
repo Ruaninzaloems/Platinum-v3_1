@@ -119,6 +119,57 @@
               <span class="gs-badge-val">{{ globalSnapshot()!['interestWaiver'] || 'None' }}</span>
             </div>
           </div>
+
+          <!-- Debt Collection Pipeline -->
+          @if (debtPipeline()) {
+            <div class="debt-pipeline-bar" data-testid="debt-pipeline">
+              <div class="debt-pipeline-title">Debt Collection Pipeline</div>
+              <div class="debt-pipeline-steps">
+                <div class="dp-step" [class.dp-step-active]="debtPipeline()!.stage >= 1" [class.dp-step-current]="debtPipeline()!.stage === 1">
+                  <div class="dp-step-dot">1</div>
+                  <div class="dp-step-info">
+                    <span class="dp-step-label">In Arrears</span>
+                    @if (debtPipeline()!.arrearsAmount > 0) {
+                      <span class="dp-step-val">R {{ formatCurrency(debtPipeline()!.arrearsAmount) }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="dp-step-line" [class.dp-line-active]="debtPipeline()!.stage >= 2"></div>
+                <div class="dp-step" [class.dp-step-active]="debtPipeline()!.stage >= 2" [class.dp-step-current]="debtPipeline()!.stage === 2">
+                  <div class="dp-step-dot">2</div>
+                  <div class="dp-step-info">
+                    <span class="dp-step-label">S129 Notice</span>
+                    @if (debtPipeline()!.s129Status) {
+                      <span class="dp-step-val">{{ debtPipeline()!.s129Status }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="dp-step-line" [class.dp-line-active]="debtPipeline()!.stage >= 3"></div>
+                <div class="dp-step" [class.dp-step-active]="debtPipeline()!.stage >= 3" [class.dp-step-current]="debtPipeline()!.stage === 3">
+                  <div class="dp-step-dot">3</div>
+                  <div class="dp-step-info">
+                    <span class="dp-step-label">Handed Over</span>
+                    @if (debtPipeline()!.handoverAttorney) {
+                      <span class="dp-step-val">{{ debtPipeline()!.handoverAttorney }}</span>
+                    }
+                    @if (debtPipeline()!.handoverStatus) {
+                      <span class="dp-step-sub">{{ debtPipeline()!.handoverStatus }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="dp-step-line" [class.dp-line-active]="debtPipeline()!.stage >= 4"></div>
+                <div class="dp-step" [class.dp-step-active]="debtPipeline()!.stage >= 4" [class.dp-step-current]="debtPipeline()!.stage === 4">
+                  <div class="dp-step-dot">4</div>
+                  <div class="dp-step-info">
+                    <span class="dp-step-label">Legal Action</span>
+                    @if (debtPipeline()!.legalNote) {
+                      <span class="dp-step-val">{{ debtPipeline()!.legalNote }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
         }
     </div>
 
@@ -157,7 +208,7 @@
       <div class="tab-nav-inner">
         <!-- Desktop tabs -->
         <div class="desktop-tabs">
-          @for (group of tabGroups; track group.heading) {
+          @for (group of tabGroups(); track group.heading) {
             <div class="tab-group">
               <div class="tab-group-heading">{{ group.heading }}</div>
               <div class="tab-group-tabs">
@@ -186,7 +237,7 @@
           @if (mobileTabMenuOpen()) {
             <div class="mobile-tab-overlay" (click)="closeMobileTabMenu()"></div>
             <div class="mobile-tab-menu">
-              @for (group of tabGroups; track group.heading) {
+              @for (group of tabGroups(); track group.heading) {
                 <div class="mobile-tab-menu-group">
                   <div class="mobile-tab-menu-heading">{{ group.heading }}</div>
                   <div class="mobile-tab-menu-grid">
@@ -397,7 +448,7 @@
                   <span class="debt-table-title">Total Balance/Debt</span>
                   <span class="debt-table-count">{{ getBalanceItems().length }} service{{ getBalanceItems().length !== 1 ? 's' : '' }}</span>
                 </div>
-                <div class="debt-table-wrapper debt-desktop-only">
+                <div class="debt-table-wrapper">
                   <table class="debt-table" data-testid="table-balance-debt">
                     <thead>
                       <tr>
@@ -444,50 +495,6 @@
                       </tr>
                     </tfoot>
                   </table>
-                </div>
-                <div class="debt-mobile-cards debt-mobile-only">
-                  @for (item of getBalanceItems(); track $index) {
-                    <div class="debt-m-card" [attr.data-testid]="'debt-card-' + $index">
-                      <div class="debt-m-card-top">
-                        <span class="debt-m-svc">{{ item.serviceDescription || item.serviceDesc || item.description || item.serviceTypeDesc || 'Service' }}</span>
-                        <span class="debt-m-total" [class.debt-negative]="getDebtVal(item, 'totalOutStanding') < 0">{{ formatDebtAmt(getDebtVal(item, 'totalOutStanding')) }}</span>
-                      </div>
-                      @if (getDebtVal(item, 'totalOutStanding') !== 0) {
-                        <div class="debt-m-aging">
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">New</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="getDebtVal(item, 'newCharge') < 0">{{ formatDebtAmt(getDebtVal(item, 'newCharge')) }}</span>
-                          </div>
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">Current</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="getDebtVal(item, 'current') < 0">{{ formatDebtAmt(getDebtVal(item, 'current')) }}</span>
-                          </div>
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">30d</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="getDebtVal(item, 'days30') < 0">{{ formatDebtAmt(getDebtVal(item, 'days30')) }}</span>
-                          </div>
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">60d</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="getDebtVal(item, 'days60') < 0">{{ formatDebtAmt(getDebtVal(item, 'days60')) }}</span>
-                          </div>
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">90d</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="getDebtVal(item, 'days90') < 0">{{ formatDebtAmt(getDebtVal(item, 'days90')) }}</span>
-                          </div>
-                          <div class="debt-m-age-item">
-                            <span class="debt-m-age-lbl">120d+</span>
-                            <span class="debt-m-age-val" [class.debt-negative]="(getDebtVal(item, 'days120') + getDebtVal(item, 'days150') + getDebtVal(item, 'days180')) < 0">{{ formatDebtAmt(getDebtVal(item, 'days120') + getDebtVal(item, 'days150') + getDebtVal(item, 'days180')) }}</span>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  }
-                  <div class="debt-m-card debt-m-totals">
-                    <div class="debt-m-card-top">
-                      <span class="debt-m-svc debt-m-total-label">Total</span>
-                      <span class="debt-m-total debt-m-total-val" [class.debt-negative]="getDebtColumnTotal('totalOutStanding') < 0">{{ formatDebtAmt(getDebtColumnTotal('totalOutStanding')) }}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             } @else {
@@ -657,16 +664,29 @@
           <div class="tab-panel" data-testid="services-panel">
             @if (svcSelectedService()) {
               <div class="svc-balance-drilldown" data-testid="service-balance-detail">
-                <div class="svc-bal-header">
-                  <button class="svc-bal-back" (click)="svcSelectedService.set(null); svcPurchaseHistory.set([]); svcPurchaseStats.set(null)" data-testid="button-back-services">← Back</button>
-                  <h3 class="svc-bal-title">{{ svcDrilldownMode() === 'purchase-history' ? 'Purchase History' : (getSvcCategory(svcSelectedService()) === 'basic' ? 'Billing History' : 'Service Type Balance') }}</h3>
-                  <span class="svc-bal-subtitle">{{ svcSelectedService()?.serviceDesc || svcSelectedService()?.serviceDescription || svcSelectedService()?.tariffType || '' }}</span>
+                <div class="svc-bal-header-v2">
+                  <div class="svc-bal-header-left">
+                    <button class="svc-bal-back-v2" (click)="svcSelectedService.set(null); svcPurchaseHistory.set([]); svcPurchaseStats.set(null)" data-testid="button-back-services">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      Back
+                    </button>
+                    <div class="svc-bal-header-info">
+                      <h3 class="svc-bal-title-v2">{{ svcDrilldownMode() === 'purchase-history' ? 'Purchase History' : 'Billing History' }}</h3>
+                      <div class="svc-bal-service-badge">
+                        <span class="svc-bal-badge-dot"></span>
+                        {{ svcSelectedService()?.serviceDesc || svcSelectedService()?.serviceDescription || svcSelectedService()?.tariffType || '' }}
+                      </div>
+                    </div>
+                  </div>
                   @if (svcDrilldownMode() === 'balance') {
-                    <select class="svc-bal-fy-select" [ngModel]="svcBalanceFinYear()" (ngModelChange)="changeSvcBalanceFinYear($event)" data-testid="select-fin-year-detail">
-                      @for (fy of getSvcBalanceFinYearOptions(); track fy) {
-                        <option [value]="fy">{{ fy }}</option>
-                      }
-                    </select>
+                    <div class="svc-bal-header-right">
+                      <label class="svc-bal-fy-label">Financial Year</label>
+                      <select class="svc-bal-fy-select-v2" [ngModel]="svcBalanceFinYear()" (ngModelChange)="changeSvcBalanceFinYear($event)" data-testid="select-fin-year-detail">
+                        @for (fy of getSvcBalanceFinYearOptions(); track fy) {
+                          <option [value]="fy">{{ fy }}</option>
+                        }
+                      </select>
+                    </div>
                   }
                 </div>
 
@@ -729,7 +749,7 @@
                         <tbody>
                           @for (s of svcPurchaseHistory(); track $index) {
                             <tr [class.pp-cancelled]="(s.canceledStatus || s.cancelledStatus || '').toLowerCase() === 'yes'">
-                              <td class="debt-td-desc">{{ formatDate(s.receiptDate || s.date || s.transactionDate) }}</td>
+                              <td class="debt-td-desc">{{ formatDate(s.dateCaptured || s.receiptDate || s.date || s.transactionDate) }}</td>
                               <td class="debt-td-amt mono">{{ s.receiptNo || s.receiptNumber || '-' }}</td>
                               <td class="debt-td-amt mono bold accent-text">{{ formatDebtAmt(s.total || s.amount || s.receiptAmount || 0) }}</td>
                               <td class="debt-td-amt mono">{{ s.prepaidUnit || s.units || s.prepaidUnits || '-' }}</td>
@@ -759,74 +779,135 @@
                   } @else if (getSvcBalanceFiltered().length === 0) {
                     <div class="empty-state"><p class="empty-text">No billing data for this service in {{ svcBalanceFinYear() }}</p></div>
                   } @else {
-                    <div class="debt-table-wrapper">
-                      <table class="debt-table svc-modern-table" data-testid="table-service-detail">
-                        <thead>
-                          <tr>
-                            <th class="debt-th-desc">Service Description</th>
-                            <th class="debt-th-amt">Opening Balance</th>
-                            <th class="debt-th-amt">Amount</th>
-                            <th class="debt-th-amt">VAT</th>
-                            <th class="debt-th-amt">Interest</th>
-                            <th class="debt-th-amt">Total Amount</th>
-                            <th class="debt-th-amt">Closing Balance</th>
-                            <th class="debt-th-amt">Current Interest</th>
-                            <th class="debt-th-amt">Current Charge</th>
-                            <th class="debt-th-desc">Month</th>
-                            <th class="debt-th-desc">Fin Year</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (r of getSvcBalanceFiltered(); track $index) {
-                            <tr>
-                              <td class="debt-td-desc">{{ r.serviceDescription || (svcSelectedService()?.serviceDesc || '') }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.openingBalance || 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.amount || 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.vat || 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.interestAmount ?? r.interest ?? 0) }}</td>
-                              <td class="debt-td-amt mono bold accent-text">{{ formatDebtAmt(r.totalAmount ?? r.total ?? 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.closingBalance ?? r.closingBal ?? 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.currentInterestAmount || 0) }}</td>
-                              <td class="debt-td-amt mono">{{ formatDebtAmt(r.currentCharge || 0) }}</td>
-                              <td class="debt-td-desc">{{ r.month || '-' }}</td>
-                              <td class="debt-td-desc">{{ r.financialYear || '-' }}</td>
-                            </tr>
-                          }
-                          <tr class="debt-total-row">
-                            <td class="debt-td-desc bold">Total</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().openingBalance || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().amount || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().vat || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().interestAmount || 0) }}</td>
-                            <td class="debt-td-amt mono bold accent-text">{{ formatDebtAmt(getSvcBalanceTotals().totalAmount || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().closingBalance || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().currentInterestAmount || 0) }}</td>
-                            <td class="debt-td-amt mono bold">{{ formatDebtAmt(getSvcBalanceTotals().currentCharge || 0) }}</td>
-                            <td class="debt-td-desc" colspan="2"></td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div class="svc-billing-summary-cards">
+                      <div class="svc-summary-card svc-summary-total">
+                        <div class="svc-summary-icon">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V18M14 6H8C6.89543 6 6 6.89543 6 8C6 9.10457 6.89543 10 8 10H12C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <div class="svc-summary-content">
+                          <span class="svc-summary-label">Total Billed</span>
+                          <span class="svc-summary-value">R {{ formatCurrency(getSvcBalanceTotals().totalAmount || 0) }}</span>
+                        </div>
+                      </div>
+                      <div class="svc-summary-card svc-summary-avg">
+                        <div class="svc-summary-icon">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17L7 10L11 13L17 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <div class="svc-summary-content">
+                          <span class="svc-summary-label">Monthly Average</span>
+                          <span class="svc-summary-value">R {{ formatCurrency(getSvcBillingAvg()) }}</span>
+                        </div>
+                      </div>
+                      <div class="svc-summary-card svc-summary-high">
+                        <div class="svc-summary-icon">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L13 9H17L14 13L15 18L10 15L5 18L6 13L3 9H7L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <div class="svc-summary-content">
+                          <span class="svc-summary-label">Highest Month</span>
+                          <span class="svc-summary-value">R {{ formatCurrency(getSvcBillingHigh().amount) }}</span>
+                          <span class="svc-summary-sub">{{ getSvcBillingHigh().month }}</span>
+                        </div>
+                      </div>
+                      <div class="svc-summary-card svc-summary-months">
+                        <div class="svc-summary-icon">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 8H17M7 2V5M13 2V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </div>
+                        <div class="svc-summary-content">
+                          <span class="svc-summary-label">Billing Periods</span>
+                          <span class="svc-summary-value">{{ getSvcBalanceFiltered().length }}</span>
+                          <span class="svc-summary-sub">months</span>
+                        </div>
+                      </div>
                     </div>
 
                     @if (getSvcBalanceChartData().length > 0) {
-                      <div class="svc-bal-chart-section">
-                        <div class="svc-bal-chart-title">Monthly Billing Amount</div>
-                        <div class="svc-bal-chart-legend">
-                          <span class="svc-bal-legend-item"><span class="svc-bal-legend-swatch accent-bg"></span> Billing Amount</span>
+                      <div class="svc-chart-v2">
+                        <div class="svc-chart-v2-header">
+                          <div class="svc-chart-v2-title">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="8" width="3" height="6" rx="0.5" fill="var(--platinum-accent, #c9a84c)" opacity="0.4"/><rect x="5.5" y="5" width="3" height="9" rx="0.5" fill="var(--platinum-accent, #c9a84c)" opacity="0.65"/><rect x="10" y="2" width="3" height="12" rx="0.5" fill="var(--platinum-accent, #c9a84c)"/></svg>
+                            Monthly Billing Trend
+                          </div>
+                          <div class="svc-chart-v2-legend">
+                            <span class="svc-chart-legend-dot"></span>
+                            Total Amount (incl. VAT)
+                          </div>
                         </div>
-                        <div class="svc-bal-chart">
-                          <div class="svc-bal-chart-bars">
+                        <div class="svc-chart-v2-body">
+                          <div class="svc-chart-v2-grid">
+                            <div class="svc-chart-gridline"></div>
+                            <div class="svc-chart-gridline"></div>
+                            <div class="svc-chart-gridline"></div>
+                            <div class="svc-chart-gridline"></div>
+                          </div>
+                          <div class="svc-chart-v2-bars">
                             @for (d of getSvcBalanceChartData(); track $index) {
-                              <div class="svc-bal-bar-col">
-                                <span class="svc-bal-bar-val mono">{{ formatDebtAmt(d.amount) }}</span>
-                                <div class="svc-bal-bar accent-bg" [style.height.%]="getSvcBalanceBarHeight(d.amount)"></div>
-                                <span class="svc-bal-bar-label">{{ d.month }}</span>
+                              <div class="svc-chart-v2-col" [attr.data-testid]="'chart-bar-' + d.month">
+                                <div class="svc-chart-v2-tooltip mono">R {{ formatCurrency(d.amount) }}</div>
+                                <div class="svc-chart-v2-bar-track">
+                                  <div class="svc-chart-v2-bar" [style.height.%]="getSvcBalanceBarHeight(d.amount)"></div>
+                                </div>
+                                <span class="svc-chart-v2-label">{{ d.month.substring(0, 3) }}</span>
                               </div>
                             }
                           </div>
                         </div>
                       </div>
                     }
+
+                    <div class="svc-table-v2-wrapper">
+                      <div class="svc-table-v2-header">
+                        <span class="svc-table-v2-title">
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                          Detailed Breakdown
+                        </span>
+                        <span class="svc-table-v2-count">{{ getSvcBalanceFiltered().length }} period{{ getSvcBalanceFiltered().length !== 1 ? 's' : '' }}</span>
+                      </div>
+                      <div class="svc-table-v2-scroll">
+                        <table class="svc-table-v2" data-testid="table-service-detail">
+                          <thead>
+                            <tr>
+                              <th class="svc-th-month">Month</th>
+                              <th class="svc-th-amt">Amount</th>
+                              <th class="svc-th-amt">VAT</th>
+                              <th class="svc-th-amt">Interest</th>
+                              <th class="svc-th-amt svc-th-total">Total</th>
+                              <th class="svc-th-amt">Opening Bal</th>
+                              <th class="svc-th-amt">Closing Bal</th>
+                              <th class="svc-th-amt">Current Charge</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (r of getSvcBalanceFiltered(); track $index) {
+                              <tr class="svc-tr-v2">
+                                <td class="svc-td-month">
+                                  <span class="svc-month-badge">{{ (r.month || '-').substring(0, 3) }}</span>
+                                  <span class="svc-month-fy">{{ r.financialYear || '' }}</span>
+                                </td>
+                                <td class="svc-td-amt mono">{{ formatDebtAmt(r.amount || 0) }}</td>
+                                <td class="svc-td-amt mono">{{ formatDebtAmt(r.vat || 0) }}</td>
+                                <td class="svc-td-amt mono">{{ formatDebtAmt(r.interestAmount ?? r.interest ?? 0) }}</td>
+                                <td class="svc-td-amt mono svc-td-total">{{ formatDebtAmt(r.totalAmount ?? r.total ?? 0) }}</td>
+                                <td class="svc-td-amt mono svc-td-muted">{{ formatDebtAmt(r.openingBalance || 0) }}</td>
+                                <td class="svc-td-amt mono svc-td-muted">{{ formatDebtAmt(r.closingBalance ?? r.closingBal ?? 0) }}</td>
+                                <td class="svc-td-amt mono svc-td-muted">{{ formatDebtAmt(r.currentCharge || 0) }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                          <tfoot>
+                            <tr class="svc-tr-total">
+                              <td class="svc-td-month"><strong>Total</strong></td>
+                              <td class="svc-td-amt mono"><strong>{{ formatDebtAmt(getSvcBalanceTotals().amount || 0) }}</strong></td>
+                              <td class="svc-td-amt mono"><strong>{{ formatDebtAmt(getSvcBalanceTotals().vat || 0) }}</strong></td>
+                              <td class="svc-td-amt mono"><strong>{{ formatDebtAmt(getSvcBalanceTotals().interestAmount || 0) }}</strong></td>
+                              <td class="svc-td-amt mono svc-td-total"><strong>{{ formatDebtAmt(getSvcBalanceTotals().totalAmount || 0) }}</strong></td>
+                              <td class="svc-td-amt mono svc-td-muted"><strong>{{ formatDebtAmt(getSvcBalanceTotals().openingBalance || 0) }}</strong></td>
+                              <td class="svc-td-amt mono svc-td-muted"><strong>{{ formatDebtAmt(getSvcBalanceTotals().closingBalance || 0) }}</strong></td>
+                              <td class="svc-td-amt mono svc-td-muted"><strong>{{ formatDebtAmt(getSvcBalanceTotals().currentCharge || 0) }}</strong></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
                   }
                 }
               </div>
@@ -2662,20 +2743,18 @@
                         <th class="debt-th-desc">Date</th>
                         <th class="debt-th-amt">Amount</th>
                         <th class="debt-th-desc">Description</th>
-                        <th class="debt-th-desc">Reference</th>
-                        <th class="debt-th-desc">Bank</th>
-                        <th class="debt-th-desc">Status</th>
+                        <th class="debt-th-desc">Receipt / Reference</th>
+                        <th class="debt-th-desc">Allocation Date</th>
                       </tr>
                     </thead>
                     <tbody>
                       @for (note of tabData()?.bankStatementNotes || []; track $index) {
                         <tr [attr.data-testid]="'row-bank-note-' + $index">
-                          <td class="debt-td-desc">{{ formatDate(note.transactionDate || note.date || note.capturedDate) }}</td>
+                          <td class="debt-td-desc">{{ formatDate(note.bankStatementDate || note.transactionDate || note.date || note.capturedDate) }}</td>
                           <td class="debt-td-amt">{{ formatDebtAmt(note.amount ?? note.transactionAmount ?? 0) }}</td>
-                          <td class="debt-td-desc">{{ note.description || note.bankStatementNote || note.narrative || '-' }}</td>
-                          <td class="debt-td-desc mono">{{ note.reference || note.bankReference || '-' }}</td>
-                          <td class="debt-td-desc">{{ note.bank || note.bankName || '-' }}</td>
-                          <td class="debt-td-desc">{{ note.status || note.allocationStatus || '-' }}</td>
+                          <td class="debt-td-desc">{{ note.bankStatementNote || note.description || note.narrative || '-' }}</td>
+                          <td class="debt-td-desc mono">{{ note.receiptNo || note.reference || note.bankReference || '-' }}</td>
+                          <td class="debt-td-desc">{{ formatDate(note.billingAllocationDate || note.allocationDate) }}</td>
                         </tr>
                       }
                     </tbody>
@@ -3000,51 +3079,42 @@
         @if (activeTab() === 'statements') {
           <div class="tab-panel" data-testid="statements-tab">
             @if (tabData()?._error) {
-              <div class="tab-error-banner">⚠️ {{ tabData()._error }}</div>
+              <div class="tab-error-banner">{{ tabData()._error }}</div>
             }
 
-            <div class="stmt-workspace" data-testid="stmt-generator">
-              <div class="stmt-workspace-header">
-                <span class="stmt-workspace-title">Account Statements</span>
-                <span class="stmt-workspace-subtitle">Generate, download, or send statements for this account</span>
-              </div>
-
-              <div class="stmt-workspace-body">
-                <div class="stmt-config-panel">
-                  <div class="stmt-config-section">
-                    <span class="stmt-config-label">Statement Type</span>
-                    <div class="stmt-type-pills">
-                      <button class="stmt-pill" [class.stmt-pill-active]="stmtType() === 'standard'" (click)="stmtType.set('standard')" data-testid="btn-stmt-standard">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        Account Statement
-                      </button>
-                      <button class="stmt-pill" [class.stmt-pill-active]="stmtType() === 'detailed'" (click)="stmtType.set('detailed')" data-testid="btn-stmt-detailed">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        Detailed Statement
-                      </button>
-                    </div>
+            <div class="stmt-v2-layout">
+              <div class="stmt-v2-toolbar">
+                <div class="stmt-v2-toolbar-left">
+                  <div class="stmt-v2-type-toggle">
+                    <button class="stmt-v2-type-btn" [class.stmt-v2-type-active]="stmtType() === 'standard'" (click)="stmtType.set('standard')" data-testid="btn-stmt-standard">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      Account Statement
+                    </button>
+                    <button class="stmt-v2-type-btn" [class.stmt-v2-type-active]="stmtType() === 'detailed'" (click)="stmtType.set('detailed')" data-testid="btn-stmt-detailed">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                      Detailed Statement
+                    </button>
                   </div>
-
-                  <div class="stmt-config-row">
-                    <div class="stmt-config-section stmt-config-fy">
-                      <span class="stmt-config-label">Financial Year</span>
-                      <select class="stmt-config-select" [ngModel]="stmtFinYear()" (ngModelChange)="stmtFinYear.set($event)" data-testid="select-stmt-finyear">
+                  <div class="stmt-v2-filters">
+                    <div class="stmt-v2-filter">
+                      <label class="stmt-v2-label">Financial Year</label>
+                      <select class="stmt-v2-select" [ngModel]="stmtFinYear()" (ngModelChange)="stmtFinYear.set($event)" data-testid="select-stmt-finyear">
                         @for (y of stmtAvailableYears(); track y) {
                           <option [value]="y">{{ y }}</option>
                         }
                       </select>
                     </div>
-                    <div class="stmt-config-section stmt-config-month">
-                      <span class="stmt-config-label">From Month</span>
-                      <select class="stmt-config-select" [ngModel]="stmtMonthFrom()" (ngModelChange)="stmtMonthFrom.set($event)" data-testid="select-stmt-month-from">
+                    <div class="stmt-v2-filter">
+                      <label class="stmt-v2-label">From</label>
+                      <select class="stmt-v2-select" [ngModel]="stmtMonthFrom()" (ngModelChange)="stmtMonthFrom.set($event)" data-testid="select-stmt-month-from">
                         @for (m of stmtMonths; track m) {
                           <option [value]="m">{{ m || '-- All --' }}</option>
                         }
                       </select>
                     </div>
-                    <div class="stmt-config-section stmt-config-month">
-                      <span class="stmt-config-label">To Month</span>
-                      <select class="stmt-config-select" [ngModel]="stmtMonthTo()" (ngModelChange)="stmtMonthTo.set($event)" data-testid="select-stmt-month-to">
+                    <div class="stmt-v2-filter">
+                      <label class="stmt-v2-label">To</label>
+                      <select class="stmt-v2-select" [ngModel]="stmtMonthTo()" (ngModelChange)="stmtMonthTo.set($event)" data-testid="select-stmt-month-to">
                         @for (m of stmtMonths; track m) {
                           <option [value]="m">{{ m || '-- All --' }}</option>
                         }
@@ -3052,53 +3122,252 @@
                     </div>
                   </div>
                 </div>
-
-                <div class="stmt-actions-bar">
-                  <button class="stmt-action-btn stmt-action-pdf" (click)="generateStatement()" [disabled]="stmtGenerating()" data-testid="btn-stmt-generate">
+                <div class="stmt-v2-toolbar-actions">
+                  <button class="stmt-v2-btn stmt-v2-btn-view" (click)="generateStatement()" [disabled]="stmtGenerating()" data-testid="btn-stmt-generate">
                     @if (stmtGenerating()) {
-                      <span class="stmt-spinner"></span> Opening Report...
+                      <span class="stmt-spinner"></span> Opening...
                     } @else {
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      View Statement
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      View
                     }
                   </button>
-                  <button class="stmt-action-btn stmt-action-send" (click)="openStmtSendPanel()" data-testid="btn-stmt-open-send">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    Send Statement
+                  <button class="stmt-v2-btn stmt-v2-btn-send" (click)="openStmtSendPanel()" data-testid="btn-stmt-open-send">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Send
                   </button>
                 </div>
+              </div>
 
-                @if (stmtGenerated()) {
-                  <div class="stmt-output-card" data-testid="stmt-result">
-                    <div class="stmt-output-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    </div>
-                    <div class="stmt-output-info">
-                      <span class="stmt-output-title">Report Opened</span>
-                      <span class="stmt-output-detail">{{ stmtType() === 'detailed' ? 'Detailed' : 'Standard' }} | {{ stmtFinYear() }}{{ stmtMonthFrom() ? ' — ' + stmtMonthFrom() : '' }}{{ stmtMonthTo() && stmtMonthTo() !== stmtMonthFrom() ? ' to ' + stmtMonthTo() : '' }}</span>
-                    </div>
-                    @if (stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url) {
-                      <button class="stmt-output-btn stmt-output-btn-preview" (click)="previewStatement(stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url)" data-testid="btn-stmt-preview">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        Preview
-                      </button>
-                      <button class="stmt-output-btn" (click)="downloadStatement(stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url)" data-testid="btn-stmt-download">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Download
-                      </button>
+              @if (stmtGenerated()) {
+                <div class="stmt-v2-result-bar" data-testid="stmt-result">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span class="stmt-v2-result-text">{{ stmtType() === 'detailed' ? 'Detailed' : 'Standard' }} statement opened — {{ stmtFinYear() }}{{ stmtMonthFrom() ? ' / ' + stmtMonthFrom() : '' }}{{ stmtMonthTo() && stmtMonthTo() !== stmtMonthFrom() ? ' to ' + stmtMonthTo() : '' }}</span>
+                  @if (stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url) {
+                    <button class="stmt-v2-result-action" (click)="previewStatement(stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url)" data-testid="btn-stmt-preview">Preview</button>
+                    <button class="stmt-v2-result-action" (click)="downloadStatement(stmtGenerated()?.fileUrl || stmtGenerated()?.downloadUrl || stmtGenerated()?.url)" data-testid="btn-stmt-download">Download</button>
+                  }
+                  <button class="stmt-v2-result-action" (click)="openStmtSendPanel()" data-testid="btn-stmt-send-from-result">Send</button>
+                  <button class="stmt-v2-result-action" (click)="generateStatement()" data-testid="btn-stmt-reopen">Re-open</button>
+                </div>
+              }
+
+              <div class="stmt-v2-content">
+                <div class="stmt-v2-panel stmt-v2-panel-available" data-testid="citizen-statements-section">
+                  <div class="stmt-v2-panel-header">
+                    <span class="stmt-v2-panel-title">Available Statements (BI Reports)</span>
+                    @if (citizenStatementsLoading()) {
+                      <span class="stmt-spinner"></span>
                     }
-                    <button class="stmt-output-btn stmt-output-btn-send" (click)="openStmtSendPanel()" data-testid="btn-stmt-send-from-result">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                      Send
-                    </button>
-                    <button class="stmt-output-btn" (click)="generateStatement()" data-testid="btn-stmt-reopen">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                      Re-open
-                    </button>
                   </div>
-                }
+
+                  @if (citizenStatementsError()) {
+                    <div class="stmt-v2-panel-error">{{ citizenStatementsError() }}</div>
+                  }
+
+                  @if (!citizenStatementsLoading() && citizenStatements().length > 0) {
+                    <div class="stmt-v2-bi-list">
+                      @for (stmt of citizenStatements(); track stmt.accountStatementID || $index) {
+                        <div class="stmt-v2-bi-card" [class.stmt-v2-bi-card-active]="stmtDetailSelectedId() === (stmt.accountStatementID || stmt.billingPeriodID)" [attr.data-testid]="'citizen-stmt-row-' + $index">
+                          <div class="stmt-v2-bi-info">
+                            <span class="stmt-v2-bi-month">{{ stmt.month }}</span>
+                            <span class="stmt-v2-bi-fy">{{ stmt.financialYear }}</span>
+                            <span class="stmt-v2-bi-dates">{{ formatDateDMY(stmt.statementDate) }} &mdash; Due: {{ formatDateDMY(stmt.dueDate) }}</span>
+                          </div>
+                          <div class="stmt-v2-bi-actions">
+                            <button class="stmt-v2-bi-btn" [class.stmt-v2-bi-btn-active]="stmtDetailSelectedId() === (stmt.accountStatementID || stmt.billingPeriodID)" (click)="toggleStatementDetail(stmt)" [attr.data-testid]="'btn-citizen-stmt-detail-' + $index" title="View Transaction Details">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            </button>
+                            @if (stmt.accountStatementUrl) {
+                              <button class="stmt-v2-bi-btn stmt-v2-bi-btn-std" (click)="openCitizenStatement(stmt, 'standard')" [attr.data-testid]="'btn-citizen-stmt-standard-' + $index" title="View Standard Statement">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              </button>
+                            }
+                            @if (stmt.detailedAccountStatementUrl) {
+                              <button class="stmt-v2-bi-btn stmt-v2-bi-btn-det" (click)="openCitizenStatement(stmt, 'detailed')" [attr.data-testid]="'btn-citizen-stmt-detailed-' + $index" title="View Detailed Statement">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                              </button>
+                            }
+                            @if (stmt.accountStatementUrl || stmt.detailedAccountStatementUrl) {
+                              <button class="stmt-v2-bi-btn stmt-v2-bi-btn-send" (click)="sendStatementRow(stmt)" [attr.data-testid]="'btn-citizen-stmt-send-' + $index" title="Send this statement via SMS/Email">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                              </button>
+                            }
+                          </div>
+                        </div>
+
+                        @if (stmtDetailSelectedId() === (stmt.accountStatementID || stmt.billingPeriodID)) {
+                          <div class="stmt-v2-bi-detail-expand">
+                            @if (stmtDetailLoading()) {
+                              <div class="stmt-v2-detail-loading"><span class="stmt-spinner"></span> Loading transaction details...</div>
+                            } @else if (stmtDetailError()) {
+                              <div class="stmt-v2-panel-error">{{ stmtDetailError() }}</div>
+                            } @else if (stmtDetailData() !== null) {
+                              @if (stmtDetailData()!.length === 0) {
+                                <div class="stmt-v2-detail-empty">No transaction details available for this period.</div>
+                              } @else {
+                                <div class="stmt-detail-table-wrap">
+                                  <table class="stmt-detail-table" data-testid="stmt-detail-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Transaction Date</th>
+                                        <th>Transaction Description</th>
+                                        <th>Receipt ID / Doc Transaction ID</th>
+                                        <th>Document Number</th>
+                                        <th>Tariff</th>
+                                        <th class="num-col">Amount</th>
+                                        <th class="num-col">Interest</th>
+                                        <th class="num-col">VAT</th>
+                                        <th class="num-col">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      @for (row of stmtDetailData()!; track $index) {
+                                        <tr [class.stmt-detail-row-balance]="row.drilldown === 'OpenBalance' || row.drilldown === 'CloseBalance'"
+                                            [class.stmt-detail-row-closing]="row.drilldown === 'CloseBalance'">
+                                          <td>{{ row.drilldown === 'OpenBalance' || row.drilldown === 'CloseBalance' ? '' : formatDateDMY(row.transactionDate) }}</td>
+                                          <td class="desc-col">{{ row.description }}</td>
+                                          <td>{{ row.transactionId || '' }}</td>
+                                          <td>{{ row.documentNumber || '' }}</td>
+                                          <td class="tariff-col">{{ row.tariff || '' }}</td>
+                                          <td class="num-col">{{ fmtStmtDetailAmount(row.amount) }}</td>
+                                          <td class="num-col">{{ fmtStmtDetailAmount(row.interestAmount) }}</td>
+                                          <td class="num-col">{{ fmtStmtDetailAmount(row.vatAmount) }}</td>
+                                          <td class="num-col">{{ fmtStmtDetailAmount(row.totalAmount) }}</td>
+                                        </tr>
+                                      }
+                                    </tbody>
+                                  </table>
+                                </div>
+                              }
+                            }
+                          </div>
+                        }
+                      }
+                    </div>
+                  }
+
+                  @if (!citizenStatementsLoading() && !citizenStatementsError() && citizenStatements().length === 0) {
+                    <div class="stmt-v2-empty-msg">No pre-generated statements available for this account</div>
+                  }
+                </div>
+
+                <div class="stmt-v2-panel stmt-v2-panel-history">
+                  <div class="stmt-v2-panel-header">
+                    <span class="stmt-v2-panel-title">Statement History</span>
+                    <span class="stmt-v2-panel-count">{{ (tabData()?.statements || []).length }}</span>
+                  </div>
+
+                  @if ((tabData()?.statements || []).length > 0) {
+                    <div class="stmt-v2-history-list">
+                      @for (s of tabData()?.statements || []; track $index) {
+                        <div class="stmt-v2-hist-card" [attr.data-testid]="'row-statement-' + $index">
+                          <div class="stmt-v2-hist-info">
+                            <span class="stmt-v2-hist-period">{{ s.financialYear || s.billingPeriod || '-' }} / {{ s.month || s.billingMonth || '-' }}</span>
+                            <span class="stmt-v2-hist-desc">{{ s.description || s.statementDescription || 'Account Statement' }}</span>
+                            <span class="stmt-v2-hist-meta">
+                              <span class="stmt-v2-hist-type" [class.stmt-v2-hist-type-detail]="(s.statementType || s.type || '').toLowerCase().includes('detail')">{{ s.statementType || s.type || '-' }}</span>
+                              <span class="stmt-v2-hist-amount">R {{ formatCurrency(s.amount ?? s.totalAmount ?? 0) }}</span>
+                              @if (s.generatedDate || s.dateGenerated || s.date || s.dateCaptured) {
+                                <span class="stmt-v2-hist-date">{{ formatDate(s.generatedDate || s.dateGenerated || s.date || s.dateCaptured) }}</span>
+                              }
+                            </span>
+                          </div>
+                          <div class="stmt-v2-hist-actions">
+                            @if (s.fileUrl || s.downloadUrl || s.url) {
+                              <button class="stmt-v2-bi-btn stmt-v2-bi-btn-std" (click)="previewStatement(s.fileUrl || s.downloadUrl || s.url)" [attr.data-testid]="'btn-preview-stmt-' + $index" title="Preview PDF">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                              </button>
+                              <button class="stmt-v2-bi-btn" (click)="downloadStatement(s.fileUrl || s.downloadUrl || s.url)" [attr.data-testid]="'btn-download-stmt-' + $index" title="Download PDF">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                              </button>
+                            }
+                            <div class="gp-sms-send-wrap" [attr.data-testid]="'gp-sms-wrap-' + $index">
+                              @if (gpSmsSending() === $index) {
+                                <span class="gp-sms-spinner"></span>
+                              } @else {
+                                <button class="stmt-v2-bi-btn gp-sms-send-btn" (click)="toggleGpSmsMenu($index)" [attr.data-testid]="'btn-gp-send-' + $index" title="Send statement via GP-SMS">
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                </button>
+                              }
+                              @if (gpSmsMenuOpen() === $index) {
+                                <div class="gp-sms-dropdown" (mouseleave)="gpSmsMenuOpen.set(null)" [attr.data-testid]="'gp-sms-menu-' + $index">
+                                  <button class="gp-sms-option" (click)="gpSmsSendStatement(s, 'email', $index)" [attr.data-testid]="'btn-gp-email-' + $index">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                                    Email
+                                  </button>
+                                  <button class="gp-sms-option" (click)="gpSmsSendStatement(s, 'sms', $index)" [attr.data-testid]="'btn-gp-sms-' + $index">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    SMS
+                                  </button>
+                                  <button class="gp-sms-option" (click)="gpSmsSendStatement(s, 'both', $index)" [attr.data-testid]="'btn-gp-both-' + $index">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    Both
+                                  </button>
+                                </div>
+                              }
+                            </div>
+                            <button class="stmt-v2-bi-btn" (click)="regenFromHistory(s)" [attr.data-testid]="'btn-regen-stmt-' + $index" title="Re-generate">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="stmt-v2-empty-msg">No statements generated yet</div>
+                  }
+                </div>
               </div>
             </div>
+
+            @if (stmtFilterTxnLoading() || stmtFilterTxnData() !== null) {
+              <div class="stmt-filter-txn-panel" data-testid="stmt-filter-txn-panel">
+                <div class="stmt-filter-txn-header">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  Transaction Details — {{ stmtFinYear() }}{{ stmtMonthFrom() ? ' / ' + stmtMonthFrom() : '' }}{{ stmtMonthTo() && stmtMonthTo() !== stmtMonthFrom() ? ' → ' + stmtMonthTo() : '' }}
+                  <span class="stmt-filter-txn-count">{{ (stmtFilterTxnData() || []).length }} record(s)</span>
+                </div>
+                @if (stmtFilterTxnLoading()) {
+                  <div class="stmt-filter-txn-loading"><span class="stmt-spinner"></span> Loading transactions...</div>
+                }
+                @if (stmtFilterTxnError()) {
+                  <div class="stmt-filter-txn-error">{{ stmtFilterTxnError() }}</div>
+                }
+                @if (!stmtFilterTxnLoading() && stmtFilterTxnData() !== null) {
+                  @if ((stmtFilterTxnData() || []).length === 0) {
+                    <div class="stmt-filter-txn-empty">No transactions found for this period.</div>
+                  } @else {
+                    <div class="stmt-filter-txn-scroll">
+                      <table class="stmt-detail-table">
+                        <thead>
+                          <tr>
+                            <th class="desc-col">Description</th>
+                            <th class="tariff-col">Tariff</th>
+                            <th class="num-col">Amount</th>
+                            <th class="num-col">VAT</th>
+                            <th class="num-col">Total</th>
+                            <th class="num-col">Transaction Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (txn of (stmtFilterTxnData() || []); track txn.transactionId || $index) {
+                            <tr [class.stmt-detail-row-balance]="txn.drilldown === 'OpenBalance'"
+                                [class.stmt-detail-row-closing]="txn.drilldown === 'ClosingBalance'">
+                              <td class="desc-col">{{ txn.description || txn.drilldown }}</td>
+                              <td class="tariff-col">{{ txn.tariff || txn.tariffCode || '' }}</td>
+                              <td class="num-col">{{ fmtStmtDetailAmount(txn.amount) }}</td>
+                              <td class="num-col">{{ fmtStmtDetailAmount(txn.vatAmount) }}</td>
+                              <td class="num-col">{{ fmtStmtDetailAmount(txn.totalAmount) }}</td>
+                              <td class="num-col">{{ txn.transactionDate ? (txn.transactionDate | date:'dd/MM/yyyy') : '' }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                }
+              </div>
+            }
 
             @if (stmtSendPanelOpen()) {
               <div class="stmt-send-overlay" (click)="closeStmtSendPanel()" data-testid="stmt-send-overlay">
@@ -3118,15 +3387,24 @@
                     </div>
                   }
 
-                  <div class="stmt-send-method-toggle">
-                    <button class="stmt-send-method-btn" [class.stmt-send-method-active]="stmtSendMode() === 'email'" (click)="stmtSendMode.set('email')" data-testid="btn-send-method-email">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                      Email
-                    </button>
-                    <button class="stmt-send-method-btn" [class.stmt-send-method-active]="stmtSendMode() === 'sms'" (click)="stmtSendMode.set('sms')" data-testid="btn-send-method-sms">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      SMS
-                    </button>
+                  <div class="stmt-channel-picker-row">
+                    <div class="stmt-channel-label">Send via:</div>
+                    <div class="stmt-channel-cards">
+                      <button class="stmt-channel-card" [class.stmt-channel-card-active]="stmtSendMode() === 'email'" (click)="stmtSendMode.set('email')" data-testid="btn-send-method-email">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        <span class="stmt-channel-card-label">Email</span>
+                        @if (stmtSendMode() === 'email') {
+                          <span class="stmt-channel-card-check">&#10003;</span>
+                        }
+                      </button>
+                      <button class="stmt-channel-card" [class.stmt-channel-card-active]="stmtSendMode() === 'sms'" (click)="stmtSendMode.set('sms')" data-testid="btn-send-method-sms">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span class="stmt-channel-card-label">SMS</span>
+                        @if (stmtSendMode() === 'sms') {
+                          <span class="stmt-channel-card-check">&#10003;</span>
+                        }
+                      </button>
+                    </div>
                   </div>
 
                   @if (stmtSendStep() === 'compose') {
@@ -3157,6 +3435,17 @@
                         }
                       </div>
 
+                      @if (stmtAvailablePeriods().length > 1) {
+                        <div class="stmt-send-section">
+                          <label class="stmt-send-field-label">Statement Period</label>
+                          <select class="form-select stmt-period-select" [ngModel]="stmtSelectedPeriodId()" (ngModelChange)="onStmtPeriodChange($event)" data-testid="select-stmt-email-period">
+                            @for (p of stmtAvailablePeriods(); track p.periodId) {
+                              <option [value]="p.periodId">{{ p.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      }
+
                       <div class="stmt-send-section">
                         <label class="stmt-send-field-label">Subject</label>
                         <input type="text" class="stmt-send-input" [ngModel]="stmtSubject()" (ngModelChange)="stmtSubject.set($event)" data-testid="input-stmt-subject" />
@@ -3165,6 +3454,12 @@
                       <div class="stmt-send-section">
                         <label class="stmt-send-field-label">Email Message</label>
                         <textarea class="stmt-send-textarea" rows="10" [ngModel]="stmtMessageBody()" (ngModelChange)="stmtMessageBody.set($event)" data-testid="textarea-stmt-message"></textarea>
+                        @if (stmtSecureUrl()) {
+                          <div style="margin-top:8px;padding:10px 14px;background:#eef6ff;border:1px solid #c3dafe;border-radius:6px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#1e40af;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <span>A secure <strong>"View Statement Online"</strong> button will be included in the email automatically.</span>
+                          </div>
+                        }
                       </div>
 
                       <button class="stmt-send-submit" (click)="sendStatement('email')" [disabled]="stmtSending() || getSelectedEmails().length === 0" data-testid="btn-stmt-send-email">
@@ -3202,15 +3497,27 @@
                         }
                       </div>
 
+                      @if (stmtAvailablePeriods().length > 1) {
+                        <div class="stmt-send-section">
+                          <label class="stmt-send-field-label">Statement Period</label>
+                          <select class="form-select stmt-period-select" [ngModel]="stmtSelectedPeriodId()" (ngModelChange)="onStmtPeriodChange($event)" data-testid="select-stmt-period">
+                            @for (p of stmtAvailablePeriods(); track p.periodId) {
+                              <option [value]="p.periodId">{{ p.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      }
+
                       <div class="stmt-send-section">
                         <label class="stmt-send-field-label">
                           SMS Message
-                          <span class="stmt-sms-counter" [class.stmt-sms-over]="getSmsCharCount() > 160">{{ getSmsCharCount() }}/160</span>
+                          <span class="stmt-sms-counter" [class.stmt-sms-over]="getSmsCharCount() > 320">{{ getSmsCharCount() }}/320</span>
+                          @if (getSmsCharCount() > 160) { <span class="stmt-sms-parts">({{ getSmsParts() }} SMS parts)</span> }
                         </label>
-                        <textarea class="stmt-send-textarea stmt-sms-textarea" rows="3" maxlength="160" [ngModel]="stmtSmsBody()" (ngModelChange)="stmtSmsBody.set($event)" data-testid="textarea-stmt-sms"></textarea>
+                        <textarea class="stmt-send-textarea stmt-sms-textarea" rows="4" maxlength="320" [ngModel]="stmtSmsBody()" (ngModelChange)="stmtSmsBody.set($event)" data-testid="textarea-stmt-sms"></textarea>
                       </div>
 
-                      <button class="stmt-send-submit" (click)="sendStatement('sms')" [disabled]="stmtSending() || getSelectedPhones().length === 0 || getSmsCharCount() > 160" data-testid="btn-stmt-send-sms">
+                      <button class="stmt-send-submit" (click)="sendStatement('sms')" [disabled]="stmtSending() || getSelectedPhones().length === 0 || getSmsCharCount() > 320" data-testid="btn-stmt-send-sms">
                         @if (stmtSending()) { <span class="stmt-spinner"></span> Sending... } @else {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                           Send SMS to {{ getSelectedPhones().length }} Recipient{{ getSelectedPhones().length !== 1 ? 's' : '' }}
@@ -3277,62 +3584,6 @@
                 </div>
               </div>
             }
-
-            <div class="debt-table-section" style="margin-top: 1rem;">
-              <div class="debt-table-header stmt-hist-header">
-                <span class="debt-table-title">Statement History</span>
-                <span class="debt-table-count">{{ (tabData()?.statements || []).length }} statement{{ (tabData()?.statements || []).length !== 1 ? 's' : '' }}</span>
-              </div>
-              <div class="debt-table-wrapper">
-                <table class="debt-table" data-testid="table-statements">
-                  <thead>
-                    <tr>
-                      <th class="debt-th-desc">Financial Year</th>
-                      <th class="debt-th-desc">Month</th>
-                      <th class="debt-th-desc">Type</th>
-                      <th class="debt-th-desc">Description</th>
-                      <th class="debt-th-desc">Amount</th>
-                      <th class="debt-th-desc">Generated Date</th>
-                      <th class="debt-th-desc">Status</th>
-                      <th class="debt-th-desc">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (s of tabData()?.statements || []; track $index) {
-                      <tr [attr.data-testid]="'row-statement-' + $index">
-                        <td class="debt-td-desc">{{ s.financialYear || s.billingPeriod || s.period || '-' }}</td>
-                        <td class="debt-td-desc">{{ s.month || s.billingMonth || '-' }}</td>
-                        <td class="debt-td-desc"><span class="stmt-type-badge" [class.stmt-detailed]="(s.statementType || s.type || '').toLowerCase().includes('detail')">{{ s.statementType || s.type || '-' }}</span></td>
-                        <td class="debt-td-desc">{{ s.description || s.statementDescription || 'Account Statement' }}</td>
-                        <td class="debt-td-desc mono">R {{ formatCurrency(s.amount ?? s.totalAmount ?? 0) }}</td>
-                        <td class="debt-td-desc">{{ formatDate(s.generatedDate || s.dateGenerated || s.date || s.dateCaptured) }}</td>
-                        <td class="debt-td-desc"><span class="ind-status-badge" [class.ind-active]="(s.status || '').toLowerCase() !== 'failed'">{{ s.status || '-' }}</span></td>
-                        <td class="debt-td-desc">
-                          <div class="stmt-row-actions">
-                            @if (s.fileUrl || s.downloadUrl || s.url) {
-                              <button class="stmt-hist-btn stmt-hist-preview" (click)="previewStatement(s.fileUrl || s.downloadUrl || s.url)" [attr.data-testid]="'btn-preview-stmt-' + $index" title="Preview PDF">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                              </button>
-                              <button class="stmt-hist-btn stmt-hist-download" (click)="downloadStatement(s.fileUrl || s.downloadUrl || s.url)" [attr.data-testid]="'btn-download-stmt-' + $index" title="Download PDF">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                              </button>
-                            }
-                            <button class="stmt-hist-btn stmt-hist-send" (click)="sendStatementRow(s)" [attr.data-testid]="'btn-send-stmt-' + $index" title="Send via Email or SMS">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                            </button>
-                            <button class="stmt-hist-btn stmt-hist-regen" (click)="regenFromHistory(s)" [attr.data-testid]="'btn-regen-stmt-' + $index" title="Load into generator">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    } @empty {
-                      <tr><td colspan="8" class="debt-td-desc" style="text-align:center; color: var(--pos-text-muted); padding: 1rem;">No statements generated yet. Use the tools above to create one.</td></tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         }
 
@@ -4342,51 +4593,28 @@
                     <span class="debt-table-count">{{ (tabData()?.conventionalMeters || []).length }} meter{{ (tabData()?.conventionalMeters || []).length !== 1 ? 's' : '' }}</span>
                   </div>
                   @if ((tabData()?.conventionalMeters || []).length > 0) {
-                    <div class="cons-layout" style="margin-top: 0.75rem;">
-                      <div class="cons-meter-sidebar">
+                    <div class="cons-layout-vertical" style="margin-top: 0.75rem;">
+                      <div class="cons-meter-strip-row">
                         @for (m of tabData()?.conventionalMeters || []; track $index) {
-                          <div class="cons-meter-card" [class.cons-meter-active]="meterSelectedConv()?.physicalMeterNo === m.physicalMeterNo && meterSelectedConv()?.serviceDesc === m.serviceDesc" (click)="selectConvMeter(m)" [attr.data-testid]="'conv-meter-' + $index">
-                            <div class="cons-meter-icon">
+                          <div class="cons-meter-strip-card" [class.cons-meter-active]="meterSelectedConv()?.physicalMeterNo === m.physicalMeterNo && meterSelectedConv()?.serviceDesc === m.serviceDesc" (click)="selectConvMeter(m)" [attr.data-testid]="'conv-meter-' + $index">
+                            <div class="cons-strip-icon">
                               @if ((m.serviceDesc || '').toLowerCase().includes('water')) { 💧 }
                               @else if ((m.serviceDesc || '').toLowerCase().includes('elec')) { ⚡ }
                               @else if ((m.serviceDesc || '').toLowerCase().includes('sewer') || (m.serviceDesc || '').toLowerCase().includes('effluent')) { 🚿 }
                               @else { 📊 }
                             </div>
-                            <div class="cons-meter-info">
-                              <div class="cons-meter-name">{{ m.serviceDesc || m.serviceDescription || 'Meter' }}</div>
-                              <div class="cons-meter-no mono">{{ m.physicalMeterNo || m.meterNo || '-' }}</div>
-                              <div class="cons-meter-status">
-                                <span class="svc-status-badge" [class.svc-active]="(m.serviceStatus || m.meterStatus || '').toLowerCase() === 'active'">{{ m.serviceStatus || m.meterStatus || '-' }}</span>
-                              </div>
+                            <div class="cons-strip-info">
+                              <div class="cons-strip-name">{{ m.serviceDesc || m.serviceDescription || 'Meter' }}</div>
+                              <div class="cons-strip-no mono">{{ m.physicalMeterNo || m.meterNo || '-' }}</div>
                             </div>
+                            <span class="svc-status-badge cons-strip-status" [class.svc-active]="(m.serviceStatus || m.meterStatus || '').toLowerCase() === 'active'">{{ m.serviceStatus || m.meterStatus || '-' }}</span>
                           </div>
                         }
                       </div>
 
-                      <div class="cons-main-panel">
-                        @if (meterSelectedConv()) {
-                          <div style="margin-bottom: 0.5rem;">
-                            <button class="svc-bal-back" (click)="meterSelectedConv.set(null); meterConvHistory.set([]); meterConvInsights.set(null)" data-testid="button-back-meter-list">← Back to Meter List</button>
-                          </div>
-                          <div class="cons-selected-header">
-                            <div class="cons-selected-title">
-                              <span class="cons-selected-svc">{{ meterSelectedConv().serviceDesc || 'Meter' }}</span>
-                              <span class="cons-selected-meter mono">Meter: {{ meterSelectedConv().physicalMeterNo || meterSelectedConv().meterNo || '-' }}</span>
-                            </div>
-                            <div class="meter-header-badges">
-                              @if (meterSelectedConv().connectionSizeDesc || meterSelectedConv().meterConnectionSize) {
-                                <span class="cons-conn-badge">Connection: {{ meterSelectedConv().connectionSizeDesc || meterSelectedConv().meterConnectionSize }}</span>
-                              }
-                              @if (meterSelectedConv().meterClassificationDesc) {
-                                <span class="cons-conn-badge meter-class-badge">{{ meterSelectedConv().meterClassificationDesc }}</span>
-                              }
-                              @if (meterSelectedConv().serviceStatus || meterSelectedConv().meterStatus) {
-                                <span class="cons-conn-badge" [class.meter-status-active]="(meterSelectedConv().serviceStatus || meterSelectedConv().meterStatus || '').toLowerCase() === 'active'">{{ meterSelectedConv().serviceStatus || meterSelectedConv().meterStatus }}</span>
-                              }
-                            </div>
-                          </div>
-
-                          <div class="meter-detail-grid" data-testid="meter-detail-grid">
+                      @if (meterSelectedConv()) {
+                        <div class="cons-detail-full">
+                          <div class="meter-detail-grid meter-detail-grid-wide" data-testid="meter-detail-grid">
                             <div class="meter-detail-item">
                               <span class="meter-detail-label">Meter Number</span>
                               <span class="meter-detail-value mono">{{ meterSelectedConv().physicalMeterNo || meterSelectedConv().meterNo || '-' }}</span>
@@ -4520,51 +4748,65 @@
                             </div>
 
                             <div class="cons-history-section">
-                              <div class="debt-table-header">
+                              <div class="debt-table-header" style="flex-wrap:wrap; gap:0.5rem; align-items:center;">
                                 <span class="debt-table-title">Reading History</span>
                                 <span class="debt-table-count">{{ meterConvHistory().length }} readings</span>
+                                <div class="meter-year-filter" style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-left:auto;">
+                                  @for (fy of meterConvAvailableYears(); track fy) {
+                                    <label class="meter-year-chip" [class.meter-year-chip-active]="meterConvSelectedYears().includes(fy)">
+                                      <input type="checkbox" style="display:none" [checked]="meterConvSelectedYears().includes(fy)" (change)="toggleMeterYear(fy)" />
+                                      {{ fy }}
+                                    </label>
+                                  }
+                                  @if (meterConvSelectedYears().length < meterConvAvailableYears().length) {
+                                    <button class="btn btn-ghost" style="font-size:11px; padding:3px 10px; height:28px;" (click)="selectAllMeterYears()">All Years</button>
+                                  }
+                                  @if (meterConvLoading()) {
+                                    <span style="font-size:11px; color:var(--pos-text-muted);">Loading…</span>
+                                  }
+                                </div>
                               </div>
                               <div class="cons-smart-table-wrap cons-wide-grid">
                                 <table class="cons-smart-table cons-reading-table" data-testid="table-conv-meter-history">
                                   <thead>
                                     <tr>
-                                      <th>Service Type</th>
-                                      <th>Meter Classification</th>
-                                      <th>Tariff</th>
-                                      <th>Combination Meter No</th>
-                                      <th>Factor</th>
-                                      <th>Meter No</th>
-                                      <th>Physical Meter No</th>
-                                      <th>Billing Month</th>
-                                      <th>Meter Book</th>
-                                      <th>Route</th>
-                                      <th>Capturer Name</th>
-                                      <th>Old Reading Date</th>
-                                      <th>Old Reading</th>
-                                      <th>New Reading Date</th>
-                                      <th>New Reading</th>
-                                      <th>Reading Days</th>
-                                      <th>Consumption</th>
-                                      <th>Levy Status</th>
-                                      <th>Test Reading Date</th>
-                                      <th>Test Reading</th>
-                                      <th>Decline Reason</th>
-                                      <th>Meter Error Code</th>
-                                      <th>Import Status</th>
-                                      <th>Meter Change</th>
-                                      <th>Meter Status</th>
-                                      <th>Service Status</th>
-                                      <th>Reading Status</th>
-                                      <th>Disconnection Status</th>
-                                      <th>Disconnection Reading</th>
-                                      <th>Disconnection Date</th>
+                                      <th class="th-sort" (click)="sortMeterHistory('serviceDesc')">Service Type<span class="sort-icon">{{ meterConvSortCol() === 'serviceDesc' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('meterClassificationDesc')">Meter Classification<span class="sort-icon">{{ meterConvSortCol() === 'meterClassificationDesc' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('tariff')">Tariff<span class="sort-icon">{{ meterConvSortCol() === 'tariff' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('combinationMeterPhysicalNumber')">Combination Meter No<span class="sort-icon">{{ meterConvSortCol() === 'combinationMeterPhysicalNumber' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('tarifffactor')">Factor<span class="sort-icon">{{ meterConvSortCol() === 'tarifffactor' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('meterNo')">Meter No<span class="sort-icon">{{ meterConvSortCol() === 'meterNo' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('physicalMeterNo')">Physical Meter No<span class="sort-icon">{{ meterConvSortCol() === 'physicalMeterNo' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('billingmonth')">Billing Month<span class="sort-icon">{{ meterConvSortCol() === 'billingmonth' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('meterBookName')">Meter Book<span class="sort-icon">{{ meterConvSortCol() === 'meterBookName' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('routeFileName')">Route<span class="sort-icon">{{ meterConvSortCol() === 'routeFileName' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('capturer')">Capturer Name<span class="sort-icon">{{ meterConvSortCol() === 'capturer' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('reading1Date')">Old Reading Date<span class="sort-icon">{{ meterConvSortCol() === 'reading1Date' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('reading1')">Old Reading<span class="sort-icon">{{ meterConvSortCol() === 'reading1' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('reading2Date')">New Reading Date<span class="sort-icon">{{ meterConvSortCol() === 'reading2Date' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('reading2')">New Reading<span class="sort-icon">{{ meterConvSortCol() === 'reading2' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('readingdays')">Reading Days<span class="sort-icon">{{ meterConvSortCol() === 'readingdays' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('consumption')">Consumption<span class="sort-icon">{{ meterConvSortCol() === 'consumption' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('levyStatus')">Levy Status<span class="sort-icon">{{ meterConvSortCol() === 'levyStatus' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('testReadingDate')">Test Reading Date<span class="sort-icon">{{ meterConvSortCol() === 'testReadingDate' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('testReading')">Test Reading<span class="sort-icon">{{ meterConvSortCol() === 'testReading' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('declineReason')">Decline Reason<span class="sort-icon">{{ meterConvSortCol() === 'declineReason' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('errorcode')">Meter Error Code<span class="sort-icon">{{ meterConvSortCol() === 'errorcode' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('flag')">Import Status<span class="sort-icon">{{ meterConvSortCol() === 'flag' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('meterChange')">Meter Change<span class="sort-icon">{{ meterConvSortCol() === 'meterChange' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('meterStatus')">Meter Status<span class="sort-icon">{{ meterConvSortCol() === 'meterStatus' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('serviceStatus')">Service Status<span class="sort-icon">{{ meterConvSortCol() === 'serviceStatus' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('readingStatus')">Reading Status<span class="sort-icon">{{ meterConvSortCol() === 'readingStatus' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('disconnectionStatus')">Disconnection Status<span class="sort-icon">{{ meterConvSortCol() === 'disconnectionStatus' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('disconnectionReading')">Disconnection Reading<span class="sort-icon">{{ meterConvSortCol() === 'disconnectionReading' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
+                                      <th class="th-sort" (click)="sortMeterHistory('disconnectionDate')">Disconnection Date<span class="sort-icon">{{ meterConvSortCol() === 'disconnectionDate' ? (meterConvSortDir() === 'asc' ? ' ↑' : ' ↓') : '' }}</span></th>
                                       <th>Contractor Remarks</th>
                                       <th>Disconnection Letter</th>
                                       <th>Supporting Document</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    @for (r of meterConvHistory(); track $index) {
+                                    @for (r of meterConvHistorySorted(); track $index) {
                                       <tr [class.cons-row-spike]="isConvAnomaly(r, $index) === 'spike'" [class.cons-row-drop]="isConvAnomaly(r, $index) === 'drop'" [class.cons-row-zero]="isConvAnomaly(r, $index) === 'zero'">
                                         <td>{{ r.serviceDesc || '-' }}</td>
                                         <td>{{ r.meterClassificationDesc || '-' }}</td>
@@ -4773,10 +5015,8 @@
                           @if (!meterConvLoading() && meterConvHistory().length === 0) {
                             <div class="empty-state"><div class="empty-icon">📉</div><p class="empty-text">No reading history for this meter</p></div>
                           }
-                        } @else {
-                          <div class="empty-state"><div class="empty-icon">👈</div><p class="empty-text">Select a conventional meter to view consumption trends</p></div>
-                        }
-                      </div>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div style="padding: 1rem; color: var(--pos-text-muted); font-size: 0.85rem;">No conventional meters on this account</div>
@@ -4789,34 +5029,22 @@
                     <span class="debt-table-count">{{ (tabData()?.prepaidMeters || []).length }} meter{{ (tabData()?.prepaidMeters || []).length !== 1 ? 's' : '' }}</span>
                   </div>
                   @if ((tabData()?.prepaidMeters || []).length > 0) {
-                    <div class="cons-layout" style="margin-top: 0.75rem;">
-                      <div class="cons-meter-sidebar">
+                    <div class="cons-layout-vertical" style="margin-top: 0.75rem;">
+                      <div class="cons-meter-strip-row">
                         @for (m of tabData()?.prepaidMeters || []; track $index) {
-                          <div class="cons-meter-card" [class.cons-meter-active]="getPrepaidMeterNo(meterSelectedPrepaid()) === getPrepaidMeterNo(m)" (click)="selectPrepaidMeter(m)" [attr.data-testid]="'prepaid-meter-' + $index">
-                            <div class="cons-meter-icon">⚡</div>
-                            <div class="cons-meter-info">
-                              <div class="cons-meter-name">{{ m.prepaidServiceDesc || m.serviceType || m.serviceDescription || m.serviceDesc || 'Prepaid' }}</div>
-                              <div class="cons-meter-no mono">{{ m.prepaidMeterNo || m.meterNumber || m.physicalMeterNo || m.meterNo || m.meter_ID || '-' }}</div>
-                              <div class="cons-meter-status">
-                                <span class="svc-status-badge" [class.svc-active]="(m.serviceStatus || m.meterStatus || '').toLowerCase() === 'active'">{{ m.serviceStatus || m.meterStatus || '-' }}</span>
-                              </div>
+                          <div class="cons-meter-strip-card cons-strip-prepaid" [class.cons-meter-active]="getPrepaidMeterNo(meterSelectedPrepaid()) === getPrepaidMeterNo(m)" (click)="selectPrepaidMeter(m)" [attr.data-testid]="'prepaid-meter-' + $index">
+                            <div class="cons-strip-icon">⚡</div>
+                            <div class="cons-strip-info">
+                              <div class="cons-strip-name">{{ m.prepaidServiceDesc || m.serviceType || m.serviceDescription || m.serviceDesc || 'Prepaid' }}</div>
+                              <div class="cons-strip-no mono">{{ m.prepaidMeterNo || m.meterNumber || m.physicalMeterNo || m.meterNo || m.meter_ID || '-' }}</div>
                             </div>
+                            <span class="svc-status-badge cons-strip-status" [class.svc-active]="(m.serviceStatus || m.meterStatus || '').toLowerCase() === 'active'">{{ m.serviceStatus || m.meterStatus || '-' }}</span>
                           </div>
                         }
                       </div>
 
-                      <div class="cons-main-panel">
-                        @if (meterSelectedPrepaid()) {
-                          <div style="margin-bottom: 0.5rem;">
-                            <button class="svc-bal-back" (click)="meterSelectedPrepaid.set(null); meterPrepaidSales.set([]); meterPrepaidStats.set(null)" data-testid="button-back-prepaid-list">← Back to Meter List</button>
-                          </div>
-                          <div class="cons-selected-header pp-header">
-                            <div class="cons-selected-title">
-                              <span class="cons-selected-svc">{{ meterSelectedPrepaid().prepaidServiceDesc || meterSelectedPrepaid().serviceType || meterSelectedPrepaid().serviceDescription || meterSelectedPrepaid().serviceDesc || 'Prepaid Meter' }}</span>
-                              <span class="cons-selected-meter mono">Meter: {{ meterSelectedPrepaid().prepaidMeterNo || meterSelectedPrepaid().meterNumber || meterSelectedPrepaid().physicalMeterNo || meterSelectedPrepaid().meterNo || meterSelectedPrepaid().meter_ID || '-' }}</span>
-                            </div>
-                          </div>
-
+                      @if (meterSelectedPrepaid()) {
+                        <div class="cons-detail-full">
                           @if (meterPrepaidLoading()) {
                             <div class="cons-loading"><div class="search-spinner-inline"></div><span>Loading prepaid sales...</span></div>
                           }
@@ -4883,7 +5111,7 @@
                                   <tbody>
                                     @for (s of meterPrepaidSales(); track $index) {
                                       <tr [class.pp-row-cancelled]="(s.canceledStatus || s.cancelledStatus || '').toLowerCase() === 'yes'">
-                                        <td class="debt-td-desc">{{ formatDate(s.receiptDate || s.date || s.transactionDate) }}</td>
+                                        <td class="debt-td-desc">{{ formatDate(s.dateCaptured || s.receiptDate || s.date || s.transactionDate) }}</td>
                                         <td class="debt-td-desc mono">{{ s.receiptNo || s.receiptNumber || '-' }}</td>
                                         <td class="debt-td-amt mono">{{ formatDebtAmt(s.amount || s.receiptAmount || 0) }}</td>
                                         <td class="debt-td-amt mono">{{ formatDebtAmt(s.vatAmount || s.vat || 0) }}</td>
@@ -4906,10 +5134,8 @@
                           @if (!meterPrepaidLoading() && meterPrepaidSales().length === 0) {
                             <div class="empty-state"><div class="empty-icon">🔌</div><p class="empty-text">No prepaid sales history for this meter</p></div>
                           }
-                        } @else {
-                          <div class="empty-state"><div class="empty-icon">👈</div><p class="empty-text">Select a prepaid meter to view sales history</p></div>
-                        }
-                      </div>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div style="padding: 1rem; color: var(--pos-text-muted); font-size: 0.85rem;">No prepaid meters on this account</div>
@@ -5682,7 +5908,7 @@
                         <option [value]="detailFinYear()">{{ detailFinYear() }}</option>
                       }
                     </select>
-                    <select class="dtl-select" [value]="detailMonth()" (change)="onDetailMonthChange($any($event.target).value)" data-testid="select-detail-month">
+                    <select class="dtl-select" [ngModel]="detailMonth()" (ngModelChange)="onDetailMonthChange($event)" data-testid="select-detail-month">
                       <option value="">All Months</option>
                       @for (m of detailMonths; track m) {
                         <option [value]="m">{{ m }}</option>
@@ -5726,29 +5952,75 @@
                   <button class="dtl-btn dtl-btn-retry" (click)="loadDetailedTransactions()">Retry</button>
                 </div>
               } @else if (detailTransactions().length > 0) {
-                <div class="dtl-table-wrapper dtl-desktop-only">
+                <div class="dtl-summary-strip" data-testid="dtl-summary-strip">
+                  <div class="dtl-summary-stat dtl-stat-count">
+                    <span class="dtl-stat-icon">◈</span>
+                    <div class="dtl-stat-content">
+                      <span class="dtl-summary-stat-label">Transactions</span>
+                      <span class="dtl-summary-stat-val">{{ detailTransactions().length }}</span>
+                    </div>
+                  </div>
+                  <div class="dtl-summary-stat dtl-stat-charges">
+                    <span class="dtl-stat-icon dtl-stat-icon-charges">●</span>
+                    <div class="dtl-stat-content">
+                      <span class="dtl-summary-stat-label">Total Charges</span>
+                      <span class="dtl-summary-stat-val">{{ formatDebtAmt(getTxnSummaryCharges()) }}</span>
+                    </div>
+                  </div>
+                  <div class="dtl-summary-stat dtl-stat-payments">
+                    <span class="dtl-stat-icon dtl-stat-icon-payments">▸</span>
+                    <div class="dtl-stat-content">
+                      <span class="dtl-summary-stat-label">Total Payments</span>
+                      <span class="dtl-summary-stat-val dtl-neg">{{ formatDebtAmt(getTxnSummaryPayments()) }}</span>
+                    </div>
+                  </div>
+                  <div class="dtl-summary-stat dtl-stat-balance">
+                    <span class="dtl-stat-icon dtl-stat-icon-balance">◉</span>
+                    <div class="dtl-stat-content">
+                      <span class="dtl-summary-stat-label">Closing Balance</span>
+                      <span class="dtl-summary-stat-val dtl-balance-glow">{{ formatDebtAmt(getTxnSummaryClosing()) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="dtl-table-wrapper">
                   <table class="dtl-table" data-testid="table-detailed-transactions">
+                    <colgroup>
+                      <col class="dtl-col-date">
+                      <col class="dtl-col-desc">
+                      <col class="dtl-col-receipt">
+                      <col class="dtl-col-docno">
+                      <col class="dtl-col-amt">
+                      <col class="dtl-col-amt">
+                      <col class="dtl-col-amt">
+                      <col class="dtl-col-total">
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th class="dtl-th">Transaction Date</th>
-                        <th class="dtl-th">Transaction Description</th>
-                        <th class="dtl-th">Receipt ID/ Doc Transaction ID</th>
-                        <th class="dtl-th">Document Number</th>
-                        <th class="dtl-th">Tariff</th>
+                        <th class="dtl-th dtl-th-date">Date</th>
+                        <th class="dtl-th dtl-th-desc">Description</th>
+                        <th class="dtl-th dtl-th-receipt">Receipt / Doc ID</th>
+                        <th class="dtl-th dtl-th-docno">Doc No.</th>
                         <th class="dtl-th dtl-th-amt">Amount</th>
                         <th class="dtl-th dtl-th-amt">Interest</th>
                         <th class="dtl-th dtl-th-amt">VAT</th>
-                        <th class="dtl-th dtl-th-amt">Total</th>
+                        <th class="dtl-th dtl-th-amt dtl-th-total">Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      @for (txn of detailTransactions(); track $index) {
-                        <tr class="dtl-row" [class]="getTxnRowClass(txn)" (click)="onTxnRowClick(txn)" [attr.data-testid]="'dtl-row-' + $index">
-                          <td class="dtl-td">{{ formatDate(txn.transactionDate || txn.date) }}</td>
-                          <td class="dtl-td dtl-td-desc">{{ txn.transactionDescription || txn.description || '-' }}</td>
-                          <td class="dtl-td mono">{{ txn.receiptId || txn.receiptNo || txn.receipt_ID || txn.documentTransactionId || '' }}</td>
-                          <td class="dtl-td mono">{{ txn.documentNumber || txn.docNumber || '' }}</td>
-                          <td class="dtl-td">{{ txn.tariff || '' }}</td>
+                      @for (txn of detailTransactions(); track getGlobalIndex(txn); let ti = $index) {
+                        <tr class="dtl-row" [class]="getTxnRowClass(txn)" (click)="onTxnRowClick(txn)" [attr.data-testid]="'dtl-row-' + ti">
+                          <td class="dtl-td dtl-td-date">{{ formatDate(txn.transactionDate || txn.date) }}</td>
+                          <td class="dtl-td dtl-td-desc">
+                            <span class="dtl-txn-icon" [class]="'dtl-icon-' + getTxnCategory(txn)">{{ getTxnIcon(txn) }}</span>
+                            <span class="dtl-desc-wrap">
+                              <span class="dtl-desc-primary">{{ txn.transactionDescription || txn.description || '-' }}</span>
+                              @if (txn.tariff) {
+                                <span class="dtl-desc-tariff">{{ txn.tariff }}</span>
+                              }
+                            </span>
+                          </td>
+                          <td class="dtl-td dtl-td-receipt mono">{{ txn.receiptId || txn.receiptNo || txn.receipt_ID || txn.documentTransactionId || '' }}</td>
+                          <td class="dtl-td dtl-td-docno mono">{{ txn.documentNumber || txn.docNumber || '' }}</td>
                           <td class="dtl-td dtl-td-amt" [class.dtl-neg]="(txn.amount || 0) < 0">{{ formatDebtAmt(txn.amount ?? 0) }}</td>
                           <td class="dtl-td dtl-td-amt" [class.dtl-neg]="(txn.interestAmount || txn.interest || 0) < 0">{{ formatDebtAmt(txn.interestAmount ?? txn.interest ?? 0) }}</td>
                           <td class="dtl-td dtl-td-amt" [class.dtl-neg]="(txn.vatAmount || txn.vat || 0) < 0">{{ formatDebtAmt(txn.vatAmount ?? txn.vat ?? 0) }}</td>
@@ -5757,34 +6029,6 @@
                       }
                     </tbody>
                   </table>
-                </div>
-                <div class="dtl-mobile-cards dtl-mobile-only">
-                  @for (txn of detailTransactions(); track $index) {
-                    <div class="dtl-card" [class]="getTxnRowClass(txn)" (click)="onTxnRowClick(txn)" [attr.data-testid]="'dtl-card-' + $index">
-                      <div class="dtl-card-top">
-                        <div class="dtl-card-left">
-                          <span class="dtl-card-date">{{ formatDate(txn.transactionDate || txn.date) }}</span>
-                          <span class="dtl-card-desc">{{ txn.transactionDescription || txn.description || '-' }}</span>
-                        </div>
-                        <span class="dtl-card-total" [class.dtl-neg]="(txn.total || txn.totalAmount || 0) < 0">{{ formatDebtAmt(txn.total ?? txn.totalAmount ?? 0) }}</span>
-                      </div>
-                      <div class="dtl-card-amounts">
-                        <span class="dtl-card-amt"><span class="dtl-card-amt-lbl">Amt</span> {{ formatDebtAmt(txn.amount ?? 0) }}</span>
-                        <span class="dtl-card-amt"><span class="dtl-card-amt-lbl">Int</span> {{ formatDebtAmt(txn.interestAmount ?? txn.interest ?? 0) }}</span>
-                        <span class="dtl-card-amt"><span class="dtl-card-amt-lbl">VAT</span> {{ formatDebtAmt(txn.vatAmount ?? txn.vat ?? 0) }}</span>
-                      </div>
-                      @if (txn.receiptId || txn.receiptNo || txn.receipt_ID || txn.documentTransactionId || txn.tariff) {
-                        <div class="dtl-card-meta">
-                          @if (txn.receiptId || txn.receiptNo || txn.receipt_ID || txn.documentTransactionId) {
-                            <span class="dtl-card-meta-item mono">Rcpt: {{ txn.receiptId || txn.receiptNo || txn.receipt_ID || txn.documentTransactionId }}</span>
-                          }
-                          @if (txn.tariff) {
-                            <span class="dtl-card-meta-item">{{ txn.tariff }}</span>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
                 </div>
                 <div class="dtl-footer">
                   <span class="dtl-count">{{ detailTransactions().length }} transaction{{ detailTransactions().length !== 1 ? 's' : '' }}</span>
@@ -6269,18 +6513,28 @@
                     </thead>
                     <tbody>
                       @for (item of nbeLineItems(); track $index) {
-                        <tr [attr.data-testid]="'row-nbe-' + $index">
+                        <tr [attr.data-testid]="'row-nbe-' + $index" [class.nbe-reversal-row]="item.type === 'reversal'">
                           <td class="debt-td-desc">{{ item.service }}</td>
-                          <td class="debt-td-desc"><span class="nbe-type-badge" [attr.data-type]="item.type">{{ item.type }}</span></td>
+                          <td class="debt-td-desc"><span class="nbe-type-badge" [attr.data-type]="item.type">{{ item.type === 'avg-estimate' ? 'avg' : item.type }}</span></td>
                           <td class="debt-td-desc">
-                            @if (item.type === 'metered' && item.consumption) {
-                              {{ item.consumption | number:'1.0-1' }} units &#64; R{{ formatCurrency(item.rate || 0) }}/unit
-                              @if (item.meter) { <span class="mono" style="font-size: 0.75rem; margin-left: 4px;">({{ item.meter }})</span> }
+                            @if (item.consumption) {
+                              {{ item.consumption | number:'1.0-1' }} units
+                              @if (item.readingDays) { <span class="mono" style="font-size: 0.75rem;"> ({{ item.readingDays }} days)</span> }
+                              @if (item.avgMonths) { <span style="font-size: 0.75rem;"> ({{ item.avgMonths }}-month avg)</span> }
+                              @if (item.meter) { <span class="mono" style="font-size: 0.75rem; margin-left: 4px;">Meter: {{ item.meter }}</span> }
+                            } @else if (item.detail) {
+                              <span style="font-size: 0.8rem;">{{ item.detail }}</span>
                             } @else {
                               Fixed charge
                             }
                           </td>
-                          <td class="debt-td-amt mono accent">R {{ formatCurrency(item.amount) }}</td>
+                          <td class="debt-td-amt mono" [class.accent]="item.type !== 'reversal'" [class.nbe-reversal-amt]="item.type === 'reversal'">
+                            @if (item.type === 'reversal') {
+                              (R {{ formatCurrency(item.amount * -1) }})
+                            } @else {
+                              R {{ formatCurrency(item.amount) }}
+                            }
+                          </td>
                         </tr>
                       }
                     </tbody>
@@ -6576,13 +6830,9 @@
                 <tr>
                   <th style="width:40px"></th>
                   <th>Account No</th>
-                  <th>Unit ID</th>
-                  <th>Partition ID</th>
-                  <th>Old Code</th>
                   <th>Type</th>
                   <th>Name</th>
                   <th>SG Number / Property Desc.</th>
-                  <th>Delivery Address</th>
                   <th>Location Address</th>
                   <th>Contact Details</th>
                   <th>Status</th>
@@ -6601,20 +6851,30 @@
                       <button class="link-btn" (click)="selectAccount(account)" [attr.data-testid]="'btn-account-' +  getAccountId(account)  + ''">
                         {{ getAccountNum(account) }}
                       </button>
+                      @if (account.oldAccountCode) {
+                        <div class="result-sub-info">Old: {{ account.oldAccountCode }}</div>
+                      }
                     </td>
-                    <td class="mono muted">{{ account.unitID || '-' }}</td>
-                    <td class="mono muted">{{ account.unitPartitionID || '-' }}</td>
-                    <td class="mono muted">{{ account.oldAccountCode || '-' }}</td>
                     <td><span class="inline-badge outline" [attr.data-testid]="'badge-type-' +  getAccountId(account)  + ''">{{ account.accountType || account.accountDesc || '-' }}</span></td>
-                    <td [attr.data-testid]="'text-name-' +  getAccountId(account)  + ''">{{ getAccountName(account) }}</td>
+                    <td [attr.data-testid]="'text-name-' +  getAccountId(account)  + ''">
+                      <div>{{ getAccountName(account) }}</div>
+                      @if (account.unitID) {
+                        <div class="result-sub-info">Unit {{ account.unitID }}@if (account.unitPartitionID) { / Part {{ account.unitPartitionID }} }</div>
+                      }
+                    </td>
                     <td class="mono muted address-cell" [title]="account.sgNumber ? formatSgBreakdown(account.sgNumber) : ''">{{ account.sgNumber || '-' }}@if (account.sgNumber) {<br><span class="sg-breakdown-sm">{{ formatSgBreakdown(account.sgNumber) }}</span>}</td>
-                    <td class="address-cell">{{ (account.deliveryAddress || '-').replace('\r\n', ', ') }}</td>
-                    <td class="address-cell" [attr.data-testid]="'text-address-' +  getAccountId(account)  + ''">{{ (account.locationAddress || account.address || '-').replace('\r\n', ', ') }}</td>
+                    <td class="address-cell" [attr.data-testid]="'text-address-' +  getAccountId(account)  + ''">{{ (account.locationAddress || account.address || account.deliveryAddress || '-').replace('\r\n', ', ') }}</td>
                     <td class="contact-cell">
-                      @if (account.contactDetails) {
-                        <div class="contact-cell-text">{{ stripHtml(account.contactDetails) }}</div>
+                      @let contactItems = parseContactItems(account.contactDetails);
+                      @if (contactItems.length) {
+                        @for (item of contactItems; track item.label) {
+                          <div class="contact-item">
+                            <span class="contact-item-icon">{{ item.icon }}</span>
+                            <span class="contact-item-value">{{ item.value }}</span>
+                          </div>
+                        }
                       } @else {
-                        <span class="muted">-</span>
+                        <span class="muted">—</span>
                       }
                     </td>
                     <td><span class="inline-badge" [class.active]="isAccountActive(account)" [attr.data-testid]="'badge-status-' +  getAccountId(account)  + ''">{{ account.accountStatus || account.statusDesc || '-' }}</span></td>
@@ -6624,7 +6884,7 @@
                   </tr>
                   @if (expandedRowId() === getAccountId(account)) {
                     <tr>
-                      <td colspan="13" class="expanded-content">
+                      <td colspan="9" class="expanded-content">
                         @if (expandedRowLoading()) {
                           <div class="qv-loading">
                             <div class="search-spinner"></div>
@@ -6664,32 +6924,70 @@
                                 </div>
                               </div>
                             </div>
-                            <div class="qv-panels">
-                              <div class="qv-panel">
-                                <div class="qv-panel-header">💳 Balance Aging</div>
-                                <div class="qv-panel-body">
+                            <div class="qv-panels-vertical">
+                              <div class="qv-panel qv-panel-aging-full">
+                                <div class="qv-panel-header">
+                                  <svg style="width:11px;height:11px;display:inline;vertical-align:middle;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                                  Balance Aging
+                                </div>
+                                <div class="qv-panel-body" style="padding:0">
                                   @if (expandedRowData().balanceFailed) {
-                                    <div class="qv-fetch-error">Failed to load balance data</div>
+                                    <div class="qv-fetch-error" style="padding:0.5rem 0.75rem">Failed to load balance data</div>
                                   } @else if (expandedRowData().balance?.length > 0) {
-                                    @for (b of expandedRowData().balance; track $index) {
-                                      <div class="qv-balance-row">
-                                        <span class="qv-svc-name">{{ b.serviceDescription || b.serviceDesc || 'Service' }}</span>
-                                        <div class="qv-aging-bar">
-                                          <span class="qv-aging-segment current" [title]="'Current: R ' + formatCurrency(b.current || 0)">{{ formatCurrency(b.current || 0) }}</span>
-                                          <span class="qv-aging-segment days30" [title]="'30d: R ' + formatCurrency(b.days30 || 0)">{{ formatCurrency(b.days30 || 0) }}</span>
-                                          <span class="qv-aging-segment days60" [title]="'60d: R ' + formatCurrency(b.days60 || 0)">{{ formatCurrency(b.days60 || 0) }}</span>
-                                          <span class="qv-aging-segment days90" [title]="'90+d: R ' + formatCurrency((b.days90 || 0) + (b.days120 || 0) + (b.days150 || 0))">{{ formatCurrency((b.days90 || 0) + (b.days120 || 0) + (b.days150 || 0)) }}</span>
-                                          <span class="qv-aging-segment total">{{ formatCurrency(b.totalOutStanding || b.totalOutstandingAmount || 0) }}</span>
-                                        </div>
-                                      </div>
-                                    }
+                                    <table class="qv-aging-table">
+                                      <thead>
+                                        <tr>
+                                          <th class="qv-aging-th qv-aging-svc-th">Service</th>
+                                          <th class="qv-aging-th">Current</th>
+                                          <th class="qv-aging-th">30 Days</th>
+                                          <th class="qv-aging-th">60 Days</th>
+                                          <th class="qv-aging-th">90 Days</th>
+                                          <th class="qv-aging-th">120 Days</th>
+                                          <th class="qv-aging-th">150 Days</th>
+                                          <th class="qv-aging-th">180+ Days</th>
+                                          <th class="qv-aging-th qv-aging-total-th">Total</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        @for (b of expandedRowData().balance; track $index) {
+                                          <tr class="qv-aging-row">
+                                            <td class="qv-aging-td qv-aging-svc-td">{{ b.serviceDescription || b.serviceDesc || 'Service' }}</td>
+                                            <td class="qv-aging-td" [class.qv-age-zero]="!(b.current || 0)">{{ formatCurrency(b.current || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-30" [class.qv-age-zero]="!(b.days30 || 0)">{{ formatCurrency(b.days30 || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-60" [class.qv-age-zero]="!(b.days60 || 0)">{{ formatCurrency(b.days60 || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-90" [class.qv-age-zero]="!(b.days90 || 0)">{{ formatCurrency(b.days90 || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-120" [class.qv-age-zero]="!(b.days120 || 0)">{{ formatCurrency(b.days120 || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-150" [class.qv-age-zero]="!(b.days150 || 0)">{{ formatCurrency(b.days150 || 0) }}</td>
+                                            <td class="qv-aging-td qv-age-180" [class.qv-age-zero]="!(b.untill360 || b.until360 || 0)">{{ formatCurrency(b.untill360 || b.until360 || 0) }}</td>
+                                            <td class="qv-aging-td qv-aging-total-td">{{ formatCurrency(b.totalOutStanding || b.totalOutstandingAmount || 0) }}</td>
+                                          </tr>
+                                        }
+                                      </tbody>
+                                      <tfoot>
+                                        <tr class="qv-aging-foot">
+                                          <td class="qv-aging-td qv-aging-svc-td" style="font-weight:700">Total</td>
+                                          <td class="qv-aging-td">{{ formatCurrency(qvBalanceColTotal('current')) }}</td>
+                                          <td class="qv-aging-td qv-age-30">{{ formatCurrency(qvBalanceColTotal('days30')) }}</td>
+                                          <td class="qv-aging-td qv-age-60">{{ formatCurrency(qvBalanceColTotal('days60')) }}</td>
+                                          <td class="qv-aging-td qv-age-90">{{ formatCurrency(qvBalanceColTotal('days90')) }}</td>
+                                          <td class="qv-aging-td qv-age-120">{{ formatCurrency(qvBalanceColTotal('days120')) }}</td>
+                                          <td class="qv-aging-td qv-age-150">{{ formatCurrency(qvBalanceColTotal('days150')) }}</td>
+                                          <td class="qv-aging-td qv-age-180">{{ formatCurrency(qvBalance180Total()) }}</td>
+                                          <td class="qv-aging-td qv-aging-total-td">{{ formatCurrency(qvBalanceTotalOs()) }}</td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
                                   } @else {
-                                    <div class="qv-no-data">No balance data</div>
+                                    <div class="qv-no-data" style="padding:0.5rem 0.75rem">No balance data</div>
                                   }
                                 </div>
                               </div>
+                              <div class="qv-panels-bottom">
                               <div class="qv-panel">
-                                <div class="qv-panel-header">📊 Active Services</div>
+                                <div class="qv-panel-header">
+                                  <svg style="width:11px;height:11px;display:inline;vertical-align:middle;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                                  Active Services
+                                </div>
                                 <div class="qv-panel-body">
                                   @if (expandedRowData().servicesFailed) {
                                     <div class="qv-fetch-error">Failed to load services</div>
@@ -6710,7 +7008,9 @@
                                 </div>
                               </div>
                               <div class="qv-panel">
-                                <div class="qv-panel-header">📞 Contact</div>
+                                <div class="qv-panel-header">
+                                  <svg style="width:11px;height:11px;display:inline;vertical-align:middle;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 11.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/></svg>
+                                  Contact Details</div>
                                 <div class="qv-panel-body">
                                   @if (expandedRowData().contactFailed) {
                                     <div class="qv-fetch-error">Failed to load contact</div>
@@ -6736,6 +7036,7 @@
                                     <div class="qv-no-data">No contact details</div>
                                   }
                                 </div>
+                              </div>
                               </div>
                             </div>
                             <div class="qv-actions">

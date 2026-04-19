@@ -5,11 +5,12 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { DateInputComponent } from '../../../shared/components/date-input.component';
 
 @Component({
   selector: 'app-sms-log-report',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './sms-log-report.component.html',
   styleUrl: './sms-log-report.component.css'
 })

@@ -1,4 +1,5 @@
 <div class="page-container">
+  <!-- ── Page header ──────────────────────────────────────────────────── -->
   <div class="page-header">
     <div>
       <h1 class="page-title" data-testid="text-page-title">Section 129 — Letter of Demand</h1>
@@ -6,380 +7,1500 @@
     </div>
   </div>
 
+  <!-- ── Step indicator ──────────────────────────────────────────────── -->
+  <div class="step-indicator">
+    <div class="step-item" [class.active]="step === 'configure'" [class.done]="step !== 'configure'">
+      <div class="step-circle">@if (step !== 'configure') { ✓ } @else { 1 }</div>
+      <span class="step-label">Configure</span>
+    </div>
+    <div class="step-line" [class.done]="step === 'review' || step === 'generating' || step === 'done'"></div>
+    <div class="step-item" [class.active]="step === 'previewing' || step === 'review'" [class.done]="step === 'generating' || step === 'done'">
+      <div class="step-circle">@if (step === 'generating' || step === 'done') { ✓ } @else { 2 }</div>
+      <span class="step-label">Preview Accounts</span>
+    </div>
+    <div class="step-line" [class.done]="step === 'done'"></div>
+    <div class="step-item" [class.active]="step === 'generating' || step === 'done'" [class.done]="step === 'done'">
+      <div class="step-circle">@if (step === 'done') { ✓ } @else { 3 }</div>
+      <span class="step-label">Submit Trial Review</span>
+    </div>
+  </div>
+
+  <!-- ── Top selectors (always visible) ──────────────────────────────── -->
   <div class="top-selects">
     <div class="field-group">
       <span class="field-label">Financial Year</span>
-      <select class="field-select" [(ngModel)]="finYear" (ngModelChange)="onFinYearChange()" data-testid="select-fin-year">
-        @for (fy of finYears; track fy) {
-          <option [value]="fy">{{ fy }}</option>
-        }
-      </select>
+      <div class="field-readonly" data-testid="display-fin-year">{{ finYear }}</div>
     </div>
     <div class="field-group">
       <span class="field-label">Month</span>
-      <select class="field-select" [(ngModel)]="finMonth" data-testid="select-fin-month">
-        @for (m of months; track m.value) {
-          <option [value]="m.value">{{ m.label }}</option>
-        }
-      </select>
-    </div>
-    <div class="field-group">
-      <span class="field-label">Run Type</span>
-      <select class="field-select" [(ngModel)]="runType" data-testid="select-run-type">
-        <option value="trial-review">Trial Review</option>
-        <option value="trial-run">Trial Run</option>
-      </select>
+      <div class="field-readonly" data-testid="display-fin-month">{{ currentMonthLabel }}</div>
     </div>
     <div class="field-group">
       <span class="field-label">Handover Option</span>
-      <select class="field-select" [(ngModel)]="handoverOption" data-testid="select-handover-option">
-        <option value="account">Account</option>
-        <option value="bulk">Bulk</option>
-        <option value="rotation">Rotation</option>
+      <select class="field-select" [(ngModel)]="handoverOption" [disabled]="step !== 'configure'" data-testid="select-handover-option">
+        <option value="account">Single Account</option>
+        <option value="bulk">Bulk (by filters)</option>
+        @if (config()?.activateRotation) { <option value="rotation">Rotation (attorney split)</option> }
       </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Section 129 Configuration</span>
+      <div class="config-summary-pill">
+        @if (configLoading()) { <span class="text-muted">Loading...</span> }
+        @else if (config()) {
+          <span>Lapse: {{ config()!.lapseDays }}d</span>
+          <span class="pill-sep">·</span>
+          <span>Min: R{{ (config()!.minimumAmount ?? 0).toFixed(0) }}</span>
+          <span class="pill-sep">·</span>
+          <span>{{ config()!.demandLetterTemplate || '—' }}</span>
+        } @else { <span class="text-muted">No config for this year</span> }
+      </div>
     </div>
   </div>
 
   <div class="content-area">
-    <div class="card">
-      <div class="card-body">
-        <div class="card-title-row">
-          <h2 class="card-title">Section 129 Configuration</h2>
-        </div>
-        @if (configLoading()) {
-          <div class="loading-inline">
-            <span class="spinner"></span>
-            Loading configuration...
-          </div>
-        } @else if (config()) {
-          <div class="config-grid">
-            <div class="config-value">
-              <div class="config-value-label">Demand Letter Template</div>
-              <div class="config-value-text" data-testid="text-config-demand-letter">{{ config()!.demandLetterTemplate || '—' }}</div>
-            </div>
-            <div class="config-value">
-              <div class="config-value-label">SMS Template</div>
-              <div class="config-value-text" data-testid="text-config-sms-template">{{ config()!.smsTemplate || '—' }}</div>
-            </div>
-            <div class="config-value">
-              <div class="config-value-label">Admin Fees</div>
-              <div class="config-value-text" data-testid="text-config-admin-fees">R {{ (config()!.adminFees ?? 0).toFixed(2) }}</div>
-            </div>
-            <div class="config-value">
-              <div class="config-value-label">Lapse Days</div>
-              <div class="config-value-text" data-testid="text-config-lapse-days">{{ config()!.lapseDays }}</div>
-            </div>
-            <div class="config-value">
-              <div class="config-value-label">Interest Rate</div>
-              <div class="config-value-text" data-testid="text-config-interest-rate">{{ config()!.interestRate ?? 0 }}%</div>
-            </div>
-            <div class="config-value">
-              <div class="config-value-label">Minimum Amount</div>
-              <div class="config-value-text" data-testid="text-config-min-amount">R {{ (config()!.minimumAmount ?? 0).toFixed(2) }}</div>
-            </div>
-          </div>
-        } @else {
-          <p class="text-muted" data-testid="text-config-error">Configuration could not be loaded from the API.</p>
-        }
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="card-body">
-        <div class="card-title-row">
-          <h2 class="card-title">Filter Parameters</h2>
+    <!-- ══════════════════════════════════════════════════════════════════
+         STEP 1: CONFIGURE
+    ══════════════════════════════════════════════════════════════════ -->
+    @if (step === 'configure') {
+      @if (handoverOption === 'account') {
+        <div class="card">
+          <div class="card-body">
+            <div class="card-title-row"><h2 class="card-title">Single Account</h2></div>
+            <p class="text-muted" style="margin-bottom:1rem;font-size:13px">Enter the account number to check if it qualifies for a Section 129 notice and preview the details.</p>
+            <div class="filter-grid-2">
+              <div class="field-group">
+                <span class="field-label">Account Number <span class="req-star">*</span></span>
+                <input class="field-input" [class.field-invalid]="missingAccountNumber" [(ngModel)]="accountNumber" placeholder="e.g. 000000016360" data-testid="input-account-number" />
+                @if (missingAccountNumber) { <span class="field-error-msg">Account number is required</span> }
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="filter-grid">
-          <div class="field-group">
-            <span class="field-label">Billing Cycle</span>
-            <select class="field-select" [(ngModel)]="billingCycle" data-testid="select-billing-cycle">
-              <option value="">Select cycle</option>
-              @for (c of billingCycles; track c.id) {
-                <option [value]="c.id">{{ c.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Town</span>
-            <select class="field-select" [(ngModel)]="town" (ngModelChange)="onTownChange()" data-testid="select-town">
-              <option value="__all__">All Towns</option>
-              @for (t of towns; track t.id) {
-                <option [value]="t.id">{{ t.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Suburb</span>
-            <select class="field-select" [(ngModel)]="suburb" [disabled]="!town || town === '__all__' || suburbsLoading" data-testid="select-suburb">
-              @if (suburbsLoading) {
-                <option value="">Loading suburbs...</option>
-              } @else if (suburbs.length === 0) {
-                <option value="">{{ !town || town === '__all__' ? 'Select a town first' : 'No suburbs available' }}</option>
-              } @else {
-                <option value="__all__">All Suburbs</option>
-                @for (s of suburbs; track s.id) {
-                  <option [value]="s.id">{{ s.name }}</option>
+      } @else {
+        <div class="card">
+          <div class="card-body">
+            <div class="card-title-row"><h2 class="card-title">Filter Parameters <span class="required-note">(Billing Cycle is required)</span></h2></div>
+            <div class="filter-grid">
+              <div class="field-group">
+                <span class="field-label">Billing Cycle <span class="req-star">*</span></span>
+                <select class="field-select" [class.field-invalid]="missingBillingCycle" [(ngModel)]="billingCycle" data-testid="select-billing-cycle">
+                  <option value="">Select cycle</option>
+                  @for (c of billingCycles; track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+                </select>
+                @if (missingBillingCycle) { <span class="field-error-msg">Billing cycle is required</span> }
+              </div>
+              <div class="field-group multi-select-wrap">
+                <span class="field-label">Town</span>
+                <button type="button" class="multi-trigger" [class.open]="townDropdownOpen" (click)="toggleTownDropdown($event)" data-testid="select-town-multi">
+                  <span class="multi-trigger-text">{{ townTriggerText }}</span>
+                  <span class="multi-trigger-arrow">{{ townDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (townDropdownOpen) {
+                  <div class="multi-dropdown" data-testid="town-dropdown" (click)="$event.stopPropagation()">
+                    <div class="multi-dd-header">
+                      <input class="multi-dd-search" type="text" [(ngModel)]="townSearchText" placeholder="Search..." data-testid="input-town-search" />
+                    </div>
+                    <div class="multi-dd-actions">
+                      <button type="button" class="multi-dd-action" (click)="selectAllTowns()" data-testid="button-select-all-towns">All</button>
+                      <button type="button" class="multi-dd-action" (click)="clearAllTowns()" data-testid="button-clear-all-towns">Clear</button>
+                    </div>
+                    <div class="multi-dd-list">
+                      @for (t of filteredTowns; track t.id) {
+                        <label class="multi-dd-item" (click)="$event.preventDefault(); toggleTown(t)">
+                          <input type="checkbox" [checked]="isTownSelected(t.id)" tabindex="-1" />
+                          <span>{{ t.name }}</span>
+                        </label>
+                      }
+                      @if (filteredTowns.length === 0) {
+                        <div class="multi-dd-empty">No towns match your search</div>
+                      }
+                    </div>
+                  </div>
                 }
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Property Category</span>
-            <select class="field-select" [(ngModel)]="propertyCategory" data-testid="select-property-category">
-              <option value="__all__">All Categories</option>
-              @for (pc of propertyCategories; track pc.id) {
-                <option [value]="pc.id">{{ pc.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Account Type</span>
-            <select class="field-select" [(ngModel)]="accountType" data-testid="select-account-type">
-              <option value="__all__">All Types</option>
-              @for (at of accountTypes; track at.id) {
-                <option [value]="at.id">{{ at.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Type of Person</span>
-            <select class="field-select" [(ngModel)]="typeOfPerson" data-testid="select-type-of-person">
-              <option value="__all__">All</option>
-              @for (pt of personTypes; track pt.id) {
-                <option [value]="pt.id">{{ pt.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field-group">
-            <span class="field-label">Service Group Code</span>
-            <input class="field-input" [(ngModel)]="serviceGroupCode" placeholder="Enter code" data-testid="input-service-group" />
-          </div>
-          <div class="field-group">
-            <span class="field-label">Ageing</span>
-            <select class="field-select" [(ngModel)]="ageing" data-testid="select-ageing">
-              <option value="__all__">All</option>
-              @for (a of ageingRanges; track a.id) {
-                <option [value]="a.id">{{ a.name }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <div class="toggle-row">
-          <div class="toggle-item">
-            <input type="checkbox" id="includeIndigents" [(ngModel)]="includeIndigents" data-testid="checkbox-include-indigents" />
-            <label for="includeIndigents">Include Indigents</label>
-          </div>
-          <div class="toggle-item">
-            <input type="checkbox" id="includePensioners" [(ngModel)]="includePensioners" data-testid="checkbox-include-pensioners" />
-            <label for="includePensioners">Include Pensioners</label>
-          </div>
-          <div class="toggle-item">
-            <input type="checkbox" id="excludeDeposits" [(ngModel)]="excludeDepositBalances" data-testid="checkbox-exclude-deposits" />
-            <label for="excludeDeposits">Exclude Deposit Balances</label>
-          </div>
-          <div class="field-group" style="min-width:10rem">
-            <span class="field-label">Amount Greater Than</span>
-            <input type="number" class="field-input" [(ngModel)]="amountGreaterThan" placeholder="0.00" data-testid="input-amount-greater" />
-          </div>
-        </div>
-
-        <div class="contact-grid">
-          <div class="field-group">
-            <span class="field-label">Contact Person</span>
-            <input class="field-input" [(ngModel)]="contactPerson" placeholder="Name" data-testid="input-contact-person" />
-          </div>
-          <div class="field-group">
-            <span class="field-label">Contact Phone</span>
-            <input class="field-input" [(ngModel)]="contactPhone" placeholder="Phone" data-testid="input-contact-phone" />
-          </div>
-          <div class="field-group">
-            <span class="field-label">Contact Email</span>
-            <input class="field-input" [(ngModel)]="contactEmail" placeholder="Email" data-testid="input-contact-email" />
-          </div>
-        </div>
-
-        <div class="distribution-section">
-          <div class="field-group">
-            <span class="field-label">Distribution Type</span>
-            <select class="field-select" [(ngModel)]="distributionType" data-testid="select-distribution-type">
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="print">Print</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-          @if (distributionType === 'email') {
-            <div class="toggle-item">
-              <input type="checkbox" id="mustEmailBePrinted" [(ngModel)]="mustEmailBePrinted" data-testid="checkbox-email-print" />
-              <label for="mustEmailBePrinted">Must Email be Printed?</label>
+                @if (selectedTowns.length > 0) {
+                  <div class="multi-chips">
+                    @for (t of selectedTowns; track t.id) {
+                      <span class="multi-chip">
+                        {{ t.name }}
+                        <span class="multi-chip-x" (click)="removeTown(t.id)">&times;</span>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="field-group suburb-multi">
+                <span class="field-label">Suburbs</span>
+                <button type="button" class="suburb-trigger" [class.open]="suburbDropdownOpen"
+                  [disabled]="selectedTowns.length === 0 || suburbsLoading"
+                  (click)="toggleSuburbDropdown()" data-testid="select-suburb-multi">
+                  <span class="suburb-trigger-text">{{ suburbTriggerText }}</span>
+                  <span class="suburb-trigger-arrow">{{ suburbDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (suburbDropdownOpen) {
+                  <div class="suburb-dropdown" data-testid="suburb-dropdown" (click)="$event.stopPropagation()">
+                    <div class="suburb-dd-header">
+                      <div class="suburb-mode-toggle">
+                        <button type="button" class="suburb-mode-btn" [class.active-include]="suburbMode === 'include'" (click)="suburbMode = 'include'" data-testid="button-suburb-include">Include</button>
+                        <button type="button" class="suburb-mode-btn" [class.active-exclude]="suburbMode === 'exclude'" (click)="suburbMode = 'exclude'" data-testid="button-suburb-exclude">Exclude</button>
+                      </div>
+                      <input class="suburb-search" type="text" [(ngModel)]="suburbSearchText" placeholder="Search suburbs..." data-testid="input-suburb-search" />
+                    </div>
+                    <div class="suburb-dd-actions">
+                      <button type="button" class="suburb-dd-action" (click)="selectAllSuburbs()" data-testid="button-select-all-suburbs">Select All</button>
+                      <button type="button" class="suburb-dd-action" (click)="clearAllSuburbs()" data-testid="button-clear-all-suburbs">Clear All</button>
+                    </div>
+                    <div class="suburb-dd-list">
+                      @for (s of filteredSuburbs; track s.id) {
+                        <label class="suburb-dd-item" (click)="$event.preventDefault(); toggleSuburb(s)">
+                          <input type="checkbox" [checked]="isSuburbSelected(s.id)" tabindex="-1" />
+                          <span>{{ s.name }}</span>
+                        </label>
+                      }
+                      @if (filteredSuburbs.length === 0) {
+                        <div class="suburb-dd-empty">No suburbs match your search</div>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (selectedSuburbs.length > 0) {
+                  <div class="suburb-chips">
+                    @for (s of selectedSuburbs; track s.id) {
+                      <span class="suburb-chip" [class.include]="suburbMode === 'include'" [class.exclude]="suburbMode === 'exclude'">
+                        {{ s.name }}
+                        <span class="suburb-chip-x" (click)="removeSuburb(s.id)">&times;</span>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+              <!-- Property Category multi-select -->
+              <div class="field-group multi-select-wrap">
+                <span class="field-label">Property Category</span>
+                <button type="button" class="multi-trigger" [class.open]="propCatDropdownOpen" (click)="togglePropCatDropdown($event)" data-testid="select-property-category">
+                  <span class="multi-trigger-text">{{ propCatTriggerText }}</span>
+                  <span class="multi-trigger-arrow">{{ propCatDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (propCatDropdownOpen) {
+                  <div class="multi-dropdown" (click)="$event.stopPropagation()">
+                    <div class="multi-dd-header">
+                      <input class="multi-dd-search" type="text" [(ngModel)]="propCatSearchText" placeholder="Search..." />
+                    </div>
+                    <div class="multi-dd-actions">
+                      <button type="button" class="multi-dd-action" (click)="selectAllPropCat()">All</button>
+                      <button type="button" class="multi-dd-action" (click)="clearAllPropCat()">Clear</button>
+                    </div>
+                    <div class="multi-dd-list">
+                      @for (p of filteredPropertyCategories; track p.id) {
+                        <label class="multi-dd-item" (click)="$event.preventDefault(); togglePropCat(p)">
+                          <input type="checkbox" [checked]="isPropCatSelected(p.id)" tabindex="-1" />
+                          <span>{{ p.name }}</span>
+                        </label>
+                      }
+                      @if (filteredPropertyCategories.length === 0) { <div class="multi-dd-empty">No results</div> }
+                    </div>
+                  </div>
+                }
+                @if (selectedPropertyCategories.length > 0) {
+                  <div class="multi-chips">
+                    @for (p of selectedPropertyCategories; track p.id) {
+                      <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePropCat(p.id)">&times;</span></span>
+                    }
+                  </div>
+                }
+              </div>
+              <!-- Property Type of Use multi-select -->
+              <div class="field-group multi-select-wrap">
+                <span class="field-label">Property Type of Use</span>
+                <button type="button" class="multi-trigger" [class.open]="propTypeDropdownOpen" (click)="togglePropTypeDropdown($event)" data-testid="select-property-type-of-use">
+                  <span class="multi-trigger-text">{{ propTypeTriggerText }}</span>
+                  <span class="multi-trigger-arrow">{{ propTypeDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (propTypeDropdownOpen) {
+                  <div class="multi-dropdown" (click)="$event.stopPropagation()">
+                    <div class="multi-dd-header">
+                      <input class="multi-dd-search" type="text" [(ngModel)]="propTypeSearchText" placeholder="Search..." />
+                    </div>
+                    <div class="multi-dd-actions">
+                      <button type="button" class="multi-dd-action" (click)="selectAllPropType()">All</button>
+                      <button type="button" class="multi-dd-action" (click)="clearAllPropType()">Clear</button>
+                    </div>
+                    <div class="multi-dd-list">
+                      @for (p of filteredPropertyTypesOfUse; track p.id) {
+                        <label class="multi-dd-item" (click)="$event.preventDefault(); togglePropType(p)">
+                          <input type="checkbox" [checked]="isPropTypeSelected(p.id)" tabindex="-1" />
+                          <span>{{ p.name }}</span>
+                        </label>
+                      }
+                      @if (filteredPropertyTypesOfUse.length === 0) { <div class="multi-dd-empty">No results</div> }
+                    </div>
+                  </div>
+                }
+                @if (selectedPropertyTypesOfUse.length > 0) {
+                  <div class="multi-chips">
+                    @for (p of selectedPropertyTypesOfUse; track p.id) {
+                      <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePropType(p.id)">&times;</span></span>
+                    }
+                  </div>
+                }
+              </div>
+              <!-- Account Type multi-select -->
+              <div class="field-group multi-select-wrap">
+                <span class="field-label">Account Type</span>
+                <button type="button" class="multi-trigger" [class.open]="accTypeDropdownOpen" (click)="toggleAccTypeDropdown($event)" data-testid="select-account-type">
+                  <span class="multi-trigger-text">{{ accTypeTriggerText }}</span>
+                  <span class="multi-trigger-arrow">{{ accTypeDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (accTypeDropdownOpen) {
+                  <div class="multi-dropdown" (click)="$event.stopPropagation()">
+                    <div class="multi-dd-header">
+                      <input class="multi-dd-search" type="text" [(ngModel)]="accTypeSearchText" placeholder="Search..." />
+                    </div>
+                    <div class="multi-dd-actions">
+                      <button type="button" class="multi-dd-action" (click)="selectAllAccType()">All</button>
+                      <button type="button" class="multi-dd-action" (click)="clearAllAccType()">Clear</button>
+                    </div>
+                    <div class="multi-dd-list">
+                      @for (a of filteredAccountTypes; track a.id) {
+                        <label class="multi-dd-item" (click)="$event.preventDefault(); toggleAccType(a)">
+                          <input type="checkbox" [checked]="isAccTypeSelected(a.id)" tabindex="-1" />
+                          <span>{{ a.name }}</span>
+                        </label>
+                      }
+                      @if (filteredAccountTypes.length === 0) { <div class="multi-dd-empty">No results</div> }
+                    </div>
+                  </div>
+                }
+                @if (selectedAccountTypes.length > 0) {
+                  <div class="multi-chips">
+                    @for (a of selectedAccountTypes; track a.id) {
+                      <span class="multi-chip">{{ a.name }} <span class="multi-chip-x" (click)="removeAccType(a.id)">&times;</span></span>
+                    }
+                  </div>
+                }
+              </div>
+              <!-- Type of Person multi-select -->
+              <div class="field-group multi-select-wrap">
+                <span class="field-label">Type of Person</span>
+                <button type="button" class="multi-trigger" [class.open]="personTypeDropdownOpen" (click)="togglePersonTypeDropdown($event)" data-testid="select-type-of-person">
+                  <span class="multi-trigger-text">{{ personTypeTriggerText }}</span>
+                  <span class="multi-trigger-arrow">{{ personTypeDropdownOpen ? '▲' : '▼' }}</span>
+                </button>
+                @if (personTypeDropdownOpen) {
+                  <div class="multi-dropdown" (click)="$event.stopPropagation()">
+                    <div class="multi-dd-header">
+                      <input class="multi-dd-search" type="text" [(ngModel)]="personTypeSearchText" placeholder="Search..." />
+                    </div>
+                    <div class="multi-dd-actions">
+                      <button type="button" class="multi-dd-action" (click)="selectAllPersonType()">All</button>
+                      <button type="button" class="multi-dd-action" (click)="clearAllPersonType()">Clear</button>
+                    </div>
+                    <div class="multi-dd-list">
+                      @for (p of filteredPersonTypes; track p.id) {
+                        <label class="multi-dd-item" (click)="$event.preventDefault(); togglePersonType(p)">
+                          <input type="checkbox" [checked]="isPersonTypeSelected(p.id)" tabindex="-1" />
+                          <span>{{ p.name }}</span>
+                        </label>
+                      }
+                      @if (filteredPersonTypes.length === 0) { <div class="multi-dd-empty">No results</div> }
+                    </div>
+                  </div>
+                }
+                @if (selectedPersonTypes.length > 0) {
+                  <div class="multi-chips">
+                    @for (p of selectedPersonTypes; track p.id) {
+                      <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePersonType(p.id)">&times;</span></span>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="field-group">
+                <span class="field-label">Ageing</span>
+                <select class="field-select" [(ngModel)]="ageing" data-testid="select-ageing">
+                  <option value="__all__">All</option>
+                  @for (a of ageingRanges; track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+                </select>
+              </div>
             </div>
+            <div class="toggle-row">
+              <div class="toggle-item"><input type="checkbox" id="incIndigents" [(ngModel)]="includeIndigents" /><label for="incIndigents">Include Indigents</label></div>
+              <div class="toggle-item"><input type="checkbox" id="incPensioners" [(ngModel)]="includePensioners" /><label for="incPensioners">Include Pensioners</label></div>
+              <div class="toggle-item"><input type="checkbox" id="exclDeposits" [(ngModel)]="excludeDepositBalances" /><label for="exclDeposits">Exclude Deposit Balances</label></div>
+              <div class="field-group" style="min-width:11rem">
+                <span class="field-label">Amount Greater Than
+                  @if (config()?.minimumAmount != null) {
+                    <span class="field-hint">(Config default: R{{ config()!.minimumAmount }})</span>
+                  }
+                </span>
+                <input type="number" class="field-input" [(ngModel)]="amountGreaterThan" placeholder="0.00" data-testid="input-amount-greater" />
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title-row"><h2 class="card-title">Contact &amp; Distribution</h2></div>
+          <div class="contact-grid">
+            <div class="field-group"><span class="field-label">Contact Person</span><input class="field-input" [(ngModel)]="contactPerson" placeholder="Name" /></div>
+            <div class="field-group"><span class="field-label">Contact Phone</span><input class="field-input" [(ngModel)]="contactPhone" placeholder="Phone" /></div>
+            <div class="field-group"><span class="field-label">Contact Email</span><input class="field-input" [(ngModel)]="contactEmail" placeholder="Email" /></div>
+          </div>
+          <div class="distribution-section">
+            <div class="field-group">
+              <span class="field-label">
+                Default Delivery Channel
+                <span class="field-hint">Applied to all accounts — you can override per account on the next screen</span>
+              </span>
+              <select class="field-select" [(ngModel)]="distributionType" data-testid="select-distribution-type">
+                <option value="email">Email</option><option value="sms">SMS</option>
+                <option value="whatsapp">WhatsApp</option><option value="print">Print</option><option value="all">All channels</option>
+              </select>
+            </div>
+            @if (distributionType === 'email') {
+              <div class="toggle-item"><input type="checkbox" id="emailPrint" [(ngModel)]="mustEmailBePrinted" /><label for="emailPrint">Must Email be Printed?</label></div>
+            }
+          </div>
+          <div class="action-bar" style="margin-top:1rem">
+            @if (missingConfig) {
+              <div class="validation-alert">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Section 129 configuration has not loaded — please wait or refresh the page before proceeding.
+              </div>
+            }
+            <button class="btn btn-primary btn-lg" (click)="handlePreview()" [disabled]="!canPreview" [title]="!canPreview ? 'Please fill in all required fields before previewing accounts' : ''" data-testid="button-preview">
+              🔍 Preview Qualifying Accounts
+            </button>
+            <button class="btn btn-ghost" (click)="clearFilters()" data-testid="button-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         STEP 2a: PREVIEWING (detailed progress)
+    ══════════════════════════════════════════════════════════════════ -->
+    @if (step === 'previewing') {
+      <div class="card preview-progress-card">
+        <div class="card-body">
+          <div class="pp-header">
+            <div class="pp-header-left">
+              <div class="pp-status-dot" [class.pp-dot-active]="pollProgress()" [class.pp-dot-submitting]="!pollProgress()"></div>
+              <div>
+                <h3 class="pp-title">
+                  @if (!pollProgress()) { Submitting to Platinum… }
+                  @else { Qualifying Accounts }
+                </h3>
+                <p class="pp-subtitle">
+                  @if (!pollProgress()) { Sending your filter criteria to the Platinum database for processing. }
+                  @else { Scanning the database for accounts matching your criteria. }
+                </p>
+              </div>
+            </div>
+            <div class="pp-timer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {{ formattedElapsed }}
+            </div>
+          </div>
+
+          <div class="pp-body">
+            <div class="pp-stats-row">
+              <div class="pp-stat">
+                <span class="pp-stat-val">
+                  @if (pollProgress() && pollProgress()!.completedAccounts > 0) {
+                    {{ pollProgress()!.completedAccounts | number }}
+                  } @else {
+                    —
+                  }
+                </span>
+                <span class="pp-stat-label">Accounts Found</span>
+              </div>
+              <div class="pp-stat">
+                <span class="pp-stat-val pp-stat-status">
+                  @if (!pollProgress()) { Submitting }
+                  @else { {{ pollProgress()!.statusDescription }} }
+                </span>
+                <span class="pp-stat-label">Status</span>
+              </div>
+              <div class="pp-stat">
+                <span class="pp-stat-val">Run #{{ activeRunId || '—' }}</span>
+                <span class="pp-stat-label">Run ID</span>
+              </div>
+            </div>
+
+            <div class="pp-progress-section">
+              @if (pollProgress() && pollProgress()!.progress >= 0) {
+                <div class="pp-progress-bar">
+                  <div class="pp-progress-fill" [style.width.%]="pollProgress()!.progress"></div>
+                </div>
+                <div class="pp-progress-meta">
+                  <span>{{ pollProgress()!.progress }}% complete</span>
+                  @if (pollProgress()!.completedAccounts > 0 && pollProgress()!.totalAccounts > 0) {
+                    <span>{{ pollProgress()!.completedAccounts | number }} of {{ pollProgress()!.totalAccounts | number }}</span>
+                  }
+                </div>
+              } @else {
+                <div class="pp-progress-bar">
+                  <div class="pp-progress-indeterminate"></div>
+                </div>
+                <div class="pp-progress-meta">
+                  <span>Processing…</span>
+                </div>
+              }
+            </div>
+
+            @if (appliedRunParams) {
+              <div class="pp-filters-section">
+                <div class="pp-filters-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                  <span>Applied Filters</span>
+                </div>
+                <div class="pp-filter-chips">
+                  <div class="pp-chip">
+                    <span class="pp-chip-key">Billing Cycle</span>
+                    <span class="pp-chip-val">{{ appliedRunParams.billingCycleName || '—' }}</span>
+                  </div>
+                  <div class="pp-chip">
+                    <span class="pp-chip-key">Min Amount</span>
+                    <span class="pp-chip-val">R {{ (appliedRunParams.amountGreaterThan ?? 0).toLocaleString('en-ZA', {minimumFractionDigits:2}) }}</span>
+                  </div>
+                  @if (appliedRunParams.propertyCategory) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Property Category</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.propertyCategory }}</span>
+                    </div>
+                  }
+                  @if (appliedRunParams.towns) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Town</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.towns }}</span>
+                    </div>
+                  }
+                  @if (appliedRunParams.suburbs) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Suburbs ({{ appliedRunParams.suburbMode }})</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.suburbs }}</span>
+                    </div>
+                  }
+                  @if (appliedRunParams.accountType) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Account Type</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.accountType }}</span>
+                    </div>
+                  }
+                  @if (appliedRunParams.typeOfPerson) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Person Type</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.typeOfPerson }}</span>
+                    </div>
+                  }
+                  @if (appliedRunParams.ageing) {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Ageing</span>
+                      <span class="pp-chip-val">{{ appliedRunParams.ageing }}</span>
+                    </div>
+                  }
+                  <div class="pp-chip" [class.pp-chip-excluded]="!appliedRunParams.includeIndigents">
+                    <span class="pp-chip-key">Indigents</span>
+                    <span class="pp-chip-val">{{ appliedRunParams.includeIndigents ? 'Included' : 'Excluded' }}</span>
+                  </div>
+                  <div class="pp-chip" [class.pp-chip-excluded]="!appliedRunParams.includePensioners">
+                    <span class="pp-chip-key">Pensioners</span>
+                    <span class="pp-chip-val">{{ appliedRunParams.includePensioners ? 'Included' : 'Excluded' }}</span>
+                  </div>
+                  @if (appliedRunParams.excludeDepositBalances) {
+                    <div class="pp-chip pp-chip-excluded">
+                      <span class="pp-chip-key">Deposit Balances</span>
+                      <span class="pp-chip-val">Excluded</span>
+                    </div>
+                  } @else {
+                    <div class="pp-chip">
+                      <span class="pp-chip-key">Deposit Balances</span>
+                      <span class="pp-chip-val">Included</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="pp-footer">
+            <button class="btn btn-outline btn-sm" (click)="goBackToConfigure()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         STEP 2b: REVIEW ACCOUNTS
+    ══════════════════════════════════════════════════════════════════ -->
+    @if (step === 'review') {
+      <!-- Summary banner -->
+      <div class="review-summary-bar">
+        <div class="review-summary-stat">
+          <span class="review-summary-val" data-testid="text-selected-count">{{ selectedCount }}</span>
+          <span class="review-summary-lbl">of {{ totalCount }} selected</span>
+        </div>
+        <div class="review-summary-sep"></div>
+        <div class="review-summary-stat">
+          <span class="review-summary-val">R {{ selectedTotal.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+          <span class="review-summary-lbl">outstanding (selected)</span>
+        </div>
+        @if (selectedCount > 0) {
+          <div class="review-summary-sep"></div>
+          <!-- Channel breakdown pills -->
+          <div class="channel-breakdown">
+            @if (emailCount > 0) {
+              <span class="ch-pill ch-email">
+                <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                {{ emailCount }}
+              </span>
+            }
+            @if (smsCount > 0) {
+              <span class="ch-pill ch-sms">
+                <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                {{ smsCount }}
+              </span>
+            }
+            @if (whatsappCount > 0) {
+              <span class="ch-pill ch-whatsapp">
+                <svg class="ch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                {{ whatsappCount }}
+              </span>
+            }
+            @if (printCount > 0) {
+              <span class="ch-pill ch-print">
+                <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                {{ printCount }}
+              </span>
+            }
+            @if (noContactCount > 0) { <span class="ch-pill ch-warn">⚠ {{ noContactCount }} no contact</span> }
+          </div>
+        }
+        <div class="review-summary-actions">
+          <!-- Bulk set channel -->
+          @if (selectedCount > 0) {
+            <span class="bulk-label">Set all →</span>
+            <button class="ch-bulk-btn ch-bulk-email" title="Email all selected (falls back to Print if no email address on file)" (click)="setAllChannels('email')" data-testid="button-set-all-email">
+              <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              Email
+            </button>
+            <button class="ch-bulk-btn ch-bulk-sms" title="SMS all selected (falls back to Print if no cell number on file)" (click)="setAllChannels('sms')" data-testid="button-set-all-sms">
+              <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              SMS
+            </button>
+            <button class="ch-bulk-btn ch-bulk-whatsapp" title="WhatsApp all selected (falls back to Print if no cell number on file)" (click)="setAllChannels('whatsapp')" data-testid="button-set-all-whatsapp">
+              <svg class="ch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+              WhatsApp
+            </button>
+            <button class="ch-bulk-btn ch-bulk-print" title="Print all selected — generate physical letters" (click)="setAllChannels('print')" data-testid="button-set-all-print">
+              <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print
+            </button>
+            <div class="review-summary-sep"></div>
+          }
+          <button class="btn btn-outline btn-sm" (click)="selectAll()">Select All</button>
+          <button class="btn btn-outline btn-sm" (click)="deselectAll()">Deselect All</button>
+        </div>
+      </div>
+
+      <!-- Applied filter summary -->
+      @if (appliedRunParams) {
+        <div class="filter-summary-bar">
+          <svg class="filter-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span class="filter-summary-label">Filters applied:</span>
+          <span class="filter-chip">
+            <span class="filter-chip-key">Billing Cycle</span>
+            <span class="filter-chip-val">{{ appliedRunParams.billingCycleName || '—' }}</span>
+          </span>
+          @if (appliedRunParams.towns) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Town</span>
+              <span class="filter-chip-val">{{ appliedRunParams.towns }}</span>
+            </span>
+          }
+          @if (appliedRunParams.suburbs) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Suburbs ({{ appliedRunParams.suburbMode }})</span>
+              <span class="filter-chip-val">{{ appliedRunParams.suburbs }}</span>
+            </span>
+          }
+          @if (appliedRunParams.propertyCategory) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Category</span>
+              <span class="filter-chip-val">{{ appliedRunParams.propertyCategory }}</span>
+            </span>
+          }
+          @if (appliedRunParams.accountType) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Account Type</span>
+              <span class="filter-chip-val">{{ appliedRunParams.accountType }}</span>
+            </span>
+          }
+          @if (appliedRunParams.typeOfPerson) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Person Type</span>
+              <span class="filter-chip-val">{{ appliedRunParams.typeOfPerson }}</span>
+            </span>
+          }
+          @if (appliedRunParams.ageing) {
+            <span class="filter-chip">
+              <span class="filter-chip-key">Ageing</span>
+              <span class="filter-chip-val">{{ appliedRunParams.ageing }}</span>
+            </span>
+          }
+          @if (appliedRunParams.amountGreaterThan !== null && appliedRunParams.amountGreaterThan > 0) {
+            <span class="filter-chip filter-chip-amount">
+              <span class="filter-chip-key">Min Amount</span>
+              <span class="filter-chip-val">R {{ appliedRunParams.amountGreaterThan.toLocaleString('en-ZA', {minimumFractionDigits: 2}) }}</span>
+            </span>
+          }
+          <span class="filter-chip" [class.filter-chip-off]="!appliedRunParams.includeIndigents">
+            <span class="filter-chip-key">Indigents</span>
+            <span class="filter-chip-val">{{ appliedRunParams.includeIndigents ? 'Included' : 'Excluded' }}</span>
+          </span>
+          <span class="filter-chip" [class.filter-chip-off]="!appliedRunParams.includePensioners">
+            <span class="filter-chip-key">Pensioners</span>
+            <span class="filter-chip-val">{{ appliedRunParams.includePensioners ? 'Included' : 'Excluded' }}</span>
+          </span>
+          <span class="filter-chip" [class.filter-chip-off]="appliedRunParams.excludeDepositBalances">
+            <span class="filter-chip-key">Deposit Balances</span>
+            <span class="filter-chip-val">{{ appliedRunParams.excludeDepositBalances ? 'Excluded' : 'Included' }}</span>
+          </span>
+          @if (appliedRunParams.clientFiltered > 0) {
+            <span class="filter-chip-alert">
+              ⚠ {{ appliedRunParams.clientFiltered }} account{{ appliedRunParams.clientFiltered !== 1 ? 's' : '' }} deselected — below minimum amount threshold
+            </span>
           }
         </div>
+      }
 
-        <div class="action-bar">
-          <button class="btn btn-primary" (click)="handleSubmit()" [disabled]="submitting()" data-testid="button-submit">
-            @if (submitting()) { <span class="spinner"></span> }
-            Submit Run
-          </button>
-          <button class="btn btn-outline" (click)="handleClear()" data-testid="button-clear">Clear</button>
+      <!-- No contact info warning -->
+      @if (noContactCount > 0) {
+        <div class="alert-warn">
+          <span>⚠</span>
+          <span><strong>{{ noContactCount }} account{{ noContactCount !== 1 ? 's' : '' }}</strong> assigned to a channel with no matching contact info — they have been set to <strong>Print</strong> automatically. You can override per account in the grid below.</span>
         </div>
-      </div>
-    </div>
+      }
 
-    <div class="card">
-      <div class="card-body" style="padding:0">
-        @if (runsLoading()) {
-          <div class="loading-center">
-            <span class="spinner spinner-lg"></span>
-            <p>Loading runs...</p>
+      <!-- Account grid -->
+      <div class="card">
+        <div class="card-body" style="padding-bottom:0">
+          <div class="card-title-row" style="justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
+            <div style="display:flex;align-items:center;gap:0.75rem">
+              <h2 class="card-title" style="margin:0">Qualifying Accounts <span class="badge-count">{{ totalCount }}</span></h2>
+              @if (namesFetching()) { <span class="spinner" style="width:14px;height:14px" title="Loading account names…"></span> }
+              @if (contactsEnriching()) { <span class="spinner" style="width:14px;height:14px" title="Loading contact details…"></span> <span style="font-size:11px;color:var(--platinum-primary);opacity:0.7">{{ contactsEnrichProgress() }}</span> }
+              @if (!contactsEnriching() && contactsEnrichProgress()) { <span style="font-size:11px;color:#388e3c">{{ contactsEnrichProgress() }}</span> }
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" (click)="downloadReviewCSV()" [disabled]="exportingReviewCsv || reviewAccounts().length === 0" title="Export all qualifying accounts to CSV" data-testid="button-export-review-csv">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                @if (exportingReviewCsv) { <span class="spinner" style="width:12px;height:12px"></span> } @else { Export CSV }
+              </button>
+              <label style="font-size:12px;color:var(--text-muted);white-space:nowrap">Rows per page:</label>
+              <select class="field-input-sm" style="width:5rem;padding:4px 8px" (change)="setAccPageSize(+$any($event.target).value)" [value]="accPageSize" data-testid="select-page-size">
+                @for (sz of ACC_PAGE_SIZES; track sz) { <option [value]="sz" [selected]="sz === accPageSize">{{ sz }}</option> }
+              </select>
+              <input class="field-input-sm" style="width:15rem" [(ngModel)]="accountSearchText" (ngModelChange)="onAccountSearch()" placeholder="Search account / name…" data-testid="input-account-search" />
+            </div>
           </div>
-        } @else if (runs().length === 0) {
-          <div class="loading-center">
-            <p class="text-muted">No Section 129 runs found.</p>
+        </div>
+        @if (accountsLoading()) {
+          <div class="loading-center"><span class="spinner spinner-lg"></span><p>Loading {{ totalCount > 0 ? totalCount + ' ' : '' }}accounts…</p></div>
+        } @else if (reviewAccounts().length === 0) {
+          <div class="empty-state">
+            <p style="font-size:2rem;margin-bottom:0.5rem">🚫</p>
+            <p style="font-weight:600">No qualifying accounts found</p>
+            <p class="text-muted" style="font-size:13px">Try adjusting your filters — e.g. a different billing cycle or ageing range.</p>
+            <button class="btn btn-outline" style="margin-top:1rem" (click)="goBackToConfigure()">← Change Filters</button>
           </div>
         } @else {
           <div class="table-container">
             <table>
               <thead>
                 <tr>
-                  <th>Run ID</th>
-                  <th>Status</th>
-                  <th>Run Type</th>
-                  <th>Distribution</th>
-                  <th>Handover</th>
-                  <th>Actioned By</th>
-                  <th>Date Created</th>
+                  <th style="width:2.5rem"><input type="checkbox" [checked]="selectedCount === totalCount" (change)="selectedCount === totalCount ? deselectAll() : selectAll()" /></th>
+                  <th>Account No</th>
+                  <th>Name / Description</th>
                   <th>Billing Cycle</th>
-                  <th class="text-right">Accounts</th>
-                  <th class="text-right">Amount</th>
-                  <th>Actions</th>
+                  <th>Ageing</th>
+                  <th class="text-right">Outstanding</th>
+                  <th class="text-center" style="min-width:11rem">
+                    <span>Delivery Channel</span>
+                    <div class="col-sub">Set now · Sent on Final Run</div>
+                  </th>
+                  <th style="width:2.5rem"></th>
                 </tr>
               </thead>
               <tbody>
-                @for (run of paginatedRuns; track run.runId) {
-                  <tr class="clickable" (click)="handleRowClick(run)" [attr.data-testid]="'row-run-' + run.runId" [class.running-row]="isRunning(run.runId)">
-                    <td class="font-mono" [attr.data-testid]="'text-runid-' + run.runId">{{ run.runId }}</td>
+                @for (acc of pagedAccounts; track acc.accountId) {
+                  <tr [class.deselected-row]="!acc.selected" (click)="toggleAccount(acc)" style="cursor:pointer" [attr.data-testid]="'row-account-' + acc.accountNumber">
+                    <td (click)="$event.stopPropagation()">
+                      <input type="checkbox" [checked]="acc.selected" (change)="toggleAccount(acc)" />
+                    </td>
+                    <td class="font-mono">{{ acc.accountNumber || '—' }}</td>
                     <td>
-                      @if (isRunning(run.runId)) {
-                        <div class="progress-cell" [attr.data-testid]="'progress-' + run.runId">
-                          <span class="badge badge-running">
-                            <span class="spinner spinner-xs"></span>
-                            {{ getProgress(run.runId)!.statusDescription }}
-                          </span>
-                          <div class="progress-bar-container">
-                            <div class="progress-bar-fill" [style.width.%]="getProgress(run.runId)!.progress"></div>
-                          </div>
-                          <span class="progress-text">{{ getProgress(run.runId)!.progress }}% — {{ getProgress(run.runId)!.completedAccounts }}/{{ getProgress(run.runId)!.totalAccounts }} accounts</span>
-                        </div>
+                      @if (acc.accountName) {
+                        <span>{{ acc.accountName }}</span>
+                        @if (acc.hasEmail) { <span class="contact-dot contact-email" title="Email: {{ (acc.allEmails || [acc.email]).join(', ') }}">●</span> }
+                        @if (acc.hasCell) { <span class="contact-dot contact-cell" title="Phone: {{ (acc.allMobiles || [acc.cellNumber]).join(', ') }}">●</span> }
+                      } @else if (namesFetching()) {
+                        <span class="text-muted" style="font-size:11px;font-style:italic">loading…</span>
                       } @else {
-                        <span class="badge" [class]="getStatusColor(run.status)" [attr.data-testid]="'badge-status-' + run.runId">{{ run.status }}</span>
+                        <span class="text-muted">—</span>
                       }
                     </td>
-                    <td>{{ run.runType }}</td>
-                    <td>{{ run.distributionType || '—' }}</td>
-                    <td>{{ run.handoverOption || '—' }}</td>
-                    <td>{{ run.actionedBy || '—' }}</td>
-                    <td>{{ fmtDate(run.dateCreated) }}</td>
-                    <td>{{ run.billingCycle || '—' }}</td>
-                    <td class="text-right font-mono">{{ run.totalAccounts }}</td>
-                    <td class="text-right font-mono">R {{ run.totalAmount.toLocaleString('en-ZA', {minimumFractionDigits: 2}) }}</td>
-                    <td (click)="$event.stopPropagation()">
-                      <div class="actions-cell">
-                        <button class="btn btn-ghost btn-sm btn-icon" (click)="openFileModal(run.runId)" title="View Files" [attr.data-testid]="'button-files-' + run.runId">📄</button>
-                        @if (run.status === 'Trial Run' || run.status === 'Approved') {
-                          <button class="btn btn-ghost btn-sm btn-icon" (click)="handleFinalRun(run.runId)" [disabled]="finalRunningId === run.runId" title="Final Run" [attr.data-testid]="'button-final-' + run.runId">
-                            @if (finalRunningId === run.runId) { <span class="spinner"></span> } @else { ▶ }
+                    <td>{{ acc.billingCycle || '—' }}</td>
+                    <td>{{ acc.ageingRange || '—' }}</td>
+                    <td class="text-right font-mono">R {{ (acc.outstandingAmount || 0).toLocaleString('en-ZA', {minimumFractionDigits: 2}) }}</td>
+                    <!-- Per-account channel toggle buttons -->
+                    <td class="text-center" (click)="$event.stopPropagation()">
+                      @if (acc.selected) {
+                        <div class="ch-toggle-group">
+                          <button class="ch-toggle-btn ch-toggle-email"
+                            [class.active]="acc.channel === 'email'"
+                            [disabled]="!acc.hasEmail"
+                            [title]="acc.hasEmail ? 'Email · ' + acc.email : 'No email address on file'"
+                            (click)="setAccountChannel(acc.accountId, 'email', $event)"
+                            [attr.data-testid]="'btn-ch-email-' + acc.accountNumber">
+                            <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                           </button>
-                        }
-                        @if (canDeleteRun(run)) {
-                          <button class="btn btn-ghost btn-sm btn-icon" style="color:#ef4444" (click)="confirmDelete(run.runId)" title="Delete" [attr.data-testid]="'button-delete-' + run.runId">🗑</button>
-                        }
-                      </div>
+                          <button class="ch-toggle-btn ch-toggle-sms"
+                            [class.active]="acc.channel === 'sms'"
+                            [disabled]="!acc.hasCell"
+                            [title]="acc.hasCell ? 'SMS · ' + acc.cellNumber : 'No cell number on file'"
+                            (click)="setAccountChannel(acc.accountId, 'sms', $event)"
+                            [attr.data-testid]="'btn-ch-sms-' + acc.accountNumber">
+                            <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          </button>
+                          <button class="ch-toggle-btn ch-toggle-whatsapp"
+                            [class.active]="acc.channel === 'whatsapp'"
+                            [disabled]="!acc.hasCell"
+                            [title]="acc.hasCell ? 'WhatsApp · ' + acc.cellNumber : 'No cell number on file'"
+                            (click)="setAccountChannel(acc.accountId, 'whatsapp', $event)"
+                            [attr.data-testid]="'btn-ch-wa-' + acc.accountNumber">
+                            <svg class="ch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                          </button>
+                          <button class="ch-toggle-btn ch-toggle-print"
+                            [class.active]="acc.channel === 'print'"
+                            title="Print a physical letter"
+                            (click)="setAccountChannel(acc.accountId, 'print', $event)"
+                            [attr.data-testid]="'btn-ch-print-' + acc.accountNumber">
+                            <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                          </button>
+                        </div>
+                      } @else {
+                        <span class="excluded-badge" [title]="acc.exclusionReason || 'This account does not meet the run criteria and will not receive a notice'">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          excluded
+                        </span>
+                      }
                     </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          @if (totalGridPages > 1) {
-            <div class="pagination">
-              <span class="pagination-info" data-testid="text-pagination-info">Page {{ gridPage }} of {{ totalGridPages }} ({{ runs().length }} runs)</span>
-              <div class="pagination-buttons">
-                <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="gridPage <= 1" data-testid="button-prev-page">‹</button>
-                <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="gridPage >= totalGridPages" data-testid="button-next-page">›</button>
-              </div>
-            </div>
-          }
-        }
-      </div>
-    </div>
-  </div>
-
-  @if (fileModalOpen) {
-    <div class="modal-overlay" (click)="closeFileModal()">
-      <div class="modal-content" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3 class="modal-title">Run #{{ fileModalRunId }} — Files</h3>
-          <button class="btn btn-ghost btn-icon" (click)="closeFileModal()" data-testid="button-close-file-modal">✕</button>
-        </div>
-        <div class="modal-body">
-          @if (filesLoading) {
-            <div class="loading-inline"><span class="spinner"></span> Loading files...</div>
-          } @else if (runFiles.length === 0) {
-            <p class="text-muted">No files found for this run.</p>
-          } @else {
-            <table>
-              <thead>
-                <tr>
-                  <th>File Name</th>
-                  <th>Type</th>
-                  <th class="text-right">Size</th>
-                  <th>Date</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (file of runFiles; track file.fileId) {
-                  <tr>
-                    <td>{{ file.fileName }}</td>
-                    <td>{{ file.fileType }}</td>
-                    <td class="text-right">{{ formatFileSize(file.fileSize) }}</td>
-                    <td>{{ fmtDate(file.dateCreated) }}</td>
-                    <td>
-                      <button class="btn btn-outline btn-sm" (click)="handleDownloadFile(file.fileId)" [disabled]="downloadingFileId === file.fileId" [attr.data-testid]="'button-download-' + file.fileId">
-                        @if (downloadingFileId === file.fileId) { <span class="spinner"></span> } @else { Download }
+                    <td class="text-center" (click)="$event.stopPropagation()">
+                      <button class="btn-enquiry-link" title="View account enquiry"
+                        (click)="openEnquiry(acc.accountNumber, acc.accountId)"
+                        [attr.data-testid]="'btn-enquiry-' + acc.accountNumber">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                       </button>
                     </td>
                   </tr>
                 }
               </tbody>
             </table>
+          </div>
+          <!-- Pagination footer -->
+          @if (filteredAccounts.length > accPageSize || accTotalPages > 1) {
+            <div class="pagination" style="padding:0.75rem 1.25rem;border-top:1px solid var(--border-color)">
+              <span class="pagination-info">
+                {{ accPageStart }}–{{ accPageEnd }} of {{ filteredAccounts.length }}
+                @if (filteredAccounts.length < totalCount) { <span class="text-muted">(filtered from {{ totalCount }})</span> }
+              </span>
+              <div class="pagination-buttons">
+                <button class="btn btn-outline btn-sm" (click)="accGoTo(1)" [disabled]="accPage <= 1" title="First page">«</button>
+                <button class="btn btn-outline btn-sm" (click)="accGoTo(accPage - 1)" [disabled]="accPage <= 1" title="Previous page">‹</button>
+                <span style="font-size:13px;padding:0 0.5rem;color:var(--text-secondary)">Page {{ accPage }} / {{ accTotalPages }}</span>
+                <button class="btn btn-outline btn-sm" (click)="accGoTo(accPage + 1)" [disabled]="accPage >= accTotalPages" title="Next page">›</button>
+                <button class="btn btn-outline btn-sm" (click)="accGoTo(accTotalPages)" [disabled]="accPage >= accTotalPages" title="Last page">»</button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Generate action bar -->
+      @if (reviewAccounts().length > 0) {
+        <div class="card">
+          <div class="card-body">
+            <div class="generate-footer">
+              <div class="generate-footer-info">
+                @if (selectedCount > 0) {
+                  <div class="generate-channel-summary">
+                    @if (emailCount > 0) {
+                      <span class="ch-pill ch-email">
+                        <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        {{ emailCount }} Email
+                      </span>
+                    }
+                    @if (smsCount > 0) {
+                      <span class="ch-pill ch-sms">
+                        <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        {{ smsCount }} SMS
+                      </span>
+                    }
+                    @if (whatsappCount > 0) {
+                      <span class="ch-pill ch-whatsapp">
+                        <svg class="ch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                        {{ whatsappCount }} WhatsApp
+                      </span>
+                    }
+                    @if (printCount > 0) {
+                      <span class="ch-pill ch-print">
+                        <svg class="ch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        {{ printCount }} Print
+                      </span>
+                    }
+                  </div>
+                  @if (distributionType === 'email' || emailCount > 0) {
+                    <div class="toggle-item" style="margin-top:0.5rem">
+                      <input type="checkbox" id="emailPrintFinal" [(ngModel)]="mustEmailBePrinted" />
+                      <label for="emailPrintFinal">Also print emailed notices</label>
+                    </div>
+                  }
+                }
+              </div>
+              <div class="action-bar" style="margin-top:0">
+                <button class="btn btn-outline" (click)="goBackToConfigure()" data-testid="button-back-to-configure">← Change Filters</button>
+                <button class="btn btn-primary btn-lg" (click)="handleGenerate()" [disabled]="selectedCount === 0" data-testid="button-generate">
+                  ✔ Submit Trial Review — {{ selectedCount }} Account{{ selectedCount !== 1 ? 's' : '' }} →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    }
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         STEP 3a: GENERATING (spinner)
+    ══════════════════════════════════════════════════════════════════ -->
+    @if (step === 'generating') {
+      <div class="card processing-card">
+        <div class="card-body">
+          <div class="processing-icon">📋</div>
+          <h3 class="processing-title">Submitting trial review…</h3>
+          <p class="processing-sub">Saving the selected accounts and delivery channel assignments for {{ selectedCount }} account{{ selectedCount !== 1 ? 's' : '' }}. Actual notices and PDFs are generated during the Final Run after supervisor authorization.</p>
+
+          <!-- Live batch submission status -->
+          @if (generateBatchStatus().length > 0) {
+            <div class="batch-status-list">
+              @for (batch of generateBatchStatus(); track batch.channel) {
+                <div class="batch-status-item" [class.batch-done]="batch.done">
+                  <span class="batch-icon">{{ batch.done ? '✅' : '⏳' }}</span>
+                  <span class="batch-label">{{ batch.channel | titlecase }} — {{ batch.count | number }} account{{ batch.count !== 1 ? 's' : '' }}</span>
+                  <span class="batch-state">{{ batch.done ? 'Submitted' : 'Queuing…' }}</span>
+                </div>
+              }
+            </div>
+          }
+          @if (pollProgress()) {
+            <div class="processing-progress-wrap">
+              <div class="processing-status-label">{{ pollProgress()!.statusDescription }}</div>
+              <div class="processing-progress-bar">
+                @if (pollProgress()!.progress >= 0) {
+                  <div class="processing-progress-fill" [style.width.%]="pollProgress()!.progress"></div>
+                } @else {
+                  <div class="processing-progress-indeterminate"></div>
+                }
+              </div>
+              @if (pollProgress()!.progress >= 0) {
+                <div class="processing-stats">
+                  @if (pollProgress()!.completedAccounts > 0) {
+                    <span class="processing-status-text">{{ pollProgress()!.completedAccounts | number }} / {{ pollProgress()!.totalAccounts | number }} notices generated</span>
+                  } @else {
+                    <span class="processing-status-text">Generating — please wait…</span>
+                  }
+                  <span class="processing-percent">{{ pollProgress()!.progress }}%</span>
+                </div>
+              } @else if (pollProgress()!.completedAccounts > 0) {
+                <div class="processing-stats">
+                  <span class="processing-status-text">{{ pollProgress()!.completedAccounts | number }} notices generated so far…</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="processing-pulse">
+              <span class="spinner spinner-lg"></span>
+              <span class="processing-pulse-text">Submitting to Platinum…</span>
+            </div>
           }
         </div>
       </div>
-    </div>
-  }
+    }
 
-  @if (deleteConfirmRunId !== null) {
-    <div class="modal-overlay" (click)="cancelDelete()">
-      <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3 class="modal-title">Confirm Delete</h3>
-        </div>
-        <div class="modal-body">
-          <p class="confirm-text">Are you sure you want to delete Section 129 run #{{ deleteConfirmRunId }}?</p>
-          <p class="confirm-warning">This action cannot be undone.</p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" (click)="cancelDelete()" data-testid="button-cancel-delete">Cancel</button>
-          <button class="btn btn-danger" (click)="handleDeleteRun()" [disabled]="isDeleting" data-testid="button-confirm-delete">
-            @if (isDeleting) { <span class="spinner"></span> Deleting... } @else { Delete Run }
-          </button>
+    <!-- ══════════════════════════════════════════════════════════════════
+         STEP 3b: DONE
+    ══════════════════════════════════════════════════════════════════ -->
+    @if (step === 'done') {
+      <div class="card done-card">
+        <div class="card-body">
+          <div class="done-icon">✅</div>
+          <h3 class="done-title">{{ doneIsTrialComplete ? 'Trial Review Complete' : 'Notices Generated Successfully' }}</h3>
+          @if (doneSummary) {
+            <div class="done-stats">
+              <div class="done-stat"><span class="done-stat-val">{{ doneSummary.accountCount }}</span><span class="done-stat-lbl">accounts selected</span></div>
+              <div class="done-stat"><span class="done-stat-val">R {{ doneSummary.totalAmount.toLocaleString('en-ZA', {minimumFractionDigits: 2}) }}</span><span class="done-stat-lbl">outstanding (selected)</span></div>
+            </div>
+          }
+          @if (doneIsTrialComplete) {
+            <p class="done-subtitle">Run #{{ doneRunId }} — qualifying accounts have been saved. The notices have <strong>not yet been generated</strong>. A supervisor must authorize this run before the final notices can be produced.</p>
+            <!-- Next-steps workflow pills -->
+            <div class="done-workflow">
+              <div class="done-wf-step done-wf-done">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Trial Review
+              </div>
+              <div class="done-wf-arrow">→</div>
+              <div class="done-wf-step done-wf-active">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                Authorization
+              </div>
+              <div class="done-wf-arrow">→</div>
+              <div class="done-wf-step done-wf-pending">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Generate PDFs
+              </div>
+            </div>
+          }
         </div>
       </div>
+
+      <!-- Generated files (only relevant after Final Run) -->
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title-row"><h2 class="card-title">{{ doneIsTrialComplete ? 'Notice Files — Run #' + doneRunId : 'Generated Files — Run #' + doneRunId }}</h2></div>
+          @if (doneFilesLoading()) {
+            <div class="loading-inline"><span class="spinner"></span> Loading files…</div>
+          } @else if (doneIsTrialComplete) {
+            <!-- Trial complete — PDFs come after Final Run -->
+            <div class="done-no-files-info">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a84c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <div>
+                <strong>PDF files are generated during the Final Run</strong>
+                <p>This run (#{{ doneRunId }}) has a status of <em>Trial Complete</em>. A supervisor must approve it via the <strong>Authorization</strong> page. Once authorized, return here and use the <strong>▶ Final Run</strong> button in the Run History to produce the notices and downloadable PDFs.</p>
+              </div>
+            </div>
+          } @else if (doneFiles().length === 0) {
+            <p class="text-muted">No files found — the run may still be processing.</p>
+          } @else {
+            <div class="file-list">
+              @for (file of doneFiles(); track file.fileId) {
+                <div class="file-item">
+                  <div class="file-icon">{{ file.fileType?.toLowerCase() === 'pdf' ? '📄' : file.fileType?.toLowerCase() === 'zip' ? '🗜' : '📊' }}</div>
+                  <div class="file-info">
+                    <div class="file-name">{{ file.fileName }}</div>
+                    <div class="file-meta">{{ file.fileType }} · {{ formatFileSize(file.fileSize) }} · {{ fmtDate(file.dateCreated) }}</div>
+                  </div>
+                  <button class="btn btn-outline btn-sm" (click)="handleDownloadFile(file.fileId)" [disabled]="downloadingFileId === file.fileId" [attr.data-testid]="'button-download-' + file.fileId">
+                    @if (downloadingFileId === file.fileId) { <span class="spinner"></span> } @else { ⬇ Download }
+                  </button>
+                </div>
+              }
+            </div>
+          }
+          <div class="action-bar" style="margin-top:1.25rem">
+            <button class="btn btn-primary" (click)="startNewRun()" data-testid="button-new-run">+ Process Another Run</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         RUN HISTORY (always visible)
+    ══════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-body" style="padding-bottom:0">
+        <div class="card-title-row">
+          <h2 class="card-title">Run History</h2>
+          @if (runsLoading()) { <span class="spinner"></span> }
+        </div>
+      </div>
+      @if (!runsLoading() && runs().length === 0) {
+        <div class="empty-state"><p class="text-muted">No runs found for {{ finYear }}.</p></div>
+      } @else if (!runsLoading()) {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:32px"></th>
+                <th>Run ID</th>
+                <th>Status</th>
+                <th>Run Type</th>
+                <th>Distribution</th>
+                <th>Handover</th>
+                <th>Created By</th>
+                <th>Date</th>
+                <th>Authorized By</th>
+                <th>Billing Cycle</th>
+                <th class="text-right">Accounts</th>
+                <th class="text-right">Amount</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (run of paginatedRuns; track run.runId) {
+                <tr [attr.data-testid]="'row-run-' + run.runId">
+                  <td class="text-center" style="padding:0 4px">
+                    <button class="btn-expand-run" (click)="toggleRunExpand(run.runId)" [title]="expandedRunIds.has(run.runId) ? 'Hide filters' : 'Show filters used for this run'" [attr.data-testid]="'btn-expand-' + run.runId">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [style.transform]="expandedRunIds.has(run.runId) ? 'rotate(90deg)' : 'none'" style="width:14px;height:14px;transition:transform 0.15s"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </td>
+                  <td class="font-mono">{{ run.runId }}</td>
+                  <td><span class="badge" [class]="getStatusColor(run.status)">{{ run.status }}</span></td>
+                  <td>{{ run.runType }}</td>
+                  <td>{{ run.distributionType || '—' }}</td>
+                  <td>{{ run.handoverOption || '—' }}</td>
+                  <td>{{ run.actionedBy || '—' }}</td>
+                  <td>{{ fmtDate(run.dateCreated) }}</td>
+                  <td>{{ run.authorizedBy || '—' }}</td>
+                  <td>{{ run.billingCycle || '—' }}</td>
+                  <td class="text-right font-mono">{{ run.totalAccounts > 0 ? run.totalAccounts : '—' }}</td>
+                  <td class="text-right font-mono col-amount">{{ run.totalAmount > 0 ? 'R\u00a0' + run.totalAmount.toLocaleString('en-ZA', {minimumFractionDigits: 2}) : '—' }}</td>
+                  <td class="run-notes-cell">{{ run.notes || '—' }}</td>
+                  <td>
+                    <div class="actions-cell">
+                      @if (run.status === 'Trial Complete') {
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="resumeRun(run)" [disabled]="resumingRunId === run.runId" title="Resume Review — load accounts and continue" [attr.data-testid]="'button-resume-' + run.runId">
+                          @if (resumingRunId === run.runId) { <span class="spinner"></span> } @else { 🔄 }
+                        </button>
+                      }
+                      @if (run.status === 'Authorized') {
+                        <button class="btn btn-primary btn-sm" (click)="handleFinalRun(run.runId)" [disabled]="finalRunningId === run.runId" title="Generate final notices — send emails / produce PDFs for download" [attr.data-testid]="'button-final-' + run.runId">
+                          @if (finalRunningId === run.runId) { <span class="spinner"></span> Generating… } @else { ▶ Final Run }
+                        </button>
+                      }
+                      @if (isDeclinedOrFailed(run.status)) {
+                        <span class="run-declined-label" [title]="run.notes || 'Declined / Failed'">{{ run.notes ? '⚠ ' + run.notes : '✕ ' + run.status }}</span>
+                      }
+                      @if (isRunApproved(run)) {
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="handleSendNotices(run, 'email')" [disabled]="sendingRunId === run.runId" title="Send Email Notices" [attr.data-testid]="'button-email-' + run.runId">
+                          @if (sendingRunId === run.runId && sendingChannel === 'email') { <span class="spinner" style="width:13px;height:13px"></span> } @else {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                          }
+                        </button>
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="handleSendNotices(run, 'sms')" [disabled]="sendingRunId === run.runId" title="Send SMS Notices" [attr.data-testid]="'button-sms-' + run.runId">
+                          @if (sendingRunId === run.runId && sendingChannel === 'sms') { <span class="spinner" style="width:13px;height:13px"></span> } @else {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          }
+                        </button>
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="handleSendNotices(run, 'whatsapp')" [disabled]="sendingRunId === run.runId" title="Send WhatsApp Notices" [attr.data-testid]="'button-whatsapp-' + run.runId">
+                          @if (sendingRunId === run.runId && sendingChannel === 'whatsapp') { <span class="spinner" style="width:13px;height:13px"></span> } @else {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 0 1-4.29-1.248l-.308-.182-2.87.852.852-2.87-.182-.308A7.96 7.96 0 0 1 4 12c0-4.411 3.589-8 8-8s8 3.589 8 8-3.589 8-8 8z"/></svg>
+                          }
+                        </button>
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="exportRunCSV(run)" [disabled]="exportingRunCsvId === run.runId" title="Export qualifying accounts to CSV" [attr.data-testid]="'button-csv-' + run.runId">
+                          @if (exportingRunCsvId === run.runId) {
+                            <span class="spinner" style="width:13px;height:13px"></span>
+                          } @else {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          }
+                        </button>
+                      }
+                      @if (canShowRunFiles(run)) {
+                        <button class="btn btn-ghost btn-sm btn-icon" (click)="openHistoryFiles(run.runId)" title="View & Download Generated Files (PDF / ZIP)" [attr.data-testid]="'button-files-' + run.runId">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+                        </button>
+                      }
+                      @if (canDeleteRun(run)) {
+                        <button class="btn btn-ghost btn-sm btn-icon" style="color:#ef4444" (click)="confirmDelete(run)" title="Delete" [attr.data-testid]="'button-delete-' + run.runId">🗑</button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+                @if (expandedRunIds.has(run.runId)) {
+                  <tr class="run-filter-row" [attr.data-testid]="'row-filters-' + run.runId">
+                    <td [attr.colspan]="14">
+                      <div class="run-filter-detail">
+                        <span class="run-filter-title">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                          Filters Used
+                        </span>
+                        <div class="run-filter-pills">
+                          <span class="run-filter-pill"><strong>Ageing:</strong> {{ getAgeingLabel(run.ageingId) }}</span>
+                          <span class="run-filter-pill"><strong>Min Amount:</strong> {{ run.amountGreaterThan != null ? 'R ' + run.amountGreaterThan.toLocaleString('en-ZA', {minimumFractionDigits: 2}) : '—' }}</span>
+                          <span class="run-filter-pill"><strong>Lapse Days:</strong> {{ run.lapseDays ?? '—' }}</span>
+                          <span class="run-filter-pill"><strong>Billing Cycle:</strong> {{ run.billingCycle || '—' }}</span>
+                          <span class="run-filter-pill" [class.run-filter-included]="run.includeIndigent" [class.run-filter-excluded]="!run.includeIndigent"><strong>Indigents:</strong> {{ run.includeIndigent ? 'Included' : 'Excluded' }}</span>
+                          <span class="run-filter-pill" [class.run-filter-included]="run.includePensioners" [class.run-filter-excluded]="!run.includePensioners"><strong>Pensioners:</strong> {{ run.includePensioners ? 'Included' : 'Excluded' }}</span>
+                          <span class="run-filter-pill" [class.run-filter-included]="!run.excludeDepositBalances" [class.run-filter-excluded]="run.excludeDepositBalances"><strong>Deposit Balances:</strong> {{ run.excludeDepositBalances ? 'Excluded' : 'Included' }}</span>
+                          @if (run.adminFee != null) {
+                            <span class="run-filter-pill"><strong>Admin Fee:</strong> R {{ run.adminFee | number:'1.2-2' }}</span>
+                          }
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (totalGridPages > 1) {
+          <div class="pagination">
+            <span class="pagination-info">Page {{ gridPage }} of {{ totalGridPages }} ({{ runs().length }} runs)</span>
+            <div class="pagination-buttons">
+              <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="gridPage <= 1">‹</button>
+              <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="gridPage >= totalGridPages">›</button>
+            </div>
+          </div>
+        }
+      }
     </div>
-  }
+  </div>
 </div>
+
+<!-- ── History file modal ─────────────────────────────────────────────── -->
+@if (historyFileModalOpen) {
+  <div class="modal-overlay" (click)="closeHistoryFiles()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Run #{{ historyFileModalRunId }} — Generated Files</h3>
+          @if (historyFileModalRun) {
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+              Status: <strong>{{ historyFileModalRun.status }}</strong>
+              @if (historyFileModalRun.actionedBy) { &nbsp;·&nbsp; {{ historyFileModalRun.actionedBy }} }
+              @if (historyFileModalRun.dateCreated) { &nbsp;·&nbsp; {{ fmtDate(historyFileModalRun.dateCreated) }} }
+            </div>
+          }
+        </div>
+        <button class="btn btn-ghost btn-icon" (click)="closeHistoryFiles()">✕</button>
+      </div>
+      <div class="modal-body">
+        @if (historyFilesLoading) {
+          <div class="modal-state-container">
+            <span class="spinner spinner-lg"></span>
+            <p class="modal-state-title">Retrieving files…</p>
+            <p class="modal-state-sub">Fetching file records from the Platinum EMS. This should only take a moment.</p>
+          </div>
+        } @else if (historyFiles.length === 0) {
+          @if (historyFileModalRun?.status === 'Trial Complete') {
+            <div class="modal-state-container">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a84c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+              <p class="modal-state-title">No downloadable files yet</p>
+              <p class="modal-state-sub">Notice PDF files and the ZIP archive are produced during the <strong>Final Run</strong>. This run is currently in <strong>Trial Complete</strong> status — it must be reviewed and authorised by a supervisor before the Final Run can be executed.</p>
+            </div>
+          } @else {
+            <div class="modal-state-container">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <p class="modal-state-title">No files found for this run</p>
+              <p class="modal-state-sub">The Platinum EMS has not returned any files for Run #{{ historyFileModalRunId }}. If the run completed recently, files may still be processing — please wait a few minutes and try again.</p>
+            </div>
+          }
+        } @else {
+          <p class="modal-file-count">{{ historyFiles.length }} file{{ historyFiles.length !== 1 ? 's' : '' }} available for download</p>
+          <div class="file-list">
+            @for (file of historyFiles; track file.fileId) {
+              <div class="file-item">
+                <div class="file-icon">{{ file.fileType?.toLowerCase() === 'pdf' ? '📄' : file.fileType?.toLowerCase() === 'zip' ? '🗜' : '📊' }}</div>
+                <div class="file-info">
+                  <div class="file-name">{{ file.fileName }}</div>
+                  <div class="file-meta">{{ file.fileType }} · {{ formatFileSize(file.fileSize) }} · {{ fmtDate(file.dateCreated) }}</div>
+                </div>
+                <button class="btn btn-outline btn-sm" (click)="handleDownloadFile(file.fileId)" [disabled]="downloadingFileId === file.fileId" [attr.data-testid]="'button-hist-download-' + file.fileId">
+                  @if (downloadingFileId === file.fileId) { <span class="spinner"></span> } @else { ⬇ Download }
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Delete modal ─────────────────────────────────────────────────────── -->
+@if (deleteConfirmRun !== null) {
+  <div class="modal-overlay" (click)="deletePhase !== 'deleting' && cancelDelete()">
+    <div class="modal-content del-modal" (click)="$event.stopPropagation()">
+
+      <!-- ── Phase: CONFIRM ── -->
+      @if (deletePhase === 'confirm') {
+        <div class="modal-header del-header-danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:#ef4444;flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          <h3 class="modal-title">Delete Run #{{ deleteConfirmRun.runId }}</h3>
+        </div>
+        <div class="modal-body">
+          <!-- Run summary card -->
+          <div class="del-summary-card">
+            <div class="del-summary-row">
+              <span class="del-summary-label">Status</span>
+              <span class="del-summary-val"><span class="run-badge">{{ deleteConfirmRun.status }}</span></span>
+            </div>
+            <div class="del-summary-row">
+              <span class="del-summary-label">Billing Cycle</span>
+              <span class="del-summary-val">{{ deleteConfirmRun.billingCycle || '—' }}</span>
+            </div>
+            <div class="del-summary-row">
+              <span class="del-summary-label">Accounts</span>
+              <span class="del-summary-val">{{ deleteConfirmRun.totalAccounts | number }} account(s)</span>
+            </div>
+            <div class="del-summary-row">
+              <span class="del-summary-label">Actioned By</span>
+              <span class="del-summary-val">{{ deleteConfirmRun.actionedBy || '—' }}</span>
+            </div>
+            <div class="del-summary-row">
+              <span class="del-summary-label">Date Created</span>
+              <span class="del-summary-val">{{ deleteConfirmRun.dateCreated ? (deleteConfirmRun.dateCreated | date:'dd/MM/yyyy') : '—' }}</span>
+            </div>
+          </div>
+
+          <!-- What gets deleted -->
+          <p class="del-section-label">The following will be permanently removed:</p>
+          <ul class="del-impact-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;color:#ef4444;flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> All generated notice files (PDFs, print batches)</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;color:#ef4444;flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> All account records linked to this run ({{ deleteConfirmRun.totalAccounts | number }})</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;color:#ef4444;flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg> The run record and all associated parameters</li>
+          </ul>
+
+          <p class="confirm-warning" style="margin-top:0.75rem">⚠ This action cannot be undone. Deleted runs cannot be recovered.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="cancelDelete()">Cancel</button>
+          <button class="btn btn-danger" (click)="handleDeleteRun()" data-testid="button-confirm-delete">
+            Delete Permanently
+          </button>
+        </div>
+      }
+
+      <!-- ── Phase: DELETING (progress) ── -->
+      @if (deletePhase === 'deleting') {
+        <div class="modal-header del-header-danger">
+          <span class="spinner" style="border-top-color:#ef4444"></span>
+          <h3 class="modal-title">Deleting Run #{{ deleteConfirmRun.runId }}…</h3>
+        </div>
+        <div class="modal-body">
+          <p class="del-progress-sub">Please wait — communicating with Platinum. Do not close this window.</p>
+          <div class="del-steps">
+            @for (step of deleteSteps; track $index) {
+              <div class="del-step" [class.del-step-done]="deleteCurrentStep > $index" [class.del-step-active]="deleteCurrentStep === $index">
+                <div class="del-step-icon">
+                  @if (deleteCurrentStep > $index) {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>
+                  } @else if (deleteCurrentStep === $index) {
+                    <span class="spinner" style="width:12px;height:12px;border-width:2px;border-top-color:currentColor"></span>
+                  } @else {
+                    <span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:block"></span>
+                  }
+                </div>
+                <div class="del-step-body">
+                  <div class="del-step-label">{{ step.label }}</div>
+                  <div class="del-step-detail">{{ step.detail }}</div>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="del-progress-bar-wrap">
+            <div class="del-progress-bar-track">
+              <div class="del-progress-bar-fill" [style.width.%]="((deleteCurrentStep + 1) / deleteSteps.length) * 100"></div>
+            </div>
+            <span class="del-progress-pct">{{ ((deleteCurrentStep + 1) / deleteSteps.length * 100) | number:'1.0-0' }}%</span>
+          </div>
+        </div>
+      }
+
+      <!-- ── Phase: DONE ── -->
+      @if (deletePhase === 'done') {
+        <div class="modal-header" style="background:#f0fdf4;border-bottom:1px solid #bbf7d0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" style="width:20px;height:20px;flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+          <h3 class="modal-title" style="color:#15803d">Run #{{ deleteConfirmRun.runId }} Deleted</h3>
+        </div>
+        <div class="modal-body">
+          <div class="del-steps">
+            @for (step of deleteSteps; track $index) {
+              <div class="del-step del-step-done">
+                <div class="del-step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <div class="del-step-body">
+                  <div class="del-step-label">{{ step.label }}</div>
+                  <div class="del-step-detail">{{ step.detail }}</div>
+                </div>
+              </div>
+            }
+          </div>
+          <p class="del-done-msg">All records have been removed from Platinum. The run history has been updated.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" (click)="closeDoneDelete()" data-testid="button-delete-close">Close</button>
+        </div>
+      }
+
+    </div>
+  </div>
+}
+
+@if (enquiryPanelOpen()) {
+  <div class="enquiry-overlay" (click)="closeEnquiryPanel()" data-testid="enquiry-overlay"></div>
+  <div class="enquiry-panel" data-testid="enquiry-panel">
+    <div class="enquiry-panel-header">
+      <div class="enquiry-panel-title-row">
+        <h3 class="enquiry-panel-title">Account Enquiry</h3>
+        <span class="enquiry-panel-account">{{ enquiryPanelAccount() }}</span>
+      </div>
+      <div class="enquiry-panel-actions">
+        <button class="btn btn-outline btn-sm" (click)="openEnquiryFullPage()" title="Open full enquiry page" data-testid="btn-enquiry-full-page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Full Page
+        </button>
+        <button class="enquiry-panel-close" (click)="closeEnquiryPanel()" data-testid="btn-enquiry-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="enquiry-panel-body">
+      @if (enquiryPanelLoading()) {
+        <div class="enquiry-loading">
+          <div class="spinner-sm"></div>
+          <span>Loading account details...</span>
+        </div>
+      } @else if (enquiryPanelData()?.error) {
+        <div class="enquiry-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#ef4444"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>{{ enquiryPanelData()?.error }}</span>
+        </div>
+      } @else if (enquiryPanelData()) {
+        <div class="enquiry-section">
+          <h4 class="enquiry-section-title">Account Details</h4>
+          <div class="enquiry-grid">
+            <div class="enquiry-field">
+              <span class="enquiry-label">Account No</span>
+              <span class="enquiry-value" data-testid="enquiry-account-no">{{ enquiryPanelData()?.accountNumber || enquiryPanelAccount() }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Description</span>
+              <span class="enquiry-value" data-testid="enquiry-description">{{ enquiryPanelData()?.description || enquiryPanelData()?.accountName || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Account Type</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.accountType || enquiryPanelData()?.debtorCategory || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Billing Cycle</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.billingCycleName || enquiryPanelData()?.billingCycle || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Town</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.townName || enquiryPanelData()?.town || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Suburb</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.suburbName || enquiryPanelData()?.suburb || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Stand / ERF</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.erfNumber || enquiryPanelData()?.standNumber || '—' }}</span>
+            </div>
+            <div class="enquiry-field">
+              <span class="enquiry-label">Status</span>
+              <span class="enquiry-value">{{ enquiryPanelData()?.status || enquiryPanelData()?.accountStatus || '—' }}</span>
+            </div>
+          </div>
+        </div>
+
+        @if (enquiryPanelData()?.postalAddress || enquiryPanelData()?.physicalAddress || enquiryPanelData()?.cellNumber || enquiryPanelData()?.emailAddress) {
+          <div class="enquiry-section">
+            <h4 class="enquiry-section-title">Contact Info</h4>
+            <div class="enquiry-grid">
+              @if (enquiryPanelData()?.cellNumber) {
+                <div class="enquiry-field">
+                  <span class="enquiry-label">Cell</span>
+                  <span class="enquiry-value">{{ enquiryPanelData()?.cellNumber }}</span>
+                </div>
+              }
+              @if (enquiryPanelData()?.emailAddress) {
+                <div class="enquiry-field">
+                  <span class="enquiry-label">Email</span>
+                  <span class="enquiry-value">{{ enquiryPanelData()?.emailAddress }}</span>
+                </div>
+              }
+              @if (enquiryPanelData()?.postalAddress) {
+                <div class="enquiry-field enquiry-field-full">
+                  <span class="enquiry-label">Postal Address</span>
+                  <span class="enquiry-value">{{ enquiryPanelData()?.postalAddress }}</span>
+                </div>
+              }
+              @if (enquiryPanelData()?.physicalAddress) {
+                <div class="enquiry-field enquiry-field-full">
+                  <span class="enquiry-label">Physical Address</span>
+                  <span class="enquiry-value">{{ enquiryPanelData()?.physicalAddress }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (enquiryPanelBalances()) {
+          <div class="enquiry-section">
+            <h4 class="enquiry-section-title">Balance Summary</h4>
+            <div class="enquiry-grid">
+              <div class="enquiry-field">
+                <span class="enquiry-label">Current Balance</span>
+                <span class="enquiry-value enquiry-amount" data-testid="enquiry-current-balance">R {{ (enquiryPanelBalances()?.currentBalance ?? enquiryPanelBalances()?.totalBalance ?? 0) | number:'1.2-2' }}</span>
+              </div>
+              @if (enquiryPanelBalances()?.totalArrears != null) {
+                <div class="enquiry-field">
+                  <span class="enquiry-label">Total Arrears</span>
+                  <span class="enquiry-value enquiry-amount enquiry-debt">R {{ enquiryPanelBalances()?.totalArrears | number:'1.2-2' }}</span>
+                </div>
+              }
+              @if (enquiryPanelBalances()?.depositBalance != null) {
+                <div class="enquiry-field">
+                  <span class="enquiry-label">Deposit</span>
+                  <span class="enquiry-value enquiry-amount">R {{ enquiryPanelBalances()?.depositBalance | number:'1.2-2' }}</span>
+                </div>
+              }
+              @if (enquiryPanelBalances()?.lastPaymentAmount != null) {
+                <div class="enquiry-field">
+                  <span class="enquiry-label">Last Payment</span>
+                  <span class="enquiry-value">R {{ enquiryPanelBalances()?.lastPaymentAmount | number:'1.2-2' }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (enquiryPanelServices().length > 0) {
+          <div class="enquiry-section">
+            <h4 class="enquiry-section-title">Services ({{ enquiryPanelServices().length }})</h4>
+            <div class="enquiry-services-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Category</th>
+                    <th class="text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (svc of enquiryPanelServices(); track $index) {
+                    <tr>
+                      <td>{{ svc.serviceName || svc.description || '—' }}</td>
+                      <td>{{ svc.serviceCategory || svc.category || '—' }}</td>
+                      <td class="text-right">{{ svc.balance != null ? 'R ' + (svc.balance | number:'1.2-2') : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}

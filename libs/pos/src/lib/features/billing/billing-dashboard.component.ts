@@ -1,6 +1,7 @@
 import { Component, signal, computed, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -32,6 +33,7 @@ export class BillingDashboardComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private auth = inject(AuthService);
+  private sanitizer = inject(DomSanitizer);
 
   objectKeys = Object.keys;
 
@@ -59,6 +61,11 @@ export class BillingDashboardComponent implements OnInit {
   debtChartData = signal<any[]>([]);
   meterChartData = signal<any[]>([]);
   billingCyclesData = signal<any[]>([]);
+  debtSummary = signal<{ totalDebt: number; totalDisConnection: number; totalReconnect: number } | null>(null);
+  meterSeriesItems = signal<{ key: string; label: string; value: number }[]>([]);
+  billingCyclesList = signal<{ billingCycleID: string; cycle_Description: string }[]>([]);
+  selectedCycleId = signal<string>('');
+  meterLoading = signal(false);
 
   categories: CategoryConfig[] = [
     { key: 'account', label: 'Account', gradient: 'grad-accent', hasItemCountFn: true },
@@ -270,6 +277,8 @@ export class BillingDashboardComponent implements OnInit {
 
   withCounts = computed(() => this.sortedSubItems().filter(s => s.count > 0));
   zeroCounts = computed(() => this.sortedSubItems().filter(s => s.count === 0));
+  criticalItems = computed(() => this.withCounts().filter(s => s.severity === 'critical'));
+  warningItems = computed(() => this.withCounts().filter(s => s.severity === 'warning'));
 
   detailColumns = computed(() => {
     const items = this.detailItems();
@@ -372,36 +381,76 @@ export class BillingDashboardComponent implements OnInit {
   }
 
   async loadChartData(): Promise<void> {
-    if (this.paymentByTypeData().length > 0 || this.debtChartData().length > 0 || this.meterChartData().length > 0) return;
+    if (this.paymentByTypeData().length > 0 || this.debtSummary() || this.meterSeriesItems().length > 0) return;
     this.chartLoading.set(true);
     try {
-      const [pbt, dc, mc, bc] = await Promise.allSettled([
+      const [pbt, dc, bc] = await Promise.allSettled([
         firstValueFrom(this.api.get('/api/platinum/billing-dashboard/get-billing-payment-by-type-of-use')),
         firstValueFrom(this.api.get('/api/platinum/billing-dashboard/get-debt-arrangement-summary-chart')),
-        firstValueFrom(this.api.get('/api/platinum/billing-dashboard/get-meterreading-progress-chart')),
         firstValueFrom(this.api.get('/api/platinum/billing-dashboard/get-billing-dashboard-billing-cycles')),
       ]);
       if (pbt.status === 'fulfilled') {
-        const rows = this.extractTableRows(pbt.value);
-        this.paymentByTypeData.set(Array.isArray(pbt.value) ? pbt.value : rows);
+        const raw: any = pbt.value;
+        const items = raw?.items ?? (Array.isArray(raw) ? raw : this.extractTableRows(raw));
+        this.paymentByTypeData.set(items);
       }
       if (dc.status === 'fulfilled') {
-        const rows = this.extractTableRows(dc.value);
-        this.debtChartData.set(rows.length > 0 ? rows : (dc.value ? [dc.value] : []));
-      }
-      if (mc.status === 'fulfilled') {
-        const rows = this.extractTableRows(mc.value);
-        this.meterChartData.set(rows.length > 0 ? rows : (mc.value ? [mc.value] : []));
+        const raw: any = dc.value;
+        if (raw && typeof raw === 'object') {
+          this.debtSummary.set({
+            totalDebt: Number(raw.totalDebt ?? 0),
+            totalDisConnection: Number(raw.totalDisConnection ?? 0),
+            totalReconnect: Number(raw.totalReconnect ?? 0),
+          });
+        }
       }
       if (bc.status === 'fulfilled') {
-        const rows = this.extractTableRows(bc.value);
-        this.billingCyclesData.set(rows.length > 0 ? rows : (bc.value ? [bc.value] : []));
+        const raw: any = bc.value;
+        const list: any[] = raw?.billingCycleList ?? (Array.isArray(raw) ? raw : []);
+        const cycles = list.map((c: any) => ({
+          billingCycleID: String(c.billingCycleID ?? c.BillingCycleID ?? ''),
+          cycle_Description: String(c.cycle_Description ?? c.cycleDescription ?? c.description ?? ''),
+        }));
+        this.billingCyclesList.set(cycles);
+        if (cycles.length > 0 && !this.selectedCycleId()) {
+          const primary = cycles.find(c => c.billingCycleID !== '999999') ?? cycles[0];
+          this.selectedCycleId.set(primary.billingCycleID);
+          await this.loadMeterData(primary.billingCycleID);
+        }
       }
     } catch {
     } finally {
       this.chartLoading.set(false);
     }
   }
+
+  async loadMeterData(cycleId: string): Promise<void> {
+    this.meterLoading.set(true);
+    try {
+      const params = cycleId ? `?billingCycleId=${cycleId}&billingCycleID=${cycleId}` : '';
+      const raw: any = await firstValueFrom(this.api.get(`/api/platinum/billing-dashboard/get-meterreading-progress-chart${params}`));
+      const series: any[] = raw?.series ?? (Array.isArray(raw) ? raw : []);
+      this.meterSeriesItems.set(series.map((s: any) => ({
+        key: s.key ?? s.Key ?? '',
+        label: s.label ?? s.Label ?? s.key ?? '',
+        value: Number(s.value ?? s.Value ?? 0),
+      })));
+    } catch {
+    } finally {
+      this.meterLoading.set(false);
+    }
+  }
+
+  async onCycleChange(event: Event): Promise<void> {
+    const cycleId = (event.target as HTMLSelectElement).value;
+    this.selectedCycleId.set(cycleId);
+    await this.loadMeterData(cycleId);
+  }
+
+  paymentChartMax = computed(() => {
+    const items = this.paymentByTypeData();
+    return Math.max(1, ...items.map((i: any) => Math.max(Number(i.amount || 0), Number(i.paidAmount || 0))));
+  });
 
   getChartColumns(data: any[]): string[] {
     if (!data || data.length === 0) return [];
@@ -421,7 +470,19 @@ export class BillingDashboardComponent implements OnInit {
   }
 
   hasAnyChartData(): boolean {
-    return this.paymentByTypeData().length > 0 || this.debtChartData().length > 0 || this.meterChartData().length > 0 || this.billingCyclesData().length > 0;
+    return this.paymentByTypeData().length > 0 || !!this.debtSummary() || this.meterSeriesItems().length > 0 || this.billingCyclesList().length > 0;
+  }
+
+  formatChartAmount(val: number): string {
+    if (val >= 1_000_000_000) return `R ${(val / 1_000_000_000).toFixed(1)}B`;
+    if (val >= 1_000_000) return `R ${(val / 1_000_000).toFixed(1)}M`;
+    if (val >= 1_000) return `R ${(val / 1_000).toFixed(0)}K`;
+    return `R ${val.toFixed(0)}`;
+  }
+
+  barPct(val: number, max: number): number {
+    if (!max) return 0;
+    return Math.round((val / max) * 100);
   }
 
   toggleSubItem(itemKey: string): void {
@@ -520,5 +581,32 @@ export class BillingDashboardComponent implements OnInit {
 
   toggleZeroCounts(): void {
     this.showZeroCounts.update(v => !v);
+  }
+
+  getCategoryIcon(key: string): SafeHtml {
+    const icons: Record<string, string> = {
+      account: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+      indigentsubsidy: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+      consumption: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+      journal: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+      debt: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="7.01" y2="15"/><line x1="11" y1="15" x2="13" y2="15"/></svg>`,
+      billing: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+      property: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+      pos: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+      rebate: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+      graphs: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+      assets: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+    };
+    return this.sanitizer.bypassSecurityTrustHtml(icons[key] || icons['account']);
+  }
+
+  getSeverityIcon(severity: string): SafeHtml {
+    const icons: Record<string, string> = {
+      critical: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      warning: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+      info: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      neutral: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+    };
+    return this.sanitizer.bypassSecurityTrustHtml(icons[severity] || icons['info']);
   }
 }

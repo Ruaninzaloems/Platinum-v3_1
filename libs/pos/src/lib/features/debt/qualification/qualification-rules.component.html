@@ -207,11 +207,139 @@
     </div>
   }
 
-  <div class="card card-info">
+  <div class="card card-help">
     <div class="card-body">
-      <p class="info-text">
-        <strong>Tips:</strong> Rules evaluate account data against your conditions. Use "Test Accounts Data" to paste sample accounts, then click the play button on a rule to test it. Conditions support AND/OR logic for complex criteria like "totalArrears &gt; 10000 AND arrearDays &gt; 90".
-      </p>
+      <div class="help-toggle" (click)="showHelp.set(!showHelp())" data-testid="button-toggle-help">
+        <div class="help-toggle-left">
+          <span class="help-icon">&#128214;</span>
+          <strong class="help-toggle-title">Setup Guide — How to Configure Qualification Rules</strong>
+        </div>
+        <span class="help-arrow" [class.open]="showHelp()">&#9660;</span>
+      </div>
+
+      @if (showHelp()) {
+        <div class="help-content">
+          <div class="help-section">
+            <h4 class="help-heading">What are Qualification Rules?</h4>
+            <p class="help-para">Qualification Rules define which debtor accounts qualify for debt recovery actions (Section 129 notices, handovers, legal proceedings). Each rule contains conditions that filter accounts based on their arrears, payment behaviour, and property information. Only accounts matching ALL conditions in a rule will be flagged for action.</p>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Step 1 — Create a New Rule</h4>
+            <ol class="help-list">
+              <li>Click the <strong>+ Add Rule</strong> button at the top right</li>
+              <li>Enter a <strong>Rule Name</strong> — use a descriptive name like "High-value water debtors over 90 days"</li>
+              <li>Add an optional <strong>Description</strong> to explain what the rule targets</li>
+              <li>Set a <strong>Priority</strong> number — higher numbers are evaluated first. Use this when multiple rules may apply to the same account</li>
+            </ol>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Step 2 — Add Conditions</h4>
+            <p class="help-para">Each rule needs at least one condition. Conditions follow the pattern: <span class="mono-inline">FIELD  OPERATOR  VALUE</span></p>
+            <div class="help-table-wrap">
+              <table class="help-table">
+                <thead>
+                  <tr><th>Available Field</th><th>What It Checks</th><th>Example Use</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Total Arrears (R)</td><td>Combined outstanding amount across all services</td><td>> 5000 (over R5,000 in arrears)</td></tr>
+                  <tr><td>Water Arrears (R)</td><td>Outstanding water charges only</td><td>> 2000 (water debt over R2,000)</td></tr>
+                  <tr><td>Electricity Arrears (R)</td><td>Outstanding electricity charges only</td><td>> 1000</td></tr>
+                  <tr><td>Rates Arrears (R)</td><td>Outstanding municipal rates</td><td>> 3000</td></tr>
+                  <tr><td>Refuse Arrears (R)</td><td>Outstanding refuse/solid waste charges</td><td>> 500</td></tr>
+                  <tr><td>Sewerage Arrears (R)</td><td>Outstanding sewerage charges</td><td>> 500</td></tr>
+                  <tr><td>Arrear Age (days)</td><td>How many days the oldest arrear has been outstanding</td><td>> 90 (overdue more than 90 days)</td></tr>
+                  <tr><td>Days Since Last Payment</td><td>Number of days since the account last made a payment</td><td>> 60 (no payment in 2 months)</td></tr>
+                  <tr><td>Property Value (R)</td><td>Valuation amount of the property</td><td>> 500000 (high-value properties)</td></tr>
+                  <tr><td>Risk Score (0-100)</td><td>Score from the Risk Scoring module</td><td>> 60 (high risk accounts)</td></tr>
+                  <tr><td>Indigent Status</td><td>Whether the account is registered as indigent</td><td>= false (exclude indigents)</td></tr>
+                  <tr><td>Previous Legal Actions</td><td>Count of past legal actions against the account</td><td>= 0 (first-time offenders only)</td></tr>
+                  <tr><td>Debt Size (R)</td><td>Total debt owed (same as total arrears)</td><td>>= 10000</td></tr>
+                  <tr><td>Payment History Score</td><td>Score reflecting past payment behaviour (0-100)</td><td>< 30 (poor payment history)</td></tr>
+                  <tr><td>Location Risk Score</td><td>Area-based risk factor (0-100)</td><td>> 70</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Step 3 — Combine Conditions with AND / OR</h4>
+            <p class="help-para">Add multiple conditions by clicking <strong>+ Add Condition</strong>. Choose how they combine:</p>
+            <ul class="help-list">
+              <li><strong>AND</strong> — All conditions must be true. Example: Total Arrears > 5000 <strong>AND</strong> Arrear Age > 90 means the account must owe more than R5,000 <em>and</em> be overdue for more than 90 days.</li>
+              <li><strong>OR</strong> — At least one condition must be true. Example: Water Arrears > 3000 <strong>OR</strong> Electricity Arrears > 3000 means either water <em>or</em> electricity debt qualifies.</li>
+            </ul>
+            <div class="help-example">
+              <div class="help-example-title">Example: Identify accounts for Section 129 Notice</div>
+              <pre class="help-code">WHERE Total Arrears (R) > 5000
+AND Arrear Age (days) > 90
+AND Indigent Status = false
+AND Days Since Last Payment > 60</pre>
+              <p class="help-example-desc">This rule targets non-indigent accounts owing more than R5,000 that are 90+ days overdue and haven't paid in 2 months.</p>
+            </div>
+            <div class="help-example">
+              <div class="help-example-title">Example: High-value property debtors</div>
+              <pre class="help-code">WHERE Property Value (R) > 800000
+AND Total Arrears (R) > 10000
+AND Previous Legal Actions = 0</pre>
+              <p class="help-example-desc">Targets high-value properties with significant debt that haven't been through legal action before.</p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Step 4 — Test Your Rule</h4>
+            <ol class="help-list">
+              <li>Scroll down to the <strong>Test Accounts Data</strong> section</li>
+              <li>Enter test account data as CSV lines, one per line. The format is:<br /><span class="mono-inline">accountNo, totalArrears, arrearDays, lastPaymentDays, propertyValue, waterArrears, electricityArrears</span></li>
+              <li>Click the <strong>&#9654; play button</strong> on your rule in the table</li>
+              <li>The results will show how many accounts matched and which ones qualify</li>
+            </ol>
+            <div class="help-example">
+              <div class="help-example-title">Test data example</div>
+              <pre class="help-code">ACC001, 15000, 120, 90, 800000, 5000, 3000
+ACC002, 3000, 30, 15, 250000, 1000, 500
+ACC003, 8500, 95, 70, 450000, 4000, 2000
+ACC004, 500, 10, 5, 300000, 200, 100</pre>
+              <p class="help-example-desc">With the Section 129 rule above, ACC001 and ACC003 would match. ACC002 has too few arrear days and ACC004's arrears are too low.</p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Step 5 — Manage Your Rules</h4>
+            <ul class="help-list">
+              <li><strong>Toggle Active/Inactive</strong> — Use the switch in the table to enable or disable a rule without deleting it</li>
+              <li><strong>Edit</strong> — Click the &#9998; pencil icon to modify an existing rule</li>
+              <li><strong>Delete</strong> — Click the &#128465; trash icon to permanently remove a rule</li>
+              <li><strong>Priority Order</strong> — When multiple rules apply, higher priority rules are evaluated first</li>
+            </ul>
+          </div>
+
+          <div class="help-section">
+            <h4 class="help-heading">Available Operators</h4>
+            <div class="help-chips">
+              <span class="help-chip"><strong>></strong> greater than</span>
+              <span class="help-chip"><strong><</strong> less than</span>
+              <span class="help-chip"><strong>>=</strong> greater or equal</span>
+              <span class="help-chip"><strong><=</strong> less or equal</span>
+              <span class="help-chip"><strong>=</strong> equal to</span>
+              <span class="help-chip"><strong>!=</strong> not equal to</span>
+              <span class="help-chip"><strong>contains</strong> text contains</span>
+            </div>
+          </div>
+
+          <div class="help-section help-tip-box">
+            <h4 class="help-heading">Quick Tips</h4>
+            <ul class="help-list">
+              <li>Start with a simple rule (e.g., Total Arrears > 5000) and add conditions gradually</li>
+              <li>Always test your rule with sample data before relying on it for debt recovery</li>
+              <li>Use the Indigent Status = false condition to exclude indigent households from legal action</li>
+              <li>Create separate rules for different service types (water-specific, electricity-specific) to manage service-level disconnections</li>
+              <li>Rules with higher priority numbers run first — use this to catch critical accounts before general rules</li>
+            </ul>
+          </div>
+        </div>
+      }
     </div>
   </div>
 </div>

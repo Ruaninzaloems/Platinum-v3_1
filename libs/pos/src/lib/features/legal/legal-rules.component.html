@@ -224,23 +224,11 @@
         <div class="form-row-2">
           <div class="form-group">
             <label class="form-label">Effective From *</label>
-            <input
-              type="date"
-              [ngModel]="form().effectiveFrom"
-              (ngModelChange)="updateForm('effectiveFrom', $event)"
-              class="form-input"
-              data-testid="input-effective-from"
-            />
+            <app-date-input [value]="form().effectiveFrom" (valueChange)="updateForm('effectiveFrom', $event)" testId="input-effective-from" />
           </div>
           <div class="form-group">
             <label class="form-label">Effective To</label>
-            <input
-              type="date"
-              [ngModel]="form().effectiveTo"
-              (ngModelChange)="updateForm('effectiveTo', $event)"
-              class="form-input"
-              data-testid="input-effective-to"
-            />
+            <app-date-input [value]="form().effectiveTo" (valueChange)="updateForm('effectiveTo', $event)" testId="input-effective-to" />
           </div>
         </div>
         <div class="toggle-row">

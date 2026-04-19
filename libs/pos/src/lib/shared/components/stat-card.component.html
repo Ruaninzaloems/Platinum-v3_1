@@ -1,4 +1,9 @@
-<div class="card stat-card" data-testid="stat-card">
+<div class="stat-card" [class]="'stat-card variant-' + variant + (link ? ' stat-clickable' : '')" (click)="handleClick()" [style.cursor]="link ? 'pointer' : 'default'" data-testid="stat-card">
+  @if (icon) {
+    <div class="stat-icon-container">
+      <span class="material-icons stat-icon">{{ icon }}</span>
+    </div>
+  }
   <div class="stat-content">
     <span class="stat-label" data-testid="text-stat-label">{{ label }}</span>
     <span class="stat-value" data-testid="text-stat-value">{{ value }}</span>
@@ -8,7 +13,4 @@
       </span>
     }
   </div>
-  @if (icon) {
-    <div class="stat-icon">{{ icon }}</div>
-  }
 </div>

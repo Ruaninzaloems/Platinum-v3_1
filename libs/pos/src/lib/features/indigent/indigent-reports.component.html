@@ -1,0 +1,432 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Indigent Reports</h1>
+      <p class="page-subtitle">Application statistics, subsidy analysis, and verification rates</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportCsv()" [disabled]="!stats()" data-testid="button-export">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field-group">
+      <span class="field-label">Financial Year</span>
+      <select class="field-select" [(ngModel)]="finYear" (ngModelChange)="onFinYearChange()" data-testid="select-fin-year">
+        @for (fy of finYears; track fy) {
+          <option [value]="fy">{{ fy }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div class="tab-bar" style="margin-bottom:16px">
+    <button class="tab-btn" [class.active]="activeReportTab === 'overview'" (click)="onReportTabChange('overview')" data-testid="tab-overview">Overview</button>
+    <button class="tab-btn" [class.active]="activeReportTab === 'steercom'" (click)="onReportTabChange('steercom')" data-testid="tab-steercom">Steercom Referrals</button>
+    <button class="tab-btn" [class.active]="activeReportTab === 'comm_audit'" (click)="onReportTabChange('comm_audit')" data-testid="tab-comm-audit">Communication Audit</button>
+  </div>
+
+  @if (activeReportTab === 'comm_audit') {
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Communication Audit Report</h3>
+        <button class="btn btn-outline btn-sm" (click)="exportCommAuditCsv()" [disabled]="commAuditLogs().length === 0" data-testid="button-export-comm-audit">Export CSV</button>
+      </div>
+      <div class="card-body">
+        <div class="toolbar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <div class="field-group">
+            <span class="field-label">Date From</span>
+            <input type="date" class="field-input" [(ngModel)]="commAuditFilters.dateFrom" data-testid="input-audit-date-from" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Date To</span>
+            <input type="date" class="field-input" [(ngModel)]="commAuditFilters.dateTo" data-testid="input-audit-date-to" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Account Number</span>
+            <input class="field-input" [(ngModel)]="commAuditFilters.accountNumber" placeholder="Search by account" data-testid="input-audit-account" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Channel</span>
+            <select class="field-select" [(ngModel)]="commAuditFilters.method" data-testid="select-audit-method">
+              <option value="all">All Channels</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="system">System</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <span class="field-label">Indigent Type</span>
+            <select class="field-select" [(ngModel)]="commAuditFilters.indigentTypeName" data-testid="select-audit-type">
+              <option value="">All Types</option>
+              @for (t of indigentTypes(); track t.indigentTypeId) {
+                <option [value]="t.indigentTypeName">{{ t.indigentTypeName }}</option>
+              }
+            </select>
+          </div>
+          <div class="field-group" style="align-self:flex-end">
+            <button class="btn btn-primary btn-sm" (click)="loadCommAudit()" data-testid="button-apply-audit-filter">Apply Filters</button>
+          </div>
+        </div>
+        @if (commAuditLoading()) {
+          <div class="loading-center" style="padding:24px"><span class="spinner"></span> Loading audit logs...</div>
+        } @else if (commAuditLogs().length === 0) {
+          <div class="empty-state" style="padding:24px"><p>No communication logs found. Apply filters or adjust date range.</p></div>
+        } @else {
+          <div class="table-container" style="padding:0">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Channel</th>
+                  <th>Event</th>
+                  <th>Indigent Type</th>
+                  <th>Recipients</th>
+                  <th>Subject</th>
+                  <th>Message Preview</th>
+                  <th>Status</th>
+                  <th>Sent By</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (log of commAuditLogs(); track log.id) {
+                  <tr [attr.data-testid]="'row-audit-' + log.id">
+                    <td>{{ fmtDate(log.createdAt) }}</td>
+                    <td class="font-mono">{{ log.accountNumber }}</td>
+                    <td>{{ log.accountHolder }}</td>
+                    <td><span class="badge" [class]="log.method === 'email' ? 'badge-info' : log.method === 'sms' ? 'badge-success' : 'badge-grey'">{{ log.method }}</span></td>
+                    <td style="font-size:12px">{{ log.eventType || '-' }}</td>
+                    <td style="font-size:12px">{{ log.indigentTypeName || '-' }}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">{{ log.recipients }}</td>
+                    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">{{ log.subject }}</td>
+                    <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#64748b" [title]="log.messageBody || ''">{{ (log.messageBody || '').substring(0, 100) }}{{ (log.messageBody || '').length > 100 ? '...' : '' }}</td>
+                    <td><span class="badge" [class]="log.status === 'sent' ? 'badge-success' : 'badge-danger'">{{ log.status }}</span></td>
+                    <td>{{ log.sentByName }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer" style="padding:12px;text-align:right">
+            <span class="text-muted">{{ commAuditLogs().length }} record(s)</span>
+          </div>
+        }
+      </div>
+    </div>
+  } @else if (activeReportTab === 'steercom') {
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Steering Committee Referrals</h3>
+        <button class="btn btn-outline btn-sm" (click)="exportSteercomCsv()" [disabled]="steercomReferrals().length === 0" data-testid="button-export-steercom">Export CSV</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        @if (steercomLoading()) {
+          <div class="loading-center" style="padding:24px"><span class="spinner"></span> Loading referrals...</div>
+        } @else if (steercomReferrals().length === 0) {
+          <div class="empty-state" style="padding:24px"><p>No Steercom referrals found.</p></div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Indigent Type</th>
+                  <th>Referral Date</th>
+                  <th>Reason</th>
+                  <th>Referred By</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of steercomReferrals(); track item.applicationId) {
+                  <tr [attr.data-testid]="'row-steercom-' + item.applicationId">
+                    <td class="font-mono">{{ item.applicationId }}</td>
+                    <td class="font-mono">{{ item.accountNumber }}</td>
+                    <td>{{ item.accountHolderName }}</td>
+                    <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                    <td>{{ fmtDate(item.referralDate) }}</td>
+                    <td>{{ item.referralReason }}</td>
+                    <td>{{ item.referredBy }}</td>
+                    <td><span class="badge badge-warning">{{ item.status }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer" style="padding:12px;text-align:right">
+            <span class="text-muted">{{ steercomTotal() }} total referral(s)</span>
+          </div>
+        }
+      </div>
+    </div>
+  } @else {
+
+  @if (loading()) {
+    <div class="loading-center">
+      <span class="spinner spinner-lg"></span>
+      <p>Loading statistics...</p>
+    </div>
+  } @else if (!stats()) {
+    <div class="empty-state">
+      <p>No statistics available for the selected year.</p>
+    </div>
+  } @else {
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Applications</div>
+        <div class="stat-value" data-testid="text-total-apps">{{ fmtNumber(stats()!.totalApplications) }}</div>
+      </div>
+      <div class="stat-card stat-success">
+        <div class="stat-label">Approved</div>
+        <div class="stat-value" data-testid="text-approved">{{ fmtNumber(stats()!.totalApproved) }}</div>
+        <div class="stat-sub">{{ fmtPercent(approvalRate) }}</div>
+      </div>
+      <div class="stat-card stat-danger">
+        <div class="stat-label">Declined</div>
+        <div class="stat-value" data-testid="text-declined">{{ fmtNumber(stats()!.totalDeclined) }}</div>
+        <div class="stat-sub">{{ fmtPercent(declineRate) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Terminated</div>
+        <div class="stat-value" data-testid="text-terminated">{{ fmtNumber(stats()!.totalTerminated) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Disqualified</div>
+        <div class="stat-value" data-testid="text-disqualified">{{ fmtNumber(stats()!.totalDisqualified) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value" data-testid="text-pending">{{ fmtNumber(stats()!.totalPending) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Reapplications</div>
+        <div class="stat-value" data-testid="text-reapplications">{{ fmtNumber(stats()!.totalReapplications) }}</div>
+      </div>
+      <div class="stat-card stat-accent">
+        <div class="stat-label">Total Subsidy Cost</div>
+        <div class="stat-value" data-testid="text-subsidy-cost">{{ fmtCurrency(stats()!.totalSubsidyCost) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Write-Offs</div>
+        <div class="stat-value" data-testid="text-write-offs">{{ fmtCurrency(stats()!.totalWriteOffs) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Processing Days</div>
+        <div class="stat-value" data-testid="text-avg-days">{{ stats()!.averageProcessingDays | number:'1.0-0' }}</div>
+      </div>
+    </div>
+
+    <div class="card verification-card">
+      <div class="card-header">
+        <h2 class="card-title">Verification Completion Rate</h2>
+        <span class="verification-pct" data-testid="text-verification-rate">{{ fmtPercent(stats()!.verificationCompletionRate) }}</span>
+      </div>
+      <div class="card-body">
+        <div class="progress-bar-container" data-testid="progress-verification">
+          <div class="progress-bar-fill" [style.width]="stats()!.verificationCompletionRate + '%'" [class.progress-high]="stats()!.verificationCompletionRate >= 75" [class.progress-medium]="stats()!.verificationCompletionRate >= 40 && stats()!.verificationCompletionRate < 75" [class.progress-low]="stats()!.verificationCompletionRate < 40"></div>
+        </div>
+      </div>
+    </div>
+
+    @if (stats()!.byMonth && stats()!.byMonth.length > 0) {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Monthly Breakdown</h2>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="text-right">Applications</th>
+                  <th class="text-right">Approved</th>
+                  <th class="text-right">Declined</th>
+                  <th class="text-right">Terminated</th>
+                  <th class="text-right">Subsidy Cost</th>
+                  <th style="width:30%">Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (m of stats()!.byMonth; track m.month) {
+                  <tr [attr.data-testid]="'row-month-' + m.month">
+                    <td class="font-medium">{{ m.monthName }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(m.applications) }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(m.approved) }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(m.declined) }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(m.terminated) }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(m.subsidyCost) }}</td>
+                    <td>
+                      <div class="bar-container">
+                        <div class="bar-fill" [style.width]="getBarWidth(m.applications, getMaxMonthly())"></div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (stats()!.byIndigentType && stats()!.byIndigentType.length > 0) {
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Breakdown by Indigent Type</h2>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Indigent Type</th>
+                  <th class="text-right">Applications</th>
+                  <th class="text-right">Approved</th>
+                  <th class="text-right">Subsidy Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of stats()!.byIndigentType; track t.indigentTypeId) {
+                  <tr [attr.data-testid]="'row-type-' + t.indigentTypeId">
+                    <td class="font-medium">{{ t.indigentTypeName }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(t.applications) }}</td>
+                    <td class="text-right font-mono">{{ fmtNumber(t.approved) }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(t.subsidyCost) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="card" data-testid="card-writeoff-report">
+      <div class="card-header">
+        <h2 class="card-title">Debt Write-Off Report</h2>
+        <button class="btn btn-outline btn-sm" (click)="exportWriteOffCsv()" [disabled]="!writeOffHistory().length" data-testid="button-export-writeoff">Export CSV</button>
+      </div>
+      <div class="card-body">
+        <div class="writeoff-stats-row">
+          <div class="wo-stat">
+            <span class="wo-stat-label">Total Write-Offs ({{ finYear }})</span>
+            <span class="wo-stat-value" data-testid="text-total-writeoff-amount">{{ fmtCurrency(stats()?.totalWriteOffs || 0) }}</span>
+          </div>
+          <div class="wo-stat">
+            <span class="wo-stat-label">Types with Write-Off</span>
+            <span class="wo-stat-value" data-testid="text-writeoff-type-count">{{ getWriteOffConfiguredCount() }}</span>
+          </div>
+          <div class="wo-stat">
+            <span class="wo-stat-label">Pending Senior Write-Offs</span>
+            <span class="wo-stat-value wo-stat-warning" data-testid="text-pending-senior-writeoffs">{{ pendingSeniorWriteOffCount }}</span>
+          </div>
+        </div>
+
+        @if (indigentTypes().length > 0) {
+          <h3 class="wo-section-title">Write-Off Configuration by Type</h3>
+          <div class="table-container">
+            <table data-testid="table-writeoff-config">
+              <thead>
+                <tr>
+                  <th>Indigent Type</th>
+                  <th>On Approval</th>
+                  <th>Continuous</th>
+                  <th>Interval</th>
+                  <th>Document Type</th>
+                  <th>Handover Debt</th>
+                  <th>Terminate Handover</th>
+                  <th>Terminate Plans</th>
+                  <th>Notifications</th>
+                  <th>Senior Exempt</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of indigentTypes(); track t.indigentTypeId) {
+                  @if (t.isActive) {
+                    <tr [attr.data-testid]="'row-writeoff-type-' + t.indigentTypeId">
+                      <td class="font-medium">{{ t.indigentTypeName }}</td>
+                      <td><span class="badge" [class]="t.enableWriteOffOnApproval ? 'badge-success' : 'badge-muted'">{{ t.enableWriteOffOnApproval ? 'Enabled' : 'Disabled' }}</span></td>
+                      <td><span class="badge" [class]="t.enableContinuousWriteOff ? 'badge-success' : 'badge-muted'">{{ t.enableContinuousWriteOff ? 'Enabled' : 'Disabled' }}</span></td>
+                      <td>{{ t.enableContinuousWriteOff ? (t.continuousWriteOffIntervalMonths || 12) + ' months' : '-' }}</td>
+                      <td>{{ getDocTypeName(t.writeOffDocumentTypeId) }}</td>
+                      <td><span class="badge" [class]="t.writeOffHandoverDebt !== false ? 'badge-success' : 'badge-muted'">{{ t.writeOffHandoverDebt !== false ? 'Yes' : 'No' }}</span></td>
+                      <td><span class="badge" [class]="t.terminateHandoverOnApproval !== false ? 'badge-success' : 'badge-muted'">{{ t.terminateHandoverOnApproval !== false ? 'Yes' : 'No' }}</span></td>
+                      <td><span class="badge" [class]="t.terminateRepaymentPlanOnApproval !== false ? 'badge-success' : 'badge-muted'">{{ t.terminateRepaymentPlanOnApproval !== false ? 'Yes' : 'No' }}</span></td>
+                      <td>
+                        @if (t.writeOffNotifyEmail) { <span class="wo-chip">Email</span> }
+                        @if (t.writeOffNotifySms) { <span class="wo-chip">SMS</span> }
+                        @if (t.writeOffNotifyWhatsapp) { <span class="wo-chip">WhatsApp</span> }
+                        @if (!t.writeOffNotifyEmail && !t.writeOffNotifySms && !t.writeOffNotifyWhatsapp) { - }
+                      </td>
+                      <td>
+                        @if (t.exemptSeniorsFromRenewal) {
+                          <span class="badge badge-warning">{{ t.seniorExemptionAge || 65 }}+ yrs</span>
+                        } @else {
+                          -
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (writeOffHistory().length > 0) {
+          <h3 class="wo-section-title">Write-Off History</h3>
+          <div class="table-container">
+            <table data-testid="table-writeoff-history">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Name</th>
+                  <th>Indigent Type</th>
+                  <th class="text-right">Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of writeOffHistory(); track item.writeOffId) {
+                  <tr [attr.data-testid]="'row-writeoff-' + item.writeOffId">
+                    <td>{{ fmtDate(item.writeOffDate) }}</td>
+                    <td class="font-mono">{{ item.accountNo }}</td>
+                    <td>{{ item.accountHolderName }}</td>
+                    <td>{{ item.indigentTypeName }}</td>
+                    <td class="text-right font-mono">{{ fmtCurrency(item.writeOffAmount) }}</td>
+                    <td><span class="badge" [class]="getWriteOffTypeBadge(item.writeOffType)">{{ getWriteOffTypeLabel(item.writeOffType) }}</span></td>
+                    <td><span class="badge" [class]="item.status === 'completed' ? 'badge-success' : item.status === 'failed' ? 'badge-danger' : 'badge-warning'">{{ item.status }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-writeoff" data-testid="empty-writeoff-history">
+            <span class="material-icons">money_off</span>
+            <p>No write-off history available. Write-off records will appear here once the write-off API is integrated and transactions are processed.</p>
+            <div class="api-needed-banner">
+              <span class="material-icons">info</span>
+              <div>
+                <strong>APIs Required for Full Integration</strong>
+                <ul>
+                  <li>Write-off account debt (Platinum ATTP endpoint) — triggers debt write-off on account</li>
+                  <li>Get write-off history by account/period — retrieves past write-off records</li>
+                  <li>Get pending write-offs for seniors with extended periods</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+  }
+</div>

@@ -1,0 +1,403 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Authorization Queue</h1>
+      <p class="page-subtitle">Review and authorize verified indigent applications</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field-group">
+      <span class="field-label">Filter by Indigent Type</span>
+      <select class="field-select" [(ngModel)]="filterType" (ngModelChange)="onFilterChange()" data-testid="select-type-filter">
+        <option value="">All Types</option>
+        @for (t of indigentTypes(); track t.indigentTypeId) {
+          <option [value]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+        }
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Page Size</span>
+      <select class="field-select page-size-select" [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChange()" data-testid="select-page-size">
+        @for (size of pageSizeOptions; track size) {
+          <option [value]="size">{{ size }}</option>
+        }
+      </select>
+    </div>
+    <div class="toolbar-info">
+      <span class="count-badge" data-testid="text-queue-count">{{ totalCount() }} pending</span>
+      @if (selectedIds.size > 0) {
+        <button class="btn btn-success btn-sm" (click)="openBatchAuthorizeModal()" data-testid="button-batch-authorize">
+          Batch Approve ({{ selectedIds.size }})
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading authorization queue...</p>
+        </div>
+      } @else if (queue().length === 0) {
+        <div class="empty-state">
+          <p>No applications pending authorization.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" [checked]="allSelected" (change)="selectAll()" data-testid="checkbox-select-all" /></th>
+                <th>App ID</th>
+                <th>Account</th>
+                <th>Account Holder</th>
+                <th>ID Number</th>
+                <th>Type</th>
+                <th>Application Date</th>
+                <th class="text-right">Income</th>
+                <th class="text-center">Subsidy %</th>
+                <th class="text-right">Market Value</th>
+                <th>Property Address</th>
+                <th>Site Verification</th>
+                <th>Officer</th>
+                <th>Qualification</th>
+                <th>Request Type</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of queue(); track item.applicationId) {
+                <tr [attr.data-testid]="'row-auth-' + item.applicationId">
+                  <td><input type="checkbox" [checked]="isSelected(item.applicationId)" (change)="toggleSelect(item.applicationId)" [attr.data-testid]="'checkbox-select-' + item.applicationId" /></td>
+                  <td class="font-mono">{{ item.applicationId }}</td>
+                  <td class="font-mono">{{ item.accountNumber }}</td>
+                  <td>{{ item.accountHolderName }}</td>
+                  <td class="font-mono">{{ item.idNumber || '—' }}</td>
+                  <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                  <td>
+                    {{ fmtDate(item.applicationDate) }}
+                    @if (getSlaRag(item); as sla) {
+                      <span class="badge" [class]="sla.css" style="margin-left:4px;font-size:10px" [attr.data-testid]="'badge-sla-' + item.applicationId">{{ sla.label }}</span>
+                    }
+                  </td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.householdIncome) }}</td>
+                  <td class="text-center">
+                    @if (item.qualifiedSubsidyPercentage != null) {
+                      <span class="badge" [style.background]="item.qualifiedSubsidyPercentage >= 100 ? '#e8f5e9' : item.qualifiedSubsidyPercentage > 0 ? '#fff3e0' : '#fce4ec'" [style.color]="item.qualifiedSubsidyPercentage >= 100 ? '#1b5e20' : item.qualifiedSubsidyPercentage > 0 ? '#e65100' : '#c62828'" style="font-weight:600;padding:2px 8px;border-radius:4px;">{{ item.qualifiedSubsidyPercentage }}%</span>
+                    } @else { <span style="color:#999;">—</span> }
+                  </td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.marketValue) }}</td>
+                  <td class="address-cell" [title]="item.propertyAddress">{{ item.propertyAddress }}</td>
+                  <td>
+                    <div class="ver-info">
+                      <span class="badge" [class]="item.verificationOutcome === 'Qualify' || item.verificationOutcome === 'Approved' ? 'badge-success' : 'badge-warning'" [attr.data-testid]="'badge-ver-' + item.applicationId">
+                        {{ item.verificationOutcome || 'Pending' }}
+                      </span>
+                      <span class="ver-date" data-testid="text-ver-date">{{ fmtDate(item.verificationDate) }}</span>
+                    </div>
+                  </td>
+                  <td data-testid="text-ver-officer">{{ item.verificationOfficer || '—' }}</td>
+                  <td>
+                    <div class="qual-checks">
+                      @for (check of getQualChecks(item); track check.key) {
+                        <span
+                          class="qual-badge"
+                          [class.passed]="check.passed"
+                          [class.failed]="!check.passed"
+                          [title]="check.label + ': ' + (check.passed ? 'Passed' : 'Failed')"
+                          [attr.data-testid]="'qual-' + check.key + '-' + item.applicationId">
+                          {{ check.label }}
+                        </span>
+                      }
+                      @if (getQualChecks(item).length === 0) { <span class="text-muted">—</span> }
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge badge-default" [attr.data-testid]="'badge-request-type-' + item.applicationId">{{ item.requestType || '—' }}</span>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      <button class="btn btn-ghost btn-sm" (click)="viewApplication(item.applicationId)" title="View Details" [attr.data-testid]="'button-view-' + item.applicationId">View</button>
+                      <button class="btn btn-success btn-sm" (click)="openAuthorizeModal(item)" [attr.data-testid]="'button-authorize-' + item.applicationId">Approve</button>
+                      <button class="btn btn-danger btn-sm" (click)="openDeclineModal(item)" [attr.data-testid]="'button-decline-' + item.applicationId">Decline</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (totalPages > 1) {
+          <div class="pagination">
+            <span class="pagination-info" data-testid="text-pagination-info">Page {{ page }} of {{ totalPages }} ({{ totalCount() }} items)</span>
+            <div class="pagination-buttons">
+              <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="page <= 1" data-testid="button-prev-page">‹ Prev</button>
+              @for (p of [].constructor(totalPages); track $index) {
+                @if ($index + 1 >= page - 2 && $index + 1 <= page + 2) {
+                  <button class="btn btn-sm" [class.btn-primary]="$index + 1 === page" [class.btn-outline]="$index + 1 !== page" (click)="goToPage($index + 1)" [attr.data-testid]="'button-page-' + ($index + 1)">{{ $index + 1 }}</button>
+                }
+              }
+              <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="page >= totalPages" data-testid="button-next-page">Next ›</button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>
+
+@if (authorizeModalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeAuthorizeModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Approve Application #{{ selectedItem.applicationId }}</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeAuthorizeModal()" data-testid="button-close-auth-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ selectedItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Holder</span><span class="detail-value">{{ selectedItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Type</span><span class="detail-value">{{ selectedItem.indigentTypeName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Income</span><span class="detail-value font-mono">{{ fmtCurrency(selectedItem.householdIncome) }}</span></div>
+          <div class="detail-item"><span class="detail-label">Subsidy %</span><span class="detail-value">
+            @if (selectedItem.qualifiedSubsidyPercentage != null) {
+              <span [style.background]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#e8f5e9' : '#fce4ec'" [style.color]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#1b5e20' : '#c62828'" style="padding:2px 8px;border-radius:4px;font-weight:600;">{{ selectedItem.qualifiedSubsidyPercentage }}%</span>
+            } @else { — }
+          </span></div>
+          <div class="detail-item"><span class="detail-label">Market Value</span><span class="detail-value font-mono">{{ fmtCurrency(selectedItem.marketValue) }}</span></div>
+          <div class="detail-item"><span class="detail-label">Site Verification</span><span class="detail-value">{{ selectedItem.verificationOutcome }}</span></div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field-group">
+            <span class="field-label">Monthly Subsidy (R)</span>
+            <input type="number" class="field-input" [(ngModel)]="authForm.monthlySubsidy" step="0.01" min="0" data-testid="input-subsidy" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Qualifying Units</span>
+            <input type="number" class="field-input" [(ngModel)]="authForm.qualifyingUnits" step="1" min="0" data-testid="input-units" />
+          </div>
+          @if (selectedItem && isWriteOffEnabled(selectedItem.indigentTypeId)) {
+            <div class="field-group">
+              <span class="field-label">Once-Off Write-Off (R)</span>
+              <input type="number" class="field-input" [(ngModel)]="authForm.onceWriteOff" step="0.01" min="0" data-testid="input-writeoff" />
+            </div>
+          }
+        </div>
+        <div class="field-row mt-1">
+          <div class="field-group">
+            <span class="field-label">Commencement Date</span>
+            <app-date-input [value]="authForm.commencementDate" (valueChange)="authForm.commencementDate = $event" testId="input-commencement-date" inputClass="field-input" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Reapplication Date</span>
+            <app-date-input [value]="authForm.reApplicationDate" (valueChange)="authForm.reApplicationDate = $event" testId="input-reapplication-date" inputClass="field-input" />
+            @if (selectedItem && getTypeConfig(selectedItem.indigentTypeId)?.reapplicationBaseDate === 'approval') {
+              <span class="field-hint" style="color: var(--platinum-accent);">Calculated from approval date + {{ getTypeConfig(selectedItem.indigentTypeId)?.reApplicationPeriod || 12 }} months</span>
+            }
+            @if (selectedItem && getTypeConfig(selectedItem.indigentTypeId)?.reapplicationBaseDate === 'application') {
+              <span class="field-hint" style="color: var(--platinum-accent);">Calculated from application date + {{ getTypeConfig(selectedItem.indigentTypeId)?.reApplicationPeriod || 12 }} months</span>
+            }
+          </div>
+          <div class="field-group">
+            <span class="field-label">Termination Date</span>
+            <app-date-input [value]="authForm.terminationDate" (valueChange)="authForm.terminationDate = $event" testId="input-termination-date" inputClass="field-input" />
+          </div>
+        </div>
+
+        <div class="unit-details-section mt-1">
+          <div class="unit-details-header">
+            <span class="field-label">Qualifying Unit Details</span>
+            <button class="btn btn-outline btn-sm" (click)="addQualifyingUnit()" data-testid="button-add-unit">+ Add Unit</button>
+          </div>
+          @if (qualifyingUnitDetails.length > 0) {
+            <div class="table-container">
+              <table class="unit-table">
+                <thead>
+                  <tr>
+                    <th>Unit ID</th>
+                    <th class="text-right">Subsidy per Unit (R)</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (unit of qualifyingUnitDetails; track $index) {
+                    <tr [attr.data-testid]="'row-unit-' + $index">
+                      <td>
+                        <input type="number" class="field-input field-sm" [(ngModel)]="unit.unitId" min="1" [attr.data-testid]="'input-unit-id-' + $index" />
+                      </td>
+                      <td>
+                        <input type="number" class="field-input field-sm" [(ngModel)]="unit.subsidy" step="0.01" min="0" [attr.data-testid]="'input-unit-subsidy-' + $index" />
+                      </td>
+                      <td>
+                        <button class="btn btn-ghost btn-sm btn-danger-text" (click)="removeQualifyingUnit($index)" [attr.data-testid]="'button-remove-unit-' + $index">&times;</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="text-right"><strong>Total</strong></td>
+                    <td class="text-right font-mono" data-testid="text-total-unit-subsidy"><strong>{{ fmtCurrency(totalUnitSubsidy) }}</strong></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          }
+        </div>
+
+        @if (selectedItem && getTypeConfig(selectedItem.indigentTypeId)) {
+          <div class="debt-actions-summary mt-1" data-testid="panel-debt-actions-summary">
+            <span class="field-label">Debt Actions on Approval</span>
+            <div class="debt-action-list">
+              @if (isWriteOffEnabled(selectedItem.indigentTypeId)) {
+                <span class="badge badge-info" data-testid="badge-writeoff-enabled">Write-off enabled</span>
+              } @else {
+                <span class="badge badge-outline" data-testid="badge-writeoff-disabled">Write-off disabled</span>
+              }
+              @if (getTypeConfig(selectedItem.indigentTypeId)?.writeOffHandoverDebt && isWriteOffEnabled(selectedItem.indigentTypeId)) {
+                <span class="badge badge-warning" data-testid="badge-handover-writeoff">Handover debt included</span>
+              }
+              @if (getTypeConfig(selectedItem.indigentTypeId)?.terminateHandoverOnApproval) {
+                <span class="badge badge-warning" data-testid="badge-terminate-handover">Terminate handover</span>
+              }
+              @if (getTypeConfig(selectedItem.indigentTypeId)?.terminateRepaymentPlanOnApproval) {
+                <span class="badge badge-warning" data-testid="badge-terminate-repayment">Terminate repayment plan</span>
+              }
+              @if (!isWriteOffEnabled(selectedItem.indigentTypeId) && !getTypeConfig(selectedItem.indigentTypeId)?.terminateHandoverOnApproval && !getTypeConfig(selectedItem.indigentTypeId)?.terminateRepaymentPlanOnApproval) {
+                <span class="badge badge-outline" data-testid="badge-no-debt-actions">No debt actions configured</span>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="doc-review-toggle mt-1" data-testid="auth-doc-toggle">
+          <button class="btn btn-sm btn-outline" (click)="showAuthDocs = !showAuthDocs" data-testid="button-toggle-auth-docs">
+            {{ showAuthDocs ? 'Hide' : 'Review' }} Documents
+          </button>
+        </div>
+        @if (showAuthDocs && selectedItem) {
+          <div class="doc-review-area" data-testid="auth-doc-area">
+            <app-document-manager [applicationId]="selectedItem.applicationId" />
+            <div class="doc-refresh-hint">
+              <button class="btn btn-sm btn-outline" (click)="refreshAuthDocsAfterUpload()" data-testid="button-refresh-auth-docs">Refresh Document Status</button>
+            </div>
+          </div>
+        }
+
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="authForm.remarks" rows="3" placeholder="Authorization notes..." data-testid="input-auth-remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeAuthorizeModal()" data-testid="button-cancel-auth">Cancel</button>
+        <button class="btn btn-success" (click)="submitAuthorize()" [disabled]="submitting()" data-testid="button-submit-auth">
+          @if (submitting()) { <span class="spinner"></span> }
+          Confirm Approve
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (declineModalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeDeclineModal()">
+    <div class="modal-content" style="max-width:32rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Decline Application #{{ selectedItem.applicationId }}</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDeclineModal()" data-testid="button-close-decline-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="detail-text">{{ selectedItem.accountHolderName }} — {{ selectedItem.accountNumber }}</p>
+        <div class="field-group mt-1">
+          <span class="field-label">Decline Reason *</span>
+          <select class="field-select" [(ngModel)]="declineForm.declineReasonId" data-testid="select-decline-reason">
+            <option [value]="0">Select reason</option>
+            @for (r of declineReasons(); track r.declineReasonId) {
+              <option [value]="r.declineReasonId">{{ r.declineReasonName }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="declineForm.remarks" rows="3" placeholder="Additional notes..." data-testid="input-decline-remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDeclineModal()" data-testid="button-cancel-decline">Cancel</button>
+        <button class="btn btn-danger" (click)="submitDecline()" [disabled]="submitting()" data-testid="button-submit-decline">
+          @if (submitting()) { <span class="spinner"></span> }
+          Confirm Decline
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (batchAuthorizeModalOpen) {
+  <div class="modal-overlay" (click)="closeBatchAuthorizeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Batch Authorize {{ selectedIds.size }} Applications</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeBatchAuthorizeModal()" data-testid="button-close-batch-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="detail-text">Apply the same subsidy values to all {{ selectedIds.size }} selected applications.</p>
+        <div class="form-grid">
+          <div class="field-group">
+            <span class="field-label">Monthly Subsidy (R)</span>
+            <input type="number" class="field-input" [(ngModel)]="batchAuthForm.monthlySubsidy" step="0.01" data-testid="input-batch-subsidy" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Qualifying Units</span>
+            <input type="number" class="field-input" [(ngModel)]="batchAuthForm.qualifyingUnits" data-testid="input-batch-units" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Once-Off Write-Off (R)</span>
+            <input type="number" class="field-input" [(ngModel)]="batchAuthForm.onceWriteOff" step="0.01" data-testid="input-batch-writeoff" />
+            <span class="field-hint">Only applied for types with write-off on approval enabled</span>
+          </div>
+        </div>
+        <div class="field-row mt-1">
+          <div class="field-group">
+            <span class="field-label">Commencement Date</span>
+            <app-date-input [value]="batchAuthForm.commencementDate" (valueChange)="batchAuthForm.commencementDate = $event" testId="input-batch-commencement-date" inputClass="field-input" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Reapplication Date</span>
+            <app-date-input [value]="batchAuthForm.reApplicationDate" (valueChange)="batchAuthForm.reApplicationDate = $event" testId="input-batch-reapplication-date" inputClass="field-input" />
+          </div>
+          <div class="field-group">
+            <span class="field-label">Termination Date</span>
+            <app-date-input [value]="batchAuthForm.terminationDate" (valueChange)="batchAuthForm.terminationDate = $event" testId="input-batch-termination-date" inputClass="field-input" />
+          </div>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="batchAuthForm.remarks" rows="3" placeholder="Batch authorization notes..." data-testid="input-batch-remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeBatchAuthorizeModal()" data-testid="button-cancel-batch">Cancel</button>
+        <button class="btn btn-success" (click)="submitBatchAuthorize()" [disabled]="submitting()" data-testid="button-submit-batch-auth">
+          @if (submitting()) { <span class="spinner"></span> }
+          Authorize All ({{ selectedIds.size }})
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (detailPanelOpen && detailApplicationId) {
+  <app-application-detail
+    [applicationId]="detailApplicationId"
+    mode="panel"
+    (closePanel)="closeDetailPanel()"
+  />
+}

@@ -33,7 +33,6 @@ export class PosLayoutComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
 
-  isEmbedded = signal(false);
   sidebarCollapsed = signal(false);
   mobileSidebarOpen = signal(false);
   expandedGroups = signal<Set<string>>(new Set(['Billing & Payments']));
@@ -74,10 +73,11 @@ export class PosLayoutComponent {
 
   navItems: NavItem[] = [
     { label: 'Dashboard', href: '/', icon: 'dashboard' },
-    { label: 'POS Receipting', href: '/pos', icon: 'point_of_sale' },
     {
       label: 'Billing & Payments', icon: 'payments',
       children: [
+        { label: 'POS Receipting', href: '/pos', icon: 'point_of_sale' },
+        { label: 'Supervisor', href: '/supervisor', icon: 'admin_panel_settings' },
         { label: 'Billing Dashboard', href: '/billing-dashboard', icon: 'bar_chart' },
         { label: 'Direct Deposits', href: '/direct-deposits/manual', icon: 'account_balance' },
         { label: 'Auto Allocation', href: '/direct-deposits/auto', icon: 'auto_fix_high' },
@@ -92,8 +92,37 @@ export class PosLayoutComponent {
         { label: 'View Receipts', href: '/view-receipts', icon: 'description' },
       ]
     },
-    { label: 'Communications', href: '/communications', icon: 'forum' },
-    { label: 'Supervisor', href: '/supervisor', icon: 'admin_panel_settings' },
+    {
+      label: 'Consumer Management', icon: 'person_add',
+      children: [
+        { label: 'Property Onboarding', href: '/consumer/onboarding', icon: 'add_home_work' },
+        { label: 'Entity Management', href: '/consumer/entities', icon: 'manage_accounts' },
+        { label: 'Bulk Import', href: '/consumer/bulk-import', icon: 'upload_file' },
+      ]
+    },
+    {
+      label: 'Indigent Management', icon: 'volunteer_activism',
+      children: [
+        { label: 'Dashboard', href: '/indigent/dashboard', icon: 'dashboard' },
+        { label: 'Applications', href: '/indigent/application', icon: 'assignment' },
+        { label: 'Site Verification', href: '/indigent/verification', icon: 'fact_check' },
+        { label: 'Document Verification', href: '/indigent/doc-verification', icon: 'verified_user' },
+        { label: 'Authorization', href: '/indigent/authorization', icon: 'verified' },
+        { label: 'Indigent Register', href: '/indigent/register', icon: 'list_alt' },
+        { label: 'Reapplication', href: '/indigent/reapplication', icon: 'refresh' },
+        { label: 'Termination', href: '/indigent/termination', icon: 'cancel' },
+        { label: 'Bulk Upload', href: '/indigent/bulk-upload', icon: 'upload_file' },
+        { label: 'Configuration', href: '/indigent/config', icon: 'settings' },
+        { label: 'Reports', href: '/indigent/reports', icon: 'assessment' },
+      ]
+    },
+    {
+      label: 'Communications', icon: 'forum',
+      children: [
+        { label: 'Client Messaging', href: '/communications', icon: 'mail' },
+        { label: 'Post-Billing SMS', href: '/communications/post-billing-sms', icon: 'sms' },
+      ]
+    },
     {
       label: 'Debt Management', icon: 'gavel',
       children: [
@@ -101,6 +130,7 @@ export class PosLayoutComponent {
         { label: 'Authorization', href: '/debt/section129/authorize', icon: 'verified' },
         { label: 'Configuration', href: '/debt/section129/config', icon: 'settings' },
         { label: 'Handover Management', href: '/debt/handover', icon: 'assignment_ind' },
+        { label: 'Handover Authorization', href: '/debt/handover/authorize', icon: 'verified' },
         { label: 'Handover Termination', href: '/debt/handover/terminate', icon: 'cancel' },
         { label: 'Batch Processing', href: '/debt/batch-processing', icon: 'batch_prediction' },
         { label: 'Process Monitoring', href: '/debt/process-monitoring', icon: 'monitor_heart' },
@@ -135,16 +165,12 @@ export class PosLayoutComponent {
         { label: 'Executive Dashboard', href: '/analytics/executive-dashboard', icon: 'leaderboard' },
         { label: 'Predictive Forecasting', href: '/analytics/predictive-forecasting', icon: 'auto_graph' },
         { label: 'Geographic Mapping', href: '/analytics/geographic-mapping', icon: 'map' },
+        { label: 'Account Ageing Summary', href: '/analytics/ageing-summary', icon: 'table_chart' },
       ]
     },
   ];
 
   constructor() {
-    try {
-      this.isEmbedded.set(window.self !== window.top);
-    } catch {
-      this.isEmbedded.set(true);
-    }
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd)
     ).subscribe(e => {
@@ -194,7 +220,7 @@ export class PosLayoutComponent {
   matchesUrl(href: string, url?: string): boolean {
     const current = url || this.currentUrl();
     if (href === '/') return current === '/' || current === '';
-    return current === href || current.startsWith(href + '/');
+    return current === href;
   }
 
   isActive(href: string): boolean {

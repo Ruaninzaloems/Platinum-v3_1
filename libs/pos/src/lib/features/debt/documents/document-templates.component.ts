@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TEMPLATE_CATEGORIES } from '../../../core/services/debt-config';
-import { formatDate, formatFileSize } from '../../../core/services/format.service';
-import type { DocumentTemplate, TemplateVersion } from '../../../core/models/debt.models';
+import { TEMPLATE_CATEGORIES } from '../../../services/debt-config';
+import { formatDate, formatFileSize } from '../../../services/format.service';
+import type { DocumentTemplate, TemplateVersion } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-document-templates',
@@ -205,6 +205,11 @@ export class DocumentTemplatesComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     this.uploadFileName.set(input.files?.[0]?.name || '');
   }
+
+  getSendingType(t: any): string { return t.sendingType || 'Document'; }
+  getFileType(t: any): string { return t.sendingType || t.fileType || 'Document'; }
+  getLastModified(t: any): string | null { return t.lastModified || t.lastModifiedAt || t.dateModified || null; }
+  getModifiedBy(t: any): string { return t.createdBy || t.lastModifiedBy || '—'; }
 
   fmtDate(d: string | null | undefined): string { return formatDate(d); }
   fmtFileSize(bytes: number | null | undefined): string { return formatFileSize(bytes); }

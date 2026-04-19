@@ -1,10 +1,11 @@
 import { Component, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
-import { ExportService, ExportOptions } from '../../core/services/export.service';
+import { ExportService, ExportOptions } from '../../services/export.service';
 import { firstValueFrom } from 'rxjs';
 
 interface SearchCriteria {
@@ -116,7 +117,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   private _apiCacheAccountId: number | null = null;
 
   private readonly NOCACHE_PATTERNS = [
-    'total-balance', 'close-balance', 'account-balance', 'payment-amount',
+    'total-balance', 'close-balance', 'open-balance', 'payment-amount',
     'service-type-balance', 'deposit-amount', 'outstanding', 'debt-inquiry',
     'closing-balance', 'open-balance',
   ];
@@ -171,6 +172,8 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   exportFromMonth = signal('July');
   exportToMonth = signal('June');
   exportingCsv = signal(false);
+  collapsedGroups = signal<Set<string>>(new Set());
+  txnAnimated = signal(false);
 
   consumptionSelectedMeter = signal<any>(null);
   consumptionHistory = signal<any[]>([]);
@@ -210,6 +213,70 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   meterConvHistory = signal<any[]>([]);
   meterConvLoading = signal(false);
   meterConvInsights = signal<any>(null);
+  meterConvAvailableYears = signal<string[]>([]);
+  meterConvSelectedYears = signal<string[]>([]);
+  meterConvSortCol = signal<string>('');
+  meterConvSortDir = signal<'asc' | 'desc'>('asc');
+
+  meterConvHistorySorted = computed(() => {
+    const data = this.meterConvHistory();
+    const col  = this.meterConvSortCol();
+    const dir  = this.meterConvSortDir();
+    if (!col || data.length === 0) return data;
+
+    const MONTH_ORDER: Record<string, number> = {
+      july:1, august:2, september:3, october:4, november:5, december:6,
+      january:7, february:8, march:9, april:10, may:11, june:12
+    };
+
+    return [...data].sort((a, b) => {
+      let va: any;
+      let vb: any;
+
+      if (col === 'billingmonth') {
+        // sort by financialYear first, then billing period order within the year
+        const fyA = a.financialYear || '';
+        const fyB = b.financialYear || '';
+        if (fyA !== fyB) {
+          va = fyA; vb = fyB;
+        } else {
+          va = MONTH_ORDER[(a.billingmonth || '').toLowerCase()] ?? a.billingPeriodID ?? 99;
+          vb = MONTH_ORDER[(b.billingmonth || '').toLowerCase()] ?? b.billingPeriodID ?? 99;
+        }
+      } else {
+        va = a[col] ?? '';
+        vb = b[col] ?? '';
+      }
+
+      // date columns — parse to timestamp
+      if (col.toLowerCase().includes('date') || col === 'reading1Date' || col === 'reading2Date' || col === 'testReadingDate' || col === 'disconnectionDate') {
+        const ta = va ? new Date(va).getTime() : 0;
+        const tb = vb ? new Date(vb).getTime() : 0;
+        return dir === 'asc' ? ta - tb : tb - ta;
+      }
+
+      // numeric columns
+      const na = Number(va);
+      const nb = Number(vb);
+      if (!isNaN(na) && !isNaN(nb) && va !== '' && vb !== '') {
+        return dir === 'asc' ? na - nb : nb - na;
+      }
+
+      // string comparison
+      const sa = String(va ?? '').toLowerCase();
+      const sb = String(vb ?? '').toLowerCase();
+      return dir === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+    });
+  });
+
+  sortMeterHistory(col: string) {
+    if (this.meterConvSortCol() === col) {
+      this.meterConvSortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.meterConvSortCol.set(col);
+      this.meterConvSortDir.set('asc');
+    }
+  }
   meterIntelMonths = signal(6);
   meterIntelShow = signal(true);
   meterEstShow = signal(true);
@@ -228,6 +295,57 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   s129Insights = signal<any>(null);
   s129AvailableYears = signal<string[]>([]);
 
+  debtPipelineData = signal<{ s129: any[]; handovers: any[] }>({ s129: [], handovers: [] });
+  hasHandoverData = computed(() => {
+    const dpData = this.debtPipelineData();
+    if (dpData.handovers.length > 0) return true;
+    const snap = this.globalSnapshot();
+    if (!snap) return false;
+    const hs = snap['handoverStatus'] || '';
+    return !!(hs && hs !== 'None' && hs !== 'N/A');
+  });
+  debtPipeline = computed<{ stage: number; arrearsAmount: number; s129Status: string; handoverAttorney: string; handoverStatus: string; legalNote: string } | null>(() => {
+    const snap = this.globalSnapshot();
+    if (!snap) return null;
+    const balance = snap['balance'] ?? snap['totalBalance'] ?? snap['accountBalance'] ?? 0;
+    const handoverStatus = snap['handoverStatus'] || '';
+    const isHandedOver = !!(handoverStatus && handoverStatus !== 'None' && handoverStatus !== 'N/A');
+    const dpData = this.debtPipelineData();
+    const latestS129 = dpData.s129.length > 0 ? dpData.s129[0] : null;
+    const latestHandover = dpData.handovers.length > 0 ? dpData.handovers[0] : null;
+    let stage = 0;
+    let arrearsAmount = 0;
+    let s129Status = '';
+    let handoverAttorney = '';
+    let hoStatus = '';
+    let legalNote = '';
+
+    if (balance > 0) { stage = 1; arrearsAmount = balance; }
+    if (latestS129) {
+      stage = 2;
+      s129Status = latestS129.proofOfDeliveryStatus || 'Issued';
+      const issueDate = latestS129.issueDate || latestS129.noticeDate || latestS129.dateCreated;
+      if (issueDate) {
+        const d = new Date(issueDate);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        s129Status += ` (${dd}/${mm}/${yyyy})`;
+      }
+    }
+    if (isHandedOver || (latestHandover && (latestHandover.status || latestHandover.handoverStatus) !== 'Terminated')) {
+      stage = 3;
+      handoverAttorney = latestHandover?.attorney || latestHandover?.attorneyName || '';
+      hoStatus = latestHandover?.status || latestHandover?.handoverStatus || handoverStatus;
+    }
+    if (isHandedOver && latestHandover && latestHandover.attorney) {
+      legalNote = 'With attorney';
+      stage = 4;
+    }
+    if (stage === 0 && !isHandedOver && !latestS129) return null;
+    return { stage, arrearsAmount, s129Status, handoverAttorney, handoverStatus: hoStatus, legalNote };
+  });
+
   stmtType = signal<'standard' | 'detailed'>('standard');
   stmtFinYear = signal('');
   stmtMonth = signal('');
@@ -237,11 +355,22 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   stmtGenerated = signal<any>(null);
   stmtGeneratingLink = signal(false);
   stmtGeneratedLink = signal('');
+  stmtSecureUrl = signal('');
   stmtSending = signal(false);
   stmtSendMode = signal<'email' | 'sms' | null>(null);
   stmtEmail = signal('');
   stmtPhone = signal('');
   stmtAvailableYears = signal<string[]>([]);
+  citizenStatements = signal<any[]>([]);
+  citizenStatementsLoading = signal(false);
+  citizenStatementsError = signal('');
+  stmtDetailData = signal<any[] | null>(null);
+  stmtDetailLoading = signal(false);
+  stmtDetailError = signal('');
+  stmtDetailSelectedId = signal<number | null>(null);
+  stmtFilterTxnData = signal<any[] | null>(null);
+  stmtFilterTxnLoading = signal(false);
+  stmtFilterTxnError = signal('');
   stmtMonths: string[] = ['', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
   stmtSendPanelOpen = signal(false);
   stmtReportOpening = signal(false);
@@ -255,9 +384,14 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   stmtSubject = signal('');
   stmtMessageBody = signal('');
   stmtSmsBody = signal('');
+  stmtAvailablePeriods = signal<{label: string; periodId: string; month: string}[]>([]);
+  stmtSelectedPeriodId = signal('');
   stmtCommHistory = signal<any[]>([]);
   stmtCommHistoryLoading = signal(false);
   stmtSendStep = signal<'compose' | 'sent'>('compose');
+
+  gpSmsSending = signal<number | null>(null);
+  gpSmsMenuOpen = signal<number | null>(null);
 
   commMethod = signal<'email' | 'sms'>('email');
   commRecipient = signal('');
@@ -348,17 +482,21 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     { key: 'erfNumber', label: 'ERF Number', placeholder: 'e.g. 13110', icon: '🏛️' },
   ];
 
-  tabGroups: TabGroup[] = [
+  tabGroups = computed<TabGroup[]>(() => {
+    const accountPartyTabs: TabGroup['tabs'] = [
+      { value: 'account', label: 'Account', icon: '👤' },
+      { value: 'name', label: 'Name', icon: '👥' },
+      { value: 'property', label: 'Property', icon: '🏠' },
+      { value: 'linked-accounts', label: 'Linked Accts', icon: '🏢' },
+      { value: 'contact', label: 'Contact', icon: '📞' },
+    ];
+    if (this.hasHandoverData()) {
+      accountPartyTabs.push({ value: 'handover', label: 'Handover', icon: '➡️' });
+    }
+    return [
     {
       heading: 'ACCOUNT & PARTY',
-      tabs: [
-        { value: 'account', label: 'Account', icon: '👤' },
-        { value: 'name', label: 'Name', icon: '👥' },
-        { value: 'property', label: 'Property', icon: '🏠' },
-        { value: 'linked-accounts', label: 'Linked Accts', icon: '🏢' },
-        { value: 'contact', label: 'Contact', icon: '📞' },
-        { value: 'handover', label: 'Handover', icon: '➡️' },
-      ],
+      tabs: accountPartyTabs,
     },
     {
       heading: 'SERVICES & CONSUMPTION',
@@ -409,6 +547,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       ],
     },
   ];
+  });
 
   mobileTabMenuOpen = signal(false);
 
@@ -420,11 +559,20 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private toast: ToastService,
     private auth: AuthService,
+    private route: ActivatedRoute,
   ) {
     this.exportService = new ExportService();
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    // Auto-search when arriving from another page with ?account=<accountNumber>
+    const accountParam = this.route.snapshot.queryParamMap.get('account');
+    if (accountParam) {
+      this.quickQuery.set(accountParam.trim());
+      // Small delay to let the component fully render before triggering the search
+      setTimeout(() => this.handleFullSearch(), 150);
+    }
+  }
 
   ngOnDestroy(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
@@ -442,23 +590,23 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   }
 
   get currentTabLabel(): string {
-    for (const group of this.tabGroups) {
-      const tab = group.tabs.find(t => t.value === this.activeTab());
+    for (const group of this.tabGroups()) {
+      const tab = group.tabs.find((t: any) => t.value === this.activeTab());
       if (tab) return tab.label;
     }
     return 'Account';
   }
 
   get currentTabGroup(): string {
-    for (const group of this.tabGroups) {
-      if (group.tabs.some(t => t.value === this.activeTab())) return group.heading;
+    for (const group of this.tabGroups()) {
+      if (group.tabs.some((t: any) => t.value === this.activeTab())) return group.heading;
     }
     return '';
   }
 
   get currentTabIcon(): string {
-    for (const group of this.tabGroups) {
-      const tab = group.tabs.find(t => t.value === this.activeTab());
+    for (const group of this.tabGroups()) {
+      const tab = group.tabs.find((t: any) => t.value === this.activeTab());
       if (tab) return tab.icon;
     }
     return '👤';
@@ -560,6 +708,61 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       .replace(/,\s*$/g, '')
       .replace(/\s{2,}/g, ' ')
       .trim();
+  }
+
+  /** Returns column total across all balance rows in the expanded quick view. */
+  qvBalanceColTotal(col: string): number {
+    const bal = this.expandedRowData().balance;
+    if (!bal?.length) return 0;
+    return bal.reduce((s: number, b: any) => s + (b[col] || 0), 0);
+  }
+
+  /** Returns 180+ days total across all balance rows. */
+  qvBalance180Total(): number {
+    const bal = this.expandedRowData().balance;
+    if (!bal?.length) return 0;
+    return bal.reduce((s: number, b: any) => s + (b.untill360 || b.until360 || 0), 0);
+  }
+
+  /** Returns totalOutstanding total across all balance rows. */
+  qvBalanceTotalOs(): number {
+    const bal = this.expandedRowData().balance;
+    if (!bal?.length) return 0;
+    return bal.reduce((s: number, b: any) => s + (b.totalOutStanding || b.totalOutstandingAmount || 0), 0);
+  }
+
+  /** Parses the raw contactDetails string from Platinum into structured items for display. */
+  parseContactItems(raw: string): { icon: string; label: string; value: string }[] {
+    if (!raw) return [];
+    const text = raw
+      .replace(/<br\s*\/?>/gi, ';')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    const parts = text.split(/[;,]/).map(s => s.trim()).filter(s => s.length > 0);
+    const labelMap: { key: string; label: string; icon: string }[] = [
+      { key: 'Tel Number(Work)', label: 'Work', icon: '🏢' },
+      { key: 'Tel Number', label: 'Tel', icon: '📞' },
+      { key: 'Mobile No.', label: 'Mobile', icon: '📱' },
+      { key: 'Email', label: 'Email', icon: '✉️' },
+      { key: 'Fax', label: 'Fax', icon: '🖨️' },
+    ];
+    const items: { icon: string; label: string; value: string }[] = [];
+    for (const part of parts) {
+      const colonIdx = part.indexOf(':');
+      if (colonIdx === -1) continue;
+      const rawKey = part.slice(0, colonIdx).trim();
+      const value = part.slice(colonIdx + 1).trim();
+      if (!value) continue;
+      const match = labelMap.find(m => rawKey.toLowerCase().includes(m.key.toLowerCase()));
+      items.push({ icon: match?.icon || '📋', label: match?.label || rawKey, value });
+    }
+    return items;
+  }
+
+  /** @deprecated Use parseContactItems for display. Kept for any legacy callers. */
+  formatContactCell(raw: string): string {
+    const items = this.parseContactItems(raw);
+    return items.length ? items.map(i => `${i.label}: ${i.value}`).join('  ·  ') : '-';
   }
 
   isStatusActive(val: any): boolean {
@@ -738,7 +941,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
         const id = item.account_ID || item.accountID;
         if (!id) return;
         const basic = await this.withTimeout(
-          firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${id}`)), 6000
+          firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/basic-account-details', { AccountId: String(id), IsSundryDebtor: 'false' })), 6000
         );
         if (this.quickSearchToken !== token) return;
         if (basic && !basic._error) {
@@ -867,7 +1070,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
         const acctId = body['accountID'].replace(/^0+/, '') || body['accountID'];
         try {
           const basic = await this.withTimeout(
-            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${acctId}`)), 8000
+            firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/basic-account-details', { AccountId: acctId, IsSundryDebtor: 'false' })), 8000
           );
           if (this.searchToken !== token) return;
           if (basic && !basic._error) {
@@ -957,8 +1160,10 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       this.globalSnapshot.set(null);
       this.riskFlagsLoading.set(true);
       this.riskFlags.set([]);
+      this.debtPipelineData.set({ s129: [], handovers: [] });
       this.loadHeaderBalance(id);
       this.loadTabData('account', id);
+      this.prefetchDebtPipeline(id);
     }
   }
 
@@ -968,6 +1173,23 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.globalSnapshot.set(null);
     this.riskFlags.set([]);
     this.tabData.set(null);
+    this.debtPipelineData.set({ s129: [], handovers: [] });
+  }
+
+  async prefetchDebtPipeline(accountId: number): Promise<void> {
+    try {
+      const [s129Res, handoverRes] = await Promise.allSettled([
+        this.api.get(`/api/platinum/billing-enquiry/section129-account-enquiry`, { accountId: String(accountId) }).toPromise(),
+        this.api.get(`/api/platinum/billing-enquiry/handover-account-enquiry`, { accountId: String(accountId) }).toPromise()
+      ]);
+      const s129Raw = s129Res.status === 'fulfilled' ? s129Res.value : [];
+      const s129 = Array.isArray(s129Raw) ? s129Raw : (s129Raw as any)?.data || (s129Raw as any)?.section129 || [];
+      const hoRaw = handoverRes.status === 'fulfilled' ? handoverRes.value : [];
+      const handovers = Array.isArray(hoRaw) ? hoRaw : (hoRaw as any)?.data || (hoRaw as any)?.handovers || [];
+      this.debtPipelineData.set({ s129, handovers });
+    } catch {
+      this.debtPipelineData.set({ s129: [], handovers: [] });
+    }
   }
 
   clearSearch(): void {
@@ -1141,7 +1363,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       for (const b of balance) {
         totalOutstanding += b.totalOutStanding ?? b.totalOutstandingAmount ?? 0;
         totalCurrent += b.current ?? 0;
-        totalArrears += (b.days30 ?? 0) + (b.days60 ?? 0) + (b.days90 ?? 0) + (b.days120 ?? 0) + (b.days150 ?? 0);
+        totalArrears += (b.days30 ?? 0) + (b.days60 ?? 0) + (b.days90 ?? 0) + (b.days120 ?? 0) + (b.days150 ?? 0) + (b.untill360 ?? b.until360 ?? 0);
       }
 
       this.expandedRowData.set({
@@ -1203,7 +1425,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
           const acctUnitPartForSearch = acctForPRS?.unitPartitionID || acctForPRS?.unitPartition_ID;
 
           const fastPromises = Promise.allSettled([
-            this.cachedGet(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`),
+            this.cachedGet('/api/platinum/billing-enquiry/basic-account-details', { AccountId: String(accountId), IsSundryDebtor: 'false' }),
             this.cachedGet(`/api/platinum/billing-enquiry/account-info-result/${accountId}`),
             this.cachedGet(`/api/platinum/billing-enquiry/get-contact-details/${accountId}`),
             this.cachedGet(`/api/platinum/billing-enquiry/cons-unit-by-account`, { AccountId: String(accountId) }),
@@ -1837,7 +2059,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
               }
             }
 
-            const basicAcct = await this.cachedGet(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`);
+            const basicAcct = await this.cachedGet('/api/platinum/billing-enquiry/basic-account-details', { AccountId: String(accountId), IsSundryDebtor: 'false' });
             if (basicAcct && !basicAcct._error) {
               if (!propVal['accountableOwnerName'] && !propVal['ownerName']) {
                 const fn = (basicAcct.fullNAME || '').trim();
@@ -2023,7 +2245,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
             firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details/${accountId}`)),
             firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details-history/${accountId}`)),
             firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/delivery-address-history/${accountId}`)),
-            firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`)),
+            firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/basic-account-details', { AccountId: String(accountId), IsSundryDebtor: 'false' })),
             firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-info-result/${accountId}`)),
             firstValueFrom(this.api.get<any>(`/api/platinum/billing-account-management/get-additional-emails`, { accountId: String(accountId) })),
           ]);
@@ -2055,10 +2277,18 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
           }
           const additionalEmails = additionalEmailsResult.status === 'fulfilled' ? this.normalizeArray(additionalEmailsResult.value) : [];
           if (additionalEmails.length > 0) {
-            additionalEmails.forEach((e: any, i: number) => {
-              const email = e.emailAddress || e.email || e.emailId || '';
-              if (email && !mergedContact[`additionalEmail${i + 1}`]) {
-                mergedContact[`additionalEmail${i + 1}`] = email;
+            additionalEmails.forEach((e: any) => {
+              const email = e.emailAdress || e.emailAddress || e.email || e.emailId || '';
+              const slot = e.emailNo || 0;
+              if (email) {
+                const key = slot > 0 ? `additionalEmail${slot}` : null;
+                if (key && !mergedContact[key]) {
+                  mergedContact[key] = email;
+                } else if (!key) {
+                  for (let s = 1; s <= 4; s++) {
+                    if (!mergedContact[`additionalEmail${s}`]) { mergedContact[`additionalEmail${s}`] = email; break; }
+                  }
+                }
               }
             });
           }
@@ -2215,7 +2445,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
             }
             if (!merged['firstNames'] && !merged['surname_Company'] && !merged['idNo_RegistrationNo']) {
               const [nameBasic, nameAcctInfo] = await Promise.allSettled([
-                firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/basic-account-details/${accountId}`)),
+                firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/basic-account-details', { AccountId: String(accountId), IsSundryDebtor: 'false' })),
                 firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-info-result/${accountId}`)),
               ]);
               const nb = nameBasic.status === 'fulfilled' ? (Array.isArray(nameBasic.value) ? nameBasic.value[0] : nameBasic.value) : null;
@@ -2312,14 +2542,15 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
           break;
 
         case 'statements':
+          this.stmtFinYear.set('');
+          this.stmtMonthFrom.set('');
+          this.stmtMonthTo.set('');
+          this.stmtMonth.set('');
           try {
             const stmtResult = await firstValueFrom(
               this.api.get<any>(`/api/platinum/billing-enquiry/generated-statements/${accountId}`)
             );
             const stmtArr = this.normalizeArray(stmtResult);
-            if (stmtArr.length > 0) {
-            } else {
-            }
             data = { statements: stmtArr };
             this.stmtGenerated.set(null);
             this.stmtSendMode.set(null);
@@ -2328,7 +2559,9 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
             data = { statements: [], _error: e?.message || 'Failed to load statements' };
             this.stmtGenerated.set(null);
             this.stmtSendMode.set(null);
+            this.initStmtYears([]);
           }
+          this.loadCitizenStatements(accountId);
           break;
 
         case 'clearance':
@@ -2632,9 +2865,11 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
           if (!this.detailFinYear()) {
             this.detailFinYear.set(this.userFinYear() || this.getCurrentFinYear());
           }
-          const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+          const now = new Date();
+          const openPeriodDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          const openMonth = openPeriodDate.toLocaleString('en-US', { month: 'long' });
           const finMonths = this.detailMonths;
-          const matchMonth = finMonths.find(m => m === currentMonth);
+          const matchMonth = finMonths.find(m => m === openMonth);
           if (matchMonth) {
             this.detailMonth.set(matchMonth);
             this.exportFromMonth.set('July');
@@ -2771,7 +3006,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
     try {
       const res = await firstValueFrom(
-        this.api.get<any>(`/api/platinum/billing-enquiry/account-balance/${accountId}`, { _t: String(Date.now()) })
+        this.api.get<any>(`/api/platinum/billing-enquiry/open-balance-detail/${accountId}`, { _t: String(Date.now()) })
       );
       if (res && !res._error) {
         return Array.isArray(res) ? res : res ? [res] : [];
@@ -3454,55 +3689,21 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.summarySource.set('');
     this._summaryFieldsLogged = false;
 
-    const params: Record<string, string> = { financialYear: finYear };
     let loaded = false;
 
+    // Primary: build pivot from per-month billing period transactions — matches React exactly
     try {
-      const result = await firstValueFrom(
-        this.api.get<any>(`/api/platinum/billing-enquiry/transaction-summary-list/${accountId}`, params)
-      );
-      const arr = this.normalizeArray(result);
-      if (arr.length > 0 && !arr[0]._error) {
-        const hasMonthlyData = this.checkRowHasMonthData(arr[0]);
-        if (hasMonthlyData) {
-          this.summaryData.set(arr);
-          this.summarySource.set('monthly');
-          loaded = true;
-        } else {
-        }
+      const monthlyData = await this.buildSummaryFromBillingPeriods(accountId, finYear);
+      if (monthlyData.length > 0) {
+        this.summaryData.set(monthlyData);
+        this.summarySource.set('monthly');
+        loaded = true;
       }
     } catch {
     }
 
     if (!loaded) {
-      try {
-        const monthlyData = await this.buildSummaryFromBillingPeriods(accountId, finYear);
-        if (monthlyData.length > 0) {
-          this.summaryData.set(monthlyData);
-          this.summarySource.set('monthly');
-          loaded = true;
-        }
-      } catch (e: any) {
-      }
-    }
-
-    if (!loaded) {
-      try {
-        const result = await firstValueFrom(
-          this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance/${accountId}`, { ...params, _t: String(Date.now()) })
-        );
-        const arr = this.normalizeArray(result);
-        if (arr.length > 0 && !arr[0]._error) {
-          this.summaryData.set(arr);
-          this.summarySource.set('aging');
-          loaded = true;
-        }
-      } catch {
-      }
-    }
-
-    if (!loaded) {
-      this.summaryError.set('Failed to load transaction summary');
+      this.summaryError.set('No transaction data found for ' + finYear);
     }
     this.summaryLoading.set(false);
   }
@@ -3516,6 +3717,24 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     return keys.some(k => monthKeys.includes(k));
   }
 
+  /**
+   * Extracts the canonical service-type label from a raw Platinum transaction description.
+   * Matches the React extractServiceType logic exactly so both UIs show the same rows.
+   */
+  private extractServiceType(desc: string): string {
+    if (!desc) return 'Other';
+    // Strip "Levy - " prefix
+    const levyMatch = desc.match(/^Levy\s*-\s*(.+)/i);
+    if (levyMatch) return levyMatch[1].trim();
+    // Strip "Billing Transfer Normal Journal - ...", "Normal Journal - ..." etc.
+    const journalMatch = desc.match(/^(?:Billing\s+Transfer\s+)?(?:Normal\s+)?Journal\s*-\s*(.+?)(?:\s*-\s*Transfer|$)/i);
+    if (journalMatch) return journalMatch[1].trim();
+    // Fallback: take the second segment split by " - "
+    const parts = desc.split(' - ').map((s: string) => s.trim());
+    if (parts.length >= 2) return parts[1];
+    return desc || 'Other';
+  }
+
   private async buildSummaryFromBillingPeriods(accountId: number, finYear: string): Promise<any[]> {
     const months = this.detailMonths;
     const monthFieldMap: Record<string, string> = {
@@ -3525,19 +3744,23 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     };
 
     const results = await Promise.allSettled(
-      months.map(m => firstValueFrom(
-        this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
-          accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
-        })
-      ))
+      months.map(m => {
+        const pid = this.getAbsoluteBillPeriodId(m, finYear);
+        return firstValueFrom(
+          this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+            accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+          })
+        );
+      })
     );
 
-    const serviceMap = new Map<string, any>();
-    const totals: Record<string, number> = {};
-    months.forEach(m => totals[monthFieldMap[m]] = 0);
-
-    const apiOpenBal: Record<string, number> = {};
-    const apiCloseBal: Record<string, number> = {};
+    // Accumulators — matches React buildPivotData structure
+    const serviceMap = new Map<string, Record<string, number>>();
+    const monthOpening: Record<string, number> = {};
+    const monthClosing: Record<string, number> = {};
+    const monthInterest: Record<string, number> = {};
+    const monthReceipts: Record<string, number> = {};
+    const monthCharges: Record<string, number> = {};
 
     for (let mi = 0; mi < months.length; mi++) {
       const res = results[mi];
@@ -3546,69 +3769,67 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       const field = monthFieldMap[months[mi]];
 
       for (const t of txns) {
+        const drilldown = (t.drilldown || t.drillDown || '').trim();
         const desc = t.transactionDescription || t.description || '';
-        if (!desc) continue;
-        const descLower = desc.toLowerCase();
+        const totalAmt = Number(t.totalAmount ?? t.amount ?? t.debitAmount ?? t.total ?? 0) || 0;
 
-        const amount = Number(t.totalAmount ?? t.amount ?? t.debitAmount ?? t.total ?? 0) || 0;
-
-        if (descLower.includes('open') && descLower.includes('balance')) {
-          apiOpenBal[field] = amount;
+        // Use drilldown field if present (matches React primary path)
+        if (drilldown === 'OpenBalance' || (!drilldown && /open.*balance/i.test(desc))) {
+          monthOpening[field] = (monthOpening[field] || 0) + totalAmt;
           continue;
         }
-        if (descLower.includes('clos') && descLower.includes('balance')) {
-          apiCloseBal[field] = amount;
+        if (drilldown === 'CloseBalance' || (!drilldown && /clos.*balance/i.test(desc))) {
+          monthClosing[field] = (monthClosing[field] || 0) + totalAmt;
+          continue;
+        }
+        if (drilldown === 'Interest') {
+          monthInterest[field] = (monthInterest[field] || 0) + totalAmt;
+          continue;
+        }
+        if (drilldown === 'Receipt') {
+          monthReceipts[field] = (monthReceipts[field] || 0) + totalAmt;
           continue;
         }
 
-        let serviceDesc = desc;
-        if (desc.toLowerCase().startsWith('levy - ')) serviceDesc = desc.substring(7);
-        else if (desc.toLowerCase().startsWith('levy -')) serviceDesc = desc.substring(6);
-        if (descLower.includes('payment')) serviceDesc = 'Payment';
-
-        if (!serviceMap.has(serviceDesc)) {
-          const entry: any = { description: serviceDesc, financialYear: finYear };
-          months.forEach(m => entry[monthFieldMap[m]] = 0);
-          serviceMap.set(serviceDesc, entry);
-        }
-
-        serviceMap.get(serviceDesc)[field] += amount;
-        totals[field] += amount;
+        // All other transactions → group by extracted service type
+        const serviceType = this.extractServiceType(desc);
+        if (!serviceMap.has(serviceType)) serviceMap.set(serviceType, {});
+        const row = serviceMap.get(serviceType)!;
+        row[field] = (row[field] || 0) + totalAmt;
+        monthCharges[field] = (monthCharges[field] || 0) + totalAmt;
       }
     }
 
-    const pivotedRows = Array.from(serviceMap.values());
-    if (pivotedRows.length === 0) return [];
+    const serviceRows = Array.from(serviceMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([desc, mths]) => {
+        const entry: any = { description: desc, financialYear: finYear };
+        months.forEach(m => entry[monthFieldMap[m]] = mths[monthFieldMap[m]] || 0);
+        return entry;
+      });
 
+    if (serviceRows.length === 0 && !Object.keys(monthOpening).length) return [];
 
+    // Build special rows
     const openingRow: any = { description: 'Opening Balance', financialYear: finYear, _isSpecialRow: true };
+    const chargesRow: any = { description: 'Total Charges', financialYear: finYear, _isSpecialRow: true, _isTotalRow: true };
+    const interestRow: any = { description: 'Interest', financialYear: finYear, _isSpecialRow: true };
+    const receiptsRow: any = { description: 'Receipts / Payments', financialYear: finYear, _isSpecialRow: true };
     const closingRow: any = { description: 'Closing Balance', financialYear: finYear, _isSpecialRow: true };
-    months.forEach(m => { openingRow[monthFieldMap[m]] = 0; closingRow[monthFieldMap[m]] = 0; });
 
-    let prevClosing = 0;
-    for (const m of months) {
-      const field = monthFieldMap[m];
-      const ob = apiOpenBal[field];
-      const cb = apiCloseBal[field];
-      if (ob !== undefined) {
-        openingRow[field] = ob;
-      } else {
-        openingRow[field] = prevClosing;
-      }
-      if (cb !== undefined) {
-        closingRow[field] = cb;
-        prevClosing = cb;
-      } else {
-        const computed = openingRow[field] + totals[field];
-        closingRow[field] = computed;
-        prevClosing = computed;
-      }
-    }
+    months.forEach(m => {
+      const f = monthFieldMap[m];
+      openingRow[f]  = monthOpening[f]  || 0;
+      chargesRow[f]  = monthCharges[f]  || 0;
+      interestRow[f] = monthInterest[f] || 0;
+      receiptsRow[f] = monthReceipts[f] || 0;
+      // Closing: use API value if available, otherwise derive
+      closingRow[f]  = monthClosing[f] !== undefined
+        ? monthClosing[f]
+        : (openingRow[f] + chargesRow[f] + interestRow[f] + receiptsRow[f]);
+    });
 
-    const totalRow: any = { description: 'Total', financialYear: finYear, _isSpecialRow: true, _isTotalRow: true };
-    months.forEach(m => totalRow[monthFieldMap[m]] = totals[monthFieldMap[m]]);
-
-    return [openingRow, ...pivotedRows, totalRow, closingRow];
+    return [openingRow, ...serviceRows, interestRow, chargesRow, receiptsRow, closingRow];
   }
 
   private pivotServiceTypeBalance(rows: any[], finYear: string): any[] {
@@ -3759,7 +3980,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       'days90': ['days90', '90days', 'ninetyDays', 'ninety_days'],
       'days120': ['days120', '120days', 'hundredTwentyDays', 'hundred_twenty_days'],
       'days150': ['days150', '150days', 'hundredFiftyDays', 'hundred_fifty_days'],
-      'days180': ['days180', '180days', 'overHundredEighty', 'hundredEightyPlusDays', 'over_180_days'],
+      'days180': ['days180', '180days', 'overHundredEighty', 'hundredEightyPlusDays', 'over_180_days', 'untill360', 'until360', 'over360', 'over180'],
     };
     const candidates = fieldMap[field] || [field];
     for (const key of candidates) {
@@ -3807,11 +4028,13 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       } else {
         const months = this.detailMonths;
         const results = await Promise.allSettled(
-          months.map(m => firstValueFrom(
-            this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
-              accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
-            })
-          ))
+          months.map(m => {
+            return firstValueFrom(
+              this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+                accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+              })
+            );
+          })
         );
         const allTxns = results.flatMap(r => r.status === 'fulfilled' ? this.normalizeArray(r.value) : []);
         if (allTxns.length > 0) {
@@ -3918,10 +4141,120 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
   getTxnRowClass(txn: any): string {
     const desc = (txn.transactionDescription || txn.description || '').toLowerCase();
-    if (desc.includes('open balance') || desc.includes('opening balance')) return 'txn-row-opening';
-    if (desc.includes('clos') && desc.includes('balance')) return 'txn-row-closing';
+    if (desc.includes('open balance') || desc.includes('opening balance')) return 'txn-row-balance';
+    if (desc.includes('clos') && desc.includes('balance')) return 'txn-row-balance txn-row-closing';
     if (desc.includes('payment') || txn.drilldown === 'receipt') return 'txn-row-payment';
+    if (desc.includes('rebate') || desc.includes('credit') || desc.includes('free water') || desc.includes('free elec')) return 'txn-row-rebate';
     return '';
+  }
+
+  getTxnCategory(txn: any): string {
+    const desc = (txn.transactionDescription || txn.description || '').toLowerCase();
+    if (desc.includes('open balance') || desc.includes('opening balance')) return 'balance';
+    if (desc.includes('clos') && desc.includes('balance')) return 'balance';
+    if (desc.includes('payment') || txn.drilldown === 'receipt') return 'payment';
+    if (desc.includes('rebate') || desc.includes('credit') || desc.includes('free water') || desc.includes('free elec')) return 'rebate';
+    return 'levy';
+  }
+
+  getTxnIcon(txn: any): string {
+    const desc = (txn.transactionDescription || txn.description || '').toLowerCase();
+    if (desc.includes('open balance') || desc.includes('opening balance')) return '◈';
+    if (desc.includes('clos') && desc.includes('balance')) return '◉';
+    if (desc.includes('payment') || txn.drilldown === 'receipt') return '▸';
+    if (desc.includes('rebate') || desc.includes('free water') || desc.includes('free elec')) return '◇';
+    if (desc.includes('water')) return '●';
+    if (desc.includes('elec')) return '⬡';
+    if (desc.includes('sewer') || desc.includes('sanit')) return '◆';
+    if (desc.includes('refuse') || desc.includes('waste')) return '▪';
+    if (desc.includes('rate') || desc.includes('property')) return '■';
+    return '○';
+  }
+
+  getGroupedTransactions(): { date: string; label: string; txns: any[]; total: number }[] {
+    const txns = this.detailTransactions();
+    const map = new Map<string, any[]>();
+    for (const t of txns) {
+      const dateKey = this.formatDate(t.transactionDate || t.date) || 'Unknown';
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey)!.push(t);
+    }
+    const groups: { date: string; label: string; txns: any[]; total: number }[] = [];
+    for (const [date, items] of map.entries()) {
+      const total = items.reduce((s: number, t: any) => s + (t.total ?? t.totalAmount ?? 0), 0);
+      const cats = new Set(items.map((t: any) => this.getTxnCategory(t)));
+      let label = '';
+      if (cats.has('balance') && items.length <= 2) label = 'Balance';
+      else if (cats.has('payment') && cats.size === 1) label = 'Payments';
+      else if (cats.has('levy') && !cats.has('payment')) label = 'Levies & Rebates';
+      else label = 'Mixed';
+      groups.push({ date, label, txns: items, total });
+    }
+    return groups;
+  }
+
+  getRunningBalances(): Map<number, number> {
+    const txns = this.detailTransactions();
+    const balances = new Map<number, number>();
+    let running = 0;
+    for (let i = 0; i < txns.length; i++) {
+      const desc = (txns[i].transactionDescription || txns[i].description || '').toLowerCase();
+      const total = txns[i].total ?? txns[i].totalAmount ?? 0;
+      if (desc.includes('open balance') || desc.includes('opening balance')) {
+        running = total;
+      } else {
+        running += total;
+      }
+      balances.set(i, running);
+    }
+    return balances;
+  }
+
+  toggleGroup(date: string) {
+    const current = new Set(this.collapsedGroups());
+    if (current.has(date)) {
+      current.delete(date);
+    } else {
+      current.add(date);
+    }
+    this.collapsedGroups.set(current);
+  }
+
+  isGroupCollapsed(date: string): boolean {
+    return this.collapsedGroups().has(date);
+  }
+
+  getGlobalIndex(txn: any): number {
+    return this.detailTransactions().indexOf(txn);
+  }
+
+  getTxnSummaryCharges(): number {
+    return this.detailTransactions()
+      .filter((t: any) => {
+        const desc = (t.transactionDescription || t.description || '').toLowerCase();
+        return !desc.includes('balance') && !desc.includes('payment') && t.drilldown !== 'receipt' && (t.total ?? t.totalAmount ?? 0) > 0;
+      })
+      .reduce((sum: number, t: any) => sum + (t.total ?? t.totalAmount ?? 0), 0);
+  }
+
+  getTxnSummaryPayments(): number {
+    return this.detailTransactions()
+      .filter((t: any) => {
+        const desc = (t.transactionDescription || t.description || '').toLowerCase();
+        return desc.includes('payment') || t.drilldown === 'receipt';
+      })
+      .reduce((sum: number, t: any) => sum + (t.total ?? t.totalAmount ?? 0), 0);
+  }
+
+  getTxnSummaryClosing(): number {
+    const txns = this.detailTransactions();
+    for (let i = txns.length - 1; i >= 0; i--) {
+      const desc = (txns[i].transactionDescription || txns[i].description || '').toLowerCase();
+      if (desc.includes('clos') && desc.includes('balance')) {
+        return txns[i].total ?? txns[i].totalAmount ?? 0;
+      }
+    }
+    return txns.reduce((sum: number, t: any) => sum + (t.total ?? t.totalAmount ?? 0), 0);
   }
 
   getExportMonthRange(): string[] {
@@ -3948,11 +4281,14 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
     try {
       const monthResults = await Promise.allSettled(
-        months.map(m => firstValueFrom(
-          this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
-            accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
-          })
-        ))
+        months.map(m => {
+          const pid = this.getAbsoluteBillPeriodId(m, finYear);
+          return firstValueFrom(
+            this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+              accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+            })
+          );
+        })
       );
 
       const basic = this.getAccountBasic();
@@ -4117,7 +4453,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   getBvpAgingTotal(field: string): number {
     const bal = this.tabData()?.balance || [];
     if (field === 'total') return bal.reduce((s: number, r: any) => s + Number(r.totalOutStanding || r.totalOutstanding || 0), 0);
-    if (field === 'days150') return bal.reduce((s: number, r: any) => s + Number(r.days150 || 0) + Number(r.untill360 || 0), 0);
+    if (field === 'days180') return bal.reduce((s: number, r: any) => s + this.getDebtVal(r, 'days180'), 0);
     return bal.reduce((s: number, r: any) => s + Number(r[field] || 0), 0);
   }
 
@@ -4691,19 +5027,178 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   }
 
   initStmtYears(statements: any[]) {
-    const currentYear = new Date().getFullYear();
+    const currentFy = this.userFinYear() || this.getCurrentFinYear();
+    const [startYear] = currentFy.split('/').map(Number);
     const years: string[] = [];
     for (let i = 0; i < 5; i++) {
-      years.push(`${currentYear - i}/${currentYear - i + 1}`);
+      const y = startYear - i;
+      years.push(`${y}/${y + 1}`);
     }
     const fromStmts = statements
       .map((s: any) => s.financialYear || s.billingPeriod || '')
       .filter((y: string) => y && y.includes('/'));
     const allYears = [...new Set([...years, ...fromStmts])].sort().reverse();
     this.stmtAvailableYears.set(allYears);
-    if (!this.stmtFinYear() && allYears.length > 0) {
-      this.stmtFinYear.set(allYears[0]);
+    if (!this.stmtFinYear()) {
+      this.stmtFinYear.set(currentFy);
     }
+    if (!this.stmtMonthFrom() && !this.stmtMonth()) {
+      const defaultMonth = this.getCurrentBillingMonth();
+      this.stmtMonthFrom.set(defaultMonth);
+      this.stmtMonthTo.set(defaultMonth);
+      this.stmtMonth.set(defaultMonth);
+    }
+  }
+
+  getCurrentBillingMonth(): string {
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const now = new Date();
+    return monthNames[now.getMonth()];
+  }
+
+  async loadCitizenStatements(accountId: string | number) {
+    this.citizenStatementsLoading.set(true);
+    this.citizenStatementsError.set('');
+    this.citizenStatements.set([]);
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>(`/api/platinum/billing-enquiry/available-statements/${accountId}`)
+      );
+      const arr = this.normalizeArray(result);
+      this.citizenStatements.set(arr);
+      if (arr.length > 0) {
+        const yrs = arr
+          .map((s: any) => s.financialYear || '')
+          .filter((y: string) => y && y.includes('/'));
+        if (yrs.length > 0) {
+          const merged = [...new Set([...this.stmtAvailableYears(), ...yrs])].sort().reverse();
+          this.stmtAvailableYears.set(merged);
+        }
+      }
+    } catch (e: any) {
+      this.citizenStatementsError.set(e?.message || 'Failed to load available statements');
+    } finally {
+      this.citizenStatementsLoading.set(false);
+    }
+  }
+
+  async toggleStatementDetail(stmt: any) {
+    const stmtId = stmt.accountStatementID || stmt.billingPeriodID || 0;
+    if (this.stmtDetailSelectedId() === stmtId) {
+      this.stmtDetailSelectedId.set(null);
+      this.stmtDetailData.set(null);
+      this.stmtDetailError.set('');
+      return;
+    }
+    this.stmtDetailSelectedId.set(stmtId);
+    await this.loadStatementDetails(stmt);
+  }
+
+  async loadStatementDetails(stmt: any) {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    const finYear = stmt.financialYear || '';
+    const periodId = stmt.billingPeriodID || stmt.billperiodID;
+    const monthName = stmt.month || '';
+    const billingMonth = periodId ? String(periodId) : monthName;
+
+    this.stmtDetailLoading.set(true);
+    this.stmtDetailError.set('');
+    this.stmtDetailData.set(null);
+
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>('/api/platinum/billing-enquiry/get-billing-period-transactions', {
+          accountId: String(accountId),
+          finYear,
+          billingMonth,
+          balanceType: '3',
+        })
+      );
+      const arr = this.normalizeArray(result);
+      this.stmtDetailData.set(arr.length ? arr : []);
+    } catch (e: any) {
+      this.stmtDetailError.set(e?.message || 'Failed to load transaction details');
+    } finally {
+      this.stmtDetailLoading.set(false);
+    }
+  }
+
+  async loadFilterTransactions() {
+    const account = this.selectedAccount();
+    if (!account) return;
+    const accountId = this.getAccountId(account);
+    const finYear = this.stmtFinYear();
+    const monthName = this.stmtMonthFrom() || this.stmtMonth();
+    if (!finYear || !monthName) return;
+
+    const billingMonth = monthName;
+
+    this.stmtFilterTxnLoading.set(true);
+    this.stmtFilterTxnError.set('');
+    this.stmtFilterTxnData.set(null);
+
+    try {
+      const result = await firstValueFrom(
+        this.api.get<any>('/api/platinum/billing-enquiry/get-billing-period-transactions', {
+          accountId: String(accountId),
+          finYear,
+          billingMonth,
+          balanceType: '3',
+        })
+      );
+      const arr = this.normalizeArray(result);
+      this.stmtFilterTxnData.set(arr.length ? arr : []);
+    } catch (e: any) {
+      this.stmtFilterTxnError.set(e?.message || 'Failed to load transactions');
+    } finally {
+      this.stmtFilterTxnLoading.set(false);
+    }
+  }
+
+  fmtStmtDetailAmount(val: any): string {
+    const n = Number(val ?? 0);
+    if (isNaN(n)) return '0,00';
+    if (n < 0) return `(${Math.abs(n).toLocaleString('en-ZA', { minimumFractionDigits: 2 })})`;
+    return n.toLocaleString('en-ZA', { minimumFractionDigits: 2 });
+  }
+
+  async openCitizenStatement(stmt: any, type: 'standard' | 'detailed') {
+    const url = type === 'detailed'
+      ? (stmt.detailedAccountStatementUrl || stmt.accountStatementUrl || '')
+      : (stmt.accountStatementUrl || '');
+    if (!url) {
+      this.toast.error('No statement URL available for this period');
+      return;
+    }
+    const periodId = stmt.billingPeriodID || '';
+    let fullUrl = url;
+    if (/BillPeriodID=(&|$)/.test(url)) {
+      fullUrl = url.replace(/BillPeriodID=(&|$)/, `BillPeriodID=${periodId}$1`);
+    } else if (!url.includes('BillPeriodID=')) {
+      fullUrl = `${url}${url.includes('?') ? '&' : '?'}BillPeriodID=${periodId}`;
+    }
+    const accountId = String(this.getAccountId(this.selectedAccount()) || '');
+    const secureUrl = await this.createSecureLink(fullUrl, accountId, String(periodId));
+    if (!secureUrl) {
+      this.toast.error('Could not generate secure statement link — please try again');
+      return;
+    }
+    const features = 'width=1200,height=800,top=50,left=50,toolbar=no,menubar=no,scrollbars=yes,resizable=yes';
+    const win = window.open(secureUrl, '_blank', features);
+    if (!win) {
+      this.toast.error('Popup blocked — please allow popups for this site and try again');
+    } else {
+      this.toast.success(`${type === 'detailed' ? 'Detailed' : 'Standard'} statement opened — ${stmt.month || ''} ${stmt.financialYear || ''}`);
+    }
+  }
+
+  formatDateDMY(dateStr: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   }
 
   getStmtPayload() {
@@ -4727,6 +5222,41 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       'January': 7, 'February': 8, 'March': 9, 'April': 10, 'May': 11, 'June': 12
     };
     return monthMap[monthName] || 0;
+  }
+
+  getAbsoluteBillPeriodId(monthName: string, finYear: string): number {
+    const monthMap: Record<string, number> = {
+      'July': 1, 'August': 2, 'September': 3, 'October': 4, 'November': 5, 'December': 6,
+      'January': 7, 'February': 8, 'March': 9, 'April': 10, 'May': 11, 'June': 12
+    };
+    const monthOffset = monthMap[monthName] || 0;
+    if (!monthOffset || !finYear) return monthOffset;
+
+    const stmts = this.tabData()?.statements || [];
+    const refStmt = stmts.find((s: any) => s.billperiodID && s.financialYear && s.month);
+    if (refStmt) {
+      const refMonthOffset = monthMap[refStmt.month] || 0;
+      const refYearStart = parseInt(refStmt.financialYear.split('/')[0], 10);
+      const targetYearStart = parseInt(finYear.split('/')[0], 10);
+      if (refMonthOffset && !isNaN(refYearStart) && !isNaN(targetYearStart)) {
+        const yearDiff = targetYearStart - refYearStart;
+        return refStmt.billperiodID + (yearDiff * 12) + (monthOffset - refMonthOffset);
+      }
+    }
+
+    const citizenStmts = this.citizenStatements();
+    const refCitizen = citizenStmts.find((s: any) => s.billingPeriodID && s.financialYear && s.month);
+    if (refCitizen) {
+      const refMonthOffset = monthMap[refCitizen.month] || 0;
+      const refYearStart = parseInt(refCitizen.financialYear.split('/')[0], 10);
+      const targetYearStart = parseInt(finYear.split('/')[0], 10);
+      if (refMonthOffset && !isNaN(refYearStart) && !isNaN(targetYearStart)) {
+        const yearDiff = targetYearStart - refYearStart;
+        return refCitizen.billingPeriodID + (yearDiff * 12) + (monthOffset - refMonthOffset);
+      }
+    }
+
+    return monthOffset;
   }
 
   async fetchConfigSetting(keyName: string): Promise<string> {
@@ -4765,20 +5295,35 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     const accountId = this.getAccountId(account);
     if (!accountId) return;
 
-    const periodId = this.getMonthPeriodId(monthFrom);
-    if (!periodId) {
+    const monthWithinYear = this.getMonthPeriodId(monthFrom);
+    if (!monthWithinYear) {
       this.toast.error('Invalid billing month selected');
       return;
     }
 
-    const reportName = stType === 'detailed' ? 'BillingTrailrun' : 'BillingAccountStatement';
+    const periodId = this.getAbsoluteBillPeriodId(monthFrom, finYear);
+
     this.stmtGenerating.set(true);
     this.stmtReportOpening.set(true);
     this.stmtGenerated.set(null);
     this.stmtGeneratedLink.set('');
+    this.stmtSecureUrl.set('');
 
     try {
-      await this.runStatementReport(periodId, Number(accountId), reportName);
+      const citizenMatch = this.citizenStatements().find((s: any) =>
+        s.month?.toLowerCase() === monthFrom.toLowerCase() &&
+        s.financialYear === finYear
+      );
+
+      if (citizenMatch) {
+        await this.openCitizenStatement(citizenMatch, stType);
+        this.stmtGenerated.set({ reportFilename: 'CitizenPortal', reportName: stType, opened: true });
+      } else {
+        const reportName = stType === 'detailed' ? 'BillingTrailrun' : 'BillingAccountStatement';
+        await this.runStatementReport(periodId, Number(accountId), reportName);
+      }
+      // Also load transactions inline
+      this.loadFilterTransactions();
     } catch (e: any) {
       this.toast.error(e?.message || 'Failed to generate statement');
     } finally {
@@ -4846,9 +5391,16 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
     const base = biUrl.trim().replace(/\/+$/g, '');
     const route = viewletPath.trim().replace(/^\/+/g, '');
-    const url = `${base}/webroot/decision/view/duchamp?viewlet=/${route}&Username=${encodeURIComponent(biUsername)}&${queryString}`;
+    const rawUrl = `${base}/webroot/decision/view/duchamp?viewlet=/${route}&Username=${encodeURIComponent(biUsername)}&${queryString}`;
+    const accountId = (queryString.match(/AccountID=(\d+)/)?.[1]) || '';
+    const periodId = (queryString.match(/(?:BillPeriodID|PeriodID)=(\d+)/)?.[1]) || '';
+    const secureUrl = await this.createSecureLink(rawUrl, accountId, periodId);
+    if (!secureUrl) {
+      this.toast.error('Could not generate secure statement link — please try again');
+      return false;
+    }
     const features = 'width=1200,height=800,top=50,left=50,toolbar=no,menubar=no,scrollbars=yes,resizable=yes';
-    const win = window.open(url, '_blank', features);
+    const win = window.open(secureUrl, '_blank', features);
     if (!win) {
       this.toast.error('Popup blocked — please allow popups for this site and try again');
       return false;
@@ -4886,6 +5438,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     if (!payload) return;
     this.stmtGeneratingLink.set(true);
     this.stmtGeneratedLink.set('');
+    this.stmtSecureUrl.set('');
     try {
       const result = await firstValueFrom(
         this.api.post<any>('/api/platinum/billing-enquiry/generate-statement', payload)
@@ -4941,31 +5494,93 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.toast.success('Statement download started');
   }
 
-  openStmtSendPanel(attachment?: {type: string; finYear: string; monthFrom: string; monthTo: string; fileUrl?: string}) {
+  async openStmtSendPanel(attachment?: {type: string; finYear: string; monthFrom: string; monthTo: string; fileUrl?: string}) {
     const basic = this.getAccountBasic();
     const contact = this.tabData()?.contact;
     const account = this.selectedAccount();
+    const accountId = this.getAccountId(account);
     const accountName = account?.['name'] || account?.['accountName'] || account?.['surname_Company'] || basic?.['name'] || basic?.['accountName'] || '';
     const accountNo = account?.['accountNo'] || account?.['accountNumber'] || basic?.['accountNo'] || '';
 
-    const emails: {email: string; label: string; selected: boolean}[] = [];
-    const primaryEmail = contact?.email || contact?.emailAddress || contact?.emailId || contact?.eMail || basic?.emailId || basic?.email || '';
-    if (primaryEmail) emails.push({email: primaryEmail, label: 'Primary Email', selected: true});
-    for (let i = 1; i <= 4; i++) {
-      const addEmail = contact?.[`additionalEmail${i}`] || '';
-      if (addEmail && !emails.find(e => e.email === addEmail)) {
-        emails.push({email: addEmail, label: `Additional Email ${i}`, selected: true});
+    const emailSet = new Set<string>();
+    const phoneSet = new Set<string>();
+
+    const isValidEmail = (val: any): boolean => {
+      if (typeof val !== 'string') return false;
+      const t = val.trim();
+      return t.length > 3 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+    };
+    const isValidPhone = (val: any): boolean => {
+      if (typeof val !== 'string') return false;
+      const c = val.replace(/[\s\-()]/g, '');
+      return /^(\+?27|0)\d{9}$/.test(c);
+    };
+    const normPhone = (val: string): string => {
+      const c = val.replace(/[\s\-()]/g, '');
+      if (/^\+27\d{9}$/.test(c)) return '0' + c.slice(3);
+      if (/^27\d{9}$/.test(c)) return '0' + c.slice(2);
+      return c;
+    };
+
+    const emailFields = ['email', 'eMail', 'emailAddress', 'emailId', 'Email'];
+    const phoneFields = ['tel_Mobile', 'tel_Home', 'tel_Work', 'cellphone', 'cellPhone', 'mobile', 'mobileNumber', 'CellPhone', 'telephone', 'workPhone', 'homePhone', 'phone', 'Phone', 'telNo', 'contactNo', 'contactNumber', 'cellPhoneNo'];
+
+    const extractFromRecord = (rec: any) => {
+      if (!rec || typeof rec !== 'object') return;
+      for (const f of emailFields) {
+        if (isValidEmail(rec[f])) emailSet.add(rec[f].trim().toLowerCase());
+      }
+      for (const f of phoneFields) {
+        if (isValidPhone(rec[f])) phoneSet.add(normPhone(rec[f].trim()));
+      }
+    };
+
+    extractFromRecord(contact);
+    extractFromRecord(basic);
+
+    if (accountId) {
+      try {
+        const [contactRes, nameRes, addEmailRes, enquiryContactRes] = await Promise.all([
+          firstValueFrom(this.api.get<any>('/api/platinum/billing-account-management/get-contact-details', { accountId: String(accountId) })).catch(() => null),
+          firstValueFrom(this.api.get<any>('/api/platinum/billing-enquiry/name-info-by-account', { accountId: String(accountId) })).catch(() => null),
+          firstValueFrom(this.api.get<any>('/api/platinum/billing-account-management/get-additional-emails', { accountId: String(accountId) })).catch(() => null),
+          firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/contact-details/${accountId}`)).catch(() => null),
+        ]);
+
+        const unwrap = (r: any): any[] => {
+          if (!r || r._error) return [];
+          if (Array.isArray(r)) return r;
+          if (Array.isArray(r?.value)) return r.value;
+          if (Array.isArray(r?.results)) return r.results;
+          if (Array.isArray(r?.items)) return r.items;
+          if (typeof r === 'object') return [r];
+          return [];
+        };
+
+        unwrap(contactRes).forEach(extractFromRecord);
+        unwrap(nameRes).forEach(extractFromRecord);
+        unwrap(enquiryContactRes).forEach(extractFromRecord);
+
+        if (addEmailRes && !addEmailRes._error) {
+          const emailList = Array.isArray(addEmailRes) ? addEmailRes : (addEmailRes?.value || addEmailRes?.emails || []);
+          emailList.forEach((e: any) => {
+            const addr = e?.emailAdress || e?.emailAddress || e?.email || e?.Email || (typeof e === 'string' ? e : '');
+            if (isValidEmail(addr)) emailSet.add(addr.trim().toLowerCase());
+          });
+        }
+      } catch (err) {
+        console.warn('[openStmtSendPanel] Error fetching contacts from API:', err);
       }
     }
+
+    const emails: {email: string; label: string; selected: boolean}[] = [];
+    const emailArr = Array.from(emailSet);
+    emailArr.forEach((e, i) => emails.push({ email: e, label: i === 0 ? 'Primary' : `Additional ${i}`, selected: true }));
     this.stmtAvailableEmails.set(emails);
 
     const phones: {phone: string; label: string; selected: boolean}[] = [];
-    const mobile = contact?.tel_Mobile || contact?.mobileNumber || contact?.cellphone || contact?.cellPhone || basic?.contactNo || '';
-    if (mobile) phones.push({phone: mobile, label: 'Mobile', selected: true});
-    const home = contact?.tel_Home || contact?.homeNumber || '';
-    if (home && home !== mobile) phones.push({phone: home, label: 'Home', selected: false});
-    const work = contact?.tel_Work || contact?.workNumber || '';
-    if (work && work !== mobile && work !== home) phones.push({phone: work, label: 'Work', selected: false});
+    const phoneArr = Array.from(phoneSet);
+    phoneArr.forEach((p, i) => phones.push({ phone: p, label: i === 0 ? 'Mobile' : `Phone ${i + 1}`, selected: i === 0 }));
     this.stmtAvailablePhones.set(phones);
 
     const att = attachment || {
@@ -4992,15 +5607,129 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       `Kind regards,\nFinance Department`
     );
 
-    const smsName = accountName ? accountName.split(' ')[0] : 'Customer';
-    this.stmtSmsBody.set(
-      `Hi ${smsName}, your ${att.type === 'detailed' ? 'detailed ' : ''}statement (${att.finYear}${att.monthFrom ? ' ' + att.monthFrom : ''}${att.monthTo && att.monthTo !== att.monthFrom ? '-' + att.monthTo : ''}) is available. Account: ${accountNo}`
-    );
+    const _nd = this.getNameData();
+    const _givenName = (_nd['firstNames'] || _nd['firstName'] || _nd['initials'] || '').trim().split(' ')[0];
+    const smsName = _givenName || (accountName ? accountName.split(' ')[0] : 'Customer');
+    let stmtLink = '';
+    if (att.fileUrl) {
+      if (att.fileUrl.startsWith('http')) {
+        stmtLink = att.fileUrl;
+      } else {
+        stmtLink = `${window.location.origin}/api/platinum/statement-download?fileUrl=${encodeURIComponent(att.fileUrl)}&inline=true`;
+      }
+    } else if (this.stmtGeneratedLink()) {
+      stmtLink = this.stmtGeneratedLink();
+    }
+
+    const biStmts = this.citizenStatements();
+    const genStmts = this.tabData()?.statements || [];
+    const attMonth = (att.monthFrom || '').trim().toLowerCase();
+
+    const fyMonths = ['July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June'];
+
+    const knownPeriods = new Map<string, number>();
+    for (const s of genStmts) {
+      const pid = Number(s.billperiodID || s.billingPeriodID || 0);
+      const mo = (s.month || '').trim();
+      if (pid && mo) knownPeriods.set(mo.toLowerCase(), pid);
+    }
+    for (const s of (biStmts || [])) {
+      const pid = Number(s.billingPeriodID || 0);
+      const mo = (s.month || s.billingMonth || '').trim();
+      if (pid && mo && !knownPeriods.has(mo.toLowerCase())) knownPeriods.set(mo.toLowerCase(), pid);
+    }
+
+    let basePeriodId = 0;
+    let baseMonthIdx = -1;
+    for (const [mo, pid] of knownPeriods) {
+      const idx = fyMonths.findIndex(m => m.toLowerCase() === mo);
+      if (idx >= 0) { basePeriodId = pid; baseMonthIdx = idx; break; }
+    }
+
+    const now = new Date();
+    const fyParts = (att.finYear || '').split('/');
+    const fyStartYear = parseInt(fyParts[0] || '2025');
+    let currentMonthIdx = 11;
+    for (let i = 0; i < 12; i++) {
+      const mDate = new Date(fyStartYear + (i >= 6 ? 1 : 0), (6 + i) % 12, 1);
+      if (mDate > now) { currentMonthIdx = Math.max(0, i - 1); break; }
+    }
+
+    const periods: {label: string; periodId: string; month: string}[] = [];
+    if (baseMonthIdx >= 0 && basePeriodId > 0) {
+      for (let i = 0; i <= currentMonthIdx; i++) {
+        const mo = fyMonths[i];
+        const pid = basePeriodId + (i - baseMonthIdx);
+        periods.push({ label: `${mo} (${att.finYear})`, periodId: String(pid), month: mo });
+      }
+    } else {
+      for (const s of genStmts) {
+        const pid = String(s.billperiodID || s.billingPeriodID || '');
+        const mo = (s.month || '').trim();
+        if (pid && mo) periods.push({ label: `${mo} (${att.finYear})`, periodId: pid, month: mo });
+      }
+    }
+    this.stmtAvailablePeriods.set(periods);
+
+    let selectedPeriodId = '';
+    if (attMonth && periods.length > 0) {
+      const match = periods.find(p => p.month.toLowerCase() === attMonth);
+      if (match) selectedPeriodId = match.periodId;
+    }
+    if (!selectedPeriodId && periods.length > 0) selectedPeriodId = periods[periods.length - 1].periodId;
+    this.stmtSelectedPeriodId.set(selectedPeriodId);
+
+    let biBaseUrl = '';
+    if (biStmts && biStmts.length > 0) {
+      const biAny = biStmts[0];
+      biBaseUrl = att.type === 'detailed'
+        ? (biAny?.detailedAccountStatementUrl || biAny?.accountStatementUrl || '')
+        : (biAny?.accountStatementUrl || biAny?.detailedAccountStatementUrl || '');
+    }
+
+    if (!stmtLink && biBaseUrl && selectedPeriodId) {
+      stmtLink = biBaseUrl.replace(/BillPeriodID=\d*/, `BillPeriodID=${selectedPeriodId}`);
+    } else if (stmtLink && selectedPeriodId) {
+      stmtLink = stmtLink.replace(/BillPeriodID=\d*/, `BillPeriodID=${selectedPeriodId}`);
+    }
+
+    this.stmtBaseWebUrl.set(biBaseUrl || stmtLink);
+    const baseMsg = `Hi ${smsName}, your ${att.type === 'detailed' ? 'detailed ' : ''}statement (${att.finYear}${att.monthFrom ? ' ' + att.monthFrom : ''}${att.monthTo && att.monthTo !== att.monthFrom ? '-' + att.monthTo : ''}) is ready. Acc: ${accountNo}`;
+    this.stmtSmsBody.set(baseMsg);
 
     this.stmtSendPanelOpen.set(true);
     this.stmtSendMode.set('email');
     this.stmtSendStep.set('compose');
     this.loadCommHistory();
+
+    if (stmtLink) {
+      this.createSecureLink(stmtLink, String(accountId), selectedPeriodId).then(secureUrl => {
+        if (secureUrl) {
+          this.stmtSecureUrl.set(secureUrl);
+          this.stmtSmsBody.set(`${baseMsg}\nView: ${secureUrl}`);
+          this.stmtMessageBody.set(
+            `Dear ${accountName || 'Valued Customer'},\n\n` +
+            `Please find attached your ${typeLabel} for ${periodDesc}.\n\n` +
+            `Account Number: ${accountNo}\n` +
+            `Financial Year: ${att.finYear}\n\n` +
+            `Should you have any queries regarding your account, please do not hesitate to contact us.\n\n` +
+            `Kind regards,\nFinance Department`
+          );
+        }
+      });
+    }
+  }
+
+  private async createSecureLink(rawUrl: string, accountId: string, periodId: string): Promise<string> {
+    try {
+      const result = await firstValueFrom(
+        this.api.post<any>('/api/statement/create-link', { url: rawUrl, accountId, periodId })
+      );
+      return result?.secureUrl || '';
+    } catch (e) {
+      console.error('Failed to create secure statement link:', e);
+      return '';
+    }
   }
 
   buildPeriodDescription(att: {type: string; finYear: string; monthFrom: string; monthTo: string}): string {
@@ -5010,6 +5739,55 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       return `${att.monthFrom} ${att.finYear}`;
     }
     return `the financial year ${att.finYear}`;
+  }
+
+  onStmtPeriodChange(periodId: string) {
+    this.stmtSelectedPeriodId.set(periodId);
+    const baseUrl = this.stmtBaseWebUrl();
+    const period = this.stmtAvailablePeriods().find(p => p.periodId === periodId);
+    const monthLabel = period ? period.month : '';
+    const att = this.stmtAttachment();
+    const account = this.selectedAccount();
+    const basic = this.getAccountBasic();
+    const accountName = account?.['name'] || account?.['accountName'] || account?.['surname_Company'] || basic?.['name'] || basic?.['accountName'] || '';
+    const accountNo = account?.['accountNo'] || account?.['accountNumber'] || basic?.['accountNo'] || '';
+    const _nd2 = this.getNameData();
+    const _givenName2 = (_nd2['firstNames'] || _nd2['firstName'] || _nd2['initials'] || '').trim().split(' ')[0];
+    const smsName = _givenName2 || (accountName ? accountName.split(' ')[0] : 'Customer');
+    const fy = att?.finYear || this.stmtFinYear();
+    const stType = att?.type === 'detailed' ? 'Detailed Statement' : 'Account Statement';
+    const accountId = this.getAccountId(account);
+
+    const newRawUrl = baseUrl ? baseUrl.replace(/BillPeriodID=\d*/, `BillPeriodID=${periodId}`) : '';
+    const smsBase = `Hi ${smsName}, your statement (${fy}${monthLabel ? ' ' + monthLabel : ''}) is ready. Acc: ${accountNo}`;
+    this.stmtSmsBody.set(smsBase);
+
+    this.stmtSubject.set(`${stType} — Account ${accountNo} — ${fy}${monthLabel ? ' ' + monthLabel : ''}`);
+    this.stmtMessageBody.set(
+      `Dear ${accountName || 'Valued Customer'},\n\n` +
+      `Please find attached your ${stType} for ${monthLabel ? monthLabel + ' ' : ''}${fy}.\n\n` +
+      `Account Number: ${accountNo}\n` +
+      `Financial Year: ${fy}\n\n` +
+      `Should you have any queries regarding your account, please do not hesitate to contact us.\n\n` +
+      `Kind regards,\nFinance Department`
+    );
+
+    if (newRawUrl && accountId) {
+      this.createSecureLink(newRawUrl, String(accountId), periodId).then(secureUrl => {
+        if (secureUrl) {
+          this.stmtSecureUrl.set(secureUrl);
+          this.stmtSmsBody.set(`${smsBase}\nView: ${secureUrl}`);
+          this.stmtMessageBody.set(
+            `Dear ${accountName || 'Valued Customer'},\n\n` +
+            `Please find attached your ${stType} for ${monthLabel ? monthLabel + ' ' : ''}${fy}.\n\n` +
+            `Account Number: ${accountNo}\n` +
+            `Financial Year: ${fy}\n\n` +
+            `Should you have any queries regarding your account, please do not hesitate to contact us.\n\n` +
+            `Kind regards,\nFinance Department`
+          );
+        }
+      });
+    }
   }
 
   toggleStmtEmail(index: number) {
@@ -5034,6 +5812,10 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
   getSmsCharCount(): number {
     return this.stmtSmsBody().length;
+  }
+
+  getSmsParts(): number {
+    return Math.ceil(this.stmtSmsBody().length / 160);
   }
 
   async loadCommHistory() {
@@ -5076,8 +5858,8 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       this.toast.error('Please select at least one phone number');
       return;
     }
-    if (method === 'sms' && this.stmtSmsBody().length > 160) {
-      this.toast.error('SMS message must be 160 characters or less');
+    if (method === 'sms' && this.stmtSmsBody().length > 320) {
+      this.toast.error('SMS message must be 320 characters or less');
       return;
     }
 
@@ -5089,9 +5871,12 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
     this.stmtSending.set(true);
     try {
+      const failures: string[] = [];
+      const successes: string[] = [];
+
       if (method === 'email') {
         for (const email of selectedEmails) {
-          await firstValueFrom(
+          const result = await firstValueFrom(
             this.api.post<any>('/api/platinum/billing-enquiry/send-statement', {
               accountId,
               method: 'email',
@@ -5105,12 +5890,18 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
               fileUrl: att?.fileUrl || undefined,
               subject: this.stmtSubject(),
               messageBody: this.stmtMessageBody(),
+              secureUrl: this.stmtSecureUrl() || undefined,
             })
           );
+          if (result && result.success === false) {
+            failures.push(`${email}: ${result.message || 'delivery failed'}`);
+          } else {
+            successes.push(email);
+          }
         }
       } else {
         for (const phone of selectedPhones) {
-          await firstValueFrom(
+          const result = await firstValueFrom(
             this.api.post<any>('/api/platinum/billing-enquiry/send-statement', {
               accountId,
               method: 'sms',
@@ -5122,10 +5913,18 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
               monthTo: att?.monthTo || this.stmtMonthTo() || undefined,
               month: att?.monthFrom || this.stmtMonthFrom() || this.stmtMonth() || undefined,
               messageBody: this.stmtSmsBody(),
+              secureUrl: this.stmtSecureUrl() || undefined,
             })
           );
+          if (result && result.success === false) {
+            failures.push(`${phone}: ${result.message || 'delivery failed'}`);
+          } else {
+            successes.push(phone);
+          }
         }
       }
+
+      const deliveryStatus = failures.length > 0 ? (successes.length > 0 ? 'partial' : 'failed') : 'sent';
 
       try {
         await firstValueFrom(
@@ -5141,14 +5940,23 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
             financialYear: att?.finYear || this.stmtFinYear(),
             periodFrom: att?.monthFrom || this.stmtMonthFrom() || '',
             periodTo: att?.monthTo || this.stmtMonthTo() || '',
+            status: deliveryStatus,
           })
         );
       } catch {
-        console.warn('[sendStatement] Communication log save failed — statement was sent');
+        console.warn('[sendStatement] Communication log save failed');
       }
 
-      this.stmtSendStep.set('sent');
-      this.toast.success(`Statement sent via ${method.toUpperCase()} to ${recipients}`);
+      if (failures.length > 0 && successes.length === 0) {
+        this.stmtSendStep.set('compose');
+        this.toast.error(`Delivery failed: ${failures[0]}`);
+      } else if (failures.length > 0) {
+        this.stmtSendStep.set('sent');
+        this.toast.warning(`Partial delivery — ${successes.length} sent, ${failures.length} failed`);
+      } else {
+        this.stmtSendStep.set('sent');
+        this.toast.success(`Statement sent via ${method.toUpperCase()} to ${successes.join(', ')}`);
+      }
       this.loadCommHistory();
     } catch (e: any) {
       this.toast.error(e?.error?.message || `Failed to send via ${method}`);
@@ -5180,13 +5988,76 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     const month = stmt.month || stmt.billingMonth || '';
     const stType = (stmt.statementType || stmt.type || '').toLowerCase().includes('detail') ? 'detailed' : 'standard';
 
-    this.openStmtSendPanel({
+    let biUrl = stType === 'detailed'
+      ? (stmt.detailedAccountStatementUrl || stmt.accountStatementUrl)
+      : (stmt.accountStatementUrl || stmt.detailedAccountStatementUrl);
+
+    if (biUrl) {
+      const periodId = stmt.billingPeriodID || '';
+      if (periodId && /BillPeriodID=(&|$)/.test(biUrl)) {
+        biUrl = biUrl.replace(/BillPeriodID=(&|$)/, `BillPeriodID=${periodId}$1`);
+      } else if (periodId && !biUrl.includes('BillPeriodID=')) {
+        biUrl = `${biUrl}${biUrl.includes('?') ? '&' : '?'}BillPeriodID=${periodId}`;
+      }
+    }
+
+    await this.openStmtSendPanel({
       type: stType,
       finYear: fy,
       monthFrom: month,
       monthTo: month,
-      fileUrl: stmt.fileUrl || stmt.downloadUrl || stmt.url,
+      fileUrl: stmt.fileUrl || stmt.downloadUrl || stmt.url || biUrl,
     });
+  }
+
+  toggleGpSmsMenu(index: number): void {
+    this.gpSmsMenuOpen.set(this.gpSmsMenuOpen() === index ? null : index);
+  }
+
+  async gpSmsSendStatement(stmt: any, method: 'email' | 'sms' | 'both', index: number): Promise<void> {
+    this.gpSmsMenuOpen.set(null);
+    const account = this.selectedAccount();
+    if (!account) { this.toast.error('No account selected'); return; }
+
+    const accountNo = account?.['accountNo'] || account?.['accountNumber'] || this.getAccountBasic()?.['accountNo'] || '';
+    const periodId = stmt.billingPeriodID || stmt.billperiodID || stmt.periodId || '';
+    if (!accountNo) { this.toast.error('Account number not found'); return; }
+    if (!periodId && periodId !== 0) { this.toast.error('Billing period ID not found on this statement'); return; }
+
+    this.gpSmsSending.set(index);
+    try {
+      const endpoint = method === 'both' ? '/api/gp-sms/send-both'
+        : method === 'email' ? '/api/gp-sms/send-email'
+        : '/api/gp-sms/send-sms';
+
+      const result = await firstValueFrom(
+        this.api.post<any>(endpoint, { accountNumber: Number(accountNo), periodId: Number(periodId) })
+      );
+
+      if (result?.success) {
+        if (method === 'both') {
+          const emailOk = result.email?.success;
+          const smsOk = result.sms?.success;
+          if (emailOk && smsOk) {
+            this.toast.success(`Statement sent via Email & SMS for account ${accountNo}`);
+          } else if (emailOk) {
+            this.toast.warning(`Email sent, SMS failed: ${result.sms?.error || 'unknown error'}`);
+          } else if (smsOk) {
+            this.toast.warning(`SMS sent, Email failed: ${result.email?.error || 'unknown error'}`);
+          } else {
+            this.toast.error('Both email and SMS delivery failed');
+          }
+        } else {
+          this.toast.success(`Statement sent via ${method.toUpperCase()} for account ${accountNo}`);
+        }
+      } else {
+        this.toast.error(result?.message || `Failed to send via ${method}`);
+      }
+    } catch (e: any) {
+      this.toast.error(e?.error?.message || e?.message || `Failed to send via ${method}`);
+    } finally {
+      this.gpSmsSending.set(null);
+    }
   }
 
   regenFromHistory(stmt: any): void {
@@ -5352,18 +6223,28 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
 
   async selectConvMeter(meter: any) {
     this.meterSelectedConv.set(meter);
-    this.meterConvLoading.set(true);
     this.meterConvHistory.set([]);
     this.meterConvInsights.set(null);
+    // Build available years (current + 4 prior) and default-select current + 2 prior
+    const currentFy = this.userFinYear() || this.getCurrentFinYear();
+    const [startYear] = currentFy.split('/').map(Number);
+    const available: string[] = [];
+    for (let i = 0; i < 5; i++) available.push(`${startYear - i}/${startYear - i + 1}`);
+    this.meterConvAvailableYears.set(available);
+    const defaultSelected = available.slice(0, 3);
+    this.meterConvSelectedYears.set(defaultSelected);
+    await this.loadConvMeterHistory();
+  }
+
+  async loadConvMeterHistory() {
+    this.meterConvLoading.set(true);
+    const meter = this.meterSelectedConv();
+    if (!meter) { this.meterConvLoading.set(false); return; }
     const account = this.selectedAccount();
     const accountId = this.getAccountId(account);
     const baseParams = this.getMeterReadingParams(meter, accountId);
+    const fyList = this.meterConvSelectedYears();
     try {
-      const currentFy = this.userFinYear() || this.getCurrentFinYear();
-      const [startYear] = currentFy.split('/').map(Number);
-      const fyList: string[] = [];
-      for (let i = 0; i < 3; i++) fyList.push(`${startYear - i}/${startYear - i + 1}`);
-
       const requests = fyList.map(fy =>
         firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { ...baseParams, finYear: fy }))
           .then(res => this.normalizeArray(res))
@@ -5372,7 +6253,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       const results = await Promise.all(requests);
       const allReadings = results.flat();
 
-      if (allReadings.length === 0) {
+      if (allReadings.length === 0 && fyList.length > 0) {
         const barRes = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history-barchart`, baseParams)).catch(() => []);
         const barChart = this.normalizeArray(barRes);
         if (barChart.length > 0) allReadings.push(...barChart);
@@ -5387,18 +6268,40 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.meterConvLoading.set(false);
   }
 
+  toggleMeterYear(fy: string) {
+    const current = this.meterConvSelectedYears();
+    const next = current.includes(fy) ? current.filter(y => y !== fy) : [...current, fy];
+    if (next.length === 0) return; // keep at least 1 year selected
+    this.meterConvSelectedYears.set(next);
+    this.loadConvMeterHistory();
+  }
+
+  selectAllMeterYears() {
+    this.meterConvSelectedYears.set([...this.meterConvAvailableYears()]);
+    this.loadConvMeterHistory();
+  }
+
   async selectPrepaidMeter(meter: any) {
     this.meterSelectedPrepaid.set(meter);
     this.meterPrepaidLoading.set(true);
     this.meterPrepaidSales.set([]);
     this.meterPrepaidStats.set(null);
-    const meterId = meter.meterId || meter.meter_id || meter.id || meter.prepaidMeterId || meter.meterID || meter.meter_ID || meter.serviceId || meter.service_ID || meter.meterNo || meter.prepaidMeterNo || '';
-    if (!meterId) {
+
+    // Build params with all available identifier fields — server will try each combo
+    const params: Record<string, string> = {};
+    const meterId = meter.meterId || meter.meter_id || meter.prepaidMeterId || meter.meterID || meter.meter_ID || meter.id || '';
+    const meterNo  = meter.prepaidMeterNo || meter.meterNumber || meter.physicalMeterNo || meter.meterNo || '';
+    const svcId    = meter.serviceId || meter.service_ID || meter.serviceID || '';
+    if (meterId)  params['meterId'] = String(meterId);
+    if (meterNo)  params['prepaidMeterNo'] = String(meterNo);
+    if (svcId)    params['serviceId'] = String(svcId);
+
+    if (!meterId && !meterNo && !svcId) {
       this.meterPrepaidLoading.set(false);
       return;
     }
     try {
-      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, { meterId: String(meterId) }));
+      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, params));
       const sales = this.normalizeArray(res);
       this.meterPrepaidSales.set(sales);
       this.meterPrepaidStats.set(this.computePrepaidStats(sales));
@@ -5412,7 +6315,7 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     if (!sales || sales.length === 0) return null;
     const amounts = sales.map((s: any) => Number(s.total || s.amount || s.receiptAmount || 0)).filter((v: number) => !isNaN(v) && v > 0);
     const units = sales.map((s: any) => Number(s.prepaidUnit || s.units || s.prepaidUnits || 0)).filter((v: number) => !isNaN(v) && v > 0);
-    const dates = sales.map((s: any) => s.receiptDate || s.date || s.transactionDate || '').filter((d: string) => d);
+    const dates = sales.map((s: any) => s.dateCaptured || s.receiptDate || s.date || s.transactionDate || '').filter((d: string) => d);
     const totalSpend = amounts.reduce((s: number, v: number) => s + v, 0);
     const totalUnits = units.reduce((s: number, v: number) => s + v, 0);
     const avgSpend = amounts.length > 0 ? totalSpend / amounts.length : 0;
@@ -5540,9 +6443,54 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.svcBalanceError.set('');
     const account = this.selectedAccount();
     const accountId = this.getAccountId(account);
+    const finYear = this.svcBalanceFinYear();
+    const svcDesc = (svc.serviceDesc || svc.serviceDescription || svc.tariffType || '').toLowerCase();
+
     try {
-      const data = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance`, { accountId: String(accountId), financialYear: this.svcBalanceFinYear(), _t: String(Date.now()) }));
-      this.svcBalanceData.set(this.normalizeArray(data));
+      const months = ['July','August','September','October','November','December','January','February','March','April','May','June'];
+      const results = await Promise.allSettled(
+        months.map(m => firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, {
+          accountId: String(accountId), finYear, billingMonth: m, balanceType: '3', _t: String(Date.now())
+        })))
+      );
+
+      const rows: any[] = [];
+      results.forEach((r, idx) => {
+        if (r.status !== 'fulfilled') return;
+        const txns = this.normalizeArray(r.value);
+        const levies = txns.filter((t: any) => {
+          if ((t.drilldown || '').toLowerCase() !== 'levy') return false;
+          const desc = (t.description || '').toLowerCase().replace(/^levy\s*-\s*/, '').trim();
+          return desc === svcDesc || desc.startsWith(svcDesc);
+        });
+        if (levies.length === 0) return;
+        const openBal = txns.find((t: any) => (t.drilldown || '').toLowerCase() === 'openbalance' || (t.description || '').toLowerCase().includes('open balance'));
+        const amt = levies.reduce((s: number, l: any) => s + (l.amount || 0), 0);
+        const vat = levies.reduce((s: number, l: any) => s + (l.vatAmount || 0), 0);
+        const total = levies.reduce((s: number, l: any) => s + (l.totalAmount || 0), 0);
+        const interest = levies.reduce((s: number, l: any) => s + (l.interestAmount || 0), 0);
+        rows.push({
+          serviceDescription: svc.serviceDesc || svc.tariffType || svcDesc,
+          openingBalance: 0,
+          amount: amt,
+          vat: vat,
+          interestAmount: interest,
+          totalAmount: total,
+          closingBalance: 0,
+          currentInterestAmount: 0,
+          currentCharge: total,
+          month: months[idx],
+          financialYear: finYear,
+          serviceTypeID: svc.serviceType_ID || svc.tariffTypeID || svc.serviceTypeID,
+        });
+      });
+
+      if (rows.length === 0) {
+        const fallbackData = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/service-type-balance`, { accountId: String(accountId), financialYear: finYear, _t: String(Date.now()) }));
+        this.svcBalanceData.set(this.normalizeArray(fallbackData));
+      } else {
+        this.svcBalanceData.set(rows);
+      }
     } catch (err: any) {
       this.svcBalanceData.set([]);
       this.svcBalanceError.set(err?.message || 'Failed to load service balance data');
@@ -5556,13 +6504,61 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.svcPurchaseLoading.set(true);
     this.svcPurchaseHistory.set([]);
     this.svcPurchaseStats.set(null);
-    const meterId = svc.meterId || svc.meter_id || svc.id || svc.prepaidMeterId || svc.meterID || svc.meter_ID || svc.serviceId || svc.service_ID || svc.physicalMeterMeterCode || svc.physicalMeterNo || svc.meterNo || svc.meterNumber || '';
-    if (!meterId) {
+
+    const acct = this.selectedAccount() as any;
+    const accountId = acct?.id || acct?.accountId || '';
+    let resolvedMeter: any = svc;
+    const prepaidMeters: any[] = this.tabData()?.prepaidMeters || [];
+    if (prepaidMeters.length > 0) {
+      const svcMeterNo = (svc.meterNo || '').toLowerCase().trim();
+      const match = prepaidMeters.find((pm: any) => {
+        const pmPhysical = (pm.physicalMeterNo || '').toLowerCase().trim();
+        const pmMeterNo = (pm.meterNo || pm.prepaidMeterNo || '').toLowerCase().trim();
+        if (pmPhysical && svcMeterNo.includes(pmPhysical)) return true;
+        if (pmMeterNo && svcMeterNo.includes(pmMeterNo)) return true;
+        return false;
+      });
+      if (match) resolvedMeter = match;
+    }
+    if (resolvedMeter === svc && !svc.physicalMeterNo && !svc.prepaidMeterNo) {
+      try {
+        const pmRes = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-meter-services-for-account`, { accountId: String(accountId) }));
+        const pmList = this.normalizeArray(pmRes);
+        const svcMeterNo = (svc.meterNo || '').toLowerCase().trim();
+        const match = pmList.find((pm: any) => {
+          const pmPhysical = (pm.physicalMeterNo || '').toLowerCase().trim();
+          const pmMeterNo = (pm.meterNo || pm.prepaidMeterNo || '').toLowerCase().trim();
+          if (pmPhysical && svcMeterNo.includes(pmPhysical)) return true;
+          if (pmMeterNo && svcMeterNo.includes(pmMeterNo)) return true;
+          return false;
+        });
+        if (match) resolvedMeter = match;
+      } catch {}
+    }
+
+    const params2: Record<string, string> = {};
+    const meterId2 = resolvedMeter.meterId || resolvedMeter.meter_id || resolvedMeter.prepaidMeterId || resolvedMeter.meterID || resolvedMeter.meter_ID || '';
+    const meterNo2 = resolvedMeter.prepaidMeterNo || resolvedMeter.meterNumber || resolvedMeter.physicalMeterNo || resolvedMeter.physicalMeterMeterCode || '';
+    const svcId2   = resolvedMeter.serviceId || resolvedMeter.service_ID || resolvedMeter.serviceID || '';
+    if (!meterNo2 && resolvedMeter.meterNo) {
+      const raw = String(resolvedMeter.meterNo);
+      if (raw.includes(' - ')) {
+        const parts = raw.split(' - ');
+        params2['prepaidMeterNo'] = parts[0].trim();
+        if (!meterId2 && parts[1]) params2['meterId'] = parts[1].trim();
+      } else {
+        params2['prepaidMeterNo'] = raw;
+      }
+    }
+    if (meterId2) params2['meterId'] = String(meterId2);
+    if (meterNo2) params2['prepaidMeterNo'] = String(meterNo2);
+    if (svcId2)   params2['serviceId'] = String(svcId2);
+    if (Object.keys(params2).length === 0) {
       this.svcPurchaseLoading.set(false);
       return;
     }
     try {
-      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, { meterId: String(meterId) }));
+      const res = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/prepaid-recharge-details-for-meter`, params2));
       const sales = this.normalizeArray(res);
       this.svcPurchaseHistory.set(sales);
       this.svcPurchaseStats.set(this.computePrepaidStats(sales));
@@ -5589,12 +6585,17 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   getSvcBalanceFiltered(): any[] {
     const svc = this.svcSelectedService();
     if (!svc) return [];
-    const svcDesc = svc.serviceDesc || svc.serviceDescription || svc.tariffType || '';
+    const data = this.svcBalanceData();
+    if (!data.length) return [];
+    const svcDesc = (svc.serviceDesc || svc.serviceDescription || svc.tariffType || '').toLowerCase();
     const svcTypeId = svc.tariffTypeID || svc.serviceTypeID || svc.serviceType_ID;
-    const filtered = this.svcBalanceData().filter((b: any) =>
-      (svcTypeId && b.serviceTypeID === svcTypeId) ||
-      (b.serviceDescription && svcDesc && b.serviceDescription.toLowerCase() === svcDesc.toLowerCase())
-    );
+    const filtered = data.filter((b: any) => {
+      if (svcTypeId && b.serviceTypeID === svcTypeId) return true;
+      if (b.serviceDescription && svcDesc && b.serviceDescription.toLowerCase() === svcDesc.toLowerCase()) return true;
+      const bDesc = (b.serviceDescription || b.description || '').toLowerCase();
+      if (svcDesc && (bDesc.includes(svcDesc) || (svcDesc.split(' ')[0] && bDesc.includes(svcDesc.split(' ')[0])))) return true;
+      return false;
+    });
     const monthOrder = ['July','August','September','October','November','December','January','February','March','April','May','June'];
     return [...filtered].sort((a, b) => {
       const ai = monthOrder.indexOf(a.month);
@@ -5615,6 +6616,23 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       currentCharge: (acc.currentCharge || 0) + (r.currentCharge || 0),
       closingBalance: (acc.closingBalance || 0) + (r.closingBalance ?? r.closingBal ?? 0),
     }), {});
+  }
+
+  getSvcBillingAvg(): number {
+    const rows = this.getSvcBalanceFiltered();
+    if (!rows.length) return 0;
+    const total = rows.reduce((s: number, r: any) => s + (r.totalAmount ?? r.total ?? 0), 0);
+    return total / rows.length;
+  }
+
+  getSvcBillingHigh(): { amount: number; month: string } {
+    const rows = this.getSvcBalanceFiltered();
+    if (!rows.length) return { amount: 0, month: '-' };
+    let max = rows[0];
+    rows.forEach((r: any) => {
+      if ((r.totalAmount ?? r.total ?? 0) > (max.totalAmount ?? max.total ?? 0)) max = r;
+    });
+    return { amount: max.totalAmount ?? max.total ?? 0, month: max.month || '-' };
   }
 
   getSvcBalanceChartData(): { month: string; amount: number }[] {
@@ -5763,9 +6781,71 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   }
 
   parseTariffTiers(svc: any): { label: string; from: number; to: number; rate: number }[] {
-    const costInterVal = svc?.costInterVal || svc?.costInterval || '';
-    if (!costInterVal) return [];
     const tiers: { label: string; from: number; to: number; rate: number }[] = [];
+
+    const endDateHtml = svc?.endDate || '';
+    if (typeof endDateHtml === 'string' && endDateHtml.includes('Interval - Cost')) {
+      const stripped = endDateHtml.replace(/<[^>]+>/g, '\n');
+      const rawLines = stripped.split('\n').map((l: string) => l.trim()).filter(Boolean);
+      let pastHeader = false;
+      const paired: string[] = [];
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (line.includes('Interval - Cost')) { pastHeader = true; continue; }
+        if (!pastHeader) continue;
+        if (i + 1 < rawLines.length && rawLines[i + 1].startsWith('-')) {
+          paired.push(line + ' ' + rawLines[i + 1]);
+          i++;
+        } else {
+          paired.push(line);
+        }
+      }
+      for (const line of paired) {
+        const parts = line.split(/\s*-\s*/);
+        if (parts.length >= 2) {
+          const intervalStr = parts[0].trim();
+          const costStr = parts[parts.length - 1].trim();
+          const rate = parseFloat(costStr);
+          if (isNaN(rate) || rate <= 0) continue;
+          if (/^remainder$/i.test(intervalStr)) {
+            const lastTo = tiers.length > 0 ? tiers[tiers.length - 1].to : 0;
+            tiers.push({ label: 'Remainder', from: lastTo === Infinity ? 0 : lastTo, to: Infinity, rate });
+          } else {
+            const interval = parseFloat(intervalStr);
+            if (!isNaN(interval) && interval > 0) {
+              const lastTo = tiers.length > 0 ? tiers[tiers.length - 1].to : 0;
+              tiers.push({ label: `${lastTo === Infinity ? 0 : lastTo} – ${(lastTo === Infinity ? 0 : lastTo) + interval}`, from: lastTo === Infinity ? 0 : lastTo, to: (lastTo === Infinity ? 0 : lastTo) + interval, rate });
+            } else if (interval === 0) {
+              tiers.push({ label: 'Remainder', from: tiers.length > 0 ? tiers[tiers.length - 1].to : 0, to: Infinity, rate });
+            }
+          }
+        }
+      }
+      if (tiers.length > 0) return tiers;
+    }
+
+    const costInterVal = svc?.costInterVal || svc?.costInterval;
+    if (!costInterVal) return [];
+
+    if (Array.isArray(costInterVal)) {
+      let runningFrom = 0;
+      for (const item of costInterVal) {
+        const cost = parseFloat(item.cost ?? item.rate ?? 0) || 0;
+        const interval = item.interval ?? item.units ?? item.quantity ?? 0;
+        if (cost <= 0) continue;
+        const intervalNum = typeof interval === 'string' && /^remainder$/i.test(interval.trim()) ? Infinity : parseFloat(interval) || 0;
+        if (intervalNum === Infinity || intervalNum === 0) {
+          tiers.push({ label: 'Remainder', from: runningFrom, to: Infinity, rate: cost });
+        } else {
+          const to = runningFrom + intervalNum;
+          tiers.push({ label: `${runningFrom} – ${to}`, from: runningFrom, to, rate: cost });
+          runningFrom = to;
+        }
+      }
+      if (tiers.length > 0) return tiers;
+    }
+
+    if (typeof costInterVal !== 'string') return [];
     const normalize = (s: string) => s.replace(/[R$,]/g, '').replace(/\s*per\s*(unit|kl|kwh|kilolitre|kilowatt)\s*/gi, '').trim();
     const lines = String(costInterVal).split(/[\n;|]+/).map(normalize).filter(Boolean);
     for (const line of lines) {
@@ -7207,6 +8287,42 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
     this.nbeLineItems.set([]);
     this.nbeCalculated.set(false);
     const warns: string[] = [];
+    const vatRate = 15;
+    const fmt = (n: number) => n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const isMeteredService = (svc: any): boolean => {
+      const desc = (svc.tariffType || svc.serviceDesc || svc.serviceDescription || '').toLowerCase();
+      if (desc.includes('basic') || desc.includes('fixed') || desc.includes('sanitation') || desc.includes('waste') || desc.includes('refuse') || desc.includes('sewerage')) return false;
+      const hasMeter = !!(svc.meterNo || svc.meterNumber || svc.physicalMeterNo || svc.physicalMeterNumber);
+      if (hasMeter && (desc.includes('metered') || desc.includes('water') || desc.includes('electric') || desc.includes('consumption'))) return true;
+      if (desc.includes('metered') || desc.includes('consumption')) return true;
+      return false;
+    };
+
+    const isPrepaidService = (desc: string): boolean => {
+      const d = desc.toLowerCase();
+      return d.includes('prepaid') || d.includes('pre-paid') || d.includes('pre paid') || d.includes('token') || d.includes('vend');
+    };
+
+    const extractFixedRate = (svc: any): number => {
+      const tiers = this.parseTariffTiers(svc);
+      if (tiers.length === 1) {
+        if (tiers[0].rate > 0) return tiers[0].rate;
+      }
+      for (const t of tiers) {
+        if (t.to === Infinity || t.from === 0) {
+          if (t.rate > 0) return t.rate;
+        }
+      }
+      return 0;
+    };
+
+    const withVat = (item: any): any => {
+      const amt = item.amount || 0;
+      const isExempt = item.vatExempt || item.type === 'rates';
+      const v = isExempt ? 0 : amt * (vatRate / 100);
+      return { ...item, vatAmount: v, total: amt + v };
+    };
 
     try {
       const now = new Date();
@@ -7214,16 +8330,62 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       this.nbeBillingMonth.set(`${monthNames[now.getMonth()]} ${now.getFullYear()}`);
 
       const finYearMonths = ['July','August','September','October','November','December','January','February','March','April','May','June'];
-      const [svcRes, meteredRes, ratesRes, addBillingRes] = await Promise.allSettled([
+      const currentFy = this.userFinYear() || this.getCurrentFinYear();
+
+      const [svcRes, meteredRes, ratesRes, addBillingRes, detailTemplateRes, billingMonthRes] = await Promise.allSettled([
         firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/services-search-results/${accountId}`)),
         firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/metered-services-on-account/${accountId}`)),
-        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/account-rates-details/${accountId}`, { finYear: currentFy })),
         firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/additional-billing-search-results/${accountId}`)),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/get-detail-billing-template`, { accountId: String(accountId) })),
+        firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/billing-processing-month`)),
       ]);
+
+      let prevMonthName = '';
+      let lastBilledFinYear = '';
+      const bpmData = billingMonthRes.status === 'fulfilled' ? billingMonthRes.value : null;
+      if (bpmData) {
+        const processingMonth = bpmData.billingMonth || bpmData.processingMonth || bpmData.month || '';
+        const processingFinYear = bpmData.finYear || bpmData.financialYear || '';
+        if (processingMonth) {
+          const pmIdx = finYearMonths.indexOf(processingMonth);
+          prevMonthName = pmIdx > 0 ? finYearMonths[pmIdx - 1] : finYearMonths[finYearMonths.length - 1];
+          lastBilledFinYear = processingFinYear;
+        }
+      }
+      if (!prevMonthName) {
+        const currentMonthName = monthNames[now.getMonth()];
+        const finYearIdx = finYearMonths.indexOf(currentMonthName);
+        prevMonthName = finYearIdx > 0 ? finYearMonths[finYearIdx - 1] : finYearMonths[finYearMonths.length - 1];
+      }
+      if (!lastBilledFinYear) {
+        lastBilledFinYear = now.getMonth() >= 6
+          ? `${now.getFullYear()}/${now.getFullYear() + 1}`
+          : `${now.getFullYear() - 1}/${now.getFullYear()}`;
+      }
+
+      let lastMonthTxns: any[] = [];
+      try {
+        const txnResult = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/get-billing-period-transactions`, { accountId: String(accountId), finYear: lastBilledFinYear, billingMonth: prevMonthName, balanceType: '3' }));
+        lastMonthTxns = this.normalizeArray(txnResult);
+      } catch { }
+
       const services = svcRes.status === 'fulfilled' ? this.normalizeArray(svcRes.value) : [];
       const meters = meteredRes.status === 'fulfilled' ? this.normalizeArray(meteredRes.value) : [];
       const ratesDetail = ratesRes.status === 'fulfilled' ? (Array.isArray(ratesRes.value) ? ratesRes.value[0] : ratesRes.value) : null;
       const addBilling = addBillingRes.status === 'fulfilled' ? this.normalizeArray(addBillingRes.value) : [];
+
+      const templateItems: any[] = [];
+      if (detailTemplateRes.status === 'fulfilled' && detailTemplateRes.value) {
+        const dt = detailTemplateRes.value;
+        const dtArr = Array.isArray(dt) ? dt : dt.data ? (Array.isArray(dt.data) ? dt.data : [dt.data]) : typeof dt === 'object' ? [dt] : [];
+        templateItems.push(...dtArr);
+      }
+      const templateByTariff = new Map<string, any>();
+      for (const ti of templateItems) {
+        const key = (ti.tariff || ti.tariffCode || ti.description || ti.serviceDescription || '').toLowerCase().trim();
+        if (key) templateByTariff.set(key, ti);
+      }
 
       const activeServices = services.filter((s: any) => {
         const status = (s.serviceStatus || s.statusDesc || s.status || '').toLowerCase();
@@ -7239,82 +8401,473 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
       const items: any[] = [];
       const processedKeys = new Set<string>();
 
-      for (const svc of activeServices) {
-        const desc = svc.serviceDescription || svc.serviceDesc || svc.tariffType || svc.description || 'Service';
-        const key = desc.toLowerCase();
-        if (processedKeys.has(key)) continue;
-        processedKeys.add(key);
+      const meteredMeterNos = new Set<string>();
+      const meteredTariffKeys = new Set<string>();
+      const processedPhysicalMeters = new Set<string>();
+      const uniqueMeters = new Map<string, any>();
+      for (const meter of meters) {
+        const physicalNo = (meter.physicalMeterNo || meter.physicalMeterNumber || '').toString().trim();
+        const meterNo = (meter.meterNumber || meter.meterNo || '').toString().trim();
+        const uniqueKey = physicalNo || meterNo;
+        if (!uniqueKey) continue;
+        if (meterNo) meteredMeterNos.add(meterNo.toLowerCase());
+        const tariffKey = (meter.serviceDesc || meter.serviceDescription || meter.tariffType || '').toLowerCase().trim();
+        if (tariffKey) meteredTariffKeys.add(tariffKey);
+        if (!uniqueMeters.has(uniqueKey.toLowerCase())) {
+          uniqueMeters.set(uniqueKey.toLowerCase(), meter);
+        }
+      }
 
-        const isPrepaid = key.includes('prepaid') || key.includes('pre-paid') || key.includes('token');
-        if (isPrepaid) continue;
+      const uniqueMetersArr = Array.from(uniqueMeters.values());
+      for (const meter of uniqueMetersArr) {
+        const meterNo = (meter.meterNumber || meter.meterNo || '').toString().trim();
+        const physicalNo = (meter.physicalMeterNo || meter.physicalMeterNumber || '').toString().trim();
+        if (!meterNo) continue;
 
-        const amount = parseFloat(svc.amount || svc.currentAmount || svc.tariffAmount || svc.monthlyCharge || 0);
-        const isMetered = key.includes('metered') || key.includes('consumption');
+        if (processedPhysicalMeters.has((physicalNo || meterNo).toLowerCase())) continue;
+        processedPhysicalMeters.add((physicalNo || meterNo).toLowerCase());
 
-        if (isMetered) {
-          const matchedMeter = meters.find((m: any) => {
-            const mDesc = (m.serviceDesc || m.serviceDescription || '').toLowerCase();
-            return mDesc === key || mDesc.includes(key.split(' ')[0]);
-          });
-          if (matchedMeter) {
-            try {
-              const meterID = String(matchedMeter.physicalMeterNo || matchedMeter.physicalMeterNumber || matchedMeter.meterNo || matchedMeter.meterNumber || matchedMeter.meterID || '').replace(/^0+/, '');
-              if (meterID) {
-                const currentFy = this.userFinYear() || this.getCurrentFinYear();
-                const readings: any = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { accountID: String(accountId), meterID, billingPeriodIDFrom: '1', billingPeriodIDTo: '12', finYear: currentFy }));
-                const readingsArr = this.normalizeArray(readings);
-                if (readingsArr.length >= 2) {
-                  const sorted = readingsArr.sort((a: any, b: any) => new Date(b.readingDate || b.date || 0).getTime() - new Date(a.readingDate || a.date || 0).getTime());
-                  const latest = sorted[0];
-                  const prev = sorted[1];
-                  const consumption = Math.abs(parseFloat(latest.consumption || latest.units || 0) || parseFloat(prev.consumption || prev.units || 0) || 0);
-                  const rate = amount > 0 ? amount : parseFloat(svc.tariffRate || svc.rate || '1');
-                  const estimated = consumption * (rate > 0 ? rate : 1);
-                  items.push({ service: desc, type: 'metered', amount: estimated, consumption, rate, meter: meterID });
-                } else {
-                  warns.push(`${desc}: insufficient meter readings for estimate`);
-                  if (amount > 0) items.push({ service: desc, type: 'estimated', amount });
-                }
-              } else if (amount > 0) {
-                items.push({ service: desc, type: 'estimated', amount });
+        const svcDesc = meter.serviceDesc || meter.serviceDescription || meter.tariff || 'Metered Service';
+        if (isPrepaidService(svcDesc)) continue;
+
+        const meterStatus = (meter.meterStatus || meter.status || '').toLowerCase();
+        if (meterStatus.includes('inactive') || meterStatus.includes('removed') || meterStatus.includes('decommission')) continue;
+
+        const factor = typeof meter.tarifffactor === 'number' ? meter.tarifffactor : parseFloat(meter.tarifffactor || meter.factorQuantity) || 1;
+        const displayMeter = physicalNo || meterNo;
+        const svcKey = `metered-${svcDesc.toLowerCase()}-${displayMeter.toLowerCase()}`;
+        processedKeys.add(svcKey);
+
+        const matchingSvc = services.find((s: any) => {
+          const sMeter = (s.meterNo || s.meterNumber || '').toLowerCase().trim();
+          const sDesc = (s.tariffType || s.serviceDesc || s.serviceDescription || '').toLowerCase().trim();
+          return sMeter === meterNo.toLowerCase().trim() || sDesc === svcDesc.toLowerCase().trim();
+        });
+        const tariffSource = matchingSvc || meter;
+
+        try {
+          const readings: any = await firstValueFrom(this.api.get<any>(`/api/platinum/billing-enquiry/meter-reading-history`, { accountID: String(accountId), meterID: meterNo, billingPeriodIDFrom: '1', billingPeriodIDTo: '12', finYear: currentFy }));
+          const readingsArr = this.normalizeArray(readings);
+
+          const parseDDMMYYYY = (dateStr: string): Date => {
+            if (!dateStr) return new Date('1900-01-01');
+            if (dateStr.includes('/')) {
+              const parts = dateStr.split('/');
+              if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                if (day > 0 && month >= 1 && month <= 12 && year > 1900) return new Date(year, month - 1, day);
               }
-            } catch {
-              warns.push(`${desc}: could not fetch meter readings`);
-              if (amount > 0) items.push({ service: desc, type: 'estimated', amount });
             }
-          } else if (amount > 0) {
-            items.push({ service: desc, type: 'fixed', amount });
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? new Date('1900-01-01') : d;
+          };
+
+          const sortedReadings = [...readingsArr].sort((a, b) => {
+            const dateA = parseDDMMYYYY(a.reading2Date || a.readingDate || '').getTime();
+            const dateB = parseDDMMYYYY(b.reading2Date || b.readingDate || '').getTime();
+            return dateB - dateA;
+          });
+
+          const latestReading = sortedReadings[0];
+          const latestStatus = latestReading ? (latestReading.readingStatus || '').toLowerCase() : '';
+
+          const getReadingMonthLabel = (r: any) => {
+            const bm = r?.billingmonth;
+            const fy = r?.financialYear;
+            if (bm && fy) return `${bm} ${fy}`;
+            if (bm) return bm;
+            return 'unknown';
+          };
+
+          const tiers = this.parseTariffTiers(tariffSource);
+          const STD_DAYS = 30;
+          const calcTiered = (consumption: number, days?: number): number => {
+            if (consumption <= 0 || tiers.length === 0) return 0;
+            const d = days && days > 0 ? days : STD_DAYS;
+            const dayRatio = d / STD_DAYS;
+            let remaining = consumption;
+            let subtotal = 0;
+            for (const tier of tiers) {
+              if (remaining <= 0) break;
+              const proFrom = tier.from * dayRatio;
+              const proTo = tier.to === Infinity ? Infinity : tier.to * dayRatio;
+              const tierCap = proTo === Infinity ? remaining : Math.max(0, proTo - proFrom);
+              const units = Math.min(remaining, tierCap);
+              if (units > 0) { subtotal += units * tier.rate * factor; remaining -= units; }
+            }
+            return subtotal;
+          };
+
+          const billedWithConsumption = sortedReadings.filter((r: any) => {
+            const flag = (r.flag || '').toLowerCase();
+            const rs = (r.readingStatus || '').toLowerCase();
+            if (flag.includes('reversed') || flag.includes('cancel')) return false;
+            const cons = parseFloat(r.consumption ?? r.consumptionValue ?? r.units ?? 0) || 0;
+            return rs === 'billed' && cons > 0;
+          });
+
+          const findLastMonthLevyAmount = (): number => {
+            const svcLower = svcDesc.toLowerCase();
+            for (const t of lastMonthTxns) {
+              const desc = (t.description || '').toLowerCase();
+              const dd = (t.drilldown || '').toLowerCase();
+              if (dd !== 'levy' && !desc.startsWith('levy')) continue;
+              if (svcLower.includes('water') && desc.includes('water')) return parseFloat(t.amount ?? t.totalAmount ?? 0) || 0;
+              if (svcLower.includes('elec') && desc.includes('elec')) return parseFloat(t.amount ?? t.totalAmount ?? 0) || 0;
+              if (svcLower.includes('sewer') && desc.includes('sewer')) return parseFloat(t.amount ?? t.totalAmount ?? 0) || 0;
+            }
+            return 0;
+          };
+
+          const estimateFromHistory = (): boolean => {
+            if (billedWithConsumption.length < 1) return false;
+            const recent = billedWithConsumption.slice(0, 6);
+            const avgCons = recent.reduce((s: number, r: any) => s + (parseFloat(r.consumption ?? r.consumptionValue ?? r.units ?? 0) || 0), 0) / recent.length;
+            if (avgCons <= 0) return false;
+            const roundedAvg = Math.round(avgCons * 10) / 10;
+            if (tiers.length > 0) {
+              const estAmount = calcTiered(avgCons);
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'avg-estimate', amount: estAmount,
+                consumption: roundedAvg, meter: displayMeter, avgMonths: recent.length,
+                hasTiers: true, detail: `${roundedAvg} units (${recent.length}-month avg)`,
+              });
+            } else {
+              let estAmount = 0;
+              let source = '';
+              const lastLevyAmt = findLastMonthLevyAmount();
+              if (lastLevyAmt > 0) {
+                estAmount = lastLevyAmt;
+                source = `Based on ${prevMonthName} billing`;
+              }
+              if (estAmount <= 0) {
+                const templateMatch = templateByTariff.get(svcDesc.toLowerCase().trim());
+                estAmount = templateMatch ? (parseFloat(templateMatch.amount ?? templateMatch.totalAmount ?? 0) || 0) : 0;
+                if (estAmount > 0) source = 'From billing template';
+              }
+              if (estAmount <= 0) {
+                const billedAmounts = recent.map((r: any) => parseFloat(r.amount ?? r.levyAmount ?? r.totalAmount ?? 0) || 0).filter((a: number) => a > 0);
+                if (billedAmounts.length > 0) {
+                  estAmount = billedAmounts.reduce((s: number, a: number) => s + a, 0) / billedAmounts.length;
+                  source = `Avg from ${billedAmounts.length} billed readings`;
+                }
+              }
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'avg-estimate', amount: estAmount,
+                consumption: roundedAvg, meter: displayMeter, avgMonths: recent.length,
+                detail: source ? `${roundedAvg} units (${recent.length}-month avg) — ${source}` : `${roundedAvg} units (${recent.length}-month avg)`,
+              });
+            }
+            warns.push(`${svcDesc} (${displayMeter}): No new reading — estimated from ${recent.length}-month avg of ${Math.round(avgCons)} units`);
+            return true;
+          };
+
+          if (!latestReading) {
+            items.push({
+              service: `${svcDesc} (${displayMeter})`, type: 'fixed', amount: 0,
+              detail: 'No reading history — awaiting first meter reading',
+              meter: displayMeter,
+            });
+            continue;
           }
-        } else {
-          if (amount > 0) items.push({ service: desc, type: 'fixed', amount });
-          else warns.push(`${desc}: no amount available`);
+
+          if (latestStatus === 'billed' || latestStatus === '') {
+            if (!estimateFromHistory()) {
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'fixed', amount: 0,
+                detail: `Latest reading (${getReadingMonthLabel(latestReading)}) already billed — awaiting new reading`,
+                meter: displayMeter,
+              });
+            }
+            continue;
+          }
+
+          const unbilled = sortedReadings.filter((r: any) => {
+            const flag = (r.flag || '').toLowerCase();
+            const rs = (r.readingStatus || '').toLowerCase();
+            if (flag.includes('reversed') || flag.includes('cancel')) return false;
+            if (rs === 'billed') return false;
+            if (rs.includes('awaiting') || rs.includes('unbilled') || rs.includes('pending') || rs.includes('captured')) return true;
+            return false;
+          });
+
+          if (unbilled.length === 0) {
+            if (!estimateFromHistory()) {
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'fixed', amount: 0,
+                detail: `Latest reading (${getReadingMonthLabel(latestReading)}) already billed — awaiting new reading`,
+                meter: displayMeter,
+              });
+            }
+            continue;
+          }
+
+          for (const reading of unbilled) {
+            const cons = parseFloat(reading.consumption ?? reading.consumptionValue ?? reading.units ?? 0) || 0;
+            if (cons <= 0) {
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'actual', amount: 0, consumption: 0,
+                meter: displayMeter, detail: 'Zero consumption recorded — no charge',
+              });
+              continue;
+            }
+            const rdRaw = reading.readingdays;
+            const rdNum = typeof rdRaw === 'number' ? rdRaw : parseInt(rdRaw) || undefined;
+            const readingDays = rdNum && rdNum > 0 ? rdNum : undefined;
+
+            if (tiers.length > 0) {
+              const subtotal = calcTiered(cons, readingDays);
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'actual', amount: subtotal,
+                consumption: cons, meter: displayMeter, readingDays,
+                hasTiers: true, detail: `${cons} units over ${readingDays ?? STD_DAYS} days`,
+              });
+            } else {
+              const templateMatch = templateByTariff.get(svcDesc.toLowerCase().trim());
+              if (templateMatch) {
+                const tAmt = parseFloat(templateMatch.amount ?? templateMatch.totalAmount ?? 0) || 0;
+                if (tAmt > 0) {
+                  items.push({
+                    service: `${svcDesc} (${displayMeter})`, type: 'estimate', amount: tAmt,
+                    consumption: cons, meter: displayMeter, detail: `${cons} units — amount from billing template`,
+                  });
+                  continue;
+                }
+              }
+              warns.push(`${svcDesc} (${displayMeter}): No tariff tier data — consumption ${cons} units but rate unavailable`);
+              items.push({
+                service: `${svcDesc} (${displayMeter})`, type: 'estimate', amount: 0,
+                consumption: cons, meter: displayMeter, detail: `${cons} units — tariff rate data unavailable`,
+              });
+            }
+          }
+        } catch {
+          warns.push(`${svcDesc} (${displayMeter}): Failed to load reading history`);
+          items.push({
+            service: `${svcDesc} (${displayMeter})`, type: 'fixed', amount: 0,
+            meter: displayMeter, detail: 'Could not load reading data',
+          });
         }
       }
 
+      const isWaterOrElecRebate = (desc: string) =>
+        desc.includes('water') || desc.includes('electricity') || desc.includes('electric') || desc.includes('elec ') || desc.includes('sewerage') || desc.includes('sewer');
+
+      const ratesLevyLines = lastMonthTxns.filter((t: any) => {
+        const desc = (t.description || '').toLowerCase();
+        const dd = (t.drilldown || '').toLowerCase();
+        return (dd === 'levy' || desc.startsWith('levy')) && (desc.includes('property') || desc.includes('rate'));
+      });
+      const ratesRebateLines = lastMonthTxns.filter((t: any) => {
+        const desc = (t.description || '').toLowerCase();
+        const dd = (t.drilldown || '').toLowerCase();
+        if (dd !== 'rebate' && !desc.startsWith('rebate')) return false;
+        if (isWaterOrElecRebate(desc)) return false;
+        return desc.includes('residential') || desc.includes('property') || desc.includes('rates') ||
+          desc.includes('pensioner') || desc.includes('indigent') || desc.includes('rebate -');
+      });
+      const serviceRebateLines = lastMonthTxns.filter((t: any) => {
+        const desc = (t.description || '').toLowerCase();
+        const dd = (t.drilldown || '').toLowerCase();
+        if (dd !== 'rebate' && !desc.startsWith('rebate')) return false;
+        return isWaterOrElecRebate(desc);
+      });
+
+      let usedLastMonthRates = false;
+      if (ratesLevyLines.length > 0) {
+        usedLastMonthRates = true;
+        processedKeys.add('rates-property rates');
+
+        for (const levy of ratesLevyLines) {
+          const levyAmt = parseFloat(levy.amount ?? levy.totalAmount ?? 0) || 0;
+          const levyDesc = levy.description || 'Levy - Property Rates';
+          const tariff = levy.tariff || '';
+          processedKeys.add(`rates-${levyDesc.toLowerCase()}`);
+          items.push({
+            service: levyDesc, type: 'rates', amount: levyAmt,
+            detail: tariff ? `Tariff: ${tariff}` : `Based on ${prevMonthName} billing`,
+          });
+        }
+
+        for (const rebate of ratesRebateLines) {
+          const rebateAmt = parseFloat(rebate.amount ?? rebate.totalAmount ?? 0) || 0;
+          const rebateDesc = rebate.description || 'Rebate';
+          const tariff = rebate.tariff || '';
+          processedKeys.add(`rates-${rebateDesc.toLowerCase()}`);
+          items.push({
+            service: rebateDesc, type: 'rates', amount: rebateAmt,
+            detail: tariff ? `Tariff: ${tariff}` : `Based on ${prevMonthName} billing`,
+          });
+        }
+      }
+
+      if (!usedLastMonthRates && ratesDetail && typeof ratesDetail === 'object' && !ratesDetail._error) {
+        const ratesObj = ratesDetail;
+        const annual = parseFloat(ratesObj.annualPropertyRates ?? ratesObj.annualRates ?? ratesObj.annualAmount ?? 0) || 0;
+        const freq = parseInt(ratesObj.frequency ?? 12) || 12;
+        const grossInstallment = parseFloat(ratesObj.installment ?? ratesObj.installmentAmount ?? ratesObj.instalment ?? 0) || 0;
+        let netAmount = 0;
+        let rebateTotal = 0;
+
+        if (annual > 0) {
+          netAmount = annual / Math.max(freq, 1);
+          if (grossInstallment > netAmount) rebateTotal = grossInstallment - netAmount;
+        } else if (grossInstallment > 0) {
+          const explicitRebate = parseFloat(ratesObj.rebateAmount ?? ratesObj.rebate ?? 0) || 0;
+          netAmount = Math.max(0, grossInstallment - explicitRebate);
+          rebateTotal = explicitRebate;
+        }
+
+        const desc = ratesObj.rateDescription || ratesObj.description || ratesObj.tariffDescription || ratesObj.serviceDesc || 'Property Rates';
+
+        if (netAmount > 0) {
+          processedKeys.add('rates-property rates');
+          processedKeys.add(`rates-${desc.toLowerCase()}`);
+          let detailParts: string[] = [];
+          if (rebateTotal > 0) detailParts.push(`Levy R${fmt(grossInstallment || netAmount + rebateTotal)} less rebate R${fmt(rebateTotal)}`);
+          else detailParts.push(`Monthly installment`);
+          items.push({
+            service: desc, type: 'rates', amount: netAmount,
+            detail: detailParts.join(' · '),
+          });
+        }
+      }
+
+      if (serviceRebateLines.length > 0) {
+        for (const rebate of serviceRebateLines) {
+          const rebateAmt = parseFloat(rebate.amount ?? rebate.totalAmount ?? 0) || 0;
+          const rebateDesc = rebate.description || 'Rebate';
+          const rebateKey = `svcrebate-${rebateDesc.toLowerCase()}`;
+          if (processedKeys.has(rebateKey)) continue;
+          processedKeys.add(rebateKey);
+          const tariff = rebate.tariff || '';
+          items.push({
+            service: rebateDesc, type: 'fixed', amount: rebateAmt,
+            detail: tariff ? `Tariff: ${tariff}` : `Based on ${prevMonthName} billing`,
+          });
+        }
+      }
+
+      const lastMonthLevyByService = new Map<string, { amount: number; tariff: string }>();
+      for (const t of lastMonthTxns) {
+        const desc = (t.description || '').toLowerCase();
+        const dd = (t.drilldown || '').toLowerCase();
+        if (dd === 'levy' || desc.startsWith('levy')) {
+          const amt = parseFloat(t.amount ?? t.totalAmount ?? 0) || 0;
+          if (amt > 0) lastMonthLevyByService.set(desc, { amount: amt, tariff: t.tariff || '' });
+        }
+      }
+
+      for (const svc of activeServices) {
+        const svcName = svc.tariffType || svc.serviceDesc || svc.serviceDescription || svc.description || '';
+        const svcNameLower = svcName.toLowerCase().trim();
+        const tariff = (svc.tariff || svc.tariffCode || '').toLowerCase().trim();
+
+        if (isPrepaidService(svcNameLower) || isPrepaidService(tariff)) continue;
+
+        const hasMeter = !!(svc.meterNo || svc.meterNumber || svc.physicalMeterNo || svc.physicalMeterNumber);
+        const svcMeterNo = (svc.meterNo || svc.meterNumber || '').toLowerCase().trim();
+        if (hasMeter && meteredMeterNos.has(svcMeterNo)) continue;
+        if (meteredTariffKeys.has(svcNameLower) && isMeteredService(svc)) continue;
+
+        const isRatesRelated = svcNameLower.includes('rate') && (svcNameLower.includes('property') || svcNameLower.includes('valuation') || svcNameLower.includes('assessment'));
+        if (isRatesRelated) continue;
+
+        const svcKey = `fixed-${svcNameLower}-${tariff}`;
+        if (processedKeys.has(svcKey)) continue;
+        processedKeys.add(svcKey);
+
+        if (isMeteredService(svc)) {
+          items.push({
+            service: svcName || 'Metered Service', type: 'fixed', amount: 0,
+            detail: 'Awaiting meter reading — will calculate once reading is captured',
+          });
+          continue;
+        }
+
+        let amount = 0;
+        let detail = '';
+        const factor = parseFloat(svc.factorQuantity ?? svc.tarifffactor ?? 1) || 1;
+
+        const fixedRate = extractFixedRate(svc);
+        if (fixedRate > 0) {
+          amount = fixedRate * factor;
+          detail = factor !== 1 ? `Tariff R${fmt(fixedRate)} × factor ${factor}` : `Tariff rate: R${fmt(fixedRate)}/month`;
+        }
+
+        if (amount <= 0) {
+          amount = parseFloat(svc.amount ?? svc.monthlyAmount ?? svc.levyAmount ?? svc.tariffAmount ?? 0) || 0;
+          if (amount > 0) detail = 'From service data';
+        }
+
+        if (amount <= 0) {
+          const templateMatch = templateByTariff.get(svcNameLower) || templateByTariff.get(tariff);
+          if (templateMatch) {
+            amount = parseFloat(templateMatch.amount ?? templateMatch.totalAmount ?? templateMatch.levyAmount ?? 0) || 0;
+            if (amount > 0) detail = 'From billing template';
+          }
+        }
+
+        if (amount <= 0) {
+          for (const [levyKey, levyData] of lastMonthLevyByService) {
+            if (levyKey.includes(svcNameLower) || svcNameLower.includes(levyKey.replace(/^levy\s*[-–]?\s*/i, '').trim())) {
+              amount = levyData.amount;
+              detail = `Based on ${prevMonthName} billing`;
+              break;
+            }
+          }
+        }
+
+        if (amount <= 0) {
+          warns.push(`${svcName}: Could not determine tariff amount — excluded from estimate`);
+          continue;
+        }
+
+        const isVatExempt = svcNameLower.includes('rate') && !svcNameLower.includes('water rate');
+        items.push({
+          service: svcName || 'Service', type: 'fixed', amount,
+          detail, vatExempt: isVatExempt,
+        });
+      }
+
+      const today = new Date();
       for (const ab of addBilling) {
-        const desc = ab.description || ab.serviceDescription || ab.additionalBillingDescription || 'Additional Billing';
-        const amt = parseFloat(ab.amount || ab.billingAmount || 0);
-        if (amt > 0 && !processedKeys.has(desc.toLowerCase())) {
-          processedKeys.add(desc.toLowerCase());
-          items.push({ service: desc, type: 'additional', amount: amt });
-        }
-      }
+        const desc = ab.description || ab.serviceDesc || ab.tariffDescription || 'Additional Billing';
+        const amount = parseFloat(ab.amount ?? ab.monthlyAmount ?? ab.totalAmount ?? 0) || 0;
+        if (amount <= 0) continue;
 
-      if (ratesDetail && !ratesDetail._error) {
-        const rateAmt = parseFloat(ratesDetail.monthlyRate || ratesDetail.monthlyAmount || ratesDetail.rateAmount || 0);
-        if (rateAmt > 0 && !processedKeys.has('property rates')) {
-          processedKeys.add('property rates');
-          items.push({ service: 'Property Rates', type: 'rates', amount: rateAmt });
+        const termDate = ab.terminationDate || ab.endDate || ab.toDate;
+        if (termDate) {
+          const term = new Date(termDate);
+          if (!isNaN(term.getTime()) && term < today) continue;
+        }
+        const startDate = ab.startDate || ab.fromDate || ab.effectiveDate;
+        if (startDate) {
+          const start = new Date(startDate);
+          if (!isNaN(start.getTime()) && start > today) continue;
+        }
+        const isActive = (ab.status || ab.isActive || '').toString().toLowerCase();
+        if (isActive.includes('inactive') || isActive.includes('terminated') || isActive.includes('cancel')) continue;
+
+        if (!processedKeys.has(desc.toLowerCase())) {
+          processedKeys.add(desc.toLowerCase());
+          items.push({
+            service: desc, type: 'additional', amount,
+            detail: termDate ? `Active until ${new Date(termDate).toLocaleDateString('en-GB')}` : 'Ongoing',
+          });
         }
       }
 
       if (items.length === 0) {
-        this.nbeError.set('Could not estimate any services. Insufficient data available.');
+        this.nbeError.set('No billable services found on this account.');
         this.nbeLoading.set(false);
         return;
       }
 
-      this.nbeLineItems.set(items);
+      const itemsWithVat = items.map(withVat);
+      this.nbeLineItems.set(itemsWithVat);
       this.nbeWarnings.set(warns);
       this.nbeCalculated.set(true);
     } catch (e: any) {
@@ -7329,11 +8882,11 @@ export class EnquiriesGeneralComponent implements OnInit, OnDestroy {
   }
 
   get nbeVat(): number {
-    return this.nbeSubtotal * 0.15;
+    return this.nbeLineItems().reduce((sum: number, item: any) => sum + (item.vatAmount || 0), 0);
   }
 
   get nbeTotal(): number {
-    return this.nbeSubtotal + this.nbeVat;
+    return this.nbeLineItems().reduce((sum: number, item: any) => sum + (item.total || 0), 0);
   }
 
   exportOccupiersCsv(): void {

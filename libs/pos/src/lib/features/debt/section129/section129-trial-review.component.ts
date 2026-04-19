@@ -5,9 +5,9 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { getStatusColor } from '../../../core/services/validation.service';
-import { PAGE_SIZE } from '../../../core/services/debt-config';
-import type { Section129Run, Section129RunAccount } from '../../../core/models/debt.models';
+import { getStatusColor } from '../../../services/validation.service';
+import { PAGE_SIZE } from '../../../services/debt-config';
+import type { Section129Run, Section129RunAccount } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-section129-trial-review',

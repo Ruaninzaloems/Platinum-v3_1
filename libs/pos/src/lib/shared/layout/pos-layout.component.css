@@ -4,25 +4,6 @@
   overflow: hidden;
 }
 
-.app-shell.embedded-mode {
-  height: 100vh;
-}
-
-.app-shell.embedded-mode .app-sidenav {
-  display: none !important;
-  width: 0 !important;
-  min-width: 0 !important;
-}
-
-.app-shell.embedded-mode .app-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.app-shell.embedded-mode .content-area {
-  padding: 16px;
-}
-
 .app-sidenav {
   width: 250px;
   min-width: 250px;

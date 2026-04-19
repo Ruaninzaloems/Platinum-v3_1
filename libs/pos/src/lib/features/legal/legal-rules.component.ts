@@ -1,17 +1,18 @@
 import { Component, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DateInputComponent } from '../../shared/components/date-input.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
-import { LegalRuleVersion, RuleFormData } from '../../core/models/legal.models';
-import { LEGAL_CATEGORIES, LEGAL_CATEGORY_LABELS } from '../../core/services/debt-config';
+import { LegalRuleVersion, RuleFormData } from '../../models/legal.models';
+import { LEGAL_CATEGORIES, LEGAL_CATEGORY_LABELS } from '../../services/debt-config';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-legal-rules',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './legal-rules.component.html',
   styleUrl: './legal-rules.component.css'
 })

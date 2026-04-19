@@ -1,5 +1,5 @@
 @if (open) {
-  <div class="dialog-overlay" (click)="onOverlayClick($event)" data-testid="dialog-overlay">
+  <div class="dialog-overlay" (mousedown)="onOverlayMouseDown($event)" (click)="onOverlayClick($event)" data-testid="dialog-overlay">
     <div class="dialog-content" [class]="'dialog-content dialog-' + size" data-testid="dialog">
       @if (title) {
         <div class="dialog-header">

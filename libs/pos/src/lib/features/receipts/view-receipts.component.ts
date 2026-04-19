@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
 import { firstValueFrom } from 'rxjs';
+import { DateInputComponent } from '../../shared/components/date-input.component';
 
 interface ViewReceiptCashier {
   id: string;
@@ -37,7 +38,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-view-receipts',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './view-receipts.component.html',
   styleUrl: './view-receipts.component.css'
 })

@@ -1,8 +1,38 @@
-@if (sessionLoading() && step1Status() === 'loading' && step2Status() === 'pending') {
+@if (sessionLoading()) {
   <div class="setup-loading" data-testid="cashier-setup-loading">
     <div class="card loading-card">
-      <div class="spinner"></div>
-      <p>Validating cashier registration...</p>
+      <div class="loading-steps">
+        <div class="loading-step" [class.done]="step1Status() === 'success'" [class.active]="step1Status() === 'loading'">
+          <div class="loading-step-icon">
+            @if (step1Status() === 'success') {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            } @else {
+              <div class="spinner spinner-sm"></div>
+            }
+          </div>
+          <span>Checking session status...</span>
+        </div>
+        <div class="loading-step" [class.done]="step2Status() === 'success'" [class.active]="step2Status() === 'loading'">
+          <div class="loading-step-icon">
+            @if (step2Status() === 'success') {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            } @else {
+              <div class="spinner spinner-sm"></div>
+            }
+          </div>
+          <span>Loading cash offices...</span>
+        </div>
+        <div class="loading-step" [class.done]="!configLoading() && step1Status() === 'success' && step2Status() === 'success'" [class.active]="configLoading()">
+          <div class="loading-step-icon">
+            @if (!configLoading() && step1Status() === 'success' && step2Status() === 'success') {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            } @else {
+              <div class="spinner spinner-sm"></div>
+            }
+          </div>
+          <span>Loading cashier configuration...</span>
+        </div>
+      </div>
     </div>
   </div>
 } @else if (setupComplete()) {
@@ -102,7 +132,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
               }
             </div>
-            <span class="step-label">Step 1: Validate Cashier</span>
+            <span class="step-label">Step 1: Check Session</span>
             @if (step1Status() === 'loading') { <span class="badge badge-info step-badge">In Progress</span> }
             @if (step1Status() === 'success') { <span class="badge badge-success step-badge">Done</span> }
             @if (step1Status() === 'error') { <span class="badge badge-danger step-badge">Failed</span> }
@@ -143,14 +173,14 @@
           </div>
         </div>
 
-        @if (isCashierRegistered() === false) {
-          <div class="alert alert-warning" data-testid="cashier-not-registered-warning">
+        @if (error()) {
+          <div class="alert alert-warning" data-testid="cashier-setup-error">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2">
               <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>
             </svg>
             <div>
-              <p class="alert-title">Cashier Not Registered</p>
-              <p class="alert-text">User <strong>{{ firstName() }} {{ lastName() }}</strong> (ID: {{ userId() }}) is not yet registered as a cashier in the billing system. Please contact your system administrator.</p>
+              <p class="alert-title">Setup Error</p>
+              <p class="alert-text">{{ error() }}</p>
             </div>
           </div>
         }
@@ -161,15 +191,15 @@
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
             </svg>
             <div>
-              <p class="alert-title">Cashier Validated</p>
+              <p class="alert-title">Ready to Start</p>
               <p class="alert-text">
-                User <strong>{{ firstName() }} {{ lastName() }}</strong> (User ID: {{ userId() }}) is registered as a cashier.
+                User <strong>{{ firstName() }} {{ lastName() }}</strong> (User ID: {{ userId() }}).
                 @if (dayEndCompleted()) {
                   A day-end reconciliation has been completed. Please start a new session below.
                 } @else if (resumingSession()) {
                   An active session was found. Resume your session below.
                 } @else {
-                  Select your cash office and float amount below.
+                  Select your cash office and enter your float amount to start a new session.
                 }
               </p>
             </div>
@@ -229,7 +259,8 @@
               class="form-input font-mono text-right"
               [ngModel]="floatInput()"
               (ngModelChange)="floatInput.set($event)"
-              [disabled]="isCashierRegistered() !== true"
+              [ngModelOptions]="{standalone: true}"
+              [disabled]="cashOffices().length === 0"
               data-testid="input-float"
             />
           </div>
@@ -240,10 +271,11 @@
               class="form-select"
               [ngModel]="selectedOfficeId()"
               (ngModelChange)="selectedOfficeId.set($event); onOfficeChange()"
-              [disabled]="isCashierRegistered() !== true || cashOffices().length === 0"
+              [ngModelOptions]="{standalone: true}"
+              [disabled]="cashOffices().length === 0"
               data-testid="select-cash-office"
             >
-              <option value="">{{ step2Status() === 'loading' ? 'Loading offices...' : '-- Select Cash Office --' }}</option>
+              <option value="" disabled>{{ step2Status() === 'loading' ? 'Loading offices...' : '-- Select Cash Office --' }}</option>
               @for (office of cashOffices(); track office.cashOffice_ID) {
                 <option [value]="'' + office.cashOffice_ID" [attr.data-testid]="'office-option-' + office.cashOffice_ID">
                   {{ office.cashOfficeDesc || 'Office ' + office.cashOffice_ID }}{{ defaultOfficeId() && office.cashOffice_ID.toString() === defaultOfficeId() ? ' (Default)' : '' }}
@@ -402,7 +434,7 @@
             <button
               type="submit"
               class="btn-primary btn-submit"
-              [disabled]="!selectedOffice() || submitting() || isCashierRegistered() !== true || resumingSession()"
+              [disabled]="!selectedOffice() || submitting() || resumingSession()"
               data-testid="button-submit"
             >
               @if (submitting()) {

@@ -142,7 +142,7 @@
 
         <!-- Unified Dynamic Search -->
         @if (searchMode() === 'unified') {
-          <div class="search-section">
+          <div class="search-section" #searchSection>
             <div class="search-box">
               <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               <input
@@ -386,15 +386,79 @@
           <div class="tab-form-section">
             <h3 class="section-title">Clearance Certificate Payment</h3>
             <p class="section-desc">Search for a clearance certificate by ID to add it to the basket.</p>
-            <div class="search-box">
-              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
-              <input class="search-input" type="text" placeholder="Enter clearance certificate ID..." [ngModel]="clearanceSearchId()" (ngModelChange)="clearanceSearchId.set($event)" (keydown.enter)="searchClearance()" data-testid="input-clearance-id" />
-              <button class="search-go-btn" (click)="searchClearance()" [disabled]="clearanceSearching() || !sessionActive()" data-testid="button-search-clearance">
-                @if (clearanceSearching()) { <div class="spinner-sm"></div> } @else { Search }
-              </button>
-            </div>
-            @if (clearanceError()) {
-              <div class="alert alert-error" data-testid="text-clearance-error">{{ clearanceError() }}</div>
+            @if (!clearancePreview()) {
+              <div class="search-box">
+                <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                <input class="search-input" type="text" placeholder="Enter clearance certificate ID..." [ngModel]="clearanceSearchId()" (ngModelChange)="clearanceSearchId.set($event)" (keydown.enter)="searchClearance()" data-testid="input-clearance-id" />
+                <button class="search-go-btn" (click)="searchClearance()" [disabled]="clearanceSearching() || !sessionActive()" data-testid="button-search-clearance">
+                  @if (clearanceSearching()) { <div class="spinner-sm"></div> } @else { Search }
+                </button>
+              </div>
+              @if (clearanceError()) {
+                <div class="alert alert-error" data-testid="text-clearance-error">{{ clearanceError() }}</div>
+              }
+            }
+            @if (clearancePreview()) {
+              <div class="item-preview-card" data-testid="clearance-preview-card">
+                <div class="item-preview-header">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                  <span>Clearance: {{ clearancePreview()!.clearanceData?.clearanceId }}</span>
+                  <span class="item-preview-total">R {{ formatCurrency(clearancePreview()!.amountToPay) }}</span>
+                </div>
+                <div class="item-preview-meta">
+                  <span>{{ clearancePreview()!.clearanceData?.ownerName }}</span>
+                  <span>{{ clearancePreview()!.clearanceData?.propertyDesc }}</span>
+                  <span>{{ clearancePreview()!.clearanceData?.accounts?.length }} account(s)</span>
+                </div>
+                <div class="item-tender-section">
+                  <label class="form-label">Payment Method</label>
+                  <div class="item-tender-blocks">
+                    <button class="item-tender-block" [class.active]="clearanceTender() === 'cash'" (click)="clearanceTender.set('cash')" data-testid="button-clr-cash">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M2 10h2M20 10h2M2 14h2M20 14h2"/></svg>
+                      <span>Cash</span>
+                    </button>
+                    <button class="item-tender-block" [class.active]="clearanceTender() === 'card'" (click)="clearanceTender.set('card')" data-testid="button-clr-card">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>
+                      <span>Card</span>
+                    </button>
+                    <button class="item-tender-block" [class.active]="clearanceTender() === 'split'" (click)="clearanceTender.set('split')" data-testid="button-clr-split">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 16v5h-5"/><path d="M3 16v5h5"/><path d="M21 3l-9 9"/><path d="M3 21l9-9"/></svg>
+                      <span>Split</span>
+                    </button>
+                  </div>
+                </div>
+                @if (clearanceTender() === 'split') {
+                  <div class="item-split-row">
+                    <div class="form-group">
+                      <label class="form-label">Cash Amount (R)</label>
+                      <input class="form-input" type="number" min="0" [max]="clearancePreview()!.amountToPay" step="0.01" [ngModel]="clearanceSplitCash() || null" (ngModelChange)="clearanceSplitCash.set(+$event||0); clearanceSplitCard.set(+(clearancePreview()!.amountToPay - (+$event||0)).toFixed(2))" (focus)="$event.target.select()" data-testid="input-clr-split-cash" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Card Amount (R)</label>
+                      <input class="form-input" type="number" [value]="clearanceSplitCard()" readonly data-testid="input-clr-split-card" />
+                    </div>
+                  </div>
+                }
+                @if (clearanceTender() === 'card' || clearanceTender() === 'split') {
+                  <div class="form-row misc-card-fields">
+                    <div class="form-group" style="flex:2">
+                      <label class="form-label">Card Number</label>
+                      <input class="form-input" type="text" placeholder="Last 4 digits or reference" [ngModel]="clearanceItemCardNumber()" (ngModelChange)="clearanceItemCardNumber.set($event)" data-testid="input-clr-card-number" />
+                    </div>
+                    <div class="form-group" style="flex:1">
+                      <label class="form-label">Expiry (MM/YY)</label>
+                      <input class="form-input" type="text" placeholder="MM/YY" [ngModel]="clearanceItemCardExpiry()" (ngModelChange)="clearanceItemCardExpiry.set($event)" data-testid="input-clr-card-expiry" />
+                    </div>
+                  </div>
+                }
+                <div class="item-preview-actions">
+                  <button class="search-go-btn" (click)="addClearanceFromPreview()" data-testid="button-clr-add-basket">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    Add to Basket
+                  </button>
+                  <button class="link-btn" (click)="cancelClearancePreview()" data-testid="button-clr-cancel">Search Again</button>
+                </div>
+              </div>
             }
           </div>
         }
@@ -423,6 +487,47 @@
                 <input class="form-input" type="number" min="1" step="1" placeholder="Enter amount" [ngModel]="prepaidAmount() || null" (ngModelChange)="prepaidAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-prepaid-amount" />
               </div>
             </div>
+            <div class="misc-tender-section" style="margin-top:12px">
+              <label class="form-label">Payment Method</label>
+              <div class="misc-tender-blocks">
+                <button class="misc-tender-block" [class.active]="prepaidTender() === 'cash'" (click)="prepaidTender.set('cash')" data-testid="button-prep-cash">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M2 10h2M20 10h2M2 14h2M20 14h2"/></svg>
+                  <span>Cash</span>
+                </button>
+                <button class="misc-tender-block" [class.active]="prepaidTender() === 'card'" (click)="prepaidTender.set('card')" data-testid="button-prep-card">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>
+                  <span>Card</span>
+                </button>
+                <button class="misc-tender-block" [class.active]="prepaidTender() === 'split'" (click)="prepaidTender.set('split')" data-testid="button-prep-split">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 16v5h-5"/><path d="M3 16v5h5"/><path d="M21 3l-9 9"/><path d="M3 21l9-9"/></svg>
+                  <span>Split</span>
+                </button>
+              </div>
+            </div>
+            @if (prepaidTender() === 'split') {
+              <div class="item-split-row" style="margin-top:8px">
+                <div class="form-group">
+                  <label class="form-label">Cash Amount (R)</label>
+                  <input class="form-input" type="number" min="0" [max]="prepaidAmount()" step="0.01" [ngModel]="prepaidSplitCash() || null" (ngModelChange)="prepaidSplitCash.set(+$event||0); prepaidSplitCard.set(+(prepaidAmount() - (+$event||0)).toFixed(2))" (focus)="$event.target.select()" data-testid="input-prep-split-cash" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Card Amount (R)</label>
+                  <input class="form-input" type="number" [value]="prepaidSplitCard()" readonly data-testid="input-prep-split-card" />
+                </div>
+              </div>
+            }
+            @if (prepaidTender() === 'card' || prepaidTender() === 'split') {
+              <div class="form-row misc-card-fields">
+                <div class="form-group" style="flex:2">
+                  <label class="form-label">Card Number</label>
+                  <input class="form-input" type="text" placeholder="Last 4 digits or reference" [ngModel]="prepaidItemCardNumber()" (ngModelChange)="prepaidItemCardNumber.set($event)" data-testid="input-prep-card-number" />
+                </div>
+                <div class="form-group" style="flex:1">
+                  <label class="form-label">Expiry (MM/YY)</label>
+                  <input class="form-input" type="text" placeholder="MM/YY" [ngModel]="prepaidItemCardExpiry()" (ngModelChange)="prepaidItemCardExpiry.set($event)" data-testid="input-prep-card-expiry" />
+                </div>
+              </div>
+            }
             <button class="search-go-btn" style="margin-top:12px" (click)="searchPrepaid()" [disabled]="prepaidSearching() || !sessionActive()" data-testid="button-prepaid-breakdown">
               @if (prepaidSearching()) { <div class="spinner-sm"></div> } @else { Get Breakdown & Add }
             </button>
@@ -434,12 +539,12 @@
 
         <!-- Tab-based: Misc form -->
         @if (searchMode() === 'tabs' && activeMode() === 'misc') {
-          <div class="tab-form-section">
+          <div class="tab-form-section misc-form-card">
             <h3 class="section-title">Miscellaneous Payment</h3>
-            <p class="section-desc">Select group, fill details, and add to basket.</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Payment Group</label>
+            <p class="section-desc">Select group, fill in payer details, and add to basket.</p>
+            <div class="misc-form-grid">
+              <div class="misc-form-field misc-form-full">
+                <label class="form-label">Payment Group <span class="required-star">*</span></label>
                 @if (miscGroupsLoading()) {
                   <div class="spinner-sm"></div>
                 } @else {
@@ -451,7 +556,7 @@
                   </select>
                 }
               </div>
-              <div class="form-group">
+              <div class="misc-form-field misc-form-full">
                 <label class="form-label">SCOA Item (Vote)</label>
                 @if (miscScoaLoading()) {
                   <div class="spinner-sm"></div>
@@ -465,71 +570,36 @@
                   <input class="form-input" type="text" [value]="getSelectedScoaName()" readonly data-testid="text-misc-scoa" />
                 }
               </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
+              <div class="misc-form-field">
                 <label class="form-label">Last Name</label>
                 <input class="form-input" type="text" placeholder="Payer last name" [ngModel]="miscLastName()" (ngModelChange)="miscLastName.set($event)" data-testid="input-misc-lastname" />
               </div>
-              <div class="form-group">
+              <div class="misc-form-field">
                 <label class="form-label">Initials</label>
                 <input class="form-input" type="text" placeholder="Initials" [ngModel]="miscInitials()" (ngModelChange)="miscInitials.set($event)" data-testid="input-misc-initials" />
               </div>
-              <div class="form-group">
-                <label class="form-label">Amount (R) <span class="misc-vat-badge" [class.vat-inclusive]="miscIsVatable()" [class.vat-exempt]="!miscIsVatable()" data-testid="text-vat-status">{{ miscIsVatable() ? 'VAT Incl.' : 'VAT Exempt' }}</span></label>
-                <input class="form-input" type="number" min="0" step="0.01" placeholder="Enter amount" [ngModel]="miscAmount() || null" (ngModelChange)="miscAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-misc-amount" />
-              </div>
-            </div>
-            @if (miscIsVatable() && miscAmount() > 0) {
-              <div class="misc-vat-breakdown" data-testid="misc-vat-breakdown">
-                <div class="vat-breakdown-row">
-                  <span class="vat-breakdown-label">Excl. VAT</span>
-                  <span class="vat-breakdown-value">R {{ formatCurrency(miscLiveExclAmount()) }}</span>
-                </div>
-                <div class="vat-breakdown-row">
-                  <span class="vat-breakdown-label">VAT ({{ miscEffectiveVatPct() }}%)</span>
-                  <span class="vat-breakdown-value">R {{ formatCurrency(miscLiveVatAmount()) }}</span>
-                </div>
-                <div class="vat-breakdown-row vat-breakdown-total">
-                  <span class="vat-breakdown-label">Total Incl. VAT</span>
-                  <span class="vat-breakdown-value">R {{ formatCurrency(miscAmount()) }}</span>
-                </div>
-              </div>
-            }
-            <div class="form-row">
-              <div class="form-group" style="flex:2">
+              <div class="misc-form-field misc-form-full">
                 <label class="form-label">Description</label>
-                <input class="form-input" type="text" placeholder="Payment description" [ngModel]="miscDescription()" (ngModelChange)="miscDescription.set($event)" data-testid="input-misc-desc" />
+                <input class="form-input" type="text" placeholder="Payment description (e.g. Building Plan Fees)" [ngModel]="miscDescription()" (ngModelChange)="miscDescription.set($event)" data-testid="input-misc-desc" />
               </div>
-            </div>
-            <div class="misc-tender-section">
-              <label class="form-label">Payment Method</label>
-              <div class="misc-tender-blocks">
-                <button class="misc-tender-block" [class.active]="miscTenderType() === 'cash'" (click)="miscTenderType.set('cash')" data-testid="button-misc-cash">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M2 10h2M20 10h2M2 14h2M20 14h2"/></svg>
-                  <span>Cash</span>
-                </button>
-                <button class="misc-tender-block" [class.active]="miscTenderType() === 'card'" (click)="miscTenderType.set('card')" data-testid="button-misc-card">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>
-                  <span>Card</span>
-                </button>
+              <div class="misc-form-field">
+                <label class="form-label">Amount (R) <span class="misc-vat-badge" [class.vat-inclusive]="miscIsVatable()" [class.vat-exempt]="!miscIsVatable()" data-testid="text-vat-status">{{ miscIsVatable() ? 'VAT Incl.' : 'VAT Exempt' }}</span> <span class="required-star">*</span></label>
+                <input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" [ngModel]="miscAmount() || null" (ngModelChange)="miscAmount.set(+$event || 0)" (focus)="$event.target.select()" data-testid="input-misc-amount" />
               </div>
-            </div>
-            @if (miscTenderType() === 'card') {
-              <div class="form-row misc-card-fields">
-                <div class="form-group">
-                  <label class="form-label">Card Number</label>
-                  <input class="form-input" type="text" placeholder="0000 0000 0000 0000" maxlength="19" [ngModel]="miscCardNumber()" (ngModelChange)="formatMiscCardNumber($event)" data-testid="input-misc-card-number" />
+              @if (miscIsVatable() && miscAmount() > 0) {
+                <div class="misc-form-field misc-vat-inline">
+                  <span class="vat-inline-label">Excl. VAT: <strong>R {{ formatCurrency(miscLiveExclAmount()) }}</strong></span>
+                  <span class="vat-inline-sep">|</span>
+                  <span class="vat-inline-label">VAT ({{ miscEffectiveVatPct() }}%): <strong>R {{ formatCurrency(miscLiveVatAmount()) }}</strong></span>
                 </div>
-                <div class="form-group" style="max-width:120px">
-                  <label class="form-label">Expiry</label>
-                  <input class="form-input" type="text" placeholder="MM/YY" maxlength="5" [ngModel]="miscCardExpiry()" (ngModelChange)="formatMiscCardExpiry($event)" data-testid="input-misc-card-expiry" />
-                </div>
-              </div>
-            }
-            <button class="search-go-btn" style="margin-top:12px" (click)="addMiscFromTab()" [disabled]="miscSelectedGroupId() === 0 || miscAmount() <= 0 || !sessionActive()" data-testid="button-add-misc">
-              Add to Basket ({{ miscTenderType() === 'cash' ? 'Cash' : 'Card' }})
-            </button>
+              }
+            </div>
+            <div class="misc-form-actions">
+              <button class="misc-add-btn" [disabled]="miscSelectedGroupId() === 0 || miscAmount() <= 0 || !sessionActive()" (click)="miscTenderType.set('cash'); addMiscFromTab()" data-testid="button-misc-cash">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                Add to Basket
+              </button>
+            </div>
           </div>
         }
 
@@ -695,6 +765,60 @@
                       </div>
                     </div>
                   </div>
+                  @if (item.itemTenderType) {
+                    <div class="item-tender-badge-row" [attr.data-testid]="'item-tender-badge-' + item.id">
+                      <span class="item-tender-set-badge" [class.tender-cash]="item.itemTenderType === 'cash'" [class.tender-card]="item.itemTenderType === 'card'" [class.tender-split]="item.itemTenderType === 'split'">
+                        @if (item.itemTenderType === 'cash') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+                          Cash
+                        } @else if (item.itemTenderType === 'card') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/></svg>
+                          Card
+                        } @else if (item.itemTenderType === 'split') {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-9 9"/><path d="M3 21l9-9"/></svg>
+                          Split — R{{ formatCurrency(item.itemCashAmount || 0) }} cash / R{{ formatCurrency(item.itemCardAmount || 0) }} card
+                        }
+                      </span>
+                      <button class="item-tender-edit-btn" (click)="toggleItemTenderExpand(item.id)" [attr.data-testid]="'button-item-tender-edit-' + item.id" title="Change payment method">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </button>
+                      <button class="item-tender-clear-btn" (click)="clearItemTender(item.id)" [attr.data-testid]="'button-item-clear-' + item.id" title="Remove — use default">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    </div>
+                  } @else {
+                    <button class="item-set-tender-link" (click)="toggleItemTenderExpand(item.id)" [attr.data-testid]="'button-item-set-tender-' + item.id">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                      Set payment method
+                    </button>
+                  }
+                  @if (itemTenderExpanded().has(item.id)) {
+                    <div class="item-row-tender" [attr.data-testid]="'item-tender-row-' + item.id">
+                      <span class="item-row-tender-label">Payment method for this item:</span>
+                      <div class="item-row-tender-btns">
+                        <button class="item-row-tender-btn" [class.active]="getItemTender(item) === 'cash'" (click)="setItemTenderAndCollapse(item.id, 'cash')" [attr.data-testid]="'button-item-cash-' + item.id" title="Pay this item by cash">Cash</button>
+                        <button class="item-row-tender-btn" [class.active]="getItemTender(item) === 'card'" (click)="setItemTenderAndCollapse(item.id, 'card')" [attr.data-testid]="'button-item-card-' + item.id" title="Pay this item by card">Card</button>
+                        <button class="item-row-tender-btn" [class.active]="getItemTender(item) === 'split'" (click)="setItemTender(item.id, 'split')" [attr.data-testid]="'button-item-split-' + item.id" title="Split this item across cash and card">Split</button>
+                      </div>
+                      @if (getItemTender(item) === 'split') {
+                        <div class="item-row-split-inputs">
+                          <label>Cash R</label>
+                          <input type="number" class="form-input-sm" min="0" [max]="item.amountToPay" step="0.01" [value]="item.itemCashAmount || null" (input)="updateItemSplitCash(item.id, $any($event.target).valueAsNumber || 0)" (focus)="$event.target.select()" [attr.data-testid]="'input-item-split-cash-' + item.id" />
+                          <label>Card R</label>
+                          <input type="number" class="form-input-sm" [value]="item.itemCardAmount || null" readonly [attr.data-testid]="'input-item-split-card-' + item.id" />
+                        </div>
+                      }
+                      @if (getItemTender(item) === 'card' || getItemTender(item) === 'split') {
+                        <div class="item-row-card-inputs">
+                          <input type="text" class="form-input-sm" placeholder="Card no." [value]="item.itemCardNumber || ''" (input)="updateItemCardNumber(item.id, $any($event.target).value)" [attr.data-testid]="'input-item-card-num-' + item.id" />
+                          <input type="text" class="form-input-sm" placeholder="MM/YY" style="max-width:70px" [value]="item.itemCardExpiry || ''" (input)="updateItemCardExpiry(item.id, $any($event.target).value)" [attr.data-testid]="'input-item-card-exp-' + item.id" />
+                        </div>
+                      }
+                      @if (getItemTender(item) === 'split') {
+                        <button class="item-row-tender-done-btn" (click)="collapseItemTender(item.id)">Done</button>
+                      }
+                    </div>
+                  }
                 </div>
               }
             </div>
@@ -702,8 +826,16 @@
         }
       </div>
 
+      <!-- Mobile Summary Toggle -->
+      <div class="mobile-summary-toggle" (click)="mobileSummaryOpen.set(!mobileSummaryOpen())" data-testid="button-mobile-summary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span>Payment Summary</span>
+        <span class="mobile-summary-badge">{{ basket.itemCount() }} items · R {{ formatCurrency(basket.totalToPay()) }}</span>
+        <svg class="mobile-summary-chevron" [class.expanded]="mobileSummaryOpen()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+
       <!-- RIGHT: Payment Summary -->
-      <div class="pos-right">
+      <div class="pos-right" [class.mobile-open]="mobileSummaryOpen()">
         <div class="summary-panel">
           <div class="summary-header">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -740,7 +872,12 @@
               </div>
               @for (item of basket.itemsByType()['clearance']; track item.id) {
                 <div class="summary-item-detail">
-                  <div class="summary-item-name">{{ item.clearanceData?.ownerName || item.label }}</div>
+                  <div class="summary-item-name">
+                    {{ item.clearanceData?.ownerName || item.label }}
+                    @if (item.itemTenderType) {
+                      <span class="misc-tender-tag" [class.misc-tender-card]="item.itemTenderType === 'card'" [class.misc-tender-split]="item.itemTenderType === 'split'">{{ item.itemTenderType | uppercase }}</span>
+                    }
+                  </div>
                   <div class="summary-item-meta">
                     <span>{{ item.clearanceData?.propertyDesc || item.clearanceData?.clearanceId }}</span>
                     <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
@@ -757,7 +894,12 @@
               </div>
               @for (item of basket.itemsByType()['prepaid']; track item.id) {
                 <div class="summary-item-detail">
-                  <div class="summary-item-name">{{ item.prepaidData?.serviceType || 'Electricity' }} Recharge</div>
+                  <div class="summary-item-name">
+                    {{ item.prepaidData?.serviceType || 'Electricity' }} Recharge
+                    @if (item.itemTenderType) {
+                      <span class="misc-tender-tag" [class.misc-tender-card]="item.itemTenderType === 'card'" [class.misc-tender-split]="item.itemTenderType === 'split'">{{ item.itemTenderType | uppercase }}</span>
+                    }
+                  </div>
                   <div class="summary-item-meta">
                     <span>Meter: {{ item.prepaidData?.meterNumber }}</span>
                     <span class="mono" [class.summary-zero]="item.amountToPay <= 0">R {{ formatCurrency(item.amountToPay) }}</span>
@@ -1332,22 +1474,77 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 SMS
               </button>
+              <button class="delivery-btn" style="border-color: var(--platinum-accent); color: var(--platinum-accent);" (click)="loadReceiptContacts()" [disabled]="loadingContacts()" data-testid="button-load-contacts">
+                @if (loadingContacts()) {
+                  <div class="spinner-sm"></div>
+                } @else {
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                }
+                Load Contacts
+              </button>
             </div>
 
-            @if (receiptDeliveryMethod() === 'email') {
-              <div class="delivery-input-row">
-                <input class="form-input" type="email" placeholder="Enter email address" [ngModel]="receiptEmail()" (ngModelChange)="receiptEmail.set($event)" data-testid="input-receipt-email" />
-                <button class="search-go-btn" (click)="sendReceiptVia('email')" [disabled]="sendingReceipt()" data-testid="button-send-email">
-                  @if (sendingReceipt()) { <div class="spinner-sm"></div> } @else { Send }
-                </button>
+            @if (receiptContacts().length > 0) {
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                @for (c of receiptContacts(); track c.email || c.phone) {
+                  <button class="contact-chip" (click)="selectContact(c)" data-testid="button-contact-chip">
+                    @if (c.email) {
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                      {{ c.email }}
+                    } @else {
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      {{ c.phone }}
+                    }
+                    <span style="font-size: 0.65rem; opacity: 0.7; margin-left: 4px;">{{ c.source }}</span>
+                  </button>
+                }
               </div>
             }
-            @if (receiptDeliveryMethod() === 'whatsapp' || receiptDeliveryMethod() === 'sms') {
-              <div class="delivery-input-row">
-                <input class="form-input" type="tel" placeholder="Enter phone number" [ngModel]="receiptPhone()" (ngModelChange)="receiptPhone.set($event)" data-testid="input-receipt-phone" />
-                <button class="search-go-btn" (click)="sendReceiptVia(receiptDeliveryMethod())" [disabled]="sendingReceipt()" data-testid="button-send-phone">
-                  @if (sendingReceipt()) { <div class="spinner-sm"></div> } @else { Send }
-                </button>
+
+            <div class="delivery-input-row" style="margin-top: 10px;">
+              <div style="position: relative; flex: 1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%);"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                <input class="form-input" type="email" placeholder="Email address" style="padding-left: 30px;" [ngModel]="receiptEmail()" (ngModelChange)="receiptEmail.set($event)" data-testid="input-receipt-email" />
+              </div>
+              <button class="search-go-btn" (click)="sendReceiptVia('email')" [disabled]="sendingReceipt() || !receiptEmail()" data-testid="button-send-email" title="Send email only">
+                @if (sendingReceipt() && receiptDeliveryMethod() === 'email') { <div class="spinner-sm"></div> } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
+                }
+              </button>
+            </div>
+
+            <div class="delivery-input-row">
+              <div style="position: relative; flex: 1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%);"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                <input class="form-input" type="tel" placeholder="Phone number" style="padding-left: 30px;" [ngModel]="receiptPhone()" (ngModelChange)="receiptPhone.set($event)" data-testid="input-receipt-phone" />
+              </div>
+              <button class="search-go-btn" (click)="sendReceiptVia('sms')" [disabled]="sendingReceipt() || !receiptPhone()" data-testid="button-send-sms" title="Send SMS only">
+                @if (sendingReceipt() && (receiptDeliveryMethod() === 'sms' || receiptDeliveryMethod() === 'whatsapp')) { <div class="spinner-sm"></div> } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
+                }
+              </button>
+            </div>
+
+            @if (receiptEmail() && receiptPhone()) {
+              <button class="search-go-btn" style="width: 100%; margin-top: 6px; justify-content: center; gap: 6px; background: var(--platinum-primary); color: #fff; border: none; padding: 10px;" (click)="sendReceiptAll()" [disabled]="sendingReceipt()" data-testid="button-send-all">
+                @if (sendingReceipt()) { <div class="spinner-sm"></div> Sending... } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
+                  Send Email &amp; SMS
+                }
+              </button>
+            }
+
+            @for (log of receiptSendLog(); track log.method + log.recipient) {
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 10px; border-radius: 6px; font-size: 0.75rem;"
+                   [style.background]="log.success ? '#f0fdf4' : '#fef2f2'"
+                   [style.color]="log.success ? '#166534' : '#991b1b'"
+                   [style.border]="log.success ? '1px solid #bbf7d0' : '1px solid #fecaca'">
+                @if (log.success) {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                }
+                <span>{{ log.method === 'email' ? 'Email' : 'SMS' }} {{ log.success ? 'sent to' : 'failed for' }} {{ log.recipient }}</span>
               </div>
             }
           </div>

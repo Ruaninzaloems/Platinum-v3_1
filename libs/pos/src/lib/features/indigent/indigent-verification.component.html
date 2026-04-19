@@ -1,0 +1,453 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Site Verification Management</h1>
+      <p class="page-subtitle">Manage site visit verifications for indigent applications</p>
+    </div>
+    <div class="header-actions">
+      @if (selectedAppIds.size > 0) {
+        <button class="btn btn-accent btn-sm" (click)="autoAllocateContractors()" [disabled]="allocating()" data-testid="button-auto-allocate">
+          @if (allocating()) { <span class="spinner"></span> }
+          Auto-Allocate ({{ selectedAppIds.size }})
+        </button>
+      }
+      <span class="count-badge" data-testid="text-queue-count">{{ totalCount() }} pending</span>
+    </div>
+  </div>
+
+  <div class="filters-bar">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" type="text" placeholder="Search by name, account, app ID..." [(ngModel)]="searchText" (input)="onSearchChange()" data-testid="input-search" />
+      @if (searchText) {
+        <button class="search-clear" (click)="clearSearch()" data-testid="button-clear-search">&times;</button>
+      }
+    </div>
+    <div class="filter-group">
+      <select class="filter-select" [(ngModel)]="filterContractor" (ngModelChange)="onFilterChange()" data-testid="select-contractor-filter">
+        <option value="">All Contractors</option>
+        @for (c of contractors(); track c.contractorId) {
+          <option [value]="c.contractorId">{{ c.contractorName }}</option>
+        }
+      </select>
+    </div>
+    <div class="filter-group">
+      <select class="filter-select" [(ngModel)]="filterIndigentType" (ngModelChange)="onFilterChange()" data-testid="select-type-filter">
+        <option value="">All Types</option>
+        @for (t of indigentTypes(); track t.indigentTypeId) {
+          <option [value]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+        }
+      </select>
+    </div>
+    @if (hasActiveFilters) {
+      <button class="filter-clear-btn" (click)="clearAllFilters()" data-testid="button-clear-filters">Clear Filters</button>
+    }
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading site verification queue...</p>
+        </div>
+      } @else if (displayedQueue.length === 0) {
+        <div class="empty-state">
+          @if (hasActiveFilters) {
+            <p>No applications match your filters.</p>
+            <button class="btn btn-outline btn-sm" style="margin-top:8px" (click)="clearAllFilters()">Clear Filters</button>
+          } @else {
+            <p>No applications pending site verification.</p>
+          }
+        </div>
+      } @else {
+        <div class="table-wrapper">
+          <table class="smart-table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" [checked]="allAppsSelected" (change)="selectAllApps()" data-testid="checkbox-select-all" /></th>
+                <th class="col-appid sortable" (click)="toggleSort('applicationId')" data-testid="th-app-id">
+                  App ID <span class="sort-icon">{{ getSortIcon('applicationId') }}</span>
+                </th>
+                <th class="col-account sortable" (click)="toggleSort('accountNumber')" data-testid="th-account">
+                  Account <span class="sort-icon">{{ getSortIcon('accountNumber') }}</span>
+                </th>
+                <th class="col-holder sortable" (click)="toggleSort('accountHolderName')" data-testid="th-holder">
+                  Account Holder <span class="sort-icon">{{ getSortIcon('accountHolderName') }}</span>
+                </th>
+                <th class="col-type">Type</th>
+                <th class="col-date sortable" (click)="toggleSort('applicationDate')" data-testid="th-date">
+                  Date <span class="sort-icon">{{ getSortIcon('applicationDate') }}</span>
+                </th>
+                <th class="col-income sortable text-right" (click)="toggleSort('householdIncome')" data-testid="th-income">
+                  Income <span class="sort-icon">{{ getSortIcon('householdIncome') }}</span>
+                </th>
+                <th class="col-subsidy text-center">Subsidy</th>
+                <th class="col-contractor sortable" (click)="toggleSort('assignedContractorName')" data-testid="th-contractor">
+                  Contractor <span class="sort-icon">{{ getSortIcon('assignedContractorName') }}</span>
+                </th>
+                <th class="col-due sortable" (click)="toggleSort('verificationDueDate')" data-testid="th-due">
+                  Due <span class="sort-icon">{{ getSortIcon('verificationDueDate') }}</span>
+                </th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of displayedQueue; track item.applicationId) {
+                <tr [attr.data-testid]="'row-ver-' + item.applicationId" [class.overdue-row]="isOverdue(item)" (click)="viewApplication(item.applicationId)">
+                  <td class="col-check" (click)="$event.stopPropagation()"><input type="checkbox" [checked]="isAppSelected(item.applicationId)" (change)="toggleAppSelect(item.applicationId)" [attr.data-testid]="'checkbox-select-' + item.applicationId" /></td>
+                  <td class="col-appid font-mono">{{ item.applicationId }}</td>
+                  <td class="col-account font-mono">{{ item.accountNumber }}</td>
+                  <td class="col-holder">
+                    <span class="holder-name">{{ item.accountHolderName || '—' }}</span>
+                  </td>
+                  <td class="col-type"><span class="badge badge-info">{{ item.indigentTypeName || '—' }}</span></td>
+                  <td class="col-date">
+                    {{ fmtDate(item.applicationDate) }}
+                    @if (getSlaRag(item); as sla) {
+                      <span class="sla-dot" [class]="sla.css" [title]="sla.label" [attr.data-testid]="'badge-sla-' + item.applicationId"></span>
+                    }
+                  </td>
+                  <td class="col-income text-right font-mono" style="white-space:nowrap">{{ fmtCurrency(item.householdIncome) }}</td>
+                  <td class="col-subsidy text-center">
+                    @if (item.qualifiedSubsidyPercentage != null) {
+                      <span class="subsidy-badge" [class.subsidy-full]="item.qualifiedSubsidyPercentage >= 100" [class.subsidy-partial]="item.qualifiedSubsidyPercentage > 0 && item.qualifiedSubsidyPercentage < 100" [class.subsidy-none]="item.qualifiedSubsidyPercentage === 0">{{ item.qualifiedSubsidyPercentage }}%</span>
+                    } @else { <span class="text-muted">—</span> }
+                  </td>
+                  <td class="col-contractor">{{ item.assignedContractorName || '—' }}</td>
+                  <td class="col-due">
+                    @if (item.verificationDueDate) {
+                      <span class="badge" [class]="getDueDateBadge(item)" [attr.data-testid]="'badge-due-' + item.applicationId">
+                        {{ fmtDate(item.verificationDueDate) }}
+                      </span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td class="col-actions" (click)="$event.stopPropagation()">
+                    <div class="actions-cell">
+                      <button
+                        class="action-btn action-primary"
+                        (click)="openVerificationModal(item)"
+                        title="Record Visit"
+                        [disabled]="isAttemptsExhausted(item)"
+                        [attr.data-testid]="'button-verify-' + item.applicationId">
+                        Record
+                      </button>
+                      <button class="action-btn action-outline" (click)="openDoNotCutModal(item)" title="Do-Not-Cut" [attr.data-testid]="'button-dnc-' + item.applicationId">DNC</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid-footer">
+          <div class="footer-left">
+            <span class="rows-info" data-testid="text-rows-info">Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filteredCount }}</span>
+          </div>
+          <div class="footer-center">
+            <div class="page-nav">
+              <button class="pg-btn" (click)="goToPage(1)" [disabled]="page <= 1" title="First" data-testid="button-first-page">⟨⟨</button>
+              <button class="pg-btn" (click)="prevPage()" [disabled]="page <= 1" title="Previous" data-testid="button-prev-page">⟨</button>
+              @for (p of pageNumbers; track p) {
+                @if (p === -1) {
+                  <span class="pg-ellipsis">…</span>
+                } @else {
+                  <button class="pg-btn" [class.pg-active]="p === page" (click)="goToPage(p)" [attr.data-testid]="'button-page-' + p">{{ p }}</button>
+                }
+              }
+              <button class="pg-btn" (click)="nextPage()" [disabled]="page >= totalPages" title="Next" data-testid="button-next-page">⟩</button>
+              <button class="pg-btn" (click)="goToPage(totalPages)" [disabled]="page >= totalPages" title="Last" data-testid="button-last-page">⟩⟩</button>
+            </div>
+          </div>
+          <div class="footer-right">
+            <label class="rows-per-page">
+              Rows
+              <select class="rpp-select" [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChange()" data-testid="select-page-size">
+                @for (size of pageSizeOptions; track size) {
+                  <option [value]="size">{{ size }}</option>
+                }
+              </select>
+            </label>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+@if (modalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Record Site Visit — App #{{ selectedItem.applicationId }}</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeModal()" data-testid="button-close-ver-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ selectedItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account Holder</span><span class="detail-value">{{ selectedItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Indigent Type</span><span class="detail-value">{{ selectedItem.indigentTypeName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Income</span><span class="detail-value">{{ fmtCurrency(selectedItem.householdIncome) }}</span></div>
+          <div class="detail-item"><span class="detail-label">Subsidy %</span><span class="detail-value">
+            @if (selectedItem.qualifiedSubsidyPercentage != null) {
+              <span [style.background]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#e8f5e9' : '#fce4ec'" [style.color]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#1b5e20' : '#c62828'" style="padding:2px 8px;border-radius:4px;font-weight:600;">{{ selectedItem.qualifiedSubsidyPercentage }}%</span>
+            } @else { — }
+          </span></div>
+          <div class="detail-item col-span-2"><span class="detail-label">Address</span><span class="detail-value">{{ selectedItem.propertyAddress }}</span></div>
+        </div>
+
+        <div class="completeness-bar" data-testid="completeness-indicators">
+          <div class="completeness-item" [class.complete]="docsComplete" [class.incomplete]="!docsComplete">
+            <span class="completeness-icon">{{ docsComplete ? '✓' : '!' }}</span>
+            <span>Documents {{ docsComplete ? 'Complete' : 'Incomplete' }}</span>
+          </div>
+          <div class="completeness-item" [class.complete]="sigsComplete" [class.incomplete]="!sigsComplete">
+            <span class="completeness-icon">{{ sigsComplete ? '✓' : '!' }}</span>
+            <span>Signatures {{ sigsComplete ? 'Captured' : 'Missing' }}</span>
+          </div>
+          @if (docsComplete && sigsComplete) {
+            <span class="completeness-label completeness-ok">All requirements met</span>
+          }
+        </div>
+        @if (!docsComplete && missingDocNames.length > 0) {
+          <div class="missing-docs-detail" data-testid="missing-docs-list">
+            <span class="missing-docs-label">Missing documents:</span>
+            @for (name of missingDocNames; track name) {
+              <span class="missing-doc-chip">{{ name }}</span>
+            }
+          </div>
+        }
+        @if (!sigsComplete) {
+          <div class="missing-docs-detail sig-warning">
+            <span class="missing-docs-label">No signatures captured yet for this application.</span>
+          </div>
+        }
+
+        <div class="doc-upload-toggle" data-testid="doc-upload-toggle">
+          <button class="btn btn-sm" [class.btn-primary]="!docsComplete" [class.btn-outline]="docsComplete" (click)="showDocUploadSection = !showDocUploadSection" data-testid="button-toggle-doc-upload">
+            {{ showDocUploadSection ? 'Hide' : (docsComplete ? 'View' : 'Upload') }} Documents
+          </button>
+        </div>
+        @if (showDocUploadSection && selectedItem) {
+          <div class="doc-upload-area" data-testid="doc-upload-area">
+            <app-document-manager [applicationId]="selectedItem.applicationId" />
+            <div class="doc-refresh-hint">
+              <button class="btn btn-sm btn-outline" (click)="refreshDocsAfterUpload()" data-testid="button-refresh-docs">Refresh Document Status</button>
+            </div>
+          </div>
+        }
+
+        @if (selectedItem && isDocVerificationEnabled(selectedItem)) {
+          <div class="doc-verification-section" data-testid="doc-verification-section">
+            <div class="section-header" (click)="toggleDocVerificationPanel()" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 0">
+              <span class="material-icons" style="font-size:20px;color:var(--platinum-primary)">{{ showDocVerificationPanel ? 'expand_less' : 'expand_more' }}</span>
+              <span class="material-icons" style="font-size:18px;color:var(--platinum-accent)">verified_user</span>
+              <span style="font-weight:600;font-size:14px">Document Verification</span>
+              @if (showDocVerificationPanel) {
+                <span class="badge badge-blue" style="margin-left:auto">{{ docVerificationSummary }}</span>
+              }
+            </div>
+            @if (showDocVerificationPanel) {
+              <div class="doc-review-list" style="margin-bottom:16px">
+                @for (doc of selectedDocs(); track doc.documentId || doc.documentTypeId) {
+                  <div class="doc-review-card" [class.doc-verified]="docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'verified'" [class.doc-rejected]="docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'rejected'" [attr.data-testid]="'doc-review-' + (doc.documentId || doc.documentTypeId)">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                      <span class="material-icons" style="font-size:18px;color:#6b7280">insert_drive_file</span>
+                      <span style="font-weight:500;font-size:13px;flex:1">{{ doc.documentTypeName || doc.fileName }}</span>
+                      <span class="badge" [class.badge-green]="docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'verified'" [class.badge-red]="docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'rejected'" [class.badge-blue]="docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'pending'">
+                        {{ docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] || 'pending' }}
+                      </span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <button class="btn btn-sm btn-outline" style="border-color:#22c55e;color:#22c55e" (click)="setDocVerificationStatus('' + (doc.documentId || doc.documentTypeId), 'verified')" [attr.data-testid]="'btn-verify-' + (doc.documentId || doc.documentTypeId)">
+                        <span class="material-icons" style="font-size:14px">check</span> Verify
+                      </button>
+                      <button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#ef4444" (click)="setDocVerificationStatus('' + (doc.documentId || doc.documentTypeId), 'rejected')" [attr.data-testid]="'btn-reject-' + (doc.documentId || doc.documentTypeId)">
+                        <span class="material-icons" style="font-size:14px">close</span> Reject
+                      </button>
+                    </div>
+                    @if (docVerificationStatuses()['' + (doc.documentId || doc.documentTypeId)] === 'rejected') {
+                      <div style="margin-top:8px">
+                        <input class="field-input" placeholder="Rejection reason (required)" [value]="docRejectionReasons()['' + (doc.documentId || doc.documentTypeId)] || ''" (input)="setDocRejectionReason('' + (doc.documentId || doc.documentTypeId), $any($event.target).value)" [attr.data-testid]="'input-reject-reason-' + (doc.documentId || doc.documentTypeId)" />
+                      </div>
+                    }
+                  </div>
+                }
+                @if (selectedDocs().length === 0) {
+                  <div style="text-align:center;padding:16px;color:#9ca3af;font-size:13px">No documents uploaded for this application</div>
+                }
+              </div>
+              <div class="referral-note-row" style="margin-bottom:12px">
+                <div class="field-group" style="margin-bottom:8px">
+                  <span class="field-label">Referral Note (optional)</span>
+                  <input class="field-input" [(ngModel)]="referralNote" placeholder="Add instructions or context for the referral..." data-testid="input-referral-note" />
+                </div>
+                @if (selectedItem) {
+                  <div style="font-weight:600;font-size:12px;color:#6b7280;margin-bottom:8px">Refer this application to:</div>
+                  <div class="referral-buttons" style="display:flex;gap:8px;flex-wrap:wrap">
+                    @for (target of getAvailableReferralTargets(selectedItem); track target) {
+                      <button class="btn btn-sm referral-btn"
+                        [style.border-color]="getReferralColor(target)"
+                        [style.color]="getReferralColor(target)"
+                        (click)="referTo(target)"
+                        [disabled]="submitting() || (target !== 'supervisor' && target !== 'steering_committee' && !hasRejectedDocs)"
+                        [attr.data-testid]="'button-refer-' + target">
+                        <span class="material-icons" style="font-size:16px">{{ getReferralIcon(target) }}</span>
+                        {{ getReferralLabel(target) }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <div class="form-section">
+          <div class="form-grid">
+            <div class="field-group">
+              <span class="field-label">Home Visit Date *</span>
+              <app-date-input [value]="verForm.homeVisitDate" (valueChange)="verForm.homeVisitDate = $event" testId="input-visit-date" inputClass="field-input" />
+            </div>
+            <div class="field-group">
+              <span class="field-label">Site Verification Officer *</span>
+              <input class="field-input" [(ngModel)]="verForm.verificationOfficer" placeholder="Officer name" data-testid="input-officer" [class.field-error]="formSubmitAttempted && !verForm.verificationOfficer?.trim()" />
+            </div>
+            <div class="field-group">
+              <span class="field-label">Contractor</span>
+              <select class="field-select" [(ngModel)]="verForm.contractorId" (ngModelChange)="onContractorChange()" data-testid="select-contractor">
+                <option [value]="0">Select contractor</option>
+                @for (c of contractors(); track c.contractorId) {
+                  <option [value]="c.contractorId">{{ c.contractorName }}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <span class="field-label">Field Worker</span>
+              <select class="field-select" [(ngModel)]="verForm.fieldWorkerId" (ngModelChange)="onFieldWorkerChange()" data-testid="select-field-worker">
+                <option [value]="0">Select field worker</option>
+                @for (fw of fieldWorkers(); track fw.fieldWorkerId) {
+                  <option [value]="fw.fieldWorkerId">{{ fw.fieldWorkerName }}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <span class="field-label">Home Visit Outcome *</span>
+              <select class="field-select" [(ngModel)]="verForm.homeVisitOutcomeId" data-testid="select-hv-outcome" [class.field-error]="formSubmitAttempted && !verForm.homeVisitOutcomeId">
+                <option [value]="0">Select outcome</option>
+                @for (o of homeVisitOutcomes; track o.outcomeId) {
+                  <option [value]="o.outcomeId">{{ o.outcomeName }}</option>
+                }
+              </select>
+            </div>
+            <div class="field-group">
+              <span class="field-label">Site Verification Outcome *</span>
+              <select
+                class="field-select"
+                [(ngModel)]="verForm.verificationOutcomeId"
+                [disabled]="!isHomeVisitSuccessful"
+                data-testid="select-ver-outcome"
+                [class.field-error]="formSubmitAttempted && isHomeVisitSuccessful && !verForm.verificationOutcomeId">
+                <option [value]="0">{{ isHomeVisitSuccessful ? 'Select outcome' : 'Select successful home visit first' }}</option>
+                @for (o of verificationOutcomes; track o.outcomeId) {
+                  <option [value]="o.outcomeId">{{ o.outcomeName }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-grid mt-1">
+            <div class="field-group">
+              <span class="field-label">Do-Not-Cut Extension Date</span>
+              <app-date-input [value]="verForm.doNotCutExtDate" (valueChange)="verForm.doNotCutExtDate = $event" testId="input-dnc-ext-date" inputClass="field-input" />
+            </div>
+            <div class="field-group">
+              <span class="field-label">Extension Reason {{ extensionReasonRequired ? '*' : '' }}</span>
+              <input class="field-input" [(ngModel)]="verForm.doNotCutExtReason" placeholder="Reason for extension" data-testid="input-dnc-ext-reason" [class.field-error]="extensionReasonRequired && !verForm.doNotCutExtReason.trim()" />
+              @if (extensionReasonRequired && !verForm.doNotCutExtReason.trim()) {
+                <span class="field-hint error">Required when extension date is set</span>
+              }
+            </div>
+          </div>
+          <div class="field-group mt-1">
+            <span class="field-label">Remarks</span>
+            <textarea class="field-textarea" [(ngModel)]="verForm.remarks" rows="3" placeholder="Additional notes..." data-testid="input-remarks"></textarea>
+          </div>
+        </div>
+      </div>
+      @if (formSubmitAttempted && formFieldErrors.length > 0) {
+        <div class="validation-errors" data-testid="validation-errors">
+          @for (err of formFieldErrors; track err) {
+            <div class="validation-error-item">{{ err }}</div>
+          }
+        </div>
+      }
+
+      @if (showOverrideConfirm) {
+        <div class="override-confirm" data-testid="override-confirm">
+          <div class="override-header">Proceed with incomplete requirements?</div>
+          <div class="override-warnings">
+            @for (w of completenessWarnings; track w) {
+              <div class="override-warning-item">{{ w }}</div>
+            }
+          </div>
+          <div class="override-note">You can still save this verification, but the above items should be completed for a fully compliant record.</div>
+          <div class="override-actions">
+            <button class="btn btn-outline btn-sm" (click)="cancelOverride()" data-testid="button-cancel-override">Go Back</button>
+            <button class="btn btn-accent btn-sm" (click)="confirmOverrideAndSubmit()" [disabled]="submitting()" data-testid="button-confirm-override">
+              @if (submitting()) { <span class="spinner"></span> }
+              Save Anyway
+            </button>
+          </div>
+        </div>
+      }
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeModal()" data-testid="button-cancel-ver">Cancel</button>
+        <button class="btn btn-primary" (click)="submitVerification()" [disabled]="submitting() || (formSubmitAttempted && formFieldErrors.length > 0)" data-testid="button-submit-ver">
+          @if (submitting()) { <span class="spinner"></span> }
+          Save Site Verification
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (doNotCutModalOpen && doNotCutItem) {
+  <div class="modal-overlay" (click)="closeDoNotCutModal()">
+    <div class="modal-content" style="max-width:28rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Update Do-Not-Cut Date</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDoNotCutModal()" data-testid="button-close-dnc-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="detail-text">Application #{{ doNotCutItem.applicationId }} — {{ doNotCutItem.accountHolderName }}</p>
+        <div class="field-group mt-1">
+          <span class="field-label">New Do-Not-Cut Date</span>
+          <app-date-input [value]="doNotCutDate" (valueChange)="doNotCutDate = $event" testId="input-dnc-date" inputClass="field-input" />
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Reason</span>
+          <input class="field-input" [(ngModel)]="doNotCutReason" placeholder="Reason for extension" data-testid="input-dnc-reason" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDoNotCutModal()" data-testid="button-cancel-dnc">Cancel</button>
+        <button class="btn btn-primary" (click)="submitDoNotCut()" [disabled]="doNotCutSubmitting()" data-testid="button-submit-dnc">
+          @if (doNotCutSubmitting()) { <span class="spinner"></span> }
+          Update
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (detailPanelOpen && detailApplicationId) {
+  <app-application-detail
+    [applicationId]="detailApplicationId"
+    mode="panel"
+    (closePanel)="closeDetailPanel()"
+  />
+}

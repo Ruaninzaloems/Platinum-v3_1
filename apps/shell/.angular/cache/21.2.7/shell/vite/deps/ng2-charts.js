@@ -5,7 +5,7 @@ import {
   Chart,
   defaults,
   registerables
-} from "./chunk-6TRKQFDE.js";
+} from "./chunk-W57TSTGJ.js";
 import {
   Directive,
   ElementRef,
@@ -18,20 +18,20 @@ import {
   ɵɵNgOnChangesFeature,
   ɵɵdefineDirective,
   ɵɵdirectiveInject
-} from "./chunk-TIDIRMTG.js";
+} from "./chunk-WUO4HCAV.js";
 import {
   EventEmitter,
   InjectionToken,
   NgZone,
   ɵɵdefineInjectable
-} from "./chunk-IXXODMXA.js";
-import "./chunk-OUWWR32C.js";
+} from "./chunk-OFYGUQ7M.js";
 import "./chunk-HQ5HQZO3.js";
+import "./chunk-OUWWR32C.js";
 import {
   BehaviorSubject,
   distinctUntilChanged
 } from "./chunk-AICK2LYG.js";
-import "./chunk-KWSTWQNB.js";
+import "./chunk-7WUTQBRG.js";
 
 // ../../node_modules/ng2-charts/fesm2022/ng2-charts.mjs
 var NG_CHARTS_CONFIGURATION = new InjectionToken("Configuration for ngCharts");

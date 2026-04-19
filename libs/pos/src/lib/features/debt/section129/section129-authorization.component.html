@@ -8,6 +8,12 @@
       </div>
     </div>
     <div class="header-actions">
+      <div class="fin-year-row">
+        <label class="fin-year-label">Financial Year</label>
+        <select class="select select-sm" [(ngModel)]="finYear" (ngModelChange)="onYearChange()" data-testid="select-fin-year">
+          @for (y of finYears; track y) { <option [value]="y">{{ y }}</option> }
+        </select>
+      </div>
       <button class="btn btn-outline btn-sm" (click)="loadRuns()" [disabled]="loading()" data-testid="button-refresh">
         @if (loading()) { <span class="spinner"></span> }
         Refresh
@@ -43,6 +49,7 @@
               <th>Billing Cycle</th>
               <th class="text-right">Accounts</th>
               <th class="text-right">Amount</th>
+              <th class="text-center">Details</th>
             </tr>
           </thead>
           <tbody>
@@ -69,8 +76,142 @@
                 <td class="text-muted">{{ formatDate(row.run.dateCreated) }}</td>
                 <td class="text-muted">{{ row.run.billingCycle || '—' }}</td>
                 <td class="text-right font-medium">{{ row.run.totalAccounts?.toLocaleString() || '—' }}</td>
-                <td class="text-right font-medium">{{ formatAmount(row.run.totalAmount) }}</td>
+                <td class="text-right font-medium col-amount">{{ formatAmount(row.run.totalAmount) }}</td>
+                <td class="text-center">
+                  <div class="detail-btns">
+                    <button class="btn-icon" title="View run filters" (click)="toggleDetails(row.run.runId)" [class.active]="expandedRunId() === row.run.runId" [attr.data-testid]="'button-details-' + row.run.runId">
+                      &#9432;
+                    </button>
+                    <button class="btn-icon" title="View account list" (click)="viewAccounts(row.run.runId)" [class.active]="accountsRunId() === row.run.runId" [attr.data-testid]="'button-accounts-' + row.run.runId">
+                      &#128196;
+                    </button>
+                  </div>
+                </td>
               </tr>
+
+              @if (expandedRunId() === row.run.runId) {
+                <tr class="detail-row">
+                  <td colspan="11">
+                    <div class="detail-panel">
+                      <div class="detail-panel-header">
+                        <span class="detail-panel-title">Run #{{ row.run.runId }} — Applied Filters &amp; Parameters</span>
+                      </div>
+                      <div class="filter-chips">
+                        @for (f of getFilterSummary(row.run); track $index) {
+                          <span class="filter-chip" [attr.data-testid]="'filter-chip-' + $index">{{ f }}</span>
+                        }
+                      </div>
+                      <div class="detail-grid">
+                        <div class="detail-item">
+                          <span class="detail-label">Run Type</span>
+                          <span class="detail-value">{{ row.run.runType || 'Standard' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Billing Cycle</span>
+                          <span class="detail-value">{{ row.run.billingCycle || '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Distribution</span>
+                          <span class="detail-value">{{ row.run.distributionType || '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Minimum Amount</span>
+                          <span class="detail-value">{{ row.run.amountGreaterThan != null ? formatAmount(row.run.amountGreaterThan) : 'No minimum' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Lapse Days</span>
+                          <span class="detail-value">{{ row.run.lapseDays || '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Admin Fee</span>
+                          <span class="detail-value">{{ row.run.adminFee != null ? formatAmount(row.run.adminFee) : '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Include Indigent</span>
+                          <span class="detail-value" [class.text-success]="row.run.includeIndigent" [class.text-danger]="!row.run.includeIndigent">{{ row.run.includeIndigent ? 'Yes' : 'No' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Include Pensioners</span>
+                          <span class="detail-value">{{ row.run.includePensioners ? 'Yes' : 'No' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Exclude Deposit Balances</span>
+                          <span class="detail-value">{{ row.run.excludeDepositBalances ? 'Yes' : 'No' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Total Accounts</span>
+                          <span class="detail-value font-medium">{{ row.run.totalAccounts?.toLocaleString() || '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Total Amount</span>
+                          <span class="detail-value font-medium">{{ formatAmount(row.run.totalAmount) }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Created By</span>
+                          <span class="detail-value">{{ row.run.actionedBy || '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              }
+
+              @if (accountsRunId() === row.run.runId) {
+                <tr class="detail-row">
+                  <td colspan="11">
+                    <div class="accounts-panel">
+                      <div class="detail-panel-header">
+                        <span class="detail-panel-title">Run #{{ row.run.runId }} — Account List ({{ runAccounts().length }} accounts)</span>
+                      </div>
+                      @if (accountsLoading()) {
+                        <div class="accounts-loading">
+                          <span class="spinner"></span>
+                          <span>Loading accounts from Platinum...</span>
+                        </div>
+                      } @else if (runAccounts().length === 0) {
+                        <div class="accounts-empty">No accounts found for this run.</div>
+                      } @else {
+                        <div class="accounts-table-wrap">
+                          <table class="accounts-table">
+                            <thead>
+                              <tr>
+                                <th>Account No</th>
+                                <th>Address</th>
+                                <th>Indigent</th>
+                                <th>Rebate</th>
+                                <th class="text-right">Outstanding Days</th>
+                                <th class="text-right">Qualifying Amount</th>
+                                <th class="text-right">Total Balance</th>
+                                <th class="text-right">Notice Fees</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (acc of runAccounts(); track acc.detailId || $index) {
+                                <tr [attr.data-testid]="'row-account-' + (acc.accountNo || $index)">
+                                  <td class="font-mono">{{ acc.accountNo || acc.accountId || '—' }}</td>
+                                  <td class="text-muted td-address">{{ acc.address || '—' }}</td>
+                                  <td>
+                                    @if (acc.indigentStatus && acc.indigentStatus !== 'None' && acc.indigentStatus !== '') {
+                                      <span class="badge badge-blue">{{ acc.indigentStatus }}</span>
+                                    } @else {
+                                      <span class="text-muted">No</span>
+                                    }
+                                  </td>
+                                  <td class="text-muted">{{ acc.rebateStatus || '—' }}</td>
+                                  <td class="text-right">{{ acc.outstandingDays || 0 }}</td>
+                                  <td class="text-right font-medium">{{ formatAmount(acc.qualifyingAmount) }}</td>
+                                  <td class="text-right font-medium">{{ formatAmount(acc.totalBalance || acc.balanceDue) }}</td>
+                                  <td class="text-right">{{ formatAmount(acc.noticeFees) }}</td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>

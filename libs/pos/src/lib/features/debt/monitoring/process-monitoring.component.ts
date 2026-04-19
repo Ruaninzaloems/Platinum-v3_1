@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { PROCESS_STATUS_LABELS } from '../../../core/services/debt-config';
-import { formatDateShort, formatCurrency } from '../../../core/services/format.service';
-import type { ProcessMonitoringOverview } from '../../../core/models/debt.models';
+import { PROCESS_STATUS_LABELS } from '../../../services/debt-config';
+import { formatDateShort, formatCurrency } from '../../../services/format.service';
+import type { ProcessMonitoringOverview } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-process-monitoring',

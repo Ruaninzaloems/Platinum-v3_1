@@ -5,9 +5,9 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { getFinancialYear } from '../../../core/services/format.service';
-import { SECTION129_DEFAULTS } from '../../../core/services/debt-config';
-import type { Section129ConfigEntry, Attorney, CostItem, AttorneyRotationItem, ConfigViewMode } from '../../../core/models/debt.models';
+import { getFinancialYear } from '../../../services/format.service';
+import { SECTION129_DEFAULTS } from '../../../services/debt-config';
+import type { Section129ConfigEntry, Attorney, CostItem, AttorneyRotationItem, ConfigViewMode } from '../../../models/debt.models';
 
 @Component({
   selector: 'app-section129-config',
@@ -19,6 +19,7 @@ import type { Section129ConfigEntry, Attorney, CostItem, AttorneyRotationItem, C
 export class Section129ConfigComponent implements OnInit {
   viewMode: ConfigViewMode = 'landing';
   isNewEntry = false;
+  isEditing = false;
   currentFY = getFinancialYear();
 
   finYear = this.currentFY;
@@ -138,6 +139,7 @@ export class Section129ConfigComponent implements OnInit {
 
   openEntryDetail(entry: Section129ConfigEntry): void {
     this.isNewEntry = false;
+    this.isEditing = false;
     this.selectedEntry = entry;
     this.enabled = entry.enabled;
     this.selectedFinYear = entry.finYear;
@@ -234,7 +236,7 @@ export class Section129ConfigComponent implements OnInit {
     if (!this.smsTemplate) return 'Please supply a value for SMS Notification Template.';
     if (this.lapseDays < 14 || this.lapseDays > 99) return 'The Section 129 – Letter of Demand lapse days must be > 0 and < 100.';
     if (this.noticesPerFile < 1) return 'The No-of-notices-per-file cannot be less than 1.';
-    if (this.enabled && this.isNewEntry) {
+    if (this.enabled && (this.isNewEntry || this.isEditing)) {
       const existingEnabled = this.configEntries.find(
         (entry) => entry.finYear === this.selectedFinYear && entry.enabled && entry.id !== this.selectedEntry?.id
       );
@@ -276,6 +278,7 @@ export class Section129ConfigComponent implements OnInit {
         attorneyRotation: this.attorneyRotation,
       }));
       this.toast.show('Section 129 configuration saved successfully.', 'success');
+      this.isEditing = false;
       this.viewMode = 'landing';
       this.handleSearch();
     } catch (e: any) {
@@ -297,7 +300,16 @@ export class Section129ConfigComponent implements OnInit {
     }
   }
 
+  startEdit(): void {
+    this.isEditing = true;
+  }
+
   handleCancel(): void {
-    this.viewMode = 'landing';
+    if (this.isEditing && !this.isNewEntry) {
+      this.isEditing = false;
+      if (this.selectedEntry) this.openEntryDetail(this.selectedEntry);
+    } else {
+      this.viewMode = 'landing';
+    }
   }
 }

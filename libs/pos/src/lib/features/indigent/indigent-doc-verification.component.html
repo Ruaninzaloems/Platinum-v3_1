@@ -1,0 +1,326 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Document Verification</h1>
+      <p class="page-subtitle">Review and verify uploaded documents for indigent applications</p>
+    </div>
+  </div>
+
+  <div class="workflow-banner" data-testid="workflow-banner">
+    <span class="material-icons">route</span>
+    <span class="workflow-banner-text">
+      Applications in this queue have documents awaiting review. Verify each document, then approve, reject, or refer the application to another team member.
+    </span>
+  </div>
+
+  <div class="stat-cards" data-testid="stat-cards">
+    <div class="stat-card">
+      <div class="stat-icon blue"><span class="material-icons">pending_actions</span></div>
+      <div class="stat-content">
+        <div class="stat-value" data-testid="stat-pending">{{ stats().pending }}</div>
+        <div class="stat-label">Pending Review</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><span class="material-icons">check_circle</span></div>
+      <div class="stat-content">
+        <div class="stat-value" data-testid="stat-verified">{{ stats().verified }}</div>
+        <div class="stat-label">Verified Today</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber"><span class="material-icons">swap_horiz</span></div>
+      <div class="stat-content">
+        <div class="stat-value" data-testid="stat-referred">{{ stats().referred }}</div>
+        <div class="stat-label">Referred</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon red"><span class="material-icons">error_outline</span></div>
+      <div class="stat-content">
+        <div class="stat-value" data-testid="stat-rejected">{{ stats().rejected }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field-group">
+      <span class="field-label">Indigent Type</span>
+      <select class="field-select" [(ngModel)]="filterType" (ngModelChange)="onFilterChange()" data-testid="select-type-filter">
+        <option value="">All Types</option>
+        @for (t of indigentTypes(); track t.indigentTypeId) {
+          <option [value]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+        }
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Status</span>
+      <select class="field-select" [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()" data-testid="select-status-filter">
+        <option value="">All</option>
+        <option value="pending">Pending Review</option>
+        <option value="referred">Referred</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <span class="field-label">Page Size</span>
+      <select class="field-select page-size-select" [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChange()" data-testid="select-page-size">
+        @for (size of pageSizeOptions; track size) {
+          <option [value]="size">{{ size }}</option>
+        }
+      </select>
+    </div>
+    <div class="toolbar-info">
+      <span class="count-badge" data-testid="text-queue-count">{{ totalCount() }} in queue</span>
+      <button class="btn btn-outline btn-sm" (click)="loadData()" [disabled]="loading()" data-testid="button-refresh" style="margin-left:8px">
+        <span class="material-icons" style="font-size:16px">refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading document verification queue...</p>
+        </div>
+      } @else if (queue().length === 0) {
+        <div class="empty-state">
+          <span class="material-icons" style="font-size:48px;color:#94a3b8;margin-bottom:12px">verified_user</span>
+          <p style="font-size:15px;font-weight:500;margin-bottom:4px">No applications pending document verification</p>
+          <p style="font-size:13px;color:#94a3b8">Applications will appear here when documents are uploaded and ready for review.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>App ID</th>
+                <th>Account</th>
+                <th>Account Holder</th>
+                <th>Indigent Type</th>
+                <th>Application Date</th>
+                <th>Documents</th>
+                <th>Progress</th>
+                <th>Status</th>
+                <th>Referral</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of queue(); track item.applicationId) {
+                <tr [attr.data-testid]="'row-doc-' + item.applicationId" [class.referred-row]="!!item.referralTarget">
+                  <td class="font-mono">{{ item.applicationId }}</td>
+                  <td class="font-mono">{{ item.accountNumber }}</td>
+                  <td>{{ item.accountHolderName }}</td>
+                  <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                  <td>{{ fmtDate(item.applicationDate) }}</td>
+                  <td>
+                    <span class="font-mono" style="font-size:12px">
+                      {{ item.totalDocuments }} uploaded
+                    </span>
+                  </td>
+                  <td>
+                    <div class="doc-progress">
+                      <div class="doc-bar">
+                        <div class="doc-bar-fill" [class.doc-bar-green]="getDocPercent(item) === 100" [class.doc-bar-amber]="getDocPercent(item) > 0 && getDocPercent(item) < 100" [class.doc-bar-red]="getDocPercent(item) === 0 && item.totalDocuments > 0" [style.width.%]="getDocPercent(item)"></div>
+                      </div>
+                      <span style="font-size:11px;color:#64748b;white-space:nowrap">{{ item.verifiedDocuments }}/{{ item.totalDocuments }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    @if (item.rejectedDocuments > 0) {
+                      <span class="badge badge-red">{{ item.rejectedDocuments }} rejected</span>
+                    } @else if (item.verifiedDocuments === item.totalDocuments && item.totalDocuments > 0) {
+                      <span class="badge badge-green">All verified</span>
+                    } @else if (item.pendingDocuments > 0) {
+                      <span class="badge badge-blue">{{ item.pendingDocuments }} pending</span>
+                    } @else {
+                      <span class="badge badge-muted">No docs</span>
+                    }
+                  </td>
+                  <td>
+                    @if (item.referralTarget) {
+                      <span class="badge badge-purple" [title]="item.referralNote || ''">
+                        <span class="material-icons" style="font-size:12px;margin-right:2px">{{ getReferralIcon(item.referralTarget) }}</span>
+                        {{ getReferralLabel(item.referralTarget) }}
+                      </span>
+                    } @else {
+                      <span class="text-muted" style="font-size:12px">—</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      <button class="btn btn-primary btn-sm" (click)="openReviewModal(item)" [attr.data-testid]="'button-review-' + item.applicationId">
+                        <span class="material-icons" style="font-size:14px">rate_review</span> Review
+                      </button>
+                      <button class="btn btn-ghost btn-sm" (click)="viewApplication(item.applicationId)" title="View Full Application" [attr.data-testid]="'button-view-' + item.applicationId">
+                        <span class="material-icons" style="font-size:14px">visibility</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (totalPages > 1) {
+          <div class="pagination">
+            <span class="pagination-info" data-testid="text-pagination-info">Page {{ page }} of {{ totalPages }} ({{ totalCount() }} items)</span>
+            <div class="pagination-buttons">
+              <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="page <= 1" data-testid="button-prev-page">‹ Prev</button>
+              @for (p of [].constructor(totalPages); track $index) {
+                @if ($index + 1 >= page - 2 && $index + 1 <= page + 2) {
+                  <button class="btn btn-sm" [class.btn-primary]="$index + 1 === page" [class.btn-outline]="$index + 1 !== page" (click)="goToPage($index + 1)" [attr.data-testid]="'button-page-' + ($index + 1)">{{ $index + 1 }}</button>
+                }
+              }
+              <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="page >= totalPages" data-testid="button-next-page">Next ›</button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>
+
+@if (reviewModalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeReviewModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span class="material-icons" style="font-size:20px;color:var(--platinum-accent);vertical-align:middle;margin-right:6px">verified_user</span>
+          Document Review — App #{{ selectedItem.applicationId }}
+        </h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeReviewModal()" data-testid="button-close-review-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ selectedItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account Holder</span><span class="detail-value">{{ selectedItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Indigent Type</span><span class="detail-value">{{ selectedItem.indigentTypeName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Income</span><span class="detail-value">{{ fmtCurrency(selectedItem.householdIncome) }}</span></div>
+          <div class="detail-item"><span class="detail-label">Site Verification</span>
+            <span class="detail-value">
+              @if (selectedItem.siteVerificationComplete) {
+                <span class="badge badge-green">Complete</span>
+              } @else {
+                <span class="badge badge-muted">Not required / Pending</span>
+              }
+            </span>
+          </div>
+          <div class="detail-item"><span class="detail-label">Application Date</span><span class="detail-value">{{ fmtDate(selectedItem.applicationDate) }}</span></div>
+        </div>
+
+        @if (selectedItem.referralTarget) {
+          <div class="referral-info" data-testid="referral-info">
+            <span class="material-icons">swap_horiz</span>
+            <div>
+              <div class="referral-info-text" style="font-weight:600">Referred from {{ getReferralLabel(selectedItem.referralTarget) }}</div>
+              @if (selectedItem.referralNote) {
+                <div class="referral-info-text" style="margin-top:4px">{{ selectedItem.referralNote }}</div>
+              }
+              @if (selectedItem.referredBy) {
+                <div class="referral-info-text" style="margin-top:4px;font-size:11px">By: {{ selectedItem.referredBy }} on {{ fmtDate(selectedItem.referralDate) }}</div>
+              }
+            </div>
+          </div>
+        }
+
+        <div style="font-weight:600;font-size:14px;color:var(--platinum-primary);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+          <span class="material-icons" style="font-size:18px">description</span>
+          Documents to Review ({{ reviewDocs().length }})
+          <span class="badge" style="margin-left:auto" [class.badge-green]="allDocsVerified" [class.badge-blue]="!allDocsVerified">{{ docVerificationSummary }}</span>
+        </div>
+
+        <div class="doc-review-list">
+          @for (doc of reviewDocs(); track doc.documentId || doc.documentTypeId) {
+            <div class="doc-review-card" [class.doc-verified]="getDocStatus(doc) === 'verified'" [class.doc-rejected]="getDocStatus(doc) === 'rejected'" [attr.data-testid]="'doc-review-' + (doc.documentId || doc.documentTypeId)">
+              <div class="doc-header">
+                <span class="material-icons" style="font-size:20px;color:#6b7280">insert_drive_file</span>
+                <span class="doc-name">{{ doc.documentTypeName || doc.fileName }}</span>
+                <span class="doc-meta">{{ doc.fileName }} · {{ formatFileSize(doc.fileSize) }}</span>
+                <span class="badge" [class.badge-green]="getDocStatus(doc) === 'verified'" [class.badge-red]="getDocStatus(doc) === 'rejected'" [class.badge-blue]="getDocStatus(doc) === 'pending'">
+                  {{ getDocStatus(doc) }}
+                </span>
+              </div>
+              <div class="doc-actions">
+                <button class="btn btn-sm btn-outline" style="border-color:#22c55e;color:#22c55e" (click)="setDocStatus(doc, 'verified')" [attr.data-testid]="'btn-verify-doc-' + (doc.documentId || doc.documentTypeId)">
+                  <span class="material-icons" style="font-size:14px">check_circle</span> Verify
+                </button>
+                <button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#ef4444" (click)="setDocStatus(doc, 'rejected')" [attr.data-testid]="'btn-reject-doc-' + (doc.documentId || doc.documentTypeId)">
+                  <span class="material-icons" style="font-size:14px">cancel</span> Reject
+                </button>
+                @if (doc.documentId) {
+                  <button class="btn btn-sm btn-ghost" (click)="downloadDoc(doc)" title="Download document" [attr.data-testid]="'btn-download-doc-' + doc.documentId">
+                    <span class="material-icons" style="font-size:14px">download</span>
+                  </button>
+                }
+              </div>
+              @if (getDocStatus(doc) === 'rejected') {
+                <div style="margin-top:8px">
+                  <input class="field-input" placeholder="Rejection reason (required)" [value]="getDocRejectionReason(doc)" (input)="setDocRejectionReason(doc, $any($event.target).value)" style="height:36px" [attr.data-testid]="'input-reject-reason-' + (doc.documentId || doc.documentTypeId)" />
+                </div>
+              }
+            </div>
+          }
+          @if (reviewDocs().length === 0) {
+            <div style="text-align:center;padding:24px;color:#9ca3af;font-size:13px">
+              <span class="material-icons" style="font-size:36px;display:block;margin-bottom:8px">folder_off</span>
+              No documents uploaded for this application.
+            </div>
+          }
+        </div>
+
+        <div class="referral-section" data-testid="referral-section">
+          <div class="referral-section-title">
+            <span class="material-icons" style="font-size:18px">share</span>
+            Refer Application (optional)
+          </div>
+          <div class="field-group" style="margin-bottom:12px">
+            <span class="field-label">Referral Note</span>
+            <input class="field-input" [(ngModel)]="referralNote" placeholder="Add instructions or context for the referral target..." data-testid="input-referral-note" />
+          </div>
+          <div class="referral-buttons">
+            @for (target of availableReferralTargets; track target) {
+              <button class="referral-btn"
+                [style.border-color]="getReferralColor(target)"
+                [style.color]="getReferralColor(target)"
+                (click)="submitReferred(target)"
+                [disabled]="submitting()"
+                [attr.data-testid]="'button-refer-' + target">
+                <span class="material-icons" style="font-size:16px">{{ getReferralIcon(target) }}</span>
+                Refer to {{ getReferralLabel(target) }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="outcome-section" data-testid="outcome-section">
+          <div style="font-weight:600;font-size:14px;color:var(--platinum-primary);margin-bottom:12px">Verification Outcome</div>
+          <div class="outcome-buttons">
+            <button class="outcome-btn outcome-btn-approve" (click)="submitApproved()" [disabled]="submitting() || !allDocsVerified || reviewDocs().length === 0" data-testid="button-approve-docs" [title]="!allDocsVerified ? 'All documents must be verified before approving' : ''">
+              @if (submitting()) { <span class="spinner"></span> }
+              <span class="material-icons" style="font-size:18px">check_circle</span>
+              Approve — Forward to Authorization
+            </button>
+            <button class="outcome-btn outcome-btn-reject" (click)="submitRejected()" [disabled]="submitting() || !hasRejectedDocs" data-testid="button-reject-docs" [title]="!hasRejectedDocs ? 'Mark at least one document as rejected' : ''">
+              @if (submitting()) { <span class="spinner"></span> }
+              <span class="material-icons" style="font-size:18px">cancel</span>
+              Reject — Return to Capturer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (detailPanelOpen && detailApplicationId) {
+  <app-application-detail
+    [applicationId]="detailApplicationId"
+    mode="panel"
+    (closePanel)="closeDetailPanel()"
+  />
+}

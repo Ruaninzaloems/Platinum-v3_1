@@ -16,7 +16,8 @@
         @for (opt of [
           { value: 'account', label: 'Single Account', desc: 'Handover one account to an attorney', icon: '👤' },
           { value: 'bulk', label: 'Bulk Handover', desc: 'Handover all qualifying accounts', icon: '👥' },
-          { value: 'rotation', label: 'Rotation', desc: 'Auto-distribute by percentage', icon: '🔄' }
+          { value: 'rotation', label: 'Rotation', desc: 'Auto-distribute by percentage', icon: '🔄' },
+          { value: 'fromSection129', label: 'From Section 129', desc: 'Handover accounts from approved S129 runs', icon: '📄' }
         ]; track opt.value) {
           <button class="option-btn" [class.active]="handoverOption() === opt.value"
             (click)="setOption($any(opt.value))" [attr.data-testid]="'button-option-' + opt.value">
@@ -29,11 +30,23 @@
 
       <div class="divider"></div>
 
+      <div class="form-grid-3 mb-row">
+        <div class="form-group">
+          <label class="form-label">Handover Date</label>
+          <app-date-input [value]="handedOverDate()" (valueChange)="handedOverDate.set($event)" testId="input-handover-date" />
+        </div>
+        <div class="form-group" style="grid-column: span 2">
+          <label class="form-label">Comment</label>
+          <input type="text" class="form-input" [ngModel]="handoverComment()" (ngModelChange)="handoverComment.set($event)" placeholder="Enter handover comment..." data-testid="input-handover-comment" />
+        </div>
+      </div>
+
+      <!-- ═══ SINGLE ACCOUNT ═══ -->
       @if (handoverOption() === 'account') {
         <div class="form-grid-2">
           <div class="form-group">
-            <label class="form-label">Account Number</label>
-            <input type="text" class="form-input" [ngModel]="accountSearch()" (ngModelChange)="accountSearch.set($event)" placeholder="Enter account number..." data-testid="input-account-search" />
+            <label class="form-label">Account Number(s)</label>
+            <input type="text" class="form-input" [ngModel]="accountSearch()" (ngModelChange)="accountSearch.set($event)" placeholder="Enter account number (SGNumber)..." data-testid="input-account-search" />
           </div>
           <div class="form-group">
             <label class="form-label">Attorney</label>
@@ -47,17 +60,12 @@
         </div>
       }
 
-      @if (handoverOption() === 'bulk') {
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="form-label">Attorney</label>
-            <select class="form-select" [ngModel]="selectedAttorneyId()" (ngModelChange)="selectedAttorneyId.set($event)" data-testid="select-attorney-bulk">
-              <option value="">Select attorney...</option>
-              @for (att of activeAttorneys(); track att.attorneyId) {
-                <option [value]="att.attorneyId">{{ att.attorneyName }} — {{ att.firmName }}</option>
-              }
-            </select>
-          </div>
+      <!-- ═══ BULK & ROTATION SHARED FILTERS ═══ -->
+      @if (handoverOption() === 'bulk' || handoverOption() === 'rotation') {
+        <div class="filter-section-title">Account Filters</div>
+
+        <!-- Row 1: Billing Cycle + Town + Suburbs (matches S129 sequence) -->
+        <div class="form-grid-3">
           <div class="form-group">
             <label class="form-label">Billing Cycle</label>
             <select class="form-select" [ngModel]="billingCycle()" (ngModelChange)="billingCycle.set($event)" data-testid="select-billing-cycle">
@@ -65,13 +73,229 @@
               @for (bc of billingCycles(); track bc.id) { <option [value]="bc.id">{{ bc.name }}</option> }
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group multi-select-wrap">
             <label class="form-label">Town</label>
-            <select class="form-select" [ngModel]="town()" (ngModelChange)="town.set($event)" data-testid="select-town">
-              <option value="">All Towns</option>
-              @for (t of towns(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
-            </select>
+            <button type="button" class="multi-select-trigger" [class.open]="townDropdownOpen" (click)="townDropdownOpen = !townDropdownOpen" data-testid="select-town">
+              <span class="multi-trigger-text">{{ townTriggerText }}</span>
+              <span class="multi-trigger-arrow">{{ townDropdownOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (townDropdownOpen) {
+              <div class="multi-dd" (click)="$event.stopPropagation()">
+                <div class="multi-dd-header">
+                  <input class="multi-dd-search" type="text" [(ngModel)]="townSearchText" placeholder="Search..." />
+                </div>
+                <div class="multi-dd-actions">
+                  <button type="button" class="multi-dd-action" (click)="selectAllTowns()">All</button>
+                  <button type="button" class="multi-dd-action" (click)="clearAllTowns()">Clear</button>
+                </div>
+                <div class="multi-dd-list">
+                  @for (t of filteredTowns; track t.id) {
+                    <label class="multi-dd-item" (click)="$event.preventDefault(); toggleTown(t)">
+                      <input type="checkbox" [checked]="isTownSelected(t.id)" tabindex="-1" />
+                      <span>{{ t.name }}</span>
+                    </label>
+                  }
+                  @if (filteredTowns.length === 0) { <div class="multi-dd-empty">No towns match</div> }
+                </div>
+              </div>
+            }
+            @if (selectedTowns.length > 0) {
+              <div class="multi-chips">
+                @for (t of selectedTowns; track t.id) {
+                  <span class="multi-chip">{{ t.name }} <span class="multi-chip-x" (click)="removeTown(t.id)">&times;</span></span>
+                }
+              </div>
+            }
           </div>
+          <div class="form-group suburb-multi">
+            <label class="form-label">Suburbs</label>
+            <button type="button" class="suburb-trigger" [class.open]="suburbDropdownOpen"
+              [disabled]="selectedTowns.length === 0 || suburbsLoading"
+              (click)="toggleSuburbDropdown()" data-testid="select-suburb-multi">
+              <span class="suburb-trigger-text">{{ suburbTriggerText }}</span>
+              <span class="suburb-trigger-arrow">{{ suburbDropdownOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (suburbDropdownOpen) {
+              <div class="suburb-dropdown">
+                <div class="suburb-dd-header">
+                  <div class="suburb-mode-toggle">
+                    <button type="button" class="suburb-mode-btn" [class.active-include]="suburbMode === 'include'" (click)="suburbMode = 'include'">Include</button>
+                    <button type="button" class="suburb-mode-btn" [class.active-exclude]="suburbMode === 'exclude'" (click)="suburbMode = 'exclude'">Exclude</button>
+                  </div>
+                  <input class="suburb-search" type="text" [(ngModel)]="suburbSearchText" placeholder="Search suburbs..." />
+                </div>
+                <div class="suburb-dd-actions">
+                  <button type="button" class="suburb-dd-action" (click)="selectAllSuburbs()">Select All</button>
+                  <button type="button" class="suburb-dd-action" (click)="clearAllSuburbs()">Clear All</button>
+                </div>
+                <div class="suburb-dd-list">
+                  @for (s of filteredSuburbs; track s.id) {
+                    <label class="suburb-dd-item" (click)="$event.preventDefault(); toggleSuburb(s)">
+                      <input type="checkbox" [checked]="isSuburbSelected(s.id)" tabindex="-1" />
+                      <span>{{ s.name }}</span>
+                    </label>
+                  }
+                  @if (filteredSuburbs.length === 0) { <div class="suburb-dd-empty">No suburbs match your search</div> }
+                </div>
+              </div>
+            }
+            @if (selectedSuburbs.length > 0) {
+              <div class="suburb-chips">
+                @for (s of selectedSuburbs; track s.id) {
+                  <span class="suburb-chip" [class.include]="suburbMode === 'include'" [class.exclude]="suburbMode === 'exclude'">
+                    {{ s.name }} <span class="suburb-chip-x" (click)="removeSuburb(s.id)">&times;</span>
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Row 2: Property Category + Property Type of Use + Account Type + Type of Person -->
+        <div class="form-grid-4 mt-row">
+          <div class="form-group multi-select-wrap">
+            <label class="form-label">Property Category</label>
+            <button type="button" class="multi-select-trigger" [class.open]="propCatOpen" (click)="propCatOpen = !propCatOpen" data-testid="select-prop-category">
+              <span class="multi-trigger-text">{{ propCatTriggerText }}</span>
+              <span class="multi-trigger-arrow">{{ propCatOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (propCatOpen) {
+              <div class="multi-dd" (click)="$event.stopPropagation()">
+                <div class="multi-dd-header">
+                  <input class="multi-dd-search" type="text" [(ngModel)]="propCatSearchText" placeholder="Search..." />
+                </div>
+                <div class="multi-dd-actions">
+                  <button type="button" class="multi-dd-action" (click)="selectAllPropCat()">All</button>
+                  <button type="button" class="multi-dd-action" (click)="clearAllPropCat()">Clear</button>
+                </div>
+                <div class="multi-dd-list">
+                  @for (item of filteredPropCat; track item.id) {
+                    <label class="multi-dd-item" (click)="$event.preventDefault(); togglePropCat(item)">
+                      <input type="checkbox" [checked]="isPropCatSelected(item.id)" tabindex="-1" />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  }
+                  @if (filteredPropCat.length === 0) { <div class="multi-dd-empty">No matches</div> }
+                </div>
+              </div>
+            }
+            @if (selectedPropertyCategories.length > 0) {
+              <div class="multi-chips">
+                @for (p of selectedPropertyCategories; track p.id) {
+                  <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePropCat(p.id)">&times;</span></span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-group multi-select-wrap">
+            <label class="form-label">Property Type of Use</label>
+            <button type="button" class="multi-select-trigger" [class.open]="propTypeOpen" (click)="propTypeOpen = !propTypeOpen" data-testid="select-prop-type-use">
+              <span class="multi-trigger-text">{{ propTypeTriggerText }}</span>
+              <span class="multi-trigger-arrow">{{ propTypeOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (propTypeOpen) {
+              <div class="multi-dd" (click)="$event.stopPropagation()">
+                <div class="multi-dd-header">
+                  <input class="multi-dd-search" type="text" [(ngModel)]="propTypeSearchText" placeholder="Search..." />
+                </div>
+                <div class="multi-dd-actions">
+                  <button type="button" class="multi-dd-action" (click)="selectAllPropType()">All</button>
+                  <button type="button" class="multi-dd-action" (click)="clearAllPropType()">Clear</button>
+                </div>
+                <div class="multi-dd-list">
+                  @for (item of filteredPropType; track item.id) {
+                    <label class="multi-dd-item" (click)="$event.preventDefault(); togglePropType(item)">
+                      <input type="checkbox" [checked]="isPropTypeSelected(item.id)" tabindex="-1" />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  }
+                  @if (filteredPropType.length === 0) { <div class="multi-dd-empty">No matches</div> }
+                </div>
+              </div>
+            }
+            @if (selectedPropertyTypesOfUse.length > 0) {
+              <div class="multi-chips">
+                @for (p of selectedPropertyTypesOfUse; track p.id) {
+                  <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePropType(p.id)">&times;</span></span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-group multi-select-wrap">
+            <label class="form-label">Account Type</label>
+            <button type="button" class="multi-select-trigger" [class.open]="accTypeOpen" (click)="accTypeOpen = !accTypeOpen" data-testid="select-acc-type">
+              <span class="multi-trigger-text">{{ accTypeTriggerText }}</span>
+              <span class="multi-trigger-arrow">{{ accTypeOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (accTypeOpen) {
+              <div class="multi-dd" (click)="$event.stopPropagation()">
+                <div class="multi-dd-header">
+                  <input class="multi-dd-search" type="text" [(ngModel)]="accTypeSearchText" placeholder="Search..." />
+                </div>
+                <div class="multi-dd-actions">
+                  <button type="button" class="multi-dd-action" (click)="selectAllAccType()">All</button>
+                  <button type="button" class="multi-dd-action" (click)="clearAllAccType()">Clear</button>
+                </div>
+                <div class="multi-dd-list">
+                  @for (item of filteredAccType; track item.id) {
+                    <label class="multi-dd-item" (click)="$event.preventDefault(); toggleAccType(item)">
+                      <input type="checkbox" [checked]="isAccTypeSelected(item.id)" tabindex="-1" />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  }
+                  @if (filteredAccType.length === 0) { <div class="multi-dd-empty">No matches</div> }
+                </div>
+              </div>
+            }
+            @if (selectedAccountTypes.length > 0) {
+              <div class="multi-chips">
+                @for (a of selectedAccountTypes; track a.id) {
+                  <span class="multi-chip">{{ a.name }} <span class="multi-chip-x" (click)="removeAccType(a.id)">&times;</span></span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="form-group multi-select-wrap">
+            <label class="form-label">Type of Person</label>
+            <button type="button" class="multi-select-trigger" [class.open]="personTypeOpen" (click)="personTypeOpen = !personTypeOpen" data-testid="select-person-type">
+              <span class="multi-trigger-text">{{ personTypeTriggerText }}</span>
+              <span class="multi-trigger-arrow">{{ personTypeOpen ? '▲' : '▼' }}</span>
+            </button>
+            @if (personTypeOpen) {
+              <div class="multi-dd" (click)="$event.stopPropagation()">
+                <div class="multi-dd-header">
+                  <input class="multi-dd-search" type="text" [(ngModel)]="personTypeSearchText" placeholder="Search..." />
+                </div>
+                <div class="multi-dd-actions">
+                  <button type="button" class="multi-dd-action" (click)="selectAllPersonType()">All</button>
+                  <button type="button" class="multi-dd-action" (click)="clearAllPersonType()">Clear</button>
+                </div>
+                <div class="multi-dd-list">
+                  @for (item of filteredPersonType; track item.id) {
+                    <label class="multi-dd-item" (click)="$event.preventDefault(); togglePersonType(item)">
+                      <input type="checkbox" [checked]="isPersonTypeSelected(item.id)" tabindex="-1" />
+                      <span>{{ item.name }}</span>
+                    </label>
+                  }
+                  @if (filteredPersonType.length === 0) { <div class="multi-dd-empty">No matches</div> }
+                </div>
+              </div>
+            }
+            @if (selectedPersonTypes.length > 0) {
+              <div class="multi-chips">
+                @for (p of selectedPersonTypes; track p.id) {
+                  <span class="multi-chip">{{ p.name }} <span class="multi-chip-x" (click)="removePersonType(p.id)">&times;</span></span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Row 3: Ageing + Amount + Attorney (bulk only) -->
+        <div class="form-grid-3 mt-row">
           <div class="form-group">
             <label class="form-label">Ageing</label>
             <select class="form-select" [ngModel]="ageing()" (ngModelChange)="ageing.set($event)" data-testid="select-ageing">
@@ -83,81 +307,198 @@
             <label class="form-label">Amount Greater Than</label>
             <input type="number" class="form-input" [ngModel]="amountGreaterThan()" (ngModelChange)="amountGreaterThan.set($event)" placeholder="0.00" data-testid="input-amount-threshold" />
           </div>
+          @if (handoverOption() === 'bulk') {
+            <div class="form-group">
+              <label class="form-label">Attorney</label>
+              <select class="form-select" [ngModel]="selectedAttorneyId()" (ngModelChange)="selectedAttorneyId.set($event)" data-testid="select-attorney-bulk">
+                <option value="">Select attorney...</option>
+                @for (att of activeAttorneys(); track att.attorneyId) {
+                  <option [value]="att.attorneyId">{{ att.attorneyName }} — {{ att.firmName }}</option>
+                }
+              </select>
+            </div>
+          }
         </div>
+
+        <!-- Row 4: Toggle switches -->
+        <div class="toggle-row mt-row">
+          <label class="toggle-switch" data-testid="toggle-include-indigents">
+            <input type="checkbox" [(ngModel)]="includeIndigents" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Include Indigents</span>
+          </label>
+          <label class="toggle-switch" data-testid="toggle-exclude-deposits">
+            <input type="checkbox" [(ngModel)]="excludeDepositBalances" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Exclude Deposit Balances</span>
+          </label>
+          <label class="toggle-switch" data-testid="toggle-include-pensioners">
+            <input type="checkbox" [(ngModel)]="includePensioners" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Include Pensioners</span>
+          </label>
+        </div>
+
+        <!-- Rotation panel (only for rotation) -->
+        @if (handoverOption() === 'rotation') {
+          <div class="rotation-panel">
+            <div class="rotation-header">
+              <span class="rotation-title">🔄 Attorney Rotation Allocation</span>
+              <div class="rotation-actions">
+                <span class="badge" [class.badge-success]="totalAllocation() >= 99.99 && totalAllocation() <= 100.01"
+                  [class.badge-warning]="totalAllocation() < 99.99 || totalAllocation() > 100.01" data-testid="badge-total-allocation">
+                  Total: {{ totalAllocation().toFixed(1) }}%
+                </span>
+                <button class="btn btn-sm btn-outline" (click)="addRotationAttorney()" data-testid="button-add-rotation">+ Add</button>
+              </div>
+            </div>
+            @if (rotationAllocations().length === 0) {
+              <div class="empty-state-sm">No attorneys added. Click "+ Add" to begin.</div>
+            } @else {
+              @for (alloc of rotationAllocations(); track $index; let idx = $index) {
+                <div class="rotation-row">
+                  <select class="form-select flex-1" [ngModel]="alloc.attorneyId || ''" (ngModelChange)="updateRotationAttorneyId(idx, $event)" [attr.data-testid]="'select-rot-att-' + idx">
+                    <option value="">Select attorney...</option>
+                    @for (att of activeAttorneys(); track att.attorneyId) {
+                      <option [value]="att.attorneyId">{{ att.attorneyName }}</option>
+                    }
+                  </select>
+                  <div class="pct-input-group">
+                    <input type="number" class="form-input w-20" [ngModel]="alloc.percentage" (ngModelChange)="updateRotationPercentage(idx, '' + $event)" min="0" max="100" step="0.1" [attr.data-testid]="'input-rot-pct-' + idx" />
+                    <span class="pct-label">%</span>
+                  </div>
+                  <button class="btn btn-sm btn-danger-ghost" (click)="removeRotationAttorney(idx)" [attr.data-testid]="'button-rem-rot-' + idx">✕</button>
+                </div>
+              }
+            }
+          </div>
+        }
       }
 
-      @if (handoverOption() === 'rotation') {
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="form-label">Billing Cycle</label>
-            <select class="form-select" [ngModel]="billingCycle()" (ngModelChange)="billingCycle.set($event)" data-testid="select-billing-cycle-rot">
-              <option value="">All Cycles</option>
-              @for (bc of billingCycles(); track bc.id) { <option [value]="bc.id">{{ bc.name }}</option> }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Town</label>
-            <select class="form-select" [ngModel]="town()" (ngModelChange)="town.set($event)" data-testid="select-town-rot">
-              <option value="">All Towns</option>
-              @for (t of towns(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Ageing</label>
-            <select class="form-select" [ngModel]="ageing()" (ngModelChange)="ageing.set($event)" data-testid="select-ageing-rot">
-              <option value="">Select ageing...</option>
-              @for (a of ageingRanges(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Amount Greater Than</label>
-            <input type="number" class="form-input" [ngModel]="amountGreaterThan()" (ngModelChange)="amountGreaterThan.set($event)" placeholder="0.00" data-testid="input-amount-rot" />
-          </div>
-        </div>
-
-        <div class="rotation-panel">
-          <div class="rotation-header">
-            <span class="rotation-title">🔄 Attorney Rotation Allocation</span>
-            <div class="rotation-actions">
-              <span class="badge" [class.badge-success]="totalAllocation() >= 99.99 && totalAllocation() <= 100.01"
-                [class.badge-warning]="totalAllocation() < 99.99 || totalAllocation() > 100.01" data-testid="badge-total-allocation">
-                Total: {{ totalAllocation().toFixed(1) }}%
-              </span>
-              <button class="btn btn-sm btn-outline" (click)="addRotationAttorney()" data-testid="button-add-rotation">+ Add</button>
+      <!-- ═══ FROM SECTION 129 ═══ -->
+      @if (handoverOption() === 'fromSection129') {
+        <div class="s129-panel">
+          <div class="s129-config-bar">
+            <div class="form-group s129-config-group">
+              <label class="form-label">Lapse Period (Days)</label>
+              <div class="s129-lapse-input">
+                <input type="number" class="form-input" [ngModel]="s129LapseDays()" (ngModelChange)="s129LapseDays.set($event)" min="1" max="365" data-testid="input-lapse-days" />
+              </div>
+              <span class="config-hint">Days since S129 notice before handover eligibility</span>
+            </div>
+            <div class="form-group s129-config-group">
+              <label class="form-label">Attorney</label>
+              <select class="form-select" [ngModel]="selectedAttorneyId()" (ngModelChange)="selectedAttorneyId.set($event)" data-testid="select-attorney-s129">
+                <option value="">Select attorney...</option>
+                @for (att of activeAttorneys(); track att.attorneyId) {
+                  <option [value]="att.attorneyId">{{ att.attorneyName }} — {{ att.firmName }}</option>
+                }
+              </select>
             </div>
           </div>
-          @if (rotationAllocations().length === 0) {
-            <div class="empty-state-sm">No attorneys added. Click "+ Add" to begin.</div>
+
+          @if (s129Loading()) {
+            <div class="loading-state"><div class="spinner"></div> Loading eligible runs...</div>
+          } @else if (s129TrackedRuns().length === 0 && s129Eligible().length === 0) {
+            <div class="empty-state">No approved Section 129 runs available for handover.</div>
           } @else {
-            @for (alloc of rotationAllocations(); track $index; let idx = $index) {
-              <div class="rotation-row">
-                <select class="form-select flex-1" [ngModel]="alloc.attorneyId || ''" (ngModelChange)="updateRotationAttorneyId(idx, $event)" [attr.data-testid]="'select-rot-att-' + idx">
-                  <option value="">Select attorney...</option>
-                  @for (att of activeAttorneys(); track att.attorneyId) {
-                    <option [value]="att.attorneyId">{{ att.attorneyName }}</option>
-                  }
-                </select>
-                <div class="pct-input-group">
-                  <input type="number" class="form-input w-20" [ngModel]="alloc.percentage" (ngModelChange)="updateRotationPercentage(idx, '' + $event)" min="0" max="100" step="0.1" [attr.data-testid]="'input-rot-pct-' + idx" />
-                  <span class="pct-label">%</span>
-                </div>
-                <button class="btn btn-sm btn-danger-ghost" (click)="removeRotationAttorney(idx)" [attr.data-testid]="'button-rem-rot-' + idx">✕</button>
+            @if (!s129FilterRunId()) {
+              <div class="filter-section-title">Approved S129 Runs — Select a Run to View Accounts</div>
+              <div class="table-container">
+                <table class="data-table" data-testid="table-s129-runs">
+                  <thead>
+                    <tr>
+                      <th>Run ID</th>
+                      <th>Financial Year</th>
+                      <th>Status</th>
+                      <th class="text-right">Total Accounts</th>
+                      <th class="text-right">Already Handed Over</th>
+                      <th class="text-right">Eligible</th>
+                      <th>Date Created</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (run of s129TrackedRuns(); track run.runId) {
+                      <tr class="clickable-row" (click)="loadS129RunAccounts(run.runId)" [attr.data-testid]="'row-s129-run-' + run.runId">
+                        <td class="font-mono">#{{ run.runId }}</td>
+                        <td>{{ run.financialYear }}</td>
+                        <td><span class="badge" [ngClass]="run.statusId === 4 ? 'badge-success' : 'badge-outline'">{{ run.statusDescription }}</span></td>
+                        <td class="text-right">{{ run.totalAccounts }}</td>
+                        <td class="text-right">{{ run.alreadyHandedOver }}</td>
+                        <td class="text-right font-medium">{{ run.eligibleForHandover }}</td>
+                        <td>{{ formatDate(run.dateCreated) }}</td>
+                        <td><button class="btn btn-sm btn-outline" (click)="$event.stopPropagation(); loadS129RunAccounts(run.runId)">View Accounts</button></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
               </div>
+            }
+
+            @if (s129FilterRunId()) {
+              <div class="s129-stats-bar">
+                <button class="btn btn-sm btn-ghost" (click)="s129FilterRunId.set(null); s129Eligible.set([]); clearS129Selection()" data-testid="button-back-to-runs">← Back to Runs</button>
+                <span class="s129-stat">Run <strong>#{{ s129FilterRunId() }}</strong></span>
+                <span class="s129-stat"><strong>{{ s129Eligible().length }}</strong> eligible accounts</span>
+                <span class="s129-stat"><strong>{{ s129TotalSelected }}</strong> selected</span>
+                <span class="s129-stat">Total: <strong>{{ formatCurrency(s129TotalAmount) }}</strong></span>
+                <button class="btn btn-sm btn-ghost" (click)="loadS129RunAccounts(s129FilterRunId()!)" data-testid="button-refresh-s129">Refresh</button>
+              </div>
+              @if (s129Eligible().length === 0) {
+                <div class="empty-state">No eligible accounts in this run (all may already be handed over).</div>
+              } @else {
+                <div class="table-container s129-table-wrap">
+                  <table class="data-table" data-testid="table-s129-eligible">
+                    <thead>
+                      <tr>
+                        <th style="width:32px"><input type="checkbox" [checked]="s129SelectedIds().size === s129Eligible().length && s129Eligible().length > 0" (change)="toggleS129SelectAll()" data-testid="checkbox-s129-select-all" /></th>
+                        <th>Account ID</th>
+                        <th class="text-right">Outstanding Amount</th>
+                        <th class="text-right">Qualifying Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (acc of s129Eligible(); track acc.accountId) {
+                        <tr class="clickable-row" (click)="toggleS129Account(acc.accountId)" [class.selected-row]="s129SelectedIds().has(acc.accountId)"
+                          [attr.data-testid]="'row-s129-' + acc.accountId">
+                          <td (click)="$event.stopPropagation()"><input type="checkbox" [checked]="s129SelectedIds().has(acc.accountId)" (change)="toggleS129Account(acc.accountId)" /></td>
+                          <td class="font-mono">{{ acc.accountId }}</td>
+                          <td class="text-right font-medium">{{ formatCurrency(acc.outstandingAmount) }}</td>
+                          <td class="text-right">{{ formatCurrency(acc.qualifyingAmount) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
             }
           }
         </div>
       }
 
-      <div class="action-bar">
-        <button class="btn btn-primary" (click)="handleSubmit()" [disabled]="submitting()" data-testid="button-submit">
-          @if (submitting()) { <span class="spinner-sm"></span> }
-          Submit Handover
-        </button>
-        <button class="btn btn-outline" (click)="handleClear()" data-testid="button-clear">Clear</button>
-      </div>
+      <!-- ═══ ACTION BAR ═══ -->
+      @if (handoverOption() !== 'fromSection129') {
+        <div class="action-bar">
+          <button class="btn btn-primary" (click)="handleSubmit()" [disabled]="submitting()" data-testid="button-submit">
+            @if (submitting()) { <span class="spinner-sm"></span> }
+            Submit Handover
+          </button>
+          <button class="btn btn-outline" (click)="handleClear()" data-testid="button-clear">Clear</button>
+        </div>
+      } @else {
+        <div class="action-bar">
+          <button class="btn btn-primary" (click)="submitS129Handover()" [disabled]="s129Submitting() || s129TotalSelected === 0 || !selectedAttorneyId()" data-testid="button-submit-s129">
+            @if (s129Submitting()) { <span class="spinner-sm"></span> }
+            Handover {{ s129TotalSelected }} Account{{ s129TotalSelected !== 1 ? 's' : '' }}
+          </button>
+          <button class="btn btn-outline" (click)="clearS129Selection()" data-testid="button-clear-s129">Clear Selection</button>
+        </div>
+      }
     </div>
   </div>
 
+  <!-- ═══ HANDOVER RECORDS ═══ -->
   <div class="card">
     <div class="card-header">
       <h2 class="section-title">Handover Records</h2>
@@ -207,6 +548,7 @@
     </div>
   </div>
 
+  <!-- ═══ HANDOVER DETAIL PANEL ═══ -->
   @if (selectedHandover()) {
     <div class="card" data-testid="panel-handover-detail">
       <div class="card-header">

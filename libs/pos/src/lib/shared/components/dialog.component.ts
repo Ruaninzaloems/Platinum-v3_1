@@ -12,9 +12,17 @@ export class DialogComponent {
   @Input() size: 'sm' | 'md' | 'lg' | 'xl' = 'md';
   @Output() close = new EventEmitter<void>();
 
+  private mouseDownOnOverlay = false;
+
+  onOverlayMouseDown(event: MouseEvent): void {
+    this.mouseDownOnOverlay = (event.target as HTMLElement).classList.contains('dialog-overlay');
+  }
+
   onOverlayClick(event: MouseEvent): void {
-    if ((event.target as HTMLElement).classList.contains('dialog-overlay')) {
+    const targetIsOverlay = (event.target as HTMLElement).classList.contains('dialog-overlay');
+    if (targetIsOverlay && this.mouseDownOnOverlay) {
       this.close.emit();
     }
+    this.mouseDownOnOverlay = false;
   }
 }

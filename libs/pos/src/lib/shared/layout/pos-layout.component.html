@@ -1,4 +1,4 @@
-<div class="app-shell" [class.embedded-mode]="isEmbedded()">
+<div class="app-shell">
   <aside class="app-sidenav" [class.collapsed]="sidebarCollapsed()" [class.mobile-open]="mobileSidebarOpen()">
     <div class="sidenav-header">
       <a routerLink="/" class="brand" (click)="mobileSidebarOpen.set(false)" data-testid="link-home-logo">
@@ -28,7 +28,7 @@
               <div class="group-children">
                 @for (child of $any(item).children; track child.label) {
                   <a class="nav-link sub-item" [routerLink]="child.href"
-                     routerLinkActive="active-link"
+                     routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}"
                      (click)="mobileSidebarOpen.set(false)"
                      [attr.data-testid]="'link-' + child.label">
                     <span class="material-icons nav-icon">{{ child.icon }}</span>
@@ -55,12 +55,11 @@
     </div>
   </aside>
 
-  @if (mobileSidebarOpen() && !isEmbedded()) {
+  @if (mobileSidebarOpen()) {
     <div class="sidebar-overlay" (click)="toggleMobileSidebar()"></div>
   }
 
   <div class="app-main">
-    @if (!isEmbedded()) {
     <header class="app-toolbar" data-testid="app-toolbar">
       <div class="toolbar-left">
         <button class="toolbar-menu-btn" (click)="toggleMobileSidebar()" data-testid="button-mobile-menu">
@@ -108,7 +107,6 @@
         }
       </div>
     </div>
-    }
 
     <main class="content-area">
       <router-outlet />

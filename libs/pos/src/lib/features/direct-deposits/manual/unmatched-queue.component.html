@@ -37,31 +37,11 @@
   } @else {
     <div class="stats-row" data-testid="stats-summary">
       <div class="stat-card">
-        <div class="stat-icon stat-icon-blue">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">Total Deposits</span>
-          <span class="stat-value" data-testid="stat-total">{{ stats().total }}</span>
-          <span class="stat-sub">{{ formatCurrency(stats().totalAmount) }}</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon stat-icon-green">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">Allocated</span>
-          <span class="stat-value stat-value-green" data-testid="stat-allocated">{{ stats().allocated }}</span>
-          <span class="stat-sub">{{ formatCurrency(stats().allocatedAmount) }}</span>
-        </div>
-      </div>
-      <div class="stat-card">
         <div class="stat-icon stat-icon-amber">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div class="stat-info">
-          <span class="stat-label">Pending</span>
+          <span class="stat-label">Awaiting Allocation</span>
           <span class="stat-value stat-value-amber" data-testid="stat-unallocated">{{ stats().unallocated }}</span>
           <span class="stat-sub">{{ formatCurrency(stats().unallocatedAmount) }}</span>
         </div>

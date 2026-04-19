@@ -1,6 +1,7 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DateInputComponent } from '../../../shared/components/date-input.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -40,7 +41,7 @@ interface ProcessedBatch {
 @Component({
   selector: 'app-auto-allocation',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './auto-allocation.component.html',
   styleUrl: './auto-allocation.component.css'
 })

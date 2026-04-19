@@ -1,0 +1,262 @@
+<div class="indigent-dashboard" data-testid="indigent-dashboard">
+  <app-page-header title="Indigent Management" subtitle="Overview of indigent applications, subsidies, and management activities">
+    <div class="fin-year-selector" data-testid="select-fin-year-container">
+      <label for="finYear">Financial Year:</label>
+      <select id="finYear" [(ngModel)]="finYear" (ngModelChange)="onFinYearChange()" data-testid="select-fin-year">
+        @for (fy of finYears; track fy) {
+          <option [value]="fy">{{ fy }}</option>
+        }
+      </select>
+    </div>
+  </app-page-header>
+
+  @if (loading()) {
+    <div class="loading-container" data-testid="loading-indicator">
+      <app-spinner />
+      <p>Loading dashboard data...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-container" data-testid="error-message">
+      <span class="material-icons error-icon">error_outline</span>
+      <p>{{ error() }}</p>
+      <button class="btn btn-primary" (click)="loadData()" data-testid="button-retry">Retry</button>
+    </div>
+  } @else {
+
+    <section class="section-group" data-testid="section-overview">
+      <h2 class="section-title">
+        <span class="material-icons section-icon">dashboard</span>
+        Overview
+      </h2>
+      <div class="stats-row-primary" data-testid="stats-grid">
+        <app-stat-card label="Active Indigents" [value]="formatNumber(summary()?.activeIndigentCount)" icon="groups" variant="primary" link="/indigent/register" data-testid="stat-active-indigents" />
+        <app-stat-card label="Total Subsidy Cost" [value]="formatCurrency(summary()?.totalSubsidyCost)" icon="account_balance" variant="gold" link="/indigent/reports" data-testid="stat-subsidy-cost" />
+        <app-stat-card label="Total Write-Offs" [value]="formatCurrency(summary()?.totalWriteOffs)" icon="receipt_long" variant="info" link="/indigent/reports" data-testid="stat-write-offs" />
+        <app-stat-card label="Do-Not-Cut Active" [value]="formatNumber(summary()?.doNotCutActive)" icon="security" variant="success" link="/indigent/register" data-testid="stat-do-not-cut" />
+      </div>
+    </section>
+
+    <section class="section-group" data-testid="section-pipeline">
+      <h2 class="section-title">
+        <span class="material-icons section-icon">assignment</span>
+        Application Pipeline
+      </h2>
+      <div class="stats-row-secondary" data-testid="stats-pipeline">
+        <app-stat-card label="Pending Applications" [value]="formatNumber(summary()?.pendingApplications)" icon="pending_actions" variant="warning" link="/indigent/register?status=Application" data-testid="stat-pending-applications" />
+        <app-stat-card label="Awaiting Verification" [value]="formatNumber(summary()?.pendingVerification)" icon="fact_check" variant="info" link="/indigent/verification" data-testid="stat-pending-verification" />
+        <app-stat-card label="Awaiting Authorization" [value]="formatNumber(summary()?.pendingAuthorization)" icon="verified_user" variant="primary" link="/indigent/authorization" data-testid="stat-pending-authorization" />
+      </div>
+    </section>
+
+    <section class="section-group" data-testid="section-expiry">
+      <h2 class="section-title">
+        <span class="material-icons section-icon">schedule</span>
+        Expiry &amp; Renewal
+      </h2>
+      <div class="stats-row-secondary" data-testid="stats-expiry">
+        <app-stat-card label="Expiring in 30 Days" [value]="formatNumber(summary()?.expiringIn30Days)" icon="warning_amber" variant="danger" link="/indigent/reapplication" data-testid="stat-expiring-30" />
+        <app-stat-card label="Expiring in 60 Days" [value]="formatNumber(summary()?.expiringIn60Days)" icon="event" variant="warning" link="/indigent/reapplication" data-testid="stat-expiring-60" />
+        <app-stat-card label="Pending Termination" [value]="formatNumber(summary()?.pendingTermination)" icon="cancel" variant="danger" link="/indigent/termination" data-testid="stat-pending-termination" />
+      </div>
+    </section>
+
+    @if (writeOffAlertCount > 0 && !writeOffDismissed) {
+      <section class="section-group" data-testid="section-writeoff-alerts">
+        <h2 class="section-title">
+          <span class="material-icons section-icon" style="color:var(--platinum-accent)">notifications_active</span>
+          Debt Write-Off Notifications
+          <span class="alert-badge" data-testid="text-writeoff-count">{{ writeOffAlertCount }}</span>
+          <button class="btn-dismiss" (click)="writeOffDismissed = true" title="Dismiss" data-testid="button-dismiss-writeoff">
+            <span class="material-icons">close</span>
+          </button>
+        </h2>
+
+        @if (seniorWriteOffAlerts.length > 0) {
+          <div class="writeoff-alert writeoff-alert-senior" data-testid="alert-senior-writeoff">
+            <div class="writeoff-alert-icon">
+              <span class="material-icons">elderly</span>
+            </div>
+            <div class="writeoff-alert-body">
+              <h3>Senior Pensioner Write-Offs Due</h3>
+              <p>The following indigent types have seniors (65+) with extended exemption periods requiring periodic debt write-off:</p>
+              <div class="writeoff-alert-items">
+                @for (alert of seniorWriteOffAlerts; track alert.indigentTypeId) {
+                  <div class="writeoff-item" [attr.data-testid]="'writeoff-senior-' + alert.indigentTypeId">
+                    <span class="writeoff-item-type">{{ alert.indigentTypeName }}</span>
+                    <span class="writeoff-item-detail">{{ alert.accountHolderName }}</span>
+                    <span class="writeoff-item-date">Next due: {{ formatDate(alert.nextWriteOffDueDate) }}</span>
+                    <span class="writeoff-item-badge badge-senior">{{ alert.seniorAge }}+ years</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (regularWriteOffAlerts.length > 0) {
+          <div class="writeoff-alert writeoff-alert-regular" data-testid="alert-regular-writeoff">
+            <div class="writeoff-alert-icon">
+              <span class="material-icons">money_off</span>
+            </div>
+            <div class="writeoff-alert-body">
+              <h3>Continuous Write-Offs Due</h3>
+              <p>Active indigent types with continuous write-off enabled:</p>
+              <div class="writeoff-alert-items">
+                @for (alert of regularWriteOffAlerts; track alert.indigentTypeId) {
+                  <div class="writeoff-item" [attr.data-testid]="'writeoff-regular-' + alert.indigentTypeId">
+                    <span class="writeoff-item-type">{{ alert.indigentTypeName }}</span>
+                    <span class="writeoff-item-detail">{{ alert.accountHolderName }}</span>
+                    <span class="writeoff-item-date">Next due: {{ formatDate(alert.nextWriteOffDueDate) }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (getWriteOffTypesConfigured().length > 0) {
+          <div class="writeoff-config-summary" data-testid="writeoff-config-summary">
+            <h4>Write-Off Configuration Summary</h4>
+            <table class="pro-table compact-table">
+              <thead>
+                <tr>
+                  <th>Indigent Type</th>
+                  <th>On Approval</th>
+                  <th>Continuous</th>
+                  <th>Interval</th>
+                  <th>Notifications</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of getWriteOffTypesConfigured(); track t.indigentTypeId) {
+                  <tr [attr.data-testid]="'writeoff-config-' + t.indigentTypeId">
+                    <td class="font-medium">{{ t.indigentTypeName }}</td>
+                    <td><span class="badge" [class]="t.enableWriteOffOnApproval ? 'badge-success' : 'badge-muted'">{{ t.enableWriteOffOnApproval ? 'Yes' : 'No' }}</span></td>
+                    <td><span class="badge" [class]="t.enableContinuousWriteOff ? 'badge-success' : 'badge-muted'">{{ t.enableContinuousWriteOff ? 'Yes' : 'No' }}</span></td>
+                    <td>{{ t.enableContinuousWriteOff ? (t.continuousWriteOffIntervalMonths || 12) + ' months' : '-' }}</td>
+                    <td>
+                      @if (t.writeOffNotifyEmail) { <span class="notify-chip">Email</span> }
+                      @if (t.writeOffNotifySms) { <span class="notify-chip">SMS</span> }
+                      @if (t.writeOffNotifyWhatsapp) { <span class="notify-chip">WhatsApp</span> }
+                      @if (!t.writeOffNotifyEmail && !t.writeOffNotifySms && !t.writeOffNotifyWhatsapp) { <span class="text-muted">None</span> }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+
+    <div class="two-column-layout">
+      @if (summary()?.byIndigentType?.length) {
+        <section class="section-group" data-testid="section-by-type">
+          <h2 class="section-title">
+            <span class="material-icons section-icon">category</span>
+            By Indigent Type
+          </h2>
+          <div class="table-card">
+            <table class="pro-table" data-testid="table-by-type">
+              <thead>
+                <tr>
+                  <th>Indigent Type</th>
+                  <th class="text-right">Active</th>
+                  <th class="text-right">Pending</th>
+                  <th class="text-right">Subsidy Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of summary()!.byIndigentType; track row.indigentTypeId) {
+                  <tr [attr.data-testid]="'row-type-' + row.indigentTypeId">
+                    <td>
+                      <span class="type-badge">{{ row.indigentTypeName }}</span>
+                    </td>
+                    <td class="text-right">
+                      <span class="num-badge num-success">{{ formatNumber(row.activeCount) }}</span>
+                    </td>
+                    <td class="text-right">
+                      <span class="num-badge num-warning">{{ formatNumber(row.pendingCount) }}</span>
+                    </td>
+                    <td class="text-right fw-600">{{ formatCurrency(row.subsidyCost) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr data-testid="totals-row">
+                  <td><strong>Total</strong></td>
+                  <td class="text-right"><strong>{{ formatNumber(getTotalActive()) }}</strong></td>
+                  <td class="text-right"><strong>{{ formatNumber(getTotalPending()) }}</strong></td>
+                  <td class="text-right"><strong>{{ formatCurrency(getTotalSubsidyCost()) }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      }
+
+      <section class="section-group" data-testid="section-activity">
+        <h2 class="section-title">
+          <span class="material-icons section-icon">trending_up</span>
+          Monthly Activity
+        </h2>
+        <div class="activity-cards" data-testid="monthly-activity">
+          <div class="activity-card activity-clickable" (click)="navigateTo('/indigent/application')" data-testid="activity-applications">
+            <div class="activity-card-icon bg-blue">
+              <span class="material-icons">assignment</span>
+            </div>
+            <div class="activity-card-body">
+              <span class="activity-card-value">{{ formatNumber(summary()?.applicationsThisMonth) }}</span>
+              <span class="activity-card-label">Applications This Month</span>
+            </div>
+          </div>
+          <div class="activity-card activity-clickable" (click)="navigateTo('/indigent/reapplication')" data-testid="activity-reapplications">
+            <div class="activity-card-icon bg-green">
+              <span class="material-icons">autorenew</span>
+            </div>
+            <div class="activity-card-body">
+              <span class="activity-card-value">{{ formatNumber(summary()?.reapplicationsThisMonth) }}</span>
+              <span class="activity-card-label">Reapplications This Month</span>
+            </div>
+          </div>
+          <div class="activity-card activity-clickable" (click)="navigateTo('/indigent/termination')" data-testid="activity-terminations">
+            <div class="activity-card-icon bg-red">
+              <span class="material-icons">remove_circle</span>
+            </div>
+            <div class="activity-card-body">
+              <span class="activity-card-value">{{ formatNumber(summary()?.terminationsThisMonth) }}</span>
+              <span class="activity-card-label">Terminations This Month</span>
+            </div>
+          </div>
+          <div class="activity-card activity-clickable" (click)="navigateTo('/indigent/register')" data-testid="activity-disqualified">
+            <div class="activity-card-icon bg-orange">
+              <span class="material-icons">block</span>
+            </div>
+            <div class="activity-card-body">
+              <span class="activity-card-value">{{ formatNumber(summary()?.disqualifiedThisMonth) }}</span>
+              <span class="activity-card-label">Disqualified This Month</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    @if (getSubsidyCountEntries().length > 0) {
+      <section class="section-group" data-testid="section-subsidy-counts">
+        <h2 class="section-title">
+          <span class="material-icons section-icon">donut_small</span>
+          Subsidy Item Counts
+        </h2>
+        <div class="subsidy-grid" data-testid="subsidy-item-counts">
+          @for (entry of getSubsidyCountEntries(); track entry.label) {
+            <div class="subsidy-tile" [attr.data-testid]="'subsidy-count-' + entry.label">
+              <span class="subsidy-value">{{ formatNumber(entry.value) }}</span>
+              <span class="subsidy-label">{{ entry.label }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+  }
+</div>

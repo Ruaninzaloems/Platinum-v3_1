@@ -16,6 +16,36 @@
   width: 100%;
   color: var(--pos-text-muted);
 }
+.loading-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 18rem;
+}
+.loading-step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: #9CA3AF;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+.loading-step.active {
+  color: var(--platinum-primary, #0f2b46);
+  font-weight: 500;
+}
+.loading-step.done {
+  color: #16A34A;
+}
+.loading-step-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
 .dayend-block-card {
   max-width: 32rem;
@@ -415,6 +445,18 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  background: var(--platinum-primary, #0f2b46);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-submit:hover:not(:disabled) {
+  background: #1a3d5c;
+}
+.btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .btn-cancel {
   height: 3rem;

@@ -1,10 +1,16 @@
-import { Component, signal, computed, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, signal, computed, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AuthService } from '../../core/services/auth.service';
 import { firstValueFrom } from 'rxjs';
+
+interface ContactItem {
+  value: string;
+  enabled: boolean;
+  isPrimary: boolean;
+}
 
 interface Recipient {
   id: string;
@@ -14,6 +20,9 @@ interface Recipient {
   email: string;
   additionalEmails: string[];
   mobile: string;
+  additionalMobiles: string[];
+  emailContacts: ContactItem[];
+  mobileContacts: ContactItem[];
   address: string;
   outstanding: number;
   selected: boolean;
@@ -28,6 +37,28 @@ interface Attachment {
 }
 
 type CommMode = 'email' | 'sms';
+type PageView = 'compose' | 'history';
+
+interface HistoryEntry {
+  id: number;
+  accountNumber: string;
+  accountHolder: string;
+  method: string;
+  recipients: string;
+  subject: string;
+  messageBody: string;
+  status: string;
+  createdAt: string;
+}
+
+interface SendSummary {
+  mode: string;
+  succeeded: number;
+  failed: number;
+  total: number;
+  subject: string;
+  recipientCount: number;
+}
 
 @Component({
   selector: 'app-client-communications',
@@ -42,8 +73,23 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
 
   loading = signal(false);
+  sending = signal(false);
+  sendProgress = signal({ current: 0, total: 0, succeeded: 0, failed: 0 });
   error = signal('');
   mode = signal<CommMode>('email');
+
+  pageView = signal<PageView>('compose');
+  showSuccessPopup = signal(false);
+  sendSummary = signal<SendSummary | null>(null);
+  historyEntries = signal<HistoryEntry[]>([]);
+  historyLoading = signal(false);
+  historyFilter = signal<'all' | 'email' | 'sms'>('all');
+  filteredHistory = computed(() => {
+    const filter = this.historyFilter();
+    const entries = this.historyEntries();
+    if (filter === 'all') return entries;
+    return entries.filter(e => e.method === filter);
+  });
 
   recipients = signal<Recipient[]>([]);
   searchQuery = signal('');
@@ -66,9 +112,10 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
   private searchTimer: any = null;
 
   selectedRecipients = computed(() => this.recipients().filter(r => r.selected));
-  validEmailRecipients = computed(() => this.selectedRecipients().filter(r => r.email || r.additionalEmails.length > 0));
-  validSmsRecipients = computed(() => this.selectedRecipients().filter(r => r.mobile));
-  totalEmailAddresses = computed(() => this.validEmailRecipients().reduce((sum, r) => sum + (r.email ? 1 : 0) + r.additionalEmails.length, 0));
+  validEmailRecipients = computed(() => this.selectedRecipients().filter(r => r.emailContacts?.some(c => c.enabled)));
+  validSmsRecipients = computed(() => this.selectedRecipients().filter(r => r.mobileContacts?.some(c => c.enabled)));
+  totalEmailAddresses = computed(() => this.validEmailRecipients().reduce((sum, r) => sum + (r.emailContacts?.filter(c => c.enabled).length || 0), 0));
+  totalSmsNumbers = computed(() => this.validSmsRecipients().reduce((sum, r) => sum + (r.mobileContacts?.filter(c => c.enabled).length || 0), 0));
 
   ngOnInit(): void {
     document.addEventListener('mousedown', this.handleClickOutside);
@@ -109,28 +156,49 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     return cleaned;
   }
 
-  private extractContactInfo(contactRes: any, nameRes: any): { email: string; mobile: string } {
-    let email = '';
-    let mobile = '';
+  private unwrapResponse(res: any): any[] {
+    if (!res || res._error) return [];
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.value)) return res.value;
+    if (Array.isArray(res?.results)) return res.results;
+    if (Array.isArray(res?.items)) return res.items;
+    if (typeof res === 'object') return [res];
+    return [];
+  }
 
-    const pickEmail = (...vals: any[]) => vals.find(v => this.isValidEmail(v))?.trim() || '';
-    const pickMobile = (...vals: any[]) => {
-      const found = vals.find(v => this.isValidMobile(v));
-      return found ? this.normalizeMobile(found.trim()) : '';
+  private isValidPhone(val: any): boolean {
+    if (typeof val !== 'string') return false;
+    const cleaned = val.replace(/[\s\-()]/g, '');
+    if (/^\+27\d{9}$/.test(cleaned)) return true;
+    if (/^27\d{9}$/.test(cleaned)) return true;
+    if (/^0\d{9}$/.test(cleaned)) return true;
+    return false;
+  }
+
+  private extractAllContacts(contactRes: any, nameRes: any, enquiryContactRes?: any): { emails: string[]; mobiles: string[] } {
+    const emailSet = new Set<string>();
+    const mobileSet = new Set<string>();
+
+    const emailFields = ['email', 'eMail', 'emailAddress', 'emailId', 'Email'];
+    const phoneFields = ['tel_Mobile', 'tel_Home', 'tel_Work', 'cellphone', 'cellPhone', 'mobile', 'mobileNumber', 'CellPhone', 'telephone', 'workPhone', 'homePhone', 'phone', 'Phone', 'telNo', 'contactNo', 'contactNumber', 'cellPhoneNo'];
+
+    const extractFromRecord = (rec: any) => {
+      if (!rec || typeof rec !== 'object') return;
+      for (const f of emailFields) {
+        if (this.isValidEmail(rec[f])) emailSet.add(rec[f].trim().toLowerCase());
+      }
+      for (const f of phoneFields) {
+        if (this.isValidPhone(rec[f])) {
+          mobileSet.add(this.normalizeMobile(rec[f].trim()));
+        }
+      }
     };
 
-    if (contactRes && !contactRes._error) {
-      const c = Array.isArray(contactRes) ? contactRes[0] : contactRes;
-      email = pickEmail(c?.email, c?.eMail, c?.emailAddress, c?.Email);
-      mobile = pickMobile(c?.cellphone, c?.cellPhone, c?.mobile, c?.mobileNumber, c?.CellPhone);
-    }
-    if (nameRes && !nameRes._error) {
-      const n = Array.isArray(nameRes) ? nameRes[0] : nameRes;
-      if (!email) email = pickEmail(n?.email, n?.eMail, n?.emailAddress);
-      if (!mobile) mobile = pickMobile(n?.cellphone, n?.cellPhone, n?.mobile);
-    }
+    this.unwrapResponse(contactRes).forEach(extractFromRecord);
+    this.unwrapResponse(nameRes).forEach(extractFromRecord);
+    if (enquiryContactRes) this.unwrapResponse(enquiryContactRes).forEach(extractFromRecord);
 
-    return { email, mobile };
+    return { emails: Array.from(emailSet), mobiles: Array.from(mobileSet) };
   }
 
   async performSearch(query: string): Promise<void> {
@@ -159,8 +227,8 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
             firstValueFrom(this.api.get('/api/platinum/billing-account-management/get-contact-details', { accountId: String(accId) })).catch(() => null),
             firstValueFrom(this.api.get('/api/platinum/billing-enquiry/name-info-by-account', { accountId: String(accId) })).catch(() => null),
           ]).then(([contactRes, nameRes]) => {
-            const { email, mobile } = this.extractContactInfo(contactRes, nameRes);
-            this.contactIndicators.update(prev => ({ ...prev, [accId]: { email: !!email, mobile: !!mobile, loading: false } }));
+            const { emails, mobiles } = this.extractAllContacts(contactRes, nameRes);
+            this.contactIndicators.update(prev => ({ ...prev, [accId]: { email: emails.length > 0, mobile: mobiles.length > 0, loading: false } }));
           });
         }
       });
@@ -182,27 +250,39 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async fetchContactDetails(accountId: number): Promise<{ email: string; mobile: string; additionalEmails: string[] }> {
-    let additionalEmails: string[] = [];
+  private async fetchContactDetails(accountId: number): Promise<{ email: string; additionalEmails: string[]; mobile: string; additionalMobiles: string[]; emailContacts: ContactItem[]; mobileContacts: ContactItem[] }> {
     try {
-      const [contactRes, nameRes, addEmailRes] = await Promise.all([
+      const [contactRes, nameRes, addEmailRes, enquiryContactRes] = await Promise.all([
         firstValueFrom(this.api.get('/api/platinum/billing-account-management/get-contact-details', { accountId: String(accountId) })).catch(() => null),
         firstValueFrom(this.api.get('/api/platinum/billing-enquiry/name-info-by-account', { accountId: String(accountId) })).catch(() => null),
         firstValueFrom(this.api.get('/api/platinum/billing-account-management/get-additional-emails', { accountId: String(accountId) })).catch(() => null),
+        firstValueFrom(this.api.get(`/api/platinum/billing-enquiry/contact-details/${accountId}`)).catch(() => null),
       ]);
 
-      const { email, mobile } = this.extractContactInfo(contactRes, nameRes);
+      const { emails, mobiles } = this.extractAllContacts(contactRes, nameRes, enquiryContactRes);
 
+      let extraEmails: string[] = [];
       if (addEmailRes && !addEmailRes._error) {
-        const emails = Array.isArray(addEmailRes) ? addEmailRes : (addEmailRes?.value || addEmailRes?.emails || []);
-        additionalEmails = emails
-          .map((e: any) => e?.email || e?.emailAddress || e?.Email || (typeof e === 'string' ? e : ''))
-          .filter((e: string) => this.isValidEmail(e));
+        const emailList = Array.isArray(addEmailRes) ? addEmailRes : (addEmailRes?.value || addEmailRes?.emails || []);
+        extraEmails = emailList
+          .map((e: any) => e?.emailAdress || e?.emailAddress || e?.email || e?.Email || (typeof e === 'string' ? e : ''))
+          .filter((e: string) => this.isValidEmail(e))
+          .map((e: string) => e.trim().toLowerCase());
       }
 
-      return { email, mobile, additionalEmails };
+      const allEmails = Array.from(new Set([...emails, ...extraEmails]));
+      const primaryEmail = allEmails.length > 0 ? allEmails[0] : '';
+      const additionalEmails = allEmails.slice(1);
+
+      const primaryMobile = mobiles.length > 0 ? mobiles[0] : '';
+      const additionalMobiles = mobiles.slice(1);
+
+      const emailContacts: ContactItem[] = allEmails.map((e, i) => ({ value: e, enabled: true, isPrimary: i === 0 }));
+      const mobileContacts: ContactItem[] = [primaryMobile, ...additionalMobiles].filter(Boolean).map((m, i) => ({ value: m, enabled: true, isPrimary: i === 0 }));
+
+      return { email: primaryEmail, additionalEmails, mobile: primaryMobile, additionalMobiles, emailContacts, mobileContacts };
     } catch {
-      return { email: '', mobile: '', additionalEmails: [] };
+      return { email: '', additionalEmails: [], mobile: '', additionalMobiles: [], emailContacts: [], mobileContacts: [] };
     }
   }
 
@@ -221,8 +301,8 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     this.recipientIds.add(accId);
     const newRecipient: Recipient = {
       id: `r-${Date.now()}-${accId}`, accountId: accId, accountNo: accNo, name, email: '',
-      additionalEmails: [], mobile: '', address, outstanding, selected: true,
-      contactLoading: true, contactLoaded: false,
+      additionalEmails: [], mobile: '', additionalMobiles: [], emailContacts: [], mobileContacts: [],
+      address, outstanding, selected: true, contactLoading: true, contactLoaded: false,
     };
 
     this.recipients.update(prev => [...prev, newRecipient]);
@@ -256,6 +336,17 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     this.recipients.update(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
   }
 
+  toggleContactItem(recipientId: string, type: 'email' | 'mobile', contactValue: string): void {
+    this.recipients.update(prev => prev.map(r => {
+      if (r.id !== recipientId) return r;
+      if (type === 'email') {
+        return { ...r, emailContacts: r.emailContacts.map(c => c.value === contactValue ? { ...c, enabled: !c.enabled } : c) };
+      } else {
+        return { ...r, mobileContacts: r.mobileContacts.map(c => c.value === contactValue ? { ...c, enabled: !c.enabled } : c) };
+      }
+    }));
+  }
+
   selectAll(): void { this.recipients.update(prev => prev.map(r => ({ ...r, selected: true }))); }
   deselectAll(): void { this.recipients.update(prev => prev.map(r => ({ ...r, selected: false }))); }
   clearAll(): void { this.recipientIds.clear(); this.recipients.set([]); }
@@ -282,7 +373,7 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     return `${(bytes / 1048576).toFixed(1)} MB`;
   }
 
-  handleSend(): void {
+  async handleSend(): Promise<void> {
     if (this.mode() === 'email') {
       if (this.validEmailRecipients().length === 0) {
         this.toast.error('None of the selected accounts have email addresses.');
@@ -303,23 +394,170 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const recipients = this.mode() === 'email' ? this.validEmailRecipients() : this.validSmsRecipients();
-    const count = this.mode() === 'email' ? this.totalEmailAddresses() : this.validSmsRecipients().length;
+    if (this.mode() === 'sms') {
+      await this.sendSmsMessages();
+    } else {
+      await this.sendEmailMessages();
+    }
+  }
 
-    const payload = {
-      mode: this.mode(),
-      subject: this.mode() === 'email' ? this.subject() : undefined,
-      body: this.messageBody(),
-      recipients: recipients.map(r => ({
-        accountId: r.accountId, accountNo: r.accountNo, name: r.name,
-        email: r.email, additionalEmails: r.additionalEmails, mobile: r.mobile,
-      })),
-      attachmentCount: this.attachments().length,
-      attachmentNames: this.attachments().map(a => a.name),
-    };
+  private async sendSmsMessages(): Promise<void> {
+    const recipients = this.validSmsRecipients();
+    const messageText = this.messageBody().trim();
 
-    console.log('[ClientCommunications] SEND payload:', JSON.stringify(payload, null, 2));
-    this.toast.success(`${this.mode() === 'email' ? `Email to ${count} address(es)` : `SMS to ${count} number(s)`} \u2014 sending is disabled in this prototype. Payload logged to console.`);
+    const allNumbers: { to: string; accountId: number; accountNo: string; accountHolder: string }[] = [];
+    for (const r of recipients) {
+      for (const c of (r.mobileContacts || []).filter(c => c.enabled)) {
+        allNumbers.push({ to: c.value, accountId: r.accountId, accountNo: r.accountNo, accountHolder: r.name });
+      }
+    }
+
+    if (allNumbers.length === 0) {
+      this.toast.error('No valid mobile numbers found.');
+      return;
+    }
+
+    this.sending.set(true);
+    this.sendProgress.set({ current: 0, total: allNumbers.length, succeeded: 0, failed: 0 });
+
+    try {
+      const messages = allNumbers.map(n => ({
+        to: n.to,
+        message: messageText,
+        accountId: String(n.accountId),
+        accountNumber: n.accountNo,
+        accountHolder: n.accountHolder,
+      }));
+
+      const result: any = await firstValueFrom(this.api.post('/api/sms/send-bulk', {
+        messages: messages.map(m => ({ to: m.to, message: m.message, accountId: m.accountId, accountNumber: m.accountNumber, accountHolder: m.accountHolder })),
+        context: 'Client Communications',
+      }));
+
+      const succeeded = result?.succeeded ?? (result?.success ? allNumbers.length : 0);
+      const failed = result?.failed ?? (result?.success ? 0 : allNumbers.length);
+      this.sendProgress.set({ current: allNumbers.length, total: allNumbers.length, succeeded, failed });
+
+      if (succeeded > 0) {
+        this.sendSummary.set({
+          mode: 'SMS',
+          succeeded,
+          failed,
+          total: allNumbers.length,
+          subject: '',
+          recipientCount: recipients.length,
+        });
+        this.showSuccessPopup.set(true);
+        this.resetForm();
+      } else {
+        this.toast.error(`All ${failed} SMS message(s) failed to send.`);
+      }
+    } catch (e: any) {
+      const errMsg = e?.error?.message || e?.message || 'Unknown error';
+      console.error('[ClientCommunications] SMS send error:', errMsg);
+      if (errMsg.includes('credentials not configured')) {
+        this.toast.error('SMS sending is not available — SMS Portal credentials need to be configured. Please contact your system administrator.');
+      } else {
+        this.toast.error(`SMS sending failed: ${errMsg}`);
+      }
+    } finally {
+      this.sending.set(false);
+    }
+  }
+
+  private async sendEmailMessages(): Promise<void> {
+    const recipients = this.validEmailRecipients();
+    const messageText = this.messageBody().trim();
+    const subjectText = this.subject().trim();
+
+    const allEmails: { email: string; accountId: number; accountNo: string; accountHolder: string }[] = [];
+    for (const r of recipients) {
+      for (const c of (r.emailContacts || []).filter(c => c.enabled)) {
+        allEmails.push({ email: c.value, accountId: r.accountId, accountNo: r.accountNo, accountHolder: r.name });
+      }
+    }
+
+    if (allEmails.length === 0) {
+      this.toast.error('No valid email addresses found.');
+      return;
+    }
+
+    this.sending.set(true);
+    this.sendProgress.set({ current: 0, total: allEmails.length, succeeded: 0, failed: 0 });
+
+    let succeeded = 0;
+    let failed = 0;
+    const BATCH_SIZE = 2;
+    const perEmailResults: { accountId: string; accountNumber: string; accountHolder: string; method: string; recipients: string; subject: string; messageBody: string; status: string }[] = [];
+
+    try {
+      for (let i = 0; i < allEmails.length; i += BATCH_SIZE) {
+        const batch = allEmails.slice(i, i + BATCH_SIZE);
+        if (i > 0) await new Promise(r => setTimeout(r, 1500));
+        const results = await Promise.allSettled(
+          batch.map(e =>
+            firstValueFrom(this.api.post('/api/platinum/billing-enquiry/send-notification', {
+              accountId: String(e.accountId),
+              method: 'email',
+              recipient: e.email,
+              subject: subjectText,
+              message: messageText,
+            }))
+          )
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          const r = results[j];
+          const emailEntry = batch[j];
+          const wasSent = r.status === 'fulfilled' && (r.value as any)?.success;
+          if (wasSent) {
+            succeeded++;
+          } else {
+            failed++;
+            const reason = r.status === 'rejected' ? (r.reason?.error?.message || r.reason?.message || '') : '';
+            if (reason) console.warn('[ClientCommunications] Email send failed:', reason);
+          }
+          perEmailResults.push({
+            accountId: String(emailEntry.accountId),
+            accountNumber: emailEntry.accountNo,
+            accountHolder: emailEntry.accountHolder,
+            method: 'email',
+            recipients: emailEntry.email,
+            subject: subjectText,
+            messageBody: messageText,
+            status: wasSent ? 'sent' : 'failed',
+          });
+        }
+        this.sendProgress.set({ current: i + batch.length, total: allEmails.length, succeeded, failed });
+      }
+
+      for (const entry of perEmailResults) {
+        try {
+          await firstValueFrom(this.api.post('/api/communication-logs', entry));
+        } catch {}
+      }
+
+      if (succeeded > 0) {
+        this.sendSummary.set({
+          mode: 'Email',
+          succeeded,
+          failed,
+          total: allEmails.length,
+          subject: subjectText,
+          recipientCount: recipients.length,
+        });
+        this.showSuccessPopup.set(true);
+        this.resetForm();
+      } else {
+        this.toast.error(`All ${failed} email(s) failed to send. The Platinum email service may be temporarily unavailable.`);
+      }
+    } catch (e: any) {
+      console.error('[ClientCommunications] Email send error:', e);
+      const msg = e?.error?.message || e?.statusText || e?.message || 'Unknown error';
+      this.toast.error(`Email dispatch failed: ${msg}`);
+    } finally {
+      this.sending.set(false);
+    }
   }
 
   async handleCsvImport(event: Event): Promise<void> {
@@ -380,8 +618,8 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
             this.recipientIds.add(accId);
             const newRecipient: Recipient = {
               id: `r-${Date.now()}-${accId}`, accountId: accId, accountNo: accNo, name, email: '',
-              additionalEmails: [], mobile: '', address, outstanding, selected: true,
-              contactLoading: true, contactLoaded: false,
+              additionalEmails: [], mobile: '', additionalMobiles: [], emailContacts: [], mobileContacts: [],
+              address, outstanding, selected: true, contactLoading: true, contactLoaded: false,
             };
             this.recipients.update(prev => [...prev, newRecipient]);
             totalAdded++;
@@ -443,7 +681,11 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
 
   previewToLine(): string {
     const vr = this.validEmailRecipients();
-    const shown = vr.slice(0, 3).map(r => `${r.name} <${r.email}>`).join('; ');
+    const shown = vr.slice(0, 3).map(r => {
+      const enabledEmails = (r.emailContacts || []).filter(c => c.enabled).map(c => c.value);
+      const addr = enabledEmails.length > 0 ? enabledEmails[0] : r.email;
+      return `${r.name} <${addr}>`;
+    }).join('; ');
     return vr.length > 3 ? `${shown} (+${vr.length - 3} more)` : shown;
   }
 
@@ -463,5 +705,85 @@ export class ClientCommunicationsComponent implements OnInit, OnDestroy {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  resetForm(): void {
+    this.recipientIds.clear();
+    this.recipients.set([]);
+    this.subject.set('');
+    this.messageBody.set('');
+    this.attachments.set([]);
+    this.searchQuery.set('');
+    this.searchResults.set([]);
+    this.searchDropdownOpen.set(false);
+    this.sendProgress.set({ current: 0, total: 0, succeeded: 0, failed: 0 });
+    this.showPreview.set(false);
+  }
+
+  dismissSuccessPopup(): void {
+    this.showSuccessPopup.set(false);
+    this.sendSummary.set(null);
+  }
+
+  goToHistoryFromPopup(): void {
+    this.dismissSuccessPopup();
+    this.switchToHistory();
+  }
+
+  switchToHistory(): void {
+    this.pageView.set('history');
+    this.loadHistory();
+  }
+
+  switchToCompose(): void {
+    this.pageView.set('compose');
+  }
+
+  async loadHistory(): Promise<void> {
+    this.historyLoading.set(true);
+    try {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      const dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
+      const dateTo = tomorrow.toISOString().split('T')[0];
+      const data: any = await firstValueFrom(
+        this.api.get(`/api/communication-logs-audit?dateFrom=${dateFrom}&dateTo=${dateTo}`)
+      );
+      const entries: HistoryEntry[] = (Array.isArray(data) ? data : []).map((d: any) => ({
+        id: d.id,
+        accountNumber: d.accountNumber || '',
+        accountHolder: d.accountHolder || '',
+        method: d.method || 'email',
+        recipients: d.recipients || '',
+        subject: d.subject || '',
+        messageBody: d.messageBody || '',
+        status: d.status || 'sent',
+        createdAt: d.createdAt || '',
+      }));
+      this.historyEntries.set(entries);
+    } catch (e: any) {
+      console.error('[ClientCommunications] History load error:', e);
+      this.toast.error('Failed to load communication history.');
+    } finally {
+      this.historyLoading.set(false);
+    }
+  }
+
+  formatHistoryDate(dateStr: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${mins}`;
+  }
+
+  truncateMessage(msg: string, maxLen: number = 80): string {
+    if (!msg) return '';
+    return msg.length > maxLen ? msg.slice(0, maxLen) + '...' : msg;
   }
 }

@@ -555,9 +555,9 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
     const sf = this.statusFilter();
     const allocIds = this.allocatedIds();
     if (sf === 'allocated') {
-      data = data.filter(i => i.billingAllocated || allocIds.has(i.posItem_ID));
+      data = data.filter(i => i.billingAllocated || !!i.dateAllocated || allocIds.has(i.posItem_ID));
     } else if (sf === 'unallocated') {
-      data = data.filter(i => !i.billingAllocated && !allocIds.has(i.posItem_ID));
+      data = data.filter(i => !i.billingAllocated && !i.dateAllocated && !allocIds.has(i.posItem_ID));
     }
     return data;
   });
@@ -618,8 +618,8 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
   stats = computed(() => {
     const all = this.items();
     const allocIds = this.allocatedIds();
-    const allocated = all.filter(i => i.billingAllocated || allocIds.has(i.posItem_ID));
-    const unallocated = all.filter(i => !i.billingAllocated && !allocIds.has(i.posItem_ID));
+    const allocated = all.filter(i => i.billingAllocated || !!i.dateAllocated || allocIds.has(i.posItem_ID));
+    const unallocated = all.filter(i => !i.billingAllocated && !i.dateAllocated && !allocIds.has(i.posItem_ID));
     return {
       total: all.length,
       totalAmount: all.reduce((s, i) => s + (i.amount || 0), 0),
@@ -638,6 +638,14 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
       if (allocId) {
         this.markAllocated(allocId);
         this.toast.success('Deposit allocated successfully and removed from queue.');
+      }
+      this.router.navigate([], { queryParams: {}, replaceUrl: true });
+    }
+    const alreadyAllocatedParam = this.route.snapshot.queryParamMap.get('alreadyAllocated');
+    if (alreadyAllocatedParam) {
+      const itemId = Number(alreadyAllocatedParam);
+      if (itemId) {
+        this.removeAllocatedItem(itemId);
       }
       this.router.navigate([], { queryParams: {}, replaceUrl: true });
     }
@@ -1993,7 +2001,7 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
   }
 
   isItemAllocated(item: BankReconPosItem): boolean {
-    return item.billingAllocated === true || this.allocatedIds().has(item.posItem_ID);
+    return item.billingAllocated === true || !!item.dateAllocated || this.allocatedIds().has(item.posItem_ID);
   }
 
   private markAllocated(posItemId: number): void {

@@ -43,6 +43,7 @@
                 <th>Template Code</th>
                 <th>Name</th>
                 <th>Category</th>
+                <th>Type</th>
                 <th class="text-center">Version</th>
                 <th class="text-center">Status</th>
                 <th>Last Modified</th>
@@ -56,6 +57,15 @@
                   <td class="font-mono font-medium">{{ t.templateCode }}</td>
                   <td class="font-medium">{{ t.name }}</td>
                   <td><span class="badge badge-default">{{ getCategoryLabel(t.category) }}</span></td>
+                  <td>
+                    @if (getSendingType(t) === 'Email') {
+                      <span class="badge badge-blue">Email</span>
+                    } @else if (getSendingType(t) === 'SMS') {
+                      <span class="badge badge-green">SMS</span>
+                    } @else {
+                      <span class="badge badge-default">Document</span>
+                    }
+                  </td>
                   <td class="text-center"><span class="badge badge-info">v{{ t.currentVersion || '1.0' }}</span></td>
                   <td class="text-center">
                     @if (t.isActive) {
@@ -64,8 +74,8 @@
                       <span class="badge badge-default">Inactive</span>
                     }
                   </td>
-                  <td>{{ fmtDate(t.lastModifiedAt) }}</td>
-                  <td>{{ t.lastModifiedBy || '—' }}</td>
+                  <td>{{ fmtDate(getLastModified(t)) }}</td>
+                  <td>{{ getModifiedBy(t) }}</td>
                   <td class="text-center">
                     <div class="action-buttons">
                       <button class="btn-icon" (click)="openEdit(t)" title="Edit" [attr.data-testid]="'button-edit-' + idx  + ''">✎</button>

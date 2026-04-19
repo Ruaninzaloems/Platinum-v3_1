@@ -2,13 +2,13 @@
   <div class="page-container">
     <div class="detail-header">
       <button class="btn btn-ghost btn-icon" (click)="handleCancel()" data-testid="button-back-config">‹</button>
-      <h2 class="page-title" data-testid="text-page-title">{{ isNewEntry ? 'Add New Configuration' : 'Configuration Detail' }}</h2>
+      <h2 class="page-title" data-testid="text-page-title">{{ isNewEntry ? 'Add New Configuration' : isEditing ? 'Edit Configuration' : 'Configuration Detail' }}</h2>
     </div>
 
     <div class="card">
       <div class="card-body detail-form">
         <div class="toggle-item">
-          <input type="checkbox" id="cfg-enabled" [(ngModel)]="enabled" [disabled]="!isNewEntry && selectedEntry !== null" data-testid="checkbox-config-enabled" />
+          <input type="checkbox" id="cfg-enabled" [(ngModel)]="enabled" [disabled]="!isNewEntry && !isEditing" data-testid="checkbox-config-enabled" />
           <label for="cfg-enabled" class="font-medium">Enabled</label>
         </div>
 
@@ -23,7 +23,7 @@
           </div>
           <div class="field-group">
             <span class="field-label">Section 129 Template *</span>
-            <select class="field-select" [(ngModel)]="section129Template" [disabled]="!isNewEntry" data-testid="select-config-template">
+            <select class="field-select" [(ngModel)]="section129Template" [disabled]="!isNewEntry && !isEditing" data-testid="select-config-template">
               <option value="">--Select--</option>
               @for (t of templates; track t.id) {
                 <option [value]="t.id">{{ t.name }}</option>
@@ -32,7 +32,7 @@
           </div>
           <div class="field-group">
             <span class="field-label">SMS Notification Template *</span>
-            <select class="field-select" [(ngModel)]="smsTemplate" [disabled]="!isNewEntry" data-testid="select-config-sms-template">
+            <select class="field-select" [(ngModel)]="smsTemplate" [disabled]="!isNewEntry && !isEditing" data-testid="select-config-sms-template">
               <option value="">--Select--</option>
               @for (t of smsTemplates; track t.id) {
                 <option [value]="t.id">{{ t.name }}</option>
@@ -41,25 +41,25 @@
           </div>
           <div class="field-group">
             <span class="field-label">No of Lapse Days *</span>
-            <input type="number" class="field-input" [(ngModel)]="lapseDays" min="14" max="99" [disabled]="!isNewEntry" data-testid="input-config-lapse-days" />
+            <input type="number" class="field-input" [(ngModel)]="lapseDays" min="14" max="99" [disabled]="!isNewEntry && !isEditing" data-testid="input-config-lapse-days" />
           </div>
           <div class="field-group">
             <span class="field-label">No of Notices per File *</span>
-            <input type="number" class="field-input" [(ngModel)]="noticesPerFile" min="1" [disabled]="!isNewEntry" data-testid="input-config-notices-per-file" />
+            <input type="number" class="field-input" [(ngModel)]="noticesPerFile" min="1" [disabled]="!isNewEntry && !isEditing" data-testid="input-config-notices-per-file" />
           </div>
           <div class="field-group">
             <span class="field-label">Interest Rate (%)</span>
-            <input type="number" class="field-input" [(ngModel)]="interestRate" min="0" max="100" step="0.5" placeholder="0" [disabled]="!isNewEntry" data-testid="input-config-interest-rate" />
+            <input type="number" class="field-input" [(ngModel)]="interestRate" min="0" max="100" step="0.5" placeholder="0" [disabled]="!isNewEntry && !isEditing" data-testid="input-config-interest-rate" />
           </div>
           <div class="field-group">
             <span class="field-label">Minimum Amount (R)</span>
-            <input type="number" class="field-input" [(ngModel)]="minimumAmount" min="0" step="0.01" placeholder="0.00" [disabled]="!isNewEntry" data-testid="input-config-minimum-amount" />
+            <input type="number" class="field-input" [(ngModel)]="minimumAmount" min="0" step="0.01" placeholder="0.00" [disabled]="!isNewEntry && !isEditing" data-testid="input-config-minimum-amount" />
           </div>
         </div>
 
         <div class="section-divider">
           <h3 class="section-title">Additional Billing (Notice Cost)</h3>
-          @if (isNewEntry) {
+          @if (isNewEntry || isEditing) {
             <div class="add-row">
               <div class="field-group" style="flex:1">
                 <span class="field-label">Additional Billing Type</span>
@@ -85,7 +85,7 @@
                   <th style="width:3rem">Nr</th>
                   <th>Additional Billing Type</th>
                   <th class="text-right">Total Fees</th>
-                  @if (isNewEntry) { <th style="width:3rem"></th> }
+                  @if (isNewEntry || isEditing) { <th style="width:3rem"></th> }
                 </tr>
               </thead>
               <tbody>
@@ -94,7 +94,7 @@
                     <td class="font-mono">{{ item.nr }}</td>
                     <td>{{ item.additionalBillingTypeName }}</td>
                     <td class="text-right font-mono">R {{ item.amount.toFixed(2) }}</td>
-                    @if (isNewEntry) {
+                    @if (isNewEntry || isEditing) {
                       <td><button class="btn btn-ghost btn-icon" style="color:#ef4444" (click)="removeCostItem(idx)" [attr.data-testid]="'button-remove-cost-' + idx">✕</button></td>
                     }
                   </tr>
@@ -108,11 +108,11 @@
 
         <div class="section-divider">
           <div class="toggle-item" style="margin-bottom:0.75rem">
-            <input type="checkbox" id="cfg-rotation" [(ngModel)]="activateRotation" [disabled]="!isNewEntry" data-testid="checkbox-activate-rotation" />
+            <input type="checkbox" id="cfg-rotation" [(ngModel)]="activateRotation" [disabled]="!isNewEntry && !isEditing" data-testid="checkbox-activate-rotation" />
             <label for="cfg-rotation" class="font-medium">Activate Rotation?</label>
           </div>
 
-          @if (isNewEntry && activateRotation) {
+          @if ((isNewEntry || isEditing) && activateRotation) {
             <div class="add-row">
               <div class="field-group" style="flex:1">
                 <span class="field-label">Attorney</span>
@@ -143,7 +143,7 @@
                   <th>Attorney</th>
                   <th class="text-right">% Allocation in Debtor Count</th>
                   <th class="text-right">% Allocation in Handover Amount</th>
-                  @if (isNewEntry) { <th style="width:3rem"></th> }
+                  @if (isNewEntry || isEditing) { <th style="width:3rem"></th> }
                 </tr>
               </thead>
               <tbody>
@@ -153,7 +153,7 @@
                     <td>{{ item.attorneyName }}</td>
                     <td class="text-right font-mono">{{ item.percentDebtorCount }}%</td>
                     <td class="text-right font-mono">{{ item.percentHandoverAmount }}%</td>
-                    @if (isNewEntry) {
+                    @if (isNewEntry || isEditing) {
                       <td><button class="btn btn-ghost btn-icon" style="color:#ef4444" (click)="removeAttorney(idx)" [attr.data-testid]="'button-remove-attorney-' + idx">✕</button></td>
                     }
                   </tr>
@@ -163,7 +163,7 @@
                   <td class="font-medium">Total</td>
                   <td class="text-right font-mono font-medium">{{ totalDebtorPercent }}%</td>
                   <td class="text-right font-mono font-medium">{{ totalHandoverPercent }}%</td>
-                  @if (isNewEntry) { <td></td> }
+                  @if (isNewEntry || isEditing) { <td></td> }
                 </tr>
               </tbody>
             </table>
@@ -175,11 +175,16 @@
     </div>
 
     <div class="footer-actions">
-      <button class="btn btn-outline" (click)="handleCancel()" data-testid="button-cancel-config">Cancel</button>
-      @if (isNewEntry) {
+      <button class="btn btn-outline" (click)="handleCancel()" data-testid="button-cancel-config">
+        {{ isEditing ? 'Discard Changes' : 'Cancel' }}
+      </button>
+      @if (!isNewEntry && !isEditing) {
+        <button class="btn btn-primary" (click)="startEdit()" data-testid="button-edit-config">Edit</button>
+      }
+      @if (isNewEntry || isEditing) {
         <button class="btn btn-primary" (click)="handleSubmit()" [disabled]="saving()" data-testid="button-submit-config">
           @if (saving()) { <span class="spinner"></span> }
-          Submit
+          {{ isNewEntry ? 'Submit' : 'Save Changes' }}
         </button>
       }
     </div>

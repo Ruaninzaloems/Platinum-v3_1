@@ -1,0 +1,704 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Termination Management</h1>
+      <p class="page-subtitle">Terminate active indigent subsidies with reason tracking</p>
+    </div>
+    <div class="header-actions">
+      @if (activeSection === 'termination') {
+        <button class="btn btn-danger" (click)="openBatchModal()" [disabled]="selectedIds.size === 0" data-testid="button-batch-terminate">
+          Batch Terminate ({{ selectedIds.size }})
+        </button>
+      }
+      @if (activeSection === 'auto-termination') {
+        <button class="btn btn-outline" (click)="runAutoTermination(true)" [disabled]="autoTermRunning()" data-testid="button-auto-term-preview">
+          @if (autoTermRunning()) { <span class="spinner"></span> }
+          <span class="material-icons" style="font-size: 16px;">preview</span> Preview
+        </button>
+        <button class="btn btn-danger" (click)="runAutoTermination(false)" [disabled]="autoTermRunning()" data-testid="button-auto-term-run">
+          @if (autoTermRunning()) { <span class="spinner"></span> }
+          <span class="material-icons" style="font-size: 16px;">auto_delete</span> Run Auto-Termination
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="section-tabs">
+    <button class="section-tab" [class.active]="activeSection === 'termination'" (click)="setSection('termination')" data-testid="tab-termination">Active Accounts</button>
+    <button class="section-tab" [class.active]="activeSection === 'auto-termination'" (click)="setSection('auto-termination')" data-testid="tab-auto-termination">
+      <span class="material-icons" style="font-size: 16px;">auto_delete</span> Auto-Termination
+    </button>
+    <button class="section-tab" [class.active]="activeSection === 'disqualification'" (click)="setSection('disqualification')" data-testid="tab-disqualification">Disqualification Override</button>
+  </div>
+
+  @if (activeSection === 'termination') {
+    <div class="toolbar">
+      <div class="field-group search-field">
+        <span class="field-label">Search Active Applications</span>
+        <input class="field-input" [(ngModel)]="searchText" placeholder="Account, name or ID..." (keyup.enter)="onSearch()" data-testid="input-search" />
+      </div>
+      <div class="toolbar-info">
+        <span class="count-badge" data-testid="text-count">{{ totalCount() }} active</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        @if (loading()) {
+          <div class="loading-center">
+            <span class="spinner spinner-lg"></span>
+            <p>Loading active applications...</p>
+          </div>
+        } @else if (items().length === 0) {
+          <div class="empty-state">
+            <p>No active applications found.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px">
+                    <input type="checkbox" [checked]="allSelected" (change)="selectAll()" data-testid="checkbox-select-all" />
+                  </th>
+                  <th>App ID</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th class="text-right">Subsidy</th>
+                  <th>Reapplication Date</th>
+                  <th>Do-Not-Cut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of items(); track item.applicationId) {
+                  <tr [attr.data-testid]="'row-term-' + item.applicationId">
+                    <td>
+                      <input type="checkbox" [checked]="isSelected(item.applicationId)" (change)="toggleSelect(item.applicationId)" />
+                    </td>
+                    <td class="font-mono">{{ item.applicationId }}</td>
+                    <td class="font-mono">{{ item.accountNumber }}</td>
+                    <td>{{ item.accountHolderName }}</td>
+                    <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                    <td><span class="badge badge-success">{{ item.appStatusName }}</span></td>
+                    <td class="text-right font-mono">{{ fmtCurrency(item.monthlySubsidy) }}</td>
+                    <td>{{ fmtDate(item.reApplicationDate) }}</td>
+                    <td>{{ item.doNotCutDate ? fmtDate(item.doNotCutDate) : '—' }}</td>
+                    <td>
+                      <div class="actions-cell">
+                        <button class="btn btn-danger btn-sm" (click)="openTerminateModal(item)" [attr.data-testid]="'button-terminate-' + item.applicationId">Terminate</button>
+                        <button class="btn btn-outline btn-sm" (click)="openDncModal(item)" [attr.data-testid]="'button-dnc-' + item.applicationId">Do-Not-Cut</button>
+                        <button class="btn btn-ghost btn-sm" (click)="openCommLogModal(item)" [attr.data-testid]="'button-comm-log-' + item.applicationId" title="Communication Log">
+                          <span class="material-icons" style="font-size: 16px;">history</span>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" (click)="viewApplication(item.applicationId)" [attr.data-testid]="'button-view-' + item.applicationId">View</button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (totalPages > 1) {
+            <div class="pagination">
+              <span class="pagination-info">Page {{ page }} of {{ totalPages }} ({{ totalCount() }} records)</span>
+              <div class="pagination-buttons">
+                <button class="btn btn-outline btn-sm" (click)="prevPage()" [disabled]="page <= 1">‹</button>
+                <button class="btn btn-outline btn-sm" (click)="nextPage()" [disabled]="page >= totalPages">›</button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (activeSection === 'auto-termination') {
+    <div class="auto-term-info-bar">
+      <span class="material-icons" style="color: var(--platinum-accent);">info</span>
+      <span>Applications listed below have expired or are approaching expiry. Auto-termination honours each indigent type's configured grace period and notification channels. All actions are logged to the communication log.</span>
+    </div>
+
+    <div class="stat-row" style="margin-bottom: 1rem;">
+      <div class="stat-card">
+        <span class="stat-value stat-danger">{{ expiringItems().length }}</span>
+        <span class="stat-label">Approaching Expiry</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Expiring & Overdue Applications</h2>
+        <button class="btn btn-outline btn-sm" (click)="loadExpiringApplications()" data-testid="button-refresh-expiring">Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        @if (expiringLoading()) {
+          <div class="loading-center">
+            <span class="spinner spinner-lg"></span>
+            <p>Loading expiring applications...</p>
+          </div>
+        } @else if (expiringItems().length === 0) {
+          <div class="empty-state">
+            <span class="material-icons" style="font-size: 48px; color: #27ae60;">check_circle</span>
+            <p>No applications approaching expiry.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Type</th>
+                  <th>Expiry Date</th>
+                  <th>Days Remaining</th>
+                  <th>Grace Period</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of expiringItems(); track $index) {
+                  <tr [attr.data-testid]="'row-expiring-' + $index"
+                      [class.row-overdue]="daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) < 0"
+                      [class.row-critical]="daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) >= 0 && daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) <= 14"
+                      [class.row-warning]="daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) > 14 && daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) <= 30">
+                    <td class="font-mono">{{ item['applicationId'] || item['application_ID'] || '—' }}</td>
+                    <td class="font-mono">{{ item['accountNumber'] || item['account_Number'] || '—' }}</td>
+                    <td>{{ item['accountHolderName'] || item['account_Holder'] || '—' }}</td>
+                    <td><span class="badge badge-info">{{ item['indigentTypeName'] || item['indigent_Type'] || '—' }}</span></td>
+                    <td>{{ fmtDate($any(item)['reApplicationDate'] || $any(item)['expiryDate']) }}</td>
+                    <td>
+                      @if (daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) < 0) {
+                        <span class="badge badge-danger">{{ Math.abs(daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate'])) }} days overdue</span>
+                      } @else {
+                        <span class="badge" [class]="expiryUrgency($any(item)['reApplicationDate'] || $any(item)['expiryDate']) === 'critical' ? 'badge-danger' : expiryUrgency($any(item)['reApplicationDate'] || $any(item)['expiryDate']) === 'warning' ? 'badge-warning' : 'badge-info'">
+                          {{ daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) }} days
+                        </span>
+                      }
+                    </td>
+                    <td>{{ item['graceDays'] || item['autoTerminateGraceDays'] || '—' }}</td>
+                    <td>
+                      @if (daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) < 0) {
+                        <span class="badge badge-danger">Overdue</span>
+                      } @else if (daysUntilExpiry($any(item)['reApplicationDate'] || $any(item)['expiryDate']) <= 30) {
+                        <span class="badge badge-warning">Expiring Soon</span>
+                      } @else {
+                        <span class="badge badge-info">Active</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+      <div class="card-header">
+        <h2 class="card-title">Auto-Termination Log</h2>
+        <button class="btn btn-outline btn-sm" (click)="loadAutoTerminationLog()" data-testid="button-refresh-auto-term-log">Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        @if (autoTermLogLoading()) {
+          <div class="loading-center">
+            <span class="spinner spinner-lg"></span>
+            <p>Loading log...</p>
+          </div>
+        } @else if (autoTermLogItems().length === 0) {
+          <div class="empty-state">
+            <p>No auto-termination runs recorded yet.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Run By</th>
+                  <th>Type</th>
+                  <th>Terminated</th>
+                  <th>Failed</th>
+                  <th>Notifications Sent</th>
+                  <th>Mode</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (log of autoTermLogItems(); track $index) {
+                  <tr [attr.data-testid]="'row-auto-term-log-' + $index">
+                    <td>{{ fmtDate($any(log)['runDate'] || $any(log)['dateCreated']) }}</td>
+                    <td>{{ log['runByName'] || log['userName'] || '—' }}</td>
+                    <td>{{ log['indigentTypeName'] || 'All Types' }}</td>
+                    <td class="font-mono">{{ log['totalTerminated'] || 0 }}</td>
+                    <td class="font-mono">{{ log['totalFailed'] || 0 }}</td>
+                    <td class="font-mono">{{ log['notificationsSent'] || 0 }}</td>
+                    <td>
+                      <span class="badge" [class]="log['dryRun'] ? 'badge-info' : 'badge-danger'">
+                        {{ log['dryRun'] ? 'Preview' : 'Live Run' }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (activeSection === 'disqualification') {
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Automatically Disqualified Accounts</h2>
+        <button class="btn btn-outline btn-sm" (click)="loadDisqualified()" data-testid="button-refresh-disqualified">Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        @if (disqualifiedLoading()) {
+          <div class="loading-center">
+            <span class="spinner spinner-lg"></span>
+            <p>Loading disqualified accounts...</p>
+          </div>
+        } @else if (disqualifiedItems().length === 0) {
+          <div class="empty-state">
+            <p>No automatically disqualified accounts found.</p>
+          </div>
+        } @else {
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Type</th>
+                  <th>Disqualification Reason</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of disqualifiedItems(); track $index) {
+                  <tr [attr.data-testid]="'row-disq-' + $index">
+                    <td class="font-mono">{{ item['applicationId'] || item['application_ID'] || '—' }}</td>
+                    <td class="font-mono">{{ item['accountNumber'] || item['account_Number'] || '—' }}</td>
+                    <td>{{ item['accountHolderName'] || item['account_Holder'] || '—' }}</td>
+                    <td><span class="badge badge-info">{{ item['indigentTypeName'] || item['indigent_Type'] || '—' }}</span></td>
+                    <td>{{ item['disqualificationReason'] || item['reason'] || '—' }}</td>
+                    <td>{{ fmtDate($any(item)['disqualificationDate'] || $any(item)['date']) }}</td>
+                    <td>
+                      <button class="btn btn-primary btn-sm" (click)="openOverrideModal(item)" [attr.data-testid]="'button-override-' + $index">Override</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+@if (modalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" style="max-width:36rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Terminate Application #{{ selectedItem.applicationId }}</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeModal()" data-testid="button-close-term-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ selectedItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Holder</span><span class="detail-value">{{ selectedItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Type</span><span class="detail-value">{{ selectedItem.indigentTypeName }}</span></div>
+        </div>
+
+        <div class="impact-preview" data-testid="impact-preview">
+          <h4 class="impact-title">Impact Preview</h4>
+          <div class="impact-grid">
+            <div class="impact-item">
+              <span class="impact-label">Monthly Subsidy Lost</span>
+              <span class="impact-value impact-danger">{{ fmtCurrency(selectedItem.monthlySubsidy) }}</span>
+            </div>
+            <div class="impact-item">
+              <span class="impact-label">Qualifying Units Removed</span>
+              <span class="impact-value impact-danger">{{ selectedItem.occupierCount || 0 }}</span>
+            </div>
+            <div class="impact-item">
+              <span class="impact-label">Do-Not-Cut Protection</span>
+              <span class="impact-value impact-danger">{{ selectedItem.doNotCutDate ? 'Will be removed' : 'Not active' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="warning-box">
+          <p>This will remove the indigent subsidy and all associated benefits. This action requires authorization.</p>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Effective Termination Date *</span>
+          <app-date-input [value]="termForm.terminationDate" (valueChange)="termForm.terminationDate = $event" testId="input-term-date" inputClass="field-input" />
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Termination Reason *</span>
+          <select class="field-select" [(ngModel)]="termForm.terminationReasonId" data-testid="select-term-reason">
+            <option [value]="0">Select reason</option>
+            @for (r of terminationReasons; track r.reasonId) {
+              <option [value]="r.reasonId">{{ r.reasonName }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="termForm.remarks" rows="3" placeholder="Additional notes..." data-testid="input-term-remarks"></textarea>
+        </div>
+        @if (isWriteOffEnabledForItem(selectedItem)) {
+          <div class="field-group mt-1 field-group-toggle">
+            <label class="toggle-row">
+              <input type="checkbox" [(ngModel)]="termForm.writeOffOnTermination" data-testid="toggle-writeoff-on-termination" />
+              <span class="toggle-label">Write Off Debt on Termination</span>
+            </label>
+            <span class="field-hint">Write off the outstanding debt balance when terminating this arrangement</span>
+          </div>
+          @if (termForm.writeOffOnTermination) {
+            <div class="field-group mt-1">
+              <span class="field-label">Write-Off Amount (R)</span>
+              <input type="number" class="field-input" [(ngModel)]="termForm.writeOffAmount" step="0.01" min="0" data-testid="input-term-writeoff-amount" />
+            </div>
+          }
+        }
+        <div class="mt-1">
+          <app-signature-capture [applicationId]="selectedItem.applicationId" (signatureSaved)="onSignatureSaved()" data-testid="term-signature-capture" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeModal()" data-testid="button-cancel-term">Cancel</button>
+        <button class="btn btn-danger" (click)="submitTermination()" [disabled]="submitting()" data-testid="button-submit-term">
+          @if (submitting()) { <span class="spinner"></span> }
+          Terminate
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (batchModalOpen) {
+  <div class="modal-overlay" (click)="closeBatchModal()">
+    <div class="modal-content" style="max-width:32rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Batch Termination</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeBatchModal()" data-testid="button-close-batch-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="detail-text">Terminate {{ selectedIds.size }} selected application(s).</p>
+        <div class="warning-box">
+          <p>This will remove indigent subsidies for all selected applications.</p>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Effective Termination Date *</span>
+          <app-date-input [value]="batchTerminationDate" (valueChange)="batchTerminationDate = $event" testId="input-batch-term-date" inputClass="field-input" />
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Termination Reason *</span>
+          <select class="field-select" [(ngModel)]="batchReasonId" data-testid="select-batch-reason">
+            <option [value]="0">Select reason</option>
+            @for (r of terminationReasons; track r.reasonId) {
+              <option [value]="r.reasonId">{{ r.reasonName }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="batchRemarks" rows="3" placeholder="Notes..." data-testid="input-batch-remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeBatchModal()" data-testid="button-cancel-batch-term">Cancel</button>
+        <button class="btn btn-danger" (click)="submitBatchTermination()" [disabled]="submitting()" data-testid="button-confirm-batch-term">
+          @if (submitting()) { <span class="spinner"></span> }
+          Terminate ({{ selectedIds.size }})
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (batchResultsOpen && batchResults) {
+  <div class="modal-overlay" (click)="closeBatchResults()">
+    <div class="modal-content" style="max-width:36rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Batch Termination Results</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeBatchResults()" data-testid="button-close-batch-results">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="results-summary" data-testid="batch-results-summary">
+          <div class="results-stat results-success">
+            <span class="results-stat-value">{{ batchResults.totalTerminated }}</span>
+            <span class="results-stat-label">Terminated</span>
+          </div>
+          <div class="results-stat results-fail">
+            <span class="results-stat-value">{{ batchResults.totalFailed }}</span>
+            <span class="results-stat-label">Failed</span>
+          </div>
+          <div class="results-stat">
+            <span class="results-stat-value">{{ batchResults.totalRequested }}</span>
+            <span class="results-stat-label">Requested</span>
+          </div>
+        </div>
+        @if (batchResults.results && batchResults.results.length > 0) {
+          <div class="table-container mt-1">
+            <table>
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of batchResults.results; track r.applicationId) {
+                  <tr [attr.data-testid]="'row-batch-result-' + r.applicationId">
+                    <td class="font-mono">{{ r.applicationId }}</td>
+                    <td>
+                      <span class="badge" [class]="r.success ? 'badge-success' : 'badge-danger'">{{ r.success ? 'Success' : 'Failed' }}</span>
+                    </td>
+                    <td>{{ r.message }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="closeBatchResults()" data-testid="button-dismiss-results">Done</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (autoTermResultsOpen && autoTermResults) {
+  <div class="modal-overlay" (click)="closeAutoTermResults()">
+    <div class="modal-content" style="max-width:40rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          @if (autoTermResults.dryRun) {
+            Auto-Termination Preview
+          } @else {
+            Auto-Termination Results
+          }
+        </h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeAutoTermResults()" data-testid="button-close-auto-term-results">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="results-summary">
+          <div class="results-stat" [class]="autoTermResults.dryRun ? '' : 'results-success'">
+            <span class="results-stat-value">{{ autoTermResults.totalTerminated || autoTermResults.totalEligible || autoTermResults.total || 0 }}</span>
+            <span class="results-stat-label">{{ autoTermResults.dryRun ? 'Would Be Terminated' : 'Terminated' }}</span>
+          </div>
+          @if (!autoTermResults.dryRun) {
+            <div class="results-stat results-fail">
+              <span class="results-stat-value">{{ autoTermResults.totalFailed || 0 }}</span>
+              <span class="results-stat-label">Failed</span>
+            </div>
+            <div class="results-stat">
+              <span class="results-stat-value">{{ autoTermResults.notificationsSent || 0 }}</span>
+              <span class="results-stat-label">Notifications Sent</span>
+            </div>
+          }
+        </div>
+
+        @if (autoTermResults.dryRun) {
+          <div class="info-box" style="margin-top: 1rem;">
+            <span class="material-icons" style="font-size: 16px; color: var(--platinum-accent);">info</span>
+            <span>This is a preview — no changes have been made. Click "Run Auto-Termination" to execute.</span>
+          </div>
+        } @else {
+          <div class="info-box" style="margin-top: 1rem;">
+            <span class="material-icons" style="font-size: 16px; color: #27ae60;">check_circle</span>
+            <span>All terminations and notifications have been logged to the communication log.</span>
+          </div>
+        }
+
+        @if (autoTermResults.results || autoTermResults.applications) {
+          <div class="table-container mt-1">
+            <table>
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Account</th>
+                  <th>Account Holder</th>
+                  <th>Expiry</th>
+                  @if (!autoTermResults.dryRun) {
+                    <th>Status</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of (autoTermResults.results || autoTermResults.applications); track $index) {
+                  <tr>
+                    <td class="font-mono">{{ r.applicationId || r['application_ID'] || '—' }}</td>
+                    <td class="font-mono">{{ r.accountNumber || r['account_Number'] || '—' }}</td>
+                    <td>{{ r.accountHolderName || r.accountHolder || '—' }}</td>
+                    <td>{{ fmtDate(r.expiryDate || r.reApplicationDate) }}</td>
+                    @if (!autoTermResults.dryRun) {
+                      <td>
+                        <span class="badge" [class]="r.success ? 'badge-success' : 'badge-danger'">{{ r.success ? 'Terminated' : 'Failed' }}</span>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="closeAutoTermResults()" data-testid="button-dismiss-auto-term-results">Done</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (overrideModalOpen && overrideItem) {
+  <div class="modal-overlay" (click)="closeOverrideModal()">
+    <div class="modal-content" style="max-width:32rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Override Disqualification</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeOverrideModal()" data-testid="button-close-override-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value">#{{ overrideItem['applicationId'] || overrideItem['application_ID'] }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ overrideItem['accountNumber'] || overrideItem['account_Number'] }}</span></div>
+          <div class="detail-item"><span class="detail-label">Holder</span><span class="detail-value">{{ overrideItem['accountHolderName'] || overrideItem['account_Holder'] }}</span></div>
+        </div>
+        <div class="info-box">
+          <p>Overriding will return this account to Active status. This action will be audited.</p>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Override Reason * (min 10 characters)</span>
+          <textarea class="field-textarea" [(ngModel)]="overrideReason" rows="3" placeholder="Provide detailed justification for override..." data-testid="input-override-reason"></textarea>
+          <span class="field-hint" [class.field-hint-error]="overrideReason.length > 0 && overrideReason.length < 10">{{ overrideReason.length }}/10 characters minimum</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeOverrideModal()" data-testid="button-cancel-override">Cancel</button>
+        <button class="btn btn-primary" (click)="submitOverride()" [disabled]="submitting() || overrideReason.length < 10" data-testid="button-confirm-override">
+          @if (submitting()) { <span class="spinner"></span> }
+          Override Disqualification
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (dncModalOpen && dncItem) {
+  <div class="modal-overlay" (click)="closeDncModal()">
+    <div class="modal-content" style="max-width:30rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Do-Not-Cut Protection</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDncModal()" data-testid="button-close-dnc-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value">#{{ dncItem.applicationId }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value">{{ dncItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Current Do-Not-Cut</span><span class="detail-value">{{ dncItem.doNotCutDate ? fmtDate(dncItem.doNotCutDate) : 'Not set' }}</span></div>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">New Do-Not-Cut Date</span>
+          <div class="input-with-action">
+            <app-date-input [value]="dncDate" (valueChange)="dncDate = $event" testId="input-dnc-date" inputClass="field-input" />
+            <button class="btn btn-ghost btn-sm" (click)="clearDncDate()" data-testid="button-clear-dnc">Clear</button>
+          </div>
+          <span class="field-hint">Leave empty or click Clear to remove do-not-cut protection</span>
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Reason *</span>
+          <textarea class="field-textarea" [(ngModel)]="dncReason" rows="3" placeholder="Reason for updating do-not-cut date..." data-testid="input-dnc-reason"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDncModal()" data-testid="button-cancel-term-dnc">Cancel</button>
+        <button class="btn btn-primary" (click)="submitDncUpdate()" [disabled]="submitting() || !dncReason" data-testid="button-submit-dnc">
+          @if (submitting()) { <span class="spinner"></span> }
+          {{ dncDate ? 'Update Date' : 'Remove Protection' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (commLogModalOpen && commLogItem) {
+  <div class="modal-overlay" (click)="closeCommLogModal()">
+    <div class="modal-content" style="max-width:44rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Communication Log — {{ commLogItem.accountNumber }}</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeCommLogModal()" data-testid="button-close-comm-log">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" style="margin-bottom: 1rem;">
+          <div class="detail-item"><span class="detail-label">Account Holder</span><span class="detail-value">{{ commLogItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Type</span><span class="detail-value">{{ commLogItem.indigentTypeName }}</span></div>
+        </div>
+
+        @if (commLogsLoading()) {
+          <div class="loading-center">
+            <span class="spinner"></span>
+            <p>Loading communication history...</p>
+          </div>
+        } @else if (commLogs().length === 0) {
+          <div class="empty-state" style="padding: 2rem;">
+            <span class="material-icons" style="font-size: 36px; color: #aaa;">speaker_notes_off</span>
+            <p>No communication logs found for this account.</p>
+          </div>
+        } @else {
+          <div class="comm-log-timeline">
+            @for (log of commLogs(); track log.id) {
+              <div class="comm-log-entry" [attr.data-testid]="'comm-log-entry-' + log.id">
+                <div class="comm-log-icon">
+                  @if (log.method === 'email') {
+                    <span class="material-icons">email</span>
+                  } @else if (log.method === 'sms') {
+                    <span class="material-icons">sms</span>
+                  } @else if (log.method === 'whatsapp') {
+                    <span class="material-icons">chat</span>
+                  } @else if (log.method === 'system-auto') {
+                    <span class="material-icons">auto_delete</span>
+                  } @else {
+                    <span class="material-icons">description</span>
+                  }
+                </div>
+                <div class="comm-log-content">
+                  <div class="comm-log-header">
+                    <span class="comm-log-subject">{{ log.subject || 'No subject' }}</span>
+                    <span class="comm-log-date">{{ fmtDate(log.createdAt) }}</span>
+                  </div>
+                  <div class="comm-log-meta">
+                    <span class="badge badge-info" style="font-size: 0.65rem;">{{ log.method }}</span>
+                    @if (log.statementType) {
+                      <span class="badge badge-accent" style="font-size: 0.65rem;">{{ log.statementType }}</span>
+                    }
+                    <span class="comm-log-by">by {{ log.sentByName || 'System' }}</span>
+                  </div>
+                  @if (log.messageBody) {
+                    <div class="comm-log-body">{{ log.messageBody }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="closeCommLogModal()" data-testid="button-close-comm-log-footer">Close</button>
+      </div>
+    </div>
+  </div>
+}

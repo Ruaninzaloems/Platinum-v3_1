@@ -43,14 +43,30 @@
           <div class="completed-list">
             @for (line of completedLines(); track trackByIndex($index)) {
               <div class="completed-item">
-                <span class="font-mono">{{ line.accountNo }}</span>
-                <span>{{ line.name }}</span>
-                <span class="font-mono font-semibold">{{ formatCurrency(line.amount) }}</span>
-                @if (line.receiptNo) {
-                  <span class="badge badge-success">Receipt #{{ line.receiptNo }}</span>
-                }
+                <div class="completed-item-details">
+                  <div class="completed-item-top">
+                    <span class="badge" [ngClass]="getResultTypeClass(line.allocationType || 'ACCOUNT')">{{ line.allocationType || 'Account' }}</span>
+                    <span class="font-mono font-semibold" style="color: var(--platinum-primary, #0f2b46)">{{ line.accountNo }}</span>
+                  </div>
+                  @if (line.name) {
+                    <div class="completed-item-name">{{ line.name }}</div>
+                  }
+                  @if (line.description && line.description !== line.name) {
+                    <div class="completed-item-desc text-muted">{{ line.description }}</div>
+                  }
+                </div>
+                <div class="completed-item-amount">
+                  <span class="font-mono font-semibold">{{ formatCurrency(line.amount) }}</span>
+                  @if (line.receiptNo) {
+                    <span class="badge badge-success" style="font-size: 0.65rem">Receipt #{{ line.receiptNo }}</span>
+                  }
+                </div>
               </div>
             }
+            <div class="completed-total">
+              <span class="font-semibold">Total Allocated</span>
+              <span class="font-mono font-semibold" style="color: #16A34A">{{ formatCurrency(completedLinesTotal()) }}</span>
+            </div>
           </div>
         }
 

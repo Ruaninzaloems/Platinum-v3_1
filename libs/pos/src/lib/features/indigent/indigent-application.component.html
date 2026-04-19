@@ -1,0 +1,1643 @@
+<div class="indigent-application" data-testid="indigent-application">
+  <app-page-header title="Indigent Applications" subtitle="Capture new applications or manage existing ones">
+    <button class="btn btn-outline" (click)="goBackToDashboard()" data-testid="button-back-dashboard" style="margin-right:8px">
+      <span class="material-icons">arrow_back</span> Back to Dashboard
+    </button>
+    <button class="btn btn-outline" (click)="startNewApplication()" data-testid="button-new-application">
+      <span class="material-icons">add</span> New Application
+    </button>
+  </app-page-header>
+
+  <!-- Step Indicator -->
+  <div class="step-indicator" data-testid="step-indicator">
+    @for (step of steps(); track step.key; let i = $index) {
+      <div
+        class="step-item"
+        [class.active]="step.active"
+        [class.done]="step.done"
+        [class.clickable]="canNavigateTo()[step.key]"
+        (click)="goToStep(step.key)"
+        [attr.data-testid]="'step-' + step.key"
+      >
+        <div class="step-circle">
+          @if (step.done && !step.active) {
+            <span class="material-icons step-check">check</span>
+          } @else {
+            <span class="material-icons step-icon">{{ step.icon }}</span>
+          }
+        </div>
+        <span class="step-label">{{ step.label }}</span>
+      </div>
+      @if (i < steps().length - 1) {
+        <div class="step-connector" [class.done]="step.done"></div>
+      }
+    }
+  </div>
+
+  @if (readOnly()) {
+    <div class="alert" style="background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;margin-bottom:12px" data-testid="readonly-banner">
+      <span class="material-icons" style="font-size:20px">visibility</span>
+      <span style="font-weight:500">View Only</span>
+      <span style="color:#64748b;margin-left:4px">This application is opened in read-only mode. Navigate back to make changes.</span>
+    </div>
+  }
+
+  <!-- Success / Error Messages -->
+  @if (successMessage()) {
+    <div class="alert alert-success" data-testid="alert-success">
+      <span class="material-icons">check_circle</span>
+      <span>{{ successMessage() }}</span>
+      <button class="alert-close" (click)="successMessage.set(null)">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+  }
+  @if (error()) {
+    <div class="alert alert-error" data-testid="alert-error">
+      <span class="material-icons">error</span>
+      <span>{{ error() }}</span>
+      <button class="alert-close" (click)="error.set(null)">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+  }
+
+  <!-- STEP 1: Search -->
+  @if (currentView() === 'search') {
+    <app-card title="Find Account" subtitle="Search by account number, name, or ID number to start a new application or find an existing one">
+      <div class="search-section" data-testid="search-section">
+        <div class="search-bar">
+          <span class="material-icons search-icon">{{ acLoading() ? 'hourglass_empty' : 'search' }}</span>
+          <div class="search-input-wrap">
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Type account number or name to search..."
+              [ngModel]="searchQuery()"
+              (ngModelChange)="onInputChange($event)"
+              (keyup.enter)="onSearch()"
+              (blur)="closeDropdown()"
+              (focus)="searchPerformed() ? null : showDropdown.set(autocompleteResults().length > 0)"
+              autocomplete="off"
+              data-testid="input-search"
+            />
+            @if (showDropdown() && autocompleteResults().length > 0) {
+              <div class="ac-dropdown" data-testid="autocomplete-dropdown">
+                <div class="ac-count-badge">
+                  <span class="material-icons" style="font-size:14px">people</span>
+                  {{ autocompleteResults().length }} Account{{ autocompleteResults().length !== 1 ? 's' : '' }} Found
+                </div>
+                @for (item of autocompleteResults(); track item.accountId) {
+                  <div
+                    class="ac-item ac-item-rich"
+                    (mousedown)="selectFromDropdown(item)"
+                    [attr.data-testid]="'ac-item-' + item.accountId"
+                  >
+                    <div class="ac-item-avatar">
+                      <span class="material-icons">account_circle</span>
+                    </div>
+                    <div class="ac-item-details">
+                      <div class="ac-item-top">
+                        <span class="ac-account-num">{{ item.displayItem }}</span>
+                        @if (item.accountName) {
+                          <span class="ac-sep">&mdash;</span>
+                          <span class="ac-name-text">{{ item.accountName }}</span>
+                        }
+                      </div>
+                      @if (item.address) {
+                        <div class="ac-item-address">
+                          <span class="material-icons ac-mini-icon">location_on</span>
+                          {{ item.address }}
+                        </div>
+                      }
+                    </div>
+                    <div class="ac-item-right">
+                      @if (item.balance !== null) {
+                        <span class="ac-balance" [class.ac-balance-positive]="item.balance > 0">
+                          R {{ item.balance.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}
+                        </span>
+                      }
+                      @if (item.status) {
+                        <span class="ac-status" [class.ac-status-active]="item.status === 'Active'">{{ item.status }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+          <button class="btn btn-primary" (click)="onSearch()" [disabled]="searchLoading() || searchQuery().trim().length < 2" data-testid="button-search">
+            @if (searchLoading()) {
+              <app-spinner />
+            } @else {
+              Search
+            }
+          </button>
+          @if (searchQuery() || selectedAccount() || searchPerformed()) {
+            <button class="btn btn-outline" (click)="clearSelectedAccount()" [disabled]="searchLoading()" data-testid="button-clear-search" title="Clear search">
+              <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">close</span>Clear
+            </button>
+          }
+        </div>
+
+        @if (selectedAccount() && currentView() === 'search') {
+          <div class="account-detail-card" data-testid="selected-account-detail">
+            <div class="adc-header">
+              <div class="adc-avatar">
+                <span class="material-icons">account_circle</span>
+              </div>
+              <div class="adc-title-block">
+                <h3 class="adc-name" data-testid="text-account-name">{{ selectedAccount()!.fullName || 'N/A' }}</h3>
+                <span class="adc-account-num" data-testid="text-account-number">Account {{ selectedAccount()!.accountNo }}</span>
+              </div>
+              <button class="btn btn-outline btn-sm" (click)="clearSelectedAccount()" data-testid="button-clear-account">
+                <span class="material-icons">close</span> Change
+              </button>
+            </div>
+            <div class="adc-grid">
+              <div class="adc-field">
+                <span class="material-icons adc-field-icon">location_on</span>
+                <div class="adc-field-content">
+                  <span class="adc-field-label">Physical Address</span>
+                  <span class="adc-field-value" data-testid="text-account-address">{{ selectedAccount()!.physicalAddress || '—' }}</span>
+                </div>
+              </div>
+              <div class="adc-field">
+                <span class="material-icons adc-field-icon">description</span>
+                <div class="adc-field-content">
+                  <span class="adc-field-label">SG Number</span>
+                  <span class="adc-field-value" data-testid="text-account-sg">{{ selectedAccount()!.sgNumber || '—' }}</span>
+                </div>
+              </div>
+              <div class="adc-field">
+                <span class="material-icons adc-field-icon">phone</span>
+                <div class="adc-field-content">
+                  <span class="adc-field-label">Contact Numbers</span>
+                  @if (selectedAccount()!.allPhones.length > 0) {
+                    <div class="contact-list" data-testid="text-account-phones">
+                      @for (phone of selectedAccount()!.allPhones; track $index) {
+                        <span class="contact-chip contact-chip-phone" [attr.data-testid]="'text-account-phone-' + $index">
+                          <span class="material-icons contact-chip-icon">phone</span>
+                          {{ phone }}
+                        </span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="adc-field-value" data-testid="text-account-cell">{{ selectedAccount()!.cellNo || '—' }}</span>
+                  }
+                </div>
+              </div>
+              <div class="adc-field">
+                <span class="material-icons adc-field-icon">email</span>
+                <div class="adc-field-content">
+                  <span class="adc-field-label">Email Addresses</span>
+                  @if (selectedAccount()!.allEmails.length > 0) {
+                    <div class="contact-list" data-testid="text-account-emails">
+                      @for (em of selectedAccount()!.allEmails; track $index) {
+                        <span class="contact-chip contact-chip-email" [attr.data-testid]="'text-account-email-' + $index">
+                          <span class="material-icons contact-chip-icon">email</span>
+                          {{ em }}
+                        </span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="adc-field-value" data-testid="text-account-email">{{ selectedAccount()!.email || '—' }}</span>
+                  }
+                </div>
+              </div>
+              @if (selectedAccount()!.accountStatus) {
+                <div class="adc-field">
+                  <span class="material-icons adc-field-icon">info</span>
+                  <div class="adc-field-content">
+                    <span class="adc-field-label">Account Status</span>
+                    <span class="adc-field-value" data-testid="text-account-status">{{ selectedAccount()!.accountStatus }}</span>
+                  </div>
+                </div>
+              }
+              @if (selectedAccount()!.propertyId) {
+                <div class="adc-field">
+                  <span class="material-icons adc-field-icon">home</span>
+                  <div class="adc-field-content">
+                    <span class="adc-field-label">Property ID</span>
+                    <span class="adc-field-value" data-testid="text-account-property">{{ selectedAccount()!.propertyId }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="adc-balance-row">
+              <div class="adc-balance">
+                <span class="adc-balance-label">Outstanding Balance</span>
+                <span class="adc-balance-value" data-testid="text-account-balance">{{ formatCurrency(selectedAccount()!.balance) }}</span>
+              </div>
+              @if (checkingExistingApps()) {
+                <div class="btn btn-outline btn-sm" style="pointer-events:none; opacity:0.7;">
+                  <span class="material-icons spin">sync</span> Checking existing applications...
+                </div>
+              } @else if (accountExistingApps().length === 0) {
+                <button class="btn btn-primary" (click)="proceedWithSelectedAccount()" data-testid="button-proceed-qualification">
+                  <span class="material-icons">arrow_forward</span> Proceed to Qualification
+                </button>
+              }
+            </div>
+
+            @if (!checkingExistingApps() && accountExistingApps().length > 0) {
+              <div class="existing-app-banner" data-testid="existing-app-banner">
+                <div class="existing-app-banner-header">
+                  <span class="material-icons" style="color: #dc2626; font-size: 22px;">block</span>
+                  <div>
+                    <strong>Application Already Exists</strong>
+                    <p style="margin:2px 0 0; font-size:13px; color:#555;">This account already has an active indigent application. Only one application per account is allowed. You can continue working on the existing application below. A new application can only be created after the current one has been terminated.</p>
+                  </div>
+                </div>
+                @for (app of accountExistingApps(); track app.applicationId) {
+                  <div class="existing-app-row" [attr.data-testid]="'existing-app-row-' + app.applicationId">
+                    <div class="existing-app-info">
+                      <span class="existing-app-id">#{{ app.applicationId }}</span>
+                      <span class="existing-app-status">{{ app.attpStatus }}</span>
+                      @if (app.applicationDate) {
+                        <span class="existing-app-date">{{ formatDate(app.applicationDate) }}</span>
+                      }
+                    </div>
+                    <button class="btn btn-primary" (click)="loadApplicationById(app.applicationId, false)" [attr.data-testid]="'button-continue-app-' + app.applicationId">
+                      <span class="material-icons">play_arrow</span> Continue Application
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (!selectedAccount() && searchPerformed()) {
+          @if (searchResults().length === 0 && !searchLoading()) {
+            <app-empty-state icon="search_off" title="No accounts found" message="Try a different search term — account number, name, or ID number" />
+          } @else {
+            <div class="results-list" data-testid="search-results">
+              @for (acct of searchResults(); track acct.accountId) {
+                <div class="result-card" (click)="selectFromSearchResult(acct)" [attr.data-testid]="'result-' + acct.accountId">
+                  <div class="result-header">
+                    <span class="result-account">{{ acct.accountNo }}</span>
+                    <app-badge variant="info" data-testid="badge-balance">{{ formatCurrency(acct.balance) }}</app-badge>
+                  </div>
+                  <div class="result-name">{{ acct.fullName }}</div>
+                  @if (acct.idNo) {
+                    <div class="result-detail"><span class="material-icons detail-icon">badge</span> {{ acct.idNo }}</div>
+                  }
+                  @if (acct.physicalAddress) {
+                    <div class="result-detail"><span class="material-icons detail-icon">location_on</span> {{ acct.physicalAddress }}</div>
+                  }
+                  <div class="result-action">
+                    <span class="material-icons">arrow_forward</span> Select this account
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP 2: Qualification Check -->
+  @if (currentView() === 'qualification') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <div class="selected-account-banner" data-testid="selected-account-banner">
+      <div class="banner-info">
+        <span class="material-icons banner-icon">account_circle</span>
+        <div>
+          <div class="banner-name">{{ selectedAccount()?.fullName }}</div>
+          <div class="banner-account">Account: {{ selectedAccount()?.accountNo }} &middot; Balance: {{ formatCurrency(selectedAccount()?.balance) }}</div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" (click)="startNewApplication()" data-testid="button-change-account">Change Account</button>
+    </div>
+
+    <app-card title="Qualification Check" subtitle="Select indigent type and run eligibility checks">
+      <div class="qual-section" data-testid="qualification-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="indigentType">Indigent Type</label>
+            <select
+              id="indigentType"
+              class="form-select"
+              [ngModel]="selectedIndigentTypeId()"
+              (ngModelChange)="onIndigentTypeChange($event)"
+              data-testid="select-indigent-type"
+            >
+              @for (t of indigentTypes(); track t.indigentTypeId) {
+                <option [ngValue]="t.indigentTypeId">{{ t.indigentTypeName }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        @if (!smartCheckDone() && !smartCheckLoading()) {
+          <div class="smart-qual-intro" data-testid="smart-qual-intro">
+            <div class="smart-intro-info">
+              <span class="material-icons" style="font-size: 20px; color: var(--platinum-primary);">auto_fix_high</span>
+              <div>
+                <strong>Smart Qualification</strong>
+                <p class="smart-intro-desc">Checks are run against available data in the system. Where data is available, checks are verified automatically. Where not, you will be asked to verify manually with supporting documents.</p>
+              </div>
+            </div>
+            <button class="btn btn-primary" (click)="runSmartQualification()" data-testid="button-run-smart-qual">
+              <span class="material-icons">play_arrow</span> Run Qualification Checks
+            </button>
+          </div>
+        }
+
+        @if (smartCheckLoading()) {
+          <div class="loading-inline">
+            <app-spinner />
+            <span>Fetching account data and running checks...</span>
+          </div>
+        }
+
+        @if (smartCheckDone()) {
+          <div class="smart-qual-results" data-testid="smart-qual-results">
+
+            @if (autoCheckResults().length > 0) {
+              <div class="checks-section" data-testid="auto-checks-section">
+                <div class="checks-section-header">
+                  <span class="material-icons" style="font-size: 16px; color: var(--platinum-primary);">verified_user</span>
+                  <span class="checks-section-title">Auto-Verified</span>
+                  <span class="checks-method-badge badge-auto">System Data</span>
+                  <span class="checks-count">{{ autoCheckResults().filter(c => c.passed).length }}/{{ autoCheckResults().length }} passed</span>
+                </div>
+                <div class="checks-list">
+                  @for (check of autoCheckResults(); track check.testId) {
+                    <div class="check-row" [attr.data-testid]="'check-auto-' + check.testId">
+                      <span class="material-icons check-icon" [class.pass]="check.passed === true" [class.fail]="check.passed === false">
+                        {{ check.passed === true ? 'check_circle' : check.passed === false ? 'cancel' : 'help_outline' }}
+                      </span>
+                      <div class="check-info">
+                        <span class="check-rule">{{ check.testName }}</span>
+                        <span class="check-detail">{{ check.detail }}</span>
+                        <span class="check-source">
+                          <span class="material-icons" style="font-size: 12px;">storage</span> {{ check.dataSource }}
+                        </span>
+                      </div>
+                      @if (check.passed === true) {
+                        <span class="severity-badge severity-passed">PASSED</span>
+                      } @else if (check.passed === false) {
+                        <span class="severity-badge" [class.severity-blocking]="check.severity === 'blocking'" [class.severity-warning]="check.severity === 'warning'">
+                          {{ check.severity === 'blocking' ? 'FAILED' : 'WARNING' }}
+                        </span>
+                      } @else {
+                        <span class="severity-badge severity-pending">PENDING</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (bothCheckResults().length > 0) {
+              <div class="checks-section" data-testid="both-checks-section">
+                <div class="checks-section-header">
+                  <span class="material-icons" style="font-size: 16px; color: #4338ca;">playlist_add_check</span>
+                  <span class="checks-section-title">Auto-Verified + Manual Confirmation</span>
+                  <span class="checks-method-badge badge-both">Both Required</span>
+                  <span class="checks-count">{{ bothCheckResults().filter(c => c.passed && manualOverrides()[c.testId]).length }}/{{ bothCheckResults().length }} complete</span>
+                </div>
+                <div class="checks-list">
+                  @for (check of bothCheckResults(); track check.testId) {
+                    <div class="check-row check-row-both" [attr.data-testid]="'check-both-' + check.testId">
+                      <div class="both-check-status">
+                        <span class="material-icons check-icon" [class.pass]="check.passed === true" [class.fail]="check.passed === false">
+                          {{ check.passed === true ? 'check_circle' : check.passed === false ? 'cancel' : 'help_outline' }}
+                        </span>
+                      </div>
+                      <div class="check-info">
+                        <span class="check-name">{{ check.testName }}</span>
+                        <span class="check-detail">{{ check.detail || check.description }}</span>
+                        @if (check.dataSource) {
+                          <span class="check-source">{{ check.dataSource }}</span>
+                        }
+                      </div>
+                      <div class="manual-check-actions">
+                        @if (manualOverrides()[check.testId]) {
+                          <span class="severity-badge severity-passed">VERIFIED</span>
+                        } @else {
+                          <span class="severity-badge severity-blocking">UPLOAD REQUIRED</span>
+                        }
+                        <label class="doc-upload-btn" [attr.data-testid]="'upload-doc-both-' + check.testId" title="Upload supporting document">
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display: none"
+                            (change)="onDocumentUpload($event, check.testId, check.testName)" />
+                          <span class="material-icons" style="font-size: 16px;">attach_file</span>
+                        </label>
+                      </div>
+                    </div>
+                    @if (uploadedDocs()[check.testId]?.length) {
+                      <div class="uploaded-docs-list">
+                        @for (doc of uploadedDocs()[check.testId]; track doc.name) {
+                          <div class="uploaded-doc-item">
+                            <span class="material-icons" style="font-size: 14px; color: #059669;">insert_drive_file</span>
+                            <span class="doc-name">{{ doc.name }}</span>
+                            <span class="doc-size">{{ doc.sizeLabel }}</span>
+                            @if (doc.uploaded) {
+                              <span class="doc-status-ok"><span class="material-icons" style="font-size: 12px;">check_circle</span> Ready</span>
+                            } @else if (doc.error) {
+                              <span class="doc-status-error">{{ doc.error }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (check.testId === 'income_limit') {
+                      <div class="income-capture-inline" data-testid="income-capture-inline-both">
+                        <div class="income-capture-row">
+                          <div class="income-field">
+                            <label class="income-label">Household Income (R/month)</label>
+                            <input type="number" class="income-input" min="0" step="0.01" placeholder="0.00"
+                              [ngModel]="capturedIncome()"
+                              (ngModelChange)="onIncomeCaptured($event)"
+                              data-testid="input-qual-income-both" />
+                          </div>
+                          <div class="income-field">
+                            <label class="income-label">Income Source</label>
+                            <select class="income-input" [ngModel]="capturedIncomeSourceId()" (ngModelChange)="capturedIncomeSourceId.set($event)" data-testid="select-income-source-both">
+                              <option [ngValue]="0">-- Select source --</option>
+                              @for (src of incomeSources(); track src.incomeSourceId) {
+                                <option [ngValue]="src.incomeSourceId">{{ src.incomeSourceName }}</option>
+                              }
+                            </select>
+                          </div>
+                        </div>
+                        @if (capturedIncome() > 0 && getIncomeLimit() > 0) {
+                          <div class="income-eval" [class.income-pass]="capturedIncome() <= getIncomeLimit()" [class.income-fail]="capturedIncome() > getIncomeLimit()">
+                            <span class="material-icons" style="font-size: 14px;">
+                              {{ capturedIncome() <= getIncomeLimit() ? 'check_circle' : 'cancel' }}
+                            </span>
+                            <span>R{{ capturedIncome().toLocaleString() }} {{ capturedIncome() <= getIncomeLimit() ? 'is within' : 'exceeds' }} the R{{ getIncomeLimit().toLocaleString() }} limit</span>
+                          </div>
+                        }
+                        <p class="income-hint">
+                          <span class="material-icons" style="font-size: 12px;">info</span>
+                          Upload payslips, bank statements, or SASSA letter as proof of income
+                        </p>
+                      </div>
+                    }
+
+                    @if (!uploadedDocs()[check.testId]?.length && !manualOverrides()[check.testId]) {
+                      <div class="no-doc-warning">
+                        <span class="material-icons" style="font-size: 13px;">warning</span>
+                        Upload a supporting document to verify this check
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            }
+
+            @if (manualCheckResults().length > 0) {
+              <div class="checks-section" data-testid="manual-checks-section">
+                <div class="checks-section-header">
+                  <span class="material-icons" style="font-size: 16px; color: var(--platinum-accent);">edit_note</span>
+                  <span class="checks-section-title">Manual Verification Required</span>
+                  <span class="checks-method-badge badge-manual">Documents Required</span>
+                  <span class="checks-count">{{ manualCheckResults().filter(c => manualOverrides()[c.testId]).length }}/{{ manualCheckResults().length }} confirmed</span>
+                </div>
+                <div class="checks-list">
+                  @for (check of manualCheckResults(); track check.testId) {
+                    <div class="check-row check-row-manual" [attr.data-testid]="'check-manual-' + check.testId">
+                      <span class="material-icons check-icon" [class.pass]="manualOverrides()[check.testId]" [class.pending]="!manualOverrides()[check.testId]">
+                        {{ manualOverrides()[check.testId] ? 'check_circle' : 'radio_button_unchecked' }}
+                      </span>
+                      <div class="check-info">
+                        <span class="check-rule">{{ check.testName }}</span>
+                        <span class="check-detail">{{ check.detail }}</span>
+                        <span class="check-source">
+                          <span class="material-icons" style="font-size: 12px;">description</span> {{ check.dataSource }}
+                        </span>
+                      </div>
+                      <div class="manual-check-actions">
+                        @if (manualOverrides()[check.testId]) {
+                          <span class="severity-badge severity-passed">VERIFIED</span>
+                        } @else {
+                          <span class="severity-badge severity-blocking">UPLOAD REQUIRED</span>
+                        }
+                        <label class="doc-upload-btn" [attr.data-testid]="'upload-doc-' + check.testId" title="Upload supporting document">
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display: none"
+                            (change)="onDocumentUpload($event, check.testId, check.testName)" />
+                          <span class="material-icons" style="font-size: 16px;">attach_file</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    @if (check.testId === 'income_limit') {
+                      <div class="income-capture-inline" data-testid="income-capture-inline">
+                        <div class="income-capture-row">
+                          <div class="income-field">
+                            <label class="income-label">Household Income (R/month)</label>
+                            <input type="number" class="income-input" min="0" step="0.01" placeholder="0.00"
+                              [ngModel]="capturedIncome()"
+                              (ngModelChange)="onIncomeCaptured($event)"
+                              data-testid="input-qual-income" />
+                          </div>
+                          <div class="income-field">
+                            <label class="income-label">Income Source</label>
+                            <select class="income-input" [ngModel]="capturedIncomeSourceId()" (ngModelChange)="capturedIncomeSourceId.set($event)" data-testid="select-income-source">
+                              <option [ngValue]="0">-- Select source --</option>
+                              @for (src of incomeSources(); track src.incomeSourceId) {
+                                <option [ngValue]="src.incomeSourceId">{{ src.incomeSourceName }}</option>
+                              }
+                            </select>
+                          </div>
+                        </div>
+                        @if (capturedIncome() > 0 && getIncomeLimit() > 0) {
+                          <div class="income-eval" [class.income-pass]="capturedIncome() <= getIncomeLimit()" [class.income-fail]="capturedIncome() > getIncomeLimit()">
+                            <span class="material-icons" style="font-size: 14px;">
+                              {{ capturedIncome() <= getIncomeLimit() ? 'check_circle' : 'cancel' }}
+                            </span>
+                            <span>R{{ capturedIncome().toLocaleString() }} {{ capturedIncome() <= getIncomeLimit() ? 'is within' : 'exceeds' }} the R{{ getIncomeLimit().toLocaleString() }} limit</span>
+                          </div>
+                        }
+                        <p class="income-hint">
+                          <span class="material-icons" style="font-size: 12px;">info</span>
+                          Upload payslips, bank statements, or SASSA letter as proof of income
+                        </p>
+                      </div>
+                    }
+
+                    @if (uploadedDocs()[check.testId]?.length) {
+                      <div class="uploaded-docs-list">
+                        @for (doc of uploadedDocs()[check.testId]; track doc.name) {
+                          <div class="uploaded-doc-item">
+                            <span class="material-icons" style="font-size: 14px; color: #059669;">insert_drive_file</span>
+                            <span class="doc-name">{{ doc.name }}</span>
+                            <span class="doc-size">{{ doc.sizeLabel }}</span>
+                            @if (doc.uploaded) {
+                              <span class="doc-status-ok">
+                                <span class="material-icons" style="font-size: 12px;">check_circle</span> Ready
+                              </span>
+                            } @else if (doc.error) {
+                              <span class="doc-status-error">{{ doc.error }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (!uploadedDocs()[check.testId]?.length && !manualOverrides()[check.testId]) {
+                      <div class="no-doc-warning">
+                        <span class="material-icons" style="font-size: 13px;">warning</span>
+                        Upload a supporting document to verify this check
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            }
+
+            @if (bureauCheckResults().length > 0) {
+              <div class="checks-section" data-testid="bureau-checks-section">
+                <div class="checks-section-header">
+                  <span class="material-icons" style="font-size: 16px; color: #7c3aed;">cloud_sync</span>
+                  <span class="checks-section-title">Bureau / External Verification</span>
+                  <span class="checks-method-badge badge-bureau">MBA / XDS</span>
+                </div>
+                <div class="checks-list">
+                  @for (check of bureauCheckResults(); track check.testId) {
+                    <div class="check-row" [attr.data-testid]="'check-bureau-' + check.testId">
+                      <span class="material-icons check-icon pending">cloud_queue</span>
+                      <div class="check-info">
+                        <span class="check-rule">{{ check.testName }}</span>
+                        <span class="check-detail">{{ check.detail }}</span>
+                        <span class="check-source">
+                          <span class="material-icons" style="font-size: 12px;">cloud</span> {{ check.dataSource }}
+                        </span>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (existingApplications().length > 0) {
+              <div class="existing-apps" data-testid="existing-applications" style="border: 2px solid #dc2626; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: #fef2f2;">
+                <h4 class="existing-title" style="color: #dc2626;">
+                  <span class="material-icons">block</span>
+                  Application Already Exists — Cannot Create New
+                </h4>
+                <p style="font-size: 13px; color: #555; margin: 0.25rem 0 0.75rem;">Only one application per account is allowed. A new application can only be created after the current one has been terminated.</p>
+                @for (app of existingApplications(); track app.applicationId) {
+                  <div class="existing-card" [attr.data-testid]="'existing-app-' + app.applicationId">
+                    <div class="existing-info">
+                      <app-badge [variant]="app.attpStatus === 'Active' ? 'success' : app.attpStatus === 'Pending' ? 'warning' : 'default'">{{ app.attpStatus }}</app-badge>
+                      <span>App #{{ app.applicationId }} &middot; Applied: {{ formatDate(app.applicationDate) }}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <button class="btn btn-outline btn-sm" (click)="viewExistingApplication(app.applicationId)" data-testid="button-view-existing">
+                        <span class="material-icons">visibility</span> View
+                      </button>
+                      @if (app.attpStatus !== 'Active' && app.attpStatus !== 'Terminated') {
+                        <button class="btn btn-primary btn-sm" (click)="continueExistingApplication(app.applicationId)" data-testid="button-continue-existing">
+                          <span class="material-icons">play_arrow</span> Continue
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="smart-qual-summary" data-testid="smart-qual-summary">
+              @if (smartQualificationPassed() === true) {
+                <div class="qual-header qual-pass">
+                  <span class="material-icons">check_circle</span>
+                  <span>All blocking checks passed — account qualifies for indigent registration</span>
+                </div>
+                @if (qualifiedSubsidyPercentage() !== null) {
+                  <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;"
+                    [style.background]="qualifiedSubsidyPercentage()! > 0 ? '#e8f5e9' : '#fce4ec'" data-testid="subsidy-percentage-badge">
+                    <span class="material-icons" [style.color]="qualifiedSubsidyPercentage()! > 0 ? '#2e7d32' : '#c62828'" style="font-size: 20px;">percent</span>
+                    <span [style.color]="qualifiedSubsidyPercentage()! > 0 ? '#1b5e20' : '#c62828'" style="font-weight: 600;">
+                      @if (qualifiedSubsidyPercentage()! > 0) {
+                        Qualified Subsidy: {{ qualifiedSubsidyPercentage() }}%
+                      } @else {
+                        Subsidy: 0% — Income exceeds qualification brackets
+                      }
+                    </span>
+                    @if (qualifiedSubsidyPercentage()! > 0) {
+                      <span style="font-size: 0.8rem; color: #555; margin-left: auto;">This percentage will be recorded on the application</span>
+                    }
+                  </div>
+                }
+              } @else if (smartQualificationPassed() === false) {
+                <div class="qual-header qual-warn">
+                  <span class="material-icons">warning</span>
+                  <span>Some blocking checks have not passed or are pending manual confirmation. Review the items above before proceeding.</span>
+                </div>
+              }
+            </div>
+
+            <div class="qual-actions" data-testid="qual-actions-bar">
+              <div class="qual-actions-row">
+                <button class="btn btn-outline btn-sm" (click)="runSmartQualification()" data-testid="button-rerun-qual">
+                  <span class="material-icons">refresh</span> Re-run Checks
+                </button>
+                @if (isPdfOnQualificationEnabled()) {
+                  <button class="btn btn-outline btn-sm" (click)="printQualificationReport()" data-testid="button-print-report">
+                    <span class="material-icons">picture_as_pdf</span> Print Report
+                  </button>
+                }
+                @if (isRejectionLetterEnabled() && smartQualificationPassed() === false) {
+                  <button class="btn btn-outline btn-sm" (click)="printRejectionLetter()" data-testid="button-print-rejection">
+                    <span class="material-icons">block</span> Rejection Letter
+                  </button>
+                }
+              </div>
+              @if (smartQualificationPassed() !== null) {
+                <div class="qual-actions-row" style="gap:6px">
+                  @if (isAutoSendEnabled('email')) {
+                    <button class="btn btn-outline btn-sm" (click)="sendResultViaEmail()" data-testid="button-auto-email">
+                      <span class="material-icons" style="font-size:16px">email</span> Email Result
+                    </button>
+                  }
+                  @if (isAutoSendEnabled('sms')) {
+                    <button class="btn btn-outline btn-sm" (click)="sendResultViaSms()" data-testid="button-auto-sms">
+                      <span class="material-icons" style="font-size:16px">sms</span> SMS Result
+                    </button>
+                  }
+                  @if (isAutoSendEnabled('whatsapp')) {
+                    <button class="btn btn-outline btn-sm" (click)="sendResultViaWhatsapp()" data-testid="button-auto-whatsapp">
+                      <span class="material-icons" style="font-size:16px">chat</span> WhatsApp
+                    </button>
+                  }
+                </div>
+              }
+              <div style="display:flex; gap:12px; width:100%;">
+                <button class="btn btn-outline" (click)="cancelApplication()" data-testid="button-cancel-application" style="flex:0 0 auto;">
+                  <span class="material-icons">close</span> Cancel
+                </button>
+                <button class="btn btn-primary" style="flex:1;" [disabled]="smartQualificationPassed() !== true || existingApplications().length > 0" (click)="proceedToForm()" data-testid="button-proceed-form">
+                  <span class="material-icons">arrow_forward</span> Proceed to Application
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP: Required Documents Upload -->
+  @if (currentView() === 'documents') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back-docs">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <app-card title="Supporting Documents" subtitle="Upload the required supporting documents for this application">
+      @if (getDocVerificationEnabled()) {
+        <div class="info-banner info-blue" style="margin-bottom:16px" data-testid="doc-verification-notice">
+          <span class="material-icons" style="font-size:18px">verified_user</span>
+          <span>Document verification is enabled for this indigent type. Uploaded documents will be reviewed and verified before the application can be authorized.</span>
+        </div>
+      }
+
+      <div class="required-docs-list" data-testid="required-docs-list">
+        @for (doc of getRequiredDocumentsForType(); track doc.documentKey) {
+          <div class="required-doc-card" [class.doc-required]="doc.isRequired" [class.doc-uploaded]="getRequiredDocUploadCount(doc.documentKey) > 0" [attr.data-testid]="'doc-card-' + doc.documentKey">
+            <div class="doc-card-header">
+              <div class="doc-card-title-row">
+                <span class="material-icons doc-card-icon" [class.text-green]="getRequiredDocUploadCount(doc.documentKey) > 0">
+                  {{ getRequiredDocUploadCount(doc.documentKey) > 0 ? 'check_circle' : 'upload_file' }}
+                </span>
+                <div>
+                  <div class="doc-card-title">{{ doc.documentLabel }}</div>
+                </div>
+              </div>
+              <div class="doc-card-badges">
+                @if (doc.isRequired) {
+                  <span class="badge badge-red" data-testid="badge-required">Required</span>
+                } @else {
+                  <span class="badge badge-grey">Optional</span>
+                }
+              </div>
+            </div>
+
+            @if (requiredDocUploads()[doc.documentKey]?.length) {
+              <div class="doc-card-files">
+                @for (file of requiredDocUploads()[doc.documentKey]; track file.name) {
+                  <div class="doc-file-row" [attr.data-testid]="'doc-file-' + doc.documentKey + '-' + file.name">
+                    <span class="material-icons doc-file-icon">
+                      {{ file.uploaded ? 'insert_drive_file' : 'error' }}
+                    </span>
+                    <span class="doc-file-name">{{ file.name }}</span>
+                    <span class="doc-file-size">{{ file.sizeLabel }}</span>
+                    @if (file.uploaded) {
+                      <span class="badge badge-green">Ready</span>
+                    }
+                    @if (file.error) {
+                      <span class="badge badge-red">{{ file.error }}</span>
+                    }
+                    @if (file.fileData) {
+                      <button class="btn btn-sm btn-icon" (click)="viewStagedDoc(file)" title="View" [attr.data-testid]="'button-view-staged-' + doc.documentKey + '-' + file.name">
+                        <span class="material-icons" style="font-size:16px">visibility</span>
+                      </button>
+                      <button class="btn btn-sm btn-icon" (click)="downloadStagedDoc(file)" title="Download" [attr.data-testid]="'button-download-staged-' + doc.documentKey + '-' + file.name">
+                        <span class="material-icons" style="font-size:16px">download</span>
+                      </button>
+                    }
+                    <button class="btn btn-sm btn-icon btn-danger" (click)="removeRequiredDoc(doc.documentKey, file.name)" title="Remove">
+                      <span class="material-icons" style="font-size:16px">close</span>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (getSavedDocsFor(doc).length > 0) {
+              <div class="doc-card-files" style="border-top:1px dashed #e2e8f0;margin-top:8px;padding-top:8px">
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Already uploaded</div>
+                @for (saved of getSavedDocsFor(doc); track saved.documentId) {
+                  <div class="doc-file-row" [attr.data-testid]="'saved-doc-' + saved.documentId">
+                    <span class="material-icons doc-file-icon">cloud_done</span>
+                    <span class="doc-file-name">{{ saved.fileName || saved.documentName }}</span>
+                    <span class="badge badge-blue">{{ saved.documentTypeName }}</span>
+                    <button class="btn btn-sm btn-icon" (click)="viewSavedDoc(saved.documentId)" title="View" [attr.data-testid]="'button-view-saved-' + saved.documentId">
+                      <span class="material-icons" style="font-size:16px">visibility</span>
+                    </button>
+                    <button class="btn btn-sm btn-icon" (click)="downloadSavedDoc(saved.documentId)" title="Download" [attr.data-testid]="'button-download-saved-' + saved.documentId">
+                      <span class="material-icons" style="font-size:16px">download</span>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="doc-card-upload">
+              <label class="btn btn-outline btn-sm" [attr.data-testid]="'button-upload-' + doc.documentKey">
+                <span class="material-icons" style="font-size:16px">cloud_upload</span>
+                Upload
+                <input type="file" hidden (change)="onRequiredDocUpload($event, doc)" />
+              </label>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="form-actions" style="margin-top:20px; display:flex; gap:12px;" data-testid="doc-step-actions">
+        <button class="btn btn-outline" (click)="goToStep('qualification')" data-testid="button-back-to-qual">
+          <span class="material-icons">arrow_back</span> Back
+        </button>
+        <button class="btn btn-outline" (click)="cancelApplication()" data-testid="button-cancel-application-docs">
+          <span class="material-icons">close</span> Cancel
+        </button>
+        <button class="btn btn-primary" style="margin-left:auto;" [disabled]="!allRequiredDocsUploaded()" (click)="proceedToFormFromDocs()" data-testid="button-proceed-from-docs">
+          <span class="material-icons">arrow_forward</span> Proceed to Application
+        </button>
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP 3: Application Form -->
+  @if (currentView() === 'form') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back-form">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <div class="selected-account-banner" data-testid="selected-account-banner-form">
+      <div class="banner-info">
+        <span class="material-icons banner-icon">account_circle</span>
+        <div>
+          <div class="banner-name">{{ selectedAccount()?.fullName }}</div>
+          <div class="banner-account">Account: {{ selectedAccount()?.accountNo }}</div>
+        </div>
+      </div>
+    </div>
+
+    <app-card title="Application Details" subtitle="Complete the application information below">
+      <div class="app-form" data-testid="application-form">
+        @if (selectedAccount(); as acct) {
+          <div class="app-form-section" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px" data-testid="card-account-holder">
+            <div class="app-form-section-title" style="margin-bottom:8px">
+              <span class="material-icons" style="font-size:18px;color:var(--platinum-accent)">person</span>
+              Account Holder
+              <span style="margin-left:8px;font-size:11px;font-weight:500;color:#64748b">(read-only — will be added as occupier on save)</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Title</label><div data-testid="text-holder-title">{{ holderTitle() || '—' }}</div></div>
+              <div class="form-group"><label class="form-label">Initials</label><div data-testid="text-holder-initials">{{ holderInitials() || '—' }}</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">First Names</label><div data-testid="text-holder-first-names">{{ holderFirstNames() || '—' }}</div></div>
+              <div class="form-group"><label class="form-label">Surname</label><div data-testid="text-holder-surname" style="font-weight:600;color:#1e293b">{{ holderSurname() || '—' }}</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Full Name</label><div data-testid="text-holder-name" style="font-weight:600;color:#1e293b">{{ acct.fullName || '—' }}</div></div>
+              <div class="form-group"><label class="form-label">Account Number</label><div data-testid="text-holder-account" style="font-family:'JetBrains Mono',monospace">{{ acct.accountNo || '—' }}</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">ID / Passport</label><div data-testid="text-holder-id">{{ acct.idNo || '—' }}</div></div>
+              <div class="form-group"><label class="form-label">Contact Number</label><div data-testid="text-holder-contact">{{ acct.cellNo || '—' }}</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Date of Birth</label><div data-testid="text-holder-dob">{{ formatDobDisplay(holderForm().dateOfBirth) || '—' }}</div></div>
+              <div class="form-group"><label class="form-label">Gender</label><div data-testid="text-holder-gender">{{ holderForm().gender || '—' }}</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Email</label><div data-testid="text-holder-email">{{ acct.email || '—' }}</div></div>
+              <div class="form-group">
+                <label class="form-label">Outstanding Balance</label>
+                <div data-testid="text-holder-balance" [style.color]="(acct.balance || 0) > 0 ? '#b91c1c' : '#16a34a'" style="font-weight:600;font-family:'JetBrains Mono',monospace">
+                  R {{ (acct.balance || 0) | number:'1.2-2' }}
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:1 1 100%"><label class="form-label">Physical Address</label><div data-testid="text-holder-address">{{ acct.physicalAddress || '—' }}</div></div>
+            </div>
+          </div>
+        }
+        <div class="app-form-section">
+          <div class="app-form-section-title">
+            <span class="material-icons" style="font-size: 18px; color: var(--platinum-accent);">event</span>
+            Application Information
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Application Date</label>
+              <app-date-input [value]="applicationDate().split('T')[0]" [disabled]="true" testId="input-app-date" />
+              <span class="form-hint">Set automatically — not editable</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Household Income (R)</label>
+              <div class="input-with-icon">
+                <span class="input-icon" style="font-weight:600; color: var(--platinum-primary); font-size: 14px;">R</span>
+                <input type="number" class="form-input form-input-icon" [ngModel]="householdIncome()" (ngModelChange)="householdIncome.set($event); holderForm.set({...holderForm(), incomeAmount: +$event || 0})" step="0.01" min="0" data-testid="input-household-income" />
+              </div>
+              @if (qualifiedSubsidyPercentage() !== null) {
+                <div style="margin-top: 4px; display: flex; align-items: center; gap: 6px;" data-testid="text-form-subsidy-pct">
+                  <span [style.background]="qualifiedSubsidyPercentage()! > 0 ? '#e8f5e9' : '#fce4ec'" [style.color]="qualifiedSubsidyPercentage()! > 0 ? '#1b5e20' : '#c62828'" style="padding: 2px 10px; border-radius: 4px; font-weight: 600; font-size: 0.85rem;">{{ qualifiedSubsidyPercentage() }}% Subsidy</span>
+                  <span style="font-size: 0.75rem; color: #777;">
+                    @if (qualifiedSubsidyPercentage()! > 0) {
+                      Based on income sliding scale
+                    } @else {
+                      Income exceeds qualification brackets
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Account Holder — Occupier Type</label>
+              <input type="text" class="form-input" value="Account Holder" disabled data-testid="text-holder-occupier-type" />
+              <span class="form-hint">Fixed — applicant is the account holder</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Account Holder — Relationship to Applicant</label>
+              <input type="text" class="form-input" value="Account Holder" disabled data-testid="text-holder-relationship" />
+              <span class="form-hint">Fixed — applicant is the account holder</span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Account Holder — Employer</label>
+              <select class="form-input" [ngModel]="holderForm().employerId" (ngModelChange)="holderForm.set({...holderForm(), employerId: +$event})" data-testid="select-holder-employer">
+                <option [ngValue]="0">-- None / Unknown --</option>
+                @for (e of employers(); track e.employerId) {
+                  <option [ngValue]="e.employerId">{{ e.employerName }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Account Holder — Income Source</label>
+              <select class="form-input" [ngModel]="holderForm().incomeSourceId" (ngModelChange)="holderForm.set({...holderForm(), incomeSourceId: +$event})" data-testid="select-holder-income-source">
+                <option [ngValue]="0">-- Select --</option>
+                @for (s of incomeSources(); track s.incomeSourceId) {
+                  <option [ngValue]="s.incomeSourceId">{{ s.incomeSourceName }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-form-section">
+          <div class="app-form-section-title">
+            <span class="material-icons" style="font-size: 18px; color: var(--platinum-accent);">date_range</span>
+            Key Dates
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Commencement Date</label>
+              <app-date-input [value]="commencementDate().split('T')[0]" (valueChange)="commencementDate.set($event + 'T00:00:00'); recalcDatesForSenior()" testId="input-commencement-date" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reapplication Date</label>
+              <app-date-input [value]="reApplicationDate().split('T')[0]" (valueChange)="reApplicationDate.set($event + 'T00:00:00')" testId="input-reapplication-date" />
+            </div>
+          </div>
+          @if (isSeniorExtended) {
+            <div class="senior-extended-banner" data-testid="banner-senior-extended">
+              <span class="material-icons" style="font-size: 18px;">elderly</span>
+              <span>Senior Extended Period Applied — Applicant is {{ applicantAge }} years old. Application period extended to {{ getSeniorConfig().extendedMonths }} months.</span>
+            </div>
+          }
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Termination Date</label>
+              <app-date-input [value]="terminationDate().split('T')[0]" (valueChange)="terminationDate.set($event + 'T00:00:00')" testId="input-termination-date" />
+            </div>
+            <div class="form-group"></div>
+          </div>
+        </div>
+
+        <div class="app-form-section">
+          <div class="app-form-section-title">
+            <span class="material-icons" style="font-size: 18px; color: var(--platinum-accent);">contact_phone</span>
+            Alternative Contact Details
+          </div>
+          <p class="form-hint" style="margin-bottom: 0.75rem;">Provide an alternative phone number or email in case the primary account holder contact details are unavailable.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Alternative Phone Number</label>
+              <div class="input-with-icon">
+                <span class="material-icons input-icon">phone</span>
+                <input type="tel" class="form-input form-input-icon" [ngModel]="altContactPhone()" (ngModelChange)="altContactPhone.set($event)" placeholder="e.g. 082 123 4567" data-testid="input-alt-phone" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alternative Email Address</label>
+              <div class="input-with-icon">
+                <span class="material-icons input-icon">email</span>
+                <input type="email" class="form-input form-input-icon" [ngModel]="altContactEmail()" (ngModelChange)="altContactEmail.set($event)" placeholder="e.g. name@example.com" data-testid="input-alt-email" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        @if (showTenantOption()) {
+          <div class="app-form-section">
+            <div class="app-form-section-title">
+              <span class="material-icons" style="font-size: 18px; color: var(--platinum-accent);">home</span>
+              Application Type
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #e3f2fd; border-radius: 6px; font-size: 0.85rem; color: #1565c0;">
+              <span class="material-icons" style="font-size: 18px;">info</span>
+              <span>Tenant Application — automatically detected from account type (Type 2).</span>
+            </div>
+          </div>
+        }
+
+        <div class="app-form-section">
+          <div class="app-form-section-title">
+            <span class="material-icons" style="font-size: 18px; color: var(--platinum-accent);">notes</span>
+            Additional Notes
+          </div>
+          <div class="form-group">
+            <label class="form-label">Remarks (optional)</label>
+            <textarea id="remarks" class="form-input form-textarea" rows="3" [ngModel]="remarks()" (ngModelChange)="remarks.set($event)" placeholder="Any additional notes relevant to this application..." data-testid="input-remarks"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-outline" (click)="goToStep('qualification')" data-testid="button-back-qual">
+            <span class="material-icons">arrow_back</span> Back
+          </button>
+          <button class="btn btn-primary" (click)="saveApplication()" [disabled]="savingApp()" data-testid="button-save-application">
+            @if (savingApp()) {
+              <app-spinner /> Saving...
+            } @else {
+              <span class="material-icons">save</span> Save Application
+            }
+          </button>
+        </div>
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP 4: Occupiers -->
+  @if (currentView() === 'occupiers') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back-occ">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <div class="selected-account-banner">
+      <div class="banner-info">
+        <span class="material-icons banner-icon">account_circle</span>
+        <div>
+          <div class="banner-name">{{ selectedAccount()?.fullName }}</div>
+          <div class="banner-account">Application #{{ savedApplication()?.applicationId }}</div>
+        </div>
+      </div>
+    </div>
+
+    <app-card title="Household Occupiers" subtitle="Add all people living in the household — their income determines subsidy eligibility">
+      <div class="occupiers-section" data-testid="occupiers-section">
+        <div class="occupiers-toolbar">
+          <div class="occupier-stats">
+            <span class="stat-pill"><strong>{{ occupiers().length }}</strong> occupier(s)</span>
+            <span class="stat-pill">Total Income: <strong>{{ formatCurrency(getTotalOccupierIncome()) }}</strong></span>
+            @if (getValidatableIncome() !== getTotalOccupierIncome()) {
+              <span class="stat-pill" style="background:#fef3cd;color:#856404;">Validatable: <strong>{{ formatCurrency(getValidatableIncome()) }}</strong></span>
+            }
+            @if (qualifiedSubsidyPercentage() !== null) {
+              <span class="stat-pill" [style.background]="qualifiedSubsidyPercentage()! > 0 ? '#e8f5e9' : '#fce4ec'" [style.color]="qualifiedSubsidyPercentage()! > 0 ? '#1b5e20' : '#c62828'" data-testid="text-occ-subsidy-pct">Subsidy: <strong>{{ qualifiedSubsidyPercentage() }}%</strong></span>
+            }
+          </div>
+          <button class="btn btn-primary btn-sm" (click)="openAddOccupier()" data-testid="button-add-occupier">
+            <span class="material-icons">person_add</span> Add Occupier
+          </button>
+        </div>
+
+        @if (occupiers().length === 0) {
+          <app-empty-state icon="people" title="No occupiers added" message="Add at least one household occupier to continue" />
+        } @else {
+          <div class="occupier-list" data-testid="occupier-list">
+            @for (occ of occupiers(); track occ.occupierId) {
+              <div class="occupier-card" [attr.data-testid]="'occupier-' + occ.occupierId">
+                <div class="occ-main">
+                  <span class="material-icons occ-avatar">person</span>
+                  <div class="occ-info">
+                    <div class="occ-name">
+                      {{ occ.fullName }}
+                      @if (occ.occupierTypeName) {
+                        <span class="occ-type-badge">{{ occ.occupierTypeName }}</span>
+                      }
+                      @if (isDwellingUnitsEnabled() && occ.dwellingUnitNo) {
+                        <span class="dwelling-badge" [class.dwelling-primary]="occ.dwellingUnitNo == 1" [class.dwelling-additional]="+occ.dwellingUnitNo! > 1">Unit {{ occ.dwellingUnitNo }}</span>
+                      }
+                    </div>
+                    <div class="occ-details">
+                      @if (occ.idNumber) { <span>ID: {{ occ.idNumber }}</span> }
+                      @if (occ.gender) { <span>&middot; {{ occ.gender }}</span> }
+                      @if (occ.relationship) { <span>&middot; {{ occ.relationship }}</span> }
+                    </div>
+                    <div class="occ-details">
+                      @if (occ.employerName && occ.employerName !== 'Default') { <span><span class="material-icons" style="font-size:13px; vertical-align:middle;">business</span> {{ occ.employerName }}</span> }
+                      @if (occ.contactNumber) { <span>&middot; <span class="material-icons" style="font-size:13px; vertical-align:middle;">phone</span> {{ occ.contactNumber }}</span> }
+                    </div>
+                    <div class="occ-income">
+                      <span class="material-icons">payments</span>
+                      {{ formatCurrency(occ.incomeAmount) }}/month
+                      @if (occ.incomeSourceName) { <span class="income-source">({{ occ.incomeSourceName }})</span> }
+                    </div>
+                    @if (occ.remarks) {
+                      <div class="occ-remarks"><span class="material-icons" style="font-size:13px; vertical-align:middle;">notes</span> {{ occ.remarks }}</div>
+                    }
+                  </div>
+                </div>
+                <div class="occ-actions">
+                  <button class="btn-icon" (click)="openEditOccupier(occ)" [attr.data-testid]="'button-edit-occ-' + occ.occupierId">
+                    <span class="material-icons">edit</span>
+                  </button>
+                  <button class="btn-icon btn-icon-danger" (click)="requestDeleteOccupier(occ)" [attr.data-testid]="'button-delete-occ-' + occ.occupierId">
+                    <span class="material-icons">delete</span>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="form-actions">
+          <button class="btn btn-outline" (click)="goToStep('form')" data-testid="button-back-form">
+            <span class="material-icons">arrow_back</span> Back
+          </button>
+          <div class="action-group">
+            @if (isTenantApplication()) {
+              <button class="btn btn-primary" (click)="goToTenant()" data-testid="button-goto-tenant">
+                <span class="material-icons">arrow_forward</span> Tenant Details
+              </button>
+            } @else {
+              <button class="btn btn-outline" (click)="skipToSummary()" data-testid="button-skip-summary">
+                Skip to Summary
+              </button>
+              <button class="btn btn-primary" (click)="skipToSummary()" data-testid="button-finish-occupiers">
+                <span class="material-icons">arrow_forward</span> Continue
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP 5: Tenant Details -->
+  @if (currentView() === 'tenant') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back-tenant">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <div class="selected-account-banner">
+      <div class="banner-info">
+        <span class="material-icons banner-icon">account_circle</span>
+        <div>
+          <div class="banner-name">{{ selectedAccount()?.fullName }}</div>
+          <div class="banner-account">Application #{{ savedApplication()?.applicationId }}</div>
+        </div>
+      </div>
+    </div>
+
+    <app-card title="Tenant Information" subtitle="Enter details of the tenant on this property">
+      <div class="app-form" data-testid="tenant-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="tenantName">Full Name</label>
+            <input type="text" id="tenantName" class="form-input" [ngModel]="tenantForm().fullName" (ngModelChange)="tenantForm.update(f => ({...f, fullName: $event}))" data-testid="input-tenant-name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tenantId">ID Number</label>
+            <input type="text" id="tenantId" class="form-input" [ngModel]="tenantForm().idNumber" (ngModelChange)="tenantForm.update(f => ({...f, idNumber: $event}))" data-testid="input-tenant-id" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="tenantPassport">Passport Number</label>
+            <input type="text" id="tenantPassport" class="form-input" [ngModel]="tenantForm().passportNumber" (ngModelChange)="tenantForm.update(f => ({...f, passportNumber: $event}))" data-testid="input-tenant-passport" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tenantCell">Cell Phone</label>
+            <input type="text" id="tenantCell" class="form-input" [ngModel]="tenantForm().cellPhone" (ngModelChange)="tenantForm.update(f => ({...f, cellPhone: $event}))" data-testid="input-tenant-cell" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="tenantEmail">Email</label>
+            <input type="email" id="tenantEmail" class="form-input" [ngModel]="tenantForm().email" (ngModelChange)="tenantForm.update(f => ({...f, email: $event}))" data-testid="input-tenant-email" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tenantPhysAddr">Physical Address</label>
+          <input type="text" id="tenantPhysAddr" class="form-input" [ngModel]="tenantForm().physicalAddress" (ngModelChange)="tenantForm.update(f => ({...f, physicalAddress: $event}))" data-testid="input-tenant-physical-address" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tenantPostAddr">Postal Address</label>
+          <input type="text" id="tenantPostAddr" class="form-input" [ngModel]="tenantForm().postalAddress" (ngModelChange)="tenantForm.update(f => ({...f, postalAddress: $event}))" data-testid="input-tenant-postal-address" />
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-outline" (click)="goToOccupiers()" data-testid="button-back-occupiers">
+            <span class="material-icons">arrow_back</span> Back
+          </button>
+          <button class="btn btn-primary" (click)="saveTenant()" [disabled]="savingTenant()" data-testid="button-save-tenant">
+            @if (savingTenant()) {
+              <app-spinner /> Saving...
+            } @else {
+              <span class="material-icons">save</span> Save & Continue
+            }
+          </button>
+        </div>
+      </div>
+    </app-card>
+  }
+
+  <!-- STEP 6: Summary -->
+  @if (currentView() === 'summary') {
+    @if (previousStep()) {
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px" (click)="goBack()" data-testid="button-step-back-summary">
+        <span class="material-icons" style="font-size:16px">arrow_back</span> Back to {{ previousStep()!.label }}
+      </button>
+    }
+    <div class="summary-view" data-testid="summary-view">
+      <div class="sum-header-bar">
+        <div class="sum-header-left">
+          <div class="sum-header-icon"><span class="material-icons">assignment</span></div>
+          <div>
+            <div class="sum-header-title">Application #{{ savedApplication()?.applicationId }}</div>
+            <div class="sum-header-sub">{{ selectedAccount()?.fullName || '—' }} &middot; {{ selectedAccount()?.accountNo || '—' }}</div>
+          </div>
+        </div>
+        <div class="sum-header-right">
+          <app-badge [variant]="savedApplication()?.appStatusName === 'Active' ? 'success' : 'warning'">{{ savedApplication()?.appStatusName }}</app-badge>
+          <button class="btn btn-outline btn-sm" (click)="downloadSummaryPdf()" data-testid="button-download-pdf">
+            <span class="material-icons">picture_as_pdf</span> Download PDF
+          </button>
+          @if (qrCodeDataUrl()) {
+            <div class="qr-pill" data-testid="qr-application" title="Scan to open this application">
+              <img [src]="qrCodeDataUrl()" alt="Application QR" />
+              <div class="qr-caption">Scan to open</div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div id="summary-print-area">
+        <div class="sum-grid">
+          <div class="sum-card">
+            <div class="sum-card-title"><span class="material-icons">account_circle</span> Account Holder</div>
+            <table class="sum-table">
+              <tr><td class="sum-lbl">Account</td><td class="sum-val">{{ selectedAccount()?.accountNo || '—' }}</td></tr>
+              <tr><td class="sum-lbl">Name</td><td class="sum-val">{{ selectedAccount()?.fullName || '—' }}</td></tr>
+              <tr><td class="sum-lbl">ID Number</td><td class="sum-val">{{ selectedAccount()?.idNo || '—' }}</td></tr>
+              <tr><td class="sum-lbl">Address</td><td class="sum-val">{{ selectedAccount()?.physicalAddress || '—' }}</td></tr>
+              @if (selectedAccount()?.sgNumber) {
+                <tr><td class="sum-lbl">SG Number</td><td class="sum-val">{{ selectedAccount()?.sgNumber }}</td></tr>
+              }
+              @if (selectedAccount()?.allPhones?.length) {
+                <tr><td class="sum-lbl">Contact</td><td class="sum-val">{{ selectedAccount()!.allPhones.join(', ') }}</td></tr>
+              } @else if (selectedAccount()?.cellNo) {
+                <tr><td class="sum-lbl">Contact</td><td class="sum-val">{{ selectedAccount()!.cellNo }}</td></tr>
+              }
+              @if (selectedAccount()?.allEmails?.length) {
+                <tr><td class="sum-lbl">Email</td><td class="sum-val">{{ selectedAccount()!.allEmails.join(', ') }}</td></tr>
+              } @else if (selectedAccount()?.email) {
+                <tr><td class="sum-lbl">Email</td><td class="sum-val">{{ selectedAccount()!.email }}</td></tr>
+              }
+              @if (selectedAccount()?.balance) {
+                <tr><td class="sum-lbl">Balance</td><td class="sum-val sum-val-warn">{{ formatCurrency(selectedAccount()!.balance) }}</td></tr>
+              }
+            </table>
+          </div>
+
+          <div class="sum-card">
+            <div class="sum-card-title"><span class="material-icons">description</span> Application Details</div>
+            <table class="sum-table">
+              <tr><td class="sum-lbl">Type</td><td class="sum-val">{{ savedApplication()?.indigentTypeName || '—' }}</td></tr>
+              <tr><td class="sum-lbl">Applied</td><td class="sum-val">{{ formatDate(savedApplication()?.applicationDate) }}</td></tr>
+              <tr><td class="sum-lbl">Reapply By</td><td class="sum-val">{{ formatDate(savedApplication()?.reApplicationDate) }}</td></tr>
+              <tr><td class="sum-lbl">Household Income</td><td class="sum-val">{{ formatCurrency(savedApplication()?.householdIncome) }}</td></tr>
+              @if (qualifiedSubsidyPercentage() !== null) {
+                <tr><td class="sum-lbl">Subsidy %</td><td class="sum-val" [style.color]="qualifiedSubsidyPercentage()! > 0 ? '#1b5e20' : '#c62828'" style="font-weight: 600;">{{ qualifiedSubsidyPercentage() }}%</td></tr>
+              }
+              <tr><td class="sum-lbl">Monthly Subsidy</td><td class="sum-val">{{ formatCurrency(savedApplication()?.monthlySubsidy) }}</td></tr>
+              <tr><td class="sum-lbl">Qualifying Units</td><td class="sum-val">{{ savedApplication()?.qualifyingUnits ?? '—' }}</td></tr>
+              @if (savedApplication()?.doNotCutDate) {
+                <tr><td class="sum-lbl">Do-Not-Cut</td><td class="sum-val">{{ formatDate(savedApplication()?.doNotCutDate) }}</td></tr>
+              }
+            </table>
+          </div>
+        </div>
+
+        @if (occupiers().length > 0) {
+          <div class="sum-card sum-card-full">
+            <div class="sum-card-title"><span class="material-icons">people</span> Household Occupiers ({{ occupiers().length }})</div>
+            <table class="sum-occ-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>ID Number</th>
+                  <th>Occupier Type</th>
+                  <th>Relationship</th>
+                  <th>Contact</th>
+                  <th>Employer</th>
+                  <th>Source</th>
+                  @if (isDwellingUnitsEnabled()) { <th>Unit</th> }
+                  <th class="sum-occ-amt">Income</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (occ of occupiers(); track occ.occupierId) {
+                  <tr>
+                    <td class="sum-occ-name">{{ occ.fullName }}</td>
+                    <td>{{ occ.idNumber || '—' }}</td>
+                    <td>{{ occ.occupierTypeName || (occ.occupierTypeId ? (occupierTypeOptions.find(t => t.id === occ.occupierTypeId)?.name || '—') : '—') }}</td>
+                    <td>{{ occ.relationship || '—' }}</td>
+                    <td>{{ occ.contactNumber || '—' }}</td>
+                    <td>{{ occ.employerName || '—' }}</td>
+                    <td>{{ occ.incomeSourceName || '—' }}</td>
+                    @if (isDwellingUnitsEnabled()) { <td>{{ occ.dwellingUnitNo || '—' }}</td> }
+                    <td class="sum-occ-amt">{{ formatCurrency(occ.incomeAmount) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="sum-occ-total-row">
+                  <td [attr.colspan]="isDwellingUnitsEnabled() ? 8 : 7" style="text-align:right; font-weight:600;">Total Household Income</td>
+                  <td class="sum-occ-amt" style="font-weight:700;">{{ formatCurrency(getTotalOccupierIncome()) }}</td>
+                </tr>
+                @if (getValidatableIncome() !== getTotalOccupierIncome()) {
+                  <tr class="sum-occ-validatable-row">
+                    <td [attr.colspan]="isDwellingUnitsEnabled() ? 8 : 7" style="text-align:right; font-weight:500;">
+                      Validatable Income
+                      @if (getExcludedIncomeSourceNames().length > 0) { <span class="sum-excl">(excl. {{ getExcludedIncomeSourceNames().join(', ') }})</span> }
+                      @if (getDwellingExcludedOccupiers().length > 0) { <span class="sum-excl">(excl. {{ getDwellingExcludedOccupiers().length }} add. dwelling)</span> }
+                    </td>
+                    <td class="sum-occ-amt" style="font-weight:600;">{{ formatCurrency(getValidatableIncome()) }}</td>
+                  </tr>
+                }
+              </tfoot>
+            </table>
+          </div>
+        }
+
+        @if (tenantDetail()) {
+          <div class="sum-card sum-card-full">
+            <div class="sum-card-title"><span class="material-icons">person</span> Tenant</div>
+            <table class="sum-table" style="max-width: 400px;">
+              <tr><td class="sum-lbl">Name</td><td class="sum-val">{{ tenantDetail()?.fullName }}</td></tr>
+              @if (tenantDetail()?.idNumber) {
+                <tr><td class="sum-lbl">ID</td><td class="sum-val">{{ tenantDetail()?.idNumber }}</td></tr>
+              }
+              @if (tenantDetail()?.cellPhone) {
+                <tr><td class="sum-lbl">Cell</td><td class="sum-val">{{ tenantDetail()?.cellPhone }}</td></tr>
+              }
+            </table>
+          </div>
+        }
+      </div>
+
+      @if (savedApplication()?.applicationId) {
+        @if (getSiteVerificationEnabled()) {
+          <div class="info-banner info-blue" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;background:#e8f4fd;border:1px solid #90caf9;color:#0d47a1;font-size:0.85rem" data-testid="site-verification-notice">
+            <span class="material-icons" style="font-size:18px">home_work</span>
+            <span>Site verification is enabled for this indigent type. A field worker will need to conduct a physical verification visit before the application can be authorized.</span>
+          </div>
+        }
+        @if (getDocVerificationEnabled()) {
+          <div class="info-banner info-blue" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;background:#e8f4fd;border:1px solid #90caf9;color:#0d47a1;font-size:0.85rem" data-testid="summary-doc-verification-notice">
+            <span class="material-icons" style="font-size:18px">verified_user</span>
+            <span>Document verification is enabled. Uploaded documents will be reviewed before authorization.</span>
+          </div>
+        }
+
+        <app-id-verification
+          [applicationId]="savedApplication()!.applicationId"
+          [idNumber]="selectedAccount()?.idNo || ''"
+          data-testid="id-verification-section"
+        />
+
+        <app-document-manager
+          [applicationId]="savedApplication()!.applicationId"
+          [requiredDocsConfig]="getRequiredDocsForType()"
+          data-testid="document-manager-section"
+        />
+
+        <div class="declaration-section" [hidden]="readOnly()" data-testid="declaration-section">
+          <div class="declaration-header">
+            <span class="material-icons declaration-icon">verified_user</span>
+            <h4 class="declaration-title">Declaration</h4>
+          </div>
+          <div class="declaration-body">
+            <p class="declaration-text">
+              I, <strong>{{ selectedAccount()?.fullName || 'the applicant' }}</strong>, hereby declare that all information provided in this application is true and correct to the best of my knowledge. I understand that providing false or misleading information may result in the application being declined, benefits being terminated, and possible legal action.
+            </p>
+            <label class="declaration-checkbox" data-testid="checkbox-declaration">
+              <input type="checkbox" [checked]="declarationConfirmed()" (change)="declarationConfirmed.set($any($event.target).checked)" />
+              <span>I confirm the information provided above is true and correct</span>
+            </label>
+          </div>
+        </div>
+
+        @if (isSignatureRequired()) {
+          <app-signature-capture
+            [applicationId]="savedApplication()!.applicationId"
+            [accountNo]="selectedAccount()?.accountNo || ''"
+            [accountHolder]="selectedAccount()?.fullName || ''"
+            [allowedSignatureMethods]="signatureCfg().methods"
+            [requireConsent]="signatureCfg().requireConsent"
+            [consentText]="signatureCfg().consentText"
+            [attachSignedDeclarationPdf]="signatureCfg().attachPdf"
+            [qrCodeDataUrl]="qrCodeDataUrl()"
+            (signatureSaved)="onSignatureSaved()"
+            data-testid="signature-capture-section"
+          />
+        }
+      }
+
+      @if (!isSummaryComplete() && savedApplication()?.applicationId) {
+        <div class="summary-validation" data-testid="summary-validation">
+          <span class="material-icons">info</span>
+          <span>
+            @if (!declarationConfirmed()) {
+              Please confirm the declaration above to complete the application.
+            } @else if (isSignatureRequired() && signatureCount() === 0) {
+              Please add the applicant's signature to complete the application.
+            }
+          </span>
+        </div>
+      }
+
+      @if (!readOnly()) {
+        <div class="summary-actions" data-testid="summary-actions">
+          <button class="btn btn-outline" (click)="goToOccupiers()" data-testid="button-edit-occupiers">
+            <span class="material-icons">edit</span> Edit Occupiers
+          </button>
+          <button
+            class="btn btn-primary"
+            (click)="startNewApplication()"
+            [disabled]="savedApplication()?.applicationId && !isSummaryComplete()"
+            [title]="getNextWorkflowStep().label"
+            data-testid="button-submit-next-step">
+            <span class="material-icons">{{ getNextWorkflowStep().icon }}</span>
+            {{ getNextWorkflowStep().label }}
+          </button>
+          <button class="btn btn-ghost" (click)="startNewApplication()" data-testid="button-done-new" title="Start a new application">
+            <span class="material-icons">add</span> New
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Loading Overlay -->
+  @if (loading()) {
+    <div class="loading-overlay" data-testid="loading-overlay">
+      <app-spinner />
+      <span>Loading...</span>
+    </div>
+  }
+
+  <!-- Occupier Dialog -->
+  <app-dialog [open]="showOccupierDialog()" [title]="editingOccupier() ? 'Edit Occupier' : 'Add Occupier'" size="lg" (close)="showOccupierDialog.set(false)">
+    <div class="app-form" data-testid="occupier-dialog-form">
+      <div class="app-form-section">
+        <div class="app-form-section-title"><span class="material-icons">person</span> Personal Details</div>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+          <label class="form-label" for="occName">Full Name *</label>
+          <input type="text" id="occName" class="form-input" [ngModel]="occForm().fullName" (ngModelChange)="occForm.update(f => ({...f, fullName: $event}))" data-testid="input-occ-name" />
+        </div>
+        <div class="form-row" style="margin-bottom: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="occIdNo">ID Number <span style="color:#c62828;">*</span></label>
+            <input type="text" id="occIdNo" class="form-input" maxlength="13" inputmode="numeric"
+              [ngModel]="occForm().idNumber"
+              (ngModelChange)="onOccIdNumberChange($event)"
+              [class.input-error]="occIdNumberError()"
+              placeholder="13-digit SA ID number"
+              data-testid="input-occ-id" />
+            @if (occIdNumberError()) {
+              <small style="color:#c62828; display:block; margin-top:4px;" data-testid="text-occ-id-error">{{ occIdNumberError() }}</small>
+            }
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="occPassport">Passport Number</label>
+            <input type="text" id="occPassport" class="form-input" [ngModel]="occForm().passportNumber" (ngModelChange)="occForm.update(f => ({...f, passportNumber: $event}))" data-testid="input-occ-passport" />
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="occDob">Date of Birth</label>
+            <app-date-input [value]="occForm().dateOfBirth" (valueChange)="occForm.update(f => ({...f, dateOfBirth: $event}))" testId="input-occ-dob" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="occGender">Gender</label>
+            <select id="occGender" class="form-select" [ngModel]="occForm().gender" (ngModelChange)="occForm.update(f => ({...f, gender: $event}))" data-testid="select-occ-gender">
+              <option value="">-- Select --</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="occType">Occupier Type</label>
+            <select id="occType" class="form-select" [ngModel]="occForm().occupierTypeId" (ngModelChange)="occForm.update(f => ({...f, occupierTypeId: +$event}))" data-testid="select-occ-type">
+              <option [ngValue]="0">-- Select --</option>
+              @for (t of occupierTypeOptions; track t.id) {
+                <option [ngValue]="t.id">{{ t.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="occRelationship">Relationship to Applicant</label>
+            <select id="occRelationship" class="form-select" [ngModel]="occForm().relationship" (ngModelChange)="occForm.update(f => ({...f, relationship: $event}))" data-testid="select-occ-relationship">
+              <option value="">-- Select --</option>
+              <option value="Spouse">Spouse</option>
+              <option value="Child">Child</option>
+              <option value="Parent">Parent</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Grandparent">Grandparent</option>
+              <option value="Grandchild">Grandchild</option>
+              <option value="Extended Family">Extended Family</option>
+              <option value="Boarder">Boarder</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="occContact">Contact Number</label>
+            <div class="input-with-icon">
+              <span class="material-icons input-icon">phone</span>
+              <input type="tel" id="occContact" class="form-input form-input-icon" [ngModel]="occForm().contactNumber" (ngModelChange)="occForm.update(f => ({...f, contactNumber: $event}))" placeholder="e.g. 082 123 4567" data-testid="input-occ-contact" />
+            </div>
+          </div>
+          <div class="form-group"></div>
+        </div>
+      </div>
+
+      <div class="app-form-section">
+        <div class="app-form-section-title"><span class="material-icons">work</span> Employment &amp; Income</div>
+        <div class="form-row" style="margin-bottom: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="occEmployer">Employer</label>
+            <select id="occEmployer" class="form-select" [ngModel]="occForm().employerId" (ngModelChange)="occForm.update(f => ({...f, employerId: +$event}))" data-testid="select-occ-employer">
+              @for (emp of employers(); track emp.employerId) {
+                <option [ngValue]="emp.employerId">{{ emp.employerName }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="occSource">Income Source</label>
+            <select id="occSource" class="form-select" [ngModel]="occForm().incomeSourceId" (ngModelChange)="occForm.update(f => ({...f, incomeSourceId: +$event}))" data-testid="select-occ-income-source">
+              @for (src of incomeSources(); track src.incomeSourceId) {
+                <option [ngValue]="src.incomeSourceId">{{ src.incomeSourceName }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="occIncome">Monthly Income (R)</label>
+            <input type="number" id="occIncome" class="form-input" [ngModel]="occForm().incomeAmount" (ngModelChange)="occForm.update(f => ({...f, incomeAmount: +$event}))" min="0" step="0.01" data-testid="input-occ-income" />
+          </div>
+          @if (isDwellingUnitsEnabled()) {
+            <div class="form-group">
+              <label class="form-label" for="occDwelling">Dwelling Unit</label>
+              <select id="occDwelling" class="form-select" [ngModel]="occForm().dwellingUnitNo" (ngModelChange)="occForm.update(f => ({...f, dwellingUnitNo: +$event}))" data-testid="select-occ-dwelling">
+                <option [ngValue]="1">Unit 1 (Primary Dwelling)</option>
+                <option [ngValue]="2">Unit 2</option>
+                <option [ngValue]="3">Unit 3</option>
+                <option [ngValue]="4">Unit 4</option>
+                <option [ngValue]="5">Unit 5</option>
+              </select>
+              @if (isExcludeAdditionalDwellingIncome() && +occForm().dwellingUnitNo > 1) {
+                <span class="field-hint" style="color: var(--platinum-accent); margin-top: 0.25rem;">
+                  <span class="material-icons" style="font-size:14px; vertical-align:middle;">info</span>
+                  Income excluded from qualification
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="app-form-section">
+        <div class="app-form-section-title"><span class="material-icons">notes</span> Additional Information</div>
+        <div class="form-group">
+          <label class="form-label" for="occRemarks">Remarks</label>
+          <textarea id="occRemarks" class="form-input form-textarea" rows="3" [ngModel]="occForm().remarks" (ngModelChange)="occForm.update(f => ({...f, remarks: $event}))" placeholder="Any additional notes about this occupier..." data-testid="input-occ-remarks"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-outline" (click)="showOccupierDialog.set(false)" data-testid="button-cancel-occ">Cancel</button>
+        <button class="btn btn-primary" (click)="saveOccupier()" [disabled]="savingOccupier() || !occForm().fullName.trim()" data-testid="button-save-occ">
+          @if (savingOccupier()) {
+            <app-spinner /> Saving...
+          } @else {
+            {{ editingOccupier() ? 'Update' : 'Add' }} Occupier
+          }
+        </button>
+      </div>
+    </div>
+  </app-dialog>
+
+  <app-confirm-dialog
+    [open]="showDeleteOccupierConfirm()"
+    title="Remove Occupier"
+    [message]="'Are you sure you want to remove ' + (pendingDeleteOccupier()?.fullName || 'this occupier') + ' from this application? This action cannot be undone.'"
+    confirmLabel="Remove"
+    cancelLabel="Cancel"
+    variant="danger"
+    (confirm)="confirmDeleteOccupier()"
+    (cancel)="cancelDeleteOccupier()"
+    data-testid="dialog-delete-occupier">
+  </app-confirm-dialog>
+</div>

@@ -1,0 +1,151 @@
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title" data-testid="text-page-title">Reapplication Management</h1>
+      <p class="page-subtitle">Track and process indigent reapplication deadlines</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field-group">
+      <span class="field-label">Days Until Expiry</span>
+      <input type="number" class="field-input days-input" [(ngModel)]="daysFilter" (change)="onDaysChange()" min="1" max="365" data-testid="input-days-filter" />
+    </div>
+    <div class="toolbar-info" style="display:flex;gap:8px;align-items:center">
+      <span class="count-badge" data-testid="text-count">{{ totalCount() }} due</span>
+      <button class="btn btn-outline btn-sm" (click)="sendReminders()" [disabled]="items().length === 0" data-testid="button-send-reminders">Send Reminders</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      @if (loading()) {
+        <div class="loading-center">
+          <span class="spinner spinner-lg"></span>
+          <p>Loading reapplication data...</p>
+        </div>
+      } @else if (items().length === 0) {
+        <div class="empty-state">
+          <p>No reapplications due within {{ daysFilter }} days.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>App ID</th>
+                <th>Account</th>
+                <th>Account Holder</th>
+                <th>Type</th>
+                <th>Application Date</th>
+                <th>Reapplication Date</th>
+                <th>Days Until Expiry</th>
+                <th class="text-right">Subsidy</th>
+                <th class="text-center">Subsidy %</th>
+                <th class="text-right">Income</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Reapplication</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.applicationId) {
+                <tr [attr.data-testid]="'row-reapp-' + item.applicationId" [class.expired-row]="item.daysUntilExpiry <= 0">
+                  <td class="font-mono">{{ item.applicationId }}</td>
+                  <td class="font-mono">{{ item.accountNumber }}</td>
+                  <td>{{ item.accountHolderName }}</td>
+                  <td><span class="badge badge-info">{{ item.indigentTypeName }}</span></td>
+                  <td>{{ fmtDate(item.applicationDate) }}</td>
+                  <td>{{ fmtDate(item.reApplicationDate) }}</td>
+                  <td>
+                    <span class="badge" [class]="getUrgencyClass(item.daysUntilExpiry)" [attr.data-testid]="'badge-urgency-' + item.applicationId">{{ getUrgencyLabel(item.daysUntilExpiry) }}</span>
+                  </td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.monthlySubsidy) }}</td>
+                  <td class="text-center">
+                    @if (item.qualifiedSubsidyPercentage != null) {
+                      <span class="badge" [style.background]="item.qualifiedSubsidyPercentage >= 100 ? '#e8f5e9' : item.qualifiedSubsidyPercentage > 0 ? '#fff3e0' : '#fce4ec'" [style.color]="item.qualifiedSubsidyPercentage >= 100 ? '#1b5e20' : item.qualifiedSubsidyPercentage > 0 ? '#e65100' : '#c62828'" style="font-weight:600;padding:2px 8px;border-radius:4px;">{{ item.qualifiedSubsidyPercentage }}%</span>
+                    } @else { <span style="color:#999;">—</span> }
+                  </td>
+                  <td class="text-right font-mono">{{ fmtCurrency(item.householdIncome) }}</td>
+                  <td>{{ item.cellPhone || '—' }}</td>
+                  <td>{{ item.email || '—' }}</td>
+                  <td>
+                    @if (item.reapplicationSubmitted) {
+                      <span class="badge badge-success" data-testid="badge-submitted">Yes</span>
+                    } @else {
+                      <span class="badge badge-warning" data-testid="badge-not-submitted">No</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      @if (!item.reapplicationSubmitted) {
+                        <button class="btn btn-primary btn-sm" (click)="openReapplyModal(item)" [attr.data-testid]="'button-reapply-' + item.applicationId">Submit Reapplication</button>
+                      }
+                      <button class="btn btn-ghost btn-sm" (click)="viewApplication(item.applicationId)" [attr.data-testid]="'button-view-' + item.applicationId">View</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+@if (modalOpen && selectedItem) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" style="max-width:32rem" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Submit Reapplication</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeModal()" data-testid="button-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Application</span><span class="detail-value font-mono">#{{ selectedItem.applicationId }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account</span><span class="detail-value font-mono">{{ selectedItem.accountNumber }}</span></div>
+          <div class="detail-item"><span class="detail-label">Account Holder</span><span class="detail-value">{{ selectedItem.accountHolderName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Indigent Type</span><span class="detail-value">{{ selectedItem.indigentTypeName }}</span></div>
+          <div class="detail-item"><span class="detail-label">Current Income</span><span class="detail-value font-mono">{{ fmtCurrency(selectedItem.householdIncome) }}</span></div>
+          <div class="detail-item"><span class="detail-label">Subsidy %</span><span class="detail-value">
+            @if (selectedItem.qualifiedSubsidyPercentage != null) {
+              <span [style.background]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#e8f5e9' : '#fce4ec'" [style.color]="selectedItem.qualifiedSubsidyPercentage > 0 ? '#1b5e20' : '#c62828'" style="padding:2px 8px;border-radius:4px;font-weight:600;">{{ selectedItem.qualifiedSubsidyPercentage }}%</span>
+            } @else { — }
+          </span></div>
+          <div class="detail-item"><span class="detail-label">Days Until Expiry</span><span class="detail-value"><span class="badge" [class]="getUrgencyClass(selectedItem.daysUntilExpiry)">{{ getUrgencyLabel(selectedItem.daysUntilExpiry) }}</span></span></div>
+        </div>
+        <div class="field-group">
+          <span class="field-label">Updated Household Income</span>
+          <input type="number" class="field-input" [(ngModel)]="reapplyForm.householdIncome" data-testid="input-reapply-income" />
+        </div>
+        <div class="field-group mt-1">
+          <span class="field-label">Remarks</span>
+          <textarea class="field-textarea" [(ngModel)]="reapplyForm.remarks" rows="3" placeholder="Notes about this reapplication..." data-testid="input-reapply-remarks"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeModal()" data-testid="button-cancel-reapply">Cancel</button>
+        <button class="btn btn-primary" (click)="submitReapplication()" [disabled]="submitting()" data-testid="button-submit-reapply">
+          @if (submitting()) { <span class="spinner"></span> }
+          Submit Reapplication
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (detailApplicationId() !== null) {
+  <div class="modal-overlay" (click)="closeDetail()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Application Detail</h3>
+        <button class="btn btn-ghost btn-icon" (click)="closeDetail()" data-testid="button-close-detail">✕</button>
+      </div>
+      <div class="modal-body">
+        <app-application-detail-view [applicationId]="detailApplicationId()!" />
+      </div>
+    </div>
+  </div>
+}
