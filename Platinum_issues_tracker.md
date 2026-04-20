@@ -98,6 +98,51 @@
 
 ---
 
+### FIX-008: Empty 240px gap between sidebar and main content (every shell route)
+- **Module**: Shell (Nx monorepo) — visible on `/assets/dashboard` and all other module routes
+- **Date Fixed**: 2026-04-19
+- **Description**: A peach/cream empty strip ~240px wide appeared between the sidebar (`.app-sidenav`) and main content (`.main-content`) on every route inside the Nx shell. Bounding-rect debug confirmed `.app-sidenav` at x=0/w=240 and `.main-content` at x=480/w=800 — a 240px gap with no element occupying it.
+- **Root cause**: `libs/payroll/src/lib/_payroll-global.css` is loaded as a **global** stylesheet via `apps/shell/angular.json` and contains an unscoped rule `.main-content { margin-left: 240px; }` (legacy from when payroll's standalone app used a `position: fixed` sidebar). It leaked into the shell, where `.main-content` is already a flex sibling of `.app-sidenav`, so the margin pushed the content 240px to the right.
+- **Fix**: Added override in `apps/shell/src/styles.css`:
+  ```css
+  .shell > .main-content { margin-left: 0 !important; }
+  ```
+- **Files**: `apps/shell/src/styles.css`
+- **Commit**: `5fc9c93`
+- **Related**: OPEN-005 (root-cause cleanup of cross-app global CSS leakage).
+
+---
+
+## (additional) OPEN Issues — added 2026-04-19
+
+### OPEN-005: Cross-app global CSS leakage (payroll, afs)
+- **Module**: Shell (Nx monorepo)
+- **Description**: `libs/payroll/src/lib/_payroll-global.css` and `libs/afs/src/lib/_afs-global.scss` are registered as global stylesheets in `apps/shell/angular.json`. They contain unscoped selectors (`.main-content`, `.sidebar`, etc.) that leak across every module and silently affect unrelated pages. FIX-008 was a targeted override; the underlying leak still exists.
+- **Impact**: Future visual bugs whenever an unscoped class name collides with the shell or another module.
+- **Recommended fix**: Scope each global file under a module-specific root class (e.g. `.payroll-app .main-content`, `.afs-app .sidebar`), or move only shared design tokens to the global bundle and keep layout rules inside component styles.
+- **Files**: `libs/payroll/src/lib/_payroll-global.css`, `libs/afs/src/lib/_afs-global.scss`, `apps/shell/angular.json`
+
+### OPEN-006: Azure Postgres unreachable from Replit (firewall)
+- **Module**: Environment / AFS DB connectivity
+- **Description**: TCP connect to `platinum-postgre-sql.postgres.database.azure.com:5432` times out from the Replit container. Azure Postgres firewall rejects all inbound by default; Replit's outbound IP range is not whitelisted.
+- **Impact**: Blocks any backend service in this environment from talking to the Azure-hosted `AFS` (and any other Azure PG) database.
+- **Action required (user)**: In the Azure portal → `platinum-postgre-sql` server → Networking → Firewall rules, add a rule allowing the Replit outbound IP (or "Allow public access from any Azure service…" as a temporary unblock).
+
+### OPEN-007: AFS API uses SQL Server, not PostgreSQL
+- **Module**: AFS API (`AFS-UI/dotnet-apis/PlatinumAFS.Api`)
+- **Description**: User asked to point the AFS dashboard at the Azure PostgreSQL `AFS` database. Current AFS .NET API uses EF Core `Microsoft.EntityFrameworkCore.SqlServer` with a SQL Server connection string (`Server=...;TrustServerCertificate=True;MultipleActiveResultSets=True;...`). Switching to PostgreSQL is a provider migration, not a config tweak.
+- **Required steps**:
+  1. Replace NuGet `Microsoft.EntityFrameworkCore.SqlServer` → `Npgsql.EntityFrameworkCore.PostgreSQL`
+  2. `Program.cs`: `options.UseSqlServer(...)` → `options.UseNpgsql(...)`
+  3. Rewrite connection strings in `appsettings.json`, `appsettings.Development.json`, `appsettings.Production.json` to Npgsql format (`Host=platinum-postgre-sql.postgres.database.azure.com;Port=5432;Database=AFS;Username=Admin_Dev;Password=...;SSL Mode=Require;Trust Server Certificate=true`)
+  4. Audit `Models/` and `Data/PlatinumDbContext.cs` for SQL-Server-specific annotations / column types
+  5. Verify schema in the Azure `AFS` database matches EF model expectations (cannot validate until OPEN-006 is resolved)
+- **Status**: Awaiting user go-ahead before making the swap.
+- **Files** (to be touched): `AFS-UI/dotnet-apis/PlatinumAFS.Api/PlatinumAFS.Api.csproj`, `AFS-UI/dotnet-apis/PlatinumAFS.Api/Program.cs`, `AFS-UI/dotnet-apis/PlatinumAFS.Api/appsettings*.json`
+- **Note**: The AFS module currently in the running shell is served by the lightweight Express stub at `AFS-UI/api/index.ts` (port 3004), not the .NET API. Decide whether to replace the stub with the .NET API or to also point the stub at the Azure PG DB.
+
+---
+
 ### FIX-007: AFS Module Integration
 - **Module**: AFS-UI, ASSETS-UI
 - **Date Fixed**: 2026-04-14
