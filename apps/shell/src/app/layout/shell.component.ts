@@ -612,66 +612,103 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   posNavGroups: NavGroup[] = [
     {
-      title: 'Point of Sale', icon: 'point_of_sale',
+      title: 'Billing & Payments', icon: 'point_of_sale',
       items: [
-        { label: 'POS Terminal', icon: 'point_of_sale', route: '/pos' },
-        { label: 'Billing Dashboard', icon: 'receipt', route: '/billing-dashboard' },
-        { label: 'View Receipts', icon: 'receipt_long', route: '/view-receipts' }
-      ]
-    },
-    {
-      title: 'Direct Deposits', icon: 'account_balance',
-      items: [
-        { label: 'Manual Allocation', icon: 'edit_note', route: '/direct-deposits/manual' },
+        { label: 'POS Receipting', icon: 'point_of_sale', route: '/pos' },
+        { label: 'Supervisor', icon: 'supervisor_account', route: '/supervisor' },
+        { label: 'Billing Dashboard', icon: 'bar_chart', route: '/billing-dashboard' },
+        { label: 'Direct Deposits', icon: 'account_balance', route: '/direct-deposits/manual' },
         { label: 'Auto Allocation', icon: 'auto_fix_high', route: '/direct-deposits/auto' },
-        { label: 'Allocation History', icon: 'history', route: '/direct-deposits/manual/history' },
-        { label: 'Bulk Allocation', icon: 'dynamic_feed', route: '/bulk-allocation' }
+        { label: 'Third Party Payments', icon: 'groups', route: '/third-party/processing' },
+        { label: 'Bulk Allocation', icon: 'upload_file', route: '/bulk-allocation' }
       ]
     },
     {
-      title: 'Third Party', icon: 'groups',
+      title: 'Enquiries & Receipts', icon: 'search',
       items: [
-        { label: 'Payment Processing', icon: 'payments', route: '/third-party/processing' }
+        { label: 'General Enquiries', icon: 'manage_search', route: '/enquiries/general' },
+        { label: 'View Receipts', icon: 'description', route: '/view-receipts' }
       ]
     },
     {
-      title: 'Enquiries', icon: 'search',
+      title: 'Consumer Management', icon: 'person_add',
       items: [
-        { label: 'General Enquiries', icon: 'person_search', route: '/enquiries/general' },
-        { label: 'Communications', icon: 'mail', route: '/communications' }
+        { label: 'Property Onboarding', icon: 'add_home_work', route: '/consumer/onboarding' },
+        { label: 'Entity Management', icon: 'manage_accounts', route: '/consumer/entities' },
+        { label: 'Bulk Import', icon: 'upload_file', route: '/consumer/bulk-import' }
+      ]
+    },
+    {
+      title: 'Indigent Management', icon: 'volunteer_activism',
+      items: [
+        { label: 'Dashboard', icon: 'dashboard', route: '/indigent/dashboard' },
+        { label: 'Applications', icon: 'assignment', route: '/indigent/application' },
+        { label: 'Site Verification', icon: 'fact_check', route: '/indigent/verification' },
+        { label: 'Document Verification', icon: 'verified_user', route: '/indigent/doc-verification' },
+        { label: 'Authorization', icon: 'verified', route: '/indigent/authorization' },
+        { label: 'Indigent Register', icon: 'list_alt', route: '/indigent/register' },
+        { label: 'Reapplication', icon: 'refresh', route: '/indigent/reapplication' },
+        { label: 'Termination', icon: 'cancel', route: '/indigent/termination' },
+        { label: 'Bulk Upload', icon: 'upload_file', route: '/indigent/bulk-upload' },
+        { label: 'Configuration', icon: 'settings', route: '/indigent/config' },
+        { label: 'Reports', icon: 'assessment', route: '/indigent/reports' }
+      ]
+    },
+    {
+      title: 'Communications', icon: 'forum',
+      items: [
+        { label: 'Client Messaging', icon: 'mail', route: '/communications' },
+        { label: 'Post-Billing SMS', icon: 'sms', route: '/communications/post-billing-sms' }
       ]
     },
     {
       title: 'Debt Management', icon: 'gavel',
       items: [
-        { label: 'Section 129 Notices', icon: 'description', route: '/debt/section129' },
-        { label: 'Handover', icon: 'forward', route: '/debt/handover' },
+        { label: 'Section 129 Notices', icon: 'warning', route: '/debt/section129' },
+        { label: 'Authorization', icon: 'verified', route: '/debt/section129/authorize' },
+        { label: 'Configuration', icon: 'settings', route: '/debt/section129/config' },
+        { label: 'Handover Management', icon: 'assignment_ind', route: '/debt/handover' },
+        { label: 'Handover Authorization', icon: 'verified', route: '/debt/handover/authorize' },
+        { label: 'Handover Termination', icon: 'cancel', route: '/debt/handover/terminate' },
+        { label: 'Batch Processing', icon: 'batch_prediction', route: '/debt/batch-processing' },
+        { label: 'Process Monitoring', icon: 'monitor_heart', route: '/debt/process-monitoring' },
+        { label: 'Document Templates', icon: 'article', route: '/debt/document-templates' },
+        { label: 'Digital Signatures', icon: 'draw', route: '/debt/digital-signatures' },
+        { label: 'Process Engine', icon: 'engineering', route: '/debt/process-engine' }
+      ]
+    },
+    {
+      title: 'Reports & Analytics', icon: 'summarize',
+      items: [
+        { label: 'Section 129 Report', icon: 'summarize', route: '/debt/section129-report' },
+        { label: 'Handover Report', icon: 'summarize', route: '/debt/handover-report' },
+        { label: 'SMS Log Report', icon: 'sms', route: '/debt/sms-log-report' },
         { label: 'Risk Scoring', icon: 'trending_up', route: '/debt/risk-scoring' },
-        { label: 'Batch Processing', icon: 'dynamic_feed', route: '/debt/batch-processing' },
-        { label: 'Communications', icon: 'forum', route: '/debt/communication-dashboard' },
-        { label: 'Process Monitoring', icon: 'monitor', route: '/debt/process-monitoring' }
+        { label: 'Qualification Rules', icon: 'rule', route: '/debt/qualification-rules' },
+        { label: 'Communication Timeline', icon: 'timeline', route: '/debt/communication-timelines' },
+        { label: 'Comms Dashboard', icon: 'dashboard', route: '/debt/communication-dashboard' }
       ]
     },
     {
-      title: 'Legal', icon: 'balance',
+      title: 'Legal & Compliance', icon: 'balance',
       items: [
-        { label: 'Legal Rules', icon: 'rule', route: '/legal/rules' },
+        { label: 'Legal Rules', icon: 'gavel', route: '/legal/rules' },
         { label: 'Audit Trail', icon: 'history', route: '/legal/audit-trail' },
-        { label: 'Evidence Bundle', icon: 'folder', route: '/legal/evidence-bundle' }
+        { label: 'Evidence Bundle', icon: 'folder_special', route: '/legal/evidence-bundle' }
       ]
     },
     {
-      title: 'Analytics', icon: 'analytics',
+      title: 'Analytics & Insights', icon: 'analytics',
       items: [
-        { label: 'Executive Dashboard', icon: 'dashboard', route: '/analytics/executive-dashboard' },
-        { label: 'Predictive Forecasting', icon: 'trending_up', route: '/analytics/predictive-forecasting' },
-        { label: 'Geographic Mapping', icon: 'map', route: '/analytics/geographic-mapping' }
+        { label: 'Executive Dashboard', icon: 'leaderboard', route: '/analytics/executive-dashboard' },
+        { label: 'Predictive Forecasting', icon: 'auto_graph', route: '/analytics/predictive-forecasting' },
+        { label: 'Geographic Mapping', icon: 'map', route: '/analytics/geographic-mapping' },
+        { label: 'Account Ageing Summary', icon: 'table_chart', route: '/analytics/ageing-summary' }
       ]
     },
     {
       title: 'Administration', icon: 'settings',
       items: [
-        { label: 'Supervisor', icon: 'supervisor_account', route: '/supervisor' },
         { label: 'Settings', icon: 'tune', route: '/settings' }
       ]
     }
