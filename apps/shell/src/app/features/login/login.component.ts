@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -180,20 +181,41 @@ export class LoginComponent {
 
     if ((this.username === 'admin' || this.username === 'admin@platinum.gov.za') && this.password === 'admin123') {
       this.authService.setLocalSession(this.username);
-      this.router.navigate(['/dashboard']);
-      this.loading.set(false);
+      this.bridgeScmAuth('admin', 'admin123').then(() => {
+        this.router.navigate(['/dashboard']);
+        this.loading.set(false);
+      });
       return;
     }
 
     this.authService.login(this.username, this.password).subscribe({
       next: (response) => {
         this.authService.handleLoginSuccess(response);
-        this.loading.set(false);
+        this.bridgeScmAuth(this.username, this.password).then(() => {
+          this.loading.set(false);
+        });
       },
       error: () => {
         this.errorMessage.set('Invalid username or password');
         this.loading.set(false);
       }
+    });
+  }
+
+  private http = inject(HttpClient);
+
+  private bridgeScmAuth(username: string, password: string): Promise<void> {
+    return new Promise((resolve) => {
+      this.http.post<any>('https://rep-scm-api.azurewebsites.net/api/auth/login', { username, password }).subscribe({
+        next: (resp) => {
+          const token = resp?.data?.token;
+          if (token) {
+            localStorage.setItem('platinum_token', token);
+          }
+          resolve();
+        },
+        error: () => resolve()
+      });
     });
   }
 }

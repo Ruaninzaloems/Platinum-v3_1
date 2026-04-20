@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { roleGuard } from './core/guards/role.guard';
+import { scmBootstrapGuard } from './core/guards/scm-bootstrap.guard';
 
 const R = {
   REQUESTOR: 'requestor', SCM_PRACTITIONER: 'scm_practitioner', SCM_MANAGER: 'scm_manager',
@@ -18,8 +19,8 @@ const SUPPLIER_PORTAL_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.CREDITORS_CL
 const TENDER_ROLES = [R.SCM_PRACTITIONER, R.SCM_MANAGER, R.BSC_CHAIRPERSON, R.BEC_CHAIRPERSON, R.BAC_CHAIRPERSON, R.APPROVING_OFFICER, R.CFO, R.MUNICIPAL_MANAGER, R.INTERNAL_AUDITOR, R.SYSTEM_ADMIN];
 
 export const SCM_ROUTES: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-  { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent), data: { breadcrumb: 'Executive Dashboard', icon: 'dashboard', group: 'Home' } },
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full', canActivate: [scmBootstrapGuard] },
+  { path: 'dashboard', canActivate: [scmBootstrapGuard], loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent), data: { breadcrumb: 'Executive Dashboard', icon: 'dashboard', group: 'Home' } },
   { path: 'demand', loadComponent: () => import('./features/demand/demand.component').then(m => m.DemandComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Demand Management', icon: 'inventory_2', group: 'Procurement' } },
   { path: 'requisitions', loadComponent: () => import('./features/requisitions/requisitions.component').then(m => m.RequisitionsComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Requisitions', icon: 'description', group: 'Procurement' } },
   { path: 'quotations', loadComponent: () => import('./features/quotations/quotations.component').then(m => m.QuotationsComponent), canActivate: [roleGuard], data: { roles: PROCUREMENT_ROLES, breadcrumb: 'Quotations (RFQ)', icon: 'request_quote', group: 'Procurement' } },
