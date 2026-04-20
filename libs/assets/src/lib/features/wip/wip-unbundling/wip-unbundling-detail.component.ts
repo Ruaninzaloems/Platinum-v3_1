@@ -30,10 +30,10 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
   ],
   template: `
     <div class="page-tabs">
-      <a class="page-tab" routerLink="/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a class="page-tab" routerLink="/assets/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <mat-icon>construction</mat-icon> WIP Register
       </a>
-      <a class="page-tab" routerLink="/wip/unbundling" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a class="page-tab" routerLink="/assets/wip/unbundling" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <mat-icon>category</mat-icon> Asset Unbundling
       </a>
     </div>
@@ -49,13 +49,13 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
       <div style="text-align:center;padding:80px">
         <mat-icon style="font-size:64px;width:64px;height:64px;color:#cbd5e1">error_outline</mat-icon>
         <h2 style="color:#475569">Project not found</h2>
-        <a routerLink="/wip/unbundling" mat-stroked-button>Back to List</a>
+        <a routerLink="/assets/wip/unbundling" mat-stroked-button>Back to List</a>
       </div>
     }
 
     @if (!loading() && project()) {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <a routerLink="/wip/unbundling" mat-icon-button style="color:#64748b">
+        <a routerLink="/assets/wip/unbundling" mat-icon-button style="color:#64748b">
           <mat-icon>arrow_back</mat-icon>
         </a>
         <div>

@@ -88,7 +88,7 @@
               <div style="margin:8px 0;padding:10px 14px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:8px">
                 <mat-icon style="color:#d97706;font-size:18px">warning</mat-icon>
                 <span style="font-size:13px;color:#92400e">{{noClassMessage()}}</span>
-                <a routerLink="/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
+                <a routerLink="/assets/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
               </div>
             }
 
@@ -848,7 +848,7 @@
           </thead>
           <tbody>
             @for (asset of assets(); track asset.assetId) {
-              <tr [routerLink]="['/assets', asset.assetId]" style="cursor:pointer">
+              <tr [routerLink]="['/assets/assets', asset.assetId]" style="cursor:pointer">
                 <td class="ref-cell">{{asset.assetId}}</td>
                 <td class="desc-cell" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{asset.description}}</td>
                 <td style="font-size:12px;color:#475569">{{asset.assetTypeName}}</td>

@@ -533,7 +533,7 @@ export class AcquisitionsComponent implements OnInit {
       self.snackBar.open('Asset ' + newId + ' registered successfully', 'View', {
         duration: 5000, horizontalPosition: 'end', verticalPosition: 'top'
       }).onAction().subscribe(function() {
-        if (newId) self.router.navigate(['/assets', newId]);
+        if (newId) self.router.navigate(['/assets/assets', newId]);
       });
       self.cancelWizard();
       self.na = self.emptyForm();

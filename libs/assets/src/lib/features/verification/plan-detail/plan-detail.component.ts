@@ -18,7 +18,7 @@ Chart.register(...registerables);
   imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, BaseChartDirective],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/verification/planning"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/assets/verification/planning"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:20px;font-weight:700;color:#1e293b;margin:0">{{plan?.planName || 'Loading...'}}</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">

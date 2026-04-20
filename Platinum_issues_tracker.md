@@ -183,6 +183,15 @@
 - **Recommended fix**: Use the safe-navigation operator (`data?.kpis?.totalCompilations`) or wrap each KPI block in an `@if (data?.kpis)` guard, and have `loadDashboard()` set a sensible default object (with zeros) on API failure so the UI degrades gracefully.
 - **Related**: OPEN-009 (the failing fetch that exposes this bug).
 
+### FIX-010: Assets module — all internal links broken (clicking asset row went to dashboard)
+- **Module**: Assets (`libs/assets/src/lib/**`)
+- **Date Fixed**: 2026-04-20
+- **Symptom**: Clicking any row in the Asset Register sent the user to the Assets *dashboard* instead of the asset detail page (the "Unpaved Road / Asset ID 1" page with Details / Cost Movement / Depreciation / Revaluation Reserve / Impairment / Disposal / Location / Funding Sources / Documents / Audit History tabs). Same problem affected WIP rows, Maintenance request rows, Verification register/plan rows, Bulk Upload tabs, and most internal back/cancel buttons.
+- **Root cause**: The original ASSETS-UI app was mounted at the root URL (`/`), so its templates used absolute `routerLink="/wip"`, `routerLink="/verification/register"`, `router.navigate(['/assets', id])`, etc. After the Nx migration the assets lib is now lazy-loaded under `/assets/...`, so every absolute path needed to be prefixed with `/assets`. Without the prefix, e.g. `routerLink="/assets" + ['/assets', 1]` produced URL `/assets/1`, which doesn't match any assets-module child route and fell through to the empty-path redirect → `/assets/dashboard`.
+- **Fix**: Mass-rewrote 24 template/TS files under `libs/assets/src/lib/features/**` to prefix every absolute internal path. Paths fixed: `/assets`, `/wip`, `/maintenance`, `/verification`, `/transactions`, `/reports`, `/reconciliation`, `/config`, `/admin`, `/workflows`, `/fleet`, `/acquisitions`, `/bulk-upload`, `/prior-year-adjustments`, `/prior-period-adjustments`, `/map` — all now `/assets/<path>`.
+- **Files touched** (24): `acquisitions.component.{html,ts}`, `admin/config/asset-project-statuses.component.html`, `admin/upload-errors.component.ts`, `admin/upload-jobs.component.ts`, `assets/asset-detail/asset-detail.component.html`, `assets/asset-list/asset-list.component.{html,ts}`, `bulk-upload/bulk-upload.component.ts`, `bulk-upload/wip-transfers/wip-transfers.component.ts`, `maintenance/{request-detail,request-list}/*.component.ts`, `verification/{plan-create,plan-detail,plan-list,register-create,register-detail,register-list}/*.component.ts`, `wip/{wip-detail/wip-detail.component.{html,ts},wip-list.component.{html,ts},wip-unbundling/wip-unbundling{,-detail}.component.ts}`.
+- **Note**: The legacy `libs/assets/src/lib/layout/shell.component.ts` (the old internal AFS-style shell) is no longer imported by anything in the unified shell (`apps/shell/`), so was left untouched.
+
 ### FIX-009: AFS dashboard now reads real data from Azure PostgreSQL
 - **Module**: AFS API (`AFS-UI/api/index.ts` + new `AFS-UI/api/db.ts`)
 - **Date Fixed**: 2026-04-20

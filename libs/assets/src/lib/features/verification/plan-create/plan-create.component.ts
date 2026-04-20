@@ -14,7 +14,7 @@ import { ApiService } from '../../../core/api.service';
   imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/verification/planning"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/assets/verification/planning"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">Create Verification Plan</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">Define scope, schedule, and team for a verification exercise</p>
@@ -176,7 +176,7 @@ import { ApiService } from '../../../core/api.service';
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px">
-        <button mat-stroked-button routerLink="/verification/planning">Cancel</button>
+        <button mat-stroked-button routerLink="/assets/verification/planning">Cancel</button>
         <button mat-flat-button style="background:#059669;color:white;border-radius:8px" (click)="save()" [disabled]="saving">
           @if (saving) { <span>Creating...</span> } @else { <ng-container><mat-icon>save</mat-icon> Create Plan</ng-container> }
         </button>
@@ -389,12 +389,12 @@ export class PlanCreateComponent implements OnInit {
         var linkedReg = self.form.linkedRegisterId;
         if (linkedReg) {
           self.api.syncPlanTeam(linkedReg, planId).subscribe({
-            next: function() { self.snackBar.open('Plan created successfully', 'OK', { duration: 3000 }); self.router.navigate(['/verification/planning', planId]); },
-            error: function() { self.snackBar.open('Plan created successfully', 'OK', { duration: 3000 }); self.router.navigate(['/verification/planning', planId]); }
+            next: function() { self.snackBar.open('Plan created successfully', 'OK', { duration: 3000 }); self.router.navigate(['/assets/verification/planning', planId]); },
+            error: function() { self.snackBar.open('Plan created successfully', 'OK', { duration: 3000 }); self.router.navigate(['/assets/verification/planning', planId]); }
           });
         } else {
           self.snackBar.open('Plan created successfully', 'OK', { duration: 3000 });
-          self.router.navigate(['/verification/planning', planId]);
+          self.router.navigate(['/assets/verification/planning', planId]);
         }
       },
       error: function(err: any) {

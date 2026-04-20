@@ -184,7 +184,7 @@ export class WipDetailComponent implements OnInit {
       }.bind(this),
       error: function(this: WipDetailComponent) {
         this.loading.set(false);
-        this.router.navigate(['/wip']);
+        this.router.navigate(['/assets/wip']);
       }.bind(this)
     });
   }

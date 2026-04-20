@@ -215,7 +215,7 @@ export class WipListComponent implements OnInit {
 
   clearFilters() { this.filterFinYear = ''; this.filterStatus = ''; this.loadProjects(); }
 
-  viewProject(id: number) { this.router.navigate(['/wip', id]); }
+  viewProject(id: number) { this.router.navigate(['/assets/wip', id]); }
 
   formatCurrency(val: any): string {
     const n = Number(val);

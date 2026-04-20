@@ -748,7 +748,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
         self.snackBar.open('Asset ' + newId + ' registered successfully', 'View', {
           duration: 5000, horizontalPosition: 'end', verticalPosition: 'top'
         }).onAction().subscribe(function() {
-          if (newId) self.router.navigate(['/assets', newId]);
+          if (newId) self.router.navigate(['/assets/assets', newId]);
         });
         self.showNewAssetForm = false;
         self.formStep = 'details';

@@ -20,7 +20,7 @@ import { ApiService } from '../../../core/api.service';
   imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule, MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/verification/register"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/assets/verification/register"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:20px;font-weight:700;color:#1e293b;margin:0">{{register?.registerName || 'Loading...'}}</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">

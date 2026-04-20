@@ -145,7 +145,7 @@ export class UploadJobsComponent implements OnInit, OnDestroy {
   }
 
   viewErrors(job: any): void {
-    this.router.navigate(['/bulk-upload/jobs', job.id, 'errors']);
+    this.router.navigate(['/assets/bulk-upload/jobs', job.id, 'errors']);
   }
 
   exportErrors(job: any): void {
