@@ -6,12 +6,14 @@
     "start": "npx tsx index.ts"
   },
   "dependencies": {
+    "@types/pg": "^8.20.0",
     "cors": "^2.8.5",
-    "express": "^5.0.1"
+    "express": "^5.0.1",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
-    "tsx": "^4.19.4",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/cors": "^2.8.17"
+    "tsx": "^4.19.4"
   }
 }

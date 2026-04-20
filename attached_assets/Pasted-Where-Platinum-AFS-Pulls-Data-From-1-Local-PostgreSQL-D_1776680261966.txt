@@ -1,0 +1,36 @@
+Where Platinum AFS Pulls Data From
+1. Local PostgreSQL Database (Primary Store)
+The app's own database holds the operational and reference data:
+
+General Ledger — general_ledger_entries (transactional GL with full 38-char mSCOA codes, original + adjustment + virement movements)
+Trial Balance imports — uploaded TB files staged for compilation
+Budget data — budget_cache (~874 rows synced from the Platinum API)
+Reference data (seeded once):
+mSCOA v6.9 chart of accounts — 135,870 items
+6.9 mapping table — 111,444 rows
+AFS Disclosures master — 104 disclosures
+AFS Default Rules — 38,926 rules
+Workflow data — Mapping Runs, Compilations, AFS Versions (draft/review/approved/locked), RFIs, Audit Findings, Attachments, Users/Roles/Tenants
+Materialized views — pre-aggregated GL summaries (original / adjustments / virements) for fast reporting
+2. Platinum API (Azure-hosted)
+URL: https://platinummnquma-afs-api.azurewebsites.net
+Source of GL transactions and budget data for the tenant
+URL is loaded from per-tenant configuration (not hard-coded), so each tenant can point to its own Platinum instance
+Synced into the local DB by PlatinumSyncService so reporting doesn't hit the upstream API on every request
+3. Platinum ART API (Azure South Africa North)
+URL: https://platinum-art-api-ftd9ejdaefcpdrg0.southafricanorth-01.azurewebsites.net
+Additional reporting/analytics service used alongside the main Platinum API
+4. User-Uploaded Files
+Trial Balance files — uploaded into the Mapping Workbench
+RFI attachments — uploaded to /rfis/:id/attachments (drag-and-drop or picker, up to 100 MB)
+Audit Finding evidence — uploaded to /findings/:id/attachments
+All file metadata is stored in the DB with the binary stored on disk/object storage
+5. External Service Integrations
+OpenAI — available for AI-assisted features (analysis, summarisation, etc.)
+GitHub — connected for code/repo integration
+6. How the Frontend Gets Data
+The Angular app does not talk to any of the external sources directly — it only calls the NestJS API on port 3000 (e.g. /api/mapping-workbench/..., /api/afs-versions/..., /api/rfis/...). The backend is the single gateway that:
+
+Reads/writes the local PostgreSQL database
+Pulls from Platinum API / ART API on schedule or on demand
+Handles file uploads and auth (JWT + roles)
