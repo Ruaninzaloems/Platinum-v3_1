@@ -98,6 +98,36 @@
 
 ---
 
+### FIX-009: POS module sync from upstream (Municipal-Receipting-POS-2)
+- **Module**: POS (Nx lib `libs/pos`)
+- **Date Fixed**: 2026-04-19
+- **Description**: POS module in the Nx monorepo was out of date relative to the Municipal-Receipting-POS-2 upstream repo. Missing consumer / indigent module code and ~30 component files; build was producing errors and stale UI.
+- **Fix**: Synced 107 TypeScript files from `Municipal-Receipting-POS-2` into `libs/pos/src`, including the new consumer and indigent modules. Build now compiles with 0 errors and only benign deprecation warnings.
+- **Files**: 107 files under `libs/pos/src/lib/**`
+
+### FIX-010: POS navigation links bypass lazy-loaded mount point
+- **Module**: POS (Nx lib `libs/pos`)
+- **Date Fixed**: 2026-04-19
+- **Description**: ~50 sidebar links and 8 home-page cards in the POS module used absolute paths (e.g. `/cashier/sessions`, `/direct-deposits`) which bypassed the `/pos` lazy-loaded route mount in the shell. Clicking any link took the user out of the POS module to a 404.
+- **Fix**: Prefixed every internal navigation route with `/pos` (or refactored to relative paths) in the POS layout and home component. All POS links now stay within the lazy-loaded module.
+- **Files**: `libs/pos/src/lib/shared/layout/pos-layout.component.ts`, `libs/pos/src/lib/shared/layout/pos-layout.component.html`, `libs/pos/src/lib/features/home/home.component.ts`
+
+### FIX-011: POS auth bridged to shared shell AuthService
+- **Module**: POS (Nx lib `libs/pos`), shared/auth
+- **Date Fixed**: 2026-04-19
+- **Description**: POS still had its own legacy `AuthService` that maintained a separate session, login screen, and user state. Inside the unified shell this conflicted with the shared `@platinumv3/shared/auth` ShellAuthService — POS components either saw an unauthenticated state or required a second login.
+- **Fix**: Rewrote `libs/pos/src/lib/core/services/auth.service.ts` as a thin wrapper around the shared ShellAuthService. Maps the shell's `User` shape to POS's `AuthUser` interface (`user_ID`, `userName`, `superUser` derived from roles, `firstName`, `cashFloat`, `finYear`, `site()`, `isSite02`, `authenticated()` etc.) so all ~30 POS components keep working unchanged. `login()` is a no-op (shell handles login); `logout()` delegates to the shell.
+- **Files**: `libs/pos/src/lib/core/services/auth.service.ts`
+- **Note**: Other modules (assets, scm, afs) still keep their own independent AuthServices — untouched. Only POS was bridged.
+
+### FIX-012: Shell route health verification — all 11 modules HTTP 200
+- **Module**: Shell (Nx monorepo)
+- **Date Fixed**: 2026-04-19
+- **Description**: After POS sync (FIX-009) and auth bridge (FIX-011), needed to confirm no regressions across the unified shell.
+- **Result**: All 11 routes (`/`, `/login`, `/dashboard`, `/assets`, `/scm`, `/pos`, `/payroll`, `/idp`, `/budget`, `/afs`, `/ins`) return HTTP 200. Build clean with 0 errors.
+
+---
+
 ### FIX-008: Empty 240px gap between sidebar and main content (every shell route)
 - **Module**: Shell (Nx monorepo) — visible on `/assets/dashboard` and all other module routes
 - **Date Fixed**: 2026-04-19
