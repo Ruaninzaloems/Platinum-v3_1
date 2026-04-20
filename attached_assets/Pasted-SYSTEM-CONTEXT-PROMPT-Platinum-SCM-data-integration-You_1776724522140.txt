@@ -1,0 +1,66 @@
+SYSTEM / CONTEXT PROMPT — Platinum SCM data integration
+
+You are working on a client application that must consume data exclusively from the Platinum SCM backend. Do not invent data, mock data, or query any other database directly. All reads and writes must go through the SCM-API. Follow these rules without deviation.
+
+1. Backend you must use
+API name: SCM-API (.NET 10 Web API)
+Base URL (use this and only this):
+https://rep-scm-api.azurewebsites.net/api
+
+Every request your app makes must be prefixed with this URL. Do not call localhost, do not call any Replit dev URL, do not call any other host.
+Database (do NOT touch directly): Azure SQL Server, catalog EMS_GeorgeUAT. Only the SCM-API talks to it via Entity Framework Core. Your app must never open a DB connection.
+Response envelope: every endpoint returns { "data": <payload>, ... }. Always read from the data property; never assume the payload is at the root.
+2. Authentication (mandatory)
+Obtain a JWT by POST https://rep-scm-api.azurewebsites.net/api/auth/login with { "username": "...", "password": "..." }. Fallback admin for dev: admin / admin123.
+Store the token (e.g. localStorage key platinum_token if a browser app).
+Attach it on every request as Authorization: Bearer <token>. Implement this as an HTTP interceptor / middleware — never per-call.
+On 401, redirect to login and clear the token. Do not retry blindly.
+3. Required client architecture
+Implement a single BaseApiService that wraps the HTTP client and exposes apiGet / apiPost / apiPut / apiDelete. It must:
+Prefix all paths with https://rep-scm-api.azurewebsites.net/api.
+Unwrap the data envelope.
+Centralise error handling (surface API error messages, never swallow).
+Create one feature service per domain (RequisitionService, OrderService, TenderService, QuotationService, GrnService, InvoiceService, PaymentService, VendorService, DashboardService, UifwService, etc.). Each must call BaseApiService only — no direct HTTP calls anywhere else in the app.
+Components/screens consume feature services. They must not call HTTP directly and must not transform numbers in ways that diverge from what the API returns.
+4. Canonical endpoints (use these exact URLs, do not invent variants)
+Auth: POST https://rep-scm-api.azurewebsites.net/api/auth/login
+Lists:
+GET https://rep-scm-api.azurewebsites.net/api/requisitions?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/orders?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/tenders?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/quotations?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/grn?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/invoices?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/payments?pageSize=200
+GET https://rep-scm-api.azurewebsites.net/api/vendors?pageSize=200
+Dashboards:
+GET https://rep-scm-api.azurewebsites.net/api/dashboard/executive
+GET https://rep-scm-api.azurewebsites.net/api/dashboard/control-tower
+IFW (Irregular / Fruitless / Wasteful & Unauthorised):
+GET https://rep-scm-api.azurewebsites.net/api/ifw/...
+5. Data-gathering rules (non-negotiable)
+Single source of truth: https://rep-scm-api.azurewebsites.net/api is authoritative for counts, totals, status, ageing, SLA breaches, financial year, and IFW classifications. Display whatever the API returns. Do not recompute totals on the client.
+Reconciliation principle: if the same metric appears in multiple places (e.g. dashboard tile vs list page), both must come from the API and must match. If they differ, the bug is in the API call (wrong endpoint/filter), not in the client doing its own maths.
+Status filters & terminal states must come from the API response — never hard-code "open" vs "closed" in the client.
+Money: values are returned as numbers in ZAR (Rand). Format for display only; never round before sending back.
+IDs are canonical strings (e.g. uifw-irreg-{id}). Do not generate or reformat them.
+Demo seed data (records like REQ-2024-001, TND-2024-001) is real data served by the API. Treat it as live.
+6. What you must never do
+Never point the base URL at localhost, a Replit dev domain, or any host other than https://rep-scm-api.azurewebsites.net/api.
+Never connect to EMS_GeorgeUAT or any SQL Server directly.
+Never mock, stub, or fabricate SCM records, totals, or statuses.
+Never bypass the JWT interceptor.
+Never duplicate business logic (SLA ageing, financial year calculation, MFMA workflow gates, IFW classification) on the client — call the API.
+Never assume an endpoint shape — fetch one record first and adapt to the actual JSON.
+7. Configuration the integrating app must expose
+SCM_API_BASE_URL — fixed value: https://rep-scm-api.azurewebsites.net/api
+SCM_API_USERNAME / SCM_API_PASSWORD or a pre-issued JWT
+Optional: SCM_FINANCIAL_YEAR override (otherwise use whatever the API reports)
+8. Acceptance checklist before you ship
+ All HTTP traffic flows through one BaseApiService whose base URL is https://rep-scm-api.azurewebsites.net/api.
+ No reference to localhost, 127.0.0.1, or any *.replit.dev / *.replit.app host anywhere in the codebase.
+ JWT is attached by interceptor, not by individual calls.
+ Every screen's numbers match the corresponding /api/dashboard/* and list endpoints exactly.
+ No direct DB driver, no mock fixtures, no client-side recomputation of totals/SLA/IFW.
+ 401 handling redirects to login and clears the stored token.
+Build the integration to these rules. If a requirement conflicts with these rules, stop and ask before proceeding.
