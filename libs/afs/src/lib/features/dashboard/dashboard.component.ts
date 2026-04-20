@@ -66,7 +66,7 @@ export class DashboardComponent implements OnInit {
           this.autoRetryWithDelay();
         }
       },
-      error: () => this.autoRetryWithDelay(),
+      error: () => { this.autoRetryWithDelay(); },
     });
   }
 
@@ -95,7 +95,7 @@ export class DashboardComponent implements OnInit {
         this.data = data;
         this.loading = false;
         this.retryCount = 0;
-        this.cdr.markForCheck();
+        this.cdr.detectChanges();
       },
       error: (err) => {
         void err;

@@ -158,6 +158,14 @@
 - **Impact**: Blocks any backend service in this environment from talking to the Azure-hosted `AFS` (and any other Azure PG) database.
 - **Action required (user)**: In the Azure portal → `platinum-postgre-sql` server → Networking → Firewall rules, add a rule allowing the Replit outbound IP (or "Allow public access from any Azure service…" as a temporary unblock).
 
+### FIX-008: AFS dashboard empty body — global CSS leakage from Payroll
+- **Module**: AFS (`libs/afs/src/lib/features/dashboards/dashboard-container.component.css`) + global styles
+- **Date Fixed**: 2026-04-20
+- **Symptom**: `/afs/dashboard` rendered the header bar and tab strip, but the entire body below was blank — even though the API returned data successfully and the component's `ngOnInit` / `loadDashboard` logs confirmed `data` arrived.
+- **Root cause**: `libs/payroll/src/lib/_payroll-global.css:645` declares `.tab-content { display: none; }` (a payroll-specific tab-toggle pattern). Because `apps/shell/angular.json` loads all module `_*-global.{scss,css}` files **globally**, this rule cascaded onto AFS's own `.tab-content` div in `dashboard-container.component`, hiding every `<app-dashboard>` (and every other tab body) at all times. The DashboardComponent was being instantiated and populated, but its host `.tab-content` parent had `display: none`, so nothing rendered.
+- **Fix**: Added `display: block !important` (plus `min-height: calc(100vh - 240px)` and `overflow-y: visible`) to AFS's `.tab-content` rule in `dashboard-container.component.css`, and `:host { display: block; min-height: 100% }` to give the container a defined box. Also switched the data callback from `cdr.markForCheck()` to `cdr.detectChanges()` for reliability under `provideZonelessChangeDetection()`.
+- **Follow-up (broader OPEN-005 instance)**: All `_*-global.{scss,css}` files in `apps/shell/angular.json` are unscoped. Other generic class names (e.g. `.kpi-row`, `.page-container`, `.modal-overlay`) likely collide too. Long-term fix: wrap each module's global rules under a module-scoped parent class (e.g. `.payroll-scope .tab-content`) or move them into per-component styles.
+
 ### OPEN-008: AFS dashboard crashes — `Cannot read properties of undefined (reading 'totalCompilations')`
 - **Module**: AFS (`libs/afs/src/lib/features/dashboard/dashboard.component.html`)
 - **Date Found**: 2026-04-19

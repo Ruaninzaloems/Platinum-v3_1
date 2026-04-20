@@ -33,6 +33,10 @@ args = "Backend API"
 task = "workflow.run"
 args = "Platinum Shell"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "AFS API"
+
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
@@ -56,6 +60,18 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow]]
+name = "AFS API"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd AFS-UI/api && PORT=9000 npx tsx index.ts"
+waitForPort = 9000
 
 [[ports]]
 localPort = 3000
@@ -106,10 +122,6 @@ localPort = 8008
 externalPort = 8008
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
 localPort = 8081
 externalPort = 8099
 
@@ -120,10 +132,6 @@ externalPort = 8099
 [[ports]]
 localPort = 9000
 externalPort = 9000
-
-[[ports]]
-localPort = 18156
-externalPort = 3003
 
 [userenv]
 

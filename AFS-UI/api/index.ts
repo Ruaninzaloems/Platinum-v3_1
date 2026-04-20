@@ -86,6 +86,41 @@ app.get('/api/dashboard/recent-activity', (_req, res) => {
   res.json([]);
 });
 
+app.get('/api/reports/dashboard', (_req, res) => {
+  const currentYear = new Date().getFullYear();
+  const month = new Date().getMonth() + 1;
+  const fyStart = month >= 7 ? currentYear : currentYear - 1;
+  res.json({
+    financialYear: { id: '1', label: `${fyStart}/${fyStart + 1}`, status: 'Open' },
+    kpis: {
+      totalCompilations: 0,
+      inProgress: 0,
+      approved: 0,
+      published: 0,
+      openRfis: 0,
+      overdueRfis: 0,
+      unresolvedFindings: 0,
+      totalFindings: 0,
+      pendingAdjustments: 0,
+      evidenceCount: 0,
+      wpCompletion: 0,
+      avgCompleteness: 0,
+      tbEntryCount: 0,
+    },
+    compilationsByStatus: {},
+    findingsBySeverity: {},
+    complianceScore: 0,
+    recentActivity: [],
+    adjustmentSummary: { total: 0, posted: 0, totalAmount: 0 },
+    tbSummary: null,
+    tbCategoryBreakdown: [],
+    budgetVsActual: [],
+    topRevenueItems: [],
+    topExpenditureItems: [],
+    glSummary: null,
+  });
+});
+
 app.use('/api', (_req, res) => {
   res.json([]);
 });
