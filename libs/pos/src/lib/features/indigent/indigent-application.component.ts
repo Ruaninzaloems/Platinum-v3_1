@@ -400,7 +400,7 @@ export class IndigentApplicationComponent implements OnInit, OnDestroy {
   }
 
   goBackToDashboard(): void {
-    this.router.navigate(['/indigent/dashboard']);
+    this.router.navigate(['/pos/indigent/dashboard']);
   }
 
   private get userId(): number { return this.auth.user()?.user_ID || 0; }

@@ -215,5 +215,5 @@ export class DocumentTemplatesComponent implements OnInit {
   fmtFileSize(bytes: number | null | undefined): string { return formatFileSize(bytes); }
 
   goHome(): void { this.router.navigate(['/']); }
-  goDebt(): void { this.router.navigate(['/debt/section129']); }
+  goDebt(): void { this.router.navigate(['/pos/debt/section129']); }
 }

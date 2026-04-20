@@ -233,6 +233,6 @@ export class IndigentBulkUploadComponent implements OnInit {
   }
 
   goToAuthorization(): void {
-    this.router.navigate(['/indigent/authorization']);
+    this.router.navigate(['/pos/indigent/authorization']);
   }
 }

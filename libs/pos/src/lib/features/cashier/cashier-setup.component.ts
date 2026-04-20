@@ -409,7 +409,7 @@ export class CashierSetupComponent implements OnInit {
     const existingId = this.existingCashierId();
     if (!existingId) {
       this.toast.success('Session resumed.');
-      this.router.navigate(['/pos']);
+      this.router.navigate(['/pos/pos']);
       return;
     }
 
@@ -456,7 +456,7 @@ export class CashierSetupComponent implements OnInit {
     if (this.embedded) {
       this.sessionStarted.emit();
     } else {
-      this.router.navigate(['/pos']);
+      this.router.navigate(['/pos/pos']);
     }
   }
 

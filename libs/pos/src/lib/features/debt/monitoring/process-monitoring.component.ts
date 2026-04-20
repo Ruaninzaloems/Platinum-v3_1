@@ -95,5 +95,5 @@ export class ProcessMonitoringComponent implements OnInit {
   fmtCurrency(v: number | null | undefined): string { return formatCurrency(v); }
 
   goHome(): void { this.router.navigate(['/']); }
-  goDebt(): void { this.router.navigate(['/debt/section129']); }
+  goDebt(): void { this.router.navigate(['/pos/debt/section129']); }
 }

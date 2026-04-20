@@ -137,7 +137,7 @@ export class Section129TrialReviewComponent implements OnInit {
         finalReviewComplete: this.finalReviewComplete,
       }));
       this.toast.show(result?.message || `Successfully submitted review for ${this.selectedIds.size} account(s).`, 'success');
-      this.router.navigate(['/debt/section129']);
+      this.router.navigate(['/pos/debt/section129']);
     } catch (err: any) {
       this.toast.show(err?.error?.message || err?.message || 'Failed to submit trial review.', 'error');
     } finally {
@@ -146,7 +146,7 @@ export class Section129TrialReviewComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/debt/section129']);
+    this.router.navigate(['/pos/debt/section129']);
   }
 
   prevPage(): void {

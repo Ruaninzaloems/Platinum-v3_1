@@ -567,7 +567,7 @@ export class AllocationHistoryComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    this.router.navigate(['/direct-deposits/manual']);
+    this.router.navigate(['/pos/direct-deposits/manual']);
   }
 
   formatDate(val: string | null): string {

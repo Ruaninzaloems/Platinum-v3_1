@@ -447,7 +447,7 @@ export class IndigentTerminationComponent implements OnInit {
   clearDncDate(): void { this.dncDate = ''; }
 
   viewApplication(appId: number): void {
-    this.router.navigate(['/indigent/application'], { queryParams: { applicationId: appId, source: 'termination' } });
+    this.router.navigate(['/pos/indigent/application'], { queryParams: { applicationId: appId, source: 'termination' } });
   }
 
   async runAutoTermination(dryRun: boolean): Promise<void> {

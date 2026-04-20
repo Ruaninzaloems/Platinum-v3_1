@@ -283,7 +283,7 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
         );
         if (activeJob && activeJob.jobId && (activeJob.status === 'PROCESSING' || activeJob.status === 'QUEUED' || activeJob.status === 'COMPLETED')) {
           if (activeJob.status === 'COMPLETED' && (activeJob.errors || []).length === 0) {
-            this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
+            this.router.navigate(['/pos/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
             return;
           } else if (activeJob.status === 'PROCESSING' || activeJob.status === 'QUEUED') {
             this.toast.show('This deposit is being allocated by another user. Please wait.', 'info');
@@ -299,7 +299,7 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
 
       // Guard: if Platinum says this deposit is already allocated, redirect back silently
       if (item.billingAllocated || item.dateAllocated) {
-        this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
+        this.router.navigate(['/pos/direct-deposits/manual'], { queryParams: { alreadyAllocated: this.posItemId() } });
         return;
       }
 
@@ -1194,7 +1194,7 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
       if (tx.billingAllocated) {
         this.posting.set(false);
         this.postingStatus.set('');
-        this.router.navigate(['/direct-deposits/manual'], { queryParams: { alreadyAllocated: tx.posItem_ID } });
+        this.router.navigate(['/pos/direct-deposits/manual'], { queryParams: { alreadyAllocated: tx.posItem_ID } });
         return;
       }
 
@@ -1644,9 +1644,9 @@ export class AllocateTransactionComponent implements OnInit, OnDestroy {
   goBack(): void {
     const tx = this.transaction();
     if (this.postComplete() && this.postErrors().length === 0 && tx) {
-      this.router.navigate(['/direct-deposits/manual'], { queryParams: { allocated: tx.posItem_ID } });
+      this.router.navigate(['/pos/direct-deposits/manual'], { queryParams: { allocated: tx.posItem_ID } });
     } else {
-      this.router.navigate(['/direct-deposits/manual']);
+      this.router.navigate(['/pos/direct-deposits/manual']);
     }
   }
 

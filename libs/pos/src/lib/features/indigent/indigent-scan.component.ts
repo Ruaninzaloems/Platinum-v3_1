@@ -77,5 +77,5 @@ export class IndigentScanComponent implements OnInit {
     }
   }
 
-  goDashboard(): void { this.router.navigate(['/indigent/dashboard']); }
+  goDashboard(): void { this.router.navigate(['/pos/indigent/dashboard']); }
 }

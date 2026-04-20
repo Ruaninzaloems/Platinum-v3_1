@@ -188,7 +188,7 @@ export class PosWorkflowComponent implements OnInit, OnDestroy {
   }
 
   navigateToSupervisor(): void {
-    this.router.navigate(['/supervisor']);
+    this.router.navigate(['/pos/supervisor']);
   }
 
   dismissReturnBanner(): void {

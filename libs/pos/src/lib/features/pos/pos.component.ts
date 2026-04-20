@@ -3500,7 +3500,7 @@ export class PosComponent implements OnInit, OnDestroy {
   }
 
   navigateToCashierSetup(): void {
-    this.router.navigate(['/cashier-setup']);
+    this.router.navigate(['/pos/cashier-setup']);
   }
 
   navigateToDayEnd(): void {

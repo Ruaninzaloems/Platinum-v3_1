@@ -1778,7 +1778,7 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
       this.toast.show('This deposit has already been allocated.', 'info');
       return;
     }
-    this.router.navigate(['/direct-deposits/manual/allocate', item.posItem_ID]);
+    this.router.navigate(['/pos/direct-deposits/manual/allocate', item.posItem_ID]);
   }
 
   navigateToAllocateWithAccount(item: BankReconPosItem, match: SuggestedMatch): void {
@@ -1786,7 +1786,7 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
       this.toast.show('This deposit has already been allocated.', 'info');
       return;
     }
-    this.router.navigate(['/direct-deposits/manual/allocate', item.posItem_ID], {
+    this.router.navigate(['/pos/direct-deposits/manual/allocate', item.posItem_ID], {
       queryParams: {
         accountId: match.accountId,
         accountNo: match.accountNo,
@@ -2021,7 +2021,7 @@ export class UnmatchedQueueComponent implements OnInit, OnDestroy {
   }
 
   navigateToHistory(): void {
-    this.router.navigate(['/direct-deposits/manual/history']);
+    this.router.navigate(['/pos/direct-deposits/manual/history']);
   }
 
   closeDetail(): void {

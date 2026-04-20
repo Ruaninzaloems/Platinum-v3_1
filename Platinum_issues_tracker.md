@@ -183,6 +183,15 @@
 - **Recommended fix**: Use the safe-navigation operator (`data?.kpis?.totalCompilations`) or wrap each KPI block in an `@if (data?.kpis)` guard, and have `loadDashboard()` set a sensible default object (with zeros) on API failure so the UI degrades gracefully.
 - **Related**: OPEN-009 (the failing fetch that exposes this bug).
 
+### FIX-011: POS module — internal back/forward navigation broken (same migration pattern as FIX-010)
+- **Module**: POS (`libs/pos/src/lib/**`)
+- **Date Fixed**: 2026-04-20
+- **Symptom**: After landing on a POS page (e.g. Indigent Management Dashboard, Section 129, Direct Deposits, Cashier setup, Supervisor) any "Back", "Cancel", row-click navigation or programmatic redirect either landed on the wrong page or fell through to the home tile screen — sidebar nav links worked but inner workflows could not return to their parent screen.
+- **Root cause**: Same as FIX-010 but for POS. The original POS-UI was mounted at `/`, so internal navigations used absolute paths like `router.navigate(['/debt/section129'])`, `router.navigate(['/indigent/dashboard'])`, `router.navigate(['/direct-deposits/manual'])`, `router.navigate(['/pos'])`, `router.navigate(['/supervisor'])`. After the Nx migration these need a `/pos` prefix.
+- **Fix**: Mass-rewrote 16 files under `libs/pos/src/lib/**` to prefix every absolute internal path with `/pos`. Special handling for the POS workflow page itself (originally `/pos` in standalone meant the workflow component; now `/pos/pos`), and the sidebar layout brand/breadcrumb home link (kept at `/pos` to point at the POS landing/home).
+- **Files touched** (16): `features/cashier/cashier-setup.component.ts`, `features/debt/{batch/batch-processing,documents/document-templates,monitoring/process-monitoring,section129/section129-trial-review,signatures/digital-signatures}.component.ts`, `features/direct-deposits/manual/{allocate-transaction,allocation-history,unmatched-queue}.component.ts`, `features/indigent/{indigent-application,indigent-bulk-upload,indigent-scan,indigent-termination}.component.ts`, `features/pos/{pos-workflow,pos}.component.ts`, `shared/layout/pos-layout.component.html`.
+- **Note**: The sidebar nav data (`pos-layout.component.ts`) was already correctly prefixed during the migration; only the per-feature programmatic navigations and the layout template were missed.
+
 ### FIX-010: Assets module — all internal links broken (clicking asset row went to dashboard)
 - **Module**: Assets (`libs/assets/src/lib/**`)
 - **Date Fixed**: 2026-04-20
