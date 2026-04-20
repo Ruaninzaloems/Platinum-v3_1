@@ -1,0 +1,39 @@
+Refactor this app to use the same data-access architecture as my Platinum SCM project. The rules are:
+
+1. Strict layering (no shortcuts).
+Every request must flow: Controller → Service → Repository → DbContext → Database. Controllers stay thin (validate the DTO, call one service method, return the result). Services hold business logic. Only repositories are allowed to touch the DbContext — services must not inject or reference it. Cross-aggregate lookups (e.g. invoice needing a vendor name) go through the other aggregate's repository, never by querying the foreign DbSet directly.
+
+2. Repository contract.
+Each aggregate gets an IXxxRepository : IRepository<T> interface and an XxxRepository : Repository<T> implementation. The base IRepository<T> exposes GetByIdAsync, FindAsync, AddAsync, AddRangeAsync, Update, Delete, SaveChangesAsync, Query. Aggregate-specific repos add typed methods (GetWithDetailsAsync, GetFilteredAsync, etc.). For multi-step writes, the repo stages (AddAsync) and the service drives SaveChangesAsync so the same try/catch envelope controls the transaction.
+
+3. DB availability + graceful fallback.
+Register a singleton DbAvailabilityChecker that probes context.Database.CanConnect() once with a short timeout (~300 ms) and exposes IsDbAvailable and MarkUnavailable(). Also honour an env var USE_MOCK_DATA=true to force mock mode. Every service method that reads or writes data must follow this exact pattern:
+
+if (UseDb) {
+    try {
+        var rows = await _repo.GetSomethingAsync(id);
+        return Map(rows);
+    } catch (Exception ex) {
+        _logger.LogWarning(ex, "...");
+        _dbChecker.MarkUnavailable();
+    }
+}
+return _memoryFallback[id];   // seeded in-memory dict, identical JSON shape
+
+Writes follow the same envelope: stage via repo, call _repo.SaveChangesAsync(), fall back to mutating the in-memory store on failure. The HTTP response shape must be identical whether data came from the DB or the fallback — the front end must never know the difference.
+
+4. Hardened DB registration.
+Configure AddDbContext with: 5 s connection timeout, 10 s command timeout, 1 retry on transient failure (EnableRetryOnFailure(1, TimeSpan.FromSeconds(3), null)). Connection string lives in appsettings.json under ConnectionStrings:DefaultConnection.
+
+5. DI registration.
+Wire all repositories as Scoped in a single ServiceCollectionExtensions.AddRepositories() call. Wire the availability checker as Singleton. Wire services as Scoped.
+
+6. Front end.
+All HTTP calls go through one BaseApiService that wraps HttpClient, prefixes environment.apiUrl, attaches the JWT via an interceptor, retries idempotent GETs once with backoff (skipping 401/403/404), and unwraps the standard { data, page, totalCount, ... } envelope. Per-feature services (xxx.service.ts) extend or inject BaseApiService — they never call HttpClient directly. In dev, route /api to the API port via a proxy config; in prod the same /api path is served by the same host.
+
+7. Auth.
+JWT bearer issued by /api/auth/login. Keep an admin fallback (admin / admin123 or similar) that works even when the DB is unreachable, so the app is always demo-able.
+
+Acceptance check: grep -r "_context\." Services/ must return zero results. The app must serve every endpoint with 200s both when the DB is reachable and when it's hard-down (verify by pointing the connection string at an unreachable host and re-running the smoke tests). All four checkpoints — list, detail, create/update, approval/state-change — must succeed in both modes with byte-identical JSON shapes.
+
+Tweak the language for stack (Java/Spring, Node/Express, Python/FastAPI, etc.) if your other app isn't .NET — the patterns (layered access, availability checker, identical-shape fallback, single base HTTP service) are the things that matter, not the C# specifics.

@@ -1,0 +1,44 @@
+Here's a high-level overview of how data flows through this app.
+
+The golden rule
+All business data comes from the Platinum Inzalo EMS API. The app is a thin Angular frontend talking to an Express backend that acts as an authenticated proxy to Platinum. There are no local copies of business data, no caches, no fallbacks — if Platinum is down, the feature shows an error.
+
+The data path
+Angular UI  →  Express backend (proxy)  →  Platinum API  →  back to UI
+
+1. Angular frontend (browser)
+Each screen calls a small TypeScript service (e.g. IndigentService, PosService, ReceiptService).
+Those services use one shared ApiService that wraps Angular's HttpClient.
+Every request goes to a URL like /api/platinum/<area>/<action> on our own Express backend — never directly to Platinum.
+2. Express backend (the proxy on port 5000)
+It does three jobs and nothing else:
+Authenticate the user — checks the session cookie (sessions are stored in our local PostgreSQL).
+Add the Platinum bearer token — silently refreshes it when needed.
+Forward the request to Platinum — same payload, same response, no transformations.
+Routes are organised by area: auth, POS, billing, deposits, supervisor, receipts, debt, legal, communications, indigent (ATTP), consumer, etc.
+If Platinum returns an error (500, 502, 404, timeout), the backend forwards that error straight to the UI. It never substitutes empty arrays or default data.
+3. Platinum Inzalo EMS API
+The system of record for everything: accounts, balances, receipts, indigent applications, documents, day-end, debt, legal — all of it.
+We authenticate per database (e.g. George, Inzalo Site02), and that determines which tenant's data we see.
+What our local PostgreSQL is used for
+A very small, deliberate list. No business data lives here.
+
+Table	Purpose
+user_sessions	Express session store (cookie ↔ Platinum token)
+conversations, messages	The AI chat assistant transcripts
+statement_links	Short-lived signed links for emailed/SMS'd statements
+That's it. Everything else — every account, every receipt, every document — is fetched live from Platinum on every request.
+
+Two helper APIs alongside Platinum
+These are not data sources, they're action services:
+
+GP-SMS (gp-sms.azurewebsites.net) — sends statement emails/SMS with secure redirect links.
+SMS Portal (Link Mobility) — fallback SMS gateway.
+Citizen Portal API — only used to fetch BI report URLs.
+A concrete example — downloading a document (today's bug)
+The application page in Angular calls IndigentService.downloadDocument(123).
+That hits our Express route GET /api/platinum/billing-attp/download-document?documentId=123.
+Express attaches the user's Platinum token and forwards to …/api/BillingATTP/download-document?documentId=123.
+Platinum streams back the PDF; Express passes the bytes through unchanged.
+The browser saves the file with the original filename from the response header.
+Same pattern for everything: search an account, take a payment, run a day-end report, capture an indigent application. The UI asks our backend, our backend asks Platinum, and Platinum's answer (good or bad) is what the user sees.
