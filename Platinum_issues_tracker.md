@@ -158,6 +158,30 @@
 - **Impact**: Blocks any backend service in this environment from talking to the Azure-hosted `AFS` (and any other Azure PG) database.
 - **Action required (user)**: In the Azure portal → `platinum-postgre-sql` server → Networking → Firewall rules, add a rule allowing the Replit outbound IP (or "Allow public access from any Azure service…" as a temporary unblock).
 
+### OPEN-008: AFS dashboard crashes — `Cannot read properties of undefined (reading 'totalCompilations')`
+- **Module**: AFS (`libs/afs/src/lib/features/dashboard/dashboard.component.html`)
+- **Date Found**: 2026-04-19
+- **Description**: When loading `/afs/dashboard` in the shell, the page renders the header bar and tab strip ("Overview / CFO / AFS Control / Ratios / …") but the entire body below is blank. The browser console throws a hard runtime error:
+  ```
+  ERROR TypeError: Cannot read properties of undefined (reading 'totalCompilations')
+      at DashboardComponent_Conditional_2_Template (chunk-CNBJOUEX.js)
+  ```
+- **Root cause**: The dashboard template binds to `data.kpis.totalCompilations` (and ~6 other `data.kpis.*` fields) without guarding `data.kpis`. When the underlying API call fails (see OPEN-009), `data` is set to a partial object, `data.kpis` is `undefined`, and the `.totalCompilations` access throws.
+- **Affected templates** (same unguarded pattern):
+  - `libs/afs/src/lib/features/dashboard/dashboard.component.html:211`
+  - `libs/afs/src/lib/features/dashboards/afs-control-dashboard.component.html:62`
+  - `libs/afs/src/lib/features/dashboards/cfo-dashboard.component.html:79`
+  - `libs/afs/src/lib/features/reports/reports.component.html:16`
+- **Recommended fix**: Use the safe-navigation operator (`data?.kpis?.totalCompilations`) or wrap each KPI block in an `@if (data?.kpis)` guard, and have `loadDashboard()` set a sensible default object (with zeros) on API failure so the UI degrades gracefully.
+- **Related**: OPEN-009 (the failing fetch that exposes this bug).
+
+### OPEN-009: AFS dashboard data fetch returns 404
+- **Module**: AFS API / proxy (`/afs-app/api/...`)
+- **Date Found**: 2026-04-19
+- **Description**: When loading `/afs/dashboard`, the browser console reports `Failed to load resource: the server responded with a status of 404 (Not Found)`. The AFS dashboard's `loadDashboard()` call hits an endpoint on the AFS API (port 3004 stub from FIX-007) that doesn't exist, leaving the component with no data and triggering OPEN-008.
+- **Impact**: AFS dashboard is non-functional — no KPIs, no charts, no compilations data.
+- **Next step**: Identify the exact endpoint the dashboard requests, then either (a) add the route to the lightweight Express stub at `AFS-UI/api/index.ts`, or (b) replace the stub with the real .NET AFS API once OPEN-007 (provider migration) and OPEN-006 (firewall) are resolved.
+
 ### OPEN-007: AFS API uses SQL Server, not PostgreSQL
 - **Module**: AFS API (`AFS-UI/dotnet-apis/PlatinumAFS.Api`)
 - **Description**: User asked to point the AFS dashboard at the Azure PostgreSQL `AFS` database. Current AFS .NET API uses EF Core `Microsoft.EntityFrameworkCore.SqlServer` with a SQL Server connection string (`Server=...;TrustServerCertificate=True;MultipleActiveResultSets=True;...`). Switching to PostgreSQL is a provider migration, not a config tweak.
