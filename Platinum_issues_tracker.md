@@ -183,7 +183,25 @@
 - **Recommended fix**: Use the safe-navigation operator (`data?.kpis?.totalCompilations`) or wrap each KPI block in an `@if (data?.kpis)` guard, and have `loadDashboard()` set a sensible default object (with zeros) on API failure so the UI degrades gracefully.
 - **Related**: OPEN-009 (the failing fetch that exposes this bug).
 
-### OPEN-009: AFS dashboard data fetch returns 404
+### FIX-009: AFS dashboard now reads real data from Azure PostgreSQL
+- **Module**: AFS API (`AFS-UI/api/index.ts` + new `AFS-UI/api/db.ts`)
+- **Date Fixed**: 2026-04-20
+- **Symptom (was OPEN-009)**: `loadDashboard()` hit endpoints that returned 404, leaving the AFS dashboard with no data and triggering OPEN-008's null-deref crash.
+- **Resolution**: Replaced the in-memory stub with a real Express backend wired to Azure PostgreSQL.
+  - **DB module** (`AFS-UI/api/db.ts`): parses `AZURE_POSTGRES_URL` (ADO `Host=…;Port=…;Username=…;Password=…` format), overrides database to `AFS`, and exposes a pooled `pg` client with SSL.
+  - **Endpoints implemented against the live AFS schema (177 tables)**:
+    - `GET /api/health` — now reports DB connectivity (`{db:{ok:true,db:'AFS'}}`)
+    - `GET /api/admin/financial-years` — pulls from `public.financial_years`
+    - `GET /api/reports/dashboard?period=…&fyId=…` — aggregates compilations, afs_versions, rfi_requests, audit_findings, adjustments, evidence_documents, working_papers, trial_balance_entries, general_ledger_entries, budget_cache. Returns the full `DashboardData` shape (KPIs, status counts, severity breakdown, compliance score, recent activity, adjustment summary, TB summary, TB category breakdown, top revenue/expenditure items, budget-vs-actual, GL summary).
+    - `GET /api/compilations` — pulls from `public.compilations`.
+  - **Auth/notifications stubs** preserved (shell auth is the source of truth in this monorepo, AFS auth doesn't need to duplicate).
+  - **Verified data live**: 18 compilations across statuses (3 draft, 6 calculated, 9 compiled_with_exceptions), 1 published AFS version, 22,811 trial-balance entries for FY 2025/26, debit total R50.0B vs credit total R50.5B, top revenue item "Opening Balance — IA001001001001002001000000000000000000" R1.87B, budget-vs-actual variance for top 6 SCOA categories.
+- **Prerequisite**: Azure PostgreSQL firewall must whitelist the environment's outbound IP. Dev IP `35.227.191.68` was added; deploy IP will need its own rule (or enable "Allow Azure services" toggle).
+- **Files**: `AFS-UI/api/db.ts` (new), `AFS-UI/api/index.ts` (rewritten), `AFS-UI/api/package.json` (+`pg`, `@types/pg`).
+- **Pending follow-ups for full feature parity** (each is one more block of endpoints against the same DB):
+  - `/api/compilations/:id`, `/api/afs-versions/...`, `/api/rfis`, `/api/findings`, `/api/adjustments`, `/api/mappings/...`, `/api/tb-import-workbench`, `/api/general-information/...`, `/api/validation-rules`, `/api/exports/...`, `/api/admin/users|roles|sharepoint|email-config`, `/api/platinum/...`. The same DB pool is reused; each endpoint becomes a thin SQL query against the relevant table(s) listed in the schema dump.
+
+### OPEN-009: AFS dashboard data fetch returns 404 — RESOLVED by FIX-009
 - **Module**: AFS API / proxy (`/afs-app/api/...`)
 - **Date Found**: 2026-04-19
 - **Description**: When loading `/afs/dashboard`, the browser console reports `Failed to load resource: the server responded with a status of 404 (Not Found)`. The AFS dashboard's `loadDashboard()` call hits an endpoint on the AFS API (port 3004 stub from FIX-007) that doesn't exist, leaving the component with no data and triggering OPEN-008.
