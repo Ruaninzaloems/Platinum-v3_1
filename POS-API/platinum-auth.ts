@@ -499,9 +499,59 @@ export async function refreshSessionToken(session: UserSession): Promise<string>
   }
 }
 
+// ── Credential cache ─────────────────────────────────────────────────────
+// After a successful Azure login, remember the (username, password, db) hash
+// for a short window so the user can refresh / re-login without paying the
+// 1.5-2s Azure round-trip every time. Cache stores the validated session,
+// keyed by SHA-256(username|password|db) — the password is never persisted
+// in plaintext and the cache lives only in process memory.
+import { createHash } from "crypto";
+const credentialSessionCache = new Map<string, { session: UserSession; ts: number }>();
+const CREDENTIAL_CACHE_TTL = 5 * 60 * 1000;
+const CREDENTIAL_CACHE_MAX = 200;
+
+function credentialKey(username: string, password: string, db: string): string {
+  return createHash('sha256').update(`${username.toLowerCase()}|${password}|${db}`).digest('hex');
+}
+
+function getCachedCredentialSession(key: string): UserSession | undefined {
+  const entry = credentialSessionCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > CREDENTIAL_CACHE_TTL) {
+    credentialSessionCache.delete(key);
+    return undefined;
+  }
+  return entry.session;
+}
+
+function setCachedCredentialSession(key: string, session: UserSession): void {
+  if (credentialSessionCache.size >= CREDENTIAL_CACHE_MAX) {
+    const oldestKey = credentialSessionCache.keys().next().value;
+    if (oldestKey) credentialSessionCache.delete(oldestKey);
+  }
+  credentialSessionCache.set(key, { session, ts: Date.now() });
+}
+
+export function clearCredentialSessionCache(): void {
+  credentialSessionCache.clear();
+}
+
 export async function loginWithCredentials(username: string, password: string, dbName?: string, siteId?: string): Promise<{ success: boolean; session?: UserSession; error?: string }> {
   const site = getSiteConfig(siteId || 'george');
   const db = dbName || site.dbName;
+
+  // Fast-path: previously validated credentials within TTL → skip Azure entirely.
+  if (password) {
+    const ckey = credentialKey(username, password, db);
+    const cached = getCachedCredentialSession(ckey);
+    if (cached && cached.tokenExpiry > Date.now() + 60_000) {
+      // Clone so callers mutating the session don't affect the cached copy.
+      const cloned: UserSession = { ...cached, posCashierId: null };
+      console.log(`[PlatinumAuth] CREDENTIAL CACHE HIT — instant login for ${username} on site ${site.name} (skipped Azure)`);
+      return { success: true, session: cloned };
+    }
+  }
+
   try {
     const result = await fetchTokenForUser(username, password, db, site.apiUrl);
     const session: UserSession = {
@@ -513,6 +563,9 @@ export async function loginWithCredentials(username: string, password: string, d
       loggedIn: true,
       siteId: site.id,
     };
+    if (password) {
+      setCachedCredentialSession(credentialKey(username, password, db), session);
+    }
     console.log(`[PlatinumAuth] Login successful: ${result.userData.firstName} ${result.userData.lastName} (user_ID: ${result.userData.user_ID}) on site: ${site.name}`);
     return { success: true, session };
   } catch (e: any) {
