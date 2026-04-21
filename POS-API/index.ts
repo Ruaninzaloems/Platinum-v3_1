@@ -161,24 +161,12 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
 
     if (port !== 5000) {
-      const angularDir = path.resolve(process.cwd(), '..', 'ASSETS-UI');
-      if (existsSync(angularDir)) {
-        log(`Starting Angular dev server on port 5000...`);
-        const ng = spawn('npx', ['ng', 'serve', '--host', '0.0.0.0', '--port', '5000', '--proxy-config', 'proxy.conf.json'], {
-          cwd: angularDir,
-          env: { ...process.env, NG_CLI_ANALYTICS: 'false' },
-          stdio: ['ignore', 'pipe', 'pipe']
-        });
-        ng.stdout?.on('data', (d: Buffer) => {
-          const line = d.toString().trim();
-          if (line) console.log(`[angular] ${line}`);
-        });
-        ng.stderr?.on('data', (d: Buffer) => {
-          const line = d.toString().trim();
-          if (line) console.error(`[angular] ${line}`);
-        });
-        ng.on('exit', (code: number | null) => console.log(`[angular] exited with code ${code}`));
-      }
+      // NOTE: We deliberately do NOT spawn an Angular dev server here.
+      // The new Nx shell at apps/shell is owned by the dedicated
+      // "Platinum Shell" workflow on port 5000. Spawning the legacy
+      // ASSETS-UI app from this process used to win the port race and
+      // serve a stale, broken login screen (calls /api/auth/login on
+      // port 3000 → ECONNREFUSED → "Invalid username or password").
 
       const budgetApiDir = path.resolve(process.cwd(), '..', 'BUDGET-APP', 'PlatinumBudget.Api');
       if (existsSync(budgetApiDir)) {
