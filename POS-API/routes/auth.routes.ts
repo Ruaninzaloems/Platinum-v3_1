@@ -32,6 +32,31 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
 
       const site = getSiteConfig(siteId || 'george');
 
+      // ── Demo-account fast-path ──────────────────────────────────────────
+      // The login UI advertises a "Demo Credentials" panel (admin/admin123).
+      // When demo mode is off (production-style auth), those exact credentials
+      // would otherwise be sent to Azure, fail with "User not found" after
+      // 3-4s and leave the spinner hanging. Short-circuit them here so the
+      // demo logs in instantly. Real users (Superdev, etc.) still go through
+      // the Azure path below — this only matches the documented demo pair.
+      const DEMO_ACCOUNTS: Record<string, { password: string; user: any }> = {
+        admin: {
+          password: 'admin123',
+          user: { user_ID: 2, userName: 'admin', firstName: 'Admin', lastName: 'User',
+            eMail: 'admin@platinum.local', enabled: true, superUser: true, cashFloat: 0, finYear: '2025/2026' }
+        },
+      };
+      const demoMatch = DEMO_ACCOUNTS[(username || '').toLowerCase()];
+      if (demoMatch && password === demoMatch.password) {
+        const demoSession: any = {
+          token: 'local-token-' + Date.now(), tokenExpiry: Date.now() + 24 * 60 * 60 * 1000,
+          userData: demoMatch.user, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
+        };
+        req.session.platinumAuth = demoSession;
+        console.log(`[Auth] DEMO fast-path — instant session for ${username} on site ${site.name}`);
+        return res.json({ success: true, user: demoMatch.user, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+      }
+
       if (demoMode) {
         const demoUser = {
           user_ID: 2, userName: username || 'admin', firstName: 'Admin', lastName: 'User',
