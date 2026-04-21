@@ -18,8 +18,13 @@ export const routes: Routes = [
   },
   {
     path: '',
+    // canMatch (not canActivate) so the shell + dashboard chunks are NEVER
+    // requested for unauthenticated users — the guard redirects to /login
+    // before any feature code is fetched. Feature modules below remain
+    // loadChildren so each module is only downloaded the first time the
+    // user navigates to it after logging in.
+    canMatch: [authGuard],
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
-    canActivate: [authGuard],
     children: [
       { path: 'pos-view', redirectTo: 'pos', pathMatch: 'full' },
       { path: 'scm-view', redirectTo: 'scm', pathMatch: 'full' },
