@@ -109,7 +109,7 @@ export class SupplierLoginComponent {
         localStorage.setItem('platinum_token', res.token);
         localStorage.setItem('platinum_user', JSON.stringify(res.user));
         localStorage.setItem('supplier_session', JSON.stringify(res.supplier));
-        this.router.navigate(['/supplier-portal']);
+        this.router.navigate(['/scm/supplier-portal']);
       },
       error: (err) => {
         this.loading.set(false);

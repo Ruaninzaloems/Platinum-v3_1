@@ -3,6 +3,7 @@ import { authGuard } from '@platinumv3/shared/auth';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent) },
+  { path: 'supplier-login', loadComponent: () => import('@platinumv3/scm').then(m => m.SupplierLoginComponent) },
   {
     path: '',
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
