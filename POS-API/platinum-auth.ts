@@ -223,8 +223,17 @@ async function fetchTokenForUser(username: string, password: string, dbName: str
           if (data.token) {
             const userData = data.data || data.user || data.userData || {};
             const apiUserId = userData.user_ID ?? userData.userId ?? userData.id;
+            const apiUserName = (userData.userName ?? '').toString();
 
-            if (apiUserId && apiUserId !== 1) {
+            // Accept the token whenever the returned userName matches the
+            // submitted username (case-insensitive). Falling back to Azure for
+            // user_ID:1 alone was wrong because real users (e.g. Superdev) can
+            // legitimately have user_ID:1.
+            const userNameMatches =
+              apiUserName && apiUserName.toLowerCase() === username.toLowerCase();
+            const isAcceptableId = apiUserId && (apiUserId !== 1 || userNameMatches);
+
+            if (isAcceptableId) {
               const user = {
                 user_ID: apiUserId,
                 userName: userData.userName ?? username,
@@ -236,10 +245,10 @@ async function fetchTokenForUser(username: string, password: string, dbName: str
                 cashFloat: userData.cashFloat ?? 0,
                 finYear: userData.finYear || data.finYear
               };
-              console.log(`[PlatinumAuth] Token obtained via createToken. User: ${user.firstName} ${user.lastName} (user_ID: ${user.user_ID})`);
+              console.log(`[PlatinumAuth] Token obtained via createToken. User: ${user.firstName} ${user.lastName} (user_ID: ${user.user_ID}, userName: ${user.userName})`);
               return { token: data.token, userData: user, authMode: 'direct' as const };
             }
-            console.log(`[PlatinumAuth] createToken returned generic user (ID:${apiUserId}), will try Azure`);
+            console.log(`[PlatinumAuth] createToken returned generic user (ID:${apiUserId}, userName:${apiUserName}) for request "${username}", will try Azure`);
           }
         } else {
           const text = await res.text();

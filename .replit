@@ -164,4 +164,4 @@ SKIP_DB_INIT = "true"
 AZURE_POSTGRES_URL = "Host=platinum-postgre-sql.postgres.database.azure.com;Port=5432;Database=Assets;Username=Admin_Dev;Password=NOP@ssword_123;SslMode=Require;CommandTimeout=600;Timeout=30"
 
 [userenv.development]
-POS_AUTH_DEMO_MODE = "true"
+POS_AUTH_DEMO_MODE = "false"
