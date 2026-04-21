@@ -9,45 +9,82 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
   });
 
   app.post("/api/auth/login", async (req, res) => {
+    // ── Demo-mode gate ──────────────────────────────────────────────────────
+    // When POS_AUTH_DEMO_MODE === 'true' the route grants an instant session
+    // (any username/password) and tries to upgrade to a real Azure session in
+    // the background — useful for offline/dev demos.
+    // When unset/false the route ONLY succeeds after Azure validates the
+    // credentials, like a normal production login.
+    // Demo mode is also force-disabled when NODE_ENV === 'production' as a
+    // belt-and-braces guard in case the env var is misconfigured.
+    const demoMode =
+      process.env.POS_AUTH_DEMO_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production';
+
     try {
       const { username, password, dbName, siteId } = req.body;
       if (!username) {
         return res.status(400).json({ success: false, error: "Username is required" });
       }
+      if (!demoMode && !password) {
+        return res.status(400).json({ success: false, error: "Password is required" });
+      }
 
       const site = getSiteConfig(siteId || 'george');
-      const demoUser = {
-        user_ID: 2, userName: username || 'admin', firstName: 'Admin', lastName: 'User',
-        eMail: 'admin@platinum.local', enabled: true, superUser: true, cashFloat: 0, finYear: '2025'
-      };
-      const demoSession: any = {
-        token: 'local-token-' + Date.now(), tokenExpiry: Date.now() + 24 * 60 * 60 * 1000,
-        userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
-      };
-      req.session.platinumAuth = demoSession;
-      console.log(`[Auth] Local session created for ${username} on site ${site.name}`);
-      res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
 
+      if (demoMode) {
+        const demoUser = {
+          user_ID: 2, userName: username || 'admin', firstName: 'Admin', lastName: 'User',
+          eMail: 'admin@platinum.local', enabled: true, superUser: true, cashFloat: 0, finYear: '2025'
+        };
+        const demoSession: any = {
+          token: 'local-token-' + Date.now(), tokenExpiry: Date.now() + 24 * 60 * 60 * 1000,
+          userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
+        };
+        req.session.platinumAuth = demoSession;
+        console.log(`[Auth] DEMO MODE — Local session created for ${username} on site ${site.name}`);
+        res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+
+        clearLockoutCache(username);
+        loginWithCredentials(username, password, dbName, siteId).then(result => {
+          if (result.success && result.session) {
+            req.session.platinumAuth = result.session;
+            console.log(`[Auth] Upgraded to live session for ${username} (user_ID: ${result.session.userData?.user_ID})`);
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      // Production path: require a real Azure-validated session.
       clearLockoutCache(username);
-      loginWithCredentials(username, password, dbName, siteId).then(result => {
-        if (result.success && result.session) {
-          req.session.platinumAuth = result.session;
-          console.log(`[Auth] Upgraded to live session for ${username} (user_ID: ${result.session.userData?.user_ID})`);
-        }
-      }).catch(() => {});
+      const result = await loginWithCredentials(username, password, dbName, siteId);
+      if (!result.success || !result.session) {
+        console.log(`[Auth] Login DENIED for ${username} on site ${site.name}: ${result.error || 'invalid credentials'}`);
+        return res.status(401).json({ success: false, error: result.error || 'Invalid username or password' });
+      }
+      req.session.platinumAuth = result.session;
+      console.log(`[Auth] Live session created for ${username} (user_ID: ${result.session.userData?.user_ID})`);
+      res.json({
+        success: true,
+        user: result.session.userData,
+        site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass },
+      });
     } catch (e: any) {
       console.error('[Auth] Login error:', e.message);
-      const site = getSiteConfig('george');
-      const demoUser = {
-        user_ID: 2, userName: 'admin', firstName: 'Admin', lastName: 'User',
-        eMail: 'admin@platinum.local', enabled: true, superUser: true, cashFloat: 0, finYear: '2025'
-      };
-      const demoSession: any = {
-        token: 'local-token-' + Date.now(), tokenExpiry: Date.now() + 24 * 60 * 60 * 1000,
-        userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
-      };
-      req.session.platinumAuth = demoSession;
-      res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+      if (demoMode) {
+        const site = getSiteConfig('george');
+        const demoUser = {
+          user_ID: 2, userName: 'admin', firstName: 'Admin', lastName: 'User',
+          eMail: 'admin@platinum.local', enabled: true, superUser: true, cashFloat: 0, finYear: '2025'
+        };
+        const demoSession: any = {
+          token: 'local-token-' + Date.now(), tokenExpiry: Date.now() + 24 * 60 * 60 * 1000,
+          userData: demoUser, posCashierId: null, authMode: 'override', loggedIn: true, siteId: site.id
+        };
+        req.session.platinumAuth = demoSession;
+        return res.json({ success: true, user: demoUser, site: { id: site.id, name: site.name, logo: site.logo, themeClass: site.themeClass } });
+      }
+      return res.status(503).json({ success: false, error: 'Authentication service unavailable' });
     }
   });
 

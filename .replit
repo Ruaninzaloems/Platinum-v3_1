@@ -37,6 +37,10 @@ args = "Platinum Shell"
 task = "workflow.run"
 args = "AFS API"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "POS API"
+
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
@@ -73,6 +77,18 @@ task = "shell.exec"
 args = "cd AFS-UI/api && PORT=9000 npx tsx index.ts"
 waitForPort = 9000
 
+[[workflows.workflow]]
+name = "POS API"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd POS-API && PORT=3003 npx tsx index.ts"
+waitForPort = 3003
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
@@ -87,11 +103,7 @@ externalPort = 3002
 
 [[ports]]
 localPort = 3003
-externalPort = 80
-
-[[ports]]
-localPort = 4200
-externalPort = 4200
+externalPort = 3003
 
 [[ports]]
 localPort = 4201
@@ -146,3 +158,6 @@ externalPort = 3003
 [userenv.shared]
 SKIP_DB_INIT = "true"
 AZURE_POSTGRES_URL = "Host=platinum-postgre-sql.postgres.database.azure.com;Port=5432;Database=Assets;Username=Admin_Dev;Password=NOP@ssword_123;SslMode=Require;CommandTimeout=600;Timeout=30"
+
+[userenv.development]
+POS_AUTH_DEMO_MODE = "true"
