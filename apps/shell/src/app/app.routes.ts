@@ -1,9 +1,12 @@
 import { Routes } from '@angular/router';
 import { authGuard } from '@platinumv3/shared/auth';
+import { LoginComponent } from './features/login/login.component';
+import { NotFoundComponent } from './features/not-found/not-found.component';
+import { SupplierLoginComponent } from '../../../../libs/scm/src/lib/features/auth/supplier-login/supplier-login.component';
 
 export const routes: Routes = [
-  { path: 'login', loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent) },
-  { path: 'supplier-login', loadComponent: () => import('@platinumv3/scm').then(m => m.SupplierLoginComponent) },
+  { path: 'login', component: LoginComponent },
+  { path: 'supplier-login', component: SupplierLoginComponent },
   {
     path: '',
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
@@ -26,8 +29,8 @@ export const routes: Routes = [
       { path: 'afs', loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
       { path: 'ins', loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: '**', loadComponent: () => import('./features/not-found/not-found.component').then(m => m.NotFoundComponent) }
+      { path: '**', component: NotFoundComponent }
     ]
   },
-  { path: '**', loadComponent: () => import('./features/not-found/not-found.component').then(m => m.NotFoundComponent) }
+  { path: '**', component: NotFoundComponent }
 ];
