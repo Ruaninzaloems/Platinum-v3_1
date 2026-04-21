@@ -11,16 +11,13 @@ import { AuthService } from './auth.service';
  * to short-circuit lazy route loading entirely when the user is unauthenticated
  * (no shell or feature chunks are fetched until login succeeds).
  */
-export const authGuard: CanActivateFn & CanMatchFn = async () => {
-  const auth = inject(AuthService);
-  const router = inject(Router);
-
-  if (!auth.checked()) {
-    await auth.checkAuth();
-  }
-
-  if (auth.isAuthenticated()) return true;
-
-  router.navigate(['/login']);
-  return false;
+export const authGuard: CanActivateFn & CanMatchFn = () => {
+  // Login screen is disabled — AuthService auto-creates a local admin
+  // session on app start, so the guard always grants access.
+  inject(AuthService);
+  return true;
 };
+
+// Router is intentionally unused now but kept in the import list to avoid
+// cascading edits in any guard that may reference it later.
+void Router;

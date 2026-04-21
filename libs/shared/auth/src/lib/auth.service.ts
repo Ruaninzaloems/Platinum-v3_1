@@ -68,7 +68,8 @@ export class AuthService {
   });
 
   constructor() {
-    // Hydrate from localStorage for instant UI on reload (cookie is the source of truth).
+    // Login screen is disabled — every visitor gets an instant local admin
+    // session so the shell + all modules are immediately reachable.
     try {
       const u = localStorage.getItem(STORAGE_USER);
       const s = localStorage.getItem(STORAGE_SITE);
@@ -77,6 +78,10 @@ export class AuthService {
       if (s) this._site.set(JSON.parse(s));
       if (t) this._token.set(t);
     } catch {}
+    if (!this._user()) {
+      this.setLocalSession('admin');
+    }
+    this._checked.set(true);
   }
 
   /** Read-only token (used by SCM Azure backend bearer requests). */

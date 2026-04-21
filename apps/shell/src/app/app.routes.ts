@@ -1,29 +1,14 @@
 import { Routes } from '@angular/router';
-import { authGuard } from '@platinumv3/shared/auth';
-import { LoginComponent } from './features/login/login.component';
 import { NotFoundComponent } from './features/not-found/not-found.component';
 
 export const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  // Supplier-login is lazy via deep file path — keeps SCM_ROUTES/guards out
-  // of the initial bundle AND prevents its Material deps (stepper, form-field,
-  // input, button, icon, select, checkbox, progress-bar, divider) from being
-  // pulled into /login, which was saturating the browser's 6-connection HTTP/1.1
-  // limit and queueing the login POST behind the chunk waterfall.
-  {
-    path: 'supplier-login',
-    loadComponent: () =>
-      import('../../../../libs/scm/src/lib/features/auth/supplier-login/supplier-login.component')
-        .then(m => m.SupplierLoginComponent)
-  },
+  // Login is disabled — every visitor lands directly inside the shell with
+  // an auto-created local admin session. The legacy /login and
+  // /supplier-login URLs redirect to the dashboard so old links keep working.
+  { path: 'login', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'supplier-login', redirectTo: 'dashboard', pathMatch: 'full' },
   {
     path: '',
-    // canMatch (not canActivate) so the shell + dashboard chunks are NEVER
-    // requested for unauthenticated users — the guard redirects to /login
-    // before any feature code is fetched. Feature modules below remain
-    // loadChildren so each module is only downloaded the first time the
-    // user navigates to it after logging in.
-    canMatch: [authGuard],
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
     children: [
       { path: 'pos-view', redirectTo: 'pos', pathMatch: 'full' },
