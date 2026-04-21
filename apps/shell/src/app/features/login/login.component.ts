@@ -202,10 +202,9 @@ export class LoginComponent {
     this.authService.login(this.username, this.password, this.selectedSite).subscribe({
       next: (response) => {
         if (response.success) {
-          this.bridgeScmAuth(this.username, this.password).then(() => {
-            this.router.navigate(['/dashboard']);
-            this.loading.set(false);
-          });
+          this.bridgeScmAuth(this.username, this.password);
+          this.loading.set(false);
+          this.router.navigate(['/dashboard']);
         } else {
           this.errorMessage.set(response.error || 'Invalid username or password');
           this.loading.set(false);
@@ -221,23 +220,27 @@ export class LoginComponent {
   private http = inject(HttpClient);
 
   /**
-   * Best-effort: also obtain a JWT from the Azure SCM backend so SCM API
-   * calls work for the same session. If it fails, SCM data calls will fall
-   * back to the bootstrap guard's silent admin login.
+   * Fire-and-forget: best-effort attempt to also obtain a JWT from the Azure SCM
+   * backend so SCM API calls work for the same session. Must never block the main
+   * login flow — if Azure is slow/unreachable the user has already been navigated
+   * to the dashboard, and the SCM scmBootstrapGuard will perform a silent admin
+   * login on first navigation into /scm.
    */
-  private bridgeScmAuth(username: string, password: string): Promise<void> {
-    return new Promise((resolve) => {
-      this.http.post<any>(
-        'https://rep-scm-api.azurewebsites.net/api/auth/login',
-        { username, password }
-      ).subscribe({
-        next: (resp) => {
-          const token = resp?.data?.token;
-          if (token) localStorage.setItem('platinum_token', token);
-          resolve();
-        },
-        error: () => resolve()
-      });
-    });
+  private bridgeScmAuth(username: string, password: string): void {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    fetch('https://rep-scm-api.azurewebsites.net/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      signal: controller.signal,
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(resp => {
+        const token = resp?.data?.token;
+        if (token) localStorage.setItem('platinum_token', token);
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
   }
 }
