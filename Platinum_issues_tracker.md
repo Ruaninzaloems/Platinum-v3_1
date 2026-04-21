@@ -1,6 +1,6 @@
 # PLATINUM — Issues & Pending Work Tracker
 
-_Last updated: 2026-04-21_
+_Last updated: 2026-04-21 (POS auth unification)_
 
 Status legend: 🔴 Open · 🟡 In progress · 🟢 Resolved · ⚪ Deferred
 
@@ -20,7 +20,8 @@ Status legend: 🔴 Open · 🟡 In progress · 🟢 Resolved · ⚪ Deferred
 |----|--------|----------|-------|-------|
 | API-001 | 🔴 | High | IDP API (port 8008) returns 404 on `/api/cycles` | Service starts but routes missing or misregistered. IDP dashboard now shows graceful "service unavailable" panel (FIX-008). |
 | API-002 | 🔴 | High | Budget API port collision on 3001 (shared with ASSETS-API legacy) | Proxy ambiguity. Move Budget API to a free port (e.g. 3005) and update `proxy.conf.json`. |
-| API-003 | 🟡 | Medium | POS authentication model not finalized | Mix of session-cookie and JWT logic; user sees "Not authenticated" intermittently. Awaiting decision (a/b/c options were presented). |
+| API-003 | 🟢 | Medium | POS authentication model not finalized | RESOLVED 2026-04-21: POS-API designated as system-wide identity provider. Shared `AuthService` rewritten to POS shape (AuthUser/SiteInfo, session-cookie via `/pos-app/api/auth/login` with withCredentials). Interceptor scoped to first-party API prefixes only; SCM JWT bearer scoped to `rep-scm-api.azurewebsites.net`. Guard runs `/auth/status` once per app load. Login page shows Site dropdown. End-to-end verified: sites/login/status/logout. |
+| API-005 | 🔴 | **CRITICAL** | POS-API `/api/auth/login` grants demo session BEFORE validating credentials | `POS-API/routes/auth.routes.ts:19-37` returns `success:true` with a synthetic admin user immediately, then attempts the live Azure validation in the background. Practically: any username/password combination authenticates. Acceptable for dev demo but MUST be gated behind an explicit `NODE_ENV !== 'production'` flag (or removed entirely) before any non-dev deployment. |
 | API-004 | ⚪ | Low | Several AFS endpoints not yet wired in `AFS-UI/api/index.ts` | Working papers, RFI attachments, finding evidence upload still TODO. |
 
 ## Module Frontend (Nx libs)
@@ -51,6 +52,7 @@ Status legend: 🔴 Open · 🟡 In progress · 🟢 Resolved · ⚪ Deferred
 | FIX-009 | 🟢 | Shell→SCM JWT bridge |
 | FIX-010 | 🟢 | scm-bootstrap.guard silent admin login |
 | FIX-011 | 🟢 | POS sidebar 10-group / 51-item rebuild |
+| FIX-012 | 🟢 | POS auth unification — shared AuthService + scoped interceptor + Site selector login |
 
 ---
 

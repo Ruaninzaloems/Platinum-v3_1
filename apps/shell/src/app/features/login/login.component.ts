@@ -9,12 +9,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { AuthService } from '@platinumv3/shared/auth';
+import { AuthService, SiteInfo } from '@platinumv3/shared/auth';
+import { MatSelectModule } from '@angular/material/select';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSelectModule],
   template: `
     <div class="login-page">
       <div class="login-left">
@@ -62,6 +63,18 @@ import { AuthService } from '@platinumv3/shared/auth';
               </div>
             }
             <form (ngSubmit)="onLogin()">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Site</mat-label>
+                <mat-icon matPrefix>location_city</mat-icon>
+                <mat-select [(ngModel)]="selectedSite" name="site">
+                  @for (s of sites(); track s.id) {
+                    <mat-option [value]="s.id">{{ s.name }}</mat-option>
+                  }
+                  @if (sites().length === 0) {
+                    <mat-option value="george">George Municipality</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Username</mat-label>
                 <mat-icon matPrefix>person</mat-icon>
@@ -160,6 +173,8 @@ import { AuthService } from '@platinumv3/shared/auth';
 export class LoginComponent {
   username = '';
   password = '';
+  selectedSite = 'george';
+  sites = signal<SiteInfo[]>([]);
   loading = signal(false);
   errorMessage = signal('');
   hidePassword = signal(true);
@@ -167,7 +182,12 @@ export class LoginComponent {
   constructor(private authService: AuthService, private router: Router) {
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/dashboard']);
+      return;
     }
+    this.authService.loadSites().subscribe({
+      next: (list) => this.sites.set(list || []),
+      error: () => this.sites.set([{ id: 'george', name: 'George Municipality' }]),
+    });
   }
 
   onLogin() {
@@ -179,24 +199,20 @@ export class LoginComponent {
     this.loading.set(true);
     this.errorMessage.set('');
 
-    if ((this.username === 'admin' || this.username === 'admin@platinum.gov.za') && this.password === 'admin123') {
-      this.authService.setLocalSession(this.username);
-      this.bridgeScmAuth('admin', 'admin123').then(() => {
-        this.router.navigate(['/dashboard']);
-        this.loading.set(false);
-      });
-      return;
-    }
-
-    this.authService.login(this.username, this.password).subscribe({
+    this.authService.login(this.username, this.password, this.selectedSite).subscribe({
       next: (response) => {
-        this.authService.handleLoginSuccess(response);
-        this.bridgeScmAuth(this.username, this.password).then(() => {
+        if (response.success) {
+          this.bridgeScmAuth(this.username, this.password).then(() => {
+            this.router.navigate(['/dashboard']);
+            this.loading.set(false);
+          });
+        } else {
+          this.errorMessage.set(response.error || 'Invalid username or password');
           this.loading.set(false);
-        });
+        }
       },
       error: () => {
-        this.errorMessage.set('Invalid username or password');
+        this.errorMessage.set('Login service unavailable. Please try again.');
         this.loading.set(false);
       }
     });
@@ -204,14 +220,20 @@ export class LoginComponent {
 
   private http = inject(HttpClient);
 
+  /**
+   * Best-effort: also obtain a JWT from the Azure SCM backend so SCM API
+   * calls work for the same session. If it fails, SCM data calls will fall
+   * back to the bootstrap guard's silent admin login.
+   */
   private bridgeScmAuth(username: string, password: string): Promise<void> {
     return new Promise((resolve) => {
-      this.http.post<any>('https://rep-scm-api.azurewebsites.net/api/auth/login', { username, password }).subscribe({
+      this.http.post<any>(
+        'https://rep-scm-api.azurewebsites.net/api/auth/login',
+        { username, password }
+      ).subscribe({
         next: (resp) => {
           const token = resp?.data?.token;
-          if (token) {
-            localStorage.setItem('platinum_token', token);
-          }
+          if (token) localStorage.setItem('platinum_token', token);
           resolve();
         },
         error: () => resolve()
