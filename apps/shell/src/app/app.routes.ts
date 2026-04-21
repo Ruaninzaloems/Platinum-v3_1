@@ -2,11 +2,20 @@ import { Routes } from '@angular/router';
 import { authGuard } from '@platinumv3/shared/auth';
 import { LoginComponent } from './features/login/login.component';
 import { NotFoundComponent } from './features/not-found/not-found.component';
-import { SupplierLoginComponent } from '../../../../libs/scm/src/lib/features/auth/supplier-login/supplier-login.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
-  { path: 'supplier-login', component: SupplierLoginComponent },
+  // Supplier-login is lazy via deep file path — keeps SCM_ROUTES/guards out
+  // of the initial bundle AND prevents its Material deps (stepper, form-field,
+  // input, button, icon, select, checkbox, progress-bar, divider) from being
+  // pulled into /login, which was saturating the browser's 6-connection HTTP/1.1
+  // limit and queueing the login POST behind the chunk waterfall.
+  {
+    path: 'supplier-login',
+    loadComponent: () =>
+      import('../../../../libs/scm/src/lib/features/auth/supplier-login/supplier-login.component')
+        .then(m => m.SupplierLoginComponent)
+  },
   {
     path: '',
     loadComponent: () => import('./layout/shell.component').then(m => m.ShellComponent),
