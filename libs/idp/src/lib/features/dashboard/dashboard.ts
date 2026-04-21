@@ -11,6 +11,25 @@ import { DashboardData, PriorityFramework, ProjectRanking } from '../../core/mod
   imports: [CommonModule, RouterModule, DecimalPipe, DatePipe],
   encapsulation: ViewEncapsulation.None,
   template: `
+    <div class="page" *ngIf="loading()">
+      <div class="page-header">
+        <div><h1>IDP Dashboard</h1><p class="page-subtitle">Loading…</p></div>
+      </div>
+      <div class="loading"><span class="spin material-icon">progress_activity</span> Loading IDP dashboard…</div>
+    </div>
+
+    <div class="page" *ngIf="!loading() && !data() && errorMessage()">
+      <div class="page-header">
+        <div><h1>IDP Dashboard</h1><p class="page-subtitle">Mnquma Local Municipality</p></div>
+      </div>
+      <div class="empty-state">
+        <span class="material-icon" style="font-size:48px;color:#94a3b8;">cloud_off</span>
+        <h2 style="margin:16px 0 8px;font-size:18px;color:#1e293b;">IDP service unavailable</h2>
+        <p style="color:#64748b;max-width:480px;margin:0 auto 16px;">{{ errorMessage() }}</p>
+        <p style="color:#94a3b8;font-size:13px;">The IDP backend (idp-app) is not responding. Once the API service is online, refresh this page.</p>
+      </div>
+    </div>
+
     <div class="page" *ngIf="data() as d">
       <div class="page-header">
         <div>
