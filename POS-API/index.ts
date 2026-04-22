@@ -157,10 +157,11 @@ app.use((req, res, next) => {
   serveStatic(app);
 
   const port = parseInt(process.env.PORT || '5000', 10);
+  const spawnSiblings = process.env.SPAWN_SIBLING_SERVICES === 'true';
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
 
-    if (port !== 5000) {
+    if (port !== 5000 && spawnSiblings) {
       // NOTE: We deliberately do NOT spawn an Angular dev server here.
       // The new Nx shell at apps/shell is owned by the dedicated
       // "Platinum Shell" workflow on port 5000. Spawning the legacy
@@ -208,10 +209,10 @@ app.use((req, res, next) => {
 
       const perfHubDir = path.resolve(process.cwd(), '..', 'Insight-Performance-Hub');
       if (existsSync(perfHubDir)) {
-        log(`Starting Performance Hub API on port 6800...`);
+        log(`Starting Performance Hub API on port 8080...`);
         const perfApi = spawn('pnpm', ['--filter', '@workspace/api-server', 'run', 'dev'], {
           cwd: perfHubDir,
-          env: { ...process.env, PORT: '6800', NODE_ENV: 'development' },
+          env: { ...process.env, PORT: '8080', NODE_ENV: 'development' },
           stdio: ['ignore', 'pipe', 'pipe']
         });
         perfApi.stdout?.on('data', (d: Buffer) => {

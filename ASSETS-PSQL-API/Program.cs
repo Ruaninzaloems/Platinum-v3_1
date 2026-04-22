@@ -27,17 +27,32 @@ void StartBackgroundService(string workDir, string cmd, string args2)
     }
 }
 
-var workspace = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+// Dev-only: spawn sibling services so a single Replit workflow boots the
+// whole local stack. In production (Azure App Service) each service runs
+// in its own Web App, so we must NOT spawn child processes here.
+var spawnSiblings = string.Equals(
+    Environment.GetEnvironmentVariable("SPAWN_SIBLING_SERVICES"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
 
-StartBackgroundService(workspace, "/bin/bash", "-c \"PORT=3004 AFS-UI/api/node_modules/.bin/tsx AFS-UI/api/index.ts\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd POS-API && PORT=3003 npx tsx index.ts\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd PAYROLL-APP && PORT=6000 node src/server/index.js\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd IDP-UI/PlatinumIDP && dotnet run\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd SCM-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json --serve-path /scm-app/\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd AFS-UI/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8000 --proxy-config proxy.conf.json --serve-path /afs-app/\"");
-StartBackgroundService(workspace, "/bin/bash", "-c \"cd ASSETS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json\"");
+if (spawnSiblings)
+{
+    var workspace = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
 
-Console.WriteLine("[Backend API] Background services launched.");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"PORT=3004 AFS-UI/api/node_modules/.bin/tsx AFS-UI/api/index.ts\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd POS-API && PORT=3003 npx tsx index.ts\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd PAYROLL-APP && PORT=6000 node src/server/index.js\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd IDP-UI/PlatinumIDP && dotnet run\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd SCM-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json --serve-path /scm-app/\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd AFS-UI/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8000 --proxy-config proxy.conf.json --serve-path /afs-app/\"");
+    StartBackgroundService(workspace, "/bin/bash", "-c \"cd ASSETS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json\"");
+
+    Console.WriteLine("[Backend API] Background sibling services launched (SPAWN_SIBLING_SERVICES=true).");
+}
+else
+{
+    Console.WriteLine("[Backend API] Sibling spawning disabled (set SPAWN_SIBLING_SERVICES=true to enable for local dev).");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,9 +95,22 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        var corsOrigins = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (corsOrigins.Length > 0)
+        {
+            policy.WithOrigins(corsOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
 });
 
@@ -130,6 +158,14 @@ using (var scope = app.Services.CreateScope())
     await db.InitializeAsync();
 }
 
-app.Urls.Add("http://0.0.0.0:3000");
+// Bind URL: prefer ASPNETCORE_URLS (Azure-friendly), then PORT env var,
+// finally fall back to the legacy local dev port 3000.
+var aspUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+if (string.IsNullOrWhiteSpace(aspUrls))
+{
+    var portEnv = Environment.GetEnvironmentVariable("PORT");
+    var bindPort = !string.IsNullOrWhiteSpace(portEnv) ? portEnv : "3000";
+    app.Urls.Add($"http://0.0.0.0:{bindPort}");
+}
 
 app.Run();

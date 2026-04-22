@@ -49,7 +49,7 @@
     "pathRewrite": { "^/budget-app/api": "/api" }
   },
   "^/insights-app/api/(.*)$": {
-    "target": "http://localhost:6800",
+    "target": "http://localhost:8080",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/insights-app/api": "/api" }

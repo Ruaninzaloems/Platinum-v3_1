@@ -3,7 +3,11 @@ import cors from 'cors';
 import { pool, query, pingDb } from './db';
 
 const app = express();
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: corsOrigins.length > 0 ? corsOrigins : true,
+  credentials: true,
+}));
 app.use(express.json());
 app.use((req, _res, next) => {
   console.log(`[afs-api] ${req.method} ${req.url}`);
