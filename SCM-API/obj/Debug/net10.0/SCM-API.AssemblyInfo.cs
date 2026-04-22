@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SCM-API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6dab15f74e9b43490f6e0c6634b7133a732ec039")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2e744264b3ca9012105d2a92c72b3ad74258af0e")]
 [assembly: System.Reflection.AssemblyProductAttribute("SCM-API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SCM-API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
