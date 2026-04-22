@@ -83,14 +83,27 @@ export class InsDashboardComponent implements OnInit {
   load() {
     this.loading.set(true);
     this.error.set(null);
-    this.http.get(`${this.apiBase}/dashboard`).subscribe({
-      next: (data) => { this.info.set(data); this.loading.set(false); },
-      error: (err: HttpErrorResponse) => {
-        this.error.set(err.status === 0
-          ? 'Cannot reach the Performance API. The service may be offline.'
-          : `${err.status} ${err.statusText || 'Request failed'}`);
-        this.loading.set(false);
-      }
+    this.http.get<Array<{ id: number; status: string }>>(`${this.apiBase}/cycles`).subscribe({
+      next: (cycles) => {
+        const active = cycles.find(c => c.status === 'Open') ?? cycles[0];
+        if (!active) {
+          this.error.set('No performance cycles configured.');
+          this.loading.set(false);
+          return;
+        }
+        this.http.get(`${this.apiBase}/dashboards/overview`, { params: { cycleId: active.id } }).subscribe({
+          next: (data) => { this.info.set(data); this.loading.set(false); },
+          error: (err: HttpErrorResponse) => this.handleError(err)
+        });
+      },
+      error: (err: HttpErrorResponse) => this.handleError(err)
     });
+  }
+
+  private handleError(err: HttpErrorResponse) {
+    this.error.set(err.status === 0
+      ? 'Cannot reach the Performance API. The service may be offline.'
+      : `${err.status} ${err.statusText || 'Request failed'}`);
+    this.loading.set(false);
   }
 }
