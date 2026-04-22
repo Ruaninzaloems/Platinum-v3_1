@@ -86,7 +86,8 @@ builder.Services.AddScoped<AssetManagement.Services.LookupService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmInvoiceService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmUnbundlingService>();
 builder.Services.AddScoped<AssetManagement.Services.LocationService>();
-builder.Services.AddHttpClient("internal", client => { client.BaseAddress = new Uri("http://localhost:3000"); client.Timeout = TimeSpan.FromMinutes(10); });
+var internalApiBaseUrl = Environment.GetEnvironmentVariable("INTERNAL_API_URL") ?? "http://localhost:3000";
+builder.Services.AddHttpClient("internal", client => { client.BaseAddress = new Uri(internalApiBaseUrl); client.Timeout = TimeSpan.FromMinutes(10); });
 var mssqlApiBaseUrl = builder.Configuration["MssqlApi:BaseUrl"] ?? "http://localhost:3001";
 builder.Services.AddHttpClient("mssql-api", client => { client.BaseAddress = new Uri(mssqlApiBaseUrl); client.Timeout = TimeSpan.FromMinutes(5); });
 builder.Services.AddScoped<AssetManagement.Services.InternalApiClient>();
@@ -98,6 +99,11 @@ builder.Services.AddCors(options =>
         var corsOrigins = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+        var isProd = string.Equals(
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+            "Production",
+            StringComparison.OrdinalIgnoreCase);
+
         if (corsOrigins.Length > 0)
         {
             policy.WithOrigins(corsOrigins)
@@ -105,12 +111,15 @@ builder.Services.AddCors(options =>
                   .AllowAnyHeader()
                   .AllowCredentials();
         }
-        else
+        else if (!isProd)
         {
+            // Dev fail-safe: permit any origin when no allowlist is set.
             policy.AllowAnyOrigin()
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         }
+        // In production with no allowlist configured, the default policy
+        // intentionally has no allowed origins — cross-origin calls are denied.
     });
 });
 

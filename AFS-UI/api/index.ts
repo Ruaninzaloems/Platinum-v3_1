@@ -4,8 +4,12 @@ import { pool, query, pingDb } from './db';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+// Fail-safe: when no allowlist is configured we still permit credentialed
+// requests in development (NODE_ENV !== 'production'); in production an
+// empty allowlist disables cross-origin access entirely.
+const isProd = process.env.NODE_ENV === 'production';
 app.use(cors({
-  origin: corsOrigins.length > 0 ? corsOrigins : true,
+  origin: corsOrigins.length > 0 ? corsOrigins : (isProd ? false : true),
   credentials: true,
 }));
 app.use(express.json());
