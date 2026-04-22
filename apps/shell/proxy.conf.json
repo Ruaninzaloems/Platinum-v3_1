@@ -12,43 +12,43 @@
     "changeOrigin": true,
     "pathRewrite": { "^/ASSETS-API": "/api" }
   },
-  "/scm-app/api": {
+  "^/scm-app/api/(.*)$": {
     "target": "http://localhost:3002",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/scm-app/api": "/api" }
   },
-  "/pos-app/api": {
+  "^/pos-app/api/(.*)$": {
     "target": "http://localhost:3003",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/pos-app/api": "/api" }
   },
-  "/afs-app/api": {
+  "^/afs-app/api/(.*)$": {
     "target": "http://localhost:9000",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/afs-app/api": "/api" }
   },
-  "/payroll-app/api": {
+  "^/payroll-app/api/(.*)$": {
     "target": "http://localhost:6000",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/payroll-app/api": "/api/v1" }
   },
-  "/idp-app/api": {
+  "^/idp-app/api/(.*)$": {
     "target": "http://localhost:8008",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/idp-app/api": "/api" }
   },
-  "/budget-app/api": {
+  "^/budget-app/api/(.*)$": {
     "target": "http://localhost:3001",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/budget-app/api": "/api" }
   },
-  "/insights-app/api": {
+  "^/insights-app/api/(.*)$": {
     "target": "http://localhost:6800",
     "secure": false,
     "changeOrigin": true,
