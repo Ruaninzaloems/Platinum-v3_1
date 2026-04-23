@@ -504,7 +504,6 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   setModule(mod: AppModule) {
-    this.activeModule.set(mod);
     const routeMap: Record<AppModule, string> = {
       home: '/dashboard',
       assets: '/assets/dashboard',
