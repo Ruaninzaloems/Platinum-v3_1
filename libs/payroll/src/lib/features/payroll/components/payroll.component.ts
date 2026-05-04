@@ -8,13 +8,12 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
-import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-payroll',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, DateSaPipe, PaginationComponent, DateInputComponent],
+  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, DateSaPipe, DateInputComponent],
   templateUrl: './payroll.component.html',
   styleUrl: './payroll.component.css'
 })

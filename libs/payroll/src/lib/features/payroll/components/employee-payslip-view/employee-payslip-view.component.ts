@@ -4,12 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
 import { UiService } from '../../../../core/services/ui.service';
 import { IconComponent } from '../../../../shared/components/icon/icon.component';
-import { CurrencyZarPipe } from '../../../../shared/pipes/currency-zar.pipe';
 
 @Component({
   selector: 'app-employee-payslip-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe],
+  imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './employee-payslip-view.component.html',
   styleUrl: './employee-payslip-view.component.css'
 })

@@ -4,13 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 
 @Component({
   selector: 'app-pay-points',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent],
+  imports: [CommonModule, FormsModule, IconComponent, PaginationComponent],
   templateUrl: './pay-points.component.html',
   styleUrl: './pay-points.component.css'
 })

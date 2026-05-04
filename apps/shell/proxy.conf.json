@@ -53,5 +53,11 @@
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/insights-app/api": "/api" }
+  },
+  "^/overtime-app/api/(.*)$": {
+    "target": "http://localhost:8099",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/overtime-app/api": "/api" }
   }
 }

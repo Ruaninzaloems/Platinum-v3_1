@@ -39,7 +39,7 @@ interface FindingsDashboardData {
   imports: [
     CommonModule, MatCardModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule,
-    KpiTileComponent, TrafficLightComponent, AiInsightCardComponent
+    KpiTileComponent, AiInsightCardComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './findings-dashboard.component.html',

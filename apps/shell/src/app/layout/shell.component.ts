@@ -34,7 +34,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime';
 
 @Component({
   selector: 'app-shell',
@@ -65,6 +65,8 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                     <span class="brand-module">AFS</span>
                   } @else if (activeModule() === 'assets') {
                     <span class="brand-module">Assets</span>
+                  } @else if (activeModule() === 'overtime') {
+                    <span class="brand-module">Overtime</span>
                   }
                 </div>
               </div>
@@ -95,6 +97,9 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </button>
               <button class="module-chip" [class.active]="activeModule() === 'afs'" (click)="setModule('afs')">
                 <mat-icon class="chip-icon">description</mat-icon><span>AFS</span>
+              </button>
+              <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
+                <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
               </button>
             </div>
           }
@@ -314,6 +319,13 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 }
               </div>
             }
+          } @else if (activeModule() === 'overtime') {
+            @for (item of overtimeNavItems; track item.label) {
+              <a class="nav-link" [routerLink]="item.route" routerLinkActive="active-link">
+                <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                <span>{{item.label}}</span>
+              </a>
+            }
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -325,6 +337,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             @else if (activeModule() === 'insights') { v1.0 · Performance Mgmt }
             @else if (activeModule() === 'budget') { v1.0 · MFMA Budget }
             @else if (activeModule() === 'afs') { v4.0 · GRAP/MFMA AFS }
+            @else if (activeModule() === 'overtime') { v1.0 · Overtime Mgmt }
             @else { v1.0 · GRAP Compliant }
           }
         </div>
@@ -500,6 +513,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     else if (url.startsWith('/ins')) mod = 'insights';
     else if (url.startsWith('/budget')) mod = 'budget';
     else if (url.startsWith('/afs')) mod = 'afs';
+    else if (url.startsWith('/overtime')) mod = 'overtime';
     this.activeModule.set(mod);
   }
 
@@ -513,7 +527,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       idp: '/idp/dashboard',
       insights: '/ins',
       budget: '/budget',
-      afs: '/afs'
+      afs: '/afs',
+      overtime: '/overtime'
     };
     this.router.navigate([routeMap[mod]]);
   }
@@ -961,6 +976,15 @@ export class ShellComponent implements OnInit, OnDestroy {
         { label: 'Analytics', icon: 'insights', route: '/analytics' }
       ]
     }
+  ];
+
+  overtimeNavItems: NavItem[] = [
+    { label: 'Capture Overtime', icon: 'edit_note', route: '/overtime/capture' },
+    { label: 'New Transaction', icon: 'add_circle', route: '/overtime/capture/new' },
+    { label: 'Enquiry', icon: 'search', route: '/overtime/enquiry' },
+    { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing' },
+    { label: 'Setup', icon: 'settings', route: '/overtime/setup' },
+    { label: 'Positions', icon: 'work', route: '/overtime/positions' },
   ];
 
   afsNavGroups: NavGroup[] = [

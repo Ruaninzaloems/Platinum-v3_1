@@ -4,14 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
-import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-tax-tables',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe, DateSaPipe, DateInputComponent],
+  imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './tax-tables.component.html',
   styleUrl: './tax-tables.component.css'
 })

@@ -22,8 +22,8 @@ import {
   makeEnvironmentProviders,
   ɵɵdefineInjectable
 } from "./chunk-OFYGUQ7M.js";
-import "./chunk-HQ5HQZO3.js";
 import "./chunk-OUWWR32C.js";
+import "./chunk-HQ5HQZO3.js";
 import "./chunk-AICK2LYG.js";
 import "./chunk-7WUTQBRG.js";
 
@@ -53,7 +53,7 @@ var AsyncAnimationRendererFactory = class _AsyncAnimationRendererFactory {
     this._engine?.flush();
   }
   loadImpl() {
-    const loadFn = () => this.moduleImpl ?? import("./browser-GAMTVSO4.js").then((m) => m);
+    const loadFn = () => this.moduleImpl ?? import("./browser-HN5MYT47.js").then((m) => m);
     let moduleImplPromise;
     if (this.loadingSchedulerFn) {
       moduleImplPromise = this.loadingSchedulerFn(loadFn);

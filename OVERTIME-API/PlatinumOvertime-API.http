@@ -1,0 +1,46 @@
+@PlatinumOvertime_API_HostAddress = http://localhost:5000
+
+### Read singleton overtime configuration
+GET {{PlatinumOvertime_API_HostAddress}}/api/overtime-config
+Accept: application/json
+
+### Save overtime configuration
+PUT {{PlatinumOvertime_API_HostAddress}}/api/overtime-config
+Content-Type: application/json
+
+{
+  "allowOvertimeMultipleApproval": true,
+  "startDate": null,
+  "countingPeriodStartDay": 1,
+  "countingPeriodEndDay": 31,
+  "maximumMonthlyOvertimeHours": 40,
+  "exceptionalMaximumOvertimeHours": 60
+}
+
+### List positions (proxied through IPlatinumIntegrationService)
+GET {{PlatinumOvertime_API_HostAddress}}/api/positions
+Accept: application/json
+
+### List employees
+GET {{PlatinumOvertime_API_HostAddress}}/api/employees
+Accept: application/json
+
+### List departments
+GET {{PlatinumOvertime_API_HostAddress}}/api/departments
+Accept: application/json
+
+### Read approval configuration for a position
+GET {{PlatinumOvertime_API_HostAddress}}/api/positions/POS-001/approval-config
+Accept: application/json
+
+### Save approval configuration for a position
+PUT {{PlatinumOvertime_API_HostAddress}}/api/positions/POS-001/approval-config
+Content-Type: application/json
+
+{
+  "isOvertimeRecommender": true,
+  "isOvertimeApprover": false,
+  "isDepartmentExcessOvertimeApprover": false,
+  "reportingRelationships": [],
+  "actingAppointments": []
+}

@@ -52,7 +52,7 @@ interface ComplianceData {
   imports: [
     CommonModule, MatCardModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatProgressBarModule, MatTooltipModule,
-    KpiTileComponent, GaugeChartComponent, ProgressRingComponent
+    KpiTileComponent, GaugeChartComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './compliance-dashboard.component.html',

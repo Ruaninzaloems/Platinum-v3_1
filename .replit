@@ -35,14 +35,6 @@ args = "Platinum Shell"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "AFS API"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "POS API"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "IDP API"
 
 [[workflows.workflow.tasks]]
@@ -80,30 +72,6 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[[workflows.workflow]]
-name = "AFS API"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd AFS-UI/api && PORT=9000 npx tsx index.ts"
-waitForPort = 9000
-
-[[workflows.workflow]]
-name = "POS API"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd POS-API && PORT=3003 npx tsx index.ts"
-waitForPort = 3003
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow]]
 name = "IDP API"

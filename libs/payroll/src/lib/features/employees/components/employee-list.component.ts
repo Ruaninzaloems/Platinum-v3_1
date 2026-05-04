@@ -7,7 +7,6 @@ import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 import { Employee } from '../../../core/models';
 import { Subject } from 'rxjs';
@@ -16,7 +15,7 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, CurrencyZarPipe, DateInputComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, DateInputComponent],
   templateUrl: './employee-list.component.html',
   styleUrl: './employee-list.component.css'
 })

@@ -4,14 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-benefits',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, DateInputComponent],
+  imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './benefits.component.html',
   styleUrl: './benefits.component.css'
 })

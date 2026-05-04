@@ -4,14 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 
 @Component({
   selector: 'app-medical-aid-schemes',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, DateInputComponent, CurrencyZarPipe],
+  imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './medical-aid-schemes.component.html',
   styleUrl: './medical-aid-schemes.component.css'
 })

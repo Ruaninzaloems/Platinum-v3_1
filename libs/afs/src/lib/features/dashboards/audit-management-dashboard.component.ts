@@ -40,8 +40,7 @@ interface RiskArea {
   imports: [
     CommonModule, MatCardModule, MatIconModule, MatButtonModule,
     MatProgressBarModule, MatTooltipModule,
-    KpiTileComponent, GaugeChartComponent, TrafficLightComponent,
-    AiInsightCardComponent, ProgressRingComponent
+    KpiTileComponent, GaugeChartComponent, TrafficLightComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './audit-management-dashboard.component.html',

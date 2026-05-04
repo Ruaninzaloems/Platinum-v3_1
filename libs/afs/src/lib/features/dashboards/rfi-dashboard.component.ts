@@ -46,7 +46,7 @@ interface RfiDashboardData {
   imports: [
     CommonModule, MatCardModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule,
-    KpiTileComponent, TrafficLightComponent, ProgressRingComponent,
+    KpiTileComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './rfi-dashboard.component.html',

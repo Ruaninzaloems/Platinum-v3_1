@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
@@ -13,7 +12,7 @@ import { ScoaDrilldownComponent } from '../../../shared/components/scoa-drilldow
 @Component({
   selector: 'app-positions',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, DateInputComponent, DateSaPipe, ScoaDrilldownComponent],
+  imports: [CommonModule, FormsModule, IconComponent, PaginationComponent, DateInputComponent, DateSaPipe, ScoaDrilldownComponent],
   templateUrl: './positions.component.html',
   styleUrl: './positions.component.css'
 })

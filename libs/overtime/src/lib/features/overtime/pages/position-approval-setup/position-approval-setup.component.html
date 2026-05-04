@@ -1,0 +1,640 @@
+<div class="page-container">
+  <mat-progress-bar *ngIf="loadingConfig()" mode="indeterminate"></mat-progress-bar>
+
+  <!-- Gating: page only meaningful when multiple-approval is enabled at module level. -->
+  <div *ngIf="!loadingConfig() && !multipleApprovalEnabled()" class="gating-banner">
+    <mat-icon color="warn">lock</mat-icon>
+    <div>
+      <strong>Overtime Multiple Approval is disabled.</strong>
+      Enable it on the <em>Overtime Setup</em> page before configuring per-position
+      approvers.
+    </div>
+  </div>
+
+  <ng-container *ngIf="!loadingConfig() && multipleApprovalEnabled()">
+
+    <!-- ============================================================ -->
+    <!-- LIST VIEW (visible when no position is selected)             -->
+    <!-- ============================================================ -->
+    <ng-container *ngIf="!selectedPosition()">
+      <header class="page-header">
+        <h1 class="page-title">Position Approval Setup</h1>
+        <p class="page-subtitle">
+          Per-position approval flags, reporting lines, and acting appointments
+        </p>
+      </header>
+
+      <!-- KPI cards -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-value kpi-value-total">{{ summary().total | number }}</div>
+          <div class="kpi-label">Total Positions</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value kpi-value-configured">{{ summary().configured | number }}</div>
+          <div class="kpi-label">Configured</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value kpi-value-not-configured">{{ summary().notConfigured | number }}</div>
+          <div class="kpi-label">Not Configured</div>
+        </div>
+      </div>
+
+      <!-- Toolbar: search + bulk import actions -->
+      <div class="list-toolbar">
+        <div class="search-box">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input class="search-input" type="text"
+                 placeholder="Search positions by ID, code, or description…"
+                 [value]="searchTerm()" (input)="onSearchInput($event)"
+                 aria-label="Search positions">
+          <button *ngIf="searchTerm()" type="button" class="search-clear"
+                  (click)="clearSearch()" aria-label="Clear search">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="toolbar-actions">
+          <button mat-stroked-button color="primary" type="button" class="toolbar-btn"
+                  [disabled]="exportingReport()"
+                  matTooltip="Export the current position approval setup to Excel"
+                  (click)="exportReport()">
+            @if (exportingReport()) {
+              <mat-spinner diameter="16" style="display:inline-block;margin-right:4px"></mat-spinner>
+            } @else {
+              <mat-icon>download</mat-icon>
+            }
+            {{ exportingReport() ? 'Exporting…' : 'Export Position Relationships Report' }}
+          </button>
+          <button mat-stroked-button type="button" class="toolbar-btn"
+                  matTooltip="Download a pre-filled Excel template to bulk-configure approval setup"
+                  (click)="downloadTemplate()">
+            <mat-icon>download</mat-icon>
+            Download Template
+          </button>
+          <button mat-stroked-button color="primary" type="button" class="toolbar-btn"
+                  [disabled]="importLoading()"
+                  matTooltip="Upload a filled-in template to import approval configuration"
+                  (click)="openImportFilePicker()">
+            <mat-icon>upload_file</mat-icon>
+            {{ importLoading() ? 'Validating…' : 'Import' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab-style status filter -->
+      <nav class="status-tabs" role="tablist" aria-label="Filter positions by status">
+        <button type="button" role="tab"
+                id="status-tab-all"
+                class="status-tab" [class.active]="statusFilter() === 'all'"
+                [attr.aria-selected]="statusFilter() === 'all'"
+                aria-controls="status-tabpanel"
+                [attr.tabindex]="statusFilter() === 'all' ? 0 : -1"
+                (keydown)="onStatusTabKeydown($event)"
+                (click)="onStatusFilterChange('all')">
+          <span class="status-tab-label">All</span>
+          <span class="status-tab-count">{{ summary().total | number }}</span>
+        </button>
+        <button type="button" role="tab"
+                id="status-tab-configured"
+                class="status-tab" [class.active]="statusFilter() === 'configured'"
+                [attr.aria-selected]="statusFilter() === 'configured'"
+                aria-controls="status-tabpanel"
+                [attr.tabindex]="statusFilter() === 'configured' ? 0 : -1"
+                (keydown)="onStatusTabKeydown($event)"
+                (click)="onStatusFilterChange('configured')">
+          <span class="status-tab-label">Configured</span>
+          <span class="status-tab-count">{{ summary().configured | number }}</span>
+        </button>
+        <button type="button" role="tab"
+                id="status-tab-notconfigured"
+                class="status-tab" [class.active]="statusFilter() === 'notconfigured'"
+                [attr.aria-selected]="statusFilter() === 'notconfigured'"
+                aria-controls="status-tabpanel"
+                [attr.tabindex]="statusFilter() === 'notconfigured' ? 0 : -1"
+                (keydown)="onStatusTabKeydown($event)"
+                (click)="onStatusFilterChange('notconfigured')">
+          <span class="status-tab-label">Not Configured</span>
+          <span class="status-tab-count">{{ summary().notConfigured | number }}</span>
+        </button>
+      </nav>
+
+      <div class="table-wrap"
+           role="tabpanel"
+           id="status-tabpanel"
+           [attr.aria-labelledby]="'status-tab-' + statusFilter()">
+        <mat-progress-bar *ngIf="loadingList()" mode="indeterminate"></mat-progress-bar>
+
+        <table mat-table [dataSource]="rows()" class="positions-table"
+               matSort
+               [matSortActive]="sortActive()"
+               [matSortDirection]="sortDirection()"
+               matSortDisableClear
+               (matSortChange)="onSortChange($event)">
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef>ID</th>
+            <td mat-cell *matCellDef="let row" class="id-cell">{{ row.id }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef>Description</th>
+            <td mat-cell *matCellDef="let row">{{ row.description }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="departmentName">
+            <th mat-header-cell *matHeaderCellDef>Department</th>
+            <td mat-cell *matCellDef="let row">{{ row.departmentName || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="divisionCode">
+            <th mat-header-cell *matHeaderCellDef>Division Description</th>
+            <td mat-cell *matCellDef="let row">{{ row.divisionName || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="employeeId">
+            <th mat-header-cell *matHeaderCellDef>Emp ID</th>
+            <td mat-cell *matCellDef="let row">{{ row.employeeId || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="employeeCode">
+            <th mat-header-cell *matHeaderCellDef>Emp Code</th>
+            <td mat-cell *matCellDef="let row">{{ row.employeeCode || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="employeeFirstName">
+            <th mat-header-cell *matHeaderCellDef>First Name</th>
+            <td mat-cell *matCellDef="let row">{{ row.employeeFirstName || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="employeeSurname">
+            <th mat-header-cell *matHeaderCellDef>Surname</th>
+            <td mat-cell *matCellDef="let row">{{ row.employeeSurname || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="reportsTo">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="reportsTo">Reports To</th>
+            <td mat-cell *matCellDef="let row">{{ row.reportsToPositionDescription || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="status-chip"
+                    [class.status-configured]="row.isConfigured"
+                    [class.status-not-configured]="!row.isConfigured">
+                {{ row.isConfigured ? 'Configured' : 'Not Configured' }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="actions-col">Action</th>
+            <td mat-cell *matCellDef="let row" class="actions-col">
+              <button mat-flat-button color="primary" type="button"
+                      class="configure-btn"
+                      (click)="openConfigure(row)">
+                Configure
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          <tr class="empty-row" *matNoDataRow>
+            <td [attr.colspan]="displayedColumns.length">
+              <div class="empty-state">
+                <mat-icon>inbox</mat-icon>
+                <span>No positions match your filters.</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <mat-paginator
+          [length]="totalRows()"
+          [pageSize]="pageSize()"
+          [pageIndex]="pageIndex()"
+          [pageSizeOptions]="[25, 50, 100]"
+          (page)="onPage($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    </ng-container><!-- end list view: *ngIf="!selectedPosition()" -->
+
+    <!-- ============================================================ -->
+    <!-- IMPORT DIALOG (overlay; only visible after file validation)   -->
+    <!-- ============================================================ -->
+    <div *ngIf="importDialogOpen()" class="import-overlay" role="dialog" aria-modal="true" aria-labelledby="import-dialog-title">
+      <div class="import-dialog">
+
+        <div class="import-dialog-header">
+          <h2 class="import-dialog-title" id="import-dialog-title">
+            <mat-icon>cloud_upload</mat-icon>
+            Review Import
+          </h2>
+          <button mat-icon-button type="button" (click)="closeImportDialog()" aria-label="Close">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <ng-container *ngIf="importValidation() as v">
+
+          <!-- Summary row -->
+          <div class="import-summary-row">
+
+            <span class="import-badge import-badge-ok">
+              <mat-icon>check_circle</mat-icon>
+              {{ v.acceptedRows }} rows accepted
+            </span>
+            <span class="import-badge import-badge-err" *ngIf="v.errorRows > 0">
+              <mat-icon>warning</mat-icon>
+              {{ v.errorRows }} rows with errors
+            </span>
+          </div>
+
+          <!-- Scrollable body: all sections below the summary bar -->
+          <div class="import-dialog-body">
+
+          <!-- Changes preview -->
+          <div class="import-section" *ngIf="v.positionConfigChanges.length > 0">
+            <div class="import-section-title">Position Config Changes ({{ v.positionConfigChanges.length }})</div>
+            <table class="import-preview-table">
+              <thead>
+                <tr>
+                  <th>Position ID</th>
+                  <th>Description</th>
+                  <th>Recommender</th>
+                  <th>Approver</th>
+                  <th>Dept Excess</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of v.positionConfigChanges">
+                  <td>{{ c.positionId }}</td>
+                  <td>{{ c.description }}</td>
+                  <td><mat-icon [class.icon-yes]="c.isRecommender" [class.icon-no]="!c.isRecommender">{{ c.isRecommender ? 'check' : 'remove' }}</mat-icon></td>
+                  <td><mat-icon [class.icon-yes]="c.isApprover" [class.icon-no]="!c.isApprover">{{ c.isApprover ? 'check' : 'remove' }}</mat-icon></td>
+                  <td><mat-icon [class.icon-yes]="c.isDeptExcessApprover" [class.icon-no]="!c.isDeptExcessApprover">{{ c.isDeptExcessApprover ? 'check' : 'remove' }}</mat-icon></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="import-section" *ngIf="v.reportingRelationshipChanges.length > 0">
+            <div class="import-section-title">Reporting Relationship Changes ({{ v.reportingRelationshipChanges.length }})</div>
+            <table class="import-preview-table">
+              <thead>
+                <tr>
+                  <th>Position ID</th>
+                  <th>Reports To</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let r of v.reportingRelationshipChanges">
+                  <td>{{ r.positionId }}</td>
+                  <td>{{ r.reportsToPositionId }}</td>
+                  <td>{{ r.startDate | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ r.endDate ? (r.endDate | date:'dd/MM/yyyy') : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="import-section" *ngIf="v.actingAppointmentChanges.length > 0">
+            <div class="import-section-title">Acting Appointment Changes ({{ v.actingAppointmentChanges.length }})</div>
+            <table class="import-preview-table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Acting In Position</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let a of v.actingAppointmentChanges">
+                  <td>{{ a.actingEmployeeId }}</td>
+                  <td>{{ a.actingInPositionId }}</td>
+                  <td>{{ a.startDate | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ a.endDate | date:'dd/MM/yyyy' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="import-no-changes"
+               *ngIf="v.positionConfigChanges.length === 0 && v.reportingRelationshipChanges.length === 0 && v.actingAppointmentChanges.length === 0">
+            <mat-icon>info</mat-icon>
+            No valid changes found in the uploaded file.
+          </div>
+
+          <!-- Row errors (collapsible) -->
+          <div class="import-section import-errors-section" *ngIf="v.errors.length > 0">
+            <button type="button" class="import-errors-toggle" (click)="toggleImportErrors()">
+              <mat-icon>{{ importErrorsExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+              Row Errors ({{ v.errors.length }}) — these rows were skipped
+            </button>
+            <div *ngIf="importErrorsExpanded()" class="import-errors-list">
+              <div *ngFor="let e of v.errors; trackBy: importErrorTrackBy" class="import-error-row">
+                <span class="import-error-location">{{ e.sheet }}, row {{ e.row }}</span>
+                <span class="import-error-msg">{{ e.error }}</span>
+              </div>
+            </div>
+          </div>
+
+          </div><!-- end import-dialog-body -->
+
+        </ng-container>
+
+        <!-- Dialog actions -->
+        <div class="import-dialog-actions">
+          <button mat-button type="button" (click)="closeImportDialog()" [disabled]="importConfirming()">
+            Cancel
+          </button>
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="importConfirming() || (importValidation()?.acceptedRows ?? 0) === 0"
+                  (click)="confirmImport()">
+            {{ importConfirming() ? 'Applying…' : 'Confirm Import' }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CONFIGURE VIEW (full-page swap when a position is selected)  -->
+    <!-- ============================================================ -->
+    <ng-container *ngIf="selectedPosition() as p">
+      <div class="config-page">
+        <div class="config-header">
+          <button type="button" class="back-link" (click)="backToList()">
+            <mat-icon>arrow_back</mat-icon>
+            <span>Back to list</span>
+          </button>
+          <div class="config-title-block">
+            <div class="config-title">
+              <mat-icon>settings</mat-icon>
+              <span>Configure Position</span>
+            </div>
+            <div class="config-subtitle">
+              {{ selectedPositionCode() || p.id }} — {{ selectedPositionDescription() }}
+            </div>
+          </div>
+        </div>
+
+        <mat-progress-bar *ngIf="loadingConfigure()" mode="indeterminate"></mat-progress-bar>
+
+        <form [formGroup]="form" (ngSubmit)="save()" class="config-form">
+
+          <!-- Approval Roles -->
+          <section class="form-section">
+            <div class="section-head">
+              <div class="section-title">Approval Roles</div>
+              <div class="section-sub">What this position can do in the workflow</div>
+            </div>
+            <div class="section-body">
+              <div class="role-grid">
+                <mat-checkbox formControlName="isOvertimeRecommender">Overtime Recommender</mat-checkbox>
+                <mat-checkbox formControlName="isOvertimeApprover">Overtime Approver</mat-checkbox>
+                <mat-checkbox formControlName="isDepartmentExcessOvertimeApprover">
+                  Department Excess-Overtime Approver
+                </mat-checkbox>
+              </div>
+            </div>
+          </section>
+
+          <!-- Reporting Relationships -->
+          <section class="form-section compact-section">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Reporting Relationships</div>
+                <div class="section-sub">Positions this role approves for (effective-dated)</div>
+              </div>
+              <button mat-stroked-button type="button" class="head-add"
+                      (click)="addReporting()">
+                <mat-icon>add</mat-icon> Add
+              </button>
+            </div>
+            <div class="section-body">
+              <table mat-table [dataSource]="reportingRows()" class="full-width compact-table">
+                <ng-container matColumnDef="reportsToPosition">
+                  <th mat-header-cell *matHeaderCellDef>Approves For Position</th>
+                  <td mat-cell *matCellDef="let row">
+                    <div class="picker-input">
+                      <mat-icon class="picker-icon">search</mat-icon>
+                      <input type="text" class="picker-native" [matAutocomplete]="rrPos"
+                             [value]="row.controls.reportsToPositionDescription.value"
+                             (input)="onReportingPositionInput($event, row)"
+                             placeholder="Search position">
+                      <mat-autocomplete #rrPos="matAutocomplete"
+                                        panelClass="picker-panel"
+                                        [panelWidth]="420"
+                                        [autoActiveFirstOption]="true">
+                        <mat-option
+                          *ngFor="let p of filterPositions(row.controls.reportsToPositionDescription.value)"
+                          [value]="cleanDescription(p.id, p.description)"
+                          (onSelectionChange)="setReportingPosition(row, p)"
+                          class="picker-option">
+                          <span class="opt-line">{{ formatPositionLabel(p) }}</span>
+                        </mat-option>
+                      </mat-autocomplete>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empId">
+                  <th mat-header-cell *matHeaderCellDef>Emp ID</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.reportsToPositionId.value)?.employeeId || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empCode">
+                  <th mat-header-cell *matHeaderCellDef>Emp Code</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.reportsToPositionId.value)?.employeeCode || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empFirstName">
+                  <th mat-header-cell *matHeaderCellDef>First Name</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.reportsToPositionId.value)?.employeeFirstName || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empSurname">
+                  <th mat-header-cell *matHeaderCellDef>Surname</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.reportsToPositionId.value)?.employeeSurname || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="startDate">
+                  <th mat-header-cell *matHeaderCellDef>Start</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-form-field appearance="outline" class="cell-field">
+                      <input matInput [matDatepicker]="rrStart" [formControl]="row.controls.startDate">
+                      <mat-datepicker-toggle matSuffix [for]="rrStart"></mat-datepicker-toggle>
+                      <mat-datepicker #rrStart></mat-datepicker>
+                    </mat-form-field>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="endDate">
+                  <th mat-header-cell *matHeaderCellDef>End</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-form-field appearance="outline" class="cell-field">
+                      <input matInput [matDatepicker]="rrEnd" [formControl]="row.controls.endDate">
+                      <mat-datepicker-toggle matSuffix [for]="rrEnd"></mat-datepicker-toggle>
+                      <mat-datepicker #rrEnd></mat-datepicker>
+                    </mat-form-field>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let row; let i = index">
+                    <button mat-icon-button color="warn" type="button"
+                            class="row-action-btn"
+                            (click)="removeReporting(i)" aria-label="Remove">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="reportingDisplayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: reportingDisplayedColumns"></tr>
+                <tr class="empty-row" *matNoDataRow>
+                  <td [attr.colspan]="reportingDisplayedColumns.length" class="inline-empty">
+                    No reporting relationships yet.
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </section>
+
+          <!-- Acting Appointments -->
+          <section class="form-section compact-section">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Temporary Acting Appointments</div>
+                <div class="section-sub">Employees temporarily acting in this position</div>
+              </div>
+              <button mat-stroked-button type="button" class="head-add"
+                      (click)="addActing()">
+                <mat-icon>add</mat-icon> Add
+              </button>
+            </div>
+            <div class="section-body">
+              <table mat-table [dataSource]="actingRows()" class="full-width compact-table">
+                <ng-container matColumnDef="employee">
+                  <th mat-header-cell *matHeaderCellDef>Acting Employee</th>
+                  <td mat-cell *matCellDef="let row">
+                    <div class="picker-input">
+                      <mat-icon class="picker-icon">search</mat-icon>
+                      <input type="text" class="picker-native" [matAutocomplete]="aaEmp"
+                             [value]="row.controls.actingEmployeeName.value"
+                             (input)="onActingEmployeeInput($event, row)"
+                             placeholder="Search employee">
+                      <mat-autocomplete #aaEmp="matAutocomplete"
+                                        panelClass="picker-panel"
+                                        [autoActiveFirstOption]="true">
+                        <mat-option
+                          *ngFor="let e of filterEmployees(row.controls.actingEmployeeName.value)"
+                          [value]="e.fullName"
+                          (onSelectionChange)="setActingEmployee(row, e)"
+                          class="picker-option">
+                          <span class="picker-id">{{ e.employeeNumber }}</span>
+                          <span class="picker-desc">{{ e.fullName }}</span>
+                          <span *ngIf="e.positionDescription" class="picker-code">{{ e.positionDescription }}</span>
+                        </mat-option>
+                      </mat-autocomplete>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="position">
+                  <th mat-header-cell *matHeaderCellDef>Acting In Position</th>
+                  <td mat-cell *matCellDef="let row">
+                    <div class="picker-input">
+                      <mat-icon class="picker-icon">search</mat-icon>
+                      <input type="text" class="picker-native" [matAutocomplete]="aaPos"
+                             [value]="row.controls.actingInPositionDescription.value"
+                             (input)="onActingPositionInput($event, row)"
+                             placeholder="Search position">
+                      <mat-autocomplete #aaPos="matAutocomplete"
+                                        panelClass="picker-panel"
+                                        [panelWidth]="420"
+                                        [autoActiveFirstOption]="true">
+                        <mat-option
+                          *ngFor="let p of filterPositions(row.controls.actingInPositionDescription.value)"
+                          [value]="cleanDescription(p.id, p.description)"
+                          (onSelectionChange)="setActingPosition(row, p)"
+                          class="picker-option">
+                          <span class="opt-line">{{ formatPositionLabel(p) }}</span>
+                        </mat-option>
+                      </mat-autocomplete>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="startDate">
+                  <th mat-header-cell *matHeaderCellDef>Start</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-form-field appearance="outline" class="cell-field">
+                      <input matInput [matDatepicker]="aaStart" [formControl]="row.controls.startDate">
+                      <mat-datepicker-toggle matSuffix [for]="aaStart"></mat-datepicker-toggle>
+                      <mat-datepicker #aaStart></mat-datepicker>
+                    </mat-form-field>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="endDate">
+                  <th mat-header-cell *matHeaderCellDef>End</th>
+                  <td mat-cell *matCellDef="let row">
+                    <mat-form-field appearance="outline" class="cell-field">
+                      <input matInput [matDatepicker]="aaEnd" [formControl]="row.controls.endDate">
+                      <mat-datepicker-toggle matSuffix [for]="aaEnd"></mat-datepicker-toggle>
+                      <mat-datepicker #aaEnd></mat-datepicker>
+                    </mat-form-field>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let row; let i = index">
+                    <button mat-icon-button color="warn" type="button"
+                            class="row-action-btn"
+                            (click)="removeActing(i)" aria-label="Remove">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="actingDisplayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: actingDisplayedColumns"></tr>
+                <tr class="empty-row" *matNoDataRow>
+                  <td [attr.colspan]="actingDisplayedColumns.length" class="inline-empty">
+                    No acting appointments yet.
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </section>
+
+          <div class="config-actions">
+            <button mat-button type="button" (click)="backToList()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit"
+                    [disabled]="form.invalid || saving()"
+                    class="save-btn">
+              {{ saving() ? 'Saving…' : 'Save Position Configuration' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

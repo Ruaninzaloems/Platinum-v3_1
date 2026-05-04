@@ -34,6 +34,8 @@ export const routes: Routes = [
       { path: 'budget-app/**', redirectTo: 'budget' },
       { path: 'afs-app', redirectTo: 'afs', pathMatch: 'full' },
       { path: 'afs-app/**', redirectTo: 'afs' },
+      { path: 'overtime-app', redirectTo: 'overtime', pathMatch: 'full' },
+      { path: 'overtime-app/**', redirectTo: 'overtime' },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'assets', loadChildren: () => import('@platinumv3/assets').then(m => m.ASSETS_ROUTES) },
       { path: 'scm', loadChildren: () => import('@platinumv3/scm').then(m => m.SCM_ROUTES) },
@@ -43,6 +45,7 @@ export const routes: Routes = [
       { path: 'budget', loadChildren: () => import('@platinumv3/budget').then(m => m.BUDGET_ROUTES) },
       { path: 'afs', loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
       { path: 'ins', loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
+      { path: 'overtime', loadChildren: () => import('@platinumv3/overtime').then(m => m.OVERTIME_ROUTES) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]

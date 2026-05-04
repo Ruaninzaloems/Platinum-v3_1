@@ -4,16 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-leave',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, DateSaPipe, CurrencyZarPipe, DateInputComponent],
+  imports: [CommonModule, FormsModule, IconComponent, PaginationComponent, DateSaPipe, DateInputComponent],
   templateUrl: './leave.component.html',
   styleUrl: './leave.component.css'
 })

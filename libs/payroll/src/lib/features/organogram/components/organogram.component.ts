@@ -2,9 +2,6 @@ import { Component, OnInit, ChangeDetectorRef, ElementRef, ViewChild, AfterViewC
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
-import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-
 interface OrgNode {
   id: number;
   position_code: string;
@@ -35,7 +32,7 @@ interface DeptStat {
 @Component({
   selector: 'app-organogram',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './organogram.component.html',
   styleUrl: './organogram.component.css'
 })

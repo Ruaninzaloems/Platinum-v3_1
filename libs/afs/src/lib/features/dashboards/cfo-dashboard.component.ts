@@ -31,7 +31,7 @@ import { ProgressRingComponent } from '../../shared/components/progress-ring.com
     MatProgressBarModule, MatChipsModule, MatTooltipModule, MatDividerModule,
     MatSelectModule, MatFormFieldModule,
     KpiTileComponent, GaugeChartComponent, TrafficLightComponent,
-    AiInsightCardComponent, SparklineComponent, ProgressRingComponent,
+    AiInsightCardComponent, ProgressRingComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './cfo-dashboard.component.html',

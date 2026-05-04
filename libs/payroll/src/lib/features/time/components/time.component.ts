@@ -4,15 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-time',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, PaginationComponent, DateInputComponent],
+  imports: [CommonModule, FormsModule, IconComponent, PaginationComponent, DateInputComponent],
   templateUrl: './time.component.html',
   styleUrl: './time.component.css'
 })

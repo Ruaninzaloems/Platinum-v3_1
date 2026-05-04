@@ -5,12 +5,11 @@ import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
-import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 
 @Component({
   selector: 'app-trade-unions',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe],
+  imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent],
   templateUrl: './trade-unions.component.html',
   styleUrl: './trade-unions.component.css'
 })
