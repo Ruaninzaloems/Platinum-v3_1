@@ -1,6 +1,58 @@
 import express from 'express';
 import cors from 'cors';
 import { pool, query, pingDb } from './db';
+import {
+  demoFinancialYears,
+  demoDashboard,
+  demoCompilations,
+  demoFindingsDashboard,
+  demoRfiDashboard,
+  demoMfmaCommentary,
+  demoExceptionRegister,
+  demoEvidenceHeatmap,
+  demoMappingAudit,
+  demoAdjustmentsRegister,
+  demoIntegrityChecks,
+  demoMfmaSubmissions,
+  demoMfmaReport,
+} from './demo';
+
+function isDbUnavailable(err: any): boolean {
+  const msg = String(err?.message || err || '').toLowerCase();
+  return (
+    msg.includes('connection terminated') ||
+    msg.includes('connection timeout') ||
+    msg.includes('econnrefused') ||
+    msg.includes('etimedout') ||
+    msg.includes('enotfound') ||
+    msg.includes('does not exist') ||
+    msg.includes('relation') ||
+    msg.includes('password authentication') ||
+    msg.includes('no pg_hba')
+  );
+}
+
+let dbKnownDown = false;
+let dbLastChecked = 0;
+const DB_RECHECK_MS = 60_000;
+
+async function isDbDown(): Promise<boolean> {
+  const now = Date.now();
+  if (dbKnownDown && now - dbLastChecked < DB_RECHECK_MS) return true;
+  if (!dbKnownDown && now - dbLastChecked < DB_RECHECK_MS) return false;
+  dbLastChecked = now;
+  try {
+    await Promise.race([
+      query('SELECT 1'),
+      new Promise((_r, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+    ]);
+    dbKnownDown = false;
+    return false;
+  } catch {
+    dbKnownDown = true;
+    return true;
+  }
+}
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -22,8 +74,7 @@ app.use((req, _res, next) => {
 // Health
 // ────────────────────────────────────────────────────────────
 app.get('/api/health', async (_req, res) => {
-  const db = await pingDb();
-  res.json({ status: 'ok', service: 'platinum-afs-api', db });
+  res.json({ status: 'ok', service: 'platinum-afs-api', db: { ok: !(await isDbDown()) } });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -63,6 +114,7 @@ app.get('/api/notifications/unread-count', (_req, res) => {
 // Financial Years — real data
 // ────────────────────────────────────────────────────────────
 app.get('/api/admin/financial-years', async (_req, res, next) => {
+  if (await isDbDown()) return res.json(demoFinancialYears);
   try {
     const rows = await query<any>(
       `SELECT id, label, status, "isCurrent", "startDate", "endDate", "isLocked"
@@ -81,6 +133,10 @@ app.get('/api/admin/financial-years', async (_req, res, next) => {
       }))
     );
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo financial years');
+      return res.json(demoFinancialYears);
+    }
     next(e);
   }
 });
@@ -103,6 +159,7 @@ function periodToMonths(period?: string): number | null {
 // Dashboard aggregation
 // ────────────────────────────────────────────────────────────
 app.get('/api/reports/dashboard', async (req, res, next) => {
+  if (await isDbDown()) return res.json(demoDashboard);
   try {
     const period = String(req.query.period || 'full_year');
     void periodToMonths(period); // reserved for GL period filtering
@@ -400,6 +457,10 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
       glSummary,
     });
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo dashboard');
+      return res.json(demoDashboard);
+    }
     next(e);
   }
 });
@@ -408,6 +469,7 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
 // Compilations list (used by several screens)
 // ────────────────────────────────────────────────────────────
 app.get('/api/compilations', async (_req, res, next) => {
+  if (await isDbDown()) return res.json(demoCompilations);
   try {
     const rows = await query<any>(
       `SELECT id, name, status, "financialYearId", "completenessPercentage",
@@ -418,9 +480,41 @@ app.get('/api/compilations', async (_req, res, next) => {
     );
     res.json(rows);
   } catch (e) {
+    if (isDbUnavailable(e)) {
+      console.warn('[afs-api] DB unavailable, returning demo compilations');
+      return res.json(demoCompilations);
+    }
     next(e);
   }
 });
+
+// ────────────────────────────────────────────────────────────
+// Demo-only sub-dashboard endpoints (returned when DB is unreachable)
+// ────────────────────────────────────────────────────────────
+app.get('/api/reports/findings-dashboard', (_req, res) => res.json(demoFindingsDashboard));
+app.get('/api/reports/findings-extended', (_req, res) => res.json(demoFindingsDashboard));
+app.get('/api/reports/rfi-dashboard', (_req, res) => res.json(demoRfiDashboard));
+app.get('/api/reports/rfi-register', (_req, res) => res.json(demoRfiDashboard));
+app.get('/api/reports/mfma-commentary', (_req, res) => res.json(demoMfmaCommentary));
+app.get('/api/reports/mfma-commentary/:fyId', (_req, res) => res.json(demoMfmaCommentary));
+app.get('/api/reports/mfma-submissions', (_req, res) => res.json(demoMfmaSubmissions));
+app.get('/api/reports/mfma-submissions/:fyId', (_req, res) => res.json(demoMfmaSubmissions));
+app.get('/api/reports/mfma-report/:fyId', (_req, res) => res.json(demoMfmaReport));
+app.get('/api/reports/exception-register', (_req, res) => res.json(demoExceptionRegister));
+app.get('/api/reports/evidence-heatmap', (_req, res) => res.json(demoEvidenceHeatmap));
+app.get('/api/reports/mapping-audit', (_req, res) => res.json(demoMappingAudit));
+app.get('/api/reports/adjustments-register', (_req, res) => res.json(demoAdjustmentsRegister));
+app.get('/api/reports/integrity-checks', (_req, res) => res.json(demoIntegrityChecks));
+app.get('/api/working-papers', (_req, res) => res.json([]));
+app.get('/api/validation-rules/results', (_req, res) => res.json({ results: [], total: 0 }));
+app.post('/api/validation-rules/run', (_req, res) => res.json({ status: 'ok', runId: 'demo-' + Date.now() }));
+app.get('/api/ems-data/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));
+app.post('/api/ems-data/sync', (_req, res) => res.json({ status: 'started', jobId: 'demo-' + Date.now() }));
+app.get('/api/ems-data/sync/progress', (_req, res) => res.json({ status: 'idle', progress: 0 }));
+app.get('/api/platinum/sync/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));
+app.post('/api/platinum/sync/general-ledger', (_req, res) => res.json({ status: 'started' }));
+app.post('/api/platinum/sync/trial-balance', (_req, res) => res.json({ status: 'started' }));
+app.post('/api/platinum/sync/cancel', (_req, res) => res.json({ status: 'cancelled' }));
 
 // ────────────────────────────────────────────────────────────
 // Centralised error handler
