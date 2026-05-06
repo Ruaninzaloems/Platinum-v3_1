@@ -49,6 +49,10 @@ args = "SCM API"
 task = "workflow.run"
 args = "Budget API"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Sibling APIs"
+
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
@@ -110,6 +114,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd BUDGET-APP/PlatinumBudget.Api && ASPNETCORE_URLS=http://0.0.0.0:3001 dotnet run --no-launch-profile"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Sibling APIs"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node start-apis.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
