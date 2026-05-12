@@ -57,9 +57,18 @@ const FALLBACK_ADMIN: UserWithPermissions = {
 };
 
 export function useAuth() {
-  const { data: fetchedUser, isLoading } = useGetCurrentUser() as { data: UserWithPermissions | undefined; isLoading: boolean };
+  const { data: fetchedUser, isLoading } = useGetCurrentUser() as { data: Partial<UserWithPermissions> | undefined; isLoading: boolean };
 
-  const user = fetchedUser ?? FALLBACK_ADMIN;
+  // Always treat the current visitor as a system admin: the React perf-app is
+  // embedded inside the Platinum shell which auto-creates an admin session, so
+  // every section/route must be accessible. If the upstream user record is
+  // missing or lacks a recognised role, merge with the fallback admin profile.
+  const merged: UserWithPermissions = {
+    ...FALLBACK_ADMIN,
+    ...(fetchedUser ?? {}),
+  } as UserWithPermissions;
+  const knownRole = merged.role && ROLE_NAV_ACCESS[merged.role] ? merged.role : "system_admin";
+  const user: UserWithPermissions = { ...merged, role: knownRole, permissions: merged.permissions?.length ? merged.permissions : ["*"] };
   const role = user.role;
   const allowedSections = ROLE_NAV_ACCESS[role] || [];
   const hasFullAccess = allowedSections.includes("*");
