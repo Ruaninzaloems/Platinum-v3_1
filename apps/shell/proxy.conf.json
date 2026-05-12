@@ -59,5 +59,12 @@
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/overtime-app/api": "/api" }
+  },
+  "/perf-app": {
+    "target": "http://localhost:18156",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "logLevel": "warn"
   }
 }
