@@ -51,6 +51,6 @@ export class DashboardComponent {
     { name: 'IDP', path: '/idp', icon: 'account_tree', color: '#4a148c', description: 'Integrated Development Plan cycles, projects and performance tracking.' },
     { name: 'Budget', path: '/budget', icon: 'account_balance', color: '#006064', description: 'MFMA budget preparation, virements, scenarios and expenditure tracking.' },
     { name: 'AFS', path: '/afs', icon: 'description', color: '#bf360c', description: 'Annual Financial Statements builder, mappings, compilations and audit management.' },
-    { name: 'Performance', path: '/insight', icon: 'insights', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' }
+    { name: 'Performance', path: '/ins', icon: 'insights', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' }
   ];
 }
