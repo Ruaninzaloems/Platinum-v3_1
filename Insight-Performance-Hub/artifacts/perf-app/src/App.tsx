@@ -3,51 +3,50 @@ import { type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { useAuth } from "@/hooks/useAuth";
-import { PageLoader } from "@/components/ui/page-loader";
-import NotFound from "@/pages/not-found";
+import { AppLayout } from "@/layout/AppLayout";
+import { useAuth } from "@/core/hooks/useAuth";
+import NotFound from "@/features/not-found";
 
-import Dashboard from "@/pages/Dashboard";
-import PerformanceCycles from "@/pages/config/PerformanceCycles";
-import KpiGroups from "@/pages/config/KpiGroups";
-import UnitsOfMeasure from "@/pages/config/UnitsOfMeasure";
-import DataTypes from "@/pages/config/DataTypes";
-import ProgressStatuses from "@/pages/config/ProgressStatuses";
-import ScorecardTypes from "@/pages/config/ScorecardTypes";
-import NkpaWeightings from "@/pages/weightings/NkpaWeightings";
-import CompetencyRequirements from "@/pages/weightings/CompetencyRequirements";
-import SubmissionDeadlines from "@/pages/deadlines/SubmissionDeadlines";
-import ReportFields from "@/pages/deadlines/ReportFields";
-import NotificationCentre from "@/pages/notifications/NotificationCentre";
-import NotificationConfig from "@/pages/notifications/NotificationConfig";
-import AuditTrail from "@/pages/audit/AuditTrail";
-import OrgKpiPlanning from "@/pages/scorecards/OrgKpiPlanning";
-import ReviewSdbip from "@/pages/scorecards/ReviewSdbip";
-import ApproveSdbip from "@/pages/scorecards/ApproveSdbip";
-import ReviseSdbipCapture from "@/pages/scorecards/ReviseSdbipCapture";
-import ReviseSdbipReview from "@/pages/scorecards/ReviseSdbipReview";
-import ReviseSdbipApprove from "@/pages/scorecards/ReviseSdbipApprove";
-import SdbipOverview from "@/pages/sdbip/SdbipOverview";
-import ActualsCapture from "@/pages/actuals/ActualsCapture";
-import CorrectiveActions from "@/pages/actuals/CorrectiveActions";
-import ReviewLineManager from "@/pages/actuals/ReviewLineManager";
-import ReviewDirector from "@/pages/actuals/ReviewDirector";
-import ReviewPmsManager from "@/pages/actuals/ReviewPmsManager";
-import ReviewPmsDirector from "@/pages/actuals/ReviewPmsDirector";
-import ReviewInternalAudit from "@/pages/actuals/ReviewInternalAudit";
-import MonthlyActivities from "@/pages/scorecards/MonthlyActivities";
-import DeptScorecards from "@/pages/departmental/DeptScorecards";
-import ReviewQueue from "@/pages/moderation/ReviewQueue";
-import ModerationPanel from "@/pages/moderation/ModerationPanel";
-import ReportCentre from "@/pages/reports/ReportCentre";
-import IndividualAgreements from "@/pages/individual/IndividualAgreements";
-import ReviewerConfig from "@/pages/individual/ReviewerConfig";
-import CompetencyTemplates from "@/pages/individual/CompetencyTemplates";
-import IndividualAssessment from "@/pages/individual/IndividualAssessment";
-import AiInsights from "@/pages/ai/AiInsights";
-import IntegrationHub from "@/pages/integrations/IntegrationHub";
-import WorkflowConfig from "@/pages/admin/WorkflowConfig";
+import Dashboard from "@/features/dashboard/Dashboard";
+import PerformanceCycles from "@/features/config/PerformanceCycles";
+import KpiGroups from "@/features/config/KpiGroups";
+import UnitsOfMeasure from "@/features/config/UnitsOfMeasure";
+import DataTypes from "@/features/config/DataTypes";
+import ProgressStatuses from "@/features/config/ProgressStatuses";
+import ScorecardTypes from "@/features/config/ScorecardTypes";
+import NkpaWeightings from "@/features/weightings/NkpaWeightings";
+import CompetencyRequirements from "@/features/weightings/CompetencyRequirements";
+import SubmissionDeadlines from "@/features/deadlines/SubmissionDeadlines";
+import ReportFields from "@/features/deadlines/ReportFields";
+import NotificationCentre from "@/features/notifications/NotificationCentre";
+import NotificationConfig from "@/features/notifications/NotificationConfig";
+import AuditTrail from "@/features/audit/AuditTrail";
+import OrgKpiPlanning from "@/features/scorecards/OrgKpiPlanning";
+import ReviewSdbip from "@/features/scorecards/ReviewSdbip";
+import ApproveSdbip from "@/features/scorecards/ApproveSdbip";
+import ReviseSdbipCapture from "@/features/scorecards/ReviseSdbipCapture";
+import ReviseSdbipReview from "@/features/scorecards/ReviseSdbipReview";
+import ReviseSdbipApprove from "@/features/scorecards/ReviseSdbipApprove";
+import SdbipOverview from "@/features/sdbip/SdbipOverview";
+import ActualsCapture from "@/features/actuals/ActualsCapture";
+import CorrectiveActions from "@/features/actuals/CorrectiveActions";
+import ReviewLineManager from "@/features/actuals/ReviewLineManager";
+import ReviewDirector from "@/features/actuals/ReviewDirector";
+import ReviewPmsManager from "@/features/actuals/ReviewPmsManager";
+import ReviewPmsDirector from "@/features/actuals/ReviewPmsDirector";
+import ReviewInternalAudit from "@/features/actuals/ReviewInternalAudit";
+import MonthlyActivities from "@/features/scorecards/MonthlyActivities";
+import DeptScorecards from "@/features/departmental/DeptScorecards";
+import ReviewQueue from "@/features/moderation/ReviewQueue";
+import ModerationPanel from "@/features/moderation/ModerationPanel";
+import ReportCentre from "@/features/reports/ReportCentre";
+import IndividualAgreements from "@/features/individual/IndividualAgreements";
+import ReviewerConfig from "@/features/individual/ReviewerConfig";
+import CompetencyTemplates from "@/features/individual/CompetencyTemplates";
+import IndividualAssessment from "@/features/individual/IndividualAssessment";
+import AiInsights from "@/features/ai/AiInsights";
+import IntegrationHub from "@/features/integrations/IntegrationHub";
+import WorkflowConfig from "@/features/admin/WorkflowConfig";
 
 const AccessDenied = () => (
   <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-in zoom-in-95 duration-500">
@@ -61,7 +60,7 @@ const AccessDenied = () => (
 
 function ProtectedRoute({ path, component: Component }: { path: string; component: ComponentType }) {
   const { canAccessPath, isLoading } = useAuth();
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return null;
   if (!canAccessPath(path)) return <AccessDenied />;
   return <Component />;
 }
@@ -86,12 +85,6 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return <PageLoader />;
-  }
-
   return (
     <AppLayout>
       <Switch>

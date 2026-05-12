@@ -1,13 +1,23 @@
 import app from "./app";
-import { seedDatabase } from "./seed";
+import { seedDatabase } from "./Services/seed";
 
-// Honor the platform-provided PORT (Azure App Service, Replit) and
-// fall back to 6800 only when nothing is set.
-const port = parseInt(process.env.PORT || "6800", 10);
+const rawPort = process.env["PORT"];
+
+if (!rawPort) {
+  throw new Error(
+    "PORT environment variable is required but was not provided.",
+  );
+}
+
+const port = Number(rawPort);
+
+if (Number.isNaN(port) || port <= 0) {
+  throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
 
 async function start() {
   await seedDatabase();
-  app.listen(port, "0.0.0.0", () => {
+  app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });
 }

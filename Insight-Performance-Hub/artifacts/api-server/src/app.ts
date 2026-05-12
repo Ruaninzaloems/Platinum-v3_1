@@ -1,8 +1,8 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
-import router from "./routes";
-import { authMiddleware } from "./middleware/auth";
-import { errorHandler } from "./middleware/errorHandler";
+import router from "./Controllers";
+import { authMiddleware } from "./Middleware/auth";
+import { errorHandler } from "./Middleware/errorHandler";
 
 const app: Express = express();
 

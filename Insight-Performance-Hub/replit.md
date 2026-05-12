@@ -83,8 +83,27 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ### 11 Roles
 System Admin, Performance Admin, Municipal Manager, HOD, Departmental Coordinator, Responsible Post, Custodian, Reviewer, HR Admin, Audit Viewer, Council Read-only
 
+### Revised SDBIP Workflow
+- Reopen approved scorecards for mid-year revision (Approved → Draft)
+- Add new KPIs during revision with full form
+- Revise existing KPI quarterly targets with mandatory revision reasons
+- Baseline tracking: original approved targets preserved and shown for comparison
+- Revision audit trail: `sdbip_revision_logs` table tracks all changes (scorecard reopen, target revisions, new KPI additions, submissions)
+- Revision log API: `GET/POST /api/scorecards/:scorecardId/revision-logs` with type whitelist, quarter bounds validation, KPI-scorecard ownership checks, and transactional batch inserts
+- Review and approve workflows for revised SDBIP (ReviseSdbipReview, ReviseSdbipApprove pages)
+
+### Actuals Review Workflow
+- 5-level sequential review: Line Manager (Division) → Director → PMS Manager → PMS Director → Internal Audit
+- Each level can approve (forwards to next level) or return (sends back to submitter)
+- Submit Actuals page combines actuals capture + evidence upload in one view
+- Each actual shows evidence documents inline with verification status
+- Review pages show review progress tracker (which levels are done/current/pending)
+- Backend transition endpoint: `POST /api/kpi-actuals/:id/transition` with actions: submit, approve, return
+- Status flow: Draft → In Review → Approved (or Returned back to Draft)
+
 ### Navigation Modules (sidebar)
-Phase 1-2: Dashboard, Configuration, Weightings, Deadlines, Notifications, Audit Trail, Org Planning (KPI Scorecards, SDBIP Overview), Actuals & Evidence (Submit Actuals, Evidence Upload, Corrective Actions)
+Phase 1-2: Dashboard, Configuration, Weightings, Deadlines, Notifications, Audit Trail, Original SDBIP (Capture, Review, Approve, Targets & Activities, SDBIP Overview), Actuals & Evidence (Submit Actuals, Review-Line Manager, Review-Director, Review-PMS Manager, Review-PMS Director, Review-Internal Audit, Corrective Actions)
+Revised SDBIP: Revise SDBIP, Review Revised SDBIP, Approve Revised SDBIP
 Phase 3: Departmental (Dept Scorecards, KPI Assignments), Dashboards (Executive, Department, Overview), Moderation (Review Queue, Moderation Panel), Reports (Report Centre, Standard Reports, Custom Reports)
 Phase 4: Individual (My Performance, Agreements, Reviewer Config, Competencies, Assessments), AI Insights, Integrations, Admin (User Management, Role Permissions, Workflow Config)
 
@@ -145,7 +164,7 @@ React + Vite frontend with Platinum SCM design system.
 
 Database layer — Drizzle ORM with PostgreSQL.
 
-Tables: users, roles, role_permissions, performance_cycles, kpi_groups, units_of_measure, kpi_data_types, progress_statuses, scorecard_types, nkpa_weightings, competency_requirements, submission_deadlines, report_fields, audit_logs, notifications, notification_configs, scorecards, scorecard_kpis, kpi_quarter_targets, kpi_month_activities, sdbip_items, sdbip_revisions, kpi_quarter_actuals, kpi_evidence_documents, kpi_variances, remedial_action_plans, constraint_register, dept_scorecards, dept_scorecard_kpis, kpi_review_submissions, kpi_moderation_outcomes, period_locks, report_runs, individual_performance_agreements, employee_kpas, employee_kpis, reviewer_assignments, competency_templates, competency_template_items, employee_competency_scores, individual_assessment_records, moderation_records_individual, ai_insight_log, integration_sync_log, workflow_step_configs
+Tables: users, roles, role_permissions, performance_cycles, kpi_groups, units_of_measure, kpi_data_types, progress_statuses, scorecard_types, nkpa_weightings, competency_requirements, submission_deadlines, report_fields, audit_logs, notifications, notification_configs, scorecards, scorecard_kpis, kpi_quarter_targets, kpi_month_activities, sdbip_items, sdbip_revisions, sdbip_revision_logs, kpi_quarter_actuals, kpi_evidence_documents, kpi_variances, remedial_action_plans, constraint_register, dept_scorecards, dept_scorecard_kpis, kpi_review_submissions, kpi_moderation_outcomes, period_locks, report_runs, individual_performance_agreements, employee_kpas, employee_kpis, reviewer_assignments, competency_templates, competency_template_items, employee_competency_scores, individual_assessment_records, moderation_records_individual, ai_insight_log, integration_sync_log, workflow_step_configs
 
 ### `lib/api-spec` (`@workspace/api-spec`)
 
