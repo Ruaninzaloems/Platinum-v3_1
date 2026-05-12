@@ -21,6 +21,10 @@ interface NavGroup {
   items: { label: string; icon: string; route: string }[];
 }
 
+type InsightsNavEntry =
+  | { kind: 'link'; label: string; icon: string; route: string }
+  | { kind: 'group'; title: string; icon: string; items: { label: string; icon: string; route: string }[] };
+
 interface BudgetSubGroup {
   label: string;
   icon: string;
@@ -214,41 +218,32 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </div>
             }
           } @else if (activeModule() === 'insights') {
-            <a class="nav-link" routerLink="/ins/dashboard" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">dashboard</mat-icon>
-              <span>Dashboard</span>
-            </a>
-            @for (group of insightsNavGroups; track group.title) {
-              <div class="nav-group">
-                <button class="nav-group-header" (click)="toggleGroup(group.title)">
-                  <mat-icon class="nav-icon">{{group.icon}}</mat-icon>
-                  <span class="nav-group-title">{{group.title}}</span>
-                  <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(group.title)">chevron_right</mat-icon>
-                </button>
-                @if (isGroupExpanded(group.title)) {
-                  <div class="nav-group-items">
-                    @for (item of group.items; track item.label) {
-                      <a class="nav-link sub-item" [routerLink]="'/ins' + item.route" routerLinkActive="active-link">
-                        <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-                        <span>{{item.label}}</span>
-                      </a>
-                    }
-                  </div>
-                }
-              </div>
+            @for (entry of insightsNav; track $index) {
+              @if (entry.kind === 'link') {
+                <a class="nav-link" [routerLink]="'/ins' + entry.route" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">{{entry.icon}}</mat-icon>
+                  <span>{{entry.label}}</span>
+                </a>
+              } @else {
+                <div class="nav-group">
+                  <button class="nav-group-header" (click)="toggleGroup(entry.title)">
+                    <mat-icon class="nav-icon">{{entry.icon}}</mat-icon>
+                    <span class="nav-group-title">{{entry.title}}</span>
+                    <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(entry.title)">chevron_right</mat-icon>
+                  </button>
+                  @if (isGroupExpanded(entry.title)) {
+                    <div class="nav-group-items">
+                      @for (item of entry.items; track item.label) {
+                        <a class="nav-link sub-item" [routerLink]="'/ins' + item.route" routerLinkActive="active-link">
+                          <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                          <span>{{item.label}}</span>
+                        </a>
+                      }
+                    </div>
+                  }
+                </div>
+              }
             }
-            <a class="nav-link" routerLink="/ins/ai-insights" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">psychology</mat-icon>
-              <span>AI Insights</span>
-            </a>
-            <a class="nav-link" routerLink="/ins/integrations" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">hub</mat-icon>
-              <span>Integrations</span>
-            </a>
-            <a class="nav-link" routerLink="/ins/audit-trail" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">security</mat-icon>
-              <span>Audit Trail</span>
-            </a>
           } @else if (activeModule() === 'budget') {
             <a class="nav-link" routerLink="/budget/dashboard" routerLinkActive="active-link">
               <mat-icon class="nav-icon">dashboard</mat-icon>
@@ -843,65 +838,74 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  insightsNavGroups: NavGroup[] = [
-    { title: 'Configuration', icon: 'settings', items: [
-      { label: 'Performance Cycles', icon: 'loop', route: '/config/cycles' },
+  // Mirror of the React perf-app sidebar (Insight-Performance-Hub/artifacts/perf-app/src/layout/Sidebar.tsx).
+  // Order, labels and routes match exactly so the iframe loads the matching React page for every link.
+  insightsNav: InsightsNavEntry[] = [
+    { kind: 'link', label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
+    { kind: 'group', title: 'Original SDBIP', icon: 'business', items: [
+      { label: 'Capture SDBIP', icon: 'fact_check', route: '/org-planning/scorecards' },
+      { label: 'Review SDBIP', icon: 'find_in_page', route: '/org-planning/review-sdbip' },
+      { label: 'Approve SDBIP', icon: 'verified_user', route: '/org-planning/approve-sdbip' },
+      { label: 'Targets & Activities', icon: 'calendar_month', route: '/org-planning/quarterly-targets' },
+      { label: 'SDBIP Overview', icon: 'flag', route: '/sdbip/overview' },
+    ]},
+    { kind: 'group', title: 'Revised SDBIP', icon: 'autorenew', items: [
+      { label: 'Revise SDBIP', icon: 'fact_check', route: '/revised-sdbip/capture' },
+      { label: 'Review Revised SDBIP', icon: 'find_in_page', route: '/revised-sdbip/review' },
+      { label: 'Approve Revised SDBIP', icon: 'verified_user', route: '/revised-sdbip/approve' },
+    ]},
+    { kind: 'group', title: 'Departmental', icon: 'groups', items: [
+      { label: 'Dept Scorecards', icon: 'fact_check', route: '/departmental/scorecards' },
+      { label: 'KPI Assignments', icon: 'flag', route: '/departmental/kpi-assignments' },
+    ]},
+    { kind: 'group', title: 'Individual', icon: 'how_to_reg', items: [
+      { label: 'My Performance', icon: 'trending_up', route: '/individual/my-performance' },
+      { label: 'Agreements', icon: 'description', route: '/individual/agreements' },
+      { label: 'Reviewer Config', icon: 'how_to_reg', route: '/individual/reviewers' },
+      { label: 'Competencies', icon: 'menu_book', route: '/individual/competencies' },
+      { label: 'Assessments', icon: 'fact_check', route: '/individual/assessments' },
+    ]},
+    { kind: 'group', title: 'Actuals & Evidence', icon: 'fact_check', items: [
+      { label: 'Submit Actuals', icon: 'description', route: '/actuals/submit' },
+      { label: 'Review - Line Manager', icon: 'how_to_reg', route: '/actuals/review-line-manager' },
+      { label: 'Review - Director', icon: 'how_to_reg', route: '/actuals/review-director' },
+      { label: 'Review - PMS Manager', icon: 'how_to_reg', route: '/actuals/review-pms-manager' },
+      { label: 'Review - PMS Director', icon: 'how_to_reg', route: '/actuals/review-pms-director' },
+      { label: 'Review - Internal Audit', icon: 'verified_user', route: '/actuals/review-internal-audit' },
+      { label: 'Corrective Actions', icon: 'report_problem', route: '/actuals/corrective-actions' },
+    ]},
+    { kind: 'group', title: 'Moderation', icon: 'balance', items: [
+      { label: 'Review Queue', icon: 'playlist_add_check', route: '/moderation/queue' },
+      { label: 'Moderation Panel', icon: 'balance', route: '/moderation/panel' },
+    ]},
+    { kind: 'group', title: 'Reports', icon: 'menu_book', items: [
+      { label: 'Report Centre', icon: 'description', route: '/reports/centre' },
+      { label: 'Standard Reports', icon: 'description', route: '/reports/standard' },
+      { label: 'Custom Reports', icon: 'bar_chart', route: '/reports/custom' },
+    ]},
+    { kind: 'link', label: 'AI Insights', icon: 'psychology', route: '/ai-insights' },
+    { kind: 'link', label: 'Integrations', icon: 'hub', route: '/integrations' },
+    { kind: 'link', label: 'Audit Trail', icon: 'shield', route: '/audit-trail' },
+    { kind: 'group', title: 'Configuration', icon: 'settings', items: [
+      { label: 'Performance Cycles', icon: 'calendar_month', route: '/config/cycles' },
       { label: 'KPI Groups', icon: 'category', route: '/config/kpi-groups' },
       { label: 'Units of Measure', icon: 'straighten', route: '/config/units' },
       { label: 'Data Types', icon: 'data_object', route: '/config/data-types' },
       { label: 'Progress Statuses', icon: 'pending', route: '/config/statuses' },
-      { label: 'Scorecard Types', icon: 'view_list', route: '/config/scorecard-types' }
-    ]},
-    { title: 'Weightings', icon: 'balance', items: [
+      { label: 'Scorecard Types', icon: 'view_list', route: '/config/scorecard-types' },
       { label: 'NKPA Weightings', icon: 'pie_chart', route: '/weightings/nkpa' },
-      { label: 'Competency Req.', icon: 'bar_chart', route: '/weightings/competencies' }
-    ]},
-    { title: 'Deadlines', icon: 'schedule', items: [
+      { label: 'Competencies', icon: 'groups', route: '/weightings/competencies' },
       { label: 'Submission Deadlines', icon: 'event_note', route: '/deadlines/submissions' },
-      { label: 'Report Fields', icon: 'event_busy', route: '/deadlines/report-fields' }
-    ]},
-    { title: 'Notifications', icon: 'notifications', items: [
+      { label: 'Report Fields', icon: 'event_busy', route: '/deadlines/report-fields' },
       { label: 'Notification Centre', icon: 'mail_outline', route: '/notifications' },
-      { label: 'Notification Config', icon: 'settings', route: '/notifications/config' }
+      { label: 'Notification Settings', icon: 'tune', route: '/notifications/config' },
+      { label: 'Indicator Technical Descriptions', icon: 'find_in_page', route: '/config/indicator-descriptions' },
     ]},
-    { title: 'Org Planning', icon: 'corporate_fare', items: [
-      { label: 'KPI Scorecards', icon: 'account_tree', route: '/org-planning/scorecards' },
-      { label: 'Quarterly Targets', icon: 'calendar_month', route: '/org-planning/quarterly-targets' }
-    ]},
-    { title: 'SDBIP', icon: 'business', items: [
-      { label: 'SDBIP Overview', icon: 'description', route: '/sdbip/overview' },
-      { label: 'Strategic Objectives', icon: 'flag', route: '/sdbip/objectives' }
-    ]},
-    { title: 'Departmental', icon: 'apartment', items: [
-      { label: 'Dept Scorecards', icon: 'dashboard', route: '/departmental/scorecards' },
-      { label: 'KPI Assignments', icon: 'assignment', route: '/departmental/kpi-assignments' }
-    ]},
-    { title: 'Individual', icon: 'person', items: [
-      { label: 'My Performance', icon: 'trending_up', route: '/individual/my-performance' },
-      { label: 'Agreements', icon: 'handshake', route: '/individual/agreements' },
-      { label: 'Reviewers', icon: 'supervisor_account', route: '/individual/reviewers' },
-      { label: 'Competencies', icon: 'school', route: '/individual/competencies' },
-      { label: 'Assessments', icon: 'rate_review', route: '/individual/assessments' }
-    ]},
-    { title: 'Actuals & Evidence', icon: 'fact_check', items: [
-      { label: 'Submit Actuals', icon: 'data_usage', route: '/actuals/submit' },
-      { label: 'Evidence Upload', icon: 'upload_file', route: '/actuals/evidence' },
-      { label: 'Corrective Actions', icon: 'build', route: '/actuals/corrective-actions' }
-    ]},
-    { title: 'Moderation', icon: 'gavel', items: [
-      { label: 'Review Queue', icon: 'playlist_add_check', route: '/moderation/queue' },
-      { label: 'Moderation Panel', icon: 'campaign', route: '/moderation/panel' }
-    ]},
-    { title: 'Reports', icon: 'assessment', items: [
-      { label: 'Report Centre', icon: 'analytics', route: '/reports/centre' },
-      { label: 'Standard Reports', icon: 'summarize', route: '/reports/standard' },
-      { label: 'Custom Reports', icon: 'tune', route: '/reports/custom' }
-    ]},
-    { title: 'Admin', icon: 'admin_panel_settings', items: [
+    { kind: 'group', title: 'Admin', icon: 'admin_panel_settings', items: [
       { label: 'User Management', icon: 'manage_accounts', route: '/admin/users' },
-      { label: 'Role Permissions', icon: 'settings_applications', route: '/admin/roles' },
-      { label: 'Workflows', icon: 'account_tree', route: '/admin/workflows' }
-    ]}
+      { label: 'Role Permissions', icon: 'shield', route: '/admin/roles' },
+      { label: 'Workflow Config', icon: 'account_tree', route: '/admin/workflows' },
+    ]},
   ];
 
   budgetNavGroups: BudgetNavGroup[] = [
