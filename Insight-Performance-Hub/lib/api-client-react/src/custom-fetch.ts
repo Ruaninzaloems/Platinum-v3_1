@@ -271,6 +271,55 @@ async function parseSuccessBody(
   }
 }
 
+/**
+ * When the perf-app is embedded inside the Platinum shell (Angular host on port 5000),
+ * a relative `/api/*` URL would be proxied to the Assets .NET API (port 3000) and 404.
+ * The Insights API server (port 8080) is exposed by the shell at `/insights-app/api/*`,
+ * so rewrite every `/api/...` request to that path whenever the page is being served
+ * from the shell (path starts with `/perf-app` or document is in an iframe).
+ */
+function shouldRewriteApiUrls(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.location?.pathname?.startsWith("/perf-app")) return true;
+  } catch {}
+  try {
+    if (window.self !== window.top) return true;
+  } catch {
+    return true;
+  }
+  return false;
+}
+
+function rewriteApiUrl(input: RequestInfo | URL): RequestInfo | URL {
+  if (!shouldRewriteApiUrls()) return input;
+  const prefix = "/insights-app";
+  const rewriteString = (url: string): string => {
+    if (url.startsWith("/api/") || url === "/api") return prefix + url;
+    return url;
+  };
+  if (typeof input === "string") return rewriteString(input);
+  if (input instanceof URL) {
+    if (input.pathname.startsWith("/api/") || input.pathname === "/api") {
+      const next = new URL(input.toString());
+      next.pathname = prefix + next.pathname;
+      return next;
+    }
+    return input;
+  }
+  if (isRequest(input)) {
+    try {
+      const u = new URL(input.url, typeof window !== "undefined" ? window.location.href : "http://localhost");
+      if (u.pathname.startsWith("/api/") || u.pathname === "/api") {
+        u.pathname = prefix + u.pathname;
+        return new Request(u.toString(), input);
+      }
+    } catch {}
+    return input;
+  }
+  return input;
+}
+
 export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
@@ -299,7 +348,8 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const rewrittenInput = rewriteApiUrl(input);
+  const response = await fetch(rewrittenInput, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
