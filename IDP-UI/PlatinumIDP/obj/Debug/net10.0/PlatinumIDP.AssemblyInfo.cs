@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PlatinumIDP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+283e4429e5a2bfd6a6b800f70faae923758fd920")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+23a7df0f75e4f1c58e8eb484b5a55f05b0f068e7")]
 [assembly: System.Reflection.AssemblyProductAttribute("PlatinumIDP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PlatinumIDP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
