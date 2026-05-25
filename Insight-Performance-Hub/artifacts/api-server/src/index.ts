@@ -1,3 +1,4 @@
+import "./Configuration/database";
 import app from "./app";
 import { seedDatabase } from "./Services/seed";
 

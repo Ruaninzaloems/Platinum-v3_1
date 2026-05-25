@@ -1,0 +1,389 @@
+<section class="plat-page">
+  <!-- ════════════════ KPI DETAIL VIEW (Level 2) ════════════════ -->
+  <ng-container *ngIf="(selectedKpiId() || isNewKpi()) && selectedScorecardId(); else listOrKpis">
+    <div class="detail-head">
+      <div class="left">
+        <button mat-button (click)="backToKpiList()"><mat-icon>arrow_back</mat-icon> Back to KPI List</button>
+        <div class="title-block">
+          <h2>{{ isNewKpi() ? 'New KPI' : (kpiForm.kpiNumber ? ('KPI ' + kpiForm.kpiNumber) : 'KPI Detail') }}</h2>
+          <p>{{ selectedScorecard()?.name }}</p>
+        </div>
+        <app-status-badge *ngIf="selectedKpi()" [status]="selectedKpi()!.status"></app-status-badge>
+      </div>
+      <div class="actions">
+        <button *ngIf="!isReadOnly()" mat-flat-button color="primary"
+                [disabled]="saving() || !kpiForm.kpiNumber || !kpiForm.description || !kpiForm.annualTarget"
+                (click)="saveKpi()">
+          <mat-icon>{{ saving() ? 'hourglass_empty' : 'save' }}</mat-icon>
+          {{ isNewKpi() ? 'Create KPI' : 'Save Changes' }}
+        </button>
+        <button *ngIf="!isNewKpi() && selectedKpi()?.status === 'Draft'"
+                mat-stroked-button color="primary"
+                (click)="transitionKpi(selectedKpi()!.id, 'submit')">
+          <mat-icon>send</mat-icon> Submit
+        </button>
+      </div>
+    </div>
+
+    <mat-tab-group [selectedIndex]="activeTabIndex()" (selectedIndexChange)="onTabChange($event)" mat-align-tabs="start">
+      <!-- ── Basic Details ── -->
+      <mat-tab label="Basic Details">
+        <div class="plat-card form-card">
+          <div class="grid grid-2">
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Indicator Name *</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="kpiForm.description" [disabled]="isReadOnly()" placeholder="Full indicator / KPI description"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>KPI Number *</mat-label>
+              <input matInput [(ngModel)]="kpiForm.kpiNumber" [disabled]="isReadOnly()" placeholder="e.g. KPI-001" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>IDP Reference</mat-label>
+              <input matInput [(ngModel)]="kpiForm.idpReference" [disabled]="isReadOnly()" placeholder="e.g. M_HS1" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Responsible Post</mat-label>
+              <mat-select [(ngModel)]="kpiForm.responsiblePostId" [disabled]="isReadOnly()">
+                <mat-option [value]="null">— None —</mat-option>
+                <mat-option *ngFor="let u of users(); trackBy: trackById" [value]="u.id">{{ u.displayName }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Custodian Post</mat-label>
+              <mat-select [(ngModel)]="kpiForm.custodianPostId" [disabled]="isReadOnly()">
+                <mat-option [value]="null">— None —</mat-option>
+                <mat-option *ngFor="let u of users(); trackBy: trackById" [value]="u.id">{{ u.displayName }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Baseline</mat-label>
+              <input matInput [(ngModel)]="kpiForm.baseline" [disabled]="isReadOnly()" placeholder="e.g. 100%" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Annual Target *</mat-label>
+              <input matInput [(ngModel)]="kpiForm.annualTarget" [disabled]="isReadOnly()" placeholder="Target for the financial year" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Financial Baseline (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="kpiForm.annualBudgetTarget" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Weight (%)</mat-label>
+              <input matInput type="number" min="0" max="100" [(ngModel)]="kpiForm.weighting" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Funding Source</mat-label>
+              <input matInput [(ngModel)]="kpiForm.fundingSource" [disabled]="isReadOnly()" placeholder="e.g. OPEX, MIG" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Unit of Measure</mat-label>
+              <mat-select [(ngModel)]="kpiForm.unitOfMeasureId" [disabled]="isReadOnly()">
+                <mat-option [value]="null">— None —</mat-option>
+                <mat-option *ngFor="let u of uoms(); trackBy: trackById" [value]="u.id">{{ u.name }} ({{ u.abbreviation }})</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Budget Description</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="kpiForm.budgetDescription" [disabled]="isReadOnly()" placeholder="Describe the budget item (None if not applicable)"></textarea>
+            </mat-form-field>
+            <div class="span-2 chk">
+              <mat-checkbox [(ngModel)]="kpiForm.isCumulative" [disabled]="isReadOnly()">Cumulative measurement</mat-checkbox>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ── IDP / Strategic ── -->
+      <mat-tab label="IDP / Strategic" [disabled]="isNewKpi()">
+        <div class="plat-card form-card">
+          <div class="grid grid-1">
+            <mat-form-field appearance="outline">
+              <mat-label>Strategic Objective</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="kpiForm.strategicObjective" [disabled]="isReadOnly()"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Programme</mat-label>
+              <input matInput [(ngModel)]="kpiForm.programme" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Evidence Source</mat-label>
+              <input matInput [(ngModel)]="kpiForm.evidenceSource" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Evidence Portfolio</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="kpiForm.evidencePortfolio" [disabled]="isReadOnly()"></textarea>
+            </mat-form-field>
+          </div>
+          <div class="form-actions" *ngIf="!isReadOnly()">
+            <button mat-flat-button color="primary" (click)="saveKpi()" [disabled]="saving()"><mat-icon>save</mat-icon> Save</button>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ── Budget ── -->
+      <mat-tab label="Budget" [disabled]="isNewKpi()">
+        <div class="plat-card form-card">
+          <div class="grid grid-2">
+            <mat-form-field appearance="outline">
+              <mat-label>Funding Source</mat-label>
+              <input matInput [(ngModel)]="kpiForm.fundingSource" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Annual Budget Target (R)</mat-label>
+              <input matInput type="number" [(ngModel)]="kpiForm.annualBudgetTarget" [disabled]="isReadOnly()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Budget Description</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="kpiForm.budgetDescription" [disabled]="isReadOnly()"></textarea>
+            </mat-form-field>
+          </div>
+          <div class="form-actions" *ngIf="!isReadOnly()">
+            <button mat-flat-button color="primary" (click)="saveKpi()" [disabled]="saving()"><mat-icon>save</mat-icon> Save</button>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ── Targets ── -->
+      <mat-tab label="Targets" [disabled]="isNewKpi()">
+        <div class="plat-card form-card">
+          <div class="targets-grid">
+            <div *ngFor="let q of [1,2,3,4]" class="qcard">
+              <h4>Q{{ q }}</h4>
+              <mat-form-field appearance="outline">
+                <mat-label>Target Value</mat-label>
+                <input matInput [disabled]="isReadOnly()" [ngModel]="targetForm['q' + q]" (ngModelChange)="targetForm['q' + q] = $event" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Budget (R)</mat-label>
+                <input matInput type="number" [disabled]="isReadOnly()" [ngModel]="targetBudgetForm['q' + q]" (ngModelChange)="targetBudgetForm['q' + q] = $event" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Evidence Expected</mat-label>
+                <textarea matInput rows="2" [disabled]="isReadOnly()" [ngModel]="targetEvidenceForm['q' + q]" (ngModelChange)="targetEvidenceForm['q' + q] = $event"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+          <div class="form-actions" *ngIf="!isReadOnly()">
+            <button mat-flat-button color="primary" (click)="saveTargets()"><mat-icon>save</mat-icon> Save Quarterly Targets</button>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ── Monthly Activities ── -->
+      <mat-tab label="Monthly Activities" [disabled]="isNewKpi()">
+        <div class="plat-card form-card">
+          <div class="qbar">
+            <span class="lbl">Quarter:</span>
+            <button *ngFor="let q of [1,2,3,4]" mat-stroked-button
+                    [color]="selectedQuarter() === q ? 'primary' : ''"
+                    (click)="onQuarterChange(q)">Q{{ q }}</button>
+            <span class="spacer"></span>
+            <button *ngIf="!isReadOnly()" mat-flat-button color="primary" (click)="showNewActivity.set(!showNewActivity())">
+              <mat-icon>add</mat-icon> Add Activity
+            </button>
+          </div>
+
+          <div *ngIf="showNewActivity()" class="new-activity">
+            <mat-form-field appearance="outline">
+              <mat-label>Month</mat-label>
+              <mat-select [(ngModel)]="activityForm.month">
+                <mat-option *ngFor="let m of monthsForQuarter(selectedQuarter())" [value]="m">{{ monthName(m) }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="grow">
+              <mat-label>Description</mat-label>
+              <input matInput [(ngModel)]="activityForm.description" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Due Date</mat-label>
+              <input matInput type="date" [(ngModel)]="activityForm.dueDate" />
+            </mat-form-field>
+            <button mat-flat-button color="primary" (click)="addActivity()" [disabled]="!activityForm.description"><mat-icon>add</mat-icon> Add</button>
+            <button mat-button (click)="showNewActivity.set(false)">Cancel</button>
+          </div>
+
+          <table class="plat-table">
+            <thead><tr><th>Month</th><th>Description</th><th>Due</th><th>Status</th><th class="actions">Actions</th></tr></thead>
+            <tbody>
+              <tr *ngIf="activities().length === 0"><td colspan="5" class="empty">No activities for this quarter.</td></tr>
+              <tr *ngFor="let a of activities(); trackBy: trackById">
+                <td>{{ monthName(a.month) }}</td>
+                <td>{{ a.description }}</td>
+                <td>{{ a.dueDate }}</td>
+                <td><app-status-badge [status]="a.status"></app-status-badge></td>
+                <td class="actions">
+                  <button mat-icon-button (click)="toggleActivity(a)" [disabled]="isReadOnly()" title="Toggle status">
+                    <mat-icon>{{ a.status === 'Completed' ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteActivity(a)" [disabled]="isReadOnly()" title="Remove">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Tasks (quarter=5) -->
+          <div class="tasks">
+            <div class="qbar">
+              <h3>Tasks</h3>
+              <span class="spacer"></span>
+              <button *ngIf="!isReadOnly()" mat-stroked-button color="primary" (click)="showNewTask.set(!showNewTask())">
+                <mat-icon>add</mat-icon> Add Task
+              </button>
+            </div>
+
+            <div *ngIf="showNewTask()" class="new-activity">
+              <mat-form-field appearance="outline">
+                <mat-label>Quarter</mat-label>
+                <mat-select [(ngModel)]="taskForm.quarter">
+                  <mat-option *ngFor="let q of [1,2,3,4]" [value]="q">Q{{ q }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Task Name</mat-label>
+                <input matInput [(ngModel)]="taskForm.taskName" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Owner</mat-label>
+                <mat-select [(ngModel)]="taskForm.ownerId">
+                  <mat-option [value]="null">— None —</mat-option>
+                  <mat-option *ngFor="let u of users(); trackBy: trackById" [value]="u.id">{{ u.displayName }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Financial Target (R)</mat-label>
+                <input matInput [(ngModel)]="taskForm.financialTarget" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Portfolio of Evidence</mat-label>
+                <input matInput [(ngModel)]="taskForm.portfolioOfEvidence" />
+              </mat-form-field>
+              <button mat-flat-button color="primary" (click)="addTask()" [disabled]="!taskForm.taskName"><mat-icon>add</mat-icon> Add</button>
+              <button mat-button (click)="showNewTask.set(false)">Cancel</button>
+            </div>
+
+            <table class="plat-table">
+              <thead><tr><th>Q</th><th>Task</th><th>Financial Target</th><th>Portfolio of Evidence</th><th class="actions">Actions</th></tr></thead>
+              <tbody>
+                <tr *ngIf="tasks().length === 0"><td colspan="5" class="empty">No tasks defined.</td></tr>
+                <tr *ngFor="let t of tasks(); trackBy: trackById">
+                  <ng-container *ngIf="parseTask(t) as p">
+                    <td>Q{{ p.quarter }}</td>
+                    <td><strong>{{ p.taskName }}</strong></td>
+                    <td>{{ p.financialTarget || '—' }}</td>
+                    <td>{{ p.portfolioOfEvidence || '—' }}</td>
+                    <td class="actions">
+                      <button mat-icon-button color="warn" (click)="deleteTask(t)" [disabled]="isReadOnly()"><mat-icon>delete</mat-icon></button>
+                    </td>
+                  </ng-container>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </ng-container>
+
+  <!-- ════════════════ SCORECARD LIST + KPI LIST ════════════════ -->
+  <ng-template #listOrKpis>
+    <ng-container *ngIf="!selectedScorecardId(); else kpiList">
+      <app-page-header title="Capture SDBIP" subtitle="Create and manage organisational scorecards and KPIs." icon="checklist" tone="indigo">
+        <mat-form-field *ngIf="cycles().length > 0" appearance="outline" class="cycle-pick" subscriptSizing="dynamic">
+          <mat-label>Cycle</mat-label>
+          <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="selectCycle($event)">
+            <mat-option *ngFor="let c of cycles(); trackBy: trackById" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button color="primary" (click)="openNewScorecard()" [disabled]="!effectiveCycleId()">
+          <mat-icon>add</mat-icon> New Scorecard
+        </button>
+      </app-page-header>
+
+      <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
+
+      <ng-container *ngIf="!loading()">
+        <div class="scorecard-grid" *ngIf="scorecards().length > 0; else noScorecards">
+          <div *ngFor="let sc of scorecards(); trackBy: trackById" class="plat-card sc-card" (click)="openScorecard(sc)">
+            <div class="sc-head">
+              <h3>{{ sc.name }}</h3>
+              <app-status-badge [status]="sc.status"></app-status-badge>
+            </div>
+            <p class="sc-type">{{ sc.scorecardType }}</p>
+            <div class="sc-foot"><mat-icon>description</mat-icon> Click to manage KPIs</div>
+          </div>
+        </div>
+        <ng-template #noScorecards>
+          <div class="plat-card">
+            <app-empty-state icon="description" title="No scorecards yet" message='Click "New Scorecard" to create one for this cycle'></app-empty-state>
+          </div>
+        </ng-template>
+      </ng-container>
+    </ng-container>
+
+    <ng-template #kpiList>
+      <div class="kpi-list-head">
+        <div class="left">
+          <button mat-button (click)="backToScorecards()"><mat-icon>arrow_back</mat-icon> Back to Scorecards</button>
+          <div class="title-block">
+            <h2>{{ selectedScorecard()?.name }}</h2>
+            <p>{{ selectedScorecard()?.scorecardType }} — KPI catalogue</p>
+          </div>
+          <app-status-badge *ngIf="selectedScorecard()" [status]="selectedScorecard()!.status"></app-status-badge>
+        </div>
+        <div class="actions">
+          <ng-container *ngIf="selectedScorecard() as sc">
+            <button *ngIf="sc.status === 'Draft'" mat-stroked-button color="primary" (click)="transitionScorecard('submit')">
+              <mat-icon>send</mat-icon> Submit Scorecard
+            </button>
+            <button *ngIf="sc.status === 'Submitted'" mat-stroked-button color="primary" (click)="transitionScorecard('review')">
+              <mat-icon>visibility</mat-icon> Mark Reviewed
+            </button>
+            <button *ngIf="sc.status === 'Reviewed'" mat-stroked-button color="primary" (click)="transitionScorecard('approve')">
+              <mat-icon>check</mat-icon> Approve
+            </button>
+            <button *ngIf="sc.status === 'Draft'" mat-flat-button color="primary" (click)="openNewKpi()">
+              <mat-icon>add</mat-icon> Add KPI
+            </button>
+          </ng-container>
+        </div>
+      </div>
+
+      <div class="kpi-cards" *ngIf="kpis().length > 0; else noKpis">
+        <div *ngFor="let k of kpis(); trackBy: trackById" class="plat-card kpi-card">
+          <div class="kpi-row">
+            <div class="kpi-num">{{ k.kpiNumber || '—' }}</div>
+            <div class="kpi-body">
+              <div class="kpi-title">{{ k.description }}</div>
+              <div class="kpi-meta">
+                <span *ngIf="k.annualTarget">Target: {{ k.annualTarget }}</span>
+                <span *ngIf="k.idpReference">IDP: {{ k.idpReference }}</span>
+                <span *ngIf="k.programme">{{ k.programme }}</span>
+                <app-status-badge [status]="k.status"></app-status-badge>
+              </div>
+            </div>
+            <div class="kpi-actions">
+              <button mat-stroked-button (click)="openKpiDetail(k)"><mat-icon>edit</mat-icon> Open</button>
+              <ng-container [ngSwitch]="k.status">
+                <ng-container *ngSwitchCase="'Draft'">
+                  <button mat-button (click)="transitionKpi(k.id, 'submit')">Submit</button>
+                  <button mat-button color="warn" (click)="deleteKpi(k.id)">Delete</button>
+                </ng-container>
+                <button *ngSwitchCase="'Submitted'" mat-button (click)="transitionKpi(k.id, 'review')">Review</button>
+                <button *ngSwitchCase="'Reviewed'" mat-button (click)="transitionKpi(k.id, 'approve')">Approve</button>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #noKpis>
+        <div class="plat-card">
+          <app-empty-state icon="flag" title="No KPIs yet" message='Click "Add KPI" to start building this scorecard'></app-empty-state>
+        </div>
+      </ng-template>
+    </ng-template>
+  </ng-template>
+</section>

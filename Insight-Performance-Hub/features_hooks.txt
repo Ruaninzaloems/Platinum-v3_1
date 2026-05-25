@@ -1,0 +1,707 @@
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  useListScorecards, useListScorecardKpis,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  useListKpiActuals, useCreateKpiActual, useUpdateKpiActual,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  useListKpiEvidence, useUploadKpiEvidence, useVerifyEvidence,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  useTransitionKpiActual,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [selectedKpiId, setSelectedKpiId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [showCapture, setShowCapture] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [editingActualId, setEditingActualId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [showUpload, setShowUpload] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [captureForm, setCaptureForm] = useState({
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const [uploadForm, setUploadForm] = useState({ fileName: "", fileSize: 0, mimeType: "", documentType: "", description: "" });
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const { data: scorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const actualsQuery = useListKpiActuals(selectedKpiId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const createActual = useCreateKpiActual();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const updateActual = useUpdateKpiActual();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const transitionActual = useTransitionKpiActual();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const uploadEvidence = useUploadKpiEvidence();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const verifyEvidence = useVerifyEvidence();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsCapture.tsx:  const evidenceQuery = useListKpiEvidence(kpiId, { quarter: actual.quarter });
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  useListAllActuals, useTransitionKpiActual,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  useListScorecardKpis, useListKpiEvidence,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  useListCycles, useListScorecards, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const { data: allActuals, refetch: refetchActuals } = useListAllActuals({ status: "In Review", reviewLevel });
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const transitionActual = useTransitionKpiActual();
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const [selectedActualId, setSelectedActualId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const [showReturn, setShowReturn] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const [returnComments, setReturnComments] = useState("");
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const [isProcessing, setIsProcessing] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/actuals/ActualsReview.tsx:  const evidenceQuery = useListKpiEvidence(actual.kpiId, { quarter: actual.quarter });
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  useListRemedialActions, useCreateRemedialAction, useUpdateRemedialAction
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [showNew, setShowNew] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [showEdit, setShowEdit] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [statusFilter, setStatusFilter] = useState<string>("all");
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [newForm, setNewForm] = useState({
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const [editForm, setEditForm] = useState({ actionDescription: "", dueDate: "", actionOwnerIds: "" });
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const { data: actions, refetch } = useListRemedialActions(
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const createAction = useCreateRemedialAction();
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:  const updateAction = useUpdateRemedialAction();
+.local/react-source/artifacts/perf-app/src/features/actuals/CorrectiveActions.tsx:            <SelectItem value="all">All Statuses</SelectItem>
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  useListWorkflowConfigs, useCreateWorkflowConfig,
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  useUpdateWorkflowConfig, useDeleteWorkflowConfig,
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const [showCreate, setShowCreate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const [editId, setEditId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const [form, setForm] = useState({ stepName: "", stepOrder: 1, requiredRole: "", description: "", isActive: true });
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const { data: configs, refetch } = useListWorkflowConfigs();
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const createConfig = useCreateWorkflowConfig();
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const updateConfig = useUpdateWorkflowConfig();
+.local/react-source/artifacts/perf-app/src/features/admin/WorkflowConfig.tsx:  const deleteConfig = useDeleteWorkflowConfig();
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  useGetAiDashboard, useGetAtRiskKpis, useGetNarrativeSummary,
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  useGetEvidenceGaps, useGetAlignmentCheck, useListAiInsightLog,
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  useListCycles,
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: dashboard } = useGetAiDashboard({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: atRisk } = useGetAtRiskKpis({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: narrative } = useGetNarrativeSummary({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: gaps } = useGetEvidenceGaps({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: alignment } = useGetAlignmentCheck({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/ai/AiInsights.tsx:  const { data: logs } = useListAiInsightLog({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:import { useListAuditLogs } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:  const [searchTerm, setSearchTerm] = useState("");
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:  const { data, isLoading } = useListAuditLogs({});
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:    log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+.local/react-source/artifacts/perf-app/src/features/audit/AuditTrail.tsx:                    <td className="px-6 py-4 font-medium text-slate-900">{log.userName}</td>
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:import { useListDataTypes, useCreateDataType, useUpdateDataType, getListDataTypesQueryKey, type CreateDataTypeInput } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const { data: types, isLoading } = useListDataTypes();
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const createMut = useCreateDataType();
+.local/react-source/artifacts/perf-app/src/features/config/DataTypes.tsx:  const updateMut = useUpdateDataType();
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:import { useListKpiGroups, useCreateKpiGroup, useUpdateKpiGroup, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const { data: groups, isLoading } = useListKpiGroups({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const queryClient = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const createMut = useCreateKpiGroup();
+.local/react-source/artifacts/perf-app/src/features/config/KpiGroups.tsx:  const updateMut = useUpdateKpiGroup();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:import { useListCycles, useCreateCycle, useUpdateCycle, useDeleteCycle, type CreateCycleInput } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const queryClient = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const { data: cycles, isLoading } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const [deletingCycle, setDeletingCycle] = useState<{ id: number; label: string } | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const deleteMut = useDeleteCycle({
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const queryClient = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const createMut = useCreateCycle();
+.local/react-source/artifacts/perf-app/src/features/config/PerformanceCycles.tsx:  const updateMut = useUpdateCycle();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:import { useListProgressStatuses, useCreateProgressStatus, useUpdateProgressStatus, useListCycles, getListProgressStatusesQueryKey } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:export default function ProgressStatuses() {
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const { data: statuses, isLoading } = useListProgressStatuses({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:            Progress Statuses
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:          <p className="text-slate-500 mt-1">Define statuses for tracking KPI progress.</p>
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:        {activeCycle && <StatusDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} editingId={editingId} setEditingId={setEditingId} statuses={statuses} cycleId={activeCycle.id} />}
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:            {statuses?.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No statuses defined.</td></tr>}
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:            {statuses?.map((s) => (
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  statuses: { id: number; name: string; code: string; color: string; sortOrder: number }[] | undefined;
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:function StatusDialog({ open, onOpenChange, editingId, setEditingId, statuses, cycleId }: StatusDialogProps) {
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const createMut = useCreateProgressStatus();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const updateMut = useUpdateProgressStatus();
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:  const s = editingId ? statuses?.find((x) => x.id === editingId) : null;
+.local/react-source/artifacts/perf-app/src/features/config/ProgressStatuses.tsx:    const onSuccess = () => { qc.invalidateQueries({ queryKey: getListProgressStatusesQueryKey() }); onOpenChange(false); setEditingId(null); toast({ title: "Saved" }); };
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:import { useListScorecardTypes, useCreateScorecardType, useUpdateScorecardType, getListScorecardTypesQueryKey } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const { data: types, isLoading } = useListScorecardTypes();
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:          <p className="text-slate-500 mt-1">Configure the types of performance scorecards used.</p>
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const createMut = useCreateScorecardType();
+.local/react-source/artifacts/perf-app/src/features/config/ScorecardTypes.tsx:  const updateMut = useUpdateScorecardType();
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:import { useListUnitsOfMeasure, useCreateUnitOfMeasure, useUpdateUnitOfMeasure, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const { data: units, isLoading } = useListUnitsOfMeasure({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const queryClient = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const createMut = useCreateUnitOfMeasure();
+.local/react-source/artifacts/perf-app/src/features/config/UnitsOfMeasure.tsx:  const updateMut = useUpdateUnitOfMeasure();
+.local/react-source/artifacts/perf-app/src/features/dashboard/Dashboard.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboard/Dashboard.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboard/Dashboard.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboard/Dashboard.tsx:  const [activeTab, setActiveTab] = useState<TabId>("summary");
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:import { useGetDepartmentDashboard } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:import { useListCycles, useListDeptScorecards } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  const [deptId, setDeptId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  const { data: deptScorecards } = useListDeptScorecards({ cycleId });
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:  const { data } = useGetDepartmentDashboard(deptId || 0, { cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:                        const statuses = [k.q1Status, k.q2Status, k.q3Status, k.q4Status];
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptDashboard.tsx:                            {statuses.map((status, qi) => (
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:import { useGetDeptRanking, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  const [sortField, setSortField] = useState<"weightedScore" | "achievementRate">("weightedScore");
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/DeptRanking.tsx:  const { data } = useGetDeptRanking({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:import { useGetEvidenceCompliance, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/EvidenceCompliance.tsx:  const { data } = useGetEvidenceCompliance({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:import { useGetExecutiveDashboard } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:import { Target, CheckCircle, XCircle, AlertTriangle, PauseCircle, ShieldAlert, FileText, DollarSign, Clock } from "lucide-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:  const { data } = useGetExecutiveDashboard({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) });
+.local/react-source/artifacts/perf-app/src/features/dashboards/ExecDashboard.tsx:            <KpiCard icon={<PauseCircle className="w-5 h-5" />} label="On Hold" value={data?.onHold || 0} bg="bg-gray-50" color="text-gray-600" />
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:import { useGetFinancialSnapshot, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/FinancialSnapshot.tsx:  const { data } = useGetFinancialSnapshot({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:import { useGetKpiStatusSummary, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:  const { data } = useGetKpiStatusSummary({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/KpiStatusSummary.tsx:          <p className="text-sm text-slate-500 mt-1">Distribution of KPI statuses across the organisation</p>
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:import { useGetNkpaPerformance, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/NkpaPerformance.tsx:  const { data } = useGetNkpaPerformance({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:import { useGetOverviewDashboard } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/OverviewDashboard.tsx:  const { data } = useGetOverviewDashboard({ cycleId: cycleId || 0 });
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:import { useGetTopUnderperforming, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/TopUnderperforming.tsx:  const { data } = useGetTopUnderperforming({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:import { useGetTrendline, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:  const [quarter, setQuarter] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/dashboards/TrendlineChart.tsx:  const { data } = useGetTrendline({ cycleId: cycleId || 0, ...(quarter ? { quarter } : {}) }, { query: { enabled: !!cycleId } });
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:import { useListReportFields, useCreateReportField, useUpdateReportField, useDeleteReportField, useListCycles, getListReportFieldsQueryKey, type CreateReportFieldInput } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const { data: fields, isLoading } = useListReportFields({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const deleteMut = useDeleteReportField();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const createMut = useCreateReportField();
+.local/react-source/artifacts/perf-app/src/features/deadlines/ReportFields.tsx:  const updateMut = useUpdateReportField();
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:import { useListSubmissionDeadlines, useCreateSubmissionDeadline, useUpdateSubmissionDeadline, useListCycles, getListSubmissionDeadlinesQueryKey } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const { data: deadlines, isLoading } = useListSubmissionDeadlines({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const createMut = useCreateSubmissionDeadline();
+.local/react-source/artifacts/perf-app/src/features/deadlines/SubmissionDeadlines.tsx:  const updateMut = useUpdateSubmissionDeadline();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  useListDeptScorecards, useCreateDeptScorecard, useUpdateDeptScorecard,
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  useTransitionDeptScorecard, useListDeptScorecardKpis, useCreateDeptScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  useUpdateDeptKpi, useDeleteDeptKpi, useInheritKpisFromOrg,
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:import { useListScorecards } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [selectedScId, setSelectedScId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [showCreate, setShowCreate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [showAddKpi, setShowAddKpi] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [createForm, setCreateForm] = useState({ name: "", departmentId: 1, departmentName: "", parentScorecardId: 0 });
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const [kpiForm, setKpiForm] = useState({ kpiNumber: "", description: "", annualTarget: "", weighting: 0 });
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const { data: deptScorecards, refetch: refetchScorecards } = useListDeptScorecards({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const { data: orgScorecards } = useListScorecards({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const { data: kpis, refetch: refetchKpis } = useListDeptScorecardKpis(selectedScId || 0);
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const createSc = useCreateDeptScorecard();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const transitionSc = useTransitionDeptScorecard();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const createKpi = useCreateDeptScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const updateKpi = useUpdateDeptKpi();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const deleteKpi = useDeleteDeptKpi();
+.local/react-source/artifacts/perf-app/src/features/departmental/DeptScorecards.tsx:  const inheritKpis = useInheritKpisFromOrg();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  useListCompetencyTemplates, useCreateCompetencyTemplate, useUpdateCompetencyTemplate,
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  useListCompetencyItems, useCreateCompetencyItem, useDeleteCompetencyItem,
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [selectedTemplateId, setSelectedTemplateId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [showCreate, setShowCreate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [showEditTemplate, setShowEditTemplate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [showAddItem, setShowAddItem] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [form, setForm] = useState({ name: "", description: "", postLevel: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [editTemplateForm, setEditTemplateForm] = useState({ name: "", description: "", postLevel: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const [itemForm, setItemForm] = useState({ competencyName: "", description: "", weighting: 0 });
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const { data: templates, refetch } = useListCompetencyTemplates();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const { data: items, refetch: refetchItems } = useListCompetencyItems(selectedTemplateId || 0);
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const createTemplate = useCreateCompetencyTemplate();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const updateTemplate = useUpdateCompetencyTemplate();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const createItem = useCreateCompetencyItem();
+.local/react-source/artifacts/perf-app/src/features/individual/CompetencyTemplates.tsx:  const deleteItem = useDeleteCompetencyItem();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  useListAgreements, useCreateAgreement, useUpdateAgreement, useTransitionAgreement,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  useListEmployeeKpas, useCreateEmployeeKpa, useUpdateEmployeeKpa, useDeleteEmployeeKpa,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  useListEmployeeKpis, useCreateEmployeeKpi, useUpdateEmployeeKpi, useDeleteEmployeeKpi,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  useListCycles, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [selectedAgreementId, setSelectedAgreementId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [showCreate, setShowCreate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [showAddKpa, setShowAddKpa] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [showAddKpi, setShowAddKpi] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [editingKpaId, setEditingKpaId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [editingKpiId, setEditingKpiId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [form, setForm] = useState({ employeeId: 0, employeeName: "", postTitle: "", departmentId: 0, departmentName: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [kpaForm, setKpaForm] = useState({ title: "", description: "", weighting: 0 });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const [kpiForm, setKpiForm] = useState({ kpaId: 0, kpiNumber: "", description: "", annualTarget: "", weighting: 0 });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { data: agreements, refetch } = useListAgreements({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { data: kpas, refetch: refetchKpas } = useListEmployeeKpas(selectedAgreementId || 0);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const { data: kpis, refetch: refetchKpis } = useListEmployeeKpis(selectedAgreementId || 0);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const createAg = useCreateAgreement();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const transitionAg = useTransitionAgreement();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const createKpa = useCreateEmployeeKpa();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const updateKpa = useUpdateEmployeeKpa();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const deleteKpa = useDeleteEmployeeKpa();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const createKpi = useCreateEmployeeKpi();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const updateKpi = useUpdateEmployeeKpi();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:  const deleteKpi = useDeleteEmployeeKpi();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:                const u = users?.find(u => u.id === Number(v));
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAgreements.tsx:                  {users?.filter(u => u.isActive).map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName} ({u.role})</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  useListIndividualAssessments, useCreateIndividualAssessment,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  useListIndividualModerations, useCreateIndividualModeration,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  useListAgreements, useListCycles,
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [selectedAgreementId, setSelectedAgreementId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [showCreate, setShowCreate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [showModerate, setShowModerate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [form, setForm] = useState({ assessmentType: "quarterly" as "quarterly" | "mid-year" | "annual", quarter: 1, kpiScore: 0, competencyScore: 0, comments: "", developmentNeeds: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const [modForm, setModForm] = useState({ assessmentId: 0, outcome: "accepted" as "accepted" | "adjusted" | "referred", originalScore: 0, adjustedScore: 0, adjustmentReason: "", notes: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const { data: agreements } = useListAgreements({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const { data: assessments, refetch } = useListIndividualAssessments({ agreementId: selectedAgreementId });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const { data: moderations, refetch: refetchMods } = useListIndividualModerations({ agreementId: selectedAgreementId });
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const createAssessment = useCreateIndividualAssessment();
+.local/react-source/artifacts/perf-app/src/features/individual/IndividualAssessment.tsx:  const createModeration = useCreateIndividualModeration();
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:import { useListReviewerAssignments, useCreateReviewerAssignment, useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const [showAssign, setShowAssign] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const [form, setForm] = useState({ employeeId: 0, primaryReviewerId: 0, secondaryReviewerId: 0, changeReason: "" });
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const { data: assignments, refetch } = useListReviewerAssignments({ cycleId: selectedCycleId });
+.local/react-source/artifacts/perf-app/src/features/individual/ReviewerConfig.tsx:  const createAssignment = useCreateReviewerAssignment();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  useListIntegrationSyncLog, useTriggerHrSync, useTriggerBudgetPull,
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  useTriggerProjectSync, useListIdpObjectives, useListCycles,
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const [syncFilter, setSyncFilter] = useState<string | undefined>();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const [idpSearch, setIdpSearch] = useState("");
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const [budgetCycleId, setBudgetCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const { data: syncLog, refetch: refetchLog } = useListIntegrationSyncLog({ integrationType: syncFilter });
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const { data: idpObjectives } = useListIdpObjectives({ search: idpSearch });
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const hrSync = useTriggerHrSync();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const budgetPull = useTriggerBudgetPull();
+.local/react-source/artifacts/perf-app/src/features/integrations/IntegrationHub.tsx:  const projectSync = useTriggerProjectSync();
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:import { useListModerations, useCreateModeration } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const [quarter, setQuarter] = useState<number>(1);
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const [showModerate, setShowModerate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const [form, setForm] = useState({ actualId: 0, kpiId: 0, quarter: 1, outcome: "Confirmed", scoreAdjustmentReason: "", adjustedScore: 0, notes: "" });
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const { data: moderations, refetch } = useListModerations({ quarter });
+.local/react-source/artifacts/perf-app/src/features/moderation/ModerationPanel.tsx:  const createModeration = useCreateModeration();
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:import { useListReviews, useCreateReview } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const [quarter, setQuarter] = useState<number>(1);
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const [showReview, setShowReview] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const [reviewForm, setReviewForm] = useState({ actualId: 0, kpiId: 0, quarter: 1, action: "approve" as string, comments: "", returnReason: "", assessmentRating: 0 });
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const { data: reviews, refetch } = useListReviews({ quarter });
+.local/react-source/artifacts/perf-app/src/features/moderation/ReviewQueue.tsx:  const createReview = useCreateReview();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationCentre.tsx:import { useListNotifications, useMarkNotificationRead } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationCentre.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationCentre.tsx:  const { data: notifications, isLoading } = useListNotifications({});
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationCentre.tsx:  const markReadMut = useMarkNotificationRead();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationCentre.tsx:  const queryClient = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:import { useListNotificationConfigs, useCreateNotificationConfig, useUpdateNotificationConfig, useListCycles, getListNotificationConfigsQueryKey } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const { data: configs, isLoading } = useListNotificationConfigs({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const createMut = useCreateNotificationConfig();
+.local/react-source/artifacts/perf-app/src/features/notifications/NotificationConfig.tsx:  const updateMut = useUpdateNotificationConfig();
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:import { useListReportRuns, useGenerateReport } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const [cycleId, setCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const [showGenerate, setShowGenerate] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const [form, setForm] = useState({ reportType: "quarterly", title: "", quarter: 1, departmentId: 0 });
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const [exportingId, setExportingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const [exportFormat, setExportFormat] = useState<string | null>(null);
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const { data: runs, refetch } = useListReportRuns({ cycleId });
+.local/react-source/artifacts/perf-app/src/features/reports/ReportCentre.tsx:  const generateReport = useGenerateReport();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  useListScorecards, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  useListScorecardKpis, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  useListQuarterTargets, useListCycles, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [approvalComments, setApprovalComments] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [showReturnDialog, setShowReturnDialog] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [returnReason, setReturnReason] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [isProcessing, setIsProcessing] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const { data: allScorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const [expanded, setExpanded] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ApproveSdbip.tsx:  const targetsQuery = useListQuarterTargets(expanded ? kpi.id : 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  useListScorecards, useListScorecardKpis,
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  useListQuarterTargets, useUpsertQuarterTargets,
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  useListMonthActivities, useCreateMonthActivity,
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  useUpdateMonthActivity, useDeleteMonthActivity
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [selectedKpiId, setSelectedKpiId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [selectedQuarter, setSelectedQuarter] = useState(1);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [showNewActivity, setShowNewActivity] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [showTargets, setShowTargets] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [activityForm, setActivityForm] = useState({ month: 7, description: "", dueDate: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const [targetForm, setTargetForm] = useState({ q1Target: "", q2Target: "", q3Target: "", q4Target: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const { data: scorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const { data: targets, refetch: refetchTargets } = useListQuarterTargets(selectedKpiId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const { data: activities, refetch: refetchActivities } = useListMonthActivities(selectedKpiId ?? 0, { quarter: selectedQuarter });
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const upsertTargets = useUpsertQuarterTargets();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const createActivity = useCreateMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const updateActivity = useUpdateMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/MonthlyActivities.tsx:  const deleteActivity = useDeleteMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useListScorecards, useCreateScorecard, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useListScorecardKpis, useCreateScorecardKpi, useUpdateScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useDeleteScorecardKpi, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useListQuarterTargets, useUpsertQuarterTargets,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useListMonthActivities, useCreateMonthActivity,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useUpdateMonthActivity, useDeleteMonthActivity,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useListUnitsOfMeasure, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:import { useListCycles } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: uoms } = useListUnitsOfMeasure();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [selectedKpiId, setSelectedKpiId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [isNewKpi, setIsNewKpi] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [showNewScorecard, setShowNewScorecard] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [scorecardName, setScorecardName] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [kpiForm, setKpiForm] = useState<KpiForm>(EMPTY_KPI_FORM);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [isSaving, setIsSaving] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [activeTab, setActiveTab] = useState("basic");
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: scorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const createScorecard = useCreateScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const createKpi = useCreateScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const updateKpi = useUpdateScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const deleteKpi = useDeleteScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: quarterTargets, refetch: refetchTargets } = useListQuarterTargets(selectedKpiId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const upsertTargets = useUpsertQuarterTargets();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [targetForm, setTargetForm] = useState({ q1: "", q2: "", q3: "", q4: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [targetBudgetForm, setTargetBudgetForm] = useState({ q1: "", q2: "", q3: "", q4: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [targetEvidenceForm, setTargetEvidenceForm] = useState({ q1: "", q2: "", q3: "", q4: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [selectedQuarter, setSelectedQuarter] = useState(1);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: activities, refetch: refetchActivities } = useListMonthActivities(
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const { data: tasks, refetch: refetchTasks } = useListMonthActivities(
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const createActivity = useCreateMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const updateActivity = useUpdateMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const deleteActivity = useDeleteMonthActivity();
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [activityForm, setActivityForm] = useState({ month: 7, description: "", dueDate: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [showNewActivity, setShowNewActivity] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [taskForm, setTaskForm] = useState({
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  const [showNewTask, setShowNewTask] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:                          {users?.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName}</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:                          {users?.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName}</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:                              {users?.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName}</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/scorecards/OrgKpiPlanning.tsx:                          const owner = users?.find(u => u.id === task.ownerId);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  useListScorecards, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  useListScorecardKpis, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  useListQuarterTargets, useListCycles, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [reviewComments, setReviewComments] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [kpiComments, setKpiComments] = useState<Record<number, string>>({});
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [showReturnDialog, setShowReturnDialog] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [returnReason, setReturnReason] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [isProcessing, setIsProcessing] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const { data: allScorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const [expanded, setExpanded] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviewSdbip.tsx:  const targetsQuery = useListQuarterTargets(expanded ? kpi.id : 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  useListScorecards, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  useListScorecardKpis, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  useListQuarterTargets, useListCycles, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [approvalComments, setApprovalComments] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [showReturnDialog, setShowReturnDialog] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [returnReason, setReturnReason] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [isProcessing, setIsProcessing] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const { data: allScorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const [expanded, setExpanded] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipApprove.tsx:  const targetsQuery = useListQuarterTargets(expanded ? kpi.id : 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:import { useState, useEffect } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useListScorecards, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useListScorecardKpis, useCreateScorecardKpi, useUpdateScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useDeleteScorecardKpi, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useListQuarterTargets, useUpsertQuarterTargets,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useListUnitsOfMeasure, useListUsers, useListCycles,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useListRevisionLogs, useCreateRevisionLogs,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: uoms } = useListUnitsOfMeasure();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [selectedKpiId, setSelectedKpiId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [showReopenConfirm, setShowReopenConfirm] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [showNewKpi, setShowNewKpi] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [activeTab, setActiveTab] = useState("kpis");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: allScorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: revisionLogs, refetch: refetchLogs } = useListRevisionLogs(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const createRevisionLogs = useCreateRevisionLogs();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:        users={users ?? []}
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:        users={users ?? []}
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  scorecardId, scorecardName, users, uoms, onBack, onCreated,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  scorecardId: number; scorecardName: string; users: any[]; uoms: any[];
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const createKpi = useCreateScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const createRevisionLogs = useCreateRevisionLogs();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [isSaving, setIsSaving] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [kpiForm, setKpiForm] = useState<KpiForm>(EMPTY_KPI_FORM);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:                  {users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName}</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:                  {users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.displayName}</SelectItem>)}
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  scorecardId, scorecardName, kpiId, kpis, users, uoms, onBack, onSaved,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  users: any[]; uoms: any[]; onBack: () => void; onSaved: () => void;
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const { data: quarterTargets, refetch: refetchTargets } = useListQuarterTargets(kpiId);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const upsertTargets = useUpsertQuarterTargets();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const updateKpi = useUpdateScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const createRevisionLogs = useCreateRevisionLogs();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [isSaving, setIsSaving] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [targetForm, setTargetForm] = useState({ q1: "", q2: "", q3: "", q4: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [revisionReasons, setRevisionReasons] = useState({ q1: "", q2: "", q3: "", q4: "" });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  const [annualTarget, setAnnualTarget] = useState(kpi?.annualTarget ?? "");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:  useEffect(() => {
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipCapture.tsx:                  <span className="font-medium">{log.userName}</span>
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  useListScorecards, useTransitionScorecard,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  useListScorecardKpis, useTransitionScorecardKpi,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  useListQuarterTargets, useListCycles, useListUsers,
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const { data: users } = useListUsers();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [selectedScorecardId, setSelectedScorecardId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [reviewComments, setReviewComments] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [kpiComments, setKpiComments] = useState<Record<number, string>>({});
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [showReturnDialog, setShowReturnDialog] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [returnReason, setReturnReason] = useState("");
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [isProcessing, setIsProcessing] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const { data: allScorecards, refetch: refetchScorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const kpisQuery = useListScorecardKpis(selectedScorecardId ?? 0);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const transitionScorecard = useTransitionScorecard();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const transitionKpi = useTransitionScorecardKpi();
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:    const u = users?.find(u => u.id === id);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const [expanded, setExpanded] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/scorecards/ReviseSdbipReview.tsx:  const targetsQuery = useListQuarterTargets(expanded ? kpi.id : 0);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  useListSdbipItems, useCreateSdbipItem, useUpdateSdbipItem,
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  useTransitionSdbipItem, useReviseSdbipItem, useListSdbipRevisions,
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  useGenerateSdbipFromKpis
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:import { useListCycles, useListScorecards } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [selectedCycleId, setSelectedCycleId] = useState<number | undefined>();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [showNew, setShowNew] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [showEdit, setShowEdit] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [showRevise, setShowRevise] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [showRevisions, setShowRevisions] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [newDesc, setNewDesc] = useState("");
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [editForm, setEditForm] = useState({ description: "", q1Target: "", q2Target: "", q3Target: "", q4Target: "" });
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const [reviseForm, setReviseForm] = useState({ reason: "", q1Target: "", q2Target: "", q3Target: "", q4Target: "" });
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const { data: items, refetch } = useListSdbipItems({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const { data: scorecards } = useListScorecards({ cycleId: effectiveCycleId });
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const revisionsQuery = useListSdbipRevisions(showRevisions ?? 0);
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const createItem = useCreateSdbipItem();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const updateItem = useUpdateSdbipItem();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const transitionItem = useTransitionSdbipItem();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const reviseItem = useReviseSdbipItem();
+.local/react-source/artifacts/perf-app/src/features/sdbip/SdbipOverview.tsx:  const generateFromKpis = useGenerateSdbipFromKpis();
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:import { useListCompetencyRequirements, useCreateCompetencyRequirement, useUpdateCompetencyRequirement, useListCycles, getListCompetencyRequirementsQueryKey } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const { data: requirements, isLoading } = useListCompetencyRequirements({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const createMut = useCreateCompetencyRequirement();
+.local/react-source/artifacts/perf-app/src/features/weightings/CompetencyRequirements.tsx:  const updateMut = useUpdateCompetencyRequirement();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:import { useState } from "react";
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:import { useListNkpaWeightings, useCreateNkpaWeighting, useUpdateNkpaWeighting, useDeleteNkpaWeighting, useListCycles, getListNkpaWeightingsQueryKey, type CreateNkpaWeightingInput } from "@workspace/api-client-react";
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:import { useQueryClient } from "@tanstack/react-query";
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:import { useToast } from "@/core/hooks/use-toast";
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const { data: cycles } = useListCycles();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const { data: weightings, isLoading } = useListNkpaWeightings({ cycleId: activeCycle?.id });
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const [isDialogOpen, setIsDialogOpen] = useState(false);
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const [editingId, setEditingId] = useState<number | null>(null);
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const deleteMut = useDeleteNkpaWeighting();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const qc = useQueryClient();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const { toast } = useToast();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const createMut = useCreateNkpaWeighting();
+.local/react-source/artifacts/perf-app/src/features/weightings/NkpaWeightings.tsx:  const updateMut = useUpdateNkpaWeighting();

@@ -1,0 +1,113 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - artifacts/perf-app/**
+      - lib/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  nodeVersion: '24.x'
+  artifactName: 'ui-drop'
+
+stages:
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD
+# ─────────────────────────────────────────────────────────────────────────────
+  - stage: Build
+    displayName: 'Build UI'
+    jobs:
+      - job: BuildJob
+        displayName: 'Install, build & stage'
+        steps:
+          - checkout: self
+
+          - task: NodeTool@0
+            displayName: 'Install Node.js $(nodeVersion)'
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              corepack enable
+              corepack prepare pnpm@10.33.4 --activate
+              pnpm --version
+            displayName: 'Install pnpm via corepack (pinned v10.33.4)'
+
+          - script: pnpm config set store-dir $(Pipeline.Workspace)/.pnpm-store
+            displayName: 'Configure pnpm store path'
+
+          - task: Cache@2
+            displayName: 'Cache pnpm store'
+            inputs:
+              key: 'pnpm | "$(Agent.OS)" | pnpm-lock.yaml'
+              restoreKeys: |
+                pnpm | "$(Agent.OS)"
+              path: $(Pipeline.Workspace)/.pnpm-store
+
+          - script: |
+              node -e "
+                const fs  = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                delete pkg.scripts.preinstall;
+                fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+                console.log('preinstall guard removed for CI');
+              "
+            displayName: 'Remove preinstall guard (CI only)'
+
+          - script: pnpm install --frozen-lockfile
+            displayName: 'Install dependencies'
+
+          - script: pnpm --filter @workspace/perf-app run build
+            displayName: 'Build Angular app (ng build --configuration production)'
+
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)/artifacts/perf-app/dist/perf-app
+              cp -r artifacts/perf-app/dist/perf-app/browser \
+                    $(Build.ArtifactStagingDirectory)/artifacts/perf-app/dist/perf-app/browser
+            displayName: 'Stage build output'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish pipeline artifact'
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: $(artifactName)
+              publishLocation: pipeline
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOY
+# ─────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: 'Deploy UI'
+    dependsOn: Build
+    jobs:
+      - deployment: DeployUI
+        displayName: 'Deploy to Platinum-Performance-UI'
+        environment: Production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadPipelineArtifact@2
+                  displayName: 'Download pipeline artifact'
+                  inputs:
+                    artifact: $(artifactName)
+                    path: $(Pipeline.Workspace)/drop
+
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure App Service (Linux)'
+                  inputs:
+                    azureSubscription: 'EMS_Dev (04293d85-6ede-4d45-b918-d9c5738950b9)'
+                    appType: webAppLinux
+                    appName: Platinum-Performance-UI
+                    package: $(Pipeline.Workspace)/drop
+                    startUpCommand: >
+                      npx http-server
+                      artifacts/perf-app/dist/perf-app/browser
+                      -p $PORT -a 0.0.0.0

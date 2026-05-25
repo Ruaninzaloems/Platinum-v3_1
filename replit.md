@@ -49,7 +49,9 @@ Login is bypassed. `AuthService` in `libs/shared/auth/` auto-creates an admin se
 | 3003 | POS API | Express / PostgreSQL |
 | 6000 | Payroll API | Express / Node.js |
 | 8008 | IDP API | .NET 10 / PostgreSQL |
-| 8080 | Insights API (artifact) | Express |
+| 8080 | IPH API server (artifact) | Express / tsx |
+| 8081 | IPH Mockup sandbox (artifact) | Vite / React |
+| 18156 | IPH Perf app (artifact) | Angular 21 |
 | 8099 | Overtime API | .NET / EF Core / PostgreSQL |
 | 9000 | AFS API | Express / PostgreSQL |
 
@@ -61,7 +63,8 @@ Login is bypassed. `AuthService` in `libs/shared/auth/` auto-creates an admin se
 - `/idp-api/*` → IDP API (8008)
 - `/budget-api/*` → Budget API (3001)
 - `/afs-api/*` → AFS API (9000)
-- `/insights-api/*` → Insights API (8080)
+- `/insights-api/*` → IPH API (8080)
+- `/perf-app/*` → IPH Perf app (18156)
 - `/overtime-app/api/*` → Overtime API (8099, rewrite → /api)
 
 ## Workflows (9 configured, 10 max)
@@ -71,11 +74,9 @@ Login is bypassed. `AuthService` in `libs/shared/auth/` auto-creates an admin se
 4. **IDP API** — `cd IDP-UI/PlatinumIDP && dotnet run` (port 8008)
 5. **SCM API** — `cd SCM-API && dotnet run` (port 3002)
 6. **Payroll API** — `cd PAYROLL-APP && node index.js` (port 6000)
-7. **Insight-Performance-Hub/artifacts/api-server** — pnpm dev (port 8080)
-8. **Insight-Performance-Hub/artifacts/perf-app** — pnpm dev (port 5173, separate React app)
-9. **Insight-Performance-Hub/artifacts/mockup-sandbox** — pnpm dev (component preview)
+7. **Sibling APIs** — `node start-apis.js` (spawns AFS API 9000, POS API 3003, Overtime API 8099, plus the 3 IPH artifacts: api-server 8080, mockup-sandbox 8081, perf-app 18156)
 
-AFS API (9000), POS API (3003), and Overtime API (8099) are spawned by `start-apis.js` at workspace root (run via `node start-apis.js` — launched as part of Backend API or manually).
+The 3 Insight-Performance-Hub artifacts no longer have dedicated Replit workflows — the platform workflow slot quota was exhausted, so they are launched as child processes by `start-apis.js`. To pick up upstream pulls, restart the **Sibling APIs** workflow.
 
 ## Database
 - Replit built-in PostgreSQL via `DATABASE_URL`
@@ -121,7 +122,10 @@ Overtime request management, policy configuration, rate management, approval wor
 - Shell auto-recompiles in watch mode on file changes
 - SCM API uses Azure endpoint — 401 errors expected without real JWT auth
 - NG8011 warning in AFS rolled-up-gl.component is cosmetic (Material content projection)
-- Insight-Performance-Hub is React/Vite — NOT part of Angular monorepo, runs separately
+- Insight-Performance-Hub is a separate pnpm workspace, NOT part of the Angular Nx monorepo
+  - `artifacts/api-server` — Express + tsx (port 8080)
+  - `artifacts/mockup-sandbox` — Vite + React (port 8081, requires `BASE_PATH` env)
+  - `artifacts/perf-app` — **Angular 21** (port 18156, `ng serve`) — upstream changed this from React/Vite in commit 90c1eed (2026-05-19); any iframe/proxy integration in `libs/ins/` that assumed Vite/React must be re-validated
 
 ## Dependencies
 - Angular 21.2, Angular Material, Tailwind CSS

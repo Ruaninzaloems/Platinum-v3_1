@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/perf-app run dev"
 
 [services.env]
 PORT = "18156"
-BASE_PATH = "/perf-app/"
+BASE_PATH = "/"
 
 [services.production]
 build = ["pnpm", "--filter", "@workspace/perf-app", "run", "build"]

@@ -1,0 +1,139 @@
+<section class="plat-page">
+  <ng-container *ngIf="selectedScorecardId() && selectedScorecard(); else queue">
+    <div class="detail-head">
+      <div class="left">
+        <button mat-button (click)="back()"><mat-icon>arrow_back</mat-icon> Back to Queue</button>
+        <div class="title-block">
+          <h2>Review: {{ selectedScorecard()!.name }}</h2>
+          <p>
+            Created by {{ userName(selectedScorecard()!.createdById) }}
+            · <app-status-badge [status]="selectedScorecard()!.status"></app-status-badge>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="plat-card stat"><div class="stat-label">Total KPIs</div><div class="stat-value">{{ kpis().length }}</div></div>
+      <div class="plat-card stat"><div class="stat-label">Reviewed</div><div class="stat-value tone-amber">{{ reviewedKpis().length }}</div></div>
+      <div class="plat-card stat"><div class="stat-label">Pending Review</div><div class="stat-value tone-blue">{{ submittedKpis().length }}</div></div>
+    </div>
+
+    <div class="plat-card">
+      <div class="card-head">
+        <h3>KPI Review</h3>
+        <p>Review each KPI individually, then mark the entire scorecard as reviewed.</p>
+      </div>
+      <div class="kpi-list">
+        <div *ngIf="kpis().length === 0" class="empty">No KPIs found for this scorecard.</div>
+        <div *ngFor="let k of kpis(); trackBy: trackById" class="kpi-card">
+          <div class="kpi-row">
+            <div class="kpi-body">
+              <div class="kpi-meta-top">
+                <span class="kpi-num">{{ k.kpiNumber }}</span>
+                <app-status-badge [status]="k.status"></app-status-badge>
+              </div>
+              <div class="kpi-desc">{{ k.description }}</div>
+              <div class="kpi-meta">
+                <span>Weight: {{ k.weighting }}%</span>
+                <span>Annual Target: {{ k.annualTarget }}</span>
+                <span *ngIf="k.baseline">Baseline: {{ k.baseline }}</span>
+                <span>Responsible: {{ userName(k.responsiblePostId) }}</span>
+              </div>
+              <div *ngIf="k.strategicObjective" class="kpi-strategic">Strategic Objective: {{ k.strategicObjective }}</div>
+            </div>
+            <button mat-button (click)="toggleExpand(k)">{{ expanded()[k.id] ? 'Collapse' : 'Expand' }}</button>
+          </div>
+
+          <div *ngIf="expanded()[k.id]" class="kpi-expand">
+            <div class="targets-row" *ngIf="kpiTargets()[k.id]?.length">
+              <div *ngFor="let q of [1,2,3,4]" class="qcell">
+                <div class="qlbl">Q{{ q }}</div>
+                <div class="qval">{{ targetForQuarter(k.id, q)?.targetValue || '—' }}</div>
+                <div *ngIf="targetForQuarter(k.id, q)?.budgetValue != null" class="qbudget">
+                  Budget: R{{ targetForQuarter(k.id, q)!.budgetValue!.toLocaleString() }}
+                </div>
+              </div>
+            </div>
+
+            <ng-container *ngIf="k.status === 'Submitted'">
+              <mat-form-field appearance="outline" class="comment">
+                <mat-label>Review comments for this KPI</mat-label>
+                <textarea matInput rows="2" [ngModel]="kpiComments[k.id] || ''" (ngModelChange)="setComment(k.id, $event)"></textarea>
+              </mat-form-field>
+              <div class="kpi-actions">
+                <button mat-flat-button color="primary" [disabled]="isProcessing()" (click)="reviewKpi(k.id, 'review')">
+                  <mat-icon>check_circle</mat-icon> Mark Reviewed
+                </button>
+                <button mat-stroked-button color="warn" [disabled]="isProcessing()" (click)="reviewKpi(k.id, 'return')">
+                  <mat-icon>cancel</mat-icon> Return
+                </button>
+              </div>
+            </ng-container>
+
+            <div *ngIf="k.status === 'Reviewed'" class="status-line tone-amber">
+              <mat-icon>check_circle</mat-icon> Reviewed
+            </div>
+            <div *ngIf="k.status === 'Approved'" class="status-line tone-green">
+              <mat-icon>check_circle</mat-icon> Approved
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plat-card decision-card amber" *ngIf="selectedScorecard()!.status === 'Submitted'">
+      <div class="card-head">
+        <h3><mat-icon>fact_check</mat-icon> Scorecard Review Decision</h3>
+        <p>{{ allKpisReviewed()
+          ? 'All KPIs have been reviewed. You may now mark the scorecard as Reviewed.'
+          : (submittedKpis().length + ' KPI(s) still pending review. Review all KPIs before marking the scorecard.') }}</p>
+      </div>
+      <mat-form-field appearance="outline">
+        <mat-label>Review Comments (Optional)</mat-label>
+        <textarea matInput rows="3" [(ngModel)]="reviewComments" placeholder="Add any overall review comments..."></textarea>
+      </mat-form-field>
+      <div class="decision-actions">
+        <button mat-flat-button color="primary" [disabled]="!allKpisReviewed() || isProcessing()" (click)="reviewScorecard()">
+          <mat-icon>check_circle</mat-icon> Mark as Reviewed
+        </button>
+        <button mat-stroked-button color="warn" [disabled]="isProcessing()" (click)="returnScorecard()">
+          <mat-icon>cancel</mat-icon> Return to Draft
+        </button>
+      </div>
+    </div>
+  </ng-container>
+
+  <ng-template #queue>
+    <app-page-header title="Review SDBIP" subtitle="PMS Manager — review submitted scorecards before forwarding for Director approval." icon="fact_check" tone="orange">
+      <mat-form-field *ngIf="cycles().length > 0" appearance="outline" class="cycle-pick" subscriptSizing="dynamic">
+        <mat-label>Cycle</mat-label>
+        <mat-select [ngModel]="effectiveCycleId()" (ngModelChange)="selectCycle($event)">
+          <mat-option *ngFor="let c of cycles(); trackBy: trackById" [value]="c.id">{{ c.financialYearLabel }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </app-page-header>
+
+    <app-loading-spinner *ngIf="loading()"></app-loading-spinner>
+
+    <ng-container *ngIf="!loading()">
+      <div *ngIf="scorecards().length > 0; else noPending" class="queue-list">
+        <div *ngFor="let sc of scorecards(); trackBy: trackById" class="plat-card queue-card" (click)="openScorecard(sc)">
+          <div class="qc-body">
+            <h3>{{ sc.name }}</h3>
+            <p>Created by {{ userName(sc.createdById) }} · {{ formatDate(sc.createdAt) }}</p>
+          </div>
+          <div class="qc-right">
+            <app-status-badge [status]="sc.status"></app-status-badge>
+            <button mat-stroked-button color="primary"><mat-icon>visibility</mat-icon> Review</button>
+          </div>
+        </div>
+      </div>
+      <ng-template #noPending>
+        <div class="plat-card">
+          <app-empty-state icon="fact_check" title="No Scorecards Pending Review" message="All submitted scorecards have been reviewed for this cycle."></app-empty-state>
+        </div>
+      </ng-template>
+    </ng-container>
+  </ng-template>
+</section>

@@ -61,8 +61,11 @@ catalog:
 autoInstallPeers: false
 
 onlyBuiltDependencies:
+  - '@parcel/watcher'
   - '@swc/core'
   - esbuild
+  - lmdb
+  - msgpackr-extract
   - msw
   - unrs-resolver
 
