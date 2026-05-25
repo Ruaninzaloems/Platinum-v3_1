@@ -20,6 +20,7 @@
           "builder": "@angular/build:application",
           "options": {
             "outputPath": "dist/perf-app",
+            "baseHref": "/perf-app/",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
@@ -52,7 +53,8 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "allowedHosts": true
+            "allowedHosts": true,
+            "servePath": "/perf-app/"
           },
           "configurations": {
             "production": { "buildTarget": "perf-app:build:production" },
