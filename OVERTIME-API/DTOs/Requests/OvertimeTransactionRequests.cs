@@ -1,5 +1,10 @@
 namespace PlatinumOvertime_API.DTOs.Requests;
 
+public class UploadDocumentRequest
+{
+    public IFormFile File { get; set; } = null!;
+}
+
 public class CreateOvertimeTransactionRequest
 {
     public string EmployeeId { get; set; } = string.Empty;
@@ -17,6 +22,12 @@ public class CreateOvertimeTransactionRequest
     // the employee master and must not be stored on the transaction.
     public int? LegacyDepartmentId { get; set; }
     public int? LegacyDivisionId { get; set; }
+
+    /// <summary>
+    /// When true the same-date duplicate check is skipped.
+    /// The UI sets this after the user confirms the warning dialog.
+    /// </summary>
+    public bool SkipDuplicateDateCheck { get; set; }
 }
 
 public class UpdateOvertimeTransactionRequest
@@ -30,6 +41,12 @@ public class UpdateOvertimeTransactionRequest
 
     public int? LegacyDepartmentId { get; set; }
     public int? LegacyDivisionId { get; set; }
+
+    /// <summary>
+    /// When true the same-date duplicate check is skipped.
+    /// The UI sets this after the user confirms the warning dialog.
+    /// </summary>
+    public bool SkipDuplicateDateCheck { get; set; }
 }
 
 public class WorkflowActionRequest

@@ -11,6 +11,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// spreadsheet. In production (SQL Server) this seeder is a no-op because
 /// the real table is owned by Platinum Payroll. Run after
 /// <see cref="ConstDepartmentSeeder"/> so DepartmentID references resolve.
+///
+/// All date columns are datetime in production. JSON seed export contains
+/// OADate serial numbers; OADateJsonConverter handles conversion to DateTime.
+/// DirectorateLevel is bit in production (not int).
 /// </summary>
 public class ConstDivisionSeeder
 {
@@ -45,25 +49,41 @@ public class ConstDivisionSeeder
                 ""DepartmentID""            integer,
                 ""DivisionParentID""        integer,
                 ""Enabled""                 boolean,
-                ""DateCaptured""            decimal(18,8),
+                ""DateCaptured""            timestamp,
                 ""CapturerID""              integer,
-                ""DateModified""            decimal(18,8),
+                ""DateModified""            timestamp,
                 ""ModifierID""              integer,
                 ""SCOAFunctionID""          integer,
                 ""HRPayrollSCOAFundID""     integer,
-                ""StartDate""               decimal(18,8),
-                ""EndDate""                 decimal(18,8),
+                ""StartDate""               timestamp,
+                ""EndDate""                 timestamp,
                 ""RegionID""                integer,
                 ""ProjectID""               integer,
                 ""ManagerPositionID""       integer,
-                ""ManagerStartDate""        decimal(18,8),
-                ""ManagerEndDate""          decimal(18,8),
+                ""ManagerStartDate""        timestamp,
+                ""ManagerEndDate""          timestamp,
                 ""ConditionOfServiceID""    integer,
-                ""DirectorateLevel""        integer,
+                ""DirectorateLevel""        boolean,
                 ""FinYear""                 varchar(32)
             );
             CREATE INDEX IF NOT EXISTS ix_const_division_dept
                 ON ""Const_Division"" (""DepartmentID"");", ct);
+
+        // Migrate existing table if columns were previously created with wrong types.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Const_Division' AND column_name='DateCaptured') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""DateCaptured""    TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""DateModified""    TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""StartDate""       TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""EndDate""         TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""ManagerStartDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""ManagerEndDate""  TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Division"" ALTER COLUMN ""DirectorateLevel"" TYPE boolean USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Const_Division""';
+                END IF;
+            END $$;", ct);
 
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "const_division.json");
         if (!File.Exists(path))
@@ -72,9 +92,14 @@ public class ConstDivisionSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<ConstDivision>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<ConstDivision>();
+        var rows = await JsonSerializer.DeserializeAsync<List<ConstDivision>>(fs, opts, ct) ?? new List<ConstDivision>();
         if (rows.Count == 0)
         {
             _log.LogWarning("Const_Division seed file at {Path} contained no rows.", path);

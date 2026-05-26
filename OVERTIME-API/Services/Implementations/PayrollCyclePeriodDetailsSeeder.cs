@@ -11,6 +11,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// supplied spreadsheet. In production (SQL Server) this seeder is a no-op
 /// because the real table is owned by Platinum Payroll. Run after
 /// <see cref="ConstCycleSeeder"/> so CycleID references resolve.
+///
+/// All date columns are datetime in production. JSON seed export contains
+/// OADate serial numbers; OADateJsonConverter handles conversion to DateTime.
+/// ApprovedStatus is nvarchar in production (not int).
 /// </summary>
 public class PayrollCyclePeriodDetailsSeeder
 {
@@ -42,32 +46,32 @@ public class PayrollCyclePeriodDetailsSeeder
                 ""Period_ID""                  integer PRIMARY KEY,
                 ""PeriodInTaxYear""            integer,
                 ""ProcessingMonth""            varchar(64),
-                ""PeriodStartDate""            decimal(18,8),
-                ""PeriodEndDate""              decimal(18,8),
+                ""PeriodStartDate""            timestamp,
+                ""PeriodEndDate""              timestamp,
                 ""Processed""                  boolean,
                 ""MunicipalityID""             integer,
                 ""FinancialYear""              varchar(32),
                 ""Enabled""                    boolean,
-                ""DateCaptured""               decimal(18,8),
+                ""DateCaptured""               timestamp,
                 ""CapturerID""                 integer,
-                ""DateModified""               decimal(18,8),
+                ""DateModified""               timestamp,
                 ""ModifierID""                 integer,
                 ""CycleID""                    integer,
-                ""ProcessedDate""              decimal(18,8),
+                ""ProcessedDate""              timestamp,
                 ""PayrollEFTFileName""         varchar(500),
                 ""CycleModeID""                integer,
                 ""LockedDown""                 boolean,
-                ""LockDownDate""               decimal(18,8),
+                ""LockDownDate""               timestamp,
                 ""LockedDownBy""               integer,
                 ""LockdownCancelledBy""        integer,
-                ""ApprovedDate""               decimal(18,8),
+                ""ApprovedDate""               timestamp,
                 ""ApprovedBy""                 integer,
-                ""FinalRunDate""               decimal(18,8),
+                ""FinalRunDate""               timestamp,
                 ""FinalRunExecutedBy""         integer,
                 ""Reason""                     varchar(2000),
-                ""LockDownCancelledDate""      decimal(18,8),
-                ""ApprovedStatus""             integer,
-                ""TrialRunDate""               decimal(18,8),
+                ""LockDownCancelledDate""      timestamp,
+                ""ApprovedStatus""             varchar(64),
+                ""TrialRunDate""               timestamp,
                 ""TrialRunBy""                 integer,
                 ""TaxYear""                    varchar(32),
                 ""AdhocTypeID""                integer,
@@ -76,6 +80,26 @@ public class PayrollCyclePeriodDetailsSeeder
             CREATE INDEX IF NOT EXISTS ix_payroll_cycle_period_cycle
                 ON ""Payroll_CyclePeriodDetails"" (""CycleID"");", ct);
 
+        // Migrate existing table if columns were previously created with wrong types.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Payroll_CyclePeriodDetails' AND column_name='PeriodStartDate') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""PeriodStartDate""       TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""PeriodEndDate""         TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""DateCaptured""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""DateModified""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""ProcessedDate""         TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""LockDownDate""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""ApprovedDate""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""FinalRunDate""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""LockDownCancelledDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""TrialRunDate""          TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Payroll_CyclePeriodDetails"" ALTER COLUMN ""ApprovedStatus""        TYPE varchar(64) USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Payroll_CyclePeriodDetails""';
+                END IF;
+            END $$;", ct);
+
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "payroll_cycle_period_details.json");
         if (!File.Exists(path))
         {
@@ -83,9 +107,14 @@ public class PayrollCyclePeriodDetailsSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<PayrollCyclePeriodDetails>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<PayrollCyclePeriodDetails>();
+        var rows = await JsonSerializer.DeserializeAsync<List<PayrollCyclePeriodDetails>>(fs, opts, ct) ?? new List<PayrollCyclePeriodDetails>();
         if (rows.Count == 0)
         {
             _log.LogWarning("Payroll_CyclePeriodDetails seed file at {Path} contained no rows.", path);

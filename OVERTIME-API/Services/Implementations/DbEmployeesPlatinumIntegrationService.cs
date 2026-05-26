@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.DTOs.Responses;
+using PlatinumOvertime_API.Models.Common;
 using PlatinumOvertime_API.Models.Domain;
 using PlatinumOvertime_API.Services.Interfaces;
 
@@ -22,13 +24,18 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
 {
     private readonly IPlatinumIntegrationService _inner;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _cache;
+
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
     public DbEmployeesPlatinumIntegrationService(
         IPlatinumIntegrationService inner,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache cache)
     {
         _inner = inner;
         _scopeFactory = scopeFactory;
+        _cache = cache;
     }
 
     // Positions, departments — pass through to the wrapped service.
@@ -41,7 +48,7 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
     public Task<List<DepartmentDto>> GetDepartmentsAsync(CancellationToken ct = default)
         => _inner.GetDepartmentsAsync(ct);
 
-    public Task<Models.Common.PaginatedResponse<PositionListItemDto>> GetPositionsListAsync(
+    public Task<PaginatedResponse<PositionListItemDto>> GetPositionsListAsync(
         string? search, string? status, int page, int pageSize,
         string? sort = null, string? sortDirection = null, CancellationToken ct = default)
         => _inner.GetPositionsListAsync(search, status, page, pageSize, sort, sortDirection, ct);
@@ -51,6 +58,10 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
 
     public async Task<List<EmployeeDto>> GetEmployeesAsync(string? search = null, CancellationToken ct = default)
     {
+        var cacheKey = $"employees:{(string.IsNullOrWhiteSpace(search) ? "all" : search.Trim().ToLowerInvariant())}";
+        if (_cache.TryGetValue(cacheKey, out List<EmployeeDto>? cached) && cached is not null)
+            return cached;
+
         // New scope so this singleton service can use the scoped DbContext.
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
@@ -78,6 +89,7 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
                 var t = tok;
                 q = q.Where(e =>
                     e.EmployeeId.ToString().Contains(t) ||
+                    (e.PositionId != null && e.PositionId.ToString().Contains(t)) ||
                     (e.Surname != null && e.Surname.ToLower().Contains(t)) ||
                     (e.FirstName != null && e.FirstName.ToLower().Contains(t)) ||
                     (e.KnownAsName != null && e.KnownAsName.ToLower().Contains(t)));
@@ -105,8 +117,10 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
             : joined.OrderBy(r => r.emp.Surname).ThenBy(r => r.emp.FirstName);
 
         var rows = await ordered.ToListAsync(ct);
+        var result = rows.Select(r => Map(r.emp, r.pos, r.dept, r.div)).ToList();
 
-        return rows.Select(r => Map(r.emp, r.pos, r.dept, r.div)).ToList();
+        _cache.Set(cacheKey, result, CacheTtl);
+        return result;
     }
 
     public async Task<EmployeeDto?> GetEmployeeAsync(string employeeId, CancellationToken ct = default)

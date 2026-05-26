@@ -36,8 +36,12 @@ public class OvertimeTransactionDto
     public string StatusLabel { get; set; } = string.Empty;
 
     public string? RecommenderEmployeeName { get; set; }
+    public string? RecommenderPositionDescription { get; set; }
     public string? ApproverEmployeeName { get; set; }
+    public string? ApproverPositionDescription { get; set; }
+    public string? ExcessApproverEmployeeId { get; set; }
     public string? ExcessApproverEmployeeName { get; set; }
+    public string? ExcessApproverPositionDescription { get; set; }
     public string? PayrollCapturerEmployeeName { get; set; }
     public string? PayrollApproverEmployeeName { get; set; }
 

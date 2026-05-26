@@ -1,22 +1,23 @@
 namespace PlatinumOvertime_API.Services.Interfaces;
 
 /// <summary>
-/// Lightweight authentication shim for the dev environment. The real Platinum
-/// SSO is replaced with an X-User-Id header that selects one of a small set
-/// of in-memory test users (see DevUserDirectory). The same interface will be
-/// implemented over Active Directory / OAuth in production without any
-/// service-layer changes.
+/// Provides the identity of the currently authenticated user.
+/// Implemented by <c>SessionCurrentUserService</c> (session-cookie auth)
+/// and the legacy <c>DevCurrentUserService</c> (X-User-Id header shim).
 /// </summary>
 public interface ICurrentUserService
 {
+    /// <summary>True when the current request carries a valid authenticated session.</summary>
+    bool IsAuthenticated { get; }
+
     DevUser Current { get; }
     DevUser? FindByUserId(string userId);
     IReadOnlyList<DevUser> AllUsers { get; }
 }
 
 /// <summary>
-/// In-memory test user. Roles are flagged independently because the spec
-/// allows one person to wear several hats (e.g. Capturer + Recommender).
+/// Resolved user profile. Role flags are derived from PositionApprovalConfig
+/// and Sys_RolePermission; they drive both UI visibility and API authorisation.
 /// </summary>
 public class DevUser
 {

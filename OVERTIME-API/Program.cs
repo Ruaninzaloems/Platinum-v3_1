@@ -1,7 +1,10 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PlatinumOvertime_API.Configuration;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Mappings;
@@ -15,6 +18,12 @@ using PlatinumOvertime_API.Validators;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Honour the PORT env var injected by Azure App Service (and Replit).
+// Falls back to ASP.NET Core's default behaviour when not set.
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // ---------- Serilog ----------
 builder.Host.UseSerilog((ctx, cfg) => cfg
@@ -48,7 +57,9 @@ if (string.Equals(dbProvider, "Postgres", StringComparison.OrdinalIgnoreCase))
 }
 else
 {
-    builder.Services.AddDbContext<OvertimeDbContextSqlServer>(opts => opts.UseSqlServer(connStr));
+    builder.Services.AddDbContext<OvertimeDbContextSqlServer>(opts => opts
+        .UseSqlServer(connStr)
+        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
     builder.Services.AddScoped<OvertimeDbContext>(sp => sp.GetRequiredService<OvertimeDbContextSqlServer>());
 }
 
@@ -75,6 +86,33 @@ static string? ResolvePostgresConnectionString()
     var pgPwd = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
     return $"Host={host};Port={port};Database={db};Username={pgUser};Password={pgPwd};SSL Mode=Disable;Trust Server Certificate=true";
 }
+
+// ---------- In-memory cache (used by DbEmployeesPlatinumIntegrationService) ----------
+builder.Services.AddMemoryCache();
+
+// ---------- Data Protection (session cookie encryption keys) ----------
+// On Azure App Service, %HOME%\site persists across restarts and is shared
+// across all instances of the same app, so keys survive deployments and
+// scale-out. Locally, HOME is not set and we fall back to a temp path.
+var dpKeysPath = Path.Combine(
+    Environment.GetEnvironmentVariable("HOME") ?? Path.GetTempPath(),
+    "site", "dataprotection-keys");
+Directory.CreateDirectory(dpKeysPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath))
+    .SetApplicationName("PlatinumOvertime");
+
+// ---------- Session (server-side auth cookie for Platinum credentials) ----------
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(opts =>
+{
+    opts.IdleTimeout = TimeSpan.FromHours(8);
+    opts.Cookie.HttpOnly  = true;
+    opts.Cookie.SameSite  = SameSiteMode.None;  // cross-origin (Angular on different Azure subdomain)
+    opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    opts.Cookie.IsEssential = true;
+    opts.Cookie.Name = ".PlatinumOT.Session";
+});
 
 // ---------- Integration boundary ----------
 // Mock implementation today; swap for a typed HttpClient once Platinum API URLs are supplied.
@@ -107,7 +145,8 @@ if (integrationOptions.UseMock || string.IsNullOrWhiteSpace(integrationOptions.B
         {
             inner = new DbEmployeesPlatinumIntegrationService(
                 inner,
-                sp.GetRequiredService<IServiceScopeFactory>());
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IMemoryCache>());
         }
         return inner;
     });
@@ -124,7 +163,6 @@ else
 // ---------- Dev seeders for legacy Payroll_* tables ----------
 builder.Services.AddScoped<PositionDataSeeder>();
 builder.Services.AddScoped<EmployeeDataSeeder>();
-builder.Services.AddScoped<OrgChartSeeder>();
 builder.Services.AddScoped<SalaryHeadDataSeeder>();
 builder.Services.AddScoped<AAAAConfigSettingsSeeder>();
 builder.Services.AddScoped<ConstCycleSeeder>();
@@ -139,10 +177,10 @@ builder.Services.AddScoped<PayrollEmployeeOvertimeSeeder>();
 // ---------- Schema upgrader for OvertimeTransaction (idempotent ALTERs) ----------
 builder.Services.AddScoped<OvertimeCaptureSchemaUpgrader>();
 
-// ---------- Current-user shim (X-User-Id header → DevUserDirectory) ----------
+// ---------- Current-user identity (session-cookie auth) ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DevUserDirectory>();
-builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
+builder.Services.AddScoped<ICurrentUserService, SessionCurrentUserService>();
 
 // ---------- Overtime amount + formula + assignee resolver ----------
 builder.Services.AddSingleton<FormulaEvaluator>();
@@ -192,7 +230,13 @@ builder.Services.AddCors(opts =>
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+builder.Services.AddControllers(opts =>
+{
+    // Enforce session authentication on every controller action globally.
+    // Opt out on specific actions with [SkipSessionAuth].
+    opts.Filters.Add<SessionAuthFilter>();
+});
 
 // Wrap model-validation failures in ApiResponse<T> instead of ProblemDetails.
 builder.Services.Configure<ApiBehaviorOptions>(opts =>
@@ -215,54 +259,67 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // ---------- Bootstrap schema ----------
-// Both providers carry their own EF migration set:
-//   Data/Migrations/Postgres/  — applied at runtime in dev
-//   Data/Migrations/SqlServer/ — applied at runtime in prod, also exported as
-//                                database/sqlserver/001_initial.sql for DBA use.
-// Fail fast on startup if schema migration or required dev seeding fails:
-// it is much safer to refuse to serve than to silently run with a broken DB.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
-    db.Database.Migrate();
+    // Migrations are only the source of truth for Postgres. SQL Server schema
+    // is delivered via database/sqlserver/001_initial.sql and the DB user
+    // typically lacks DDL permissions, so skip migrations on SQL Server.
+    if (!string.Equals(dbProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+        db.Database.Migrate();
 
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var skipSeeding = app.Configuration.GetValue<bool>("Seeding:SkipOnStartup");
-
-    async Task RunSeeder(string name, Func<Task> action)
+    var skipSeeding = builder.Configuration.GetValue<bool>("Seeding:SkipOnStartup");
+    if (!app.Environment.IsDevelopment() || skipSeeding)
     {
-        try { await action(); }
-        catch (Exception ex) { logger.LogWarning(ex, "Seeder {Name} failed (non-fatal); API will continue without this seed data.", name); }
-    }
-
-    if (skipSeeding)
-    {
-        logger.LogInformation("Seeding:SkipOnStartup=true — skipping all dev data seeders.");
-        await RunSeeder("OvertimeCaptureSchema", () => scope.ServiceProvider.GetRequiredService<OvertimeCaptureSchemaUpgrader>().UpgradeAsync());
+        if (skipSeeding)
+            Console.WriteLine("[Seeding] SkipOnStartup=true — skipping all dev data seeders.");
     }
     else
     {
-        await RunSeeder("PositionData", () => scope.ServiceProvider.GetRequiredService<PositionDataSeeder>().SeedIfNeededAsync());
-        await RunSeeder("EmployeeData", () => scope.ServiceProvider.GetRequiredService<EmployeeDataSeeder>().SeedIfNeededAsync());
-        await RunSeeder("OrgChart", () => scope.ServiceProvider.GetRequiredService<OrgChartSeeder>().SeedIfNeededAsync());
-        await RunSeeder("SalaryHead", () => scope.ServiceProvider.GetRequiredService<SalaryHeadDataSeeder>().SeedIfNeededAsync());
-        await RunSeeder("AAAAConfigSettings", () => scope.ServiceProvider.GetRequiredService<AAAAConfigSettingsSeeder>().SeedIfNeededAsync());
-        await RunSeeder("ConstCycle", () => scope.ServiceProvider.GetRequiredService<ConstCycleSeeder>().SeedIfNeededAsync());
-        await RunSeeder("ConstDepartment", () => scope.ServiceProvider.GetRequiredService<ConstDepartmentSeeder>().SeedIfNeededAsync());
-        await RunSeeder("ConstDivision", () => scope.ServiceProvider.GetRequiredService<ConstDivisionSeeder>().SeedIfNeededAsync());
-        await RunSeeder("PayrollCyclePeriodDetails", () => scope.ServiceProvider.GetRequiredService<PayrollCyclePeriodDetailsSeeder>().SeedIfNeededAsync());
-        await RunSeeder("UserUserDetail", () => scope.ServiceProvider.GetRequiredService<UserUserDetailSeeder>().SeedIfNeededAsync());
-        await RunSeeder("UserUserRole", () => scope.ServiceProvider.GetRequiredService<UserUserRoleSeeder>().SeedIfNeededAsync());
-        await RunSeeder("SysRolePermission", () => scope.ServiceProvider.GetRequiredService<SysRolePermissionSeeder>().SeedIfNeededAsync());
-        await RunSeeder("PayrollEmployeeOvertime", () => scope.ServiceProvider.GetRequiredService<PayrollEmployeeOvertimeSeeder>().SeedIfNeededAsync());
-        await RunSeeder("OvertimeCaptureSchema", () => scope.ServiceProvider.GetRequiredService<OvertimeCaptureSchemaUpgrader>().UpgradeAsync());
+        // Dev-only: ensure the legacy Payroll_* tables exist in Postgres and are
+        // populated with the supplied datasets. No-op on SQL Server.
+        var positionSeeder = scope.ServiceProvider.GetRequiredService<PositionDataSeeder>();
+        await positionSeeder.SeedIfNeededAsync();
+
+        var employeeSeeder = scope.ServiceProvider.GetRequiredService<EmployeeDataSeeder>();
+        await employeeSeeder.SeedIfNeededAsync();
+
+
+        // Legacy salary-head reference tables (Payroll_SalaryHead etc.) — dev only.
+        var salaryHeadSeeder = scope.ServiceProvider.GetRequiredService<SalaryHeadDataSeeder>();
+        await salaryHeadSeeder.SeedIfNeededAsync();
+
+        // Legacy AAAA / Const_* / cycle-period / user reference tables — dev only.
+        // Order respects logical FK ordering: Departments before Divisions,
+        // Cycles before CyclePeriodDetails. No real DB FKs are added because
+        // these are read-only projections.
+        await scope.ServiceProvider.GetRequiredService<AAAAConfigSettingsSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<ConstCycleSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<ConstDepartmentSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<ConstDivisionSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<PayrollCyclePeriodDetailsSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<UserUserDetailSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<UserUserRoleSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<SysRolePermissionSeeder>().SeedIfNeededAsync();
+        await scope.ServiceProvider.GetRequiredService<PayrollEmployeeOvertimeSeeder>().SeedIfNeededAsync();
     }
+
+    // Idempotent ALTER TABLE for OvertimeTransaction's new columns. Runs in
+    // both dev (Postgres) and prod (SqlServer) so the schema upgrade ships
+    // without an EF migration.
+    var schemaUpgrader = scope.ServiceProvider.GetRequiredService<OvertimeCaptureSchemaUpgrader>();
+    await schemaUpgrader.UpgradeAsync();
 }
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors();
+app.UseSession();
 
 if (app.Environment.IsDevelopment())
 {
@@ -272,6 +329,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthorization();
 app.MapControllers();
+
+// Warm up the DevUserDirectory in the background so the first /api/me
+// request after startup doesn't pay the ~200ms initialisation cost.
+_ = Task.Run(() =>
+{
+    try { app.Services.GetRequiredService<DevUserDirectory>().All.Count.ToString(); }
+    catch { /* non-critical — directory will still load lazily on first request */ }
+});
 
 app.Run();
 

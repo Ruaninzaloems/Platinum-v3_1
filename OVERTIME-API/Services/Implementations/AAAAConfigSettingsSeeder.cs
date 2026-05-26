@@ -10,6 +10,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// exists in the dev Postgres database and is populated from the supplied
 /// spreadsheet. In production (SQL Server) this seeder is a no-op because
 /// the real table is owned by Platinum Payroll.
+///
+/// DateCaptured is datetime in production. JSON seed export contains OADate
+/// serial numbers; OADateJsonConverter handles conversion to DateTime.
+/// perMuni_SetupRequirements is bit in production (not int).
 /// </summary>
 public class AAAAConfigSettingsSeeder
 {
@@ -43,10 +47,26 @@ public class AAAAConfigSettingsSeeder
                 ""KeyValue""                   varchar(2000),
                 ""KeyDescription""             varchar(2000),
                 ""Module""                     varchar(200),
-                ""DateCaptured""               decimal(18,8),
+                ""DateCaptured""               timestamp,
                 ""CapturerID""                 integer,
-                ""perMuni_SetupRequirements""  integer
+                ""perMuni_SetupRequirements""  boolean
             );", ct);
+
+        // Migrate existing table if columns were previously created with wrong types.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='AAAA_ConfigSettings' AND column_name='DateCaptured') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""AAAA_ConfigSettings"" ALTER COLUMN ""DateCaptured""             TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""AAAA_ConfigSettings"" ALTER COLUMN ""perMuni_SetupRequirements"" TYPE boolean USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""AAAA_ConfigSettings""';
+                END IF;
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='AAAA_ConfigSettings' AND column_name='perMuni_SetupRequirements') = 'integer' THEN
+                    EXECUTE 'ALTER TABLE ""AAAA_ConfigSettings"" ALTER COLUMN ""perMuni_SetupRequirements"" TYPE boolean USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""AAAA_ConfigSettings""';
+                END IF;
+            END $$;", ct);
 
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "aaaa_config_settings.json");
         if (!File.Exists(path))
@@ -55,9 +75,14 @@ public class AAAAConfigSettingsSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter(), new NullableIntToBoolJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<AAAAConfigSettings>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<AAAAConfigSettings>();
+        var rows = await JsonSerializer.DeserializeAsync<List<AAAAConfigSettings>>(fs, opts, ct) ?? new List<AAAAConfigSettings>();
         if (rows.Count == 0)
         {
             _log.LogWarning("AAAA_ConfigSettings seed file at {Path} contained no rows.", path);

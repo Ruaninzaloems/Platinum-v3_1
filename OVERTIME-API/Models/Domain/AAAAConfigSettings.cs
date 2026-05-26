@@ -8,6 +8,11 @@ namespace PlatinumOvertime_API.Models.Domain;
 /// active tax year, etc.) consumed by the Platinum suite. The overtime
 /// module will read selected keys (e.g. ActiveFinYear, TaxYear) without
 /// writing to this table.
+///
+/// Production SQL Server column types (verified 2026-05-11):
+///   ConfigSett_ID int, KeyName varchar, KeyValue varchar,
+///   KeyDescription varchar, Module varchar, DateCaptured datetime,
+///   CapturerID int, perMuni_SetupRequirements bit.
 /// </summary>
 public class AAAAConfigSettings
 {
@@ -16,10 +21,7 @@ public class AAAAConfigSettings
     public string? KeyValue { get; set; }
     public string? KeyDescription { get; set; }
     public string? Module { get; set; }
-
-    /// <summary>Excel-serial date in dev; real datetime2 in prod.</summary>
-    public decimal? DateCaptured { get; set; }
-
+    public DateTime? DateCaptured { get; set; }
     public int? CapturerId { get; set; }
-    public int? PerMuniSetupRequirements { get; set; }
+    public bool? PerMuniSetupRequirements { get; set; }
 }

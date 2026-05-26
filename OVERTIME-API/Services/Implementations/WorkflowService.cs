@@ -12,15 +12,19 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// Multi-stage approval workflow:
 ///   Requested → (Recommender) → Recommended
 ///             → (Approver) → ApprovedForPayment
-///             → (ExcessApprover, only if IsExcess) → ApprovedForPayment*
-///             → (PayrollCapturer) → AwaitingPayrollApproval
-///             → (PayrollApprover) → Processed
+///             → (ExcessApprover, only if IsExcess AND ExcessApproverEmployeeId set) → ApprovedForPayment*
+///             → AwaitingPayrollApproval (open queue — any payroll user)
+///             → Processed
 ///
 /// Submit/Approve advance one step. Return sets state to Returned and routes
 /// the row back to the original capturer for edits. Reject is terminal.
 /// Auto-approve fires when the resolved next assignee is the current user
 /// (e.g. capturer is also the recommender), looping until either a different
 /// assignee is hit or a terminal state is reached.
+///
+/// Payroll stages use CurrentAssigneeUserId=null (open queue): any user with
+/// CanAccessPayroll permission can act. The dashboard queries by permission
+/// rather than CurrentAssigneeUserId for these two stages.
 /// </summary>
 public class WorkflowService : IWorkflowService
 {
@@ -67,6 +71,7 @@ public class WorkflowService : IWorkflowService
         var tx = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tx is null) return ApiResponse<OvertimeTransactionDto>.Failure("Overtime transaction not found.");
 
@@ -74,16 +79,20 @@ public class WorkflowService : IWorkflowService
             return ApiResponse<OvertimeTransactionDto>.Failure("Transaction is already in a terminal state.");
 
         // Action-specific authorisation:
-        //   Submit  → only the original capturer, only when the row is in
-        //             Requested or Returned (it's been kicked back for edits).
-        //   Approve / Return → only the currently-assigned approver.
-        //   Reject  → the current assignee OR the original capturer when the
-        //             transaction is still at Requested or Returned stage
-        //             (allows a capturer to cancel their own draft or a
-        //             returned transaction without needing to be the assignee).
-        var meId = _user.Current.UserId;
-        var isCapturer = string.Equals(tx.CapturedBy, meId, StringComparison.OrdinalIgnoreCase);
-        var isAssignee = string.Equals(tx.CurrentAssigneeUserId, meId, StringComparison.OrdinalIgnoreCase);
+        //   Submit        → only the original capturer, only when Requested or Returned.
+        //   Approve       → the current assignee, OR any user with CanAccessPayroll
+        //                   when the transaction is in the open payroll queue
+        //                   (AwaitingPayrollApproval, CurrentAssigneeUserId = null).
+        //   Return        → same rules as Approve.
+        //   Reject        → the current assignee OR the original capturer when the
+        //                   transaction is still at Requested, Recommended, or Returned
+        //                   (allows a capturer to cancel before anyone else acts).
+        var meId     = _user.Current.UserId;
+        var isCapturer        = string.Equals(tx.CapturedBy, meId, StringComparison.OrdinalIgnoreCase);
+        var isAssignee        = string.Equals(tx.CurrentAssigneeUserId, meId, StringComparison.OrdinalIgnoreCase);
+        var isPayrollOpenQueue = tx.Status == WorkflowStatus.AwaitingPayrollApproval
+                                 && tx.CurrentAssigneeUserId is null
+                                 && _user.Current.CanAccessPayroll;
 
         if (isSubmit)
         {
@@ -91,6 +100,18 @@ public class WorkflowService : IWorkflowService
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only Requested / Returned transactions can be submitted.");
             if (!isCapturer)
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only the original capturer can submit this transaction.");
+
+            // Guard: block submission of an excess transaction whose position
+            // has no excess approver configured. Without this check the
+            // transaction silently skips excess approval — which is now
+            // prevented at the workflow level (NextStage null guard) but
+            // leaves the capturer without any explanation. Surface a clear,
+            // actionable message so they know what to fix before resubmitting.
+            if (tx.IsExcess && string.IsNullOrWhiteSpace(tx.ExcessApproverEmployeeId))
+                return ApiResponse<OvertimeTransactionDto>.Failure(
+                    "This transaction exceeds the monthly overtime limit but no excess approver " +
+                    "is configured for this position. Please contact your system administrator " +
+                    "to set up an excess approver before submitting.");
         }
         else
         {
@@ -103,7 +124,7 @@ public class WorkflowService : IWorkflowService
                  || tx.Status == WorkflowStatus.Recommended
                  || tx.Status == WorkflowStatus.Returned);
 
-            if (!isAssignee && !capturerCanReject)
+            if (!isAssignee && !isPayrollOpenQueue && !capturerCanReject)
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only the current assignee can action this transaction.");
         }
 
@@ -215,22 +236,28 @@ public class WorkflowService : IWorkflowService
             WorkflowStatus.Recommended
                 => (WorkflowStatus.ApprovedForPayment, ResolveAssignee(tx.ApproverEmployeeId)),
 
-            // Approver acted. If the row is over the monthly cap and the
-            // excess approver hasn't signed off yet, stay in
-            // ApprovedForPayment for one more hop (excess approver). The
-            // outer loop sets IsExcessApproved=true after this hop.
-            WorkflowStatus.ApprovedForPayment when tx.IsExcess && !tx.IsExcessApproved
+            // Approver acted. If the row is over the monthly cap, an excess
+            // approver is configured, and they haven't signed off yet, stay
+            // in ApprovedForPayment for one more hop. The outer loop sets
+            // IsExcessApproved=true after this hop.
+            // Guard: if ExcessApproverEmployeeId is null/empty, skip the
+            // sub-hop so the transaction doesn't get stuck with a null assignee.
+            WorkflowStatus.ApprovedForPayment
+                when tx.IsExcess && !tx.IsExcessApproved
+                  && !string.IsNullOrWhiteSpace(tx.ExcessApproverEmployeeId)
                 => (WorkflowStatus.ApprovedForPayment, ResolveAssignee(tx.ExcessApproverEmployeeId)),
 
-            // Approver (or excess approver) done → goes to payroll capturer.
+            // Approver (or excess approver) done → open payroll queue.
+            // CurrentAssigneeUserId is set to null so any user with
+            // CanAccessPayroll permission can process the transaction.
             WorkflowStatus.ApprovedForPayment
-                => (WorkflowStatus.AwaitingPayrollApproval, ResolveAssignee(tx.PayrollCapturerEmployeeId)),
+                => (WorkflowStatus.AwaitingPayrollApproval, null),
 
             // Payroll capturer released → stay in AwaitingPayrollApproval
-            // for one more hop so the payroll approver can sign off. The
+            // for one more hop so a payroll approver can sign off. The
             // outer loop sets IsPayrollCaptured=true after this hop.
             WorkflowStatus.AwaitingPayrollApproval when !tx.IsPayrollCaptured
-                => (WorkflowStatus.AwaitingPayrollApproval, ResolveAssignee(tx.PayrollApproverEmployeeId)),
+                => (WorkflowStatus.AwaitingPayrollApproval, null),
 
             // Payroll approver signs off → terminal Processed, no assignee.
             WorkflowStatus.AwaitingPayrollApproval

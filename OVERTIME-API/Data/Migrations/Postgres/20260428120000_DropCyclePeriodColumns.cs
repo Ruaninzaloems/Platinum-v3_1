@@ -10,23 +10,21 @@ namespace PlatinumOvertime_API.Data.Migrations.Postgres
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(
-                """
-                DO $$ BEGIN
-                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OvertimeTransaction' AND column_name='CycleId') THEN
-                        ALTER TABLE "OvertimeTransaction" DROP COLUMN "CycleId";
-                    END IF;
-                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OvertimeTransaction' AND column_name='CycleName') THEN
-                        ALTER TABLE "OvertimeTransaction" DROP COLUMN "CycleName";
-                    END IF;
-                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OvertimeTransaction' AND column_name='PeriodId') THEN
-                        ALTER TABLE "OvertimeTransaction" DROP COLUMN "PeriodId";
-                    END IF;
-                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OvertimeTransaction' AND column_name='PeriodName') THEN
-                        ALTER TABLE "OvertimeTransaction" DROP COLUMN "PeriodName";
-                    END IF;
-                END $$;
-                """);
+            migrationBuilder.DropColumn(
+                name: "CycleId",
+                table: "OvertimeTransaction");
+
+            migrationBuilder.DropColumn(
+                name: "CycleName",
+                table: "OvertimeTransaction");
+
+            migrationBuilder.DropColumn(
+                name: "PeriodId",
+                table: "OvertimeTransaction");
+
+            migrationBuilder.DropColumn(
+                name: "PeriodName",
+                table: "OvertimeTransaction");
         }
 
         /// <inheritdoc />

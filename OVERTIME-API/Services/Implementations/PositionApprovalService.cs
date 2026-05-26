@@ -60,6 +60,33 @@ public class PositionApprovalService : IPositionApprovalService
                 throw new ArgumentException("Acting appointment End Date cannot be before Start Date.");
         }
 
+        // Guard: reject exact duplicate relationships (same Bottom position + same start date)
+        var seenRelKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rr in request.ReportingRelationships)
+        {
+            var key = $"{rr.ReportsToPositionId}|{rr.StartDate:yyyy-MM-dd}";
+            if (!seenRelKeys.Add(key))
+                throw new ArgumentException(
+                    $"Duplicate reporting relationship: position '{rr.ReportsToPositionId}' with start date {rr.StartDate:dd/MM/yyyy} appears more than once.");
+        }
+
+        // Guard: a Bottom position can only be linked to one Top (approver) position
+        if (request.ReportingRelationships.Count > 0)
+        {
+            var allConfigs = await _repo.GetAllAsync(ct);
+            foreach (var rr in request.ReportingRelationships)
+            {
+                var conflict = allConfigs.FirstOrDefault(c =>
+                    !c.PositionId.Equals(positionId, StringComparison.OrdinalIgnoreCase) &&
+                    c.ReportingRelationships.Any(r =>
+                        r.ReportsToPositionId.Equals(rr.ReportsToPositionId, StringComparison.OrdinalIgnoreCase)));
+                if (conflict is not null)
+                    throw new ArgumentException(
+                        $"Position '{rr.ReportsToPositionId}' is already configured under approver '{conflict.PositionDescription ?? conflict.PositionId}'. " +
+                        "A subordinate position can only be linked to one approver. Remove it from the other approver first.");
+            }
+        }
+
         var pos = await _platinum.GetPositionAsync(positionId, ct)
             ?? throw new KeyNotFoundException($"Position '{positionId}' not found in Platinum integration.");
 
@@ -105,6 +132,8 @@ public class PositionApprovalService : IPositionApprovalService
     public async Task<byte[]> GenerateImportTemplateAsync(CancellationToken ct = default)
     {
         var positions = await _platinum.GetPositionsAsync(null, ct);
+        var configs   = await _repo.GetAllAsync(ct);
+        var configByPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
 
         using var wb = new XLWorkbook();
 
@@ -120,7 +149,7 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         // Row 2: guidance note (not imported — parser starts at row 3).
-        wsConfig.Cell(2, 1).Value = "↑ Do not edit column headers or this note row. Valid flags: Y = Yes  |  N or blank = No";
+        wsConfig.Cell(2, 1).Value = "↑ Do not edit column headers or this note row. Valid flags: Y = Yes  |  N or blank = No  |  Green-highlighted rows already have saved configuration.";
         wsConfig.Cell(2, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
         wsConfig.Cell(2, 1).Style.Font.Italic = true;
         wsConfig.Row(2).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
@@ -129,12 +158,22 @@ public class PositionApprovalService : IPositionApprovalService
         var row = 3;
         foreach (var pos in positions)
         {
+            configByPosId.TryGetValue(pos.Id, out var cfg);
+            var isRec  = (cfg?.IsOvertimeRecommender              == true) ? "Y" : "N";
+            var isApp  = (cfg?.IsOvertimeApprover                 == true) ? "Y" : "N";
+            var isDept = (cfg?.IsDepartmentExcessOvertimeApprover == true) ? "Y" : "N";
+
             wsConfig.Cell(row, 1).Value = pos.Id;
             wsConfig.Cell(row, 2).Value = pos.Description;
             wsConfig.Cell(row, 2).Style.Protection.Locked = true;
-            wsConfig.Cell(row, 3).Value = "N";
-            wsConfig.Cell(row, 4).Value = "N";
-            wsConfig.Cell(row, 5).Value = "N";
+            wsConfig.Cell(row, 3).Value = isRec;
+            wsConfig.Cell(row, 4).Value = isApp;
+            wsConfig.Cell(row, 5).Value = isDept;
+
+            // Highlight rows that already have saved configuration in light green.
+            if (isRec == "Y" || isApp == "Y" || isDept == "Y")
+                wsConfig.Row(row).Style.Fill.BackgroundColor = XLColor.FromHtml("#E2EFDA");
+
             row++;
         }
 
@@ -147,7 +186,7 @@ public class PositionApprovalService : IPositionApprovalService
 
         // ── Sheet 2: Reporting Relationships ────────────────────────────────
         var wsRelat = wb.Worksheets.Add("Reporting Relationships");
-        var relatHeaders = new[] { "PositionId", "ReportsToPositionId", "StartDate (dd/MM/yyyy)", "EndDate (dd/MM/yyyy or blank)" };
+        var relatHeaders = new[] { "Top PositionId", "Bottom PositionId", "StartDate (dd/MM/yyyy)", "EndDate (dd/MM/yyyy or blank)" };
         for (var i = 0; i < relatHeaders.Length; i++)
         {
             var cell = wsRelat.Cell(1, i + 1);
@@ -157,9 +196,24 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         // Row 2: guidance note for reporting relationships.
-        wsRelat.Cell(2, 1).Value = "↑ Note: PositionId and ReportsToPositionId must be valid positions. Dates must be in dd/MM/yyyy format. EndDate may be left blank.";
+        wsRelat.Cell(2, 1).Value = "↑ Note: Top PositionId and Bottom PositionId must be valid positions. Dates must be in dd/MM/yyyy format. EndDate may be left blank.";
         wsRelat.Row(2).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
         wsRelat.Row(2).Style.Font.Italic = true;
+
+        var relatRow = 3;
+        foreach (var cfg in configs)
+        {
+            foreach (var rr in cfg.ReportingRelationships)
+            {
+                wsRelat.Cell(relatRow, 1).Value = cfg.PositionId;
+                wsRelat.Cell(relatRow, 2).Value = rr.ReportsToPositionId;
+                wsRelat.Cell(relatRow, 3).Value = rr.StartDate == default ? "" : rr.StartDate.ToString("dd/MM/yyyy");
+                wsRelat.Cell(relatRow, 4).Value = rr.EndDate.HasValue
+                    ? (rr.EndDate.Value.Year == 9999 ? "" : rr.EndDate.Value.ToString("dd/MM/yyyy"))
+                    : "";
+                relatRow++;
+            }
+        }
 
         wsRelat.Column(1).Width = 18;
         wsRelat.Column(2).Width = 22;
@@ -182,6 +236,19 @@ public class PositionApprovalService : IPositionApprovalService
         wsActing.Cell(2, 1).Value = "↑ Note: ActingEmployeeId must be a valid employee. ActingInPositionId must be a valid position. Both dates required in dd/MM/yyyy format. EndDate must be ≥ StartDate.";
         wsActing.Row(2).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
         wsActing.Row(2).Style.Font.Italic = true;
+
+        var actingRow = 3;
+        foreach (var cfg in configs)
+        {
+            foreach (var aa in cfg.ActingAppointments)
+            {
+                wsActing.Cell(actingRow, 1).Value = aa.ActingEmployeeId;
+                wsActing.Cell(actingRow, 2).Value = aa.ActingInPositionId;
+                wsActing.Cell(actingRow, 3).Value = aa.StartDate == default ? "" : aa.StartDate.ToString("dd/MM/yyyy");
+                wsActing.Cell(actingRow, 4).Value = aa.EndDate == default   ? "" : aa.EndDate.ToString("dd/MM/yyyy");
+                actingRow++;
+            }
+        }
 
         wsActing.Column(1).Width = 20;
         wsActing.Column(2).Width = 22;
@@ -206,15 +273,19 @@ public class PositionApprovalService : IPositionApprovalService
         var employees = await _platinum.GetEmployeesAsync(null, ct);
 
         // O(1) enrichment maps
-        var posById   = positions.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
-        // employee keyed by the position they occupy → gives us division info
+        var posById = positions.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+
+        // Config keyed by position ID — used to look up flags/relationships for
+        // each position when iterating over the full positions list.
+        var configByPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
+
+        // Employee keyed by the position they occupy → gives us full name / division.
         var empByPosId = employees
             .Where(e => !string.IsNullOrWhiteSpace(e.PositionId))
             .GroupBy(e => e.PositionId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        // Set of all position IDs that have at least one acting appointment
-        // recorded against them (used for the Temporary Acting Appointment Y/N column).
+        // Set of all position IDs that have at least one acting appointment.
         var actingPositionIds = new HashSet<string>(
             configs.SelectMany(c => c.ActingAppointments)
                    .Select(a => a.ActingInPositionId),
@@ -226,11 +297,12 @@ public class PositionApprovalService : IPositionApprovalService
 
         var headers = new[]
         {
-            "Configured Position ID",
-            "Configured Position Description",
+            "Position ID",
+            "Position Description",
             "Occupying Employee",
             "Department",
             "Division",
+            "Configuration Status",
             "Overtime Recommender (Y/N)",
             "Overtime Approver (Y/N)",
             "Dept Excess Approver (Y/N)",
@@ -258,28 +330,37 @@ public class PositionApprovalService : IPositionApprovalService
         ws.Row(1).Height = 36;
 
         var rowNum = 2;
-        // Sort configs deterministically by position ID for a stable output
-        foreach (var cfg in configs.OrderBy(c => c.PositionId))
+
+        // Sort all positions by department → description for easy scanning.
+        foreach (var pos in positions.OrderBy(p => p.DepartmentName).ThenBy(p => p.Description))
         {
-            // Configured-position enrichment
-            posById.TryGetValue(cfg.PositionId, out var cfgPos);
-            empByPosId.TryGetValue(cfg.PositionId, out var cfgEmp);
-
-            var cfgEmployee = cfgEmp is not null
-                ? $"{cfgEmp.FullName} ({cfgEmp.EmployeeNumber})"
+            empByPosId.TryGetValue(pos.Id, out var posEmp);
+            var employee = posEmp is not null
+                ? $"{posEmp.FullName} ({posEmp.EmployeeNumber})"
                 : string.Empty;
-            var cfgDept     = cfgPos?.DepartmentName ?? string.Empty;
-            var cfgDiv      = cfgEmp?.DivisionName ?? string.Empty;
+            var dept = pos.DepartmentName;
+            var div  = posEmp?.DivisionName ?? string.Empty;
 
-            var isRec  = cfg.IsOvertimeRecommender                ? "Y" : "N";
-            var isApp  = cfg.IsOvertimeApprover                   ? "Y" : "N";
-            var isExc  = cfg.IsDepartmentExcessOvertimeApprover   ? "Y" : "N";
+            if (!configByPosId.TryGetValue(pos.Id, out var cfg))
+            {
+                // Not configured — one row, all flag/relationship columns blank.
+                WriteReportRow(ws, rowNum++,
+                    pos.Id, pos.Description, employee, dept, div,
+                    "Not Configured",
+                    "", "", "", "", "", "", "", "", "", "", "");
+                continue;
+            }
+
+            var isRec = cfg.IsOvertimeRecommender              ? "Y" : "N";
+            var isApp = cfg.IsOvertimeApprover                 ? "Y" : "N";
+            var isExc = cfg.IsDepartmentExcessOvertimeApprover ? "Y" : "N";
 
             if (cfg.ReportingRelationships.Count == 0)
             {
-                // One row, blank applies-to columns
+                // Configured but no reporting relationships yet — one row, blank applies-to columns.
                 WriteReportRow(ws, rowNum++,
-                    cfg.PositionId, cfg.PositionDescription, cfgEmployee, cfgDept, cfgDiv,
+                    pos.Id, pos.Description, employee, dept, div,
+                    "Configured",
                     isRec, isApp, isExc,
                     "", "", "", "", "", "", "", "");
             }
@@ -287,7 +368,6 @@ public class PositionApprovalService : IPositionApprovalService
             {
                 foreach (var rel in cfg.ReportingRelationships.OrderBy(r => r.StartDate))
                 {
-                    // Applies-to position enrichment
                     posById.TryGetValue(rel.ReportsToPositionId, out var appPos);
                     empByPosId.TryGetValue(rel.ReportsToPositionId, out var appEmp);
 
@@ -301,10 +381,11 @@ public class PositionApprovalService : IPositionApprovalService
                     var endStr   = rel.EndDate.HasValue
                         ? rel.EndDate.Value.Year == 9999 ? "" : rel.EndDate.Value.ToString("dd/MM/yyyy")
                         : "";
-                    var acting   = actingPositionIds.Contains(rel.ReportsToPositionId) ? "Y" : "N";
+                    var acting = actingPositionIds.Contains(rel.ReportsToPositionId) ? "Y" : "N";
 
                     WriteReportRow(ws, rowNum++,
-                        cfg.PositionId, cfg.PositionDescription, cfgEmployee, cfgDept, cfgDiv,
+                        pos.Id, pos.Description, employee, dept, div,
+                        "Configured",
                         isRec, isApp, isExc,
                         rel.ReportsToPositionId,
                         rel.ReportsToPositionDescription,
@@ -314,7 +395,7 @@ public class PositionApprovalService : IPositionApprovalService
             }
         }
 
-        // Auto-fit all columns to their content, capped at 50 characters wide
+        // Auto-fit all columns to their content, capped at 50 characters wide.
         ws.Columns().AdjustToContents();
         for (var col = 1; col <= headers.Length; col++)
         {
@@ -322,12 +403,21 @@ public class PositionApprovalService : IPositionApprovalService
                 ws.Column(col).Width = 50;
         }
 
-        // Centre the Y/N flag columns and date columns
-        foreach (var col in new[] { 6, 7, 8, 14, 15, 16 })
+        // Centre the status, Y/N flag columns, and date columns.
+        foreach (var col in new[] { 6, 7, 8, 9, 15, 16, 17 })
         {
             var colRange = ws.Column(col).CellsUsed();
             foreach (var cell in colRange)
                 cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        }
+
+        // Colour the Configuration Status column: green for Configured, amber for Not Configured.
+        for (var r = 2; r < rowNum; r++)
+        {
+            var statusCell = ws.Cell(r, 6);
+            statusCell.Style.Fill.BackgroundColor = statusCell.GetString() == "Configured"
+                ? XLColor.FromHtml("#E2EFDA")
+                : XLColor.FromHtml("#FFF2CC");
         }
 
         using var ms = new MemoryStream();
@@ -336,27 +426,29 @@ public class PositionApprovalService : IPositionApprovalService
     }
 
     private static void WriteReportRow(IXLWorksheet ws, int row,
-        string cfgId, string cfgDesc, string cfgEmp, string cfgDept, string cfgDiv,
+        string posId, string posDesc, string posEmp, string posDept, string posDiv,
+        string status,
         string isRec, string isApp, string isExc,
         string appId, string appDesc, string appEmp, string appDept, string appDiv,
         string startDate, string endDate, string acting)
     {
-        ws.Cell(row, 1).Value  = cfgId;
-        ws.Cell(row, 2).Value  = cfgDesc;
-        ws.Cell(row, 3).Value  = cfgEmp;
-        ws.Cell(row, 4).Value  = cfgDept;
-        ws.Cell(row, 5).Value  = cfgDiv;
-        ws.Cell(row, 6).Value  = isRec;
-        ws.Cell(row, 7).Value  = isApp;
-        ws.Cell(row, 8).Value  = isExc;
-        ws.Cell(row, 9).Value  = appId;
-        ws.Cell(row, 10).Value = appDesc;
-        ws.Cell(row, 11).Value = appEmp;
-        ws.Cell(row, 12).Value = appDept;
-        ws.Cell(row, 13).Value = appDiv;
-        ws.Cell(row, 14).Value = startDate;
-        ws.Cell(row, 15).Value = endDate;
-        ws.Cell(row, 16).Value = acting;
+        ws.Cell(row, 1).Value  = posId;
+        ws.Cell(row, 2).Value  = posDesc;
+        ws.Cell(row, 3).Value  = posEmp;
+        ws.Cell(row, 4).Value  = posDept;
+        ws.Cell(row, 5).Value  = posDiv;
+        ws.Cell(row, 6).Value  = status;
+        ws.Cell(row, 7).Value  = isRec;
+        ws.Cell(row, 8).Value  = isApp;
+        ws.Cell(row, 9).Value  = isExc;
+        ws.Cell(row, 10).Value = appId;
+        ws.Cell(row, 11).Value = appDesc;
+        ws.Cell(row, 12).Value = appEmp;
+        ws.Cell(row, 13).Value = appDept;
+        ws.Cell(row, 14).Value = appDiv;
+        ws.Cell(row, 15).Value = startDate;
+        ws.Cell(row, 16).Value = endDate;
+        ws.Cell(row, 17).Value = acting;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -441,19 +533,23 @@ public class PositionApprovalService : IPositionApprovalService
         {
             var h2Col1 = wsRelat.Cell(1, 1).GetString().Trim();
             var h2Col2 = wsRelat.Cell(1, 2).GetString().Trim();
-            if (!h2Col1.Equals("PositionId", StringComparison.OrdinalIgnoreCase))
+            if (!h2Col1.Equals("Top PositionId", StringComparison.OrdinalIgnoreCase))
             {
-                result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = 1, Error = $"Column A header must be 'PositionId' but found '{h2Col1}'. Ensure you are using the correct import template." });
+                result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = 1, Error = $"Column A header must be 'Top PositionId' but found '{h2Col1}'. Ensure you are using the correct import template." });
                 result.ErrorRows++;
             }
-            if (!h2Col2.Contains("ReportsTo", StringComparison.OrdinalIgnoreCase))
+            if (!h2Col2.Equals("Bottom PositionId", StringComparison.OrdinalIgnoreCase))
             {
-                result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = 1, Error = $"Column B header should contain 'ReportsTo' but found '{h2Col2}'. Ensure you are using the correct import template." });
+                result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = 1, Error = $"Column B header must be 'Bottom PositionId' but found '{h2Col2}'. Ensure you are using the correct import template." });
                 result.ErrorRows++;
             }
 
             // Data starts at row 3 (row 1 = headers, row 2 = guidance note).
             var lastRow = wsRelat.LastRowUsed()?.RowNumber() ?? 2;
+            // Tracks (Top|Bottom|StartDate) to catch exact duplicates within this file.
+            var seenRelatKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Tracks Bottom → Top to catch a Bottom position linked to more than one Top.
+            var bottomToTopImport = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var rowNum = 3; rowNum <= lastRow; rowNum++)
             {
                 var posId = wsRelat.Cell(rowNum, 1).GetString().Trim();
@@ -501,6 +597,25 @@ public class PositionApprovalService : IPositionApprovalService
                     result.ErrorRows++;
                     continue;
                 }
+
+                // Duplicate check: same Top + Bottom + StartDate already seen in this file.
+                var relatKey = $"{posId}|{reportsTo}|{startDate:yyyy-MM-dd}";
+                if (!seenRelatKeys.Add(relatKey))
+                {
+                    result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = rowNum, Error = $"Duplicate row: Top PositionId '{posId}' + Bottom PositionId '{reportsTo}' with start date {startDate:dd/MM/yyyy} already appears in this file." });
+                    result.ErrorRows++;
+                    continue;
+                }
+
+                // Cross-top check: same Bottom position linked to a different Top in this file.
+                if (bottomToTopImport.TryGetValue(reportsTo, out var existingTop) &&
+                    !existingTop.Equals(posId, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = rowNum, Error = $"Position '{reportsTo}' is already linked to Top PositionId '{existingTop}' elsewhere in this file. A position can only be linked to one approver." });
+                    result.ErrorRows++;
+                    continue;
+                }
+                bottomToTopImport[reportsTo] = posId;
 
                 result.ReportingRelationshipChanges.Add(new ReportingRelationshipChangeDto
                 {
@@ -622,6 +737,8 @@ public class PositionApprovalService : IPositionApprovalService
                 validationErrors.Add($"Position Config: PositionId '{c.PositionId}' is not a valid position.");
         }
 
+        var confirmRelatKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var confirmBottomToTop = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var r in request.ReportingRelationshipChanges)
         {
             if (!positionIds.Contains(r.PositionId))
@@ -630,6 +747,36 @@ public class PositionApprovalService : IPositionApprovalService
                 validationErrors.Add($"Reporting Relationships: ReportsToPositionId '{r.ReportsToPositionId}' is not a valid position.");
             if (r.EndDate.HasValue && r.EndDate.Value < r.StartDate)
                 validationErrors.Add($"Reporting Relationships: EndDate before StartDate for position '{r.PositionId}'.");
+
+            // Duplicate check: same (Top, Bottom, StartDate) combo more than once.
+            var dKey = $"{r.PositionId}|{r.ReportsToPositionId}|{r.StartDate:yyyy-MM-dd}";
+            if (!confirmRelatKeys.Add(dKey))
+                validationErrors.Add($"Reporting Relationships: duplicate entry — Top='{r.PositionId}', Bottom='{r.ReportsToPositionId}', start={r.StartDate:dd/MM/yyyy}.");
+
+            // Cross-top check within the import batch.
+            if (confirmBottomToTop.TryGetValue(r.ReportsToPositionId, out var existingTopInBatch) &&
+                !existingTopInBatch.Equals(r.PositionId, StringComparison.OrdinalIgnoreCase))
+                validationErrors.Add($"Reporting Relationships: position '{r.ReportsToPositionId}' cannot be linked to both '{existingTopInBatch}' and '{r.PositionId}'. A position can only have one approver.");
+            else
+                confirmBottomToTop[r.ReportsToPositionId] = r.PositionId;
+        }
+
+        // Relationship-change detection: bottom positions moving to a new top.
+        // Instead of blocking, we collect the displaced old tops so their relationships
+        // can be auto-end-dated when the batch is committed.
+        var importedTopIds = new HashSet<string>(request.ReportingRelationshipChanges.Select(r => r.PositionId), StringComparer.OrdinalIgnoreCase);
+        var allDbConfigs = await _repo.GetAllAsync(ct);
+
+        // Map: bottomPositionId → (oldTopConfig, newRelationshipStartDate)
+        var displacedOldTops = new Dictionary<string, (PositionApprovalConfig OldTop, DateTime NewStartDate)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in request.ReportingRelationshipChanges)
+        {
+            var conflict = allDbConfigs.FirstOrDefault(c =>
+                !importedTopIds.Contains(c.PositionId) &&
+                c.ReportingRelationships.Any(rel =>
+                    rel.ReportsToPositionId.Equals(r.ReportsToPositionId, StringComparison.OrdinalIgnoreCase)));
+            if (conflict is not null)
+                displacedOldTops[r.ReportsToPositionId] = (conflict, r.StartDate);
         }
 
         foreach (var a in request.ActingAppointmentChanges)
@@ -744,6 +891,45 @@ public class PositionApprovalService : IPositionApprovalService
             };
         }
 
+        // ── Apply auto-end-dates to old tops displaced by reassigned bottom positions ──
+        // These configs were not in the import but must be updated so the old relationship
+        // is closed off (EndDate = newStartDate - 1 day) before the new one takes effect.
+        foreach (var (bottomId, (oldTop, newStartDate)) in displacedOldTops)
+        {
+            if (domainByPosition.ContainsKey(oldTop.PositionId))
+                continue; // already fully replaced by this import — let that take effect
+
+            var endDate = newStartDate.AddDays(-1);
+            var updatedRelationships = oldTop.ReportingRelationships
+                .Select(rel => rel.ReportsToPositionId.Equals(bottomId, StringComparison.OrdinalIgnoreCase)
+                    ? new PositionReportingRelationship
+                    {
+                        Id = rel.Id,
+                        PositionApprovalConfigId = rel.PositionApprovalConfigId,
+                        ReportsToPositionId = rel.ReportsToPositionId,
+                        ReportsToPositionDescription = rel.ReportsToPositionDescription,
+                        StartDate = rel.StartDate,
+                        EndDate = endDate < rel.StartDate ? rel.StartDate : endDate,
+                        CreatedAt = rel.CreatedAt
+                    }
+                    : rel)
+                .ToList();
+
+            domainByPosition[oldTop.PositionId] = new PositionApprovalConfig
+            {
+                Id = oldTop.Id,
+                PositionId = oldTop.PositionId,
+                PositionDescription = oldTop.PositionDescription,
+                IsOvertimeRecommender = oldTop.IsOvertimeRecommender,
+                IsOvertimeApprover = oldTop.IsOvertimeApprover,
+                IsDepartmentExcessOvertimeApprover = oldTop.IsDepartmentExcessOvertimeApprover,
+                CreatedAt = oldTop.CreatedAt,
+                UpdatedBy = updatedBy,
+                ReportingRelationships = updatedRelationships,
+                ActingAppointments = oldTop.ActingAppointments.ToList()
+            };
+        }
+
         // ── Commit all changes in one database transaction ────────────────────
         await _repo.BatchUpsertInTransactionAsync(domainByPosition.Values, ct);
 
@@ -772,12 +958,18 @@ public class PositionApprovalService : IPositionApprovalService
         if (DateTime.TryParseExact(raw, new[] { "dd/MM/yyyy", "d/M/yyyy", "dd/M/yyyy", "d/MM/yyyy" },
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out result))
+        {
+            result = DateTime.SpecifyKind(result, DateTimeKind.Utc);
             return true;
+        }
 
         // Fallback: ClosedXML may expose numeric date serial or general format.
         if (DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out result))
+        {
+            result = DateTime.SpecifyKind(result, DateTimeKind.Utc);
             return true;
+        }
 
         return false;
     }

@@ -55,11 +55,11 @@ public class PositionDataSeeder
                 ""DivisionID""    integer,
                 ""JobProfileID""  integer,
                 ""Status""        integer,
-                ""Enabled""       integer,
+                ""Enabled""       boolean,
                 ""ParentID""      integer,
-                ""EmployeeID""    varchar(64),
+                ""EmployeeID""    integer,
                 ""HOD""           integer,
-                ""HierarchyNo""   integer,
+                ""HierarchyNo""   varchar(64),
                 ""UniqueId""      varchar(64)
             );", ct);
 
@@ -71,8 +71,12 @@ public class PositionDataSeeder
         }
 
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<PayrollPosition>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<PayrollPosition>();
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        opts.Converters.Add(new PlatinumOvertime_API.Data.NullableIntToBoolJsonConverter());     // Enabled, HOD: 0/1 → bool?
+        opts.Converters.Add(new PlatinumOvertime_API.Data.NullableStringFromNumberJsonConverter()); // HierarchyNo: int → string?
+        opts.Converters.Add(new PlatinumOvertime_API.Data.NullableIntFromStringJsonConverter());    // EmployeeId: "266" → int?
+        var rows = await JsonSerializer.DeserializeAsync<List<PayrollPosition>>(fs, opts, ct)
+            ?? new List<PayrollPosition>();
 
         if (rows.Count == 0)
         {

@@ -13,6 +13,11 @@ namespace PlatinumOvertime_API.Services.Implementations;
 ///   Const_MOC, Const_MOCDetail.
 /// In production (SQL Server) these tables are owned by Platinum Payroll and
 /// already populated, so this seeder no-ops on non-Postgres providers.
+///
+/// Const_MOC and Const_MOCDetail date columns (StartDate, EndDate) are
+/// datetime in production. The JSON seed files export them as OADate serial
+/// numbers (decimal). The private Raw DTOs capture those decimals, and the
+/// mapping converts them via DateTime.FromOADate before inserting.
 /// </summary>
 public class SalaryHeadDataSeeder
 {
@@ -39,6 +44,7 @@ public class SalaryHeadDataSeeder
             return;
         }
 
+        // Create tables with correct production-aligned column types (timestamp for dates).
         await _db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS ""Payroll_SalaryHead"" (
                 ""SalaryHead_ID""    integer PRIMARY KEY,
@@ -68,17 +74,34 @@ public class SalaryHeadDataSeeder
                 ""MOC_ID""        integer PRIMARY KEY,
                 ""SalaryHeadID""  integer,
                 ""Enabled""       boolean,
-                ""StartDate""     decimal(18,8),
-                ""EndDate""       decimal(18,8)
+                ""StartDate""     timestamp,
+                ""EndDate""       timestamp
             );
             CREATE TABLE IF NOT EXISTS ""Const_MOCDetail"" (
                 ""MOCDetail_ID""  integer PRIMARY KEY,
                 ""MOCID""         integer,
                 ""Enabled""       boolean,
-                ""StartDate""     decimal(18,8),
-                ""EndDate""       decimal(18,8),
+                ""StartDate""     timestamp,
+                ""EndDate""       timestamp,
                 ""Formula""       varchar(2000)
             );", ct);
+
+        // Migrate existing stale tables that were created with decimal(18,8) for date columns.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Const_MOC' AND column_name='StartDate') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Const_MOC"" ALTER COLUMN ""StartDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_MOC"" ALTER COLUMN ""EndDate""   TYPE timestamp USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Const_MOC""';
+                END IF;
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Const_MOCDetail' AND column_name='StartDate') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Const_MOCDetail"" ALTER COLUMN ""StartDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_MOCDetail"" ALTER COLUMN ""EndDate""   TYPE timestamp USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Const_MOCDetail""';
+                END IF;
+            END $$;", ct);
 
         await SeedTableAsync<RawSalaryHead, PayrollSalaryHead>(
             "salary_heads.json", "Payroll_SalaryHead",
@@ -114,6 +137,9 @@ public class SalaryHeadDataSeeder
                 Enabled = r.Enabled == 1
             }, ct);
 
+        // MOC dates come from JSON as OADate serial numbers (e.g. 1, 2958465).
+        // DateTime.FromOADate returns Kind=Unspecified; Npgsql 6+ requires Utc
+        // for timestamptz columns, so we always SpecifyKind Utc after conversion.
         await SeedTableAsync<RawMOC, ConstMOC>(
             "moc.json", "Const_MOC",
             r => new ConstMOC
@@ -121,8 +147,12 @@ public class SalaryHeadDataSeeder
                 MOCId = r.MOC_ID,
                 SalaryHeadId = r.SalaryHeadID,
                 Enabled = r.Enabled == 1,
-                StartDate = r.StartDate,
-                EndDate = r.EndDate
+                StartDate = r.StartDate.HasValue
+                    ? DateTime.SpecifyKind(DateTime.FromOADate((double)r.StartDate.Value), DateTimeKind.Utc)
+                    : null,
+                EndDate = r.EndDate.HasValue
+                    ? DateTime.SpecifyKind(DateTime.FromOADate((double)r.EndDate.Value), DateTimeKind.Utc)
+                    : null
             }, ct);
 
         await SeedTableAsync<RawMOCDetail, ConstMOCDetail>(
@@ -132,8 +162,12 @@ public class SalaryHeadDataSeeder
                 MOCDetailId = r.MOCDetail_ID,
                 MOCId = r.MOCID,
                 Enabled = r.Enabled == 1,
-                StartDate = r.StartDate,
-                EndDate = r.EndDate,
+                StartDate = r.StartDate.HasValue
+                    ? DateTime.SpecifyKind(DateTime.FromOADate((double)r.StartDate.Value), DateTimeKind.Utc)
+                    : null,
+                EndDate = r.EndDate.HasValue
+                    ? DateTime.SpecifyKind(DateTime.FromOADate((double)r.EndDate.Value), DateTimeKind.Utc)
+                    : null,
                 Formula = r.Formula
             }, ct);
     }
@@ -230,6 +264,8 @@ public class SalaryHeadDataSeeder
         public decimal? Percentage { get; set; }
         public int? Enabled { get; set; }
     }
+    // StartDate/EndDate are OADate serial decimals in the JSON export.
+    // Conversion to DateTime happens in the mapping lambda above.
     private class RawMOC
     {
         [JsonPropertyName("MOC_ID")] public int MOC_ID { get; set; }

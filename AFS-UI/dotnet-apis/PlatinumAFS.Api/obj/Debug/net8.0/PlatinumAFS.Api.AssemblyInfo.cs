@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PlatinumAFS.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+84fbcf39950ad53211e48690c7d836fc0c90a31e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+946892c386c7d1dc4b92119145a391152059e88a")]
 [assembly: System.Reflection.AssemblyProductAttribute("PlatinumAFS.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PlatinumAFS.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

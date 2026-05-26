@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Models.Domain;
@@ -47,8 +48,25 @@ public class UserUserRoleSeeder
             CREATE INDEX IF NOT EXISTS ix_user_user_roles_user
                 ON ""User_UserRoles"" (""UserID"");", ct);
 
+        var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "user_user_roles.json");
+        if (!File.Exists(path))
+        {
+            _log.LogWarning("User_UserRoles seed file not found at {Path}; nothing seeded.", path);
+            return;
+        }
+
+        await using var fs = File.OpenRead(path);
+        var rows = await JsonSerializer.DeserializeAsync<List<UserUserRole>>(fs,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<UserUserRole>();
+
+        if (rows.Count == 0)
+        {
+            _log.LogWarning("User_UserRoles seed file at {Path} contained no rows.", path);
+            return;
+        }
+
         var existing = await _db.Set<UserUserRole>().CountAsync(ct);
-        if (existing == _seedRows.Count)
+        if (existing == rows.Count)
         {
             _log.LogInformation("User_UserRoles already fully populated ({Count} rows); skipping seed.", existing);
             return;
@@ -56,18 +74,28 @@ public class UserUserRoleSeeder
         if (existing > 0)
         {
             _log.LogWarning("User_UserRoles has {Existing} rows but seed file has {Expected}; rebuilding.",
-                existing, _seedRows.Count);
+                existing, rows.Count);
             await _db.Database.ExecuteSqlRawAsync(@"TRUNCATE TABLE ""User_UserRoles"";", ct);
         }
 
-        _log.LogInformation("Seeding User_UserRoles with {Count} rows...", _seedRows.Count);
+        _log.LogInformation("Seeding User_UserRoles with {Count} rows...", rows.Count);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         try
         {
-            await _db.Set<UserUserRole>().AddRangeAsync(_seedRows, ct);
-            await _db.SaveChangesAsync(ct);
+            const int batchSize = 500;
+            for (var i = 0; i < rows.Count; i += batchSize)
+            {
+                var batch = rows.Skip(i).Take(batchSize).ToList();
+                await _db.Set<UserUserRole>().AddRangeAsync(batch, ct);
+                await _db.SaveChangesAsync(ct);
+                _db.ChangeTracker.Clear();
+            }
+            var final = await _db.Set<UserUserRole>().CountAsync(ct);
+            if (final != rows.Count)
+                throw new InvalidOperationException(
+                    $"User_UserRoles seed integrity check failed: inserted {final}, expected {rows.Count}.");
             await tx.CommitAsync(ct);
-            _log.LogInformation("User_UserRoles seed complete ({Count} rows).", _seedRows.Count);
+            _log.LogInformation("User_UserRoles seed complete ({Count} rows).", rows.Count);
         }
         catch
         {
@@ -75,27 +103,4 @@ public class UserUserRoleSeeder
             throw;
         }
     }
-
-    private static readonly List<UserUserRole> _seedRows = new()
-    {
-        new() { UserId = 4266, RoleId = 2071 },
-        new() { UserId = 4266, RoleId = 2103 },
-        new() { UserId = 4268, RoleId = 37   },
-        new() { UserId = 4273, RoleId = 14   },
-        new() { UserId = 4273, RoleId = 2071 },
-        new() { UserId = 4274, RoleId = 2071 },
-        new() { UserId = 4274, RoleId = 2072 },
-        new() { UserId = 4274, RoleId = 2202 },
-        new() { UserId = 4292, RoleId = 24   },
-        new() { UserId = 4292, RoleId = 1052 },
-        new() { UserId = 4292, RoleId = 1053 },
-        new() { UserId = 4292, RoleId = 2071 },
-        new() { UserId = 4302, RoleId = 2071 },
-        new() { UserId = 4302, RoleId = 2128 },
-        new() { UserId = 4304, RoleId = 2125 },
-        new() { UserId = 4305, RoleId = 2071 },
-        new() { UserId = 4305, RoleId = 2126 },
-        new() { UserId = 4305, RoleId = 2128 },
-        new() { UserId = 4527, RoleId = 2125 },
-    };
 }

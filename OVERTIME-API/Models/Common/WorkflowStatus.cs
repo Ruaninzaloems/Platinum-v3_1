@@ -14,3 +14,18 @@ public enum WorkflowStatus
     Returned = 5,
     Rejected = 99
 }
+
+public static class WorkflowStatusExtensions
+{
+    public static string ToLabel(this WorkflowStatus status) => status switch
+    {
+        WorkflowStatus.Requested               => "Captured",
+        WorkflowStatus.Recommended             => "Awaiting Recommendation",
+        WorkflowStatus.ApprovedForPayment      => "Awaiting Approval",
+        WorkflowStatus.AwaitingPayrollApproval => "Awaiting Payroll",
+        WorkflowStatus.Processed               => "Processed",
+        WorkflowStatus.Returned                => "Returned",
+        WorkflowStatus.Rejected                => "Rejected",
+        _                                      => status.ToString()
+    };
+}

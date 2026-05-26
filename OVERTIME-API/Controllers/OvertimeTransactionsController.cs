@@ -99,10 +99,11 @@ public class OvertimeTransactionsController : ControllerBase
 
     [HttpPost("{id:guid}/documents")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<OvertimeDocumentDto>>> UploadDocument(
-        Guid id, [FromForm] IFormFile file, CancellationToken ct = default)
+        Guid id, [FromForm] UploadDocumentRequest request, CancellationToken ct = default)
     {
-        var resp = await _service.UploadDocumentAsync(id, file, ct);
+        var resp = await _service.UploadDocumentAsync(id, request.File, ct);
         return resp.IsSuccess ? Ok(resp) : BadRequest(resp);
     }
 

@@ -10,6 +10,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// the dev Postgres database and is populated from the supplied spreadsheet.
 /// In production (SQL Server) this seeder is a no-op because the real table
 /// is owned by Platinum Payroll.
+///
+/// DateCaptured and DateModified are datetime in production. The JSON seed
+/// export contains OADate serial numbers for these fields; OADateJsonConverter
+/// handles the conversion to DateTime during deserialization.
 /// </summary>
 public class ConstCycleSeeder
 {
@@ -41,13 +45,24 @@ public class ConstCycleSeeder
                 ""Cycle_ID""           integer PRIMARY KEY,
                 ""CycleDesc""          varchar(500),
                 ""Enabled""            boolean,
-                ""DateCaptured""       decimal(18,8),
+                ""DateCaptured""       timestamp,
                 ""CapturerID""         integer,
-                ""DateModified""       decimal(18,8),
+                ""DateModified""       timestamp,
                 ""ModifierID""         integer,
                 ""CycleTypeID""        integer,
                 ""SkipInNewTaxYear""   boolean
             );", ct);
+
+        // Migrate existing table if date columns were previously created as decimal(18,8).
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Const_Cycle' AND column_name='DateCaptured') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Const_Cycle"" ALTER COLUMN ""DateCaptured"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Cycle"" ALTER COLUMN ""DateModified"" TYPE timestamp USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Const_Cycle""';
+                END IF;
+            END $$;", ct);
 
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "const_cycle.json");
         if (!File.Exists(path))
@@ -56,9 +71,14 @@ public class ConstCycleSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<ConstCycle>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<ConstCycle>();
+        var rows = await JsonSerializer.DeserializeAsync<List<ConstCycle>>(fs, opts, ct) ?? new List<ConstCycle>();
         if (rows.Count == 0)
         {
             _log.LogWarning("Const_Cycle seed file at {Path} contained no rows.", path);

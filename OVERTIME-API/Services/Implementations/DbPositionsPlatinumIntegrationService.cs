@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.DTOs.Responses;
 using PlatinumOvertime_API.Models.Common;
@@ -17,13 +18,18 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
 {
     private readonly MockPlatinumIntegrationService _mock;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _cache;
+
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
     public DbPositionsPlatinumIntegrationService(
         MockPlatinumIntegrationService mock,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache cache)
     {
         _mock = mock;
         _scopeFactory = scopeFactory;
+        _cache = cache;
     }
 
     public Task<List<EmployeeDto>> GetEmployeesAsync(string? search = null, CancellationToken ct = default)
@@ -37,41 +43,74 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
 
     public async Task<List<PositionDto>> GetPositionsAsync(string? search = null, CancellationToken ct = default)
     {
+        var cacheKey = $"positions:{(string.IsNullOrWhiteSpace(search) ? "all" : search.Trim().ToLowerInvariant())}";
+        if (_cache.TryGetValue(cacheKey, out List<PositionDto>? cached) && cached is not null)
+            return cached;
+
         // New scope so this singleton service can use the scoped DbContext.
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
 
-        var q = BuildPositionQuery(db, search);
+        // Load positions, employees, and departments in 3 flat queries then
+        // join in memory. This replaces the previous approach which translated
+        // to ~4,895 correlated OUTER APPLY subqueries (one per position row)
+        // and caused ~3 second response times on the full unfiltered list.
+        var positions = await BuildPositionQuery(db, search)
+            .OrderBy(p => p.PositionDesc)
+            .ToListAsync(ct);
 
-        // Project to PositionDto in SQL. `let emp` joins the incumbent employee
-        // in the same round trip via a correlated OUTER APPLY so vacant positions
-        // get empty strings without a separate query.
-        var rows = await (
-            from p in q
-            let emp = db.PayrollEmployees
-                .Where(e => e.PositionId == p.PositionId)
-                .Select(e => new { e.EmployeeId, e.EmpCode, e.FirstName, e.Surname })
-                .FirstOrDefault()
-            orderby p.PositionDesc
-            select new PositionDto
+        if (positions.Count == 0)
+        {
+            var empty = new List<PositionDto>();
+            _cache.Set(cacheKey, empty, CacheTtl);
+            return empty;
+        }
+
+        var positionIds = positions.Select(p => p.PositionId).ToHashSet();
+
+        // One query for all incumbent employees in this result set.
+        var empsByPositionId = await db.PayrollEmployees
+            .AsNoTracking()
+            .Where(e => e.PositionId.HasValue && positionIds.Contains(e.PositionId!.Value))
+            .Select(e => new { e.PositionId, e.EmployeeId, e.EmpCode, e.FirstName, e.Surname })
+            .ToListAsync(ct);
+        var empMap = empsByPositionId
+            .GroupBy(e => e.PositionId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // One query for all departments referenced by this result set.
+        var deptIds = positions
+            .Where(p => p.DepartmentId.HasValue)
+            .Select(p => p.DepartmentId!.Value)
+            .Distinct()
+            .ToList();
+        var deptMap = deptIds.Count > 0
+            ? await db.ConstDepartments
+                .AsNoTracking()
+                .Where(d => deptIds.Contains(d.DepartmentId))
+                .ToDictionaryAsync(d => d.DepartmentId, d => d.DepartmentDesc ?? string.Empty, ct)
+            : new Dictionary<int, string>();
+
+        var result = positions.Select(p =>
+        {
+            empMap.TryGetValue(p.PositionId, out var emp);
+            var deptName = p.DepartmentId.HasValue && deptMap.TryGetValue(p.DepartmentId.Value, out var dn) ? dn : string.Empty;
+            return new PositionDto
             {
                 Id = p.PositionId.ToString(),
                 PositionCode = p.PositionCode ?? string.Empty,
                 Description = p.PositionDesc ?? string.Empty,
                 DepartmentId = p.DepartmentId.HasValue ? p.DepartmentId.Value.ToString() : string.Empty,
-                DepartmentName = p.DepartmentId.HasValue
-                    ? (db.ConstDepartments
-                        .Where(d => d.DepartmentId == p.DepartmentId!.Value)
-                        .Select(d => d.DepartmentDesc).FirstOrDefault() ?? string.Empty)
-                    : string.Empty,
+                DepartmentName = deptName,
                 EmployeeId = emp != null ? emp.EmployeeId.ToString() : string.Empty,
-                EmployeeCode = (emp != null ? emp.EmpCode : null) ?? string.Empty,
-                EmployeeFirstName = (emp != null ? emp.FirstName : null) ?? string.Empty,
-                EmployeeSurname = (emp != null ? emp.Surname : null) ?? string.Empty
-            }
-        ).ToListAsync(ct);
+                EmployeeCode = emp?.EmpCode ?? string.Empty,
+                EmployeeFirstName = emp?.FirstName ?? string.Empty,
+                EmployeeSurname = emp?.Surname ?? string.Empty
+            };
+        }).ToList();
 
-        return rows;
+        _cache.Set(cacheKey, result, CacheTtl);
+        return result;
     }
 
     public async Task<PositionDto?> GetPositionAsync(string positionId, CancellationToken ct = default)
@@ -109,116 +148,194 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
 
-        // Correlate PayrollPosition with PositionApprovalConfig in SQL so the
-        // IsConfigured flag is computed by the database (translated by EF to
-        // an EXISTS / IN sub-select on the configured-ids set) — no second
-        // round-trip to load the full id list. PositionId in
-        // PositionApprovalConfig is a string mirror of the legacy numeric
-        // PositionId, so the correlation key is the stringified id.
-        var configIds = db.PositionApprovalConfigs.Select(c => c.PositionId);
-
-        var positions = BuildPositionQuery(db, search);
-
-        // "Today" boundaries for currently-effective filtering.
-        // StartDate comparison: use "before tomorrow midnight" so that
-        // relationships seeded/created today with a time component are included
-        // regardless of the hour they were inserted.
-        // EndDate comparison: "today midnight or later" — rows with EndDate = today
-        // (stored as midnight) should still be considered active.
         var today = DateTime.UtcNow.Date;
         var tomorrow = today.AddDays(1);
 
-        // Correlated sub-selects keep this a single SQL round trip:
-        //   - Reports To: most recent currently-effective parent for the position
-        //     (joined through PositionApprovalConfig + PositionReportingRelationship).
-        //   - Department / Division: looked up against Const_Department /
-        //     Const_Division using `let` so the division row is fetched once per
-        //     position (single OUTER APPLY) and both code + description come back
-        //     in one trip. Positions whose department or division id is null (or
-        //     points at a row that no longer exists) resolve to empty string.
-        var enriched =
-            from p in positions
-            let dept = db.ConstDepartments
-                .Where(d => p.DepartmentId.HasValue && d.DepartmentId == p.DepartmentId!.Value)
-                .Select(d => new { d.DepartmentDesc })
-                .FirstOrDefault()
-            let div = db.ConstDivisions
-                .Where(d => p.DivisionId.HasValue && d.DivisionId == p.DivisionId!.Value)
-                .Select(d => new { d.DivisionCode, d.DivisionDesc })
-                .FirstOrDefault()
-            // Incumbent employee — the Payroll_Employee row whose PositionId
-            // matches this position. When a position is vacant (no matching row)
-            // all four employee fields resolve to empty string.
-            let emp = db.PayrollEmployees
-                .Where(e => e.PositionId == p.PositionId)
-                .Select(e => new { e.EmployeeId, e.EmpCode, e.FirstName, e.Surname })
-                .FirstOrDefault()
-            select new PositionListItemDto
+        var positions = BuildPositionQuery(db, search);
+        var statusKey = (status ?? "all").Trim().ToLowerInvariant();
+        var sortKey = (sort ?? string.Empty).Trim().ToLowerInvariant();
+        var desc = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        // Materialize the configured position ID set once as integers.
+        // This turns the status filter into a fast local IN-list rather than
+        // a correlated EXISTS subquery repeated for every position row —
+        // which was the primary cause of the slow COUNT query.
+        var allConfiguredIdInts = (await db.PositionApprovalConfigs.AsNoTracking()
+                .Select(c => c.PositionId)
+                .ToListAsync(ct))
+            .Select(s => int.TryParse(s, out var n) ? n : -1)
+            .Where(n => n >= 0)
+            .ToHashSet();
+
+        // Apply status filter on the BASE positions query — no enrichment joins.
+        IQueryable<PayrollPosition> filtered = statusKey switch
+        {
+            "configured" => positions.Where(p => allConfiguredIdInts.Contains(p.PositionId)),
+            "notconfigured" or "not-configured" or "not_configured" =>
+                positions.Where(p => !allConfiguredIdInts.Contains(p.PositionId)),
+            _ => positions
+        };
+
+        // Fast count — just positions (+ optional search EXISTS), no OUTER APPLY.
+        var total = await filtered.CountAsync(ct);
+        if (total == 0)
+            return new PaginatedResponse<PositionListItemDto>
             {
-                Id = p.PositionId.ToString(),
+                Items = [],
+                Total = 0,
+                Page = page,
+                PageSize = pageSize
+            };
+
+        // Fetch the page of raw PayrollPosition rows.
+        // For "reportsto" sort we still need the join to determine order, but
+        // the COUNT above is already fast. For all other sorts we order purely
+        // on the positions table — no joins, very fast.
+        List<PayrollPosition> pagePositions;
+
+        if (sortKey == "reportsto")
+        {
+            // Build a minimal projection with just the sort key, page the IDs,
+            // then re-fetch those specific rows to get all columns.
+            var sortProjection =
+                from p in filtered
+                let reportsTo = (from r in db.PositionReportingRelationships
+                                 join c in db.PositionApprovalConfigs
+                                     on r.PositionApprovalConfigId equals c.Id
+                                 where r.ReportsToPositionId == p.PositionId.ToString()
+                                      && r.StartDate < tomorrow
+                                      && (r.EndDate == null || r.EndDate >= today)
+                                 orderby r.StartDate descending
+                                 select c.PositionDescription).FirstOrDefault() ?? string.Empty
+                select new { p.PositionId, p.PositionDesc, reportsTo };
+
+            var orderedProjection = desc
+                ? sortProjection.OrderBy(x => x.reportsTo == "" ? 1 : 0)
+                                .ThenByDescending(x => x.reportsTo)
+                                .ThenBy(x => x.PositionDesc)
+                : sortProjection.OrderBy(x => x.reportsTo == "" ? 1 : 0)
+                                .ThenBy(x => x.reportsTo)
+                                .ThenBy(x => x.PositionDesc);
+
+            var pageIds = await orderedProjection
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => x.PositionId)
+                .ToListAsync(ct);
+
+            var posDict = await db.Set<PayrollPosition>().AsNoTracking()
+                .Where(p => pageIds.Contains(p.PositionId))
+                .ToDictionaryAsync(p => p.PositionId, ct);
+
+            pagePositions = pageIds
+                .Where(id => posDict.ContainsKey(id))
+                .Select(id => posDict[id])
+                .ToList();
+        }
+        else
+        {
+            // Sort on positions columns only — no enrichment required.
+            IOrderedQueryable<PayrollPosition> orderedBase;
+            if (int.TryParse(search?.Trim(), out var sid) && sid != 0)
+                orderedBase = filtered
+                    .OrderBy(p => p.PositionId == sid ? 0 : p.PositionCode == search!.Trim() ? 1 : 2)
+                    .ThenBy(p => p.PositionDesc);
+            else if (desc)
+                orderedBase = filtered.OrderByDescending(p => p.PositionDesc);
+            else
+                orderedBase = filtered.OrderBy(p => p.PositionDesc);
+
+            pagePositions = await orderedBase
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
+        }
+
+        if (pagePositions.Count == 0)
+            return new PaginatedResponse<PositionListItemDto>
+            {
+                Items = [],
+                Total = total,
+                Page = page,
+                PageSize = pageSize
+            };
+
+        // Enrich ONLY the page positions (max pageSize rows) with flat lookups.
+        // No OUTER APPLY — each of the queries below is a single round-trip.
+        var pageIds2 = pagePositions.Select(p => p.PositionId).ToList();
+        var pageIdStrings = pageIds2.Select(id => id.ToString()).ToHashSet();
+
+        // Department names
+        var deptIds = pagePositions
+            .Where(p => p.DepartmentId.HasValue)
+            .Select(p => p.DepartmentId!.Value).Distinct().ToList();
+        var deptMap = deptIds.Count > 0
+            ? await db.ConstDepartments.AsNoTracking()
+                .Where(d => deptIds.Contains(d.DepartmentId))
+                .ToDictionaryAsync(d => d.DepartmentId, d => d.DepartmentDesc ?? string.Empty, ct)
+            : new Dictionary<int, string>();
+
+        // Division codes and names
+        var divIds = pagePositions
+            .Where(p => p.DivisionId.HasValue)
+            .Select(p => p.DivisionId!.Value).Distinct().ToList();
+        var divRows = divIds.Count > 0
+            ? await db.ConstDivisions.AsNoTracking()
+                .Where(d => divIds.Contains(d.DivisionId))
+                .ToListAsync(ct)
+            : [];
+        var divCodeMap = divRows.ToDictionary(d => d.DivisionId, d => d.DivisionCode ?? string.Empty);
+        var divNameMap = divRows.ToDictionary(d => d.DivisionId, d => d.DivisionDesc ?? string.Empty);
+
+        // Incumbent employees (one per position)
+        var empList = await db.PayrollEmployees.AsNoTracking()
+            .Where(e => e.PositionId.HasValue && pageIds2.Contains(e.PositionId!.Value))
+            .ToListAsync(ct);
+        var empByPos = empList
+            .GroupBy(e => e.PositionId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // ReportsTo descriptions — flat join, no correlated subquery
+        var reportsToEntries = await (
+            from r in db.PositionReportingRelationships
+            join c in db.PositionApprovalConfigs on r.PositionApprovalConfigId equals c.Id
+            where pageIdStrings.Contains(r.ReportsToPositionId)
+                  && r.StartDate < tomorrow
+                  && (r.EndDate == null || r.EndDate >= today)
+            orderby r.StartDate descending
+            select new { r.ReportsToPositionId, c.PositionDescription }
+        ).ToListAsync(ct);
+        var reportsToMap = reportsToEntries
+            .GroupBy(x => x.ReportsToPositionId)
+            .ToDictionary(g => g.Key, g => g.First().PositionDescription);
+
+        var items = pagePositions.Select(p =>
+        {
+            empByPos.TryGetValue(p.PositionId, out var emp);
+            var deptName = p.DepartmentId.HasValue && deptMap.TryGetValue(p.DepartmentId.Value, out var dn) ? dn : string.Empty;
+            var divCode = p.DivisionId.HasValue && divCodeMap.TryGetValue(p.DivisionId.Value, out var dc) ? dc : string.Empty;
+            var divName = p.DivisionId.HasValue && divNameMap.TryGetValue(p.DivisionId.Value, out var dv) ? dv : string.Empty;
+            var posIdStr = p.PositionId.ToString();
+            reportsToMap.TryGetValue(posIdStr, out var reportsTo);
+
+            return new PositionListItemDto
+            {
+                Id = posIdStr,
                 PositionCode = p.PositionCode ?? string.Empty,
                 Description = p.PositionDesc ?? string.Empty,
                 DepartmentId = p.DepartmentId.HasValue ? p.DepartmentId.Value.ToString() : string.Empty,
-                DepartmentName = (dept != null ? dept.DepartmentDesc : null) ?? string.Empty,
+                DepartmentName = deptName,
                 DivisionId = p.DivisionId.HasValue ? p.DivisionId.Value.ToString() : string.Empty,
-                DivisionCode = (div != null ? div.DivisionCode : null) ?? string.Empty,
-                DivisionName = (div != null ? div.DivisionDesc : null) ?? string.Empty,
-                IsConfigured = configIds.Contains(p.PositionId.ToString()),
+                DivisionCode = divCode,
+                DivisionName = divName,
+                IsConfigured = allConfiguredIdInts.Contains(p.PositionId),
                 EmployeeId = emp != null ? emp.EmployeeId.ToString() : string.Empty,
-                EmployeeCode = (emp != null ? emp.EmpCode : null) ?? string.Empty,
-                EmployeeFirstName = (emp != null ? emp.FirstName : null) ?? string.Empty,
-                EmployeeSurname = (emp != null ? emp.Surname : null) ?? string.Empty,
-                ReportsToPositionDescription =
-                    (from r in db.PositionReportingRelationships
-                     join c in db.PositionApprovalConfigs on r.PositionApprovalConfigId equals c.Id
-                     where r.ReportsToPositionId == p.PositionId.ToString()
-                          && r.StartDate < tomorrow
-                          && (r.EndDate == null || r.EndDate >= today)
-                     orderby r.StartDate descending
-                     select c.PositionDescription).FirstOrDefault() ?? string.Empty
+                EmployeeCode = emp?.EmpCode ?? string.Empty,
+                EmployeeFirstName = emp?.FirstName ?? string.Empty,
+                EmployeeSurname = emp?.Surname ?? string.Empty,
+                ReportsToPositionDescription = reportsTo ?? string.Empty
             };
-
-        var statusKey = (status ?? "all").Trim().ToLowerInvariant();
-        enriched = statusKey switch
-        {
-            "configured" => enriched.Where(x => x.IsConfigured),
-            "notconfigured" or "not-configured" or "not_configured" =>
-                enriched.Where(x => !x.IsConfigured),
-            _ => enriched
-        };
-
-        // Order in SQL so Skip/Take are deterministic. ThenBy(Description) on
-        // every branch keeps ties stable so paging never reshuffles rows.
-        var sortKey = (sort ?? string.Empty).Trim().ToLowerInvariant();
-        var desc = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
-        IOrderedQueryable<PositionListItemDto> ordered = sortKey switch
-        {
-            // Empty Reports To values cluster at the END regardless of
-            // direction (asc or desc) — users sorting by parent should see
-            // populated rows first; blanks are noise.
-            "reportsto" => desc
-                ? enriched.OrderBy(x => x.ReportsToPositionDescription == "" ? 1 : 0)
-                          .ThenByDescending(x => x.ReportsToPositionDescription)
-                          .ThenBy(x => x.Description)
-                : enriched.OrderBy(x => x.ReportsToPositionDescription == "" ? 1 : 0)
-                          .ThenBy(x => x.ReportsToPositionDescription)
-                          .ThenBy(x => x.Description),
-            // Default: alphabetical by description, but when the search term is
-            // a pure integer, put the exact-ID match first so typing "541"
-            // immediately surfaces position 541 at the top of the list.
-            _ when int.TryParse(search?.Trim(), out var sid) && sid != 0
-                => enriched
-                    .OrderBy(x => x.Id == sid.ToString() ? 0 :
-                                  x.PositionCode == (search!.Trim()) ? 1 : 2)
-                    .ThenBy(x => x.Description),
-            _ => enriched.OrderBy(x => x.Description)
-        };
-
-        var total = await ordered.CountAsync(ct);
-        var items = await ordered
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        }).ToList();
 
         return new PaginatedResponse<PositionListItemDto>
         {
@@ -281,5 +398,4 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
                     (e.EmpCode != null && e.EmpCode.ToLower().Contains(lower))
                 )));
     }
-
 }

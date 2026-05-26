@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Models.Domain;
@@ -21,6 +20,9 @@ public class DevCurrentUserService : ICurrentUserService
 
     public DevCurrentUserService(IHttpContextAccessor http, DevUserDirectory directory)
     { _http = http; _directory = directory; }
+
+    /// <summary>The dev shim is always "authenticated" (no session check needed).</summary>
+    public bool IsAuthenticated => true;
 
     public DevUser Current
     {
@@ -75,7 +77,7 @@ public class DevUserDirectory
     {
         _scopeFactory = null!;
         var list = testUsers.ToList();
-        _byUserId     = list.ToDictionary(u => u.UserId,     StringComparer.OrdinalIgnoreCase);
+        _byUserId = list.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
         _byEmployeeId = list
             .GroupBy(u => u.EmployeeId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -102,8 +104,7 @@ public class DevUserDirectory
         var byUserId = _byUserId;
         var byEmployeeId = _byEmployeeId;
         if (byUserId != null && byUserId.TryGetValue(userId, out var u)) return u;
-        if (byEmployeeId != null && byEmployeeId.TryGetValue(userId, out var u2)) return u2;
-        return null;
+        return byEmployeeId != null && byEmployeeId.TryGetValue(userId, out var u2) ? u2 : null;
     }
 
     /// <summary>Drop the cached snapshot so the next read re-queries the DB.</summary>
@@ -117,10 +118,10 @@ public class DevUserDirectory
         }
     }
 
-    private const int PermissionConfig   = 3200;
-    private const int PermissionCapture  = 3201;
-    private const int PermissionPayroll  = 3202;
-    private const int PermissionEnquiry  = 3203;
+    private const int PermissionConfig = 3200;
+    private const int PermissionCapture = 3201;
+    private const int PermissionPayroll = 3202;
+    private const int PermissionEnquiry = 3203;
 
     private List<DevUser> Load()
     {
@@ -159,6 +160,9 @@ public class DevUserDirectory
             // granting it to every dev user (keeps the feature testable without
             // requiring complete seed data). If the permission IS present we
             // enforce it strictly per-user so role separation can be tested.
+            var hasConfigInSeed = permRows.Any(r => r.PermissionId == PermissionConfig);
+            var hasCaptureInSeed = permRows.Any(r => r.PermissionId == PermissionCapture);
+            var hasPayrollInSeed = permRows.Any(r => r.PermissionId == PermissionPayroll);
             var hasEnquiryInSeed = permRows.Any(r => r.PermissionId == PermissionEnquiry);
 
             var permsByUser = permRows
@@ -174,14 +178,14 @@ public class DevUserDirectory
             // ToString() calls in EF.
             var rows = (
                 from u in db.Set<UserUserDetail>().AsNoTracking()
-                where (u.Enabled ?? false) && !(u.HistoricUser ?? false) && u.EmpId != null
+                where (u.Enabled ?? false) && (u.HistoricUser == null || u.HistoricUser == "") && u.EmpId != null
                 join e in db.Set<PayrollEmployee>().AsNoTracking()
                     on u.EmpId equals e.EmployeeId
                 where (e.Enabled ?? false)
                 join p in db.Set<PayrollPosition>().AsNoTracking()
                     on e.PositionId equals p.PositionId into posJoin
                 from p in posJoin.DefaultIfEmpty()
-                orderby u.FirstName, u.LastName, u.UserName
+                orderby u.LastName, u.FirstName, u.UserName
                 select new
                 {
                     u.UserId,
@@ -196,7 +200,8 @@ public class DevUserDirectory
                     PositionDesc = p != null ? p.PositionDesc : null
                 }).ToList();
 
-            var users = rows.Select(r =>
+            // ── Employee-linked users (have EmpId → Payroll_Employee row) ──────
+            var employeeUsers = rows.Select(r =>
             {
                 var positionId = r.PositionId?.ToString() ?? string.Empty;
                 configs.TryGetValue(positionId, out var cfg);
@@ -241,20 +246,81 @@ public class DevUserDirectory
                     IsPayrollApprover = true,
 
                     // Page-access: derived from User_UserRoles → Sys_RolePermission.
-                    CanAccessConfig  = perms?.Contains(PermissionConfig)  ?? false,
-                    CanAccessCapture = perms?.Contains(PermissionCapture) ?? false,
-                    // Permission 3202 (Payroll Processing) is not yet in the dev seed
-                    // data, so grant it unconditionally in dev — consistent with the
-                    // IsPayrollCapturer / IsPayrollApprover flags above.
-                    CanAccessPayroll = true,
-                    // Permission 3203 (Enquiry): if 3203 rows exist anywhere in the
-                    // seed we enforce per-user; otherwise grant unconditionally so the
-                    // page stays accessible in dev without requiring complete seed data.
+                    // For each permission: if any row exists in the seed we enforce
+                    // it strictly per-user; if the permission is absent from the seed
+                    // entirely we grant it unconditionally so the page stays testable
+                    // without requiring complete seed data.
+                    CanAccessConfig = hasConfigInSeed
+                        ? (perms?.Contains(PermissionConfig) ?? false)
+                        : true,
+                    CanAccessCapture = hasCaptureInSeed
+                        ? (perms?.Contains(PermissionCapture) ?? false)
+                        : true,
+                    CanAccessPayroll = hasPayrollInSeed
+                        ? (perms?.Contains(PermissionPayroll) ?? false)
+                        : true,
                     CanAccessEnquiry = hasEnquiryInSeed
                         ? (perms?.Contains(PermissionEnquiry) ?? false)
                         : true
                 };
             }).ToList();
+
+            // ── Non-employee portal users (no EmpId: Admin, Superdev, etc.) ─────
+            // These accounts exist in User_UserDetail but have no Payroll_Employee
+            // link. They must still appear in the directory so that a session
+            // created for them by AuthController.Login can be resolved correctly.
+            // Permissions come from SuperUser flag and/or their role rows.
+            var nonEmpRows = db.Set<UserUserDetail>().AsNoTracking()
+                .Where(u => (u.Enabled ?? false) && (u.HistoricUser == null || u.HistoricUser == "") && u.EmpId == null)
+                .OrderBy(u => u.LastName).ThenBy(u => u.FirstName).ThenBy(u => u.UserName)
+                .Select(u => new
+                {
+                    u.UserId,
+                    u.FirstName,
+                    u.LastName,
+                    u.UserName,
+                    u.SuperUser
+                })
+                .ToList();
+
+            var nonEmpUsers = nonEmpRows.Select(r =>
+            {
+                permsByUser.TryGetValue(r.UserId, out var perms);
+                var isSu = r.SuperUser == true;
+                var displayName = JoinNonEmpty(r.FirstName, r.LastName);
+                if (string.IsNullOrWhiteSpace(displayName))
+                    displayName = r.UserName ?? $"User {r.UserId}";
+
+                return new DevUser
+                {
+                    UserId = r.UserId.ToString(),
+                    DisplayName = displayName,
+                    EmployeeId = string.Empty,
+                    EmployeeName = displayName,
+                    PositionId = string.Empty,
+                    PositionDescription = string.Empty,
+                    IsCapturer = isSu,
+                    IsRecommender = isSu,
+                    IsApprover = isSu,
+                    IsExcessApprover = isSu,
+                    IsPayrollCapturer = isSu,
+                    IsPayrollApprover = isSu,
+                    CanAccessConfig = hasConfigInSeed
+                        ? (perms?.Contains(PermissionConfig) ?? isSu)
+                        : true,
+                    CanAccessCapture = hasCaptureInSeed
+                        ? (perms?.Contains(PermissionCapture) ?? isSu)
+                        : true,
+                    CanAccessPayroll = hasPayrollInSeed
+                        ? (perms?.Contains(PermissionPayroll) ?? isSu)
+                        : true,
+                    CanAccessEnquiry = hasEnquiryInSeed
+                        ? (perms?.Contains(PermissionEnquiry) ?? isSu)
+                        : true,
+                };
+            }).ToList();
+
+            var users = employeeUsers.Concat(nonEmpUsers).ToList();
 
             // Publish dictionaries BEFORE _cache so the lock-free fast path
             // (`if (_cache != null) return _cache;`) never observes a non-null
@@ -292,9 +358,9 @@ public class DevUserDirectory
         IsExcessApprover = true,
         IsPayrollCapturer = true,
         IsPayrollApprover = true,
-        CanAccessConfig   = true,
-        CanAccessCapture  = true,
-        CanAccessPayroll  = true,
-        CanAccessEnquiry  = true
+        CanAccessConfig = true,
+        CanAccessCapture = true,
+        CanAccessPayroll = true,
+        CanAccessEnquiry = true
     };
 }

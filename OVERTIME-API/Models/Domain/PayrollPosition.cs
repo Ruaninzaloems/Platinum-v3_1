@@ -20,10 +20,10 @@ public class PayrollPosition
     public int? DivisionId { get; set; }
     public int? JobProfileId { get; set; }
     public int? Status { get; set; }
-    public int? Enabled { get; set; }
+    public bool? Enabled { get; set; }
     public int? ParentId { get; set; }
-    public string? EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
     public int? HOD { get; set; }
-    public int? HierarchyNo { get; set; }
+    public string? HierarchyNo { get; set; }
     public string? UniqueId { get; set; }
 }

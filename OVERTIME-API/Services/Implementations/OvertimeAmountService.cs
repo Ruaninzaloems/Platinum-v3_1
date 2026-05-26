@@ -10,8 +10,9 @@ namespace PlatinumOvertime_API.Services.Implementations;
 ///
 /// Algorithm (matches Platinum production):
 ///   1. Locate the active MOC for the salary head: Const_MOC where
-///      SalaryHeadID = X AND Enabled AND today between StartDate/EndDate
-///      (Excel serial dates in dev seed; datetime2 in prod).
+///      SalaryHeadID = X AND Enabled AND today between StartDate/EndDate.
+///      StartDate/EndDate are datetime in both production (SQL Server)
+///      and dev (Postgres timestamp, seeded via OADate conversion).
 ///   2. Locate the active MOCDetail under that MOC (same date filter).
 ///   3. Resolve formula variables from Payroll_Employee:
 ///         OverTimeHour = caller-supplied hours
@@ -33,19 +34,6 @@ public class OvertimeAmountService : IOvertimeAmountService
     public OvertimeAmountService(OvertimeDbContext db, FormulaEvaluator evaluator, ILogger<OvertimeAmountService> log)
     { _db = db; _evaluator = evaluator; _log = log; }
 
-    /// <summary>
-    /// Excel serial date for "today". Dev seed dates are stored as Excel
-    /// serial numbers (45000-ish) so we compare on the same scale.
-    /// SQL Server prod stores datetime2 — the seeder there inserts real
-    /// dates, but this dev-only conversion is harmless because no real
-    /// MOC ever falls outside its window.
-    /// </summary>
-    private static decimal ExcelSerialToday()
-    {
-        var epoch = new DateTime(1899, 12, 30);
-        return (decimal)(DateTime.UtcNow.Date - epoch).TotalDays;
-    }
-
     public async Task<List<OvertimeTypeOption>> GetOvertimeTypesForEmployeeAsync(int employeeId, CancellationToken ct = default)
     {
         // Entitlements live in Payroll_EmployeePayrollDefinition; project to
@@ -66,8 +54,9 @@ public class OvertimeAmountService : IOvertimeAmountService
             .Where(h => entitled.Contains(h.SalaryHeadId))
             .ToListAsync(ct);
 
-        // Latest active MOCDetail per salary head.
-        var today = ExcelSerialToday();
+        // Filter to active MOCs: StartDate/EndDate are datetime in production
+        // SQL Server and timestamp in dev Postgres (seeded via OADate conversion).
+        var today = DateTime.UtcNow.Date;
         var mocs = await _db.ConstMOCs
             .Where(m => entitled.Contains(m.SalaryHeadId)
                         && (m.Enabled ?? true)
@@ -118,7 +107,7 @@ public class OvertimeAmountService : IOvertimeAmountService
             .FirstOrDefaultAsync(h => h.SalaryHeadId == salaryHeadId, ct)
             ?? throw new InvalidOperationException($"Salary head {salaryHeadId} not found.");
 
-        var today = ExcelSerialToday();
+        var today = DateTime.UtcNow.Date;
         var moc = await _db.ConstMOCs
             .Where(m => m.SalaryHeadId == salaryHeadId
                         && (m.Enabled ?? true)

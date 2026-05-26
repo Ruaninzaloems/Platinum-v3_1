@@ -6,9 +6,9 @@ using PlatinumOvertime_API.Services.Interfaces;
 namespace PlatinumOvertime_API.Controllers;
 
 /// <summary>
-/// Reflects the current authenticated user back to the UI. The dev shim
-/// reads X-User-Id; the response also lists every available dev user so the
-/// "switch user" widget in the UI doesn't need a separate endpoint.
+/// Reflects the current authenticated user back to the UI.
+/// Returns 401 when no session is active so the Angular auth guard can redirect
+/// unauthenticated requests to the login page.
 /// </summary>
 [ApiController]
 [Route("api/me")]
@@ -20,29 +20,30 @@ public class MeController : ControllerBase
     [HttpGet]
     public ActionResult<ApiResponse<MeDto>> Get()
     {
-        var u = _user.Current;
-        var dto = ToDto(u);
-        dto.AvailableUsers = _user.AllUsers.Select(ToDto).ToList();
+        if (!_user.IsAuthenticated)
+            return Unauthorized(ApiResponse<MeDto>.Failure("Not authenticated."));
+
+        var dto = ToDto(_user.Current);
         return Ok(ApiResponse<MeDto>.Success(dto));
     }
 
-    private static MeDto ToDto(DevUser u) => new()
+    internal static MeDto ToDto(DevUser u) => new()
     {
-        UserId = u.UserId,
-        DisplayName = u.DisplayName,
-        EmployeeId = u.EmployeeId,
-        EmployeeName = u.EmployeeName,
-        PositionId = u.PositionId,
+        UserId              = u.UserId,
+        DisplayName         = u.DisplayName,
+        EmployeeId          = u.EmployeeId,
+        EmployeeName        = u.EmployeeName,
+        PositionId          = u.PositionId,
         PositionDescription = u.PositionDescription,
-        IsCapturer = u.IsCapturer,
-        IsRecommender = u.IsRecommender,
-        IsApprover = u.IsApprover,
-        IsExcessApprover = u.IsExcessApprover,
-        IsPayrollCapturer = u.IsPayrollCapturer,
-        IsPayrollApprover = u.IsPayrollApprover,
-        CanAccessConfig = u.CanAccessConfig,
-        CanAccessCapture = u.CanAccessCapture,
-        CanAccessPayroll = u.CanAccessPayroll,
-        CanAccessEnquiry = u.CanAccessEnquiry
+        IsCapturer          = u.IsCapturer,
+        IsRecommender       = u.IsRecommender,
+        IsApprover          = u.IsApprover,
+        IsExcessApprover    = u.IsExcessApprover,
+        IsPayrollCapturer   = u.IsPayrollCapturer,
+        IsPayrollApprover   = u.IsPayrollApprover,
+        CanAccessConfig     = u.CanAccessConfig,
+        CanAccessCapture    = u.CanAccessCapture,
+        CanAccessPayroll    = u.CanAccessPayroll,
+        CanAccessEnquiry    = u.CanAccessEnquiry,
     };
 }

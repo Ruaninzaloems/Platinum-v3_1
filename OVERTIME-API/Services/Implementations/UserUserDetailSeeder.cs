@@ -13,6 +13,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 ///
 /// Sensitive columns (Password, TransactionPassword, SignatureImage) are
 /// preserved as null in the seed data.
+///
+/// All date columns are datetime in production. JSON seed export contains
+/// OADate serial numbers; OADateJsonConverter handles conversion to DateTime.
+/// SignatureImage is varbinary in production; mapped as bytea in Postgres.
 /// </summary>
 public class UserUserDetailSeeder
 {
@@ -53,28 +57,50 @@ public class UserUserDetailSeeder
                 ""DepartmentID""               integer,
                 ""Enabled""                    boolean,
                 ""TotalLogin""                 integer,
-                ""LastLoginDate""              decimal(18,8),
+                ""LastLoginDate""              timestamp,
                 ""sendSMS""                    boolean,
                 ""SuperUser""                  boolean,
-                ""DateCaptured""               decimal(18,8),
+                ""DateCaptured""               timestamp,
                 ""CapturerID""                 integer,
                 ""PasswordNeverExpire""        boolean,
-                ""PasswordLastChangedDate""    decimal(18,8),
+                ""PasswordLastChangedDate""    timestamp,
                 ""ModifierID""                 integer,
-                ""DateModified""               decimal(18,8),
+                ""DateModified""               timestamp,
                 ""TemporaryPassword""          boolean,
                 ""CashFloat""                  decimal(18,2),
-                ""StartDate""                  decimal(18,8),
-                ""EndDate""                    decimal(18,8),
-                ""HistoricUser""               boolean,
+                ""StartDate""                  timestamp,
+                ""EndDate""                    timestamp,
+                ""HistoricUser""               varchar(100),
                 ""TransactionPassword""        varchar(500),
                 ""SignatureFilePath""          varchar(1000),
-                ""SignatureUploadedOn""        decimal(18,8),
-                ""SignatureImage""             text,
+                ""SignatureUploadedOn""        timestamp,
+                ""SignatureImage""             bytea,
                 ""SignatureImageMimeType""     varchar(100)
             );
             CREATE INDEX IF NOT EXISTS ix_user_user_detail_emp
                 ON ""User_UserDetail"" (""EmpID"");", ct);
+
+        // Migrate existing table if columns were previously created with wrong types.
+        // IMPORTANT: these migrations must NEVER truncate the table — existing rows
+        // (including manually-set passwords) must always be preserved.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='User_UserDetail' AND column_name='LastLoginDate') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""LastLoginDate""           TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""DateCaptured""            TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""PasswordLastChangedDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""DateModified""            TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""StartDate""               TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""EndDate""                 TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ALTER COLUMN ""SignatureUploadedOn""     TYPE timestamp USING NULL';
+                END IF;
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='User_UserDetail' AND column_name='SignatureImage') = 'text' THEN
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" DROP COLUMN ""SignatureImage""';
+                    EXECUTE 'ALTER TABLE ""User_UserDetail"" ADD COLUMN ""SignatureImage"" bytea';
+                END IF;
+            END $$;", ct);
 
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "user_user_detail.json");
         if (!File.Exists(path))
@@ -83,9 +109,14 @@ public class UserUserDetailSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<UserUserDetail>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<UserUserDetail>();
+        var rows = await JsonSerializer.DeserializeAsync<List<UserUserDetail>>(fs, opts, ct) ?? new List<UserUserDetail>();
         if (rows.Count == 0)
         {
             _log.LogWarning("User_UserDetail seed file at {Path} contained no rows.", path);
@@ -93,16 +124,13 @@ public class UserUserDetailSeeder
         }
 
         var existing = await _db.Set<UserUserDetail>().CountAsync(ct);
-        if (existing == rows.Count)
-        {
-            _log.LogInformation("User_UserDetail already fully populated ({Count} rows); skipping seed.", existing);
-            return;
-        }
         if (existing > 0)
         {
-            _log.LogWarning("User_UserDetail has {Existing} rows but seed file has {Expected}; rebuilding.",
-                existing, rows.Count);
-            await _db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"User_UserDetail\";", ct);
+            // Table already has rows — never wipe it. Passwords and any other
+            // fields set manually in dev must be preserved across restarts.
+            // Seeding only runs when the table is completely empty.
+            _log.LogInformation("User_UserDetail already populated ({Existing} rows); skipping seed.", existing);
+            return;
         }
 
         _log.LogInformation("Seeding User_UserDetail with {Count} rows...", rows.Count);

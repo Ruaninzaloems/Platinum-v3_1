@@ -57,6 +57,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         var rows = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .Where(t => t.Status != WorkflowStatus.Processed
                         && t.Status != WorkflowStatus.Rejected
                         && (t.CurrentAssigneeUserId == me || t.CapturedBy == me))
@@ -73,6 +74,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         var rows = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .Where(t => t.Status == WorkflowStatus.Processed
                         || t.Status == WorkflowStatus.Rejected)
             .OrderByDescending(t => t.UpdatedAt)
@@ -91,6 +93,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             .AsNoTracking()
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .AsQueryable();
 
         if (status.HasValue)
@@ -132,6 +135,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         var rows = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .Where(t => t.EmployeeId == employeeId)
             .OrderByDescending(t => t.OvertimeDate)
             .ToListAsync(ct);
@@ -168,18 +172,21 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         if (!int.TryParse(request.EmployeeId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var empNum))
             return ApiResponse<OvertimeTransactionDto>.Failure("EmployeeId is not numeric.");
 
-        // Duplicate guard: reject a second non-rejected transaction for the
-        // same employee + salary head + date combination.
+        // Duplicate guard: warn (not hard-block) when a non-rejected transaction
+        // already exists for the same employee + salary head + date.
         var requestedDate = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc);
-        var duplicate = await _db.OvertimeTransactions
-            .AnyAsync(t => t.EmployeeId == request.EmployeeId
-                           && t.SalaryHeadId == request.SalaryHeadId
-                           && t.OvertimeDate == requestedDate
-                           && t.Status != WorkflowStatus.Rejected, ct);
-        if (duplicate)
-            return ApiResponse<OvertimeTransactionDto>.Failure(
-                "A transaction for this employee, overtime type, and date already exists. " +
-                "Please check the existing entry before submitting a new one.");
+        if (!request.SkipDuplicateDateCheck)
+        {
+            var duplicate = await _db.OvertimeTransactions
+                .AnyAsync(t => t.EmployeeId == request.EmployeeId
+                               && t.SalaryHeadId == request.SalaryHeadId
+                               && t.OvertimeDate == requestedDate
+                               && t.Status != WorkflowStatus.Rejected, ct);
+            if (duplicate)
+                return ApiResponse<OvertimeTransactionDto>.Failure(
+                    "DUPLICATE_DATE_WARNING: A claim for this employee, overtime type, and date already exists. " +
+                    "Are you sure you want to submit another claim for the same date?");
+        }
 
         // Calculate amount (snapshot formula + amount onto the row).
         OvertimeAmountResult calc;
@@ -201,6 +208,19 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             .SumAsync(t => (decimal?)t.Hours, ct) ?? 0m;
         var monthlyMax = cfg?.MaximumMonthlyOvertimeHours ?? 40m;
         var isExcess = (hoursAlready + request.Hours) > monthlyMax;
+
+        // Hard-reject if adding these hours would push the employee's monthly
+        // total beyond the exceptional maximum ceiling.
+        var exceptionalMax = cfg?.ExceptionalMaximumOvertimeHours ?? 60m;
+        _log.LogInformation(
+            "ExceptionalMax check: emp={Emp} date={Date} window=[{Start},{End}] hoursAlready={Already} requested={Req} max={Max} total={Total}",
+            request.EmployeeId, request.OvertimeDate.Date.ToString("yyyy-MM-dd"),
+            windowStart.ToString("yyyy-MM-dd"), windowEnd.ToString("yyyy-MM-dd HH:mm:ss"),
+            hoursAlready, request.Hours, exceptionalMax, hoursAlready + request.Hours);
+        if ((hoursAlready + request.Hours) > exceptionalMax)
+            return ApiResponse<OvertimeTransactionDto>.Failure(
+                $"{emp.FullName} already has {hoursAlready:0.##} hour{(hoursAlready == 1m ? "" : "s")} captured this month. " +
+                $"Adding {request.Hours:0.##} hour{(request.Hours == 1m ? "" : "s")} would exceed the maximum allowed of {exceptionalMax:0.##} hours.");
 
         // Resolve the workflow chain for snapshotting.
         var bundle = await _resolver.ResolveAsync(emp.PositionId, ct);
@@ -281,6 +301,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         var tx = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tx is null)
             return ApiResponse<OvertimeTransactionDto>.Failure("Overtime transaction not found.");
@@ -314,12 +335,11 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         if (!int.TryParse(tx.EmployeeId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var empNum))
             return ApiResponse<OvertimeTransactionDto>.Failure("EmployeeId on the transaction is not numeric.");
 
-        // Duplicate guard: when the date or head changes, ensure the new
-        // combination (employee + head + date) is not already occupied by
-        // another non-rejected transaction.
+        // Duplicate guard: warn (not hard-block) when the new date/head combination
+        // is already occupied by another non-rejected transaction.
         var newDate = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc);
         var newHead = request.SalaryHeadId;
-        if (newDate != tx.OvertimeDate.Date || newHead != tx.SalaryHeadId)
+        if (!request.SkipDuplicateDateCheck && (newDate != tx.OvertimeDate.Date || newHead != tx.SalaryHeadId))
         {
             var duplicate = await _db.OvertimeTransactions
                 .AnyAsync(t => t.Id != id
@@ -329,8 +349,8 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                                && t.Status != WorkflowStatus.Rejected, ct);
             if (duplicate)
                 return ApiResponse<OvertimeTransactionDto>.Failure(
-                    "A transaction for this employee, overtime type, and date already exists. " +
-                    "Please check the existing entry before submitting a new one.");
+                    "DUPLICATE_DATE_WARNING: A claim for this employee, overtime type, and date already exists. " +
+                    "Are you sure you want to submit another claim for the same date?");
         }
 
         // Recalculate amount + isExcess only if the inputs changed (cheap to
@@ -361,6 +381,17 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                             && t.OvertimeDate >= windowStart && t.OvertimeDate <= windowEnd)
                 .SumAsync(t => (decimal?)t.Hours, ct) ?? 0m;
             var monthlyMax = cfg?.MaximumMonthlyOvertimeHours ?? 40m;
+
+            // Hard-reject on update only when hours are increasing beyond the
+            // exceptional maximum. Reducing hours is always allowed.
+            if (request.Hours > tx.Hours)
+            {
+                var exceptionalMax = cfg?.ExceptionalMaximumOvertimeHours ?? 60m;
+                if ((hoursAlready + request.Hours) > exceptionalMax)
+                    return ApiResponse<OvertimeTransactionDto>.Failure(
+                        $"{tx.EmployeeName} already has {hoursAlready:0.##} hour{(hoursAlready == 1m ? "" : "s")} captured this month. " +
+                        $"Adding {request.Hours:0.##} hour{(request.Hours == 1m ? "" : "s")} would exceed the maximum allowed of {exceptionalMax:0.##} hours.");
+            }
 
             tx.SalaryHeadId   = request.SalaryHeadId;
             tx.SalaryHeadName = calc.SalaryHeadName;
@@ -628,6 +659,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.Id == id, ct);
 
     private static TimeSpan? ParseTime(string? hhmm)
@@ -697,10 +729,17 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         Amount = t.Amount,
         Reason = t.Reason,
         Status = t.Status,
-        StatusLabel = t.Status.ToString(),
+        StatusLabel = t.Status.ToLabel(),
         RecommenderEmployeeName = t.RecommenderEmployeeName,
+        RecommenderPositionDescription = string.IsNullOrWhiteSpace(t.RecommenderEmployeeId) ? null
+            : userSvc?.FindByUserId(t.RecommenderEmployeeId)?.PositionDescription,
         ApproverEmployeeName = t.ApproverEmployeeName,
+        ApproverPositionDescription = string.IsNullOrWhiteSpace(t.ApproverEmployeeId) ? null
+            : userSvc?.FindByUserId(t.ApproverEmployeeId)?.PositionDescription,
+        ExcessApproverEmployeeId = t.ExcessApproverEmployeeId,
         ExcessApproverEmployeeName = t.ExcessApproverEmployeeName,
+        ExcessApproverPositionDescription = string.IsNullOrWhiteSpace(t.ExcessApproverEmployeeId) ? null
+            : userSvc?.FindByUserId(t.ExcessApproverEmployeeId)?.PositionDescription,
         PayrollCapturerEmployeeName = t.PayrollCapturerEmployeeName,
         PayrollApproverEmployeeName = t.PayrollApproverEmployeeName,
         CurrentAssigneeUserId = t.CurrentAssigneeUserId,

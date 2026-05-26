@@ -137,7 +137,7 @@ public class PayrollProcessingService : IPayrollProcessingService
                 CapturedByName = t.CapturedByName,
                 IsExcess = t.IsExcess,
                 Status = (int)t.Status,
-                StatusLabel = t.Status.ToString()
+                StatusLabel = t.Status.ToLabel()
             };
         }).ToList();
 

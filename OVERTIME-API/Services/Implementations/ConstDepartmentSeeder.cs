@@ -10,6 +10,10 @@ namespace PlatinumOvertime_API.Services.Implementations;
 /// exists in the dev Postgres database and is populated from the supplied
 /// spreadsheet. In production (SQL Server) this seeder is a no-op because
 /// the real table is owned by Platinum Payroll.
+///
+/// All date columns are datetime in production. JSON seed export contains
+/// OADate serial numbers; OADateJsonConverter handles conversion to DateTime.
+/// VatApportionment is int in production (not decimal).
 /// </summary>
 public class ConstDepartmentSeeder
 {
@@ -41,19 +45,35 @@ public class ConstDepartmentSeeder
                 ""Department_ID""        integer PRIMARY KEY,
                 ""DepartmentDesc""       varchar(500),
                 ""Enabled""              boolean,
-                ""DateCaptured""         decimal(18,8),
+                ""DateCaptured""         timestamp,
                 ""CapturerID""           integer,
-                ""DateModified""         decimal(18,8),
+                ""DateModified""         timestamp,
                 ""ModifierID""           integer,
                 ""DepartmentCode""       varchar(64),
-                ""StartDate""            decimal(18,8),
-                ""EndDate""              decimal(18,8),
-                ""VatApportionment""     decimal(18,4),
+                ""StartDate""            timestamp,
+                ""EndDate""              timestamp,
+                ""VatApportionment""     integer,
                 ""ManagerPositionID""    integer,
-                ""ManagerStartDate""     decimal(18,8),
-                ""ManagerEndDate""       decimal(18,8),
+                ""ManagerStartDate""     timestamp,
+                ""ManagerEndDate""       timestamp,
                 ""FinYear""              varchar(32)
             );", ct);
+
+        // Migrate existing table if columns were previously created with wrong types.
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name='Const_Department' AND column_name='DateCaptured') = 'numeric' THEN
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""DateCaptured""    TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""DateModified""    TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""StartDate""       TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""EndDate""         TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""ManagerStartDate"" TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""ManagerEndDate""  TYPE timestamp USING NULL';
+                    EXECUTE 'ALTER TABLE ""Const_Department"" ALTER COLUMN ""VatApportionment"" TYPE integer USING NULL';
+                    EXECUTE 'TRUNCATE TABLE ""Const_Department""';
+                END IF;
+            END $$;", ct);
 
         var path = Path.Combine(_env.ContentRootPath, "Data", "SeedData", "const_department.json");
         if (!File.Exists(path))
@@ -62,9 +82,14 @@ public class ConstDepartmentSeeder
             return;
         }
 
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new OADateJsonConverter() }
+        };
+
         await using var fs = File.OpenRead(path);
-        var rows = await JsonSerializer.DeserializeAsync<List<ConstDepartment>>(fs,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<ConstDepartment>();
+        var rows = await JsonSerializer.DeserializeAsync<List<ConstDepartment>>(fs, opts, ct) ?? new List<ConstDepartment>();
         if (rows.Count == 0)
         {
             _log.LogWarning("Const_Department seed file at {Path} contained no rows.", path);

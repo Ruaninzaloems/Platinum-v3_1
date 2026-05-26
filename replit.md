@@ -116,6 +116,8 @@ KPI dashboards, performance scorecards, strategic alignment, ward-level reportin
 ### Overtime (libs/overtime/)
 Overtime request management, policy configuration, rate management, approval workflows, reporting, settings. .NET/EF Core API on port 8099.
 
+**Upstream sync (2026-05-26):** OVERTIME-API/ synced from https://github.com/Ruaninzaloems/Platinum-Overtime.git (commit 5b8c1b4). Added: AdminController, AuthController, DashboardController, SessionAuthFilter middleware (global session auth + `[SkipSessionAuth]` opt-out), DashboardSummaryDto, EmployeeDataSeeder, UserUserRoleSeeder, OADateJsonConverter, run-api.sh, appsettings.Production.json. Removed: OrgChartSeeder.cs. Preserved locally: appsettings.json (Postgres provider), appsettings.Development.json (Replit DB config + `Seeding:SkipOnStartup=true`), Properties/launchSettings.json, App_Data/. Program.cs patched so all dev seeders honour `Seeding:SkipOnStartup` (the upstream EmployeeDataSeeder unconditionally inserts 3,550 Payroll_Employee rows and crashes on null IdNo without this guard). The Sibling APIs workflow now uses `dotnet run --project PlatinumOvertime-API.csproj` instead of running a prebuilt .dll, so source changes are picked up on workflow restart. The Angular UI side (PlatinumOvertime-UI in upstream) was NOT merged — libs/overtime/ has already been refactored into the Nx monorepo and a wholesale copy would undo that work.
+
 ## Technical Notes
 - Angular 21 with zoneless change detection (`provideZonelessChangeDetection()`)
 - Standalone components throughout (no NgModules)
