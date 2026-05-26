@@ -16,6 +16,8 @@ public class AssetDisposal
     public int? CapturerID { get; set; }
     public DateTime? DateModified { get; set; }
     public int? ModifierID { get; set; }
+    public decimal? CatchUpDep { get; set; }
+    public int? CatchUpDays { get; set; }
 }
 
 public class AssetDisposalApproval

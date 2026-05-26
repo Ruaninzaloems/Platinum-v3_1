@@ -14,12 +14,14 @@ public class AssetImpairmentController : ControllerBase
     private readonly DbConnectionFactory _db;
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
+    private readonly EmailService _emailService;
 
-    public AssetImpairmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService)
+    public AssetImpairmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -231,7 +233,8 @@ public class AssetImpairmentController : ControllerBase
                        ""ImpairmentDate"", ""NewCarryingAmount"", ""ImpairmentAmount"", ""FinYear"", ""RemainingUsefulLife"",
                        COALESCE(""Approved"", 0) AS ""Approved"",
                        COALESCE(""CatchUpDepreciation"", 0) AS ""CatchUpDepreciation"",
-                       COALESCE(""CatchUpDays"", 0) AS ""CatchUpDays""
+                       COALESCE(""CatchUpDays"", 0) AS ""CatchUpDays"",
+                       COALESCE(""Reason"", '') AS ""Reason""
                 FROM ""Asset_Impairment"" WHERE ""Impairment_ID"" = @id", new { id }, txn);
 
             if (impairment is null)
@@ -339,7 +342,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, debitVoteId, finYear,
-                    journalTransactionTypeId, itemDescription, documentNumber,
+                    documentTypeId, itemDescription, documentNumber,
                     debit: impairmentTotal, credit: null, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig?.DebitScoaFundId, scoaRegionId: mscoaConfig?.DebitScoaRegionId,
@@ -355,7 +358,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, creditVoteId, finYear,
-                    journalTransactionTypeId, itemDescription, documentNumber,
+                    documentTypeId, itemDescription, documentNumber,
                     debit: null, credit: impairmentTotal, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig?.CreditScoaFundId, scoaRegionId: mscoaConfig?.CreditScoaRegionId,
@@ -372,7 +375,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, mscoaConfig.ReserveVoteId, finYear,
-                    journalTransactionTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
+                    documentTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
                     debit: revaluationReserveAmount, credit: null, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -385,7 +388,7 @@ public class AssetImpairmentController : ControllerBase
 
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, mscoaConfig.OffsetVoteId, finYear,
-                    journalTransactionTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
+                    documentTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
                     debit: null, credit: revaluationReserveAmount, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,
@@ -516,6 +519,25 @@ public class AssetImpairmentController : ControllerBase
                 WHERE ""entity_type"" = 'impairment' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
+            var impTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetRegId);
+            impTokens["TransactionDate"]          = impairmentDate.ToString("dd MMM yyyy");
+            impTokens["ImpairmentType"]           = transactionTypeName;
+            impTokens["ImpairmentLoss"]           = impairmentAmount.ToString("N2");
+            impTokens["AdjustedCarryingAmount"]   = newCarryingValue.ToString("N2");
+            impTokens["RecoverableServiceAmount"] = newCarryingValue.ToString("N2");
+            impTokens["CatchUpDepreciation"]      = catchUpDepreciation.ToString("N2");
+            impTokens["RevaluationReserve"]       = revaluationReserveAmount.ToString("N2");
+            try
+            {
+                var impPosting = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT COALESCE(""PresentValue"", 0) AS pv FROM ""Asset_ImpairmentPostings"" WHERE ""Impairment_ID"" = @id ORDER BY ""Id"" DESC LIMIT 1",
+                    new { id });
+                impTokens["ValueInUse"] = impPosting != null ? Convert.ToDecimal(impPosting.pv ?? 0m).ToString("N2") : "";
+            }
+            catch { impTokens["ValueInUse"] = ""; }
+            impTokens["Reason"]                   = (string)(impairment.Reason ?? "");
+            impTokens["FinancialYear"]            = finYear;
+            _ = _emailService.SendTransactionEmailsAsync(isReversal ? "Impairment Reversal" : "Impairment", impTokens);
             return Ok(new { success = 1, journalId, documentNumber, transactionId });
         }
         catch (Exception ex)
@@ -572,7 +594,7 @@ public class AssetImpairmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, debitVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation - Catch-up to Impairment Date", depDocNumber,
+                depDocTypeId, "Asset Depreciation - Catch-up to Impairment Date", depDocNumber,
                 debit: catchUpAmount, credit: null, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig?.DebitScoaFundId, scoaRegionId: mscoaConfig?.DebitScoaRegionId,
@@ -588,7 +610,7 @@ public class AssetImpairmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, creditVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation - Catch-up to Impairment Date", depDocNumber,
+                depDocTypeId, "Asset Depreciation - Catch-up to Impairment Date", depDocNumber,
                 debit: null, credit: catchUpAmount, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig?.CreditScoaFundId, scoaRegionId: mscoaConfig?.CreditScoaRegionId,
@@ -683,7 +705,7 @@ public class AssetImpairmentController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.ReserveVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
+                depDocTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
                 debit: postedOffset, credit: null, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -695,7 +717,7 @@ public class AssetImpairmentController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 transactionDate, processingMonth, mscoaConfig.OffsetVoteId, finYear,
-                depJournalTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
+                depDocTypeId, "Asset Depreciation Offset - Catch-up", depDocNumber,
                 debit: null, credit: postedOffset, matchTranGuid: depTxnId,
                 journalTransactionTypeId: depJournalTypeId, assetLinkId: depJournalId,
                 scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,
@@ -864,7 +886,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, debitVoteId, finYear,
-                    journalTransactionTypeId, itemDescription, documentNumber,
+                    documentTypeId, itemDescription, documentNumber,
                     debit: impairmentTotal, credit: null, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig?.DebitScoaFundId, scoaRegionId: mscoaConfig?.DebitScoaRegionId,
@@ -880,7 +902,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, creditVoteId, finYear,
-                    journalTransactionTypeId, itemDescription, documentNumber,
+                    documentTypeId, itemDescription, documentNumber,
                     debit: null, credit: impairmentTotal, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig?.CreditScoaFundId, scoaRegionId: mscoaConfig?.CreditScoaRegionId,
@@ -897,7 +919,7 @@ public class AssetImpairmentController : ControllerBase
             {
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, mscoaConfig.ReserveVoteId, finYear,
-                    journalTransactionTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
+                    documentTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
                     debit: null, credit: revaluationReserveAmount, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -910,7 +932,7 @@ public class AssetImpairmentController : ControllerBase
 
                 await _txnService.InsertGeneralLedgerEntry(conn, txn,
                     impairmentDate, processingMonth, mscoaConfig.OffsetVoteId, finYear,
-                    journalTransactionTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
+                    documentTypeId, itemDescription + " - Revaluation Reserve", documentNumber,
                     debit: revaluationReserveAmount, credit: null, matchTranGuid: transactionId,
                     journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                     scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,
@@ -1139,10 +1161,11 @@ public class AssetImpairmentController : ControllerBase
             string itemDescription = "Asset Reversal of Impairment - Correction";
             int processingMonth = await _txnService.GetProcessingMonth(conn, 1, txn);
             var corrTranId = Guid.NewGuid();
+            int corrDocTypeId = int.TryParse(documentNumber.Split('/').FirstOrDefault(), out var cdtp) && cdtp > 0 ? cdtp : journalTxnTypeId;
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 KnownImpairmentDate, processingMonth, mscoaConfig.DebitVoteId, KnownFinYear,
-                journalTxnTypeId, itemDescription, documentNumber,
+                corrDocTypeId, itemDescription, documentNumber,
                 debit: KnownImpairmentAmount, credit: null, matchTranGuid: corrTranId,
                 journalTransactionTypeId: journalTxnTypeId, assetLinkId: assetLinkId,
                 scoaFundsId: mscoaConfig.DebitScoaFundId, scoaRegionId: mscoaConfig.DebitScoaRegionId,
@@ -1153,7 +1176,7 @@ public class AssetImpairmentController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 KnownImpairmentDate, processingMonth, mscoaConfig.CreditVoteId, KnownFinYear,
-                journalTxnTypeId, itemDescription, documentNumber,
+                corrDocTypeId, itemDescription, documentNumber,
                 debit: null, credit: KnownImpairmentAmount, matchTranGuid: corrTranId,
                 journalTransactionTypeId: journalTxnTypeId, assetLinkId: assetLinkId,
                 scoaFundsId: mscoaConfig.CreditScoaFundId, scoaRegionId: mscoaConfig.CreditScoaRegionId,
@@ -1164,7 +1187,7 @@ public class AssetImpairmentController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 KnownImpairmentDate, processingMonth, mscoaConfig.ReserveVoteId, KnownFinYear,
-                journalTxnTypeId, itemDescription + " Reserve", documentNumber,
+                corrDocTypeId, itemDescription + " Reserve", documentNumber,
                 debit: null, credit: KnownToReserve, matchTranGuid: corrTranId,
                 journalTransactionTypeId: journalTxnTypeId, assetLinkId: assetLinkId,
                 scoaFundsId: mscoaConfig.ReserveScoaFundId, scoaRegionId: mscoaConfig.ReserveScoaRegionId,
@@ -1175,7 +1198,7 @@ public class AssetImpairmentController : ControllerBase
 
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 KnownImpairmentDate, processingMonth, mscoaConfig.OffsetVoteId, KnownFinYear,
-                journalTxnTypeId, itemDescription + " Reserve", documentNumber,
+                corrDocTypeId, itemDescription + " Reserve", documentNumber,
                 debit: KnownToReserve, credit: null, matchTranGuid: corrTranId,
                 journalTransactionTypeId: journalTxnTypeId, assetLinkId: assetLinkId,
                 scoaFundsId: mscoaConfig.OffsetScoaFundId, scoaRegionId: mscoaConfig.OffsetScoaRegionId,

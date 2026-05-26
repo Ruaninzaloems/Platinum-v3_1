@@ -465,6 +465,8 @@ public class BulkTransactionController : ControllerBase
         var client = _httpClientFactory.CreateClient("internal");
         int posted = 0;
         int errored = 0;
+        decimal totalCatchUpDep  = 0m;
+        int     totalCatchUpDays = 0;
         var itemErrors = new List<object>();
 
         for (int i = 0; i < items.Count; i++)
@@ -475,22 +477,25 @@ public class BulkTransactionController : ControllerBase
                 string? errorMsg = null;
                 int? postedEntityId = null;
 
+                decimal itemCatchUpDep  = 0m;
+                int     itemCatchUpDays = 0;
+
                 switch (item.TransactionType)
                 {
                     case "Revaluation":
-                        (postedEntityId, errorMsg) = await PostRevaluation(conn, client, item);
+                        (postedEntityId, errorMsg, itemCatchUpDep, itemCatchUpDays) = await PostRevaluation(conn, client, item);
                         break;
                     case "Impairment":
-                        (postedEntityId, errorMsg) = await PostImpairment(conn, client, item, false);
+                        (postedEntityId, errorMsg, itemCatchUpDep, itemCatchUpDays) = await PostImpairment(conn, client, item, false);
                         break;
                     case "ImpairmentReversal":
-                        (postedEntityId, errorMsg) = await PostImpairment(conn, client, item, true);
+                        (postedEntityId, errorMsg, itemCatchUpDep, itemCatchUpDays) = await PostImpairment(conn, client, item, true);
                         break;
                     case "Disposal":
-                        (postedEntityId, errorMsg) = await PostDisposal(conn, client, item);
+                        (postedEntityId, errorMsg, _, _) = await PostDisposal(conn, client, item);
                         break;
                     case "Refurbishment":
-                        (postedEntityId, errorMsg) = await PostRefurbishment(client, item);
+                        (postedEntityId, errorMsg, _, _) = await PostRefurbishment(client, item);
                         break;
                     default:
                         errorMsg = "Unknown transaction type: " + item.TransactionType;
@@ -507,8 +512,13 @@ public class BulkTransactionController : ControllerBase
                 else
                 {
                     posted++;
-                    await conn.ExecuteAsync(@"UPDATE ""Asset_BulkTransactionItems"" SET ""Status"" = 'Posted', ""PostedEntityID"" = @entityId WHERE ""ID"" = @itemId",
-                        new { entityId = postedEntityId, itemId = item.ID });
+                    totalCatchUpDep  += itemCatchUpDep;
+                    totalCatchUpDays += itemCatchUpDays;
+                    await conn.ExecuteAsync(@"UPDATE ""Asset_BulkTransactionItems""
+                        SET ""Status"" = 'Posted', ""PostedEntityID"" = @entityId,
+                            ""CatchUpDep"" = @catchUpDep, ""CatchUpDays"" = @catchUpDays
+                        WHERE ""ID"" = @itemId",
+                        new { entityId = postedEntityId, catchUpDep = itemCatchUpDep > 0 ? (decimal?)itemCatchUpDep : null, catchUpDays = itemCatchUpDays > 0 ? (int?)itemCatchUpDays : null, itemId = item.ID });
                 }
             }
             catch (Exception ex)
@@ -527,7 +537,7 @@ public class BulkTransactionController : ControllerBase
             WHERE ""ID"" = @id",
             new { posted, errored, id });
 
-        return Ok(new { success = true, posted, errored, totalItems = items.Count, errors = itemErrors });
+        return Ok(new { success = true, posted, errored, totalItems = items.Count, totalCatchUpDep, totalCatchUpDays, errors = itemErrors });
     }
 
     [HttpPost("jobs/{id:int}/reject")]
@@ -603,7 +613,7 @@ public class BulkTransactionController : ControllerBase
         return (catchUpDays, catchUpDep);
     }
 
-    private async Task<(int? entityId, string? error)> PostRevaluation(
+    private async Task<(int? entityId, string? error, decimal catchUpDep, int catchUpDays)> PostRevaluation(
         System.Data.Common.DbConnection conn, HttpClient client, BulkTransactionItem item)
     {
         var projected = await _txnService.GetEffectiveAssetValues(conn, item.AssetRegisterItemID, item.TransactionDate.AddSeconds(-1));
@@ -637,7 +647,7 @@ public class BulkTransactionController : ControllerBase
         if (!createResp.IsSuccessStatusCode)
         {
             var body = await createResp.Content.ReadAsStringAsync();
-            return (null, $"Create failed ({createResp.StatusCode}): {body}");
+            return (null, $"Create failed ({createResp.StatusCode}): {body}", 0m, 0);
         }
 
         var createResult = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -648,19 +658,19 @@ public class BulkTransactionController : ControllerBase
             revalId = idEl2.GetInt32();
 
         if (revalId == 0)
-            return (null, "Revaluation created but could not get ID");
+            return (null, "Revaluation created but could not get ID", 0m, 0);
 
         var approveResp = await client.PostAsJsonAsync($"/api/asset-revaluations/{revalId}/approve", new { ApprovedBy = 1 });
         if (!approveResp.IsSuccessStatusCode)
         {
             var body = await approveResp.Content.ReadAsStringAsync();
-            return (revalId, $"Created (ID={revalId}) but approval failed ({approveResp.StatusCode}): {body}");
+            return (revalId, $"Created (ID={revalId}) but approval failed ({approveResp.StatusCode}): {body}", 0m, 0);
         }
 
-        return (revalId, null);
+        return (revalId, null, catchUpDepReval, catchUpDaysReval);
     }
 
-    private async Task<(int? entityId, string? error)> PostImpairment(
+    private async Task<(int? entityId, string? error, decimal catchUpDep, int catchUpDays)> PostImpairment(
         System.Data.Common.DbConnection conn, HttpClient client, BulkTransactionItem item, bool isReversal)
     {
         var projected = await _txnService.GetEffectiveAssetValues(conn, item.AssetRegisterItemID, item.TransactionDate.AddSeconds(-1));
@@ -682,7 +692,7 @@ public class BulkTransactionController : ControllerBase
         {
             totalAmount = basis - adjustedCarrying;
             if (totalAmount <= 0)
-                return (null, $"Reversal amount must be positive (basis={basis}, carrying={adjustedCarrying})");
+                return (null, $"Reversal amount must be positive (basis={basis}, carrying={adjustedCarrying})", 0m, 0);
             impairmentLoss = totalAmount;
             amountFromRevalReserve = 0;
             newCarrying = adjustedCarrying + totalAmount;
@@ -691,7 +701,7 @@ public class BulkTransactionController : ControllerBase
         {
             totalAmount = adjustedCarrying - basis;
             if (totalAmount <= 0)
-                return (null, $"Impairment amount must be positive (post-catchup carrying={adjustedCarrying}, basis={basis})");
+                return (null, $"Impairment amount must be positive (post-catchup carrying={adjustedCarrying}, basis={basis})", 0m, 0);
             amountFromRevalReserve = Math.Min(totalAmount, revalReserve);
             impairmentLoss = Math.Max(0, totalAmount - revalReserve);
             newCarrying = Math.Max(0, adjustedCarrying - totalAmount);
@@ -719,7 +729,7 @@ public class BulkTransactionController : ControllerBase
         if (!createResp.IsSuccessStatusCode)
         {
             var body = await createResp.Content.ReadAsStringAsync();
-            return (null, $"Create failed ({createResp.StatusCode}): {body}");
+            return (null, $"Create failed ({createResp.StatusCode}): {body}", 0m, 0);
         }
 
         var createResult = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -730,7 +740,7 @@ public class BulkTransactionController : ControllerBase
             impId = idEl2.GetInt32();
 
         if (impId == 0)
-            return (null, "Impairment created but could not get ID");
+            return (null, "Impairment created but could not get ID", 0m, 0);
 
         var postingPayload = new
         {
@@ -746,7 +756,7 @@ public class BulkTransactionController : ControllerBase
         if (!postingResp.IsSuccessStatusCode)
         {
             var body = await postingResp.Content.ReadAsStringAsync();
-            return (impId, $"Created (ID={impId}) but posting failed ({postingResp.StatusCode}): {body}");
+            return (impId, $"Created (ID={impId}) but posting failed ({postingResp.StatusCode}): {body}", 0m, 0);
         }
 
         string approveUrl = isReversal
@@ -757,13 +767,13 @@ public class BulkTransactionController : ControllerBase
         if (!approveResp.IsSuccessStatusCode)
         {
             var body = await approveResp.Content.ReadAsStringAsync();
-            return (impId, $"Created (ID={impId}) but approval failed ({approveResp.StatusCode}): {body}");
+            return (impId, $"Created (ID={impId}) but approval failed ({approveResp.StatusCode}): {body}", 0m, 0);
         }
 
-        return (impId, null);
+        return (impId, null, catchUpDepImp, catchUpDaysImp);
     }
 
-    private async Task<(int? entityId, string? error)> PostDisposal(
+    private async Task<(int? entityId, string? error, decimal catchUpDep, int catchUpDays)> PostDisposal(
         System.Data.Common.DbConnection conn, HttpClient client, BulkTransactionItem item)
     {
         string fy = _txnService.GetCurrentFinancialPeriod().year;
@@ -782,7 +792,7 @@ public class BulkTransactionController : ControllerBase
         if (!createResp.IsSuccessStatusCode)
         {
             var body = await createResp.Content.ReadAsStringAsync();
-            return (null, $"Create failed ({createResp.StatusCode}): {body}");
+            return (null, $"Create failed ({createResp.StatusCode}): {body}", 0m, 0);
         }
 
         var createResult = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -793,26 +803,26 @@ public class BulkTransactionController : ControllerBase
             dispId = idEl2.GetInt32();
 
         if (dispId == 0)
-            return (null, "Disposal created but could not get ID");
+            return (null, "Disposal created but could not get ID", 0m, 0);
 
         var submitResp = await client.PostAsJsonAsync($"/api/disposals/{dispId}/submit-for-approval", new { });
         if (!submitResp.IsSuccessStatusCode)
         {
             var body = await submitResp.Content.ReadAsStringAsync();
-            return (dispId, $"Created (ID={dispId}) but submit-for-approval failed ({submitResp.StatusCode}): {body}");
+            return (dispId, $"Created (ID={dispId}) but submit-for-approval failed ({submitResp.StatusCode}): {body}", 0m, 0);
         }
 
         var approveResp = await client.PostAsJsonAsync($"/api/disposals/{dispId}/approve", new { ApprovedBy = 1, Comments = "Bulk transaction approval" });
         if (!approveResp.IsSuccessStatusCode)
         {
             var body = await approveResp.Content.ReadAsStringAsync();
-            return (dispId, $"Created (ID={dispId}) but approval failed ({approveResp.StatusCode}): {body}");
+            return (dispId, $"Created (ID={dispId}) but approval failed ({approveResp.StatusCode}): {body}", 0m, 0);
         }
 
-        return (dispId, null);
+        return (dispId, null, 0m, 0);
     }
 
-    private async Task<(int? entityId, string? error)> PostRefurbishment(HttpClient client, BulkTransactionItem item)
+    private async Task<(int? entityId, string? error, decimal catchUpDep, int catchUpDays)> PostRefurbishment(HttpClient client, BulkTransactionItem item)
     {
         var createPayload = new
         {
@@ -831,7 +841,7 @@ public class BulkTransactionController : ControllerBase
         if (!createResp.IsSuccessStatusCode)
         {
             var body = await createResp.Content.ReadAsStringAsync();
-            return (null, $"Create failed ({(int)createResp.StatusCode}): {body}");
+            return (null, $"Create failed ({(int)createResp.StatusCode}): {body}", 0m, 0);
         }
 
         var created = await createResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -841,10 +851,10 @@ public class BulkTransactionController : ControllerBase
         if (!approveResp.IsSuccessStatusCode)
         {
             var body = await approveResp.Content.ReadAsStringAsync();
-            return (refurbId, $"Approve failed ({(int)approveResp.StatusCode}): {body}");
+            return (refurbId, $"Approve failed ({(int)approveResp.StatusCode}): {body}", 0m, 0);
         }
 
-        return (refurbId, null);
+        return (refurbId, null, 0m, 0);
     }
 
     private static bool TryGetDecimal(Dictionary<string, string> row, string key, out decimal value)

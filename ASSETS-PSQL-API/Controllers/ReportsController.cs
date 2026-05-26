@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
 using AssetManagement.Services;
+using ClosedXML.Excel;
+using System.Text;
 
 namespace AssetManagement.Controllers;
 
@@ -32,8 +34,11 @@ public class ReportsController : ControllerBase
         [FromQuery] int? classId = null,
         [FromQuery] int? typeId = null,
         [FromQuery] string? description = null,
-        [FromQuery] bool isSummary = false)
+        [FromQuery] bool isSummary = false,
+        [FromQuery] bool acquisitionsOnly = false,
+        [FromQuery] bool acquisitionsAllYears = false)
     {
+        bool finYearProvided = !string.IsNullOrEmpty(finYear);
         if (string.IsNullOrEmpty(finYear))
         {
             var now = DateTime.Now;
@@ -247,7 +252,7 @@ FROM (
     WHERE ""FinancialYear"" = @finYear
       AND ""FinancialPeriod"" >= @fromPeriod
       AND ""FinancialPeriod"" <= @toPeriod
-      AND (@assetId IS NULL OR ""AssetRegisterItemID"" = @assetId)
+      AND (@assetId::integer IS NULL OR ""AssetRegisterItemID"" = @assetId::integer)
 ) ts
 GROUP BY
     ""AssetRegisterItemID"", ""FinancialYear"",
@@ -315,17 +320,12 @@ FROM ""Asset_Transaction_Summary""
 WHERE ""FinancialYear"" = @finYear
   AND ""FinancialPeriod"" >= @fromPeriod
   AND ""FinancialPeriod"" <= @toPeriod
-  AND (@assetId IS NULL OR ""AssetRegisterItemID"" = @assetId)";
+  AND (@assetId::integer IS NULL OR ""AssetRegisterItemID"" = @assetId::integer)";
         }
 
-        if (assetId.HasValue)
-            parameters.Add("assetId", assetId.Value);
+        parameters.Add("assetId", assetId.HasValue ? (object)assetId.Value : (object?)null);
 
-        var insertSqlFinal = insertSql;
-        if (!assetId.HasValue)
-            insertSqlFinal = insertSqlFinal.Replace("AND (@assetId IS NULL OR \"AssetRegisterItemID\" = @assetId)", "");
-
-        await conn.ExecuteAsync(insertSqlFinal, parameters, commandTimeout: 120);
+        await conn.ExecuteAsync(insertSql, parameters, commandTimeout: 300);
 
         var filters = new List<string>();
         var mainParams = new DynamicParameters();
@@ -366,6 +366,11 @@ WHERE ""FinancialYear"" = @finYear
             filters.Add(@"i.""Description"" LIKE @description");
             mainParams.Add("description", "%" + description + "%");
         }
+        if (acquisitionsOnly)
+        {
+            var fyPredicate = (finYearProvided && !acquisitionsAllYears) ? @" AND ats_acq.""FinancialYear"" = @finYear" : "";
+            filters.Add($@"EXISTS (SELECT 1 FROM ""Asset_Transaction_Summary"" ats_acq WHERE ats_acq.""AssetRegisterItemID"" = i.""AssetRegisterItem_ID""{fyPredicate} AND ats_acq.""AdditionVaue"" IS NOT NULL AND ats_acq.""AdditionVaue"" <> 0)");
+        }
 
         var whereClause = filters.Count > 0
             ? "AND " + string.Join(" AND ", filters)
@@ -396,6 +401,11 @@ WHERE ""FinancialYear"" = @finYear
 ) adisp ON TRUE";
 
         var mainSql = $@"
+WITH last_tran AS (
+    SELECT ""AssetRegisterItem_ID"", MAX(""ID"") AS ""MaxID""
+    FROM ""Asset_Register_Transactions""
+    GROUP BY ""AssetRegisterItem_ID""
+)
 SELECT
   @finYear AS ""FinYear""
 , ats.""FinancialPeriod""
@@ -446,7 +456,7 @@ SELECT
 , CASE WHEN i.""DateOfDisposal"" IS NOT NULL AND i.""DateOfDisposal"" > '1900-01-02' THEN i.""DateOfDisposal"" ELSE NULL END AS ""DisposalDate""
 , i.""DisposalReason""
 , CASE WHEN i.""Impairment_Date"" IS NOT NULL AND i.""Impairment_Date"" > '1900-01-02' THEN i.""Impairment_Date"" ELSE NULL END AS ""ImpairmentDate""
-, (SELECT art2.""TransactionDate"" FROM ""Asset_Register_Transactions"" art2 WHERE art2.""AssetRegisterItem_ID"" = i.""AssetRegisterItem_ID"" ORDER BY art2.""ID"" DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY) AS ""DateModified""
+, art_last.""TransactionDate"" AS ""DateModified""
 , i.""VerificationDate""
 , '' AS ""VerificationDoneBy""
 , i.""YearConstructed""
@@ -624,13 +634,15 @@ LEFT JOIN ""Const_Asset_Criticality_Grade"" crit ON i.""CriticalityGrade"" = cri
 LEFT JOIN ""Const_Asset_Performance_Grade"" pergrd ON i.""PerformanceGrade"" = pergrd.""AssetPerformanceGradeID""
 LEFT JOIN ""Const_Asset_Utilisation_Grade"" util ON i.""UtilisationGrade"" = util.""AssetUtilisationGradeID""
 LEFT JOIN ""Const_Asset_Health_Grade"" hg ON i.""InfrastructureHealthGrade"" = hg.""AssetHealthGradeID""
+LEFT JOIN last_tran ON last_tran.""AssetRegisterItem_ID"" = i.""AssetRegisterItem_ID""
+LEFT JOIN ""Asset_Register_Transactions"" art_last ON art_last.""ID"" = last_tran.""MaxID""
 {sqlDispJoin}
 WHERE (i.""DateOfTakeOnBalancesImported"" IS NOT NULL OR i.""ManagedFlag"" = 1)
   AND (COALESCE(ats.""CostOpening"", 0) > 0 OR COALESCE(ats.""CostClosing"", 0) > 0 OR COALESCE(ats.""TransferFromAmount"", 0) > 0 OR COALESCE(ats.""TransferToAmount"", 0) > 0 OR COALESCE(ats.""AdditionVaue"", 0) > 0)
   {whereClause}
 ORDER BY i.""AssetRegisterItem_ID"", ats.""FinancialPeriod""";
 
-        var results = (await conn.QueryAsync(mainSql, mainParams, commandTimeout: 120)).AsList();
+        var results = (await conn.QueryAsync(mainSql, mainParams, commandTimeout: 300)).AsList();
 
         return Ok(new
         {
@@ -834,7 +846,7 @@ SELECT
     COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%AccumulatedDepreciation%' THEN g.""Debit"" ELSE 0 END), 0) AS ""GL_AccDep"",
     COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%AccumulatedImpairment%'
                        AND g.""TransactionDetails"" NOT LIKE '%Accumulated Surplus%' THEN g.""Debit"" ELSE 0 END), 0) AS ""GL_AccImp"",
-    COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%DisposalProceeds%' THEN g.""Debit"" ELSE 0 END), 0) AS ""GL_Proceeds"",
+    COALESCE(SUM(CASE WHEN (g.""TransactionDetails"" LIKE '%DisposalProceeds%' OR g.""TransactionDetails"" LIKE '%- Proceeds%') THEN g.""Debit"" ELSE 0 END), 0) AS ""GL_Proceeds"",
     COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%DisposalLoss%' THEN g.""Debit"" ELSE 0 END), 0) AS ""GL_Loss"",
     COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%DisposalGain%' THEN g.""Credit"" ELSE 0 END), 0) AS ""GL_Gain"",
     COALESCE(SUM(CASE WHEN g.""TransactionDetails"" LIKE '%- Cost%' THEN g.""Credit"" ELSE 0 END), 0) AS ""GL_Cost"",
@@ -1064,11 +1076,12 @@ LEFT JOIN (
     GROUP BY ""AssetRegisterItem_ID""
 ) art ON art.""AssetRegisterItem_ID"" = i.""AssetRegisterItem_ID""
 LEFT JOIN LATERAL (
-    SELECT ""DocumentNumber""
-    FROM ""Led_Journal_Asset""
-    WHERE ""Asset_RegisterItem_ID"" = i.""AssetRegisterItem_ID""
-      AND ""AssetJournalTransactionTypeID"" = 26
-    ORDER BY ""AssetJournal_ID"" DESC
+    SELECT g.""DocumentNumber""
+    FROM ""Asset_Register_Transactions"" t
+    JOIN ""Asset_GeneralLedger"" g ON g.""MatchTranGuid"" = t.""GLGUID_ID""::uuid
+    WHERE t.""AssetRegisterItem_ID"" = i.""AssetRegisterItem_ID""
+      AND t.""TransactionTypeID"" = 26
+    ORDER BY t.""ID"" DESC
     LIMIT 1
 ) jnl ON true
 WHERE {whereClause}
@@ -1475,8 +1488,11 @@ ORDER BY g.""PostingDate"", g.""GenLedger_ID""";
         [FromQuery] int? categoryId = null,
         [FromQuery] int? subCategoryId = null,
         [FromQuery] int? measurementTypeId = null,
-        [FromQuery] int? statusId = null)
+        [FromQuery] int? statusId = null,
+        [FromQuery] bool acquisitionsOnly = false,
+        [FromQuery] bool acquisitionsAllYears = false)
     {
+        bool finYearProvided = !string.IsNullOrEmpty(finYear);
         if (string.IsNullOrEmpty(finYear))
         {
             var now = DateTime.Now;
@@ -1521,6 +1537,11 @@ ORDER BY g.""PostingDate"", g.""GenLedger_ID""";
         {
             filters.Add(@"i.""AssetStatus_ID"" = @statusId");
             parameters.Add("statusId", statusId.Value);
+        }
+        if (acquisitionsOnly)
+        {
+            var fyPredicate = (finYearProvided && !acquisitionsAllYears) ? @" AND ats_acq.""FinancialYear"" = @finYear" : "";
+            filters.Add($@"EXISTS (SELECT 1 FROM ""Asset_Transaction_Summary"" ats_acq WHERE ats_acq.""AssetRegisterItemID"" = i.""AssetRegisterItem_ID""{fyPredicate} AND ats_acq.""AdditionVaue"" IS NOT NULL AND ats_acq.""AdditionVaue"" <> 0)");
         }
 
         var whereClause = filters.Count > 0 ? "AND " + string.Join(" AND ", filters) : "";
@@ -1629,7 +1650,7 @@ WHERE 1=1
   {whereClause}
 ORDER BY i.""AssetRegisterItem_ID"", dep.""MonthID"" NULLS LAST";
 
-        var results = await conn.QueryAsync(sql, parameters, commandTimeout: 120);
+        var results = await conn.QueryAsync(sql, parameters, commandTimeout: 300);
 
         return Ok(results);
     }
@@ -1909,7 +1930,8 @@ SELECT
         ? @"COALESCE(ats.""AccImpReversalOpening"", 0)            AS ""accImpReversalOpening"",
     COALESCE(ats.""ImpReversalMovement"", 0)                      AS ""impReversalMovement"",
     COALESCE(ats.""AccImpReversalClosing"", 0)                    AS ""accImpReversalClosing"""
-        : @"COALESCE(ats.""AccImpMovement"", 0)                   AS ""accImpMovement""")}
+        : @"COALESCE(ats.""AccImpMovement"", 0)                   AS ""accImpMovement"" ")},
+    COALESCE(REPLACE(jnl.""DocumentNumber"", '/', '_'), '')       AS ""documentNumber""
 FROM ""Asset_Impairment"" imp
 JOIN ""Asset_Register_Items"" i ON i.""AssetRegisterItem_ID"" = imp.""Asset_ItemID""
 LEFT JOIN ""Const_AssetType_Sys"" astp ON i.""AssetType_ID"" = astp.""AssetType_ID""
@@ -1946,6 +1968,15 @@ LEFT JOIN (
       AND ""FinancialPeriod"" BETWEEN @fromPeriod AND @toPeriod
     GROUP BY ""AssetRegisterItemID""
 ) ats ON ats.""AssetRegisterItemID"" = i.""AssetRegisterItem_ID""
+LEFT JOIN LATERAL (
+    SELECT g.""DocumentNumber""
+    FROM ""Asset_Register_Transactions"" t
+    JOIN ""Asset_GeneralLedger"" g ON g.""MatchTranGuid"" = t.""GLGUID_ID""::uuid
+    WHERE t.""AssetRegisterItem_ID"" = i.""AssetRegisterItem_ID""
+      AND t.""TransactionTypeID"" = 24
+    ORDER BY t.""ID"" DESC
+    LIMIT 1
+) jnl ON true
 WHERE {whereClause}
 ORDER BY imp.""ImpairmentDate"" DESC, i.""AssetRegisterItem_ID""";
 
@@ -2479,6 +2510,90 @@ ORDER BY i.""AssetRegisterItem_ID""";
         return Ok(results);
     }
 
+    [HttpGet("measurement-model-compliance")]
+    public async Task<IActionResult> GetMeasurementModelCompliance(
+        [FromQuery] int? typeId = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? departmentId = null)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+
+        var orgModel = await conn.ExecuteScalarAsync<string?>(
+            @"SELECT ""measurement_model"" FROM ""Asset_OrganisationSettings"" LIMIT 1");
+
+        if (string.IsNullOrWhiteSpace(orgModel))
+            return Ok(new { orgModel = (string?)null, conflicts = Array.Empty<object>() });
+
+        string nonComplianceFilter;
+        if (string.Equals(orgModel, "Cost", StringComparison.OrdinalIgnoreCase))
+            nonComplianceFilter = @"AND i.""MeasurementType_ID"" IN (SELECT ""AssetConfig_MeasurementType_ID"" FROM ""AssetConfig_MeasurementType"" WHERE ""Name"" ILIKE '%Revaluation%')";
+        else if (string.Equals(orgModel, "Revaluation", StringComparison.OrdinalIgnoreCase))
+            nonComplianceFilter = @"AND i.""MeasurementType_ID"" IN (SELECT ""AssetConfig_MeasurementType_ID"" FROM ""AssetConfig_MeasurementType"" WHERE ""Name"" ILIKE '%Cost%')";
+        else
+            nonComplianceFilter = "AND 1=0";
+
+        var filters = new List<string>();
+        var parameters = new DynamicParameters();
+
+        if (typeId.HasValue)
+        {
+            filters.Add(@"i.""AssetType_ID"" = @typeId");
+            parameters.Add("typeId", typeId.Value);
+        }
+        if (categoryId.HasValue)
+        {
+            filters.Add(@"i.""AssetCategory_ID"" = @categoryId");
+            parameters.Add("categoryId", categoryId.Value);
+        }
+        if (departmentId.HasValue)
+        {
+            filters.Add(_db.IsSqlServer
+                ? @"TRY_CAST(i.""MunicipalDepartment_ID"" AS INT) = @departmentId"
+                : @"i.""MunicipalDepartment_ID"" ~ '^\d+$' AND i.""MunicipalDepartment_ID""::INTEGER = @departmentId");
+            parameters.Add("departmentId", departmentId.Value);
+        }
+
+        var whereClause = filters.Count > 0 ? "AND " + string.Join(" AND ", filters) : "";
+
+        string deptJoin = _db.IsSqlServer
+            ? @"LEFT JOIN ""Const_Department"" dep ON dep.""Department_ID"" = TRY_CAST(i.""MunicipalDepartment_ID"" AS INT)"
+            : @"LEFT JOIN ""Const_Department"" dep ON i.""MunicipalDepartment_ID"" ~ '^\d+$' AND dep.""Department_ID"" = i.""MunicipalDepartment_ID""::INTEGER";
+
+        var sql = $@"
+SELECT
+    i.""AssetRegisterItem_ID""                                              AS ""assetId""
+  , COALESCE(i.""Description"", '')                                        AS ""description""
+  , COALESCE(i.""Barcode"", '')                                            AS ""barcode""
+  , COALESCE(astp.""AssetTypeDesc"", '')                                   AS ""assetType""
+  , COALESCE(acc.""AssetCategoryDesc"", '')                                AS ""assetCategory""
+  , COALESCE(sc.""Asset_SubCategoryDescription"", '')                      AS ""assetSubCategory""
+  , COALESCE(cac.""AssetClassDesc"", '')                                   AS ""assetClass""
+  , COALESCE(meas.""Name"", '')                                            AS ""measurementType""
+  , COALESCE(meas.""NoDepreciation"", 0)                                   AS ""noDepreciation""
+  , COALESCE(cas.""AssetStatusDesc"", '')                                  AS ""assetStatus""
+  , COALESCE(i.""MunicipalDepartment_ID"", '')                            AS ""departmentId""
+  , COALESCE(dep.""DepartmentDesc"", '')                                   AS ""department""
+  , i.""AcquisitionDate""                                                  AS ""acquisitionDate""
+  , i.""InserviceDate""                                                    AS ""inServiceDate""
+  , COALESCE(i.""RemainingUsefulLife"", 0)                                 AS ""remainingUsefulLifeMonths""
+FROM ""Asset_Register_Items"" i
+LEFT JOIN ""Const_AssetType_Sys"" astp       ON astp.""AssetType_ID"" = i.""AssetType_ID""
+LEFT JOIN ""Const_AssetCategory_sys"" acc    ON acc.""AssetCategoryID"" = i.""AssetCategory_ID""
+LEFT JOIN ""Const_Asset_SubCategory"" sc     ON sc.""Asset_SubCategory_ID"" = i.""Asset_SubCategory_ID""
+LEFT JOIN ""Const_AssetClass_sys"" cac       ON cac.""AssetClass_ID"" = i.""AssetClass_ID""
+LEFT JOIN ""AssetConfig_MeasurementType"" meas ON meas.""AssetConfig_MeasurementType_ID"" = i.""MeasurementType_ID""
+LEFT JOIN ""Const_AssetStatus_Sys"" cas      ON cas.""AssetStatus_ID"" = i.""AssetStatus_ID""
+{deptJoin}
+WHERE COALESCE(i.""Decommissioning"", 0) = 0
+  {nonComplianceFilter}
+  {whereClause}
+ORDER BY i.""AssetCategory_ID"", i.""AssetRegisterItem_ID""";
+
+        var results = await conn.QueryAsync(sql, parameters, commandTimeout: 60);
+        return Ok(new { orgModel = orgModel, conflicts = results });
+    }
+
     [HttpGet("location-content-filters")]
     public async Task<IActionResult> GetLocationContentFilters()
     {
@@ -2511,5 +2626,317 @@ ORDER BY i.""AssetRegisterItem_ID""";
             departments = departments,
             divisions = divisions
         });
+    }
+
+    // ─── Asset GL Transactions Report ─────────────────────────────────────────
+
+    [HttpGet("asset-gl/filter-options")]
+    public async Task<IActionResult> GetAssetGlFilterOptions(
+        [FromQuery] string? finYear = null,
+        [FromQuery] int? processingMonth = null)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+
+        var finYears = await conn.QueryAsync<string>(@"
+            SELECT DISTINCT ""FinYear""
+            FROM ""Asset_GeneralLedger""
+            WHERE ""AssetLinkID"" IS NOT NULL AND ""FinYear"" IS NOT NULL
+            ORDER BY ""FinYear""");
+
+        var pmConditions = new System.Collections.Generic.List<string>
+            { @"""AssetLinkID"" IS NOT NULL", @"""ProcessingMonth"" IS NOT NULL" };
+        if (!string.IsNullOrEmpty(finYear)) pmConditions.Add(@"""FinYear"" = @finYear");
+        var pmSql = $@"SELECT DISTINCT ""ProcessingMonth"" FROM ""Asset_GeneralLedger"" WHERE {string.Join(" AND ", pmConditions)} ORDER BY ""ProcessingMonth""";
+        var processingMonths = await conn.QueryAsync<int>(pmSql, new { finYear });
+
+        var ttConditions = new System.Collections.Generic.List<string>
+            { @"gl.""AssetLinkID"" IS NOT NULL", @"gl.""TransactionTypeID"" IS NOT NULL" };
+        if (!string.IsNullOrEmpty(finYear)) ttConditions.Add(@"gl.""FinYear"" = @finYear");
+        if (processingMonth.HasValue && processingMonth > 0) ttConditions.Add(@"gl.""ProcessingMonth"" = @processingMonth");
+        var ttSql = $@"
+            SELECT DISTINCT gl.""TransactionTypeID"" AS ""documentTypeId"",
+                   COALESCE(dt.""DocumentTypeDesc"", CAST(gl.""TransactionTypeID"" AS VARCHAR)) AS ""documentTypeDesc""
+            FROM ""Asset_GeneralLedger"" gl
+            LEFT JOIN ""Const_DocumentType"" dt ON gl.""TransactionTypeID"" = dt.""DocumentType_ID""
+            WHERE {string.Join(" AND ", ttConditions)}
+            ORDER BY COALESCE(dt.""DocumentTypeDesc"", CAST(gl.""TransactionTypeID"" AS VARCHAR))";
+        var transactionTypes = await conn.QueryAsync<dynamic>(ttSql, new { finYear, processingMonth });
+
+        return Ok(new { finYears, processingMonths, transactionTypes });
+    }
+
+    [HttpGet("asset-gl")]
+    public async Task<IActionResult> GetAssetGl(
+        [FromQuery] string? finYear = null,
+        [FromQuery] int? processingMonth = null,
+        [FromQuery] int? transactionTypeId = null)
+    {
+        if (string.IsNullOrEmpty(finYear))
+        {
+            var now = DateTime.Now;
+            finYear = now.Month >= 7 ? $"{now.Year}/{now.Year + 1}" : $"{now.Year - 1}/{now.Year}";
+        }
+
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+
+        var conditions = new System.Collections.Generic.List<string>
+        {
+            @"gl.""AssetLinkID"" IS NOT NULL",
+            @"gl.""FinYear"" = @finYear"
+        };
+        if (processingMonth.HasValue && processingMonth > 0)
+            conditions.Add(@"gl.""ProcessingMonth"" = @processingMonth");
+        if (transactionTypeId.HasValue && transactionTypeId > 0)
+            conditions.Add(@"gl.""TransactionTypeID"" = @transactionTypeId");
+
+        var where = string.Join(" AND ", conditions);
+
+        var sql = $@"
+SELECT
+    gl.""FinYear""                                                                   AS ""finYear"",
+    gl.""ProcessingMonth""                                                           AS ""processingMonth"",
+    TO_CHAR(gl.""PostingDate"", 'DD/MM/YYYY')                                       AS ""postingDate"",
+    COALESCE(CAST(gl.""ProjectID"" AS VARCHAR), '')                                 AS ""projectId"",
+    COALESCE(CAST(gl.""PlanProjectItemID"" AS VARCHAR), '')                         AS ""planProjectItemId"",
+    COALESCE(gl.""DocumentNumber"", '')                                             AS ""documentNumber"",
+    gl.""GenLedger_ID""                                                             AS ""genLedgerId"",
+    COALESCE(dt.""DocumentTypeDesc"", '')                                           AS ""transactionType"",
+    COALESCE(gl.""TransactionDetails"", '')                                         AS ""transactionDetails"",
+    COALESCE(gl.""Debit"", 0)                                                      AS ""debit"",
+    COALESCE(gl.""Credit"", 0)                                                     AS ""credit"",
+    COALESCE(gl.""Debit"", 0) - COALESCE(gl.""Credit"", 0)                        AS ""total"",
+    COALESCE(ss.""ScoaCode"", '')                                                   AS ""scoaItemCode"",
+    COALESCE(ss.""ScoaDesc"", '')                                                   AS ""scoaItemDesc"",
+    ''                                                                              AS ""scoaFundCode"",
+    ''                                                                              AS ""scoaFundDesc"",
+    ''                                                                              AS ""scoaFunctionCode"",
+    ''                                                                              AS ""scoaFunctionDesc"",
+    ''                                                                              AS ""scoaProjectCode"",
+    ''                                                                              AS ""scoaProjectDesc"",
+    ''                                                                              AS ""scoaCostingCode"",
+    ''                                                                              AS ""scoaCostingDesc"",
+    ''                                                                              AS ""scoaRegionCode"",
+    ''                                                                              AS ""scoaRegionDesc"",
+    CONCAT(COALESCE(dep.""DepartmentCode"",''),'|',COALESCE(div.""DivisionCode"",''))  AS ""municipalClass"",
+    CONCAT(COALESCE(dep.""DepartmentDesc"",''),'|',COALESCE(div.""DivisionDesc"",''))  AS ""municipalClassDesc""
+FROM ""Asset_GeneralLedger""    gl
+LEFT JOIN ""Const_SCOA_Structure""  ss  ON gl.""SCOAItemID""        = ss.""ScoaID""
+LEFT JOIN ""Const_Division""        div ON gl.""DivisionID""        = div.""Division_ID""
+LEFT JOIN ""Const_Department""      dep ON div.""DepartmentID""     = dep.""Department_ID""
+LEFT JOIN ""Const_DocumentType""    dt  ON gl.""TransactionTypeID"" = dt.""DocumentType_ID""
+WHERE {where}
+ORDER BY gl.""FinYear"", gl.""ProcessingMonth"", gl.""PostingDate"", gl.""GenLedger_ID""";
+
+        var rows = await conn.QueryAsync(sql,
+            new { finYear, processingMonth, transactionTypeId },
+            commandTimeout: 120);
+        return Ok(rows);
+    }
+
+    // ─── mSCOA Settings Report ────────────────────────────────────────────────
+
+    private string BuildPsqlMscoaSettingsSql(string extra)
+    {
+        string Slot(string itemField, string displayNameCol, string subtypeCol) => $@"
+    SELECT
+        m.""AssetConfig_mSCOA_ID""                                                           AS ""mscoaId"",
+        m.""FinYear""                                                                         AS ""finYear"",
+        COALESCE(t.""AssetTypeDesc"", '')                                                     AS ""assetType"",
+        COALESCE(c.""AssetCategoryDesc"", '')                                                 AS ""category"",
+        COALESCE(sc.""Asset_SubCategoryDescription"", '')                                     AS ""subCategory"",
+        COALESCE(mt.""Name"", '')                                                             AS ""measurementType"",
+        COALESCE(st.""AssetStatusDesc"", '')                                                  AS ""status"",
+        COALESCE(dep.""DepartmentDesc"", '')                                                  AS ""departmentDesc"",
+        COALESCE(div.""DivisionDesc"", '')                                                    AS ""divisionDesc"",
+        COALESCE(tt.""Name"", '')                                                             AS ""transactionType"",
+        COALESCE(tt.""{displayNameCol}"", '')                                                 AS ""transactionDescription"",
+        COALESCE(tt.""{subtypeCol}"", '')                                                     AS ""transactionSubtype"",
+        ppi.""PlanProjectItem_ID""                                                            AS ""projectItemId"",
+        CONCAT(COALESCE(CAST(pp.""ProjectCode"" AS TEXT),''), ' | ', COALESCE(pp.""ProjectName"",''))    AS ""projectCodeName"",
+        COALESCE(ss.""ScoaCode"", '')                                                         AS ""scoaItemCode"",
+        COALESCE(ss.""ScoaDesc"", '')                                                         AS ""scoaItemDesc"",
+        COALESCE(sfnd.""ScoaCode"", '')                                                       AS ""scoaFundCode"",
+        COALESCE(sfnd.""ScoaShortDesc"", '')                                                  AS ""scoaFundDesc"",
+        COALESCE(sfs.""ScoaCode"", '')                                                        AS ""scoaFunctionCode"",
+        COALESCE(sfs.""ScoaShortDesc"", '')                                                   AS ""scoaFunctionDesc"",
+        COALESCE(srs.""ScoaCode"", '')                                                        AS ""scoaRegionCode"",
+        COALESCE(srs.""ScoaShortDesc"", '')                                                   AS ""scoaRegionDesc"",
+        COALESCE(scs.""ScoaCode"", '')                                                        AS ""scoaCostingCode"",
+        COALESCE(scs.""ScoaShortDesc"", '')                                                   AS ""scoaCostingDesc"",
+        COALESCE(sps.""ScoaCode"", '')                                                        AS ""scoaProjectCode"",
+        COALESCE(sps.""ScoaShortDesc"", '')                                                   AS ""scoaProjectDesc"",
+        CONCAT(COALESCE(dep.""DepartmentCode"",''),'|',COALESCE(div.""DivisionCode"",''),' / ',COALESCE(dep.""DepartmentDesc"",''),'|',COALESCE(div.""DivisionDesc"",''))    AS ""municipalClassification""
+    FROM ""AssetConfig_mSCOA"" m
+    JOIN  ""AssetConfig_mSCOA_TransactionType"" mtt  ON mtt.""AssetConfig_mSCOA_ID""          = m.""AssetConfig_mSCOA_ID""
+    JOIN  ""Plan_ProjectItem""                  ppi  ON ppi.""PlanProjectItem_ID""            = mtt.""{itemField}""
+    LEFT JOIN ""Plan_Project""                  pp   ON pp.""Project_ID""                     = ppi.""ProjectID""
+    LEFT JOIN ""AssetConfig_TransactionType""   tt   ON tt.""AssetConfig_TransactionType_ID"" = mtt.""TransactionTypeID""
+    LEFT JOIN ""Const_AssetType_Sys""           t    ON t.""AssetType_ID""                    = m.""TypeID""
+    LEFT JOIN ""Const_AssetCategory_sys""       c    ON c.""AssetCategoryID""                 = m.""CategoryID""
+    LEFT JOIN ""Const_Asset_SubCategory""       sc   ON sc.""Asset_SubCategory_ID""           = m.""SubCategoryID""
+    LEFT JOIN ""AssetConfig_MeasurementType""   mt   ON mt.""AssetConfig_MeasurementType_ID"" = m.""MeasurementTypeID""
+    LEFT JOIN ""Const_AssetStatus_Sys""         st   ON st.""AssetStatus_ID""                 = m.""StatusID""
+    LEFT JOIN ""Const_SCOA_Structure""          ss   ON ss.""ScoaID""                         = ppi.""SCOAItemID""
+    LEFT JOIN ""Const_SCOA_Structure""          sfnd ON sfnd.""ScoaID""                       = ppi.""SCOAFundId""
+    LEFT JOIN ""Const_SCOA_Structure""          sfs  ON sfs.""ScoaID""                        = ppi.""SCOAFunctionId""
+    LEFT JOIN ""Const_SCOA_Structure""          srs  ON srs.""ScoaID""                        = ppi.""SCOARegionId""
+    LEFT JOIN ""Const_SCOA_Structure""          scs  ON scs.""ScoaID""                        = ppi.""SCOACostingID""
+    LEFT JOIN ""Const_SCOA_Structure""          sps  ON sps.""ScoaID""                        = pp.""ScoaProjectID""
+    LEFT JOIN ""Const_Department""              dep  ON dep.""Department_ID""                 = m.""DepartmentID""
+    LEFT JOIN ""Const_Division""                div  ON div.""Division_ID""                   = m.""DivisionID""
+    WHERE mtt.""{itemField}"" IS NOT NULL{extra}";
+
+        // 11 slots: CreditItem22_1 column does not exist in AssetConfig_mSCOA_TransactionType schema
+        // PSQL has only Const_SCOA_Structure; Fund/Function/Region/Costing/Project SCOA tables absent
+        // Display names from AssetConfig_TransactionType DR/CR columns (same mapping as SQL Server)
+        return string.Join("\n    UNION ALL\n", new[]
+        {
+            Slot("DebitItem11_1",  "DRDisplayName11", "SubType1"),
+            Slot("DebitItem11_2",  "DRDisplayName14", "SubType1"),
+            Slot("CreditItem11_1", "CRDisplayName11", "SubType1"),
+            Slot("DebitItem21_1",  "DRDisplayName21", "SubType2"),
+            Slot("DebitItem21_2",  "CRDisplayName22", "SubType2"),
+            Slot("CreditItem21_1", "CRDisplayName21", "SubType2"),
+            Slot("DebitItem12_1",  "DRDisplayName12", "SubType1"),
+            Slot("CreditItem12_1", "DRDisplayName12", "SubType1"),
+            Slot("DebitItem22_1",  "DRDisplayName22", "SubType2"),
+            Slot("CreditItem13_1", "DRDisplayName13", "SubType1"),
+            Slot("CreditItem23_1", "DRDisplayName23", "SubType2"),
+        }) + @"
+    ORDER BY ""mscoaId"", ""transactionType"", ""transactionSubtype"", ""transactionDescription""";
+    }
+
+    private (string extra, object parms) BuildPsqlMscoaSettingsFilter(
+        string? finYear, int? typeId, int? categoryId, int? subCategoryId, int? departmentId, int? divisionId)
+    {
+        var conds = new List<string>();
+        if (!string.IsNullOrEmpty(finYear))              conds.Add(@"m.""FinYear"" = @finYear");
+        if (typeId.HasValue && typeId > 0)               conds.Add(@"m.""TypeID"" = @typeId::integer");
+        if (categoryId.HasValue && categoryId > 0)       conds.Add(@"m.""CategoryID"" = @categoryId::integer");
+        if (subCategoryId.HasValue && subCategoryId > 0) conds.Add(@"m.""SubCategoryID"" = @subCategoryId::integer");
+        if (departmentId.HasValue && departmentId > 0)   conds.Add(@"m.""DepartmentID"" = @departmentId::integer");
+        if (divisionId.HasValue && divisionId > 0)       conds.Add(@"m.""DivisionID"" = @divisionId::integer");
+        var extra = conds.Count > 0 ? " AND " + string.Join(" AND ", conds) : "";
+        var parms = new { finYear, typeId, categoryId, subCategoryId, departmentId, divisionId };
+        return (extra, parms);
+    }
+
+    private static readonly string[] PsqlMscoaSettingsCols = new[]
+    {
+        "mSCOA ID","Fin Year","Asset Type","Category","Sub Category","Measurement Type","Status",
+        "Transaction Type","Transaction Description","Transaction Subtype","Project Item ID",
+        "Project Code / Name","SCOA Item Code","SCOA Item Desc","Fund Code","Fund Desc",
+        "Function Code","Function Desc","Region Code","Region Desc","Costing Code","Costing Desc",
+        "Project Code","Project Desc","Municipal Classification"
+    };
+
+    private static string PsqlMscoaSettingsRowCell(dynamic r, string col)
+    {
+        var d = (IDictionary<string, object>)r;
+        string V(string k) => d.TryGetValue(k, out var v) && v != null ? v.ToString()! : "";
+        return col switch
+        {
+            "mSCOA ID"                  => V("mscoaId"),
+            "Fin Year"                  => V("finYear"),
+            "Asset Type"                => V("assetType"),
+            "Category"                  => V("category"),
+            "Sub Category"              => V("subCategory"),
+            "Measurement Type"          => V("measurementType"),
+            "Status"                    => V("status"),
+            "Transaction Type"          => V("transactionType"),
+            "Transaction Description"   => V("transactionDescription"),
+            "Transaction Subtype"       => V("transactionSubtype"),
+            "Project Item ID"           => V("projectItemId"),
+            "Project Code / Name"       => V("projectCodeName"),
+            "SCOA Item Code"            => V("scoaItemCode"),
+            "SCOA Item Desc"            => V("scoaItemDesc"),
+            "Fund Code"                 => V("scoaFundCode"),
+            "Fund Desc"                 => V("scoaFundDesc"),
+            "Function Code"             => V("scoaFunctionCode"),
+            "Function Desc"             => V("scoaFunctionDesc"),
+            "Region Code"               => V("scoaRegionCode"),
+            "Region Desc"               => V("scoaRegionDesc"),
+            "Costing Code"              => V("scoaCostingCode"),
+            "Costing Desc"              => V("scoaCostingDesc"),
+            "Project Code"              => V("scoaProjectCode"),
+            "Project Desc"              => V("scoaProjectDesc"),
+            "Municipal Classification"  => V("municipalClassification"),
+            _ => ""
+        };
+    }
+
+    [HttpGet("mscoa-settings")]
+    public async Task<IActionResult> GetMscoaSettingsReport(
+        [FromQuery] string? finYear = null,
+        [FromQuery] int? typeId = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? subCategoryId = null,
+        [FromQuery] int? departmentId = null,
+        [FromQuery] int? divisionId = null)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var (extra, parms) = BuildPsqlMscoaSettingsFilter(finYear, typeId, categoryId, subCategoryId, departmentId, divisionId);
+        var sql = BuildPsqlMscoaSettingsSql(extra);
+        var rows = await conn.QueryAsync(sql, parms, commandTimeout: 60);
+        return Ok(rows);
+    }
+
+    [HttpGet("mscoa-settings/excel")]
+    public async Task<IActionResult> GetMscoaSettingsReportExcel(
+        [FromQuery] string? finYear = null,
+        [FromQuery] int? typeId = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? subCategoryId = null,
+        [FromQuery] int? departmentId = null,
+        [FromQuery] int? divisionId = null)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var (extra, parms) = BuildPsqlMscoaSettingsFilter(finYear, typeId, categoryId, subCategoryId, departmentId, divisionId);
+        var sql = BuildPsqlMscoaSettingsSql(extra);
+        var rows = (await conn.QueryAsync(sql, parms, commandTimeout: 60)).ToList();
+
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add("mSCOA Settings");
+        ws.Row(1).Style.Font.Bold = true;
+        for (int ci = 0; ci < PsqlMscoaSettingsCols.Length; ci++)
+            ws.Cell(1, ci + 1).Value = PsqlMscoaSettingsCols[ci];
+        for (int ri = 0; ri < rows.Count; ri++)
+            for (int ci = 0; ci < PsqlMscoaSettingsCols.Length; ci++)
+                ws.Cell(ri + 2, ci + 1).Value = PsqlMscoaSettingsRowCell(rows[ri], PsqlMscoaSettingsCols[ci]);
+        ws.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        wb.SaveAs(stream);
+        return File(stream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"mscoa_settings_{DateTime.Now:yyyyMMdd}.xlsx");
+    }
+
+    [HttpGet("mscoa-settings/csv")]
+    public async Task<IActionResult> GetMscoaSettingsReportCsv(
+        [FromQuery] string? finYear = null,
+        [FromQuery] int? typeId = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? subCategoryId = null,
+        [FromQuery] int? departmentId = null,
+        [FromQuery] int? divisionId = null)
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var (extra, parms) = BuildPsqlMscoaSettingsFilter(finYear, typeId, categoryId, subCategoryId, departmentId, divisionId);
+        var sql = BuildPsqlMscoaSettingsSql(extra);
+        var rows = (await conn.QueryAsync(sql, parms, commandTimeout: 60)).ToList();
+
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", PsqlMscoaSettingsCols.Select(c => $"\"{c}\"")));
+        foreach (var row in rows)
+            sb.AppendLine(string.Join(",", PsqlMscoaSettingsCols.Select(c => $"\"{PsqlMscoaSettingsRowCell(row, c).Replace("\"", "\"\"")}\"")));
+
+        return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv",
+            $"mscoa_settings_{DateTime.Now:yyyyMMdd}.csv");
     }
 }

@@ -9,7 +9,12 @@ namespace AssetManagement.Controllers;
 public class InvTransferController : ControllerBase
 {
     private readonly DbConnectionFactory _db;
-    public InvTransferController(DbConnectionFactory db) => _db = db;
+    private readonly AssetManagement.Services.EmailService _emailService;
+    public InvTransferController(DbConnectionFactory db, AssetManagement.Services.EmailService emailService)
+    {
+        _db = db;
+        _emailService = emailService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? finYear)
@@ -81,6 +86,18 @@ public class InvTransferController : ControllerBase
         var rows = await conn.ExecuteAsync(
             @"UPDATE ""Asset_InvTransfer"" SET ""AssetRegisterItem_ID"" = @assetId WHERE ""InvTransferID"" = @id",
             new { assetId, id });
-        return rows == 0 ? NotFound(new { error = $"Inventory transfer {id} not found" }) : Ok(new { success = true });
+        if (rows == 0) return NotFound(new { error = $"Inventory transfer {id} not found" });
+        try
+        {
+            var tfrTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetId);
+            var assetDept = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                @"SELECT COALESCE(""MunicipalDepartment_ID""::text, '') AS dept FROM ""Asset_Register_Items"" WHERE ""AssetRegisterItem_ID"" = @assetId",
+                new { assetId });
+            tfrTokens["FromLocation"] = "Inventory";
+            tfrTokens["ToLocation"]   = (string?)(assetDept?.dept) ?? "";
+            _ = _emailService.SendTransactionEmailsAsync("Transfer", tfrTokens);
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[InvTransferController] Email dispatch failed for Transfer approval {id}: {ex.Message}"); }
+        return Ok(new { success = true });
     }
 }

@@ -14,12 +14,14 @@ public class DisposalController : ControllerBase
     private readonly DbConnectionFactory _db;
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
+    private readonly EmailService _emailService;
 
-    public DisposalController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService)
+    public DisposalController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -61,7 +63,7 @@ public class DisposalController : ControllerBase
         await conn.OpenAsync();
 
         var disp = await conn.QueryFirstOrDefaultAsync<AssetDisposal>(
-            @"SELECT ""AssetDisposal_ID"", ""AssetItemID"" AS ""AssetRegisterItem_ID"", ""DisposalDate"", ""AssetDisposalMethodID"" AS ""DisposalMethod_ID"", ""SalePrice"", ""CarryingAmount"", ""AmountProfitLoss"" AS ""ProfitLoss"", ""DisposalReason"" AS ""Reason"", ""Status"", ""FinYear"", ""DateCaptured"", ""CapturerID"", ""DateModified"", ""ModifierID"" FROM ""Asset_Disposal"" WHERE ""AssetDisposal_ID"" = @id", new { id });
+            @"SELECT ""AssetDisposal_ID"", ""AssetItemID"" AS ""AssetRegisterItem_ID"", ""DisposalDate"", ""AssetDisposalMethodID"" AS ""DisposalMethod_ID"", ""SalePrice"", ""CarryingAmount"", ""AmountProfitLoss"" AS ""ProfitLoss"", ""DisposalReason"" AS ""Reason"", ""Status"", ""FinYear"", ""DateCaptured"", ""CapturerID"", ""DateModified"", ""ModifierID"", ""CatchUpDep"", ""CatchUpDays"" FROM ""Asset_Disposal"" WHERE ""AssetDisposal_ID"" = @id", new { id });
         if (disp == null) return NotFound(new { error = "Disposal record not found" });
 
         int assetId = disp.AssetRegisterItem_ID ?? 0;
@@ -104,25 +106,41 @@ public class DisposalController : ControllerBase
         else
             depFromDate = txnDate;
 
-        int catchUpDays = (int)(txnDate - depFromDate).TotalDays;
-        if (catchUpDays < 0) catchUpDays = 0;
+        bool isApproved = string.Equals(disp.Status, "Approved", StringComparison.OrdinalIgnoreCase);
 
+        int catchUpDays;
+        decimal catchUpDep;
+        decimal dailyRate;
         decimal carryingBeforeCatchUp = projected.CarryingAmount;
-        decimal catchUpDep = 0m;
-        decimal dailyRate = 0m;
-        decimal adjustedCarrying = projected.CarryingAmount;
+        decimal adjustedCarrying;
 
-        decimal remainingUsefulLifeMonths = (decimal)(asset?.RemainingUsefulLife ?? 0m);
-        if (catchUpDays > 0 && remainingUsefulLifeMonths > 0)
+        if (isApproved && (disp.CatchUpDep.HasValue || disp.CatchUpDays.HasValue))
         {
-            decimal residual = (decimal)(asset?.ResidualValue ?? 0m);
-            decimal depreciableAmount = Math.Max(0, carryingBeforeCatchUp - residual);
-            int maxDepDays = (int)(remainingUsefulLifeMonths * 30.44m);
-            if (catchUpDays > maxDepDays) catchUpDays = maxDepDays;
-            catchUpDep = Math.Round(depreciableAmount * 12m / remainingUsefulLifeMonths / 365m * catchUpDays, 2);
-            if (catchUpDep > depreciableAmount) catchUpDep = depreciableAmount;
+            catchUpDays = disp.CatchUpDays ?? 0;
+            catchUpDep = disp.CatchUpDep ?? 0m;
+            dailyRate = (catchUpDays > 0 && catchUpDep > 0) ? Math.Round(catchUpDep / catchUpDays, 2) : 0m;
             adjustedCarrying = Math.Max(0, carryingBeforeCatchUp - catchUpDep);
-            if (catchUpDays > 0 && catchUpDep > 0) dailyRate = Math.Round(catchUpDep / catchUpDays, 2);
+        }
+        else
+        {
+            catchUpDays = (int)(txnDate - depFromDate).TotalDays;
+            if (catchUpDays < 0) catchUpDays = 0;
+            catchUpDep = 0m;
+            dailyRate = 0m;
+            adjustedCarrying = projected.CarryingAmount;
+
+            decimal remainingUsefulLifeMonths = (decimal)(asset?.RemainingUsefulLife ?? 0m);
+            if (catchUpDays > 0 && remainingUsefulLifeMonths > 0)
+            {
+                decimal residual = (decimal)(asset?.ResidualValue ?? 0m);
+                decimal depreciableAmount = Math.Max(0, carryingBeforeCatchUp - residual);
+                int maxDepDays = (int)(remainingUsefulLifeMonths * 30.44m);
+                if (catchUpDays > maxDepDays) catchUpDays = maxDepDays;
+                catchUpDep = Math.Round(depreciableAmount * 12m / remainingUsefulLifeMonths / 365m * catchUpDays, 2);
+                if (catchUpDep > depreciableAmount) catchUpDep = depreciableAmount;
+                adjustedCarrying = Math.Max(0, carryingBeforeCatchUp - catchUpDep);
+                if (catchUpDays > 0 && catchUpDep > 0) dailyRate = Math.Round(catchUpDep / catchUpDays, 2);
+            }
         }
 
         decimal salePrice = disp.SalePrice ?? 0m;
@@ -627,8 +645,12 @@ public class DisposalController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Disposal"" SET ""Status"" = 'Approved', ""DateModified"" = GETDATE(),
-                    ""Approved"" = 1, ""ApprovedDate"" = GETDATE(), ""ApprovedBy"" = @approvedBy
-                WHERE ""AssetDisposal_ID"" = @id", new { id, approvedBy = request.ApprovedBy }, txn);
+                    ""Approved"" = 1, ""ApprovedDate"" = GETDATE(), ""ApprovedBy"" = @approvedBy,
+                    ""CatchUpDep"" = @catchUpDep, ""CatchUpDays"" = @catchUpDays
+                WHERE ""AssetDisposal_ID"" = @id",
+                new { id, approvedBy = request.ApprovedBy,
+                      catchUpDep = catchUpDepreciation > 0 ? (decimal?)catchUpDepreciation : null,
+                      catchUpDays = catchUpDepreciation > 0 ? (int?)catchUpDays : null }, txn);
 
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Asset_Disposal_Approval"" (""AssetDisposal_ID"", ""AssetItemID"", ""ApprovalDate"", ""ApprovedByID"",
@@ -661,6 +683,43 @@ public class DisposalController : ControllerBase
                 WHERE ""entity_type"" = 'disposal' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
+            bool notifyDebtor = false;
+            string disposalReason = "";
+            string disposalMethod = "";
+            try
+            {
+                var flags = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT d.""notify_debtor"",
+                             COALESCE(d.""DisposalReason"", '') AS ""DisposalReason"",
+                             COALESCE(m.""AssetDisposalMethodDesc"", '') AS ""DisposalMethodDesc""
+                      FROM ""Asset_Disposal"" d
+                      LEFT JOIN ""Const_AssetDisposalMethod"" m ON m.""AssetDisposalMethod_ID"" = d.""AssetDisposalMethodID""
+                      WHERE d.""AssetDisposal_ID"" = @id", new { id }, txn);
+                if (flags != null)
+                {
+                    if (flags.notify_debtor != null)
+                        notifyDebtor = Convert.ToInt32(flags.notify_debtor) != 0;
+                    disposalReason = (string)(flags.DisposalReason ?? "");
+                    disposalMethod = (string)(flags.DisposalMethodDesc ?? "");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[DisposalController] Could not read disposal flags for disposal {id}: {ex.Message}");
+            }
+            if (notifyDebtor)
+            {
+                var dispTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetRegId);
+                dispTokens["DisposalDate"]        = disposalDate.ToString("dd MMM yyyy");
+                dispTokens["DisposalProceeds"]    = salePrice.ToString("N2");
+                dispTokens["AdjustedCarryingAmount"] = carryingValue.ToString("N2");
+                dispTokens["ProfitLoss"]          = profitLoss.ToString("N2");
+                dispTokens["CatchUpDepreciation"] = catchUpDepreciation.ToString("N2");
+                dispTokens["DisposalReason"]      = disposalReason;
+                dispTokens["DisposalMethod"]      = disposalMethod;
+                dispTokens["FinancialYear"]       = finYear;
+                _ = _emailService.SendTransactionEmailsAsync("Disposal", dispTokens);
+            }
             return Ok(new { success = 1, journalId, documentNumber, transactionId, profitLoss, isGain });
         }
         catch (Exception ex)

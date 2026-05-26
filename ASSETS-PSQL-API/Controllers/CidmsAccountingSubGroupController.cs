@@ -38,6 +38,8 @@ public class CidmsAccountingSubGroupController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" WHERE ""AssetAccountSubGroupDesc"" ILIKE @AssetAccountSubGroupDesc AND ""AssetAccountGroupID"" = @AssetAccountGroupID", new { model.AssetAccountSubGroupDesc, model.AssetAccountGroupID }) > 0;
+        if (dup) return Conflict(new { error = $"CIDMS accounting sub-group '{model.AssetAccountSubGroupDesc}' already exists under this accounting group" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Accounting_Sub_Group"" (""AssetAccountSubGroupDesc"", ""AssetAccountGroupID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
             VALUES (@AssetAccountSubGroupDesc, @AssetAccountGroupID, @Enabled, GETDATE(), @CapturerID, @Default)
@@ -51,6 +53,8 @@ public class CidmsAccountingSubGroupController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" WHERE ""AssetAccountSubGroupDesc"" ILIKE @AssetAccountSubGroupDesc AND ""AssetAccountGroupID"" = @AssetAccountGroupID AND ""AssetAccountSubGroupID"" <> @id", new { model.AssetAccountSubGroupDesc, model.AssetAccountGroupID, id }) > 0;
+        if (dup) return Conflict(new { error = $"CIDMS accounting sub-group '{model.AssetAccountSubGroupDesc}' already exists under this accounting group" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Accounting_Sub_Group""
             SET ""AssetAccountSubGroupDesc"" = @AssetAccountSubGroupDesc, ""AssetAccountGroupID"" = @AssetAccountGroupID,
@@ -66,6 +70,42 @@ public class CidmsAccountingSubGroupController : ControllerBase
         await conn.OpenAsync();
         var rows = await conn.ExecuteAsync(@"DELETE FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" WHERE ""AssetAccountSubGroupID"" = @id", new { id });
         return rows == 0 ? NotFound(new { error = "CIDMS Accounting Sub Group not found" }) : Ok(new { success = 1 });
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var rows = await conn.QueryAsync<dynamic>(@"
+            SELECT sg.""AssetAccountSubGroupID"" AS ""sgid"",
+                   ag.""AssetAccountGroupDesc"" AS ""groupdesc"",
+                   sg.""AssetAccountSubGroupDesc"" AS ""sgdesc"",
+                   sg.""Enabled"" AS ""enabled""
+            FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" sg
+            LEFT JOIN ""Const_Asset_CIDMS_Accounting_Group"" ag ON ag.""AssetAccountGroupID"" = sg.""AssetAccountGroupID""
+            ORDER BY sg.""AssetAccountSubGroupID""");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("CIDMS Accounting Sub Groups");
+        ws.Cell(1, 1).Value = "ID";
+        ws.Cell(1, 2).Value = "Accounting Group";
+        ws.Cell(1, 3).Value = "Sub Group Description";
+        ws.Cell(1, 4).Value = "Enabled";
+        ws.Row(1).Style.Font.Bold = true;
+        int r = 2;
+        foreach (var row in rows)
+        {
+            ws.Cell(r, 1).Value = (int)row.sgid;
+            ws.Cell(r, 2).Value = (string?)row.groupdesc ?? "";
+            ws.Cell(r, 3).Value = (string?)row.sgdesc ?? "";
+            ws.Cell(r, 4).Value = (int)row.enabled == 1 ? "Yes" : "No";
+            r++;
+        }
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "CIDMSAccountingSubGroups_Export.xlsx");
     }
 
     [HttpGet("import-template")]
@@ -96,7 +136,9 @@ public class CidmsAccountingSubGroupController : ControllerBase
         using var workbook = new XLWorkbook(stream);
         var ws = workbook.Worksheets.First();
         var errors = new List<ImportError>();
+        var rowNums = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var rows = new List<(string desc, int groupId)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 2; r <= ws.LastRowUsed()?.RowNumber(); r++)
         {
@@ -112,7 +154,13 @@ public class CidmsAccountingSubGroupController : ControllerBase
                 errors.Add(new ImportError { Row = r, Column = "Accounting Group ID", Value = groupIdStr, Message = "Invalid Accounting Group ID" });
                 continue;
             }
+            if (!seen.Add($"{desc}|{groupId}"))
+            {
+                errors.Add(new ImportError { Row = r, Column = "Accounting Sub Group", Value = desc, Message = $"Duplicate: 'Accounting Sub Group' value '{desc}' for this group in file" });
+                continue;
+            }
             rows.Add((desc, groupId));
+            rowNums[desc] = r;
         }
 
         if (errors.Count > 0)
@@ -120,15 +168,23 @@ public class CidmsAccountingSubGroupController : ControllerBase
 
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dbErrors = new List<ImportError>();
         await using var txn = await conn.BeginTransactionAsync();
 
         foreach (var (desc, groupId) in rows)
         {
+            var exists = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Accounting_Sub_Group"" WHERE ""AssetAccountSubGroupDesc"" ILIKE @desc AND ""AssetAccountGroupID"" = @groupId", new { desc, groupId }, txn) > 0;
+            if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "Accounting Sub Group", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Accounting_Sub_Group"" (""AssetAccountSubGroupDesc"", ""AssetAccountGroupID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
                 VALUES (@desc, @groupId, 1, GETDATE(), 1, 1)", new { desc, groupId }, txn);
         }
 
+        if (dbErrors.Count > 0)
+        {
+            await txn.RollbackAsync();
+            return BadRequest(new ImportResult { Success = false, Errors = dbErrors });
+        }
         await txn.CommitAsync();
         return Ok(new ImportResult { Success = true, Imported = rows.Count });
     }

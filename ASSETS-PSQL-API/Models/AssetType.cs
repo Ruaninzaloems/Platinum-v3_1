@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AssetManagement.Models;
 
 public class AssetType
@@ -11,5 +13,6 @@ public class AssetType
     public int? ModifierID { get; set; }
     public int? Default { get; set; } = 1;
     public int? RequireStatus { get; set; }
+    [JsonPropertyName("noUsefulLife")]
     public int? NoUsefuleLife { get; set; }
 }

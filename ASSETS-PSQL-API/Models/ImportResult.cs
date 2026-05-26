@@ -4,6 +4,9 @@ public class ImportResult
 {
     public bool Success { get; set; }
     public int Imported { get; set; }
+    public int Inserted { get; set; }
+    public int Updated { get; set; }
+    public int Skipped { get; set; }
     public List<ImportError> Errors { get; set; } = new();
 }
 

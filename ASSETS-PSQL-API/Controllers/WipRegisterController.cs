@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
+using AssetManagement.Helpers;
 using AssetManagement.Services;
 
 namespace AssetManagement.Controllers;
@@ -14,15 +15,17 @@ public class WipRegisterController : ControllerBase
     private readonly LookupService _lookup;
     private readonly ScmInvoiceService _scmInvoice;
     private readonly ScmUnbundlingService _scmUnbundling;
+    private readonly EmailService _emailService;
 
     public WipRegisterController(DbConnectionFactory db, TransactionService txnService, LookupService lookup,
-        ScmInvoiceService scmInvoice, ScmUnbundlingService scmUnbundling)
+        ScmInvoiceService scmInvoice, ScmUnbundlingService scmUnbundling, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookup = lookup;
         _scmInvoice = scmInvoice;
         _scmUnbundling = scmUnbundling;
+        _emailService = emailService;
     }
 
     private static string BaseSelect => @"
@@ -488,6 +491,16 @@ public class WipRegisterController : ControllerBase
                 ""DateModified"" = NOW()
             WHERE ""WIPRegister_ID"" = @id", new { id, comment, approverId });
         if (rows == 0) return NotFound(new { error = "WIP register not found" });
+        try
+        {
+            _ = _emailService.SendTransactionEmailsAsync("Unbundling", new Dictionary<string, string>
+            {
+                ["WipReference"] = id.ToString(),
+                ["Comment"]      = comment ?? "",
+                ["ApprovalDate"] = DateTime.Now.ToString("dd MMM yyyy")
+            });
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[WipRegisterController] Email dispatch failed for Unbundling approval {id}: {ex.Message}"); }
         var updated = await conn.QueryFirstOrDefaultAsync<dynamic>(BaseSelect + @" WHERE w.""WIPRegister_ID"" = @id", new { id });
         return Ok(updated);
     }
@@ -1153,9 +1166,9 @@ public class WipRegisterController : ControllerBase
         {
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Transfer_Transactions""
-                SET ""IsApproved"" = 1, ""DateModified"" = NOW(), ""ModifierID"" = 1
+                SET ""IsApproved"" = 1, ""DateModified"" = NOW(), ""ModifierID"" = @modifierId
                 WHERE ""AssetTransfer_ID"" = ANY(@ids)",
-                new { ids = transferIds.ToArray() });
+                new { ids = transferIds.ToArray(), modifierId = this.GetCapturerId() });
         }
 
         await conn.ExecuteAsync(@"

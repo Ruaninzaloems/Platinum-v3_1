@@ -17,7 +17,7 @@ public class AssetClassController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? typeId, [FromQuery] int? categoryId, [FromQuery] int? subCategoryId,
-        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search)
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? search, [FromQuery] string? model)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
@@ -30,6 +30,10 @@ public class AssetClassController : ControllerBase
         if (categoryId.HasValue) { filterClause += @" AND ""AssetCategoryID"" = @categoryId"; parameters.Add("categoryId", categoryId); }
         if (subCategoryId.HasValue) { filterClause += @" AND ""Asset_SubCategory_ID"" = @subCategoryId"; parameters.Add("subCategoryId", subCategoryId); }
         if (!string.IsNullOrWhiteSpace(search)) { filterClause += @" AND ""AssetClassDesc"" LIKE @search"; parameters.Add("search", $"%{search}%"); }
+        if (string.Equals(model, "Cost", StringComparison.OrdinalIgnoreCase))
+            filterClause += @" AND (""AssetMeasurement_ID"" IS NULL OR ""AssetMeasurement_ID"" IN (SELECT ""AssetConfig_MeasurementType_ID"" FROM ""AssetConfig_MeasurementType"" WHERE ""Name"" NOT ILIKE '%Revaluation%'))";
+        else if (string.Equals(model, "Revaluation", StringComparison.OrdinalIgnoreCase))
+            filterClause += @" AND ""AssetMeasurement_ID"" IN (SELECT ""AssetConfig_MeasurementType_ID"" FROM ""AssetConfig_MeasurementType"" WHERE ""Name"" ILIKE '%Revaluation%')";
 
         sql += filterClause + @" ORDER BY ""AssetClass_ID""";
         countSql += filterClause;
@@ -63,13 +67,15 @@ public class AssetClassController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_AssetClass_sys"" WHERE ""AssetClassDesc"" ILIKE @AssetClassDesc AND ""TypeID"" IS NOT DISTINCT FROM @TypeID AND ""AssetCategoryID"" IS NOT DISTINCT FROM @AssetCategoryID AND ""Asset_SubCategory_ID"" IS NOT DISTINCT FROM @Asset_SubCategory_ID", new { model.AssetClassDesc, model.TypeID, model.AssetCategoryID, model.Asset_SubCategory_ID }) > 0;
+        if (dup) return Conflict(new { error = $"Asset class '{model.AssetClassDesc}' already exists for this type/category/sub-category" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetClass_sys"" (""AssetClassDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"",
                 ""Asset_SubCategory_ID"", ""UsefulLifeInMonths"", ""AssetDepreciationMethod_ID"",
-                ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"")
+                ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"", ""RevaluationMethod"")
             VALUES (@AssetClassDesc, @Enabled, GETDATE(), @CapturerID,
                 @Asset_SubCategory_ID, @UsefulLifeInMonths, @AssetDepreciationMethod_ID,
-                @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID)
+                @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID, @RevaluationMethod)
             RETURNING ""AssetClass_ID""", model);
         model.AssetClass_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -80,17 +86,23 @@ public class AssetClassController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var isDefault = await conn.ExecuteScalarAsync<int>(@"SELECT COALESCE(""Default"",0) FROM ""Const_AssetClass_sys"" WHERE ""AssetClass_ID"" = @id", new { id });
+        if (isDefault == 1)
+            return BadRequest(new { error = "Cannot update a system/default Asset Class — system classes cannot be changed." });
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_AssetClass_sys"" WHERE ""AssetClassDesc"" ILIKE @AssetClassDesc AND ""TypeID"" IS NOT DISTINCT FROM @TypeID AND ""AssetCategoryID"" IS NOT DISTINCT FROM @AssetCategoryID AND ""Asset_SubCategory_ID"" IS NOT DISTINCT FROM @Asset_SubCategory_ID AND ""AssetClass_ID"" <> @id", new { model.AssetClassDesc, model.TypeID, model.AssetCategoryID, model.Asset_SubCategory_ID, id }) > 0;
+        if (dup) return Conflict(new { error = $"Asset class '{model.AssetClassDesc}' already exists for this type/category/sub-category" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetClass_sys""
             SET ""AssetClassDesc"" = @AssetClassDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(),
                 ""Asset_SubCategory_ID"" = @Asset_SubCategory_ID, ""UsefulLifeInMonths"" = @UsefulLifeInMonths,
                 ""AssetDepreciationMethod_ID"" = @AssetDepreciationMethod_ID,
                 ""TypeID"" = @TypeID, ""AssetCategoryID"" = @AssetCategoryID,
-                ""AssetStatus_ID"" = @AssetStatus_ID, ""AssetMeasurement_ID"" = @AssetMeasurement_ID
+                ""AssetStatus_ID"" = @AssetStatus_ID, ""AssetMeasurement_ID"" = @AssetMeasurement_ID,
+                ""RevaluationMethod"" = @RevaluationMethod
             WHERE ""AssetClass_ID"" = @id",
             new { model.AssetClassDesc, model.Enabled, model.Asset_SubCategory_ID, model.UsefulLifeInMonths,
                   model.AssetDepreciationMethod_ID, model.TypeID, model.AssetCategoryID,
-                  model.AssetStatus_ID, model.AssetMeasurement_ID, id });
+                  model.AssetStatus_ID, model.AssetMeasurement_ID, model.RevaluationMethod, id });
         return rows == 0 ? NotFound(new { error = "Asset class not found" }) : Ok(new { success = 1 });
     }
 
@@ -99,8 +111,78 @@ public class AssetClassController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var isDefault = await conn.ExecuteScalarAsync<int>(@"SELECT COALESCE(""Default"",0) FROM ""Const_AssetClass_sys"" WHERE ""AssetClass_ID"" = @id", new { id });
+        if (isDefault == 1)
+            return BadRequest(new { error = "Cannot delete a system/default Asset Class — system classes cannot be deleted." });
+        var refs = await conn.ExecuteScalarAsync<int>(@"
+            SELECT COUNT(1) FROM ""Asset_Register_Items"" WHERE ""AssetClass_ID"" = @id", new { id });
+        if (refs > 0)
+            return Conflict(new { error = "Cannot delete this Asset Class — it is referenced by existing asset register items." });
         var rows = await conn.ExecuteAsync(@"DELETE FROM ""Const_AssetClass_sys"" WHERE ""AssetClass_ID"" = @id", new { id });
         return rows == 0 ? NotFound(new { error = "Asset class not found" }) : Ok(new { success = 1 });
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+
+        var rows = await conn.QueryAsync<dynamic>(@"
+            SELECT
+                ac.""AssetClassDesc"",
+                at.""AssetTypeDesc"",
+                cat.""AssetCategoryDesc"",
+                sub.""Asset_SubCategoryDescription"",
+                mt.""Name"" AS ""MeasurementType"",
+                st.""AssetStatusDesc"",
+                ac.""UsefulLifeInMonths"",
+                dm.""AssetDepreciationMethodDesc"",
+                ac.""RevaluationByCostModel"",
+                ac.""RevaluationByRevalutionModel""
+            FROM ""Const_AssetClass_sys"" ac
+            LEFT JOIN ""Const_AssetType_Sys"" at ON ac.""TypeID"" = at.""AssetType_ID""
+            LEFT JOIN ""Const_AssetCategory_sys"" cat ON ac.""AssetCategoryID"" = cat.""AssetCategoryID""
+            LEFT JOIN ""Const_Asset_SubCategory"" sub ON ac.""Asset_SubCategory_ID"" = sub.""Asset_SubCategory_ID""
+            LEFT JOIN ""AssetConfig_MeasurementType"" mt ON ac.""AssetMeasurement_ID"" = mt.""AssetConfig_MeasurementType_ID""
+            LEFT JOIN ""Const_AssetStatus_Sys"" st ON ac.""AssetStatus_ID"" = st.""AssetStatus_ID""
+            LEFT JOIN ""Const_AssetDepreciationMethod_Sys"" dm ON ac.""AssetDepreciationMethod_ID"" = dm.""AssetDepreciationMethod_ID""
+            ORDER BY ac.""AssetClassDesc""");
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Asset Classes");
+        ws.Cell(1, 1).Value = "Asset Class";
+        ws.Cell(1, 2).Value = "Asset Type";
+        ws.Cell(1, 3).Value = "Category";
+        ws.Cell(1, 4).Value = "Sub Category";
+        ws.Cell(1, 5).Value = "Measurement Type";
+        ws.Cell(1, 6).Value = "Asset Status";
+        ws.Cell(1, 7).Value = "Useful Life (Months)";
+        ws.Cell(1, 8).Value = "Depreciation Method";
+        ws.Cell(1, 9).Value = "Revaluation By Cost Model";
+        ws.Cell(1, 10).Value = "Revaluation By Revaluation Model";
+        ws.Row(1).Style.Font.Bold = true;
+
+        int row = 2;
+        foreach (var r in rows)
+        {
+            ws.Cell(row, 1).Value = (string?)r.AssetClassDesc ?? "";
+            ws.Cell(row, 2).Value = (string?)r.AssetTypeDesc ?? "";
+            ws.Cell(row, 3).Value = (string?)r.AssetCategoryDesc ?? "";
+            ws.Cell(row, 4).Value = (string?)r.Asset_SubCategoryDescription ?? "";
+            ws.Cell(row, 5).Value = (string?)r.MeasurementType ?? "";
+            ws.Cell(row, 6).Value = (string?)r.AssetStatusDesc ?? "";
+            ws.Cell(row, 7).Value = r.UsefulLifeInMonths != null ? (int)r.UsefulLifeInMonths : 0;
+            ws.Cell(row, 8).Value = (string?)r.AssetDepreciationMethodDesc ?? "";
+            ws.Cell(row, 9).Value = Convert.ToInt32(r.RevaluationByCostModel ?? 0) == 1 ? "Yes" : "No";
+            ws.Cell(row, 10).Value = Convert.ToInt32(r.RevaluationByRevalutionModel ?? 0) == 1 ? "Yes" : "No";
+            row++;
+        }
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "AssetClasses_Export.xlsx");
     }
 
     [HttpGet("import-template")]
@@ -116,6 +198,8 @@ public class AssetClassController : ControllerBase
         ws.Cell(1, 6).Value = "Asset Status";
         ws.Cell(1, 7).Value = "Useful Life (Months)";
         ws.Cell(1, 8).Value = "Depreciation Method";
+        ws.Cell(1, 9).Value = "Revaluation By Cost Model";
+        ws.Cell(1, 10).Value = "Revaluation By Revaluation Model";
         ws.Cell(2, 1).Value = "HV switching station equipment - HV busbar indoor";
         ws.Cell(2, 2).Value = "Property, Plant and Equipment";
         ws.Cell(2, 3).Value = "Electrical Infrastructure";
@@ -124,6 +208,8 @@ public class AssetClassController : ControllerBase
         ws.Cell(2, 6).Value = "In Use";
         ws.Cell(2, 7).Value = 720;
         ws.Cell(2, 8).Value = "Straight Line";
+        ws.Cell(2, 9).Value = "No";
+        ws.Cell(2, 10).Value = "No";
         ws.Row(1).Style.Font.Bold = true;
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -159,6 +245,8 @@ public class AssetClassController : ControllerBase
             .ToDictionary(d => ((string)(d.AssetDepreciationMethodDesc ?? "")).Trim(), d => (int)d.AssetDepreciationMethod_ID, StringComparer.OrdinalIgnoreCase);
 
         var rowData = new List<AssetClass>();
+        var seenClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rowNumMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 2; r <= ws.LastRowUsed()?.RowNumber(); r++)
         {
@@ -170,6 +258,8 @@ public class AssetClassController : ControllerBase
             var statusDesc = ws.Cell(r, 6).GetString().Trim();
             var usefulLifeStr = ws.Cell(r, 7).GetString().Trim();
             var depMethodDesc = ws.Cell(r, 8).GetString().Trim();
+            var revalByCostRaw = ws.Cell(r, 9).GetString().Trim();
+            var revalByRevalutionRaw = ws.Cell(r, 10).GetString().Trim();
 
             if (string.IsNullOrWhiteSpace(classDesc))
                 errors.Add(new ImportError { Row = r, Column = "Asset Class", Value = classDesc, Message = "Required field 'Asset Class' is empty" });
@@ -186,6 +276,12 @@ public class AssetClassController : ControllerBase
 
             if (string.IsNullOrWhiteSpace(usefulLifeStr) || !int.TryParse(usefulLifeStr, out _))
                 errors.Add(new ImportError { Row = r, Column = "Useful Life (Months)", Value = usefulLifeStr, Message = "Required field 'Useful Life (Months)' must be a number" });
+
+            if (!string.IsNullOrEmpty(revalByCostRaw) && !string.Equals(revalByCostRaw, "yes", StringComparison.OrdinalIgnoreCase) && !string.Equals(revalByCostRaw, "no", StringComparison.OrdinalIgnoreCase))
+                errors.Add(new ImportError { Row = r, Column = "Revaluation By Cost Model", Value = revalByCostRaw, Message = $"Invalid value '{revalByCostRaw}' in column 'Revaluation By Cost Model' — must be 'Yes', 'No', or blank" });
+
+            if (!string.IsNullOrEmpty(revalByRevalutionRaw) && !string.Equals(revalByRevalutionRaw, "yes", StringComparison.OrdinalIgnoreCase) && !string.Equals(revalByRevalutionRaw, "no", StringComparison.OrdinalIgnoreCase))
+                errors.Add(new ImportError { Row = r, Column = "Revaluation By Revaluation Model", Value = revalByRevalutionRaw, Message = $"Invalid value '{revalByRevalutionRaw}' in column 'Revaluation By Revaluation Model' — must be 'Yes', 'No', or blank" });
 
             if (errors.Any(e => e.Row == r)) continue;
 
@@ -239,6 +335,11 @@ public class AssetClassController : ControllerBase
                 depMethodId = dId;
             }
 
+            if (!seenClasses.Add($"{classDesc}|{typeId}|{catId}|{subCatId}"))
+            {
+                errors.Add(new ImportError { Row = r, Column = "Asset Class", Value = classDesc, Message = $"Duplicate: 'Asset Class' value '{classDesc}' for this type/category/sub-category in file" });
+                continue;
+            }
             rowData.Add(new AssetClass
             {
                 AssetClassDesc = classDesc,
@@ -249,25 +350,53 @@ public class AssetClassController : ControllerBase
                 AssetStatus_ID = statusLookup[statusDesc],
                 UsefulLifeInMonths = int.Parse(usefulLifeStr),
                 AssetDepreciationMethod_ID = depMethodId,
+                RevaluationByCostModel = string.Equals(revalByCostRaw, "yes", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                RevaluationByRevalutionModel = string.Equals(revalByRevalutionRaw, "yes", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
                 Enabled = 1
             });
+            rowNumMap[$"{classDesc}|{typeId}|{catId}|{subCatId}"] = r;
         }
 
         if (errors.Count > 0)
             return BadRequest(new ImportResult { Success = false, Errors = errors });
 
         await using var txn = await conn.BeginTransactionAsync();
+        int inserted = 0, updated = 0, skipped = 0;
         foreach (var item in rowData)
         {
-            await conn.ExecuteAsync(@"
-                INSERT INTO ""Const_AssetClass_sys"" (""AssetClassDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"",
-                    ""Asset_SubCategory_ID"", ""UsefulLifeInMonths"", ""AssetDepreciationMethod_ID"",
-                    ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"")
-                VALUES (@AssetClassDesc, @Enabled, GETDATE(), 1,
-                    @Asset_SubCategory_ID, @UsefulLifeInMonths, @AssetDepreciationMethod_ID,
-                    @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID)", item, txn);
+            var existingId = await conn.ExecuteScalarAsync<int?>(@"SELECT ""AssetClass_ID"" FROM ""Const_AssetClass_sys"" WHERE ""AssetClassDesc"" ILIKE @AssetClassDesc AND ""TypeID"" IS NOT DISTINCT FROM @TypeID AND ""AssetCategoryID"" IS NOT DISTINCT FROM @AssetCategoryID AND ""Asset_SubCategory_ID"" IS NOT DISTINCT FROM @Asset_SubCategory_ID", new { item.AssetClassDesc, item.TypeID, item.AssetCategoryID, item.Asset_SubCategory_ID }, txn);
+            if (existingId.HasValue)
+            {
+                var isDefault = await conn.ExecuteScalarAsync<int>(@"SELECT COALESCE(""Default"",0) FROM ""Const_AssetClass_sys"" WHERE ""AssetClass_ID"" = @id", new { id = existingId.Value }, txn);
+                if (isDefault == 1) { skipped++; continue; }
+                await conn.ExecuteAsync(@"
+                    UPDATE ""Const_AssetClass_sys"" SET
+                        ""AssetMeasurement_ID"" = @AssetMeasurement_ID,
+                        ""AssetStatus_ID"" = @AssetStatus_ID,
+                        ""UsefulLifeInMonths"" = @UsefulLifeInMonths,
+                        ""AssetDepreciationMethod_ID"" = @AssetDepreciationMethod_ID,
+                        ""RevaluationByCostModel"" = @RevaluationByCostModel,
+                        ""RevaluationByRevalutionModel"" = @RevaluationByRevalutionModel,
+                        ""DateModified"" = GETDATE()
+                    WHERE ""AssetClass_ID"" = @id",
+                    new { item.AssetMeasurement_ID, item.AssetStatus_ID, item.UsefulLifeInMonths, item.AssetDepreciationMethod_ID, item.RevaluationByCostModel, item.RevaluationByRevalutionModel, id = existingId.Value }, txn);
+                updated++;
+            }
+            else
+            {
+                await conn.ExecuteAsync(@"
+                    INSERT INTO ""Const_AssetClass_sys"" (""AssetClassDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"",
+                        ""Asset_SubCategory_ID"", ""UsefulLifeInMonths"", ""AssetDepreciationMethod_ID"",
+                        ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"",
+                        ""RevaluationByCostModel"", ""RevaluationByRevalutionModel"")
+                    VALUES (@AssetClassDesc, @Enabled, GETDATE(), 1,
+                        @Asset_SubCategory_ID, @UsefulLifeInMonths, @AssetDepreciationMethod_ID,
+                        @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID,
+                        @RevaluationByCostModel, @RevaluationByRevalutionModel)", item, txn);
+                inserted++;
+            }
         }
         await txn.CommitAsync();
-        return Ok(new ImportResult { Success = true, Imported = rowData.Count });
+        return Ok(new ImportResult { Success = true, Imported = inserted + updated, Inserted = inserted, Updated = updated, Skipped = skipped });
     }
 }

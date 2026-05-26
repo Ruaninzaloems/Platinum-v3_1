@@ -4,6 +4,12 @@ using AssetManagement.Data;
 
 namespace AssetManagement.Controllers;
 
+// Intentional design: all lightweight read-only lookups (location hierarchy,
+// HR, commodities, financial reference data) are consolidated here rather than
+// split into per-entity controllers. This keeps the PSQL API lean for data
+// that is owned by external systems and is effectively read-only from this API.
+// Route paths match the psqlRoute values in database-toggle.service.ts so that
+// dropdowns resolve correctly in PostgreSQL mode and SQL Server mode alike.
 [ApiController]
 public class SharedLookupsController : ControllerBase
 {
@@ -110,43 +116,102 @@ public class SharedLookupsController : ControllerBase
     }
 
     [HttpGet("api/employees")]
-    public async Task<IActionResult> GetEmployees()
+    public async Task<IActionResult> GetEmployees(
+        [FromQuery] string? search = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"
+
+        var whereSql = @" WHERE ""Enabled"" = 1";
+        if (!string.IsNullOrWhiteSpace(search))
+            whereSql += @" AND (""Surname"" ILIKE @search OR ""FirstName"" ILIKE @search OR ""EmpCode"" ILIKE @search)";
+
+        var selectSql = @"
             SELECT ""Employee_ID"" AS ""employeeId"", ""FirstName"" AS ""firstName"", ""Surname"" AS ""surname"", ""EmpCode"" AS ""empCode""
-            FROM ""Payroll_Employee""
-            WHERE ""Enabled"" = 1
-            ORDER BY ""Surname"", ""FirstName""
-            LIMIT 500");
-        return Ok(items);
+            FROM ""Payroll_Employee""" + whereSql + @" ORDER BY ""Surname"", ""FirstName""";
+
+        var queryParams = new { search = $"%{search}%" };
+
+        if (page.HasValue || pageSize.HasValue)
+        {
+            int p  = Math.Max(1, page     ?? 1);
+            int ps = Math.Max(1, pageSize ?? 50);
+
+            var countSql = @"SELECT COUNT(*) FROM ""Payroll_Employee""" + whereSql;
+            var totalCount = await conn.QuerySingleAsync<int>(countSql, queryParams);
+
+            var pagedSql = selectSql + " LIMIT @ps OFFSET @offset";
+            var items = await conn.QueryAsync<dynamic>(pagedSql, new { search = $"%{search}%", ps, offset = (p - 1) * ps });
+
+            return Ok(new { totalCount, page = p, pageSize = ps, items });
+        }
+
+        var allItems = await conn.QueryAsync<dynamic>(selectSql, queryParams);
+        return Ok(allItems);
     }
 
     [HttpGet("api/vendors")]
-    public async Task<IActionResult> GetVendors()
+    public async Task<IActionResult> GetVendors(
+        [FromQuery] string? search = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"
+        var where = string.IsNullOrWhiteSpace(search) ? "" : @" AND ""VendorName"" ILIKE @search";
+        if (page.HasValue || pageSize.HasValue)
+        {
+            int p  = Math.Max(1, page     ?? 1);
+            int ps = Math.Max(1, pageSize ?? 50);
+            var total = await conn.QuerySingleAsync<int>($@"SELECT COUNT(*) FROM ""Cons_Vendor"" WHERE 1=1{where}", new { search = $"%{search}%" });
+            var items = await conn.QueryAsync<dynamic>($@"
+                SELECT ""Vendor_ID"" AS ""vendorId"", ""VendorName"" AS ""vendorName""
+                FROM ""Cons_Vendor""
+                WHERE 1=1{where}
+                ORDER BY ""VendorName""
+                LIMIT @ps OFFSET @offset", new { search = $"%{search}%", ps, offset = (p - 1) * ps });
+            return Ok(new { totalCount = total, page = p, pageSize = ps, items });
+        }
+        var all = await conn.QueryAsync<dynamic>($@"
             SELECT ""Vendor_ID"" AS ""vendorId"", ""VendorName"" AS ""vendorName""
             FROM ""Cons_Vendor""
-            WHERE ""Enabled"" = 1
-            ORDER BY ""VendorName""");
-        return Ok(items);
+            WHERE 1=1{where}
+            ORDER BY ""VendorName""", new { search = $"%{search}%" });
+        return Ok(all);
     }
 
     [HttpGet("api/commodities")]
-    public async Task<IActionResult> GetCommodities()
+    public async Task<IActionResult> GetCommodities(
+        [FromQuery] string? search = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"
+        var where = string.IsNullOrWhiteSpace(search) ? "" : @" AND ""CommodityDesc"" ILIKE @search";
+        if (page.HasValue || pageSize.HasValue)
+        {
+            int p  = Math.Max(1, page     ?? 1);
+            int ps = Math.Max(1, pageSize ?? 50);
+            var total = await conn.QuerySingleAsync<int>($@"SELECT COUNT(*) FROM ""Inven_Commodity"" WHERE 1=1{where}", new { search = $"%{search}%" });
+            var items = await conn.QueryAsync<dynamic>($@"
+                SELECT ""Commodity_ID"" AS ""commodityId"", ""CommodityDesc"" AS ""commodityDesc"",
+                       ""CommodityExtendedDesc"" AS ""commodityExtendedDesc""
+                FROM ""Inven_Commodity""
+                WHERE 1=1{where}
+                ORDER BY ""CommodityDesc""
+                LIMIT @ps OFFSET @offset", new { search = $"%{search}%", ps, offset = (p - 1) * ps });
+            return Ok(new { totalCount = total, page = p, pageSize = ps, items });
+        }
+        var all = await conn.QueryAsync<dynamic>($@"
             SELECT ""Commodity_ID"" AS ""commodityId"", ""CommodityDesc"" AS ""commodityDesc"",
                    ""CommodityExtendedDesc"" AS ""commodityExtendedDesc""
             FROM ""Inven_Commodity""
-            ORDER BY ""CommodityDesc""");
-        return Ok(items);
+            WHERE 1=1{where}
+            ORDER BY ""CommodityDesc""", new { search = $"%{search}%" });
+        return Ok(all);
     }
 
     [HttpGet("api/fin-years")]

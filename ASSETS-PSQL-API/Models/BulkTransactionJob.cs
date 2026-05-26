@@ -45,6 +45,8 @@ public class BulkTransactionItem
     public string? ErrorMessage { get; set; }
     public int? PostedEntityID { get; set; }
     public DateTime? DateCreated { get; set; }
+    public decimal? CatchUpDep { get; set; }
+    public int? CatchUpDays { get; set; }
 }
 
 public class BulkTransactionRejectRequest

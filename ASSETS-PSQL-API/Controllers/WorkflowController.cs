@@ -365,13 +365,14 @@ public class WorkflowController : ControllerBase
         var db = scope.ServiceProvider.GetRequiredService<DbConnectionFactory>();
         var txnService = scope.ServiceProvider.GetRequiredService<TransactionService>();
         var lookupService = scope.ServiceProvider.GetRequiredService<LookupService>();
+        var emailService = scope.ServiceProvider.GetRequiredService<AssetManagement.Services.EmailService>();
 
         await using var conn = db.CreateConnection();
         await conn.OpenAsync();
 
         if (entityType == "impairment")
         {
-            var ctrl = new AssetImpairmentController(db, txnService, lookupService);
+            var ctrl = new AssetImpairmentController(db, txnService, lookupService, emailService);
             ctrl.ControllerContext = new ControllerContext();
             var result = await ctrl.Approve(referenceId, new ImpairmentApprovalRequest { ApprovedBy = 1 });
             if (result is ObjectResult obj && obj.StatusCode >= 400)
@@ -382,12 +383,34 @@ public class WorkflowController : ControllerBase
         }
         else if (entityType == "disposal")
         {
-            var ctrl = new DisposalController(db, txnService, lookupService);
+            var ctrl = new DisposalController(db, txnService, lookupService, emailService);
             ctrl.ControllerContext = new ControllerContext();
             var result = await ctrl.Approve(referenceId, new DisposalApprovalRequest { ApprovedBy = 1 });
             if (result is ObjectResult obj && obj.StatusCode >= 400)
             {
                 Console.WriteLine($"PostApproveTransaction disposal/{referenceId} failed: {obj.StatusCode}");
+                return obj.Value;
+            }
+        }
+        else if (entityType == "revaluation")
+        {
+            var ctrl = new RevaluationController(db, txnService, lookupService, emailService);
+            ctrl.ControllerContext = new ControllerContext();
+            var result = await ctrl.Approve(referenceId, new RevaluationApprovalRequest { ApprovedBy = 1 });
+            if (result is ObjectResult obj && obj.StatusCode >= 400)
+            {
+                Console.WriteLine($"PostApproveTransaction revaluation/{referenceId} failed: {obj.StatusCode}");
+                return obj.Value;
+            }
+        }
+        else if (entityType == "impairment_reversal")
+        {
+            var ctrl = new AssetImpairmentController(db, txnService, lookupService, emailService);
+            ctrl.ControllerContext = new ControllerContext();
+            var result = await ctrl.ApproveReversal(referenceId, new ImpairmentApprovalRequest { ApprovedBy = 1 });
+            if (result is ObjectResult obj && obj.StatusCode >= 400)
+            {
+                Console.WriteLine($"PostApproveTransaction impairment_reversal/{referenceId} failed: {obj.StatusCode}");
                 return obj.Value;
             }
         }

@@ -27,6 +27,7 @@ public class BulkUploadJob
 public class ApproveRequest
 {
     public string? FinancialYear { get; set; }
+    public int? UserId { get; set; }
 }
 
 public class WipApproveRequest
@@ -35,4 +36,5 @@ public class WipApproveRequest
     public int MainAssetId { get; set; }
     public int CreditPlanProjectItemId { get; set; }
     public DateTime TransferDate { get; set; }
+    public int? UserId { get; set; }
 }

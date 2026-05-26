@@ -8,15 +8,68 @@ using Microsoft.Extensions.Configuration;
 
 namespace AssetManagement.Services;
 
+internal record LedGlPayload(
+    DateTime PostingDate, int ProcessingMonth, int? VoteId, string FinYear,
+    int? TransactionTypeId, string? TransactionDetails, string? DocumentNumber,
+    decimal? Debit, decimal? Credit, Guid? MatchTranGuid, int? JournalTransactionTypeId,
+    int? AssetLinkId, int? ScoaFundsId, int? ScoaRegionId, int? ScoaCostingId,
+    int? ScoaProjectId, int? ScoaFunctionId, int ScoaItemId,
+    int? DivisionId, int? ProjectId, int? PlanProjectItemId,
+    int SourceModuleId, int CapturerId);
+
 public class TransactionService
 {
     private readonly DbConnectionFactory _db;
     private readonly IHttpClientFactory _httpClientFactory;
 
+    private static readonly AsyncLocal<List<LedGlPayload>?> _ledGlBuffer = new();
+
     public TransactionService(DbConnectionFactory db, IHttpClientFactory httpClientFactory, IConfiguration config)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
+    }
+
+    private async Task<bool> IsGlUseInboxEnabledAsync()
+    {
+        try
+        {
+            await using var conn = _db.CreateConnection();
+            await conn.OpenAsync();
+            var val = await conn.QueryFirstOrDefaultAsync<bool?>(
+                @"SELECT ""gl_use_inbox"" FROM ""Asset_OrganisationSettings"" LIMIT 1");
+            return val ?? true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[GL_USE_INBOX] Could not read setting, defaulting to true: {ex.Message}");
+            return true;
+        }
+    }
+
+    private static readonly HashSet<string> _validGlLedTargets = new(StringComparer.Ordinal) { "postgresql", "sqlserver", "both" };
+
+    private async Task<string> GetGlLedTargetAsync()
+    {
+        try
+        {
+            await using var conn = _db.CreateConnection();
+            await conn.OpenAsync();
+            var raw = await conn.QueryFirstOrDefaultAsync<string?>(
+                @"SELECT ""gl_led_target"" FROM ""Asset_OrganisationSettings"" LIMIT 1");
+            var normalized = raw?.Trim().ToLowerInvariant() ?? "postgresql";
+            if (!_validGlLedTargets.Contains(normalized))
+            {
+                Console.Error.WriteLine($"[GL_LED_TARGET] Unrecognised value '{raw}', defaulting to 'postgresql'");
+                return "postgresql";
+            }
+            return normalized;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[GL_LED_TARGET] Could not read setting, defaulting to 'postgresql': {ex.Message}");
+            return "postgresql";
+        }
     }
 
     private async Task<bool> IsGlOutboxToggedToSqlServerAsync()
@@ -37,66 +90,120 @@ public class TransactionService
 
     public async Task SyncGlOutboxToSqlServerIfNeededAsync(params Guid[] outboxIds)
     {
-        if (!await IsGlOutboxToggedToSqlServerAsync() || outboxIds.Length == 0) return;
+        var nonEmptyIds = outboxIds.Where(id => id != Guid.Empty).ToArray();
+        if (nonEmptyIds.Length > 0 && await IsGlOutboxToggedToSqlServerAsync())
+        {
+            var client = _httpClientFactory.CreateClient("mssql-api");
+            foreach (var outboxId in nonEmptyIds)
+            {
+                try
+                {
+                    await using var conn = _db.CreateConnection();
+                    await conn.OpenAsync();
+
+                    var header = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                        @"SELECT * FROM ""GL_Outbox"" WHERE ""OutboxId"" = @id", new { id = outboxId });
+                    if (header == null) continue;
+
+                    var lines = (await conn.QueryAsync<dynamic>(
+                        @"SELECT * FROM ""GL_Outbox_Lines"" WHERE ""OutboxId"" = @id ORDER BY ""LineId""",
+                        new { id = outboxId })).ToList();
+
+                    var headerPayload = new
+                    {
+                        OutboxId = (Guid)header.OutboxId,
+                        SubmoduleId = (int)header.SubmoduleId,
+                        EventType = (string)header.EventType,
+                        DocumentNumber = (string)header.DocumentNumber,
+                        IsCashflow = (bool)header.IsCashflow,
+                        Status = (string)header.Status
+                    };
+
+                    var headerResp = await client.PostAsJsonAsync("/api/gl-outbox", headerPayload);
+                    if (!headerResp.IsSuccessStatusCode)
+                    {
+                        Console.Error.WriteLine($"[GL_OUTBOX SYNC] Header POST failed for {outboxId}: {headerResp.StatusCode}");
+                        continue;
+                    }
+
+                    foreach (var line in lines)
+                    {
+                        var linePayload = new
+                        {
+                            OutboxId = outboxId,
+                            ProcessingMonth = (int)line.ProcessingMonth,
+                            FinYear = (string)line.FinYear,
+                            TransactionDetails = (string?)line.TransactionDetails,
+                            SourceModuleId = (int)line.SourceModuleId,
+                            Debit = (decimal)line.Debit,
+                            Credit = (decimal)line.Credit,
+                            CapturerId = (int)line.CapturerId,
+                            PlanProjectItemID = (int)line.PlanProjectItemID,
+                            VATRate = (decimal?)line.VATRate,
+                            VATRateID = (int)line.VATRateID
+                        };
+                        var lineResp = await client.PostAsJsonAsync("/api/gl-outbox-lines", linePayload);
+                        if (!lineResp.IsSuccessStatusCode)
+                        {
+                            Console.Error.WriteLine($"[GL_OUTBOX SYNC] Line POST failed for outbox {outboxId}: {lineResp.StatusCode}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[GL_OUTBOX SYNC] Exception for outbox {outboxId}: {ex.Message}");
+                }
+            }
+        }
+
+        await FlushLedGeneralLedgerAsync();
+    }
+
+    private async Task FlushLedGeneralLedgerAsync()
+    {
+        var buffer = _ledGlBuffer.Value;
+        if (buffer == null || buffer.Count == 0) return;
+        _ledGlBuffer.Value = null;
+
         var client = _httpClientFactory.CreateClient("mssql-api");
-        foreach (var outboxId in outboxIds)
+        foreach (var entry in buffer)
         {
             try
             {
-                await using var conn = _db.CreateConnection();
-                await conn.OpenAsync();
-
-                var header = await conn.QueryFirstOrDefaultAsync<dynamic>(
-                    @"SELECT * FROM ""GL_Outbox"" WHERE ""OutboxId"" = @id", new { id = outboxId });
-                if (header == null) continue;
-
-                var lines = (await conn.QueryAsync<dynamic>(
-                    @"SELECT * FROM ""GL_Outbox_Lines"" WHERE ""OutboxId"" = @id ORDER BY ""LineId""",
-                    new { id = outboxId })).ToList();
-
-                var headerPayload = new
+                var payload = new
                 {
-                    OutboxId = (Guid)header.OutboxId,
-                    SubmoduleId = (int)header.SubmoduleId,
-                    EventType = (string)header.EventType,
-                    DocumentNumber = (string)header.DocumentNumber,
-                    IsCashflow = (bool)header.IsCashflow,
-                    Status = (string)header.Status
+                    entry.PostingDate,
+                    entry.ProcessingMonth,
+                    entry.VoteId,
+                    entry.FinYear,
+                    entry.TransactionTypeId,
+                    entry.TransactionDetails,
+                    entry.DocumentNumber,
+                    entry.Debit,
+                    entry.Credit,
+                    entry.MatchTranGuid,
+                    entry.JournalTransactionTypeId,
+                    entry.AssetLinkId,
+                    entry.ScoaFundsId,
+                    entry.ScoaRegionId,
+                    entry.ScoaCostingId,
+                    entry.ScoaProjectId,
+                    entry.ScoaFunctionId,
+                    entry.ScoaItemId,
+                    entry.DivisionId,
+                    entry.ProjectId,
+                    entry.PlanProjectItemId,
+                    entry.CapturerId
                 };
-
-                var headerResp = await client.PostAsJsonAsync("/api/gl-outbox", headerPayload);
-                if (!headerResp.IsSuccessStatusCode)
+                var resp = await client.PostAsJsonAsync("/api/led-general-ledger", payload);
+                if (!resp.IsSuccessStatusCode)
                 {
-                    Console.Error.WriteLine($"[GL_OUTBOX SYNC] Header POST failed for {outboxId}: {headerResp.StatusCode}");
-                    continue;
-                }
-
-                foreach (var line in lines)
-                {
-                    var linePayload = new
-                    {
-                        OutboxId = outboxId,
-                        ProcessingMonth = (int)line.ProcessingMonth,
-                        FinYear = (string)line.FinYear,
-                        TransactionDetails = (string?)line.TransactionDetails,
-                        SourceModuleId = (int)line.SourceModuleId,
-                        Debit = (decimal)line.Debit,
-                        Credit = (decimal)line.Credit,
-                        CapturerId = (int)line.CapturerId,
-                        PlanProjectItemID = (int)line.PlanProjectItemID,
-                        VATRate = (decimal?)line.VATRate,
-                        VATRateID = (int)line.VATRateID
-                    };
-                    var lineResp = await client.PostAsJsonAsync("/api/gl-outbox-lines", linePayload);
-                    if (!lineResp.IsSuccessStatusCode)
-                    {
-                        Console.Error.WriteLine($"[GL_OUTBOX SYNC] Line POST failed for outbox {outboxId}: {lineResp.StatusCode}");
-                    }
+                    Console.Error.WriteLine($"[LED_GL FLUSH] POST failed: {resp.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[GL_OUTBOX SYNC] Exception for outbox {outboxId}: {ex.Message}");
+                Console.Error.WriteLine($"[LED_GL FLUSH] Exception: {ex.Message}");
             }
         }
     }
@@ -155,34 +262,37 @@ public class TransactionService
               ORDER BY ""Financial_Year"" DESC, ""Financial_Period"" DESC
               LIMIT 1");
 
-        string nextFy;
-        int nextPeriod;
+        string nextFy = string.Empty;
+        int nextPeriod = 1;
 
         if (last != null)
         {
-            int lastPeriod = (int)last.FinancialPeriod;
-            string lastFy = (string)last.FinancialYear;
+            var rawPeriod = (last as IDictionary<string, object>)?["FinancialPeriod"] ?? (object)last.FinancialPeriod;
+            var rawFy     = (last as IDictionary<string, object>)?["FinancialYear"]  ?? (object)last.FinancialYear;
+            int lastPeriod = rawPeriod != null ? Convert.ToInt32(rawPeriod) : 1;
+            string lastFy  = rawFy?.ToString() ?? string.Empty;
             nextPeriod = lastPeriod + 1;
             if (nextPeriod > 12)
             {
                 nextPeriod = 1;
                 // Increment FY string e.g. "2024/2025" → "2025/2026"
-                var parts = lastFy.Split('/');
+                var parts = string.IsNullOrEmpty(lastFy) ? new[] { DateTime.Now.Year.ToString() } : lastFy.Split('/');
                 int startYear = int.TryParse(parts[0], out var sy) ? sy : DateTime.Now.Year;
                 nextFy = $"{startYear + 1}/{startYear + 2}";
             }
             else
             {
-                nextFy = lastFy;
+                nextFy = string.IsNullOrEmpty(lastFy) ? null : lastFy;
             }
         }
-        else
+
+        if (string.IsNullOrEmpty(nextFy))
         {
-            // True first-time fallback: read financial_year from settings
+            // Fallback: read financial_year from settings (covers first-time and null-FY cases)
             var settingsFy = await conn.QueryFirstOrDefaultAsync<string>(
                 @"SELECT ""financial_year"" FROM ""Asset_OrganisationSettings"" LIMIT 1");
             nextFy = settingsFy ?? $"{DateTime.Now.Year - 1}/{DateTime.Now.Year}";
-            nextPeriod = 1;
+            if (last == null) nextPeriod = 1;
         }
 
         // Convert period to calendar month (FY starts July = month 7)
@@ -223,9 +333,15 @@ public class TransactionService
             new { assetRegisterItemId, transactionTypeId, amount, finYear = finYear ?? fy.year });
     }
 
-    public async Task<MscoaLookupResult?> LookupMscoaConfig(DbConnection conn, int assetRegisterItemId, string transactionTypeName, string finYear, DbTransaction? txn = null)
+    public async Task<MscoaLookupResult?> LookupMscoaConfig(DbConnection conn, int assetRegisterItemId, string transactionTypeName, string finYear, DbTransaction? txn = null, bool? useDeptDivision = null)
     {
-        var result = await conn.QueryFirstOrDefaultAsync<MscoaLookupResult>(@"
+        bool useDD = useDeptDivision ?? await conn.ExecuteScalarAsync<bool>(@"
+            SELECT COALESCE(""mscoa_use_dept_division"", true) FROM ""Asset_OrganisationSettings"" LIMIT 1", txn);
+        var deptDivJoin = useDD
+            ? @"AND msc.""DepartmentID"" IS NOT NULL AND COALESCE(CAST(NULLIF(i.""MunicipalDepartment_ID"", '') AS INTEGER), 0) = msc.""DepartmentID""
+                AND msc.""DivisionID"" IS NOT NULL AND COALESCE(i.""DivisionID"", 0) = msc.""DivisionID"""
+            : "";
+        var sql = $@"
             SELECT
                 mst.""Project11"" AS ""DebitProjectId"",
                 mst.""Project14"" AS ""CreditProjectId"",
@@ -266,22 +382,22 @@ public class TransactionService
                 ppir.""DivisionId"" AS ""ReserveDivisionId"",
                 ppir.""ProjectID"" AS ""ReservePlanProjectId"",
                 ppir.""PlanProjectItem_ID"" AS ""ReservePlanProjectItemId"",
-                lvr.""Vote_ID"" AS ""ReserveVoteId""
+                lvr.""Vote_ID"" AS ""ReserveVoteId"",
+                CASE WHEN {VoteLegIncompletePredicate("mst")} THEN true ELSE false END AS ""IsVoteLegIncomplete""
             FROM ""Asset_Register_Items"" i
             INNER JOIN ""AssetConfig_mSCOA"" msc
                 ON COALESCE(i.""MeasurementType_ID"", 0) = COALESCE(msc.""MeasurementTypeID"", 0)
                 AND COALESCE(i.""AssetType_ID"", 0) = COALESCE(msc.""TypeID"", 0)
                 AND COALESCE(i.""AssetCategory_ID"", 0) = COALESCE(msc.""CategoryID"", 0)
                 AND COALESCE(i.""Asset_SubCategory_ID"", 0) = COALESCE(msc.""SubCategoryID"", 0)
-                AND msc.""DepartmentID"" IS NOT NULL AND COALESCE(CAST(NULLIF(i.""MunicipalDepartment_ID"", '') AS INTEGER), 0) = msc.""DepartmentID""
-                AND msc.""DivisionID"" IS NOT NULL AND COALESCE(i.""DivisionID"", 0) = msc.""DivisionID""
+                {deptDivJoin}
                 AND msc.""FinYear"" = @finYear
             INNER JOIN ""AssetConfig_mSCOA_TransactionType"" mst
                 ON msc.""AssetConfig_mSCOA_ID"" = mst.""AssetConfig_mSCOA_ID""
                 AND mst.""TransactionTypeID"" = (SELECT ""AssetConfig_TransactionType_ID"" FROM ""AssetConfig_TransactionType"" WHERE ""Name"" = @transactionTypeName OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY)
             LEFT JOIN ""Plan_ProjectItem"" ppid ON ppid.""PlanProjectItem_ID"" = mst.""DebitItem11_1""
             LEFT JOIN ""Led_Vote"" lvd ON lvd.""SCOAItemID"" = ppid.""SCOAItemID"" AND lvd.""FinYear"" = @finYear
-            LEFT JOIN ""Plan_ProjectItem"" ppic ON ppic.""PlanProjectItem_ID"" = CAST(mst.""CreditItem11_1"" AS INTEGER)
+            LEFT JOIN ""Plan_ProjectItem"" ppic ON ppic.""PlanProjectItem_ID"" = (CASE WHEN TRIM(COALESCE(mst.""CreditItem11_1"", '')) ~ '^[0-9]+$' THEN CAST(TRIM(mst.""CreditItem11_1"") AS INTEGER) END)
             LEFT JOIN ""Led_Vote"" lvc ON lvc.""SCOAItemID"" = ppic.""SCOAItemID"" AND lvc.""FinYear"" = @finYear
             LEFT JOIN ""Plan_ProjectItem"" ppio ON ppio.""PlanProjectItem_ID"" = mst.""DebitItem12_1""
                 AND ppio.""ProjectID"" = mst.""Project12"" AND ppio.""FinYear"" = @finYear
@@ -290,15 +406,21 @@ public class TransactionService
                 AND ppir.""ProjectID"" = mst.""Project13"" AND ppir.""FinYear"" = @finYear
             LEFT JOIN ""Led_Vote"" lvr ON lvr.""SCOAItemID"" = ppir.""SCOAItemID"" AND lvr.""FinYear"" = @finYear
             WHERE i.""AssetRegisterItem_ID"" = @assetRegisterItemId
-            OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+            OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+        var result = await conn.QueryFirstOrDefaultAsync<MscoaLookupResult>(sql,
             new { assetRegisterItemId, transactionTypeName, finYear }, txn);
-
         return result;
     }
 
-    public async Task<MscoaLookupResult?> LookupMscoaConfigByClassification(DbConnection conn, int typeId, int categoryId, int subCategoryId, int measurementTypeId, string transactionTypeName, string finYear, DbTransaction? txn = null, int departmentId = 0, int divisionId = 0)
+    public async Task<MscoaLookupResult?> LookupMscoaConfigByClassification(DbConnection conn, int typeId, int categoryId, int subCategoryId, int measurementTypeId, string transactionTypeName, string finYear, DbTransaction? txn = null, int departmentId = 0, int divisionId = 0, bool? useDeptDivision = null)
     {
-        var result = await conn.QueryFirstOrDefaultAsync<MscoaLookupResult>(@"
+        bool useDD = useDeptDivision ?? await conn.ExecuteScalarAsync<bool>(@"
+            SELECT COALESCE(""mscoa_use_dept_division"", true) FROM ""Asset_OrganisationSettings"" LIMIT 1", txn);
+        var deptDivWhere = useDD
+            ? @"AND msc.""DepartmentID"" IS NOT NULL AND msc.""DepartmentID"" = @departmentId
+                AND msc.""DivisionID"" IS NOT NULL AND msc.""DivisionID"" = @divisionId"
+            : "";
+        var sql = $@"
             SELECT
                 mst.""Project11"" AS ""DebitProjectId"",
                 mst.""Project14"" AS ""CreditProjectId"",
@@ -339,14 +461,15 @@ public class TransactionService
                 ppir.""DivisionId"" AS ""ReserveDivisionId"",
                 ppir.""ProjectID"" AS ""ReservePlanProjectId"",
                 ppir.""PlanProjectItem_ID"" AS ""ReservePlanProjectItemId"",
-                lvr.""Vote_ID"" AS ""ReserveVoteId""
+                lvr.""Vote_ID"" AS ""ReserveVoteId"",
+                CASE WHEN {VoteLegIncompletePredicate("mst")} THEN true ELSE false END AS ""IsVoteLegIncomplete""
             FROM ""AssetConfig_mSCOA"" msc
             INNER JOIN ""AssetConfig_mSCOA_TransactionType"" mst
                 ON msc.""AssetConfig_mSCOA_ID"" = mst.""AssetConfig_mSCOA_ID""
                 AND mst.""TransactionTypeID"" = (SELECT ""AssetConfig_TransactionType_ID"" FROM ""AssetConfig_TransactionType"" WHERE ""Name"" = @transactionTypeName OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY)
             LEFT JOIN ""Plan_ProjectItem"" ppid ON ppid.""PlanProjectItem_ID"" = mst.""DebitItem11_1""
             LEFT JOIN ""Led_Vote"" lvd ON lvd.""SCOAItemID"" = ppid.""SCOAItemID"" AND lvd.""FinYear"" = @finYear
-            LEFT JOIN ""Plan_ProjectItem"" ppic ON ppic.""PlanProjectItem_ID"" = CAST(mst.""CreditItem11_1"" AS INTEGER)
+            LEFT JOIN ""Plan_ProjectItem"" ppic ON ppic.""PlanProjectItem_ID"" = (CASE WHEN TRIM(COALESCE(mst.""CreditItem11_1"", '')) ~ '^[0-9]+$' THEN CAST(TRIM(mst.""CreditItem11_1"") AS INTEGER) END)
             LEFT JOIN ""Led_Vote"" lvc ON lvc.""SCOAItemID"" = ppic.""SCOAItemID"" AND lvc.""FinYear"" = @finYear
             LEFT JOIN ""Plan_ProjectItem"" ppio ON ppio.""PlanProjectItem_ID"" = mst.""DebitItem12_1""
                 AND ppio.""ProjectID"" = mst.""Project12"" AND ppio.""FinYear"" = @finYear
@@ -358,14 +481,58 @@ public class TransactionService
                 AND COALESCE(msc.""TypeID"", 0) = @typeId
                 AND COALESCE(msc.""CategoryID"", 0) = @categoryId
                 AND COALESCE(msc.""SubCategoryID"", 0) = @subCategoryId
-                AND msc.""DepartmentID"" IS NOT NULL AND msc.""DepartmentID"" = @departmentId
-                AND msc.""DivisionID"" IS NOT NULL AND msc.""DivisionID"" = @divisionId
+                {deptDivWhere}
                 AND msc.""FinYear"" = @finYear
-            OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+            OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+        var result = await conn.QueryFirstOrDefaultAsync<MscoaLookupResult>(sql,
             new { typeId, categoryId, subCategoryId, measurementTypeId, transactionTypeName, finYear, departmentId, divisionId }, txn);
-
         return result;
     }
+
+    /// <summary>
+    /// Returns SQL AND-conditions (no leading AND) that restrict Asset_Register_Items rows
+    /// to assets eligible for a depreciation run: has remaining useful life, carrying amount
+    /// above residual, and the asset type / measurement type allows depreciation.
+    /// alias = SQL alias for Asset_Register_Items in the outer query (e.g. "i" or "ari").
+    /// Shared between validate-pre-run groupings AND GetMissingSettings incompleteSql so
+    /// the candidate population is identical across both surfaces.
+    /// </summary>
+    public static string DepreciationOnlyFilters(string alias = "i")
+    {
+        string p = string.IsNullOrEmpty(alias) ? "" : $"{alias}.";
+        return $@"
+        COALESCE({p}""RemainingUsefulLife"", {p}""UsefulLifeMonthComponent"", 0) > 0
+        AND COALESCE({p}""CarryingAmountClosingBalance"", {p}""CurrentAmount"", {p}""PurchaseAmount"", 0) > COALESCE({p}""ResidualValue"", 0)
+        AND NOT EXISTS (
+            SELECT 1 FROM ""Const_AssetType_Sys"" t_dep
+            WHERE t_dep.""AssetType_ID"" = {p}""AssetType_ID"" AND t_dep.""NoUsefuleLife"" = 1)
+        AND NOT EXISTS (
+            SELECT 1 FROM ""AssetConfig_MeasurementType"" mt_dep
+            WHERE mt_dep.""AssetConfig_MeasurementType_ID"" = {p}""MeasurementType_ID"" AND mt_dep.""NoDepreciation"" = 1)";
+    }
+
+    /// <summary>
+    /// Returns a SQL boolean expression (parenthesised) that evaluates to true when the
+    /// given AssetConfig_mSCOA_TransactionType row has at least one incomplete vote-leg
+    /// resolution for the @finYear parameter.  alias = SQL alias for that table in the
+    /// outer query — typically "mst" in lookup queries and "tt" in report queries.
+    /// Consumed by: GetMissingSettings incompleteSql WHERE clause AND both
+    /// LookupMscoaConfig* SELECT lists so that the detection logic is identical in all paths.
+    /// </summary>
+    public static string VoteLegIncompletePredicate(string alias) => $@"(
+        {alias}.""DebitItem11_1"" IS NULL
+        OR NOT EXISTS (SELECT 1 FROM ""Plan_ProjectItem"" ppidxd WHERE ppidxd.""PlanProjectItem_ID"" = {alias}.""DebitItem11_1"")
+        OR NOT EXISTS (
+            SELECT 1 FROM ""Plan_ProjectItem"" ppidxd2
+            JOIN ""Led_Vote"" lvdxd ON lvdxd.""SCOAItemID"" = ppidxd2.""SCOAItemID"" AND lvdxd.""FinYear"" = @finYear
+            WHERE ppidxd2.""PlanProjectItem_ID"" = {alias}.""DebitItem11_1"")
+        OR NULLIF({alias}.""CreditItem11_1"", '') IS NULL
+        OR NOT EXISTS (SELECT 1 FROM ""Plan_ProjectItem"" ppidxc WHERE ppidxc.""PlanProjectItem_ID"" = (CASE WHEN TRIM(COALESCE({alias}.""CreditItem11_1"", '')) ~ '^[0-9]+$' THEN CAST(TRIM({alias}.""CreditItem11_1"") AS INTEGER) END))
+        OR NOT EXISTS (
+            SELECT 1 FROM ""Plan_ProjectItem"" ppidxc2
+            JOIN ""Led_Vote"" lvdxc ON lvdxc.""SCOAItemID"" = ppidxc2.""SCOAItemID"" AND lvdxc.""FinYear"" = @finYear
+            WHERE ppidxc2.""PlanProjectItem_ID"" = (CASE WHEN TRIM(COALESCE({alias}.""CreditItem11_1"", '')) ~ '^[0-9]+$' THEN CAST(TRIM({alias}.""CreditItem11_1"") AS INTEGER) END))
+        )";
 
     public List<string> ValidateMscoaConfig(MscoaLookupResult? config, string transactionTypeName, int assetRegId)
     {
@@ -394,7 +561,7 @@ public class TransactionService
         return errors;
     }
 
-    public GlValidationResult ValidateGlPosting(MscoaLookupResult? config, string transactionTypeName, int assetRegId, bool checkOffsetReserve)
+    public GlValidationResult ValidateGlPosting(MscoaLookupResult? config, string transactionTypeName, int assetRegId, bool checkOffsetReserve, bool useDeptDivision = true)
     {
         var result = new GlValidationResult { AssetRegisterItemId = assetRegId, TransactionType = transactionTypeName };
 
@@ -412,24 +579,24 @@ public class TransactionService
         ValidateLeg(result, "Debit", "DebitItem11_1 / Project11", config.DebitVoteId, config.DebitPlanProjectItemId,
             config.DebitScoaFundId, config.DebitScoaRegionId, config.DebitScoaCostingId,
             config.DebitScoaFunctionId, config.DebitScoaItemId, config.DebitDivisionId,
-            config.DebitPlanProjectId, true);
+            config.DebitPlanProjectId, true, useDeptDivision);
 
         ValidateLeg(result, "Credit", "CreditItem11_1 / Project14", config.CreditVoteId, config.CreditPlanProjectItemId,
             config.CreditScoaFundId, config.CreditScoaRegionId, config.CreditScoaCostingId,
             config.CreditScoaFunctionId, config.CreditScoaItemId, config.CreditDivisionId,
-            config.CreditPlanProjectId, true);
+            config.CreditPlanProjectId, true, useDeptDivision);
 
         if (checkOffsetReserve)
         {
             ValidateLeg(result, "Offset (Depreciation Reserve Transfer)", "DebitItem12_1 / Project12", config.OffsetVoteId, config.OffsetPlanProjectItemId,
                 config.OffsetScoaFundId, config.OffsetScoaRegionId, config.OffsetScoaCostingId,
                 config.OffsetScoaFunctionId, config.OffsetScoaItemId, config.OffsetDivisionId,
-                config.OffsetPlanProjectId, true);
+                config.OffsetPlanProjectId, true, useDeptDivision);
 
             ValidateLeg(result, "Reserve (Revaluation Reserve)", "CreditItem13_1 / Project13", config.ReserveVoteId, config.ReservePlanProjectItemId,
                 config.ReserveScoaFundId, config.ReserveScoaRegionId, config.ReserveScoaCostingId,
                 config.ReserveScoaFunctionId, config.ReserveScoaItemId, config.ReserveDivisionId,
-                config.ReservePlanProjectId, true);
+                config.ReservePlanProjectId, true, useDeptDivision);
         }
 
         return result;
@@ -437,7 +604,7 @@ public class TransactionService
 
     private void ValidateLeg(GlValidationResult result, string legName, string scoaField, int? voteId, int? planProjectItemId,
         int? scoaFundId, int? scoaRegionId, int? scoaCostingId, int? scoaFunctionId, int? scoaItemId,
-        int? divisionId, int? projectId, bool required)
+        int? divisionId, int? projectId, bool required, bool useDeptDivision = true)
     {
         var leg = new GlLegValidation { Leg = legName, ScoaField = scoaField };
         var missing = new List<string>();
@@ -449,7 +616,7 @@ public class TransactionService
         if (!scoaFunctionId.HasValue) missing.Add("SCOA Function");
         if (!scoaRegionId.HasValue) missing.Add("SCOA Region");
         if (!scoaCostingId.HasValue) missing.Add("SCOA Costing");
-        if (!divisionId.HasValue) missing.Add("Division");
+        if (useDeptDivision && !divisionId.HasValue) missing.Add("Division");
         if (!projectId.HasValue) missing.Add("Project");
 
         leg.MissingFields = missing;
@@ -502,6 +669,12 @@ public class TransactionService
         string eventType, string? documentNumber = null,
         bool isCashflow = false)
     {
+        if (!await IsGlUseInboxEnabledAsync())
+        {
+            _ledGlBuffer.Value ??= new List<LedGlPayload>();
+            return Guid.Empty;
+        }
+
         return await conn.QuerySingleAsync<Guid>(@"
             INSERT INTO ""GL_Outbox"" (
                 ""SubmoduleId"", ""EventType"", ""DocumentNumber"", ""IsCashflow"", ""Status""
@@ -521,6 +694,48 @@ public class TransactionService
         int? divisionId, int? projectId, int? planProjectItemId,
         Guid? outboxId = null, int sourceModuleId = 8, int capturerId = 1)
     {
+        // Resolve SCOA fields from Plan_ProjectItem / Plan_Project when a PPI ID is available.
+        // Values from the lookup override the caller-supplied values so every GL entry carries
+        // the full mSCOA breakdown derived from the plan item rather than relying on callers
+        // to forward every individual field.
+        int? rFundsId    = scoaFundsId;
+        int? rRegionId   = scoaRegionId;
+        int? rCostingId  = scoaCostingId;
+        int? rProjectId  = scoaProjectId;
+        int? rFunctionId = scoaFunctionId;
+        int  rItemId     = scoaItemId;
+        int? rDivisionId = divisionId;
+        int? rLinkedProjId = projectId;
+        if (planProjectItemId.HasValue)
+        {
+            try
+            {
+                var ppi = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
+                    SELECT ppi.""SCOAItemID"", ppi.""SCOAFundId"", ppi.""SCOAFunctionId"",
+                           ppi.""SCOARegionId"", ppi.""DivisionId"", ppi.""SCOACostingID"", ppi.""ProjectID"",
+                           pp.""ScoaProjectID""
+                    FROM   ""Plan_ProjectItem"" ppi
+                    LEFT JOIN ""Plan_Project""  pp ON pp.""Project_ID"" = ppi.""ProjectID""
+                    WHERE  ppi.""PlanProjectItem_ID"" = @id",
+                    new { id = planProjectItemId.Value }, txn);
+                if (ppi != null)
+                {
+                    rFundsId      = (int?)ppi.SCOAFundId    ?? rFundsId;
+                    rRegionId     = (int?)ppi.SCOARegionId  ?? rRegionId;
+                    rCostingId    = (int?)ppi.SCOACostingID ?? rCostingId;
+                    rProjectId    = (int?)ppi.ScoaProjectID ?? rProjectId;
+                    rFunctionId   = (int?)ppi.SCOAFunctionId ?? rFunctionId;
+                    rItemId       = (int?)ppi.SCOAItemID ?? rItemId;
+                    rDivisionId   = (int?)ppi.DivisionId    ?? rDivisionId;
+                    rLinkedProjId = (int?)ppi.ProjectID      ?? rLinkedProjId;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[InsertGeneralLedgerEntry] Plan_ProjectItem lookup failed: {ex.Message}");
+            }
+        }
+
         await conn.ExecuteAsync(@"
             INSERT INTO ""Asset_GeneralLedger"" (
                 ""PostingDate"", ""ProcessingMonth"", ""VoteID"", ""FinYear"",
@@ -534,19 +749,68 @@ public class TransactionService
                 @transactionTypeId, @transactionDetails, @documentNumber,
                 @debit, @credit, NOW(), 1,
                 @matchTranGuid, @journalTransactionTypeId, @assetLinkId,
-                @scoaFundsId, @scoaRegionId, @scoaCostingId, @scoaProjectId, @scoaFunctionId, @scoaItemId,
-                @divisionId, @projectId, @planProjectItemId
+                @rFundsId, @rRegionId, @rCostingId, @rProjectId, @rFunctionId, @rItemId,
+                @rDivisionId, @rLinkedProjId, @planProjectItemId
             )",
             new
             {
                 postingDate, processingMonth, voteId, finYear,
                 transactionTypeId, transactionDetails, documentNumber,
                 debit, credit, matchTranGuid, journalTransactionTypeId, assetLinkId,
-                scoaFundsId, scoaRegionId, scoaCostingId, scoaProjectId, scoaFunctionId, scoaItemId,
-                divisionId, projectId, planProjectItemId
+                rFundsId, rRegionId, rCostingId, rProjectId, rFunctionId, rItemId,
+                rDivisionId, rLinkedProjId, planProjectItemId
             }, txn);
 
-        if (outboxId.HasValue)
+        if (outboxId.HasValue && outboxId.Value == Guid.Empty)
+        {
+            var ledTarget = await GetGlLedTargetAsync();
+            if (ledTarget == "postgresql" || ledTarget == "both")
+            {
+                var tdTrunc = transactionDetails != null && transactionDetails.Length > 235
+                    ? transactionDetails.Substring(0, 235) : transactionDetails;
+                var dnTrunc = documentNumber != null && documentNumber.Length > 50
+                    ? documentNumber.Substring(0, 50) : documentNumber;
+                await conn.ExecuteAsync(@"
+                    INSERT INTO ""Led_GeneralLedger"" (
+                        ""PostingDate"", ""ProcessingMonth"", ""VoteID"", ""FinYear"",
+                        ""TransactionTypeID"", ""TransactionDetails"", ""DocumentNumber"",
+                        ""Debit"", ""Credit"", ""DateCaptured"", ""CapturerID"",
+                        ""MatchTranGuid"", ""JournalTransactionTypeID"", ""AssetLinkID"",
+                        ""SCOAFundsID"", ""SCOARegionID"", ""SCOACostingID"", ""SCOAProjectID"", ""SCOAFunctionID"", ""SCOAItemID"",
+                        ""DivisionID"", ""ProjectID"", ""PlanProjectItemID""
+                    ) VALUES (
+                        @postingDate, @processingMonth, @voteId, @finYear,
+                        @transactionTypeId, @transactionDetails, @documentNumber,
+                        @debit, @credit, NOW(), @capturerId,
+                        @matchTranGuid, @journalTransactionTypeId, @assetLinkId,
+                        @rFundsId, @rRegionId, @rCostingId, @rProjectId, @rFunctionId, @rItemId,
+                        @rDivisionId, @rLinkedProjId, @planProjectItemId
+                    )",
+                    new
+                    {
+                        postingDate, processingMonth, voteId, finYear,
+                        transactionTypeId, transactionDetails = tdTrunc, documentNumber = dnTrunc,
+                        debit, credit, capturerId,
+                        matchTranGuid, journalTransactionTypeId, assetLinkId,
+                        rFundsId, rRegionId, rCostingId, rProjectId, rFunctionId, rItemId,
+                        rDivisionId, rLinkedProjId, planProjectItemId
+                    }, txn);
+            }
+            if (ledTarget == "sqlserver" || ledTarget == "both")
+            {
+                _ledGlBuffer.Value ??= new List<LedGlPayload>();
+                var buffer = _ledGlBuffer.Value;
+                buffer.Add(new LedGlPayload(
+                    postingDate, processingMonth, voteId, finYear,
+                    transactionTypeId, transactionDetails, documentNumber,
+                    debit, credit, matchTranGuid, journalTransactionTypeId,
+                    assetLinkId, rFundsId, rRegionId, rCostingId,
+                    rProjectId, rFunctionId, rItemId,
+                    rDivisionId, rLinkedProjId, planProjectItemId,
+                    sourceModuleId, capturerId));
+            }
+        }
+        else if (outboxId.HasValue && outboxId.Value != Guid.Empty)
         {
             await conn.ExecuteAsync(@"
                 INSERT INTO ""GL_Outbox_Lines"" (
@@ -934,6 +1198,13 @@ public class TransactionService
         bool hasAcqDate = asset.AcquisitionDate != null;
         var now = DateTime.Now;
 
+        // If the asset was acquired on or after the rebuild start date and there is no prior-period
+        // ATS record to carry forward, the cost base must start at zero and be added in the
+        // acquisition period.  Without this, periods before acquisition incorrectly show the full
+        // purchase amount as cost opening/closing balance.
+        if (!ob0Exists && hasAcqDate && acqDate >= startDate)
+            obCostCB = 0m;
+
         // Each element: 65 values matching the INSERT column order
         var batchRows = new List<(
             decimal RemainingUsefulLife, decimal CurrentValue,
@@ -1129,9 +1400,12 @@ public class TransactionService
                 revImpCB = (obRevImpCB ?? revImpOB) + artRevImpairment - artRevImpReversal;
 
             // Cost OB / CB
+            // For a new acquisition within the rebuilt year, obCostCB starts at zero, so we add
+            // purchaseAmount here in the acquisition period (mirrors additionCB accumulation logic).
             decimal costOB = obCostCB;
             decimal costCB = obCostCB + artRevalValue + artFairValue + artTransferTo
-                             - artTransferFrom + artRefurbDT - artRefurbCT - artDisposalValue;
+                             - artTransferFrom + artRefurbDT - artRefurbCT - artDisposalValue
+                             + (isAcqMonth && noTransfer ? purchaseAmount : 0m);
 
             // CarryingAmount = CostCB - AccDepCB - AccImpCB
             decimal carryingAmount = Math.Max(0m, costCB - accDepCB - accImpCB);
@@ -1328,6 +1602,11 @@ public class TransactionService
             new { assetRegisterItemId }, txn);
     }
 
+    // NOTE: The SQL Server (ASSETS-API) equivalent of this method uses snapshot locking
+    // (IsSnapshotLocked column + sp_RebuildATS stored procedure) to skip already-verified
+    // periods on incremental rebuilds.  That optimisation is SQL Server-specific and does
+    // not apply here; applying the equivalent PostgreSQL performance improvements is tracked
+    // as a separate follow-up task (#593).
     public async Task PopulateTransactionSummaryBulkRebuild(
         List<int> assetIds, string finYear, int fromPeriod)
     {
@@ -2443,6 +2722,7 @@ public class MscoaLookupResult
     public int? ReservePlanProjectId { get; set; }
     public int? ReservePlanProjectItemId { get; set; }
     public int? ReserveVoteId { get; set; }
+    public bool IsVoteLegIncomplete { get; set; }
 }
 
 public class GlValidationResult
@@ -2450,6 +2730,11 @@ public class GlValidationResult
     public int AssetRegisterItemId { get; set; }
     public string AssetDescription { get; set; } = "";
     public string TransactionType { get; set; } = "";
+    public string? SubCategoryName { get; set; }
+    public string? MeasurementTypeName { get; set; }
+    public string? StatusName { get; set; }
+    public string? DeptName { get; set; }
+    public string? DivName { get; set; }
     public List<GlLegValidation> Legs { get; set; } = new();
     public bool IsValid => Legs.All(l => l.Valid);
 }

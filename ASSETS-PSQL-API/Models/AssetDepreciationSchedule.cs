@@ -1,7 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace AssetManagement.Models;
 
 public class AssetDepreciationSchedule
 {
+    [JsonPropertyName("depreciationScheduleId")]
     public int DepreciationSchedule_ID { get; set; }
     public string? FinYear { get; set; }
     public DateTime? RunDate { get; set; }

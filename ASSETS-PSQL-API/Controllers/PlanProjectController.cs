@@ -74,7 +74,7 @@ public class PlanProjectController : ControllerBase
     }
 
     [HttpGet("api/plan-project-items/scoa")]
-    public async Task<IActionResult> GetProjectItemsWithScoa([FromQuery] int? projectId, [FromQuery] string? finYear = null)
+    public async Task<IActionResult> GetProjectItemsWithScoa([FromQuery] int? projectId, [FromQuery] string? finYear = null, [FromQuery] string? prefix = null)
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
@@ -102,6 +102,11 @@ public class PlanProjectController : ControllerBase
         {
             sql += @" AND ppi.""FinYear"" = @finYear";
             parameters.Add("finYear", finYear);
+        }
+        if (!string.IsNullOrWhiteSpace(prefix))
+        {
+            sql += @" AND LEFT(css.""ScoaCode"", 2) = @prefix";
+            parameters.Add("prefix", prefix.Trim().ToUpper());
         }
         sql += @" ORDER BY css.""ScoaCode"", ppi.""PlanProjectItem_ID""";
         var items = await conn.QueryAsync<dynamic>(sql, parameters);

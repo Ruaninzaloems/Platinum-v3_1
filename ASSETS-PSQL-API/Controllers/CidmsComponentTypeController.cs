@@ -38,6 +38,8 @@ public class CidmsComponentTypeController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Component_Type"" WHERE ""AssetCIDMSComponentTypeDesc"" ILIKE @AssetCIDMSComponentTypeDesc AND ""AssetCIDMSAssetTypeID"" = @AssetCIDMSAssetTypeID", new { model.AssetCIDMSComponentTypeDesc, model.AssetCIDMSAssetTypeID }) > 0;
+        if (dup) return Conflict(new { error = $"CIDMS component type '{model.AssetCIDMSComponentTypeDesc}' already exists under this asset type" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Component_Type"" (""AssetCIDMSComponentTypeDesc"", ""AssetCIDMSAssetTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
             VALUES (@AssetCIDMSComponentTypeDesc, @AssetCIDMSAssetTypeID, @Enabled, GETDATE(), @CapturerID, @Default)
@@ -51,6 +53,8 @@ public class CidmsComponentTypeController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Component_Type"" WHERE ""AssetCIDMSComponentTypeDesc"" ILIKE @AssetCIDMSComponentTypeDesc AND ""AssetCIDMSAssetTypeID"" = @AssetCIDMSAssetTypeID AND ""AssetCIDMSComponentTypeID"" <> @id", new { model.AssetCIDMSComponentTypeDesc, model.AssetCIDMSAssetTypeID, id }) > 0;
+        if (dup) return Conflict(new { error = $"CIDMS component type '{model.AssetCIDMSComponentTypeDesc}' already exists under this asset type" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Component_Type""
             SET ""AssetCIDMSComponentTypeDesc"" = @AssetCIDMSComponentTypeDesc, ""AssetCIDMSAssetTypeID"" = @AssetCIDMSAssetTypeID,
@@ -66,6 +70,42 @@ public class CidmsComponentTypeController : ControllerBase
         await conn.OpenAsync();
         var rows = await conn.ExecuteAsync(@"DELETE FROM ""Const_Asset_CIDMS_Component_Type"" WHERE ""AssetCIDMSComponentTypeID"" = @id", new { id });
         return rows == 0 ? NotFound(new { error = "CIDMS Component Type not found" }) : Ok(new { success = 1 });
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var rows = await conn.QueryAsync<dynamic>(@"
+            SELECT ct.""AssetCIDMSComponentTypeID"" AS ""ctid"",
+                   at2.""AssetCIDMSAssetTypeDesc"" AS ""atdesc"",
+                   ct.""AssetCIDMSComponentTypeDesc"" AS ""ctdesc"",
+                   ct.""Enabled"" AS ""enabled""
+            FROM ""Const_Asset_CIDMS_Component_Type"" ct
+            LEFT JOIN ""Const_Asset_CIDMS_Asset_Type"" at2 ON at2.""AssetCIDMSAssetTypeID"" = ct.""AssetCIDMSAssetTypeID""
+            ORDER BY ct.""AssetCIDMSComponentTypeID""");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("CIDMS Component Types");
+        ws.Cell(1, 1).Value = "ID";
+        ws.Cell(1, 2).Value = "CIDMS Asset Type";
+        ws.Cell(1, 3).Value = "Component Type Description";
+        ws.Cell(1, 4).Value = "Enabled";
+        ws.Row(1).Style.Font.Bold = true;
+        int r = 2;
+        foreach (var row in rows)
+        {
+            ws.Cell(r, 1).Value = (int)row.ctid;
+            ws.Cell(r, 2).Value = (string?)row.atdesc ?? "";
+            ws.Cell(r, 3).Value = (string?)row.ctdesc ?? "";
+            ws.Cell(r, 4).Value = (int)row.enabled == 1 ? "Yes" : "No";
+            r++;
+        }
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "CIDMSComponentTypes_Export.xlsx");
     }
 
     [HttpGet("import-template")]
@@ -96,7 +136,9 @@ public class CidmsComponentTypeController : ControllerBase
         using var workbook = new XLWorkbook(stream);
         var ws = workbook.Worksheets.First();
         var errors = new List<ImportError>();
+        var rowNums = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var rows = new List<(string desc, int assetTypeId)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 2; r <= ws.LastRowUsed()?.RowNumber(); r++)
         {
@@ -112,7 +154,13 @@ public class CidmsComponentTypeController : ControllerBase
                 errors.Add(new ImportError { Row = r, Column = "CIDMS Asset Type ID", Value = assetTypeIdStr, Message = "Invalid CIDMS Asset Type ID" });
                 continue;
             }
+            if (!seen.Add($"{desc}|{assetTypeId}"))
+            {
+                errors.Add(new ImportError { Row = r, Column = "Component Type", Value = desc, Message = $"Duplicate: 'Component Type' value '{desc}' for this asset type in file" });
+                continue;
+            }
             rows.Add((desc, assetTypeId));
+            rowNums[desc] = r;
         }
 
         if (errors.Count > 0)
@@ -120,15 +168,23 @@ public class CidmsComponentTypeController : ControllerBase
 
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dbErrors = new List<ImportError>();
         await using var txn = await conn.BeginTransactionAsync();
 
         foreach (var (desc, assetTypeId) in rows)
         {
+            var exists = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_CIDMS_Component_Type"" WHERE ""AssetCIDMSComponentTypeDesc"" ILIKE @desc AND ""AssetCIDMSAssetTypeID"" = @assetTypeId", new { desc, assetTypeId }, txn) > 0;
+            if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "CIDMS Component Type", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Component_Type"" (""AssetCIDMSComponentTypeDesc"", ""AssetCIDMSAssetTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
                 VALUES (@desc, @assetTypeId, 1, GETDATE(), 1, 1)", new { desc, assetTypeId }, txn);
         }
 
+        if (dbErrors.Count > 0)
+        {
+            await txn.RollbackAsync();
+            return BadRequest(new ImportResult { Success = false, Errors = dbErrors });
+        }
         await txn.CommitAsync();
         return Ok(new ImportResult { Success = true, Imported = rows.Count });
     }

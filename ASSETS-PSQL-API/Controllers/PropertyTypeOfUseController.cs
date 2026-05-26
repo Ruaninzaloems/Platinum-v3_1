@@ -11,12 +11,23 @@ public class PropertyTypeOfUseController : ControllerBase
     private readonly DbConnectionFactory _db;
     public PropertyTypeOfUseController(DbConnectionFactory db) => _db = db;
 
+    private const string SelectColumns = @"
+        SELECT ""PropertyTypeOfUse_ID""  AS ""propertyTypeOfUseId"",
+               ""Description""           AS ""description"",
+               ""Enabled""               AS ""enabled"",
+               ""DateCaptured""          AS ""dateCaptured"",
+               ""CapturerID""            AS ""capturerId"",
+               ""DateModified""          AS ""dateModified"",
+               ""ModifierID""            AS ""modifierId"",
+               ""ZoneCode""              AS ""zoneCode""
+        FROM ""Const_PropertyTypeOfUse""";
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"SELECT * FROM ""Const_PropertyTypeOfUse"" ORDER BY ""Description""");
+        var items = await conn.QueryAsync<dynamic>(SelectColumns + @" ORDER BY ""Description""");
         return Ok(items);
     }
 
@@ -25,7 +36,8 @@ public class PropertyTypeOfUseController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var item = await conn.QueryFirstOrDefaultAsync<dynamic>(@"SELECT * FROM ""Const_PropertyTypeOfUse"" WHERE ""PropertyTypeOfUse_ID"" = @id", new { id });
+        var item = await conn.QueryFirstOrDefaultAsync<dynamic>(
+            SelectColumns + @" WHERE ""PropertyTypeOfUse_ID"" = @id", new { id });
         return item is null ? NotFound() : Ok(item);
     }
 }

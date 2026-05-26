@@ -18,6 +18,13 @@ public class GlValidationController : ControllerBase
         _txnService = txnService;
     }
 
+    private async Task<bool> GetUseDeptDivision(System.Data.Common.DbConnection conn)
+    {
+        return await conn.ExecuteScalarAsync<bool>(@"
+            SELECT COALESCE(""mscoa_use_dept_division"", true)
+            FROM ""Asset_OrganisationSettings"" LIMIT 1");
+    }
+
     [HttpPost("validate")]
     public async Task<IActionResult> ValidateGlPosting([FromBody] GlValidationRequest request)
     {
@@ -32,12 +39,14 @@ public class GlValidationController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
 
+        bool useDeptDivision = await GetUseDeptDivision(conn);
+
         var results = new List<GlValidationResult>();
         var allValid = 1;
 
         foreach (var assetId in request.AssetIds)
         {
-            var mscoaConfig = await _txnService.LookupMscoaConfig(conn, assetId, request.TransactionType, finYear);
+            var mscoaConfig = await _txnService.LookupMscoaConfig(conn, assetId, request.TransactionType, finYear, useDeptDivision: useDeptDivision);
 
             bool checkOffsetReserve = false;
             if (request.TransactionType == "Depreciation" || request.CheckOffsetReserve)
@@ -50,7 +59,7 @@ public class GlValidationController : ControllerBase
                 checkOffsetReserve = isRevaluationModel && Convert.ToDecimal(assetInfo?.RevalReserve ?? 0) > 0;
             }
 
-            var validation = _txnService.ValidateGlPosting(mscoaConfig, request.TransactionType, assetId, checkOffsetReserve);
+            var validation = _txnService.ValidateGlPosting(mscoaConfig, request.TransactionType, assetId, checkOffsetReserve, useDeptDivision);
 
             var descr = await conn.QueryFirstOrDefaultAsync<string>(@"
                 SELECT ""Description"" FROM ""Asset_Register_Items"" WHERE ""AssetRegisterItem_ID"" = @assetId",
@@ -82,19 +91,25 @@ public class GlValidationController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
 
-        var groupings = (await conn.QueryAsync<dynamic>(@"
+        bool useDeptDivision = await GetUseDeptDivision(conn);
+
+        var deptDivCols = useDeptDivision
+            ? @"COALESCE(CAST(NULLIF(""MunicipalDepartment_ID"", '') AS INTEGER), 0) AS ""DepartmentID"",
+                   COALESCE(""DivisionID"", 0) AS ""DivisionID"""
+            : @"0 AS ""DepartmentID"",
+                   0 AS ""DivisionID""";
+        var groupingsSql = $@"
             SELECT DISTINCT
                    COALESCE(""AssetType_ID"", 0) AS ""AssetType_ID"",
                    COALESCE(""AssetCategory_ID"", 0) AS ""AssetCategory_ID"",
                    COALESCE(""Asset_SubCategory_ID"", 0) AS ""Asset_SubCategory_ID"",
                    COALESCE(""MeasurementType_ID"", 0) AS ""MeasurementType_ID"",
                    COALESCE(""AssetStatus_ID"", 0) AS ""AssetStatus_ID"",
-                   COALESCE(CAST(NULLIF(""MunicipalDepartment_ID"", '') AS INTEGER), 0) AS ""DepartmentID"",
-                   COALESCE(""DivisionID"", 0) AS ""DivisionID""
-            FROM ""Asset_Register_Items""
-            WHERE COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0
-            AND COALESCE(""DateOfDisposal"", '9999-12-31') > GETDATE()
-            AND COALESCE(""CarryingAmountClosingBalance"", 0) > COALESCE(""ResidualValue"", 0)")).ToList();
+                   {deptDivCols}
+            FROM ""Asset_Register_Items"" ari
+            WHERE ari.""AssetDisposal_ID"" IS NULL
+            AND {TransactionService.DepreciationOnlyFilters("ari")}";
+        var groupings = (await conn.QueryAsync<dynamic>(groupingsSql)).ToList();
 
         if (groupings.Count == 0)
             return Ok(new { valid = 1, transactionType = "Depreciation", finYear, groupCount = 0, failedCount = 0, results = new List<object>() });
@@ -112,17 +127,20 @@ public class GlValidationController : ControllerBase
             int deptId = (int)(group.DepartmentID ?? 0);
             int divId = (int)(group.DivisionID ?? 0);
 
-            var mscoaConfig = await _txnService.LookupMscoaConfigByClassification(conn, typeId, categoryId, subCategoryId, measurementTypeId, "Depreciation", finYear, departmentId: deptId, divisionId: divId);
+            var mscoaConfig = await _txnService.LookupMscoaConfigByClassification(conn, typeId, categoryId, subCategoryId, measurementTypeId, "Depreciation", finYear, departmentId: deptId, divisionId: divId, useDeptDivision: useDeptDivision);
 
-            bool hasRevalAssets = await conn.ExecuteScalarAsync<int>(@"
+            var revalDeptDiv = useDeptDivision
+                ? @"AND COALESCE(CAST(NULLIF(""MunicipalDepartment_ID"", '') AS INTEGER), 0) = @deptId
+                AND COALESCE(""DivisionID"", 0) = @divId"
+                : "";
+            bool hasRevalAssets = await conn.ExecuteScalarAsync<int>($@"
                 SELECT COUNT(*) FROM ""Asset_Register_Items""
                 WHERE COALESCE(""AssetType_ID"", 0) = @typeId
                 AND COALESCE(""AssetCategory_ID"", 0) = @categoryId
                 AND COALESCE(""Asset_SubCategory_ID"", 0) = @subCategoryId
                 AND COALESCE(""MeasurementType_ID"", 0) = @measurementTypeId
                 AND COALESCE(""AssetStatus_ID"", 0) = @assetStatusId
-                AND COALESCE(CAST(NULLIF(""MunicipalDepartment_ID"", '') AS INTEGER), 0) = @deptId
-                AND COALESCE(""DivisionID"", 0) = @divId
+                {revalDeptDiv}
                 AND COALESCE(""MeasurementModel_ID"", 0) = 2
                 AND COALESCE(""RevaluationReserveClosingBalance"", 0) > 0
                 AND COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0
@@ -132,9 +150,26 @@ public class GlValidationController : ControllerBase
 
             var typeName = await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""AssetTypeDesc"" FROM ""Const_AssetType_Sys"" WHERE ""AssetType_ID"" = @typeId", new { typeId }) ?? $"Type {typeId}";
             var catName = await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""AssetCategoryDesc"" FROM ""Const_AssetCategory_sys"" WHERE ""AssetCategoryID"" = @categoryId", new { categoryId }) ?? $"Category {categoryId}";
+            var subCatName = subCategoryId > 0 ? await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""Asset_SubCategoryDescription"" FROM ""Const_Asset_SubCategory"" WHERE ""Asset_SubCategory_ID"" = @subCategoryId", new { subCategoryId }) ?? "" : "";
+            var measTypeName = measurementTypeId > 0 ? await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""Name"" FROM ""AssetConfig_MeasurementType"" WHERE ""AssetConfig_MeasurementType_ID"" = @measurementTypeId", new { measurementTypeId }) ?? "" : "";
+            var statusName = assetStatusId > 0 ? await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""AssetStatusDesc"" FROM ""Const_AssetStatus_Sys"" WHERE ""AssetStatus_ID"" = @assetStatusId", new { assetStatusId }) ?? "" : "";
+            var deptName = useDeptDivision && deptId > 0 ? await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""DepartmentDesc"" FROM ""Const_Department"" WHERE ""Department_ID"" = @deptId", new { deptId }) ?? "" : "";
+            var divName = useDeptDivision && divId > 0 ? await conn.QueryFirstOrDefaultAsync<string>(@"SELECT ""DivisionDesc"" FROM ""Const_Division"" WHERE ""Division_ID"" = @divId", new { divId }) ?? "" : "";
 
-            var validation = _txnService.ValidateGlPosting(mscoaConfig, "Depreciation", 0, hasRevalAssets);
-            validation.AssetDescription = $"{typeName} / {catName}";
+            var descrParts = new System.Collections.Generic.List<string> { $"{typeName} / {catName}" };
+            if (!string.IsNullOrEmpty(subCatName)) descrParts.Add(subCatName);
+            if (!string.IsNullOrEmpty(measTypeName)) descrParts.Add(measTypeName);
+            if (!string.IsNullOrEmpty(statusName)) descrParts.Add(statusName);
+            if (useDeptDivision && !string.IsNullOrEmpty(deptName)) descrParts.Add(deptName);
+            if (useDeptDivision && !string.IsNullOrEmpty(divName)) descrParts.Add(divName);
+
+            var validation = _txnService.ValidateGlPosting(mscoaConfig, "Depreciation", 0, hasRevalAssets, useDeptDivision);
+            validation.AssetDescription = string.Join(" | ", descrParts);
+            validation.SubCategoryName = string.IsNullOrEmpty(subCatName) ? null : subCatName;
+            validation.MeasurementTypeName = string.IsNullOrEmpty(measTypeName) ? null : measTypeName;
+            validation.StatusName = string.IsNullOrEmpty(statusName) ? null : statusName;
+            validation.DeptName = (useDeptDivision && !string.IsNullOrEmpty(deptName)) ? deptName : null;
+            validation.DivName = (useDeptDivision && !string.IsNullOrEmpty(divName)) ? divName : null;
 
             if (!validation.IsValid)
                 allValid = 0;
@@ -163,6 +198,8 @@ public class GlValidationController : ControllerBase
 
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+
+        bool useDeptDivision = await GetUseDeptDivision(conn);
 
         var scheduleItems = (await conn.QueryAsync<dynamic>(@"
             SELECT dsi.""Asset_DepreciationSchedule_Item_ID"" AS ""ScheduleItemId"",
@@ -197,10 +234,10 @@ public class GlValidationController : ControllerBase
             int categoryId = (int)(si.CategoryID ?? 0);
             int subCategoryId = (int)(si.SubCategoryID ?? 0);
             int measurementTypeId = (int)(si.MeasurementTypeID ?? 0);
-            int siDeptId = (int)(si.DepartmentID ?? 0);
-            int siDivId = (int)(si.DivisionID ?? 0);
+            int siDeptId = useDeptDivision ? (int)(si.DepartmentID ?? 0) : 0;
+            int siDivId  = useDeptDivision ? (int)(si.DivisionID  ?? 0) : 0;
 
-            var mscoaConfig = await _txnService.LookupMscoaConfigByClassification(conn, typeId, categoryId, subCategoryId, measurementTypeId, "Depreciation", finYear, departmentId: siDeptId, divisionId: siDivId);
+            var mscoaConfig = await _txnService.LookupMscoaConfigByClassification(conn, typeId, categoryId, subCategoryId, measurementTypeId, "Depreciation", finYear, departmentId: siDeptId, divisionId: siDivId, useDeptDivision: useDeptDivision);
 
             bool hasRevalAssets = await conn.ExecuteScalarAsync<int>(@"
                 SELECT COUNT(*) FROM ""Asset_Register_Items"" ari
@@ -211,7 +248,7 @@ public class GlValidationController : ControllerBase
                 AND d.""Depreciation_ScheduledItemID"" = @siId",
                 new { siId }) > 0;
 
-            var validation = _txnService.ValidateGlPosting(mscoaConfig, "Depreciation", siId, hasRevalAssets);
+            var validation = _txnService.ValidateGlPosting(mscoaConfig, "Depreciation", siId, hasRevalAssets, useDeptDivision);
             var typeName = si.TypeName?.ToString() ?? $"Type {typeId}";
             var catName = si.CategoryName?.ToString() ?? $"Category {categoryId}";
             validation.AssetDescription = $"Schedule Item #{siId} — {typeName} / {catName}";

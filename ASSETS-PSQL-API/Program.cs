@@ -1,58 +1,7 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Globalization;
-using System.Diagnostics;
 using AssetManagement.Data;
 using AssetManagement.Middleware;
-
-void StartBackgroundService(string workDir, string cmd, string args2)
-{
-    try
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = cmd,
-            Arguments = args2,
-            WorkingDirectory = workDir,
-            UseShellExecute = false,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false,
-            CreateNoWindow = true
-        };
-        Process.Start(psi);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[StartBackgroundService] Failed to start {cmd} {args2}: {ex.Message}");
-    }
-}
-
-// Dev-only: spawn sibling services so a single Replit workflow boots the
-// whole local stack. In production (Azure App Service) each service runs
-// in its own Web App, so we must NOT spawn child processes here.
-var spawnSiblings = string.Equals(
-    Environment.GetEnvironmentVariable("SPAWN_SIBLING_SERVICES"),
-    "true",
-    StringComparison.OrdinalIgnoreCase);
-
-if (spawnSiblings)
-{
-    var workspace = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-
-    StartBackgroundService(workspace, "/bin/bash", "-c \"PORT=3004 AFS-UI/api/node_modules/.bin/tsx AFS-UI/api/index.ts\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd POS-API && PORT=3003 npx tsx index.ts\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd PAYROLL-APP && PORT=6000 node src/server/index.js\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd IDP-UI/PlatinumIDP && dotnet run\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd SCM-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json --serve-path /scm-app/\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd AFS-UI/client && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 8000 --proxy-config proxy.conf.json --serve-path /afs-app/\"");
-    StartBackgroundService(workspace, "/bin/bash", "-c \"cd ASSETS-UI && NG_CLI_ANALYTICS=false npx ng serve --host 0.0.0.0 --port 5000 --proxy-config proxy.conf.json\"");
-
-    Console.WriteLine("[Backend API] Background sibling services launched (SPAWN_SIBLING_SERVICES=true).");
-}
-else
-{
-    Console.WriteLine("[Backend API] Sibling spawning disabled (set SPAWN_SIBLING_SERVICES=true to enable for local dev).");
-}
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,41 +34,31 @@ builder.Services.AddTransient<AssetManagement.Services.BulkUploadValidationServi
 builder.Services.AddScoped<AssetManagement.Services.LookupService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmInvoiceService>();
 builder.Services.AddScoped<AssetManagement.Services.ScmUnbundlingService>();
+builder.Services.AddScoped<AssetManagement.Services.EmailService>();
 builder.Services.AddScoped<AssetManagement.Services.LocationService>();
-var internalApiBaseUrl = Environment.GetEnvironmentVariable("INTERNAL_API_URL") ?? "http://localhost:3000";
-builder.Services.AddHttpClient("internal", client => { client.BaseAddress = new Uri(internalApiBaseUrl); client.Timeout = TimeSpan.FromMinutes(10); });
+builder.Services.AddHttpClient("internal", client => { client.BaseAddress = new Uri("http://localhost:3000"); client.Timeout = TimeSpan.FromMinutes(10); });
 var mssqlApiBaseUrl = builder.Configuration["MssqlApi:BaseUrl"] ?? "http://localhost:3001";
 builder.Services.AddHttpClient("mssql-api", client => { client.BaseAddress = new Uri(mssqlApiBaseUrl); client.Timeout = TimeSpan.FromMinutes(5); });
 builder.Services.AddScoped<AssetManagement.Services.InternalApiClient>();
+builder.Services.AddScoped<AssetManagement.Services.LedGeneralLedgerService>();
+
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
 
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        var corsOrigins = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        var isProd = string.Equals(
-            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
-            "Production",
-            StringComparison.OrdinalIgnoreCase);
-
-        if (corsOrigins.Length > 0)
-        {
-            policy.WithOrigins(corsOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
-        else if (!isProd)
-        {
-            // Dev fail-safe: permit any origin when no allowlist is set.
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        }
-        // In production with no allowlist configured, the default policy
-        // intentionally has no allowed origins — cross-origin calls are denied.
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
@@ -156,6 +95,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+app.UseResponseCompression();
 app.UseCors();
 app.UseMiddleware<ErrorHandlerMiddleware>();
 app.UseRouting();
@@ -167,14 +107,9 @@ using (var scope = app.Services.CreateScope())
     await db.InitializeAsync();
 }
 
-// Bind URL: prefer ASPNETCORE_URLS (Azure-friendly), then PORT env var,
-// finally fall back to the legacy local dev port 3000.
-var aspUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-if (string.IsNullOrWhiteSpace(aspUrls))
-{
-    var portEnv = Environment.GetEnvironmentVariable("PORT");
-    var bindPort = !string.IsNullOrWhiteSpace(portEnv) ? portEnv : "3000";
-    app.Urls.Add($"http://0.0.0.0:{bindPort}");
-}
+
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();

@@ -38,6 +38,8 @@ public class DepreciationApprovalTypeController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_Depreciation_Approval_Type"" WHERE ""ApprovalTypeDesc"" ILIKE @DepreciationApprovalTypeDesc", new { model.DepreciationApprovalTypeDesc }) > 0;
+        if (dup) return Conflict(new { error = $"Depreciation approval type '{model.DepreciationApprovalTypeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Depreciation_Approval_Type"" (""ApprovalTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
             VALUES (@DepreciationApprovalTypeDesc, @Enabled, GETDATE(), @CapturerID)
@@ -51,6 +53,8 @@ public class DepreciationApprovalTypeController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_Depreciation_Approval_Type"" WHERE ""ApprovalTypeDesc"" ILIKE @DepreciationApprovalTypeDesc AND ""Asset_Depreciation_Approval_Type_ID"" <> @id", new { model.DepreciationApprovalTypeDesc, id }) > 0;
+        if (dup) return Conflict(new { error = $"Depreciation approval type '{model.DepreciationApprovalTypeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Depreciation_Approval_Type""
             SET ""ApprovalTypeDesc"" = @DepreciationApprovalTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
@@ -93,7 +97,9 @@ public class DepreciationApprovalTypeController : ControllerBase
         using var workbook = new XLWorkbook(stream);
         var ws = workbook.Worksheets.First();
         var errors = new List<ImportError>();
+        var rowNums = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var rows = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 2; r <= ws.LastRowUsed()?.RowNumber(); r++)
         {
@@ -103,7 +109,13 @@ public class DepreciationApprovalTypeController : ControllerBase
                 errors.Add(new ImportError { Row = r, Column = "Depreciation Approval Type", Value = val, Message = "Required field is empty" });
                 continue;
             }
+            if (!seen.Add(val))
+            {
+                errors.Add(new ImportError { Row = r, Column = "Depreciation Approval Type", Value = val, Message = $"Duplicate: 'Depreciation Approval Type' value '{val}' in file" });
+                continue;
+            }
             rows.Add(val);
+            rowNums[val] = r;
         }
 
         if (errors.Count > 0)
@@ -111,15 +123,23 @@ public class DepreciationApprovalTypeController : ControllerBase
 
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dbErrors = new List<ImportError>();
         await using var txn = await conn.BeginTransactionAsync();
 
         foreach (var val in rows)
         {
+            var exists = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_Asset_Depreciation_Approval_Type"" WHERE ""ApprovalTypeDesc"" ILIKE @val", new { val }, txn) > 0;
+            if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Depreciation Approval Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Depreciation_Approval_Type"" (""ApprovalTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
                 VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
         }
 
+        if (dbErrors.Count > 0)
+        {
+            await txn.RollbackAsync();
+            return BadRequest(new ImportResult { Success = false, Errors = dbErrors });
+        }
         await txn.CommitAsync();
         return Ok(new ImportResult { Success = true, Imported = rows.Count });
     }

@@ -130,6 +130,7 @@ public class AssetRegisterController : ControllerBase
                 COALESCE(at.""AssetTypeDesc"", '') as ""assetTypeName"",
                 COALESCE(cond.""Description"", '') as ""condition"",
                 COALESCE(mt.""Name"", '') as ""measurementType"",
+                COALESCE(mt.""NoDepreciation"", 0) as ""noDepreciation"",
                 COALESCE(st.""AssetStatusDesc"", '') as ""status"",
                 COALESCE(latest.""CostClosingBalance"", a.""PurchaseAmount"") as ""costClosingBalance"",
                 COALESCE(latest.""AccumulatedDepreciationClosingBalance"", a.""AccumulatedDepreciationClosingBalance"") as ""depreciationClosingBalance"",
@@ -228,6 +229,7 @@ public class AssetRegisterController : ControllerBase
                 COALESCE(cls.""AssetClassDesc"", '') as ""assetClassName"",
                 COALESCE(cond.""Description"", '') as ""condition"",
                 COALESCE(mt.""Name"", '') as ""measurementType"",
+                COALESCE(mt.""NoDepreciation"", 0) as ""noDepreciation"",
                 COALESCE(st.""AssetStatusDesc"", '') as ""status"",
                 COALESCE(fs.""FinancialStatusDesc"", '') as ""financialStatus"",
                 a.""AssetType_ID"" as ""assetTypeId"",
@@ -238,6 +240,9 @@ public class AssetRegisterController : ControllerBase
                 a.""MeasurementType_ID"" as ""measurementTypeId"",
                 a.""AssetCondition_ID"" as ""assetConditionId"",
                 a.""Financial_Status_ID"" as ""financialStatusId"",
+                a.""AssetDepreciationMethod_ID"" as ""assetDepreciationMethodId"",
+                COALESCE(dm.""AssetDepreciationMethodDesc"", '') as ""depreciationMethod"",
+                a.""RevaluationMethod"" as ""revaluationMethod"",
 
                 a.""InfrastructurOrNonInfrastructure"" as ""infrastructureType"",
                 a.""NatureOfAddition"" as ""natureOfAddition"",
@@ -411,6 +416,7 @@ public class AssetRegisterController : ControllerBase
             LEFT JOIN ""Const_AssetStatus_Sys"" st ON a.""AssetStatus_ID"" = st.""AssetStatus_ID""
             LEFT JOIN ""AssetConfig_FinancialStatus"" fs ON a.""Financial_Status_ID"" = fs.""FinStatusID""
             LEFT JOIN ""Const_AssetClass_sys"" cls ON a.""AssetClass_ID"" = cls.""AssetClass_ID""
+            LEFT JOIN ""Const_AssetDepreciationMethod_Sys"" dm ON a.""AssetDepreciationMethod_ID"" = dm.""AssetDepreciationMethod_ID""
             LEFT JOIN ""Const_Asset_Criticality_Grade"" cg ON a.""CriticalityGrade"" = cg.""AssetCriticalityGradeID""
             LEFT JOIN ""Const_Asset_Performance_Grade"" pg ON a.""PerformanceGrade"" = pg.""AssetPerformanceGradeID""
             LEFT JOIN ""Const_Asset_Utilisation_Grade"" ug ON a.""UtilisationGrade"" = ug.""AssetUtilisationGradeID""
@@ -597,6 +603,7 @@ public class AssetRegisterController : ControllerBase
         { "MeasurementType_ID",     ("AssetConfig_MeasurementType",           "AssetConfig_MeasurementType_ID","Name") },
         { "AssetCondition_ID",      ("Const_Asset_Condition",                 "Asset_Condition_ID",            "Description") },
         { "Financial_Status_ID",    ("AssetConfig_FinancialStatus",           "FinStatusID",                   "FinancialStatusDesc") },
+        { "AssetDepreciationMethod_ID", ("Const_AssetDepreciationMethod_Sys", "AssetDepreciationMethod_ID",    "AssetDepreciationMethodDesc") },
         { "CIDMSSubComponentTypeID",("Const_Asset_CIDMS_SubComponent_Type",   "AssetCIDMSSubComponentTypeID",  "AssetCIDMSSubComponentTypeDesc") },
         { "CIDMSComponentType",     ("Const_Asset_CIDMS_Component_Type",      "AssetCIDMSComponentTypeID",     "AssetCIDMSComponentTypeDesc") },
         { "CIDMSAssetType",         ("Const_Asset_CIDMS_Asset_Type",          "AssetCIDMSAssetTypeID",         "AssetCIDMSAssetTypeDesc") },
@@ -617,6 +624,7 @@ public class AssetRegisterController : ControllerBase
         { "Asset_SubCategory_ID", "Asset Sub-Category" }, { "AssetClass_ID", "Asset Class" },
         { "MeasurementType_ID", "Measurement Type" }, { "AssetStatus_ID", "Asset Status" },
         { "Financial_Status_ID", "Financial Status" }, { "AssetCondition_ID", "Asset Condition" },
+        { "AssetDepreciationMethod_ID", "Depreciation Method" }, { "RevaluationMethod", "Revaluation Method" },
         { "InfrastructurOrNonInfrastructure", "Infrastructure Type" }, { "NatureOfAddition", "Nature of Addition" },
         { "AssetOwnershipName", "Asset Ownership" }, { "CriticalityGrade", "Criticality Grade" },
         { "PerformanceGrade", "Performance Grade" }, { "UtilisationGrade", "Utilisation Grade" },
@@ -1086,6 +1094,7 @@ public class AssetRegisterController : ControllerBase
         "RoomResponsiblePerson", "ITHardwareResponsiblePerson",
         "DivisionID", "DonorRegNumber", "Donor_Name", "Date_Donated", "SGNumberChange_ID",
         "AccumulatedDepreciationCurrentYear", "ImpairmentAmountCurrentYear", "ReversalOfImpairmentAmount",
+        "AssetDepreciationMethod_ID", "RevaluationMethod",
         "Modifier_ID"
     };
 }

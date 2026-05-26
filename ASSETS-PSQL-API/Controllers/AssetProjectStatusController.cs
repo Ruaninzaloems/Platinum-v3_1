@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using AssetManagement.Data;
+using ClosedXML.Excel;
 
 namespace AssetManagement.Controllers;
 
@@ -43,6 +44,8 @@ public class AssetProjectStatusController : ControllerBase
             return BadRequest(new { error = "Status description is required" });
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_AssetProjectStatus"" WHERE ""StatusDesc"" ILIKE @StatusDesc", new { model.StatusDesc }) > 0;
+        if (dup) return Conflict(new { error = $"Asset project status '{model.StatusDesc}' already exists" });
         var id = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO ""Const_AssetProjectStatus"" (""StatusDesc"")
               VALUES (@StatusDesc)
@@ -57,6 +60,8 @@ public class AssetProjectStatusController : ControllerBase
             return BadRequest(new { error = "Status description is required" });
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
+        var dup = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(1) FROM ""Const_AssetProjectStatus"" WHERE ""StatusDesc"" ILIKE @StatusDesc AND ""AssetProjectStatus_ID"" <> @id", new { model.StatusDesc, id }) > 0;
+        if (dup) return Conflict(new { error = $"Asset project status '{model.StatusDesc}' already exists" });
         var rows = await conn.ExecuteAsync(
             @"UPDATE ""Const_AssetProjectStatus"" SET ""StatusDesc"" = @StatusDesc
               WHERE ""AssetProjectStatus_ID"" = @id", new { model.StatusDesc, id });
@@ -73,6 +78,31 @@ public class AssetProjectStatusController : ControllerBase
             @"DELETE FROM ""Const_AssetProjectStatus"" WHERE ""AssetProjectStatus_ID"" = @id", new { id });
         if (rows == 0) return NotFound();
         return Ok();
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export()
+    {
+        await using var conn = _db.CreateConnection();
+        await conn.OpenAsync();
+        var rows = await conn.QueryAsync<dynamic>(@"SELECT ""AssetProjectStatus_ID"", ""StatusDesc"" FROM ""Const_AssetProjectStatus"" ORDER BY ""StatusDesc""");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Asset Project Statuses");
+        ws.Cell(1, 1).Value = "ID";
+        ws.Cell(1, 2).Value = "Status Description";
+        ws.Row(1).Style.Font.Bold = true;
+        int r = 2;
+        foreach (var row in rows)
+        {
+            ws.Cell(r, 1).Value = (int)row.AssetProjectStatus_ID;
+            ws.Cell(r, 2).Value = (string?)row.StatusDesc ?? "";
+            r++;
+        }
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "AssetProjectStatuses_Export.xlsx");
     }
 }
 

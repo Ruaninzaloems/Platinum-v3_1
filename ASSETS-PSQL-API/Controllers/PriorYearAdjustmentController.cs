@@ -18,6 +18,7 @@ public class PriorYearAdjustmentController : ControllerBase
     private readonly IWebHostEnvironment _env;
     private readonly LookupService _lookupService;
     private readonly InternalApiClient _internalApi;
+    private readonly EmailService _emailService;
     private static readonly string[] AdjustmentTypes = new[]
     {
         "COST","VALUATION","DATE","RESIDUAL",
@@ -31,7 +32,8 @@ public class PriorYearAdjustmentController : ControllerBase
         TransactionService txnService,
         IWebHostEnvironment env,
         LookupService lookupService,
-        InternalApiClient internalApi)
+        InternalApiClient internalApi,
+        EmailService emailService)
     {
         _db = db;
         _calc = calc;
@@ -39,6 +41,7 @@ public class PriorYearAdjustmentController : ControllerBase
         _env = env;
         _lookupService = lookupService;
         _internalApi = internalApi;
+        _emailService = emailService;
     }
 
     // GET /api/prior-year-adjustments/types
@@ -420,6 +423,20 @@ public class PriorYearAdjustmentController : ControllerBase
             if (pyaGlOutboxId.HasValue)
                 await _txnService.SyncGlOutboxToSqlServerIfNeededAsync(pyaGlOutboxId.Value);
 
+            decimal pyaAmount = 0m;
+            try
+            {
+                var pyaSnap = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT COALESCE(""NewCostAmount"", COALESCE(""NewValuationAmount"", COALESCE(""NewImpairmentAmount"", 0))) AS ""Amt""
+                      FROM ""Asset_PriorYearAdjustment"" WHERE ""PriorYearAdjustment_ID"" = @id", new { id });
+                if (pyaSnap != null) pyaAmount = Math.Abs((decimal)(pyaSnap.Amt ?? 0m));
+            }
+            catch { }
+            var pyaTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetId);
+            pyaTokens["AdjustmentType"]   = typeCode;
+            pyaTokens["AdjustmentAmount"] = pyaAmount.ToString("N2");
+            pyaTokens["FinancialYear"]    = finYear;
+            _ = _emailService.SendTransactionEmailsAsync("Prior Year Adjustment", pyaTokens);
             return Ok(new { success = true, message = "Prior year adjustment approved successfully" });
         }
         catch (Exception ex)
@@ -780,6 +797,8 @@ public class PriorYearAdjustmentController : ControllerBase
     {
         int journalTransactionTypeId = 36;
         string documentNumber = $"PYA-{finYear}-{record.PriorYearAdjustment_ID}";
+        int documentTypeId = await _lookupService.GetDocumentTypeIdAsync(conn, "Prior Year Adjustment", txn);
+        if (documentTypeId == 0) documentTypeId = journalTransactionTypeId;
         var transactionId = Guid.NewGuid();
         int processingMonth = await _txnService.GetProcessingMonth(conn, 1, txn);
         DateTime postingDate = record.EffectiveDate ?? DateTime.Today;
@@ -812,7 +831,7 @@ public class PriorYearAdjustmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 postingDate, processingMonth, (int)drItem.VoteId, finYear,
-                journalTransactionTypeId, $"Prior Year Adjustment — {record.AdjustmentTypeCode}", documentNumber,
+                documentTypeId, $"Prior Year Adjustment — {record.AdjustmentTypeCode}", documentNumber,
                 debit: Math.Abs(totalAmount), credit: null, matchTranGuid: transactionId,
                 journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                 scoaFundsId: (int?)drItem.SCOAFundId,
@@ -831,7 +850,7 @@ public class PriorYearAdjustmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 postingDate, processingMonth, (int)crItem.VoteId, finYear,
-                journalTransactionTypeId, $"Prior Year Adjustment — {record.AdjustmentTypeCode}", documentNumber,
+                documentTypeId, $"Prior Year Adjustment — {record.AdjustmentTypeCode}", documentNumber,
                 debit: null, credit: Math.Abs(totalAmount), matchTranGuid: transactionId,
                 journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                 scoaFundsId: (int?)crItem.SCOAFundId,

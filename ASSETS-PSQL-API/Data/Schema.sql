@@ -201,17 +201,23 @@ CREATE TABLE IF NOT EXISTS "AssetConfig_mSCOA_TransactionType" (
     "DebitItem21_1" INTEGER,
     "DebitItem21_1DisplayName" VARCHAR(200),
     "DebitItem21_2" INTEGER,
+    "DebitItem21_2DisplayName" VARCHAR(200),
     "CreditItem21_1" VARCHAR(10),
     "CreditItem21_1DisplayName" VARCHAR(200),
     "Project12" INTEGER,
     "DebitItem12_1" INTEGER,
+    "DebitItem12_1DisplayName" VARCHAR(200),
     "CreditItem12_1" INTEGER,
+    "CreditItem12_1DisplayName" VARCHAR(200),
     "Project22" INTEGER,
     "DebitItem22_1" INTEGER,
+    "DebitItem22_1DisplayName" VARCHAR(200),
     "Project13" INTEGER,
     "CreditItem13_1" INTEGER,
+    "CreditItem13_1DisplayName" VARCHAR(200),
     "Project23" INTEGER,
     "CreditItem23_1" INTEGER,
+    "CreditItem23_1DisplayName" VARCHAR(200),
     "Default" SMALLINT,
     "Enabled" SMALLINT,
     "CreatedByID" INTEGER,
@@ -1546,6 +1552,17 @@ CREATE TABLE IF NOT EXISTS "Asset_OrganisationSettings" (
 );
 ALTER TABLE "Asset_OrganisationSettings" ADD COLUMN IF NOT EXISTS "financial_year" VARCHAR(20) DEFAULT '2025/2026';
 
+CREATE TABLE IF NOT EXISTS "AAAA_ConfigSettings" (
+    "ConfigSett_ID"              SERIAL PRIMARY KEY,
+    "KeyName"                    VARCHAR(100),
+    "KeyValue"                   VARCHAR(500),
+    "KeyDescription"             VARCHAR(500),
+    "Module"                     VARCHAR(100),
+    "DateCaptured"               TIMESTAMP,
+    "CapturerID"                 INTEGER,
+    "perMuni_SetupRequirements"  BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE IF NOT EXISTS "Asset_WorkflowDefinitions" (
     "id" SERIAL PRIMARY KEY,
     "name" VARCHAR(200) NOT NULL,
@@ -1591,6 +1608,9 @@ CREATE TABLE IF NOT EXISTS "Asset_Documents" (
     "description" TEXT,
     "uploaded_at" TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE "Asset_Documents" ADD COLUMN IF NOT EXISTS "asset_register_item_id" INTEGER;
+ALTER TABLE "Asset_Documents" ADD COLUMN IF NOT EXISTS "transaction_type" VARCHAR(150);
 
 -- Legacy maintenance_requests table removed — superseded by Asset_MaintenanceRequest
 -- (see Maintenance Module Tables section below)
@@ -1737,6 +1757,18 @@ CREATE TABLE IF NOT EXISTS "Const_DocumentType" (
     "DateModified" TIMESTAMP,
     "DocumentOrder" INTEGER,
     "ModuleID" INTEGER NOT NULL DEFAULT 0
+);
+
+-- Asset-specific document type lookup (replaces any reference to Const_DocumentType
+-- in the asset documents feature — Const_DocumentType is a shared system table)
+CREATE TABLE IF NOT EXISTS "Asset_DocumentType" (
+    "DocumentType_ID" SERIAL PRIMARY KEY,
+    "DocumentType"    VARCHAR(100),
+    "DocumentTypeDesc" VARCHAR(200) NOT NULL DEFAULT '',
+    "Enabled"         SMALLINT     NOT NULL DEFAULT 1,
+    "CapturerID"      INTEGER      NOT NULL DEFAULT 1,
+    "DateCaptured"    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    "ModuleID"        INTEGER      NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS "Const_ReferenceType_sys" (
@@ -2235,6 +2267,8 @@ ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "ApprovedDate" TIMESTAMP;
 ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "RejectedBy" INTEGER;
 ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "RejectedDate" TIMESTAMP;
 ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "RejectionReason" TEXT;
+ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "CatchUpDep" DECIMAL(18,2);
+ALTER TABLE "Asset_Disposal" ADD COLUMN IF NOT EXISTS "CatchUpDays" INTEGER;
 
 ALTER TABLE "Asset_Disposal_Approval" ADD COLUMN IF NOT EXISTS "IsApprove" SMALLINT DEFAULT 0;
 ALTER TABLE "Asset_Disposal_Approval" ADD COLUMN IF NOT EXISTS "ApprovedBy" INTEGER;
@@ -3631,6 +3665,15 @@ DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Asset_MaintenanceWorkOrder' AND column_name='CreditAmount') THEN
     ALTER TABLE "Asset_MaintenanceWorkOrder" DROP COLUMN "CreditAmount";
   END IF;
+  -- Planned maintenance columns (Task #127)
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Asset_MaintenanceWorkOrder' AND column_name='PlannedScheduleID') THEN
+    ALTER TABLE "Asset_MaintenanceWorkOrder" ADD COLUMN "PlannedScheduleID" INTEGER REFERENCES "Planned_Maint_Schedule"("ScheduleID");
+  END IF;
+  -- Make RequestID nullable so planned work orders (no parent request) can be inserted
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name='Asset_MaintenanceWorkOrder' AND column_name='RequestID' AND is_nullable='NO') THEN
+    ALTER TABLE "Asset_MaintenanceWorkOrder" ALTER COLUMN "RequestID" DROP NOT NULL;
+  END IF;
 END $$;
 
 -- Maintenance seed data: Lead Times
@@ -4356,12 +4399,12 @@ ALTER TABLE IF EXISTS "AssetConfig_TransactionType" DROP COLUMN IF EXISTS "CRPos
 ALTER TABLE IF EXISTS "AssetConfig_TransactionType" DROP COLUMN IF EXISTS "CRPositionStatementType22";
 
 -- AssetConfig_mSCOA_TransactionType
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "DebitItem21_2DisplayName";
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "DebitItem12_1DisplayName";
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "CreditItem12_1DisplayName";
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "DebitItem22_1DisplayName";
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "CreditItem13_1DisplayName";
-ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" DROP COLUMN IF EXISTS "CreditItem23_1DisplayName";
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "DebitItem21_2DisplayName" VARCHAR(200);
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "DebitItem12_1DisplayName" VARCHAR(200);
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "CreditItem12_1DisplayName" VARCHAR(200);
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "DebitItem22_1DisplayName" VARCHAR(200);
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "CreditItem13_1DisplayName" VARCHAR(200);
+ALTER TABLE IF EXISTS "AssetConfig_mSCOA_TransactionType" ADD COLUMN IF NOT EXISTS "CreditItem23_1DisplayName" VARCHAR(200);
 
 -- Asset_Revaluations
 ALTER TABLE IF EXISTS "Asset_Revaluations" DROP COLUMN IF EXISTS "SCOAItemDR";
@@ -4591,3 +4634,100 @@ INSERT INTO "Sys_TableBackend" (table_key, backend) VALUES
     ('gl-outbox', 'sqlserver'),
     ('gl-outbox-lines', 'sqlserver')
 ON CONFLICT (table_key) DO NOTHING;
+
+-- Planned Maintenance lookup tables (Task #127)
+CREATE TABLE IF NOT EXISTS "Const_Maint_Type" (
+    "MaintTypeID"   SERIAL PRIMARY KEY,
+    "MaintTypeDesc" VARCHAR(100) NOT NULL,
+    "IsCapex"       BOOLEAN NOT NULL DEFAULT FALSE,
+    "Enabled"       BOOLEAN NOT NULL DEFAULT TRUE,
+    "SortOrder"     INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO "Const_Maint_Type" ("MaintTypeID", "MaintTypeDesc", "IsCapex", "SortOrder")
+VALUES
+    (1, 'Preventative', FALSE, 1),
+    (2, 'Corrective',   FALSE, 2),
+    (3, 'Predictive',   FALSE, 3),
+    (4, 'Emergency',    FALSE, 4),
+    (5, 'Renewal',      TRUE,  5)
+ON CONFLICT ("MaintTypeID") DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS "Const_Maint_Frequency" (
+    "FrequencyID"   SERIAL PRIMARY KEY,
+    "FrequencyDesc" VARCHAR(50) NOT NULL,
+    "IntervalDays"  INTEGER NOT NULL,
+    "Enabled"       BOOLEAN NOT NULL DEFAULT TRUE,
+    "SortOrder"     INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO "Const_Maint_Frequency" ("FrequencyID", "FrequencyDesc", "IntervalDays", "SortOrder")
+VALUES
+    (1,  'Daily',     1,    1),
+    (2,  'Weekly',    7,    2),
+    (3,  'Monthly',   30,   3),
+    (4,  'Quarterly', 91,   4),
+    (5,  'Bi-Annual', 182,  5),
+    (6,  'Annual',    365,  6),
+    (7,  '2-Year',    730,  7),
+    (8,  '3-Year',    1095, 8),
+    (9,  '5-Year',    1825, 9),
+    (10, '10-Year',   3650, 10)
+ON CONFLICT ("FrequencyID") DO NOTHING;
+
+ALTER TABLE "Asset_Register_Items" ADD COLUMN IF NOT EXISTS "AssetDepreciationMethod_ID" INTEGER;
+ALTER TABLE "Asset_Register_Items" ADD COLUMN IF NOT EXISTS "RevaluationMethod" VARCHAR(50);
+ALTER TABLE "Const_AssetClass_sys" ADD COLUMN IF NOT EXISTS "RevaluationMethod" VARCHAR(50);
+
+-- Bulk-upload validation columns added for fields that previously had no dedicated error column
+-- in Asset_BulkValidation but now generate validation errors (UOM case fix handled in code).
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "ErfNumber"                      VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "DisposalValue"                  VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "DisposalProceeds"               VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "ProfitorLossonDisposal"         VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "SCOAItem_PurchaseAmountOrCost"  VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "SCOAItem_AccumulatedDepreciation" VARCHAR(100);
+ALTER TABLE "Asset_BulkValidation" ADD COLUMN IF NOT EXISTS "SCOAItem_AccumulatedImpairment" VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS "Asset_ClearingAccounts" (
+    "Asset_ClearingAccounts_ID" SERIAL PRIMARY KEY,
+    "PlanProjectItem_ID"        INTEGER NOT NULL UNIQUE,
+    "DateCaptured"              TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "Asset_EmailSettings" (
+    "id"            SERIAL PRIMARY KEY,
+    "smtp_host"     VARCHAR(300),
+    "smtp_port"     INTEGER DEFAULT 587,
+    "from_name"     VARCHAR(200),
+    "from_email"    VARCHAR(300),
+    "smtp_username" VARCHAR(300),
+    "smtp_password" VARCHAR(500),
+    "use_tls"       SMALLINT DEFAULT 1,
+    "DateCaptured"  TIMESTAMP DEFAULT NOW(),
+    "DateModified"  TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Asset_EmailTemplates" (
+    "id"               SERIAL PRIMARY KEY,
+    "TransactionType"  VARCHAR(100) NOT NULL,
+    "TemplateTitle"    VARCHAR(300) NOT NULL,
+    "RecipientEmails"  TEXT NOT NULL,
+    "MessageContent"   TEXT NOT NULL,
+    "IsActive"         SMALLINT DEFAULT 1,
+    "CapturedByID"     INTEGER DEFAULT 1,
+    "DateCaptured"     TIMESTAMP DEFAULT NOW(),
+    "ModifierID"       INTEGER,
+    "DateModified"     TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Asset_EmailLog" (
+    "id"              SERIAL PRIMARY KEY,
+    "TemplateID"      INTEGER,
+    "TransactionType" VARCHAR(100),
+    "Recipients"      TEXT,
+    "Subject"         VARCHAR(300),
+    "Status"          VARCHAR(20),
+    "ErrorMessage"    TEXT,
+    "SentAt"          TIMESTAMP DEFAULT NOW()
+);

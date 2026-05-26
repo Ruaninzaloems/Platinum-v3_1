@@ -15,17 +15,19 @@ public class PriorPeriodAdjustmentController : ControllerBase
     private readonly TransactionService _txnService;
     private readonly LookupService _lookupService;
     private readonly InternalApiClient _internalApi;
+    private readonly EmailService _emailService;
     private static readonly string[] AdjustmentTypes = new[]
     {
         "DEP_ADJ", "COST_ADJ", "IMP_ADJ", "IMPREV_ADJ", "REVAL_ADJ"
     };
 
-    public PriorPeriodAdjustmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi)
+    public PriorPeriodAdjustmentController(DbConnectionFactory db, TransactionService txnService, LookupService lookupService, InternalApiClient internalApi, EmailService emailService)
     {
         _db = db;
         _txnService = txnService;
         _lookupService = lookupService;
         _internalApi = internalApi;
+        _emailService = emailService;
     }
 
     [HttpGet("types")]
@@ -457,6 +459,12 @@ public class PriorPeriodAdjustmentController : ControllerBase
             if (ppaGlOutboxId.HasValue)
                 await _txnService.SyncGlOutboxToSqlServerIfNeededAsync(ppaGlOutboxId.Value);
 
+            var ppaTokens = await _emailService.BuildAssetBaseTokensAsync(conn, assetId);
+            ppaTokens["AdjustmentType"]   = typeCode;
+            ppaTokens["AdjustmentAmount"] = ResolveAmount(record).ToString("N2");
+            ppaTokens["TargetFinYear"]    = finYear;
+            ppaTokens["TargetFinPeriod"]  = finPeriod.ToString();
+            _ = _emailService.SendTransactionEmailsAsync("Prior Period Adjustment", ppaTokens);
             return Ok(new { success = true, message = "Prior period adjustment approved successfully. Transaction summaries have been recalculated for the target period and all subsequent periods." });
         }
         catch (Exception ex)
@@ -538,6 +546,8 @@ public class PriorPeriodAdjustmentController : ControllerBase
         dynamic record, string finYear, int finPeriod, int assetId)
     {
         int journalTransactionTypeId = 37;
+        int documentTypeId = await _lookupService.GetDocumentTypeIdAsync(conn, "Prior Period Adjustment", txn);
+        if (documentTypeId == 0) documentTypeId = journalTransactionTypeId;
         int ppaId = (int)record.PriorPeriodAdjustment_ID;
         string documentNumber = $"PPA-{finYear}-{ppaId}";
         var transactionId = Guid.NewGuid();
@@ -578,7 +588,7 @@ public class PriorPeriodAdjustmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 postingDate, processingMonth, (int)drItem.VoteId, finYear,
-                journalTransactionTypeId, narration, documentNumber,
+                documentTypeId, narration, documentNumber,
                 debit: debitAmount, credit: null, matchTranGuid: transactionId,
                 journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                 scoaFundsId: (int?)drItem.SCOAFundId,
@@ -597,7 +607,7 @@ public class PriorPeriodAdjustmentController : ControllerBase
         {
             await _txnService.InsertGeneralLedgerEntry(conn, txn,
                 postingDate, processingMonth, (int)crItem.VoteId, finYear,
-                journalTransactionTypeId, narration, documentNumber,
+                documentTypeId, narration, documentNumber,
                 debit: null, credit: creditAmount, matchTranGuid: transactionId,
                 journalTransactionTypeId: journalTransactionTypeId, assetLinkId: journalId,
                 scoaFundsId: (int?)crItem.SCOAFundId,
