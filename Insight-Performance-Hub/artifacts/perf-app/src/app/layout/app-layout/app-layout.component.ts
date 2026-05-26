@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { SidebarComponent } from '../sidebar/sidebar.component';
@@ -10,11 +10,15 @@ import { TopbarComponent } from '../topbar/topbar.component';
   imports: [RouterOutlet, SidebarComponent, TopbarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="shell">
-      <app-sidebar class="shell__side" />
+    <div class="shell" [class.shell--embedded]="embedded()">
+      @if (!embedded()) {
+        <app-sidebar class="shell__side" />
+      }
       <div class="shell__main">
-        <app-topbar class="shell__top" />
-        <main class="shell__content">
+        @if (!embedded()) {
+          <app-topbar class="shell__top" />
+        }
+        <main class="shell__content" [class.shell__content--embedded]="embedded()">
           <router-outlet />
         </main>
       </div>
@@ -25,6 +29,9 @@ import { TopbarComponent } from '../topbar/topbar.component';
       display: grid;
       grid-template-columns: 240px 1fr;
       min-height: 100vh;
+    }
+    .shell--embedded {
+      grid-template-columns: 1fr;
     }
     .shell__side {
       background: var(--plat-surface);
@@ -50,6 +57,17 @@ import { TopbarComponent } from '../topbar/topbar.component';
       flex: 1;
       padding: 24px 32px;
     }
+    .shell__content--embedded {
+      padding: 16px;
+    }
   `],
 })
-export class AppLayoutComponent {}
+export class AppLayoutComponent {
+  protected readonly embedded = signal<boolean>(this.detectEmbedded());
+
+  private detectEmbedded(): boolean {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('embedded') === '1' || window.self !== window.top;
+  }
+}
