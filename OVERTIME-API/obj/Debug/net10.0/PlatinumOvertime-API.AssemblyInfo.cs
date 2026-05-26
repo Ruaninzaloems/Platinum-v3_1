@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PlatinumOvertime-API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+32f2b6a1de9aa0794e5773ef8186b1e7141db23f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2cc3b739406ccb4459738ae5147e027e6ba89612")]
 [assembly: System.Reflection.AssemblyProductAttribute("PlatinumOvertime-API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PlatinumOvertime-API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
