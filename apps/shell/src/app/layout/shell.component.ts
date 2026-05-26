@@ -983,11 +983,10 @@ export class ShellComponent implements OnInit, OnDestroy {
   ];
 
   overtimeNavItems: NavItem[] = [
-    { label: 'Capture Overtime', icon: 'edit_note', route: '/overtime/capture' },
-    { label: 'New Transaction', icon: 'add_circle', route: '/overtime/capture/new' },
-    { label: 'Enquiry', icon: 'search', route: '/overtime/enquiry' },
+    { label: 'Overtime Capture', icon: 'edit_note', route: '/overtime/capture' },
+    { label: 'Overtime Enquiry', icon: 'search', route: '/overtime/enquiry' },
     { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing' },
-    { label: 'Setup', icon: 'settings', route: '/overtime/setup' },
+    { label: 'Overtime Setup', icon: 'settings', route: '/overtime/setup' },
     { label: 'Positions', icon: 'work', route: '/overtime/positions' },
   ];
 
