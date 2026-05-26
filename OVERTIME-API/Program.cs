@@ -180,7 +180,11 @@ builder.Services.AddScoped<OvertimeCaptureSchemaUpgrader>();
 // ---------- Current-user identity (session-cookie auth) ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DevUserDirectory>();
-builder.Services.AddScoped<ICurrentUserService, SessionCurrentUserService>();
+// Login bypassed for this deployment: the dev service always reports
+// IsAuthenticated=true, so SessionAuthFilter lets every request through and
+// no login page is required. The X-User-Id header (if present) selects the
+// dev persona; otherwise DevUserDirectory.Default is used.
+builder.Services.AddScoped<ICurrentUserService, DevCurrentUserService>();
 
 // ---------- Overtime amount + formula + assignee resolver ----------
 builder.Services.AddSingleton<FormulaEvaluator>();

@@ -130,6 +130,26 @@ public class DevUserDirectory
         {
             if (_cache != null) return _cache;
 
+            try
+            {
+                return LoadFromDb();
+            }
+            catch (Exception)
+            {
+                // DB tables are missing (e.g. dev seeders were skipped) — fall
+                // back to a single hard-coded admin so /api/me and the
+                // SessionAuthFilter still work without login.
+                var fallback = new List<DevUser> { FallbackUser };
+                _byUserId = fallback.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
+                _byEmployeeId = new Dictionary<string, DevUser>(StringComparer.OrdinalIgnoreCase);
+                Volatile.Write(ref _cache, fallback);
+                return fallback;
+            }
+        }
+    }
+
+    private List<DevUser> LoadFromDb()
+    {
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
 
@@ -333,7 +353,6 @@ public class DevUserDirectory
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
             Volatile.Write(ref _cache, users);
             return users;
-        }
     }
 
     private static string JoinNonEmpty(params string?[] parts) =>
