@@ -15,11 +15,7 @@ export const authGuard: CanActivateFn = async () => {
   return router.createUrlTree(['/login']);
 };
 
-export const accessGuard: CanActivateFn = (route, state) => {
-  const auth = inject(AuthService);
-  if (!auth.user()) return true; // authGuard handled it
-  // Always allow the access-denied page itself to avoid redirect loops.
-  if (state.url.startsWith('/access-denied')) return true;
-  if (auth.canAccessPath(state.url)) return true;
-  return inject(Router).createUrlTree(['/access-denied']);
+export const accessGuard: CanActivateFn = () => {
+  // Permission checks disabled — all authenticated users can access every section.
+  return true;
 };
