@@ -17,7 +17,7 @@ public class TrackingController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"SELECT * FROM ""Asset_TrackingZones"" WHERE ""is_active"" = 1 ORDER BY ""name""");
+        var items = await conn.QueryAsync<dynamic>(@"SELECT * FROM ""Asset_TrackingZones"" WHERE ""is_active"" = TRUE ORDER BY ""name""");
         return Ok(items);
     }
 

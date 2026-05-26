@@ -364,8 +364,8 @@ public class AssetConfigMscoaController : ControllerBase
             SELECT ""Department_ID""   AS ""departmentId"",
                    ""DepartmentDesc""  AS ""departmentDesc"",
                    ""DepartmentCode""  AS ""departmentCode""
-            FROM ""Asset_Department""
-            WHERE COALESCE(""Enabled"", 1) = 1
+            FROM ""Const_Department""
+            WHERE COALESCE(""Enabled"", TRUE) = TRUE
             ORDER BY ""DepartmentDesc""");
         return Ok(rows);
     }
@@ -379,8 +379,8 @@ public class AssetConfigMscoaController : ControllerBase
                            ""DivisionDesc""  AS ""divisionDesc"",
                            ""DivisionCode""  AS ""divisionCode"",
                            ""DepartmentID""  AS ""departmentId""
-                    FROM ""Asset_Division""
-                    WHERE COALESCE(""Enabled"", 1) = 1";
+                    FROM ""Const_Division""
+                    WHERE COALESCE(""Enabled"", TRUE) = TRUE";
         var parameters = new Dapper.DynamicParameters();
         if (departmentId.HasValue)
         {
@@ -815,10 +815,10 @@ public class AssetConfigMscoaController : ControllerBase
             SELECT ""AssetStatusDesc"" AS ""Desc"", ""AssetStatus_ID"" AS ""Id"" FROM ""Const_AssetStatus_Sys"""))
             .ToDictionary(x => x.Desc.Trim().ToLower(), x => x.Id);
         var depts = (await conn.QueryAsync<(string Desc, int Id)>(@"
-            SELECT ""DepartmentDesc"" AS ""Desc"", ""Department_ID"" AS ""Id"" FROM ""Asset_Department"" WHERE COALESCE(""Enabled"", 1) = 1"))
+            SELECT ""DepartmentDesc"" AS ""Desc"", ""Department_ID"" AS ""Id"" FROM ""Const_Department"" WHERE COALESCE(""Enabled"", TRUE) = TRUE"))
             .ToDictionary(x => x.Desc.Trim().ToLower(), x => x.Id);
         var allDivs = (await conn.QueryAsync<(string Desc, int Id, int DeptId)>(@"
-            SELECT ""DivisionDesc"" AS ""Desc"", ""Division_ID"" AS ""Id"", ""DepartmentID"" AS ""DeptId"" FROM ""Asset_Division"" WHERE COALESCE(""Enabled"", 1) = 1")).ToList();
+            SELECT ""DivisionDesc"" AS ""Desc"", ""Division_ID"" AS ""Id"", ""DepartmentID"" AS ""DeptId"" FROM ""Const_Division"" WHERE COALESCE(""Enabled"", TRUE) = TRUE")).ToList();
 
         var prefixRules = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
             SELECT ""DRPositionStatementType11"", ""DRPositionStatementType12"",
