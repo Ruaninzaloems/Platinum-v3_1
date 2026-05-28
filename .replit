@@ -202,7 +202,9 @@ externalPort = 3003
 
 [userenv.shared]
 SKIP_DB_INIT = "true"
-AZURE_POSTGRES_URL = "Host=platinum-postgre-sql.postgres.database.azure.com;Port=5432;Database=Assets;Username=Admin_Dev;Password=NOP@ssword_123;SslMode=Require;CommandTimeout=600;Timeout=30"
+AZURE_POSTGRES_URL = "host=platinum-postgre-sql.postgres.database.azure.com;port=5432;username=Admin_Dev;password=NOP@ssword_123"
+AZURE_DATABASE_URL = "postgresql://Admin_Dev:NOP%40ssword_123@platinum-postgre-sql.postgres.database.azure.com:5432/PlatinumV3_db?sslmode=require"
+AFS_DB_NAME = "PlatinumV3_db"
 
 [userenv.development]
 POS_AUTH_DEMO_MODE = "false"

@@ -32,8 +32,9 @@ public class DbConnectionFactory
             }
             else
             {
-                var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
-                    ?? throw new InvalidOperationException("Neither POSTGRES_URL nor DATABASE_URL environment variable is set");
+                var databaseUrl = Environment.GetEnvironmentVariable("AZURE_DATABASE_URL")
+                    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+                    ?? throw new InvalidOperationException("Neither AZURE_DATABASE_URL, POSTGRES_URL nor DATABASE_URL environment variable is set");
                 _connectionString = ConvertToNpgsqlConnectionString(databaseUrl);
             }
             _isSqlServer = false;
@@ -1075,14 +1076,18 @@ public class DbConnectionFactory
         {
             var uri = new Uri(databaseUrl);
             var userInfo = uri.UserInfo.Split(':');
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            var sslModeStr = query["sslmode"] ?? "prefer";
+            var sslMode = sslModeStr switch { "require" => SslMode.Require, "disable" => SslMode.Disable, "prefer" => SslMode.Prefer, _ => SslMode.Prefer };
             var builder = new NpgsqlConnectionStringBuilder
             {
                 Host = uri.Host,
                 Port = uri.Port > 0 ? uri.Port : 5432,
                 Database = uri.AbsolutePath.TrimStart('/'),
-                Username = userInfo[0],
-                Password = userInfo.Length > 1 ? userInfo[1] : "",
-                SslMode = SslMode.Prefer,
+                Username = Uri.UnescapeDataString(userInfo[0]),
+                Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "",
+                SslMode = sslMode,
+                TrustServerCertificate = true,
                 CommandTimeout = 600
             };
             return builder.ConnectionString;

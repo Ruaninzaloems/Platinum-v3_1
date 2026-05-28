@@ -79,7 +79,10 @@ Login is bypassed. `AuthService` in `libs/shared/auth/` auto-creates an admin se
 The 3 Insight-Performance-Hub artifacts no longer have dedicated Replit workflows — the platform workflow slot quota was exhausted, so they are launched as child processes by `start-apis.js`. To pick up upstream pulls, restart the **Sibling APIs** workflow.
 
 ## Database
-- Replit built-in PostgreSQL via `DATABASE_URL`
+- **Azure PostgreSQL (active, 2026-05-28):** `platinum-postgre-sql.postgres.database.azure.com:5432 / PlatinumV3_db` — all APIs repointed via `AZURE_DATABASE_URL` env var (postgresql:// form with `?sslmode=require`). AFS uses `AZURE_POSTGRES_URL` (ADO format) + `AFS_DB_NAME=PlatinumV3_db`. Replit IP `136.109.111.153` whitelisted on Azure firewall.
+- All 6 APIs that previously read `DATABASE_URL` were patched to prefer `AZURE_DATABASE_URL` when set, with fallback to `DATABASE_URL` (no workflow command changes needed): ASSETS-PSQL-API (DbConnectionFactory.cs), BUDGET-APP/PlatinumBudget.Api (Program.cs), IDP-UI/PlatinumIDP (Program.cs), OVERTIME-API (Program.cs), POS-API (db.ts), PAYROLL-APP (src/server/config/database.js). .NET URL parsers updated to URL-decode username/password (Uri.UnescapeDataString) so URL-encoded `%40` → `@` works.
+- Migration: 633 tables, 345 sequences, 904 indexes, 408 FKs, 10 app functions copied via chunked pg_restore TOC (37 chunks × 120 entries, --jobs=16). Only skipped: uuid-ossp extension (blocked by Azure; zero usage confirmed).
+- Local Replit built-in PostgreSQL via `DATABASE_URL` still configured as fallback (unused by default).
 - Assets schema: `ASSETS-PSQL-API/Data/Schema.sql` (131 tables)
 - IDP tables: prefixed `idp_*`, `mscoa_*`, `priority_*`
 - Budget tables: `BudgetVersions`, `BudgetStrings`, `FinancialYears`, `Projects`, etc.
@@ -91,6 +94,8 @@ The 3 Insight-Performance-Hub artifacts no longer have dedicated Replit workflow
 
 ### Assets (libs/assets/)
 Asset lifecycle (acquisitions, transfers, disposals, revaluations), financial accounting (depreciation, prior-year adjustments, GL outbox), verification & maintenance tracking.
+
+**Azure cutover fixes (2026-05-28):** Same `"Enabled" = 1` boolean-vs-integer pattern previously fixed in TrackingController/AssetConfigMscoaController also fixed in `SharedLookupsController.cs`. Schema is mixed: `Const_Department`, `Const_Division`, `Payroll_Employee` have BOOLEAN `"Enabled"` (use `= TRUE`); `Const_Town/Suburb/Ward/Street/Building/Floor/Room` have SMALLINT `"Enabled"` (use `= 1`). The controller now uses the correct comparison per table.
 
 **Upstream sync (2026-05-26):** ASSETS-PSQL-API/ synced from https://github.com/Ruaninzaloems/Platinum-Asset-Management.git (commit ece46e8). Added: EmailService, LedGeneralLedgerService, EmailLog/EmailSettings/EmailTemplates/DocumentType controllers, Filters/, Helpers/, new SQL seeds (SeedConfigSettings, SeedSCMGRNDocuments, MigratePlannedMaintenance, MigrateWorkOrderSpec). Program.cs adds SPAWN_SIBLING_SERVICES-gated child-process spawner (unset by default — no-op). The Angular ASSETS-UI/ was NOT merged — already refactored into libs/assets/ in the Nx monorepo. Preserved locally: Properties/launchSettings.json (0.0.0.0:3000 binding for Replit proxy), run-all.sh, Uploads/. Post-sync DB migrations applied manually (because SKIP_DB_INIT=true bypasses Schema.sql): created Asset_DocumentType, Asset_EmailSettings, Asset_EmailTemplates, Asset_EmailLog, Asset_ClearingAccounts, SCM_GRNDocuments; added asset_register_item_id + transaction_type columns to Asset_Documents. Fixed two boolean-vs-integer Postgres bugs in upstream code (boolean columns compared to literal `1`): TrackingController.cs GetZones (`"is_active" = 1` → `= TRUE`) and AssetConfigMscoaController GetDepartments/GetDivisions (`COALESCE("Enabled", 1) = 1` → `COALESCE("Enabled", TRUE) = TRUE`). Also fixed two table-name mismatches in AssetConfigMscoaController: `Asset_Department`/`Asset_Division` → `Const_Department`/`Const_Division` (the real table names in this DB). Verified: 107/107 Assets API endpoints return 200, 16/16 Shell /assets/* routes render.
 

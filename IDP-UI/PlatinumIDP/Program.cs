@@ -10,10 +10,10 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
     });
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+var databaseUrl = Environment.GetEnvironmentVariable("AZURE_DATABASE_URL") ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 if (string.IsNullOrEmpty(databaseUrl))
 {
-    throw new InvalidOperationException("DATABASE_URL environment variable is not set");
+    throw new InvalidOperationException("Neither AZURE_DATABASE_URL nor DATABASE_URL environment variable is set");
 }
 
 var dbProvider = Environment.GetEnvironmentVariable("DB_PROVIDER")?.ToLower() ?? "auto";
@@ -37,7 +37,7 @@ else if (dbProvider == "postgres" || databaseUrl.StartsWith("postgresql://") || 
         var database = uri.AbsolutePath.TrimStart('/');
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
         var sslMode = query["sslmode"] ?? "Prefer";
-        connectionString = $"Host={host};Port={port};Database={database};Username={userInfo[0]};Password={userInfo[1]};SSL Mode={sslMode};Trust Server Certificate=true";
+        connectionString = $"Host={host};Port={port};Database={database};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo[1])};SSL Mode={sslMode};Trust Server Certificate=true";
     }
     else
     {

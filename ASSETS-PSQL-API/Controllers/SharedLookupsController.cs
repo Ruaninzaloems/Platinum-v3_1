@@ -21,7 +21,7 @@ public class SharedLookupsController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var items = await conn.QueryAsync<dynamic>(@"SELECT ""Department_ID"" AS ""id"", ""DepartmentDesc"" AS ""description"" FROM ""Const_Department"" WHERE ""Enabled"" = 1 ORDER BY ""DepartmentDesc""");
+        var items = await conn.QueryAsync<dynamic>(@"SELECT ""Department_ID"" AS ""id"", ""DepartmentDesc"" AS ""description"" FROM ""Const_Department"" WHERE ""Enabled"" = TRUE ORDER BY ""DepartmentDesc""");
         return Ok(items);
     }
 
@@ -30,7 +30,7 @@ public class SharedLookupsController : ControllerBase
     {
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
-        var sql = @"SELECT ""Division_ID"" AS ""id"", ""DivisionDesc"" AS ""description"", ""DepartmentID"" AS ""departmentId"" FROM ""Const_Division"" WHERE ""Enabled"" = 1";
+        var sql = @"SELECT ""Division_ID"" AS ""id"", ""DivisionDesc"" AS ""description"", ""DepartmentID"" AS ""departmentId"" FROM ""Const_Division"" WHERE ""Enabled"" = TRUE";
         if (departmentId.HasValue) sql += @" AND ""DepartmentID"" = @departmentId";
         sql += @" ORDER BY ""DivisionDesc""";
         var items = await conn.QueryAsync<dynamic>(sql, new { departmentId });
@@ -124,7 +124,7 @@ public class SharedLookupsController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
 
-        var whereSql = @" WHERE ""Enabled"" = 1";
+        var whereSql = @" WHERE ""Enabled"" = TRUE";
         if (!string.IsNullOrWhiteSpace(search))
             whereSql += @" AND (""Surname"" ILIKE @search OR ""FirstName"" ILIKE @search OR ""EmpCode"" ILIKE @search)";
 

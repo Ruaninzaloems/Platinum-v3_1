@@ -65,7 +65,7 @@ else
 
 static string? ResolvePostgresConnectionString()
 {
-    var url = Environment.GetEnvironmentVariable("DATABASE_URL");
+    var url = Environment.GetEnvironmentVariable("AZURE_DATABASE_URL") ?? Environment.GetEnvironmentVariable("DATABASE_URL");
     if (!string.IsNullOrWhiteSpace(url))
     {
         try
@@ -74,7 +74,9 @@ static string? ResolvePostgresConnectionString()
             var userInfo = u.UserInfo.Split(':', 2);
             var user = Uri.UnescapeDataString(userInfo[0]);
             var pwd = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-            return $"Host={u.Host};Port={(u.Port > 0 ? u.Port : 5432)};Database={u.AbsolutePath.TrimStart('/')};Username={user};Password={pwd};SSL Mode=Disable;Trust Server Certificate=true";
+            var q = System.Web.HttpUtility.ParseQueryString(u.Query);
+            var ssl = q["sslmode"] switch { "require" => "Require", "prefer" => "Prefer", "disable" => "Disable", _ => "Prefer" };
+            return $"Host={u.Host};Port={(u.Port > 0 ? u.Port : 5432)};Database={u.AbsolutePath.TrimStart('/')};Username={user};Password={pwd};SSL Mode={ssl};Trust Server Certificate=true";
         }
         catch { /* fall through to PG* vars */ }
     }
@@ -84,7 +86,8 @@ static string? ResolvePostgresConnectionString()
     var db = Environment.GetEnvironmentVariable("PGDATABASE") ?? "postgres";
     var pgUser = Environment.GetEnvironmentVariable("PGUSER") ?? "postgres";
     var pgPwd = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
-    return $"Host={host};Port={port};Database={db};Username={pgUser};Password={pgPwd};SSL Mode=Disable;Trust Server Certificate=true";
+    var pgSsl = Environment.GetEnvironmentVariable("PGSSLMODE") switch { "require" => "Require", "prefer" => "Prefer", "disable" => "Disable", _ => "Prefer" };
+    return $"Host={host};Port={port};Database={db};Username={pgUser};Password={pgPwd};SSL Mode={pgSsl};Trust Server Certificate=true";
 }
 
 // ---------- In-memory cache (used by DbEmployeesPlatinumIntegrationService) ----------

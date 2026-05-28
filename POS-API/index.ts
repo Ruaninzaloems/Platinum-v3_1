@@ -60,7 +60,7 @@ const PgStore = pgSessionStore(session);
 app.use(
   session({
     store: new PgStore({
-      conString: process.env.DATABASE_URL,
+      conString: process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL,
       tableName: 'user_sessions',
       createTableIfMissing: true,
       pruneSessionInterval: 300,

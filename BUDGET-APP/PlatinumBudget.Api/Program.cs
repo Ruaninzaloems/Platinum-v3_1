@@ -18,7 +18,7 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Platinum Budget Management API", Version = "v1" });
 });
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "";
+var databaseUrl = Environment.GetEnvironmentVariable("AZURE_DATABASE_URL") ?? Environment.GetEnvironmentVariable("DATABASE_URL") ?? "";
 string connectionString;
 if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
 {
@@ -29,7 +29,7 @@ if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres:
     var database = uri.AbsolutePath.TrimStart('/');
     var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
     var sslMode = query["sslmode"] ?? "disable";
-    connectionString = $"Host={host};Port={port};Database={database};Username={userInfo[0]};Password={userInfo[1]};SSL Mode={sslMode switch { "disable" => "Disable", "require" => "Require", "prefer" => "Prefer", _ => "Disable" }}";
+    connectionString = $"Host={host};Port={port};Database={database};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo[1])};SSL Mode={sslMode switch { "disable" => "Disable", "require" => "Require", "prefer" => "Prefer", _ => "Disable" }};Trust Server Certificate=true";
 }
 else
 {
