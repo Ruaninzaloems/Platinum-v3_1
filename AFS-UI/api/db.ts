@@ -1,7 +1,13 @@
 import { Pool } from 'pg';
 
-function parseAdoConnString(raw: string): Record<string, string> {
-  return Object.fromEntries(
+// Accepts either a postgresql:// URL or an ADO-style key=value connection string.
+function buildPoolConfig(raw: string): ConstructorParameters<typeof Pool>[0] {
+  if (raw.startsWith('postgresql://') || raw.startsWith('postgres://')) {
+    // Use the URL directly — the pg driver handles sslmode query params natively.
+    return { connectionString: raw, ssl: { rejectUnauthorized: false } };
+  }
+  // Legacy ADO-style: Host=...;Port=...;Database=...;Username=...;Password=...
+  const parts = Object.fromEntries(
     raw
       .split(';')
       .filter(Boolean)
@@ -10,22 +16,23 @@ function parseAdoConnString(raw: string): Record<string, string> {
         return [kv.slice(0, i).trim().toLowerCase(), kv.slice(i + 1).trim()];
       })
   );
+  return {
+    host: parts.host,
+    port: Number(parts.port) || 5432,
+    database: parts.database || parts['initial catalog'] || 'AFS',
+    user: parts.username || parts.user,
+    password: parts.password,
+    ssl: { rejectUnauthorized: false },
+  };
 }
 
-const raw = process.env.AZURE_POSTGRES_URL || '';
+const raw = process.env.AZURE_POSTGRES_URL || process.env.DATABASE_URL || '';
 if (!raw) {
-  console.warn('[afs-api] AZURE_POSTGRES_URL is not set — DB queries will fail');
+  console.warn('[afs-api] AZURE_POSTGRES_URL / DATABASE_URL is not set — DB queries will fail');
 }
-
-const parts = parseAdoConnString(raw);
 
 export const pool = new Pool({
-  host: parts.host,
-  port: Number(parts.port) || 5432,
-  database: process.env.AFS_DB_NAME || 'AFS',
-  user: parts.username || parts.user,
-  password: parts.password,
-  ssl: { rejectUnauthorized: false },
+  ...buildPoolConfig(raw),
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,

@@ -4109,13 +4109,24 @@ BEGIN
     ALTER TABLE IF EXISTS "Led_GeneralLedger" DROP COLUMN IF EXISTS "VATComment";
     ALTER TABLE IF EXISTS "Led_GeneralLedger" DROP COLUMN IF EXISTS "PettyCashRegisterLineItemID";
 
-    -- Rename table (guard: only rename if old name still exists)
+    -- Rename table (guard: only rename if old name still exists AND new name does not)
+    -- If Asset_GeneralLedger already exists (created by CREATE TABLE IF NOT EXISTS above),
+    -- just drop the old Led_GeneralLedger table instead of renaming.
     IF EXISTS (
         SELECT 1 FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE c.relname = 'Led_GeneralLedger' AND n.nspname = 'public'
     ) THEN
-        ALTER TABLE "Led_GeneralLedger" RENAME TO "Asset_GeneralLedger";
+        IF EXISTS (
+            SELECT 1 FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relname = 'Asset_GeneralLedger' AND n.nspname = 'public'
+        ) THEN
+            -- New table already created by schema init; drop the obsolete old table
+            DROP TABLE "Led_GeneralLedger";
+        ELSE
+            ALTER TABLE "Led_GeneralLedger" RENAME TO "Asset_GeneralLedger";
+        END IF;
     END IF;
 END $$;
 

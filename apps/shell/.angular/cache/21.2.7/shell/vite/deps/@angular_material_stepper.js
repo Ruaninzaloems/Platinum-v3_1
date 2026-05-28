@@ -14,6 +14,9 @@ import {
   MatRippleModule
 } from "./chunk-V2XGYFCC.js";
 import {
+  ControlContainer
+} from "./chunk-DBH5JBNH.js";
+import {
   MatRipple
 } from "./chunk-NDNJ6V2O.js";
 import {
@@ -45,9 +48,6 @@ import {
   _getFocusedElementPierceShadowDom
 } from "./chunk-6S24FBVI.js";
 import "./chunk-CZW6SUH7.js";
-import {
-  ControlContainer
-} from "./chunk-DBH5JBNH.js";
 import "./chunk-LGVK2JKN.js";
 import {
   BidiModule,

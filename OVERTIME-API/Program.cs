@@ -63,7 +63,17 @@ static string? ResolvePostgresConnectionString()
             var userInfo = u.UserInfo.Split(':', 2);
             var user = Uri.UnescapeDataString(userInfo[0]);
             var pwd = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-            return $"Host={u.Host};Port={(u.Port > 0 ? u.Port : 5432)};Database={u.AbsolutePath.TrimStart('/')};Username={user};Password={pwd};SSL Mode=Disable;Trust Server Certificate=true";
+            var qs = System.Web.HttpUtility.ParseQueryString(u.Query);
+            var sslMode = (qs["sslmode"] ?? "prefer") switch
+            {
+                "disable"     => "Disable",
+                "require"     => "Require",
+                "prefer"      => "Prefer",
+                "verify-full" => "Require",   // Azure: Require is sufficient; VerifyFull needs DigiCert CA
+                "verify-ca"   => "Require",
+                _             => "Prefer"
+            };
+            return $"Host={u.Host};Port={(u.Port > 0 ? u.Port : 5432)};Database={u.AbsolutePath.TrimStart('/')};Username={user};Password={pwd};SSL Mode={sslMode};Trust Server Certificate=true";
         }
         catch { /* fall through to PG* vars */ }
     }
@@ -73,7 +83,7 @@ static string? ResolvePostgresConnectionString()
     var db = Environment.GetEnvironmentVariable("PGDATABASE") ?? "postgres";
     var pgUser = Environment.GetEnvironmentVariable("PGUSER") ?? "postgres";
     var pgPwd = Environment.GetEnvironmentVariable("PGPASSWORD") ?? "";
-    return $"Host={host};Port={port};Database={db};Username={pgUser};Password={pgPwd};SSL Mode=Disable;Trust Server Certificate=true";
+    return $"Host={host};Port={port};Database={db};Username={pgUser};Password={pgPwd};SSL Mode=Prefer;Trust Server Certificate=false";
 }
 
 // ---------- Integration boundary ----------

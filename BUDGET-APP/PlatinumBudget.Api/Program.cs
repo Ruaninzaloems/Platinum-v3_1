@@ -23,13 +23,13 @@ string connectionString;
 if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
 {
     var uri = new Uri(databaseUrl);
-    var userInfo = uri.UserInfo.Split(':');
+    var userInfo = uri.UserInfo.Split(':', 2);
     var host = uri.Host;
     var port = uri.Port > 0 ? uri.Port : 5432;
     var database = uri.AbsolutePath.TrimStart('/');
     var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
     var sslMode = query["sslmode"] ?? "disable";
-    connectionString = $"Host={host};Port={port};Database={database};Username={userInfo[0]};Password={userInfo[1]};SSL Mode={sslMode switch { "disable" => "Disable", "require" => "Require", "prefer" => "Prefer", _ => "Disable" }}";
+    connectionString = $"Host={host};Port={port};Database={database};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo.Length > 1 ? userInfo[1] : "")};SSL Mode={sslMode switch { "disable" => "Disable", "require" => "Require", "prefer" => "Prefer", "verify-full" => "Require", "verify-ca" => "Require", _ => "Prefer" }};Trust Server Certificate=true";
 }
 else
 {

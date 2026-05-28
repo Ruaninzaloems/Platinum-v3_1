@@ -24,6 +24,9 @@ import {
 import "./chunk-HIAMQA2O.js";
 import "./chunk-MUEQFIYQ.js";
 import "./chunk-V2XGYFCC.js";
+import {
+  NG_VALUE_ACCESSOR
+} from "./chunk-DBH5JBNH.js";
 import "./chunk-NDNJ6V2O.js";
 import "./chunk-HAFEHSMH.js";
 import "./chunk-PIKEOEJD.js";
@@ -59,9 +62,6 @@ import {
 import {
   coerceArray
 } from "./chunk-CZW6SUH7.js";
-import {
-  NG_VALUE_ACCESSOR
-} from "./chunk-DBH5JBNH.js";
 import {
   CdkScrollableModule,
   ViewportRuler

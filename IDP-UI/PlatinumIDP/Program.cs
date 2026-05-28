@@ -31,13 +31,21 @@ else if (dbProvider == "postgres" || databaseUrl.StartsWith("postgresql://") || 
     if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
     {
         var uri = new Uri(databaseUrl);
-        var userInfo = uri.UserInfo.Split(':');
+        var userInfo = uri.UserInfo.Split(':', 2);
         var host = uri.Host;
         var port = uri.Port > 0 ? uri.Port : 5432;
         var database = uri.AbsolutePath.TrimStart('/');
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        var sslMode = query["sslmode"] ?? "Prefer";
-        connectionString = $"Host={host};Port={port};Database={database};Username={userInfo[0]};Password={userInfo[1]};SSL Mode={sslMode};Trust Server Certificate=true";
+        var sslMode = (query["sslmode"] ?? "prefer") switch
+        {
+            "disable"     => "Disable",
+            "require"     => "Require",
+            "prefer"      => "Prefer",
+            "verify-full" => "Require",   // Azure: Require is sufficient; VerifyFull needs DigiCert CA
+            "verify-ca"   => "Require",
+            _             => "Prefer"
+        };
+        connectionString = $"Host={host};Port={port};Database={database};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo.Length > 1 ? userInfo[1] : "")};SSL Mode={sslMode};Trust Server Certificate=true";
     }
     else
     {

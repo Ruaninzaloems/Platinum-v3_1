@@ -2,6 +2,9 @@ import {
   MatRippleModule
 } from "./chunk-V2XGYFCC.js";
 import {
+  NG_VALUE_ACCESSOR
+} from "./chunk-DBH5JBNH.js";
+import {
   MAT_RIPPLE_GLOBAL_OPTIONS,
   MatRipple,
   RippleState
@@ -23,9 +26,6 @@ import "./chunk-5TGOBOYD.js";
 import "./chunk-YNQ6MEC4.js";
 import "./chunk-6S24FBVI.js";
 import "./chunk-CZW6SUH7.js";
-import {
-  NG_VALUE_ACCESSOR
-} from "./chunk-DBH5JBNH.js";
 import "./chunk-LGVK2JKN.js";
 import {
   BidiModule,
