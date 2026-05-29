@@ -1,10 +1,11 @@
 import {
-  Component, signal, computed, inject, OnInit,
+  Component, signal, computed, inject, effect, OnInit,
   ViewChild, ElementRef, HostListener
 } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -24,7 +25,7 @@ interface BreadcrumbItem { id: string; name: string; }
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink,
-    MatIconModule, MatButtonModule,
+    MatIconModule, MatButtonModule, MatMenuModule,
     MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule,
   ],
   template: `
@@ -164,9 +165,10 @@ interface BreadcrumbItem { id: string; name: string; }
           <!-- Search -->
           <div class="search-wrap">
             <mat-icon>search</mat-icon>
-            <input type="text" placeholder="Filter files…" [(ngModel)]="filterText">
-            @if (filterText) {
-              <button mat-icon-button (click)="filterText = ''" style="height:24px;width:24px;line-height:24px">
+            <input type="text" placeholder="Filter files…"
+                   [ngModel]="filterText()" (ngModelChange)="onFilterChange($event)">
+            @if (filterText()) {
+              <button mat-icon-button (click)="onFilterChange('')" style="height:24px;width:24px;line-height:24px">
                 <mat-icon style="font-size:16px">close</mat-icon>
               </button>
             }
@@ -181,8 +183,8 @@ interface BreadcrumbItem { id: string; name: string; }
         } @else if (filteredItems().length === 0) {
           <div class="center-state" style="flex:1">
             <mat-icon class="state-icon">folder_open</mat-icon>
-            <p>{{ filterText ? 'No files match your filter' : 'This folder is empty' }}</p>
-            @if (!filterText) {
+            <p>{{ filterText() ? 'No files match your filter' : 'This folder is empty' }}</p>
+            @if (!filterText()) {
               <button mat-stroked-button (click)="fileInput.click()">Upload the first file</button>
             }
           </div>
@@ -198,7 +200,7 @@ interface BreadcrumbItem { id: string; name: string; }
             </div>
 
             <!-- Data rows -->
-            @for (item of filteredItems(); track item.id) {
+            @for (item of pagedItems(); track item.id) {
               <div class="list-row" [class.folder-row]="item.folder"
                    (dblclick)="openItem(item)">
                 <div class="col-icon">
@@ -222,28 +224,66 @@ interface BreadcrumbItem { id: string; name: string; }
                   {{ item.lastModifiedDateTime | date:'dd MMM yyyy HH:mm' }}
                 </div>
                 <div class="col-actions">
-                  @if (item.folder) {
-                    <button mat-icon-button matTooltip="Open folder"
-                            (click)="openItem(item); $event.stopPropagation()">
-                      <mat-icon>folder_open</mat-icon>
-                    </button>
-                  } @else {
-                    <button mat-icon-button matTooltip="Download"
-                            (click)="download(item); $event.stopPropagation()">
-                      <mat-icon>download</mat-icon>
-                    </button>
-                    <button mat-icon-button matTooltip="Open in SharePoint"
-                            (click)="openInBrowser(item); $event.stopPropagation()">
-                      <mat-icon>open_in_new</mat-icon>
-                    </button>
-                  }
-                  <button mat-icon-button matTooltip="Delete" color="warn"
-                          (click)="deleteItem(item); $event.stopPropagation()">
-                    <mat-icon>delete_outline</mat-icon>
+                  <button mat-icon-button class="kebab-btn" matTooltip="Actions"
+                          [matMenuTriggerFor]="rowMenu"
+                          (click)="$event.stopPropagation()">
+                    <mat-icon>more_vert</mat-icon>
                   </button>
+                  <mat-menu #rowMenu="matMenu" class="row-actions-menu" xPosition="before">
+                    @if (item.folder) {
+                      <button mat-menu-item (click)="openItem(item)">
+                        <mat-icon>folder_open</mat-icon>
+                        <span>Open folder</span>
+                      </button>
+                    } @else {
+                      <button mat-menu-item (click)="openInBrowser(item)">
+                        <mat-icon>open_in_new</mat-icon>
+                        <span>Open in SharePoint</span>
+                      </button>
+                      <button mat-menu-item (click)="download(item)">
+                        <mat-icon>download</mat-icon>
+                        <span>Download</span>
+                      </button>
+                    }
+                    <button mat-menu-item class="menu-danger" (click)="deleteItem(item)">
+                      <mat-icon>delete_outline</mat-icon>
+                      <span>Delete</span>
+                    </button>
+                  </mat-menu>
                 </div>
               </div>
             }
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-bar">
+            <div class="page-size">
+              <label>Per page:</label>
+              <select [ngModel]="pageSize()" (ngModelChange)="setPageSize(+$event)">
+                @for (opt of pageSizeOptions; track opt) {
+                  <option [value]="opt">{{ opt }}</option>
+                }
+              </select>
+            </div>
+            <div class="page-nav">
+              <button mat-icon-button matTooltip="First page"
+                      [disabled]="currentPage() === 1" (click)="firstPage()">
+                <mat-icon>first_page</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Previous page"
+                      [disabled]="currentPage() === 1" (click)="prevPage()">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
+              <button mat-icon-button matTooltip="Next page"
+                      [disabled]="currentPage() >= totalPages()" (click)="nextPage()">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Last page"
+                      [disabled]="currentPage() >= totalPages()" (click)="lastPage()">
+                <mat-icon>last_page</mat-icon>
+              </button>
+            </div>
           </div>
         }
       }
@@ -397,6 +437,35 @@ interface BreadcrumbItem { id: string; name: string; }
     }
     .folder-color { color: #f59e0b !important; font-size: 22px; }
     .file-color   { color: #3f51b5 !important; font-size: 22px; }
+    .kebab-btn { color: #64748b; }
+
+    /* ── Pagination ──────────────────────────────────────────────────────── */
+    .pagination-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+      margin: 0 1.5rem 1rem; padding: .5rem .75rem;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .page-size {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .82rem; color: #64748b;
+    }
+    .page-size select {
+      padding: .3rem 1.6rem .3rem .6rem; border: 1px solid #cbd5e1;
+      border-radius: 6px; background: #fff; font-size: .82rem; color: #0f172a;
+      cursor: pointer; outline: none;
+    }
+    .page-size select:focus { border-color: #3f51b5; }
+    .page-nav { display: flex; align-items: center; gap: .15rem; }
+    .page-info {
+      font-size: .85rem; color: #334155; font-weight: 600;
+      padding: 0 .75rem; white-space: nowrap;
+    }
+
+    /* ── Row actions menu ────────────────────────────────────────────────── */
+    .menu-danger { color: #dc2626; }
+    .menu-danger mat-icon { color: #dc2626; }
   `]
 })
 export class UatAssetsComponent implements OnInit {
@@ -420,7 +489,12 @@ export class UatAssetsComponent implements OnInit {
 
   dragOver    = signal(false);
   uploading   = signal(false);
-  filterText  = '';
+  filterText  = signal('');
+
+  // ── Pagination ──────────────────────────────────────────────────────────
+  pageSizeOptions = [10, 25, 50, 100];
+  pageSize    = signal(10);
+  currentPage = signal(1);
 
   uploadQueue = signal<{ name: string; done: boolean; error: string }[]>([]);
 
@@ -430,9 +504,40 @@ export class UatAssetsComponent implements OnInit {
   ]);
 
   filteredItems = computed(() => {
-    const q = this.filterText.toLowerCase().trim();
+    const q = this.filterText().toLowerCase().trim();
     return q ? this.sortedItems().filter(i => i.name.toLowerCase().includes(q)) : this.sortedItems();
   });
+
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize())));
+
+  pagedItems = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredItems().slice(start, start + this.pageSize());
+  });
+
+  constructor() {
+    // Keep current page within bounds when the result set shrinks
+    effect(() => {
+      const tp = this.totalPages();
+      if (this.currentPage() > tp) this.currentPage.set(tp);
+    });
+  }
+
+  // ── Pagination controls ───────────────────────────────────────────────────
+  onFilterChange(value: string): void {
+    this.filterText.set(value);
+    this.currentPage.set(1);
+  }
+
+  setPageSize(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+  }
+
+  firstPage(): void { this.currentPage.set(1); }
+  prevPage():  void { this.currentPage.update(p => Math.max(1, p - 1)); }
+  nextPage():  void { this.currentPage.update(p => Math.min(this.totalPages(), p + 1)); }
+  lastPage():  void { this.currentPage.set(this.totalPages()); }
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -488,6 +593,7 @@ export class UatAssetsComponent implements OnInit {
 
   async loadFolder(folderId: string): Promise<void> {
     this.filesLoading.set(true);
+    this.currentPage.set(1);
     try {
       this.items.set(await this.graph.getChildren(this.driveId(), folderId));
     } catch (e: any) {
