@@ -2,6 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom, Observable, of } from 'rxjs';
+import { MsAuthService } from './ms-auth.service';
 
 /**
  * User shape matches POS-API session payload (the system-wide auth source of truth).
@@ -39,6 +40,12 @@ export interface LoginResponse {
 const STORAGE_USER = 'platinum_user';
 const STORAGE_SITE = 'platinum_site';
 const STORAGE_TOKEN = 'platinum_token';
+/**
+ * Set when the user explicitly signs out, so the auto-admin session is NOT
+ * silently recreated on the next page load. Cleared on any successful login
+ * (including the "Continue as Administrator" path on the login page).
+ */
+const STORAGE_LOGGED_OUT = 'platinum_logged_out';
 
 /**
  * The base path that proxies to POS-API (the identity provider).
@@ -50,6 +57,7 @@ const POS_AUTH_BASE = '/pos-app/api';
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private msAuth = inject(MsAuthService);
 
   private _user = signal<AuthUser | null>(null);
   private _site = signal<SiteInfo | null>(null);
@@ -78,7 +86,9 @@ export class AuthService {
       if (s) this._site.set(JSON.parse(s));
       if (t) this._token.set(t);
     } catch {}
-    if (!this._user()) {
+    let loggedOut = false;
+    try { loggedOut = localStorage.getItem(STORAGE_LOGGED_OUT) === '1'; } catch {}
+    if (!this._user() && !loggedOut) {
       this.setLocalSession('admin');
     }
     this._checked.set(true);
@@ -155,13 +165,26 @@ export class AuthService {
     return this.http.get<SiteInfo[]>(`${POS_AUTH_BASE}/sites`, { withCredentials: true });
   }
 
-  async logout(): Promise<void> {
+  /**
+   * Signs the user out.
+   * @param persist When true (explicit "Sign Out"), remembers the logged-out
+   *   state so the auto-admin session is NOT silently recreated on reload.
+   *   The interceptor's 401 teardown passes false so expected upstream 401s
+   *   (e.g. the SCM Azure API) don't lock the user out permanently.
+   */
+  async logout(persist = true): Promise<void> {
     try {
       await firstValueFrom(
         this.http.post(`${POS_AUTH_BASE}/auth/logout`, {}, { withCredentials: true })
       );
     } catch {}
     this.clearSession();
+    // Also drop any Microsoft account so the login page doesn't bounce the
+    // user straight back to the dashboard via msAuth.isSignedIn().
+    try { await this.msAuth.clearLocalSession(); } catch {}
+    if (persist) {
+      try { localStorage.setItem(STORAGE_LOGGED_OUT, '1'); } catch {}
+    }
     this.router.navigate(['/login']);
   }
 
@@ -177,6 +200,8 @@ export class AuthService {
     this._site.set(site || null);
     if (token) this._token.set(token);
     try {
+      // A fresh session means the user is no longer explicitly signed out.
+      localStorage.removeItem(STORAGE_LOGGED_OUT);
       localStorage.setItem(STORAGE_USER, JSON.stringify(user));
       if (site) localStorage.setItem(STORAGE_SITE, JSON.stringify(site));
       if (token) localStorage.setItem(STORAGE_TOKEN, token);

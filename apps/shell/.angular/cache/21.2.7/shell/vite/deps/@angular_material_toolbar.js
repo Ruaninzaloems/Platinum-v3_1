@@ -1,16 +1,16 @@
 import "./chunk-PIKEOEJD.js";
 import "./chunk-3UUS4QCM.js";
+import "./chunk-LGVK2JKN.js";
 import "./chunk-JUJEZ4FJ.js";
 import "./chunk-6S24FBVI.js";
-import "./chunk-LGVK2JKN.js";
-import {
-  BidiModule
-} from "./chunk-JPXPF4SI.js";
 import {
   Platform
 } from "./chunk-L7GSUTUC.js";
 import "./chunk-M6TROWNH.js";
 import "./chunk-JTYEZAXU.js";
+import {
+  BidiModule
+} from "./chunk-JPXPF4SI.js";
 import {
   ChangeDetectionStrategy,
   Component,

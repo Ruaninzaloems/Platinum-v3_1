@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Signing in…</title>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center;
+           height: 100vh; font-family: 'Segoe UI', sans-serif; color: #64748b;
+           background: #f0f2f5; }
+    .msg { text-align: center; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #e2e8f0;
+      border-top-color: #3f51b5; border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="msg">
+    <div class="spinner"></div>
+    <p>Completing sign-in…</p>
+  </div>
+  <!--
+    This page is the popup redirect target for MSAL (Microsoft Authentication Library).
+    MSAL in the main window monitors this popup, reads the auth code from the URL,
+    processes the token, and closes this window automatically.
+    No JavaScript is needed here.
+  -->
+</body>
+</html>

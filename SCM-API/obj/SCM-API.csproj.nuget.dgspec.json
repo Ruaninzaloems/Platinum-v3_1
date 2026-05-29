@@ -1,26 +1,32 @@
 {
   "format": 1,
   "restore": {
-    "/home/runner/workspace/SCM-API/SCM-API.csproj": {}
+    "C:\\Repos\\Platinum-v3_1\\SCM-API\\SCM-API.csproj": {}
   },
   "projects": {
-    "/home/runner/workspace/SCM-API/SCM-API.csproj": {
+    "C:\\Repos\\Platinum-v3_1\\SCM-API\\SCM-API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/runner/workspace/SCM-API/SCM-API.csproj",
+        "projectUniqueName": "C:\\Repos\\Platinum-v3_1\\SCM-API\\SCM-API.csproj",
         "projectName": "SCM-API",
-        "projectPath": "/home/runner/workspace/SCM-API/SCM-API.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/home/runner/workspace/SCM-API/obj/",
+        "projectPath": "C:\\Repos\\Platinum-v3_1\\SCM-API\\SCM-API.csproj",
+        "packagesPath": "C:\\Users\\RuanvanderWesthuizen\\.nuget\\packages\\",
+        "outputPath": "C:\\Repos\\Platinum-v3_1\\SCM-API\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\RuanvanderWesthuizen\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
-          "/nix/store/bjzmfa360s8f3n4xqlnkamy13fkywb2x-dotnet-sdk-10.0.101/share/dotnet/library-packs": {},
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -101,7 +107,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/nix/store/bjzmfa360s8f3n4xqlnkamy13fkywb2x-dotnet-sdk-10.0.101/share/dotnet/sdk/10.0.101/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

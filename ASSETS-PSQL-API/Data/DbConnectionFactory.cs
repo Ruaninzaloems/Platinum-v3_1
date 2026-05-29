@@ -32,9 +32,8 @@ public class DbConnectionFactory
             }
             else
             {
-                var databaseUrl = Environment.GetEnvironmentVariable("AZURE_DATABASE_URL")
-                    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-                    ?? throw new InvalidOperationException("Neither AZURE_DATABASE_URL, POSTGRES_URL nor DATABASE_URL environment variable is set");
+                var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
+                    ?? throw new InvalidOperationException("Neither POSTGRES_URL nor DATABASE_URL environment variable is set");
                 _connectionString = ConvertToNpgsqlConnectionString(databaseUrl);
             }
             _isSqlServer = false;
@@ -281,40 +280,6 @@ public class DbConnectionFactory
             }
         }
 
-        var migrateGrnDocsPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "MigrateGRNDocuments.sql");
-        if (File.Exists(migrateGrnDocsPath))
-        {
-            var migrateGrnDocsSql = await File.ReadAllTextAsync(migrateGrnDocsPath);
-            try
-            {
-                await using var migrateGrnDocsCmd = new NpgsqlCommand(migrateGrnDocsSql, conn);
-                migrateGrnDocsCmd.CommandTimeout = 60;
-                await migrateGrnDocsCmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("SCM_GRNDocuments table migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("SCM_GRNDocuments migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        var seedGrnDocsPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "SeedSCMGRNDocuments.sql");
-        if (File.Exists(seedGrnDocsPath))
-        {
-            var seedGrnDocsSql = await File.ReadAllTextAsync(seedGrnDocsPath);
-            try
-            {
-                await using var seedGrnDocsCmd = new NpgsqlCommand(seedGrnDocsSql, conn);
-                seedGrnDocsCmd.CommandTimeout = 60;
-                await seedGrnDocsCmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("SCM_GRNDocuments seed data loaded successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("SCM_GRNDocuments seed data had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
         var migrateBulkTxnPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "MigrateBulkTransactions.sql");
         if (File.Exists(migrateBulkTxnPath))
         {
@@ -380,23 +345,6 @@ public class DbConnectionFactory
             catch (Exception ex)
             {
                 _logger.LogWarning("Bulk refurbishments migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        var migrateBulkTxnCatchUpPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "MigrateBulkTransactionCatchUp.sql");
-        if (File.Exists(migrateBulkTxnCatchUpPath))
-        {
-            var migrateBulkTxnCatchUpSql = await File.ReadAllTextAsync(migrateBulkTxnCatchUpPath);
-            try
-            {
-                await using var migrateBulkTxnCatchUpCmd = new NpgsqlCommand(migrateBulkTxnCatchUpSql, conn);
-                migrateBulkTxnCatchUpCmd.CommandTimeout = 60;
-                await migrateBulkTxnCatchUpCmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("Bulk transaction catch-up depreciation columns migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Bulk transaction catch-up depreciation columns migration had errors (non-fatal): {Message}", ex.Message);
             }
         }
 
@@ -535,70 +483,6 @@ public class DbConnectionFactory
                 _logger.LogWarning("Drop legacy Department column migration had errors (non-fatal): {Message}", ex.Message);
             }
         }
-
-        // Post-schema re-run of WO spec migration (Task #133).
-        // On first boot the patch runs BEFORE Schema.sql so the IF EXISTS guards skip column adds.
-        // Re-running here guarantees columns exist once Asset_MaintenanceWorkOrder is created.
-        var woSpecPostPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "MigrateWorkOrderSpec.sql");
-        if (File.Exists(woSpecPostPath))
-        {
-            var woSpecSql = await File.ReadAllTextAsync(woSpecPostPath);
-            try
-            {
-                await using var woSpecCmd = new NpgsqlCommand(woSpecSql, conn);
-                woSpecCmd.CommandTimeout = 60;
-                await woSpecCmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("Work Order Spec post-schema migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Work Order Spec post-schema migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        var migrateConfigSettingsPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "MigrateConfigSettings.sql");
-        if (File.Exists(migrateConfigSettingsPath))
-        {
-            var migrateConfigSettingsSql = await File.ReadAllTextAsync(migrateConfigSettingsPath);
-            try
-            {
-                await using var migrateConfigSettingsCmd = new NpgsqlCommand(migrateConfigSettingsSql, conn);
-                migrateConfigSettingsCmd.CommandTimeout = 60;
-                await migrateConfigSettingsCmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("AAAA_ConfigSettings table migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("AAAA_ConfigSettings migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        var seedConfigSettingsPath = Path.Combine(Path.GetDirectoryName(schemaPath)!, "SeedConfigSettings.sql");
-        if (File.Exists(seedConfigSettingsPath))
-        {
-            var seedConfigSettingsSql = await File.ReadAllTextAsync(seedConfigSettingsPath);
-            try
-            {
-                var statements = seedConfigSettingsSql.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                foreach (var stmt in statements)
-                {
-                    var trimmed = stmt.Trim();
-                    if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("--")) continue;
-                    try
-                    {
-                        await using var stmtCmd = new NpgsqlCommand(trimmed, conn);
-                        stmtCmd.CommandTimeout = 30;
-                        await stmtCmd.ExecuteNonQueryAsync();
-                    }
-                    catch { /* ON CONFLICT DO NOTHING handles duplicates; skip any bad row */ }
-                }
-                _logger.LogInformation("AAAA_ConfigSettings seed data loaded successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("AAAA_ConfigSettings seed had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
     }
 
     private async Task ApplyPatchMigrationsAsync(NpgsqlConnection conn)
@@ -700,42 +584,6 @@ public class DbConnectionFactory
             _logger.LogWarning("Unused table drop had errors (non-fatal): {Message}", ex.Message);
         }
 
-        // Patch 6: Planned Maintenance tables (Task #127)
-        var migratePlannedMaintPath = Path.Combine(dataDir, "MigratePlannedMaintenance.sql");
-        if (File.Exists(migratePlannedMaintPath))
-        {
-            var sql = await File.ReadAllTextAsync(migratePlannedMaintPath);
-            try
-            {
-                await using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.CommandTimeout = 60;
-                await cmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("Planned Maintenance tables migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Planned Maintenance migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        // Patch 7: Work Order Spec — new columns, lookup tables, and 3 sub-resource tables (Task #133)
-        var migrateWoSpecPath = Path.Combine(dataDir, "MigrateWorkOrderSpec.sql");
-        if (File.Exists(migrateWoSpecPath))
-        {
-            var sql = await File.ReadAllTextAsync(migrateWoSpecPath);
-            try
-            {
-                await using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.CommandTimeout = 60;
-                await cmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("Work Order Spec migration (Task #133) applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Work Order Spec migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
         // Patch 5: GL Outbox tables for GL integration (Task #120 / #124 — aligned to SQL Server)
         try
         {
@@ -796,278 +644,6 @@ public class DbConnectionFactory
         {
             _logger.LogWarning("GL Outbox table migration had errors (non-fatal): {Message}", ex.Message);
         }
-
-        try
-        {
-            await using var glUseInboxCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Asset_OrganisationSettings""
-                    ADD COLUMN IF NOT EXISTS ""gl_use_inbox"" BOOLEAN NOT NULL DEFAULT TRUE;", conn);
-            glUseInboxCmd.CommandTimeout = 15;
-            await glUseInboxCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("gl_use_inbox column patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("gl_use_inbox column patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        try
-        {
-            await using var ledGlTableCmd = new NpgsqlCommand(@"
-                CREATE TABLE IF NOT EXISTS ""Led_GeneralLedger"" (
-                    ""GenLedger_ID""             SERIAL PRIMARY KEY,
-                    ""PostingDate""              TIMESTAMP NOT NULL,
-                    ""ProcessingMonth""          INTEGER NOT NULL,
-                    ""VoteID""                   INTEGER,
-                    ""FinYear""                  VARCHAR(12) NOT NULL,
-                    ""TransactionTypeID""        INTEGER,
-                    ""TransactionDetails""       VARCHAR(235),
-                    ""DocumentNumber""           VARCHAR(50),
-                    ""Debit""                    DECIMAL(16,2),
-                    ""Credit""                   DECIMAL(16,2),
-                    ""DateCaptured""             TIMESTAMP DEFAULT NOW(),
-                    ""CapturerID""               INTEGER,
-                    ""MatchTranGuid""            UUID,
-                    ""JournalTransactionTypeID"" INTEGER,
-                    ""AssetLinkID""              INTEGER,
-                    ""SCOAFundsID""              INTEGER,
-                    ""SCOARegionID""             INTEGER,
-                    ""SCOACostingID""            INTEGER,
-                    ""SCOAProjectID""            INTEGER,
-                    ""SCOAFunctionID""           INTEGER,
-                    ""SCOAItemID""               INTEGER NOT NULL DEFAULT 0,
-                    ""DivisionID""              INTEGER,
-                    ""ProjectID""               INTEGER,
-                    ""PlanProjectItemID""        INTEGER
-                );
-                CREATE INDEX IF NOT EXISTS ""idx_led_gl_voteid""  ON ""Led_GeneralLedger""(""VoteID"");
-                CREATE INDEX IF NOT EXISTS ""idx_led_gl_finyear"" ON ""Led_GeneralLedger""(""FinYear"");", conn);
-            ledGlTableCmd.CommandTimeout = 30;
-            await ledGlTableCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Led_GeneralLedger table created/verified successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Led_GeneralLedger table migration had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        try
-        {
-            await using var glLedTargetCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Asset_OrganisationSettings""
-                    ADD COLUMN IF NOT EXISTS ""gl_led_target"" VARCHAR(20) NOT NULL DEFAULT 'postgresql';", conn);
-            glLedTargetCmd.CommandTimeout = 15;
-            await glLedTargetCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("gl_led_target column patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("gl_led_target column patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch: Add RevaluationMethod column to Const_AssetClass_sys (Task #440)
-        try
-        {
-            await using var revalMethodCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Const_AssetClass_sys""
-                    ADD COLUMN IF NOT EXISTS ""RevaluationMethod"" VARCHAR(20) DEFAULT 'restatement';", conn);
-            revalMethodCmd.CommandTimeout = 15;
-            await revalMethodCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("RevaluationMethod column patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("RevaluationMethod column patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch: Add AssetDepreciationMethod_ID and RevaluationMethod to Asset_Register_Items (Task #442)
-        try
-        {
-            await using var assetDepRevalCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Asset_Register_Items""
-                    ADD COLUMN IF NOT EXISTS ""AssetDepreciationMethod_ID"" INTEGER;
-                ALTER TABLE ""Asset_Register_Items""
-                    ADD COLUMN IF NOT EXISTS ""RevaluationMethod"" VARCHAR(50);", conn);
-            assetDepRevalCmd.CommandTimeout = 15;
-            await assetDepRevalCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Asset_Register_Items depreciation/revaluation method columns patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Asset_Register_Items depreciation/revaluation method columns patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch: AssetConfig_AssetType_MeasurementType_Link table + default seed data.
-        // This is the authoritative table that controls which measurement types are valid
-        // per asset type — replaces the incorrect AssetConfig_mSCOA join used previously.
-        var migrateLinkTablePath = Path.Combine(dataDir, "MigrateAssetTypeMeasurementLink.sql");
-        if (File.Exists(migrateLinkTablePath))
-        {
-            var sql = await File.ReadAllTextAsync(migrateLinkTablePath);
-            try
-            {
-                await using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.CommandTimeout = 60;
-                await cmd.ExecuteNonQueryAsync();
-                _logger.LogInformation("AssetConfig_AssetType_MeasurementType_Link migration applied successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("AssetConfig_AssetType_MeasurementType_Link migration had errors (non-fatal): {Message}", ex.Message);
-            }
-        }
-
-        // Patch (Task #478): Correct DRPositionStatementType / CRPositionStatementType data
-        // in AssetConfig_TransactionType.  These columns are the authoritative source of
-        // required SCOA account-code prefixes for each vote field.
-        // All five UPDATE statements are fully idempotent (updating to a known-good value).
-        try
-        {
-            await using var prefixDataCmd = new NpgsqlCommand(@"
-                UPDATE ""AssetConfig_TransactionType""
-                SET ""DRPositionStatementType13"" = 'LN',
-                    ""DRPositionStatementType14"" = 'LN'
-                WHERE ""AssetConfig_TransactionType_ID"" = 1;
-
-                UPDATE ""AssetConfig_TransactionType""
-                SET ""DRPositionStatementType13"" = 'LN'
-                WHERE ""AssetConfig_TransactionType_ID"" = 2;
-
-                UPDATE ""AssetConfig_TransactionType""
-                SET ""DRPositionStatementType13"" = 'LN'
-                WHERE ""AssetConfig_TransactionType_ID"" = 3;
-
-                UPDATE ""AssetConfig_TransactionType""
-                SET ""DRPositionStatementType12"" = 'LN',
-                    ""DRPositionStatementType13"" = 'IA',
-                    ""DRPositionStatementType14"" = 'LN',
-                    ""CRPositionStatementType11"" = 'LN',
-                    ""DRPositionStatementType21"" = 'IA',
-                    ""DRPositionStatementType22"" = 'LN',
-                    ""DRPositionStatementType23"" = 'IA',
-                    ""CRPositionStatementType21"" = 'LN',
-                    ""CRPositionStatementType22"" = 'LN'
-                WHERE ""AssetConfig_TransactionType_ID"" = 5;
-
-                UPDATE ""AssetConfig_TransactionType""
-                SET ""DRPositionStatementType13"" = 'IZ',
-                    ""DRPositionStatementType14"" = 'IL',
-                    ""DRPositionStatementType21"" = 'IA',
-                    ""DRPositionStatementType23"" = 'IZ',
-                    ""CRPositionStatementType21"" = 'IL'
-                WHERE ""AssetConfig_TransactionType_ID"" = 6;", conn);
-            prefixDataCmd.CommandTimeout = 30;
-            await prefixDataCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("mSCOA SCOA prefix data corrections applied successfully (Task #478)");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("mSCOA SCOA prefix data corrections had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch: Add missing Asset_BulkValidation columns for newly-validated fields.
-        // These fields now generate validation errors but previously had no dedicated column,
-        // causing the whole-row INSERT to fail and no errors to be stored.
-        try
-        {
-            await using var bulkValColumnsCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""ErfNumber""                       VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""DisposalValue""                   VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""DisposalProceeds""                VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""ProfitorLossonDisposal""          VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""SCOAItem_PurchaseAmountOrCost""   VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""SCOAItem_AccumulatedDepreciation"" VARCHAR(100);
-                ALTER TABLE ""Asset_BulkValidation""
-                    ADD COLUMN IF NOT EXISTS ""SCOAItem_AccumulatedImpairment""  VARCHAR(100);", conn);
-            bulkValColumnsCmd.CommandTimeout = 15;
-            await bulkValColumnsCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Asset_BulkValidation missing columns patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Asset_BulkValidation missing columns patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch (Task #494): Add mscoa_use_dept_division toggle column to Asset_OrganisationSettings.
-        // DEFAULT TRUE preserves existing behaviour for all existing deployments.
-        try
-        {
-            await using var mscoaDeptDivCmd = new NpgsqlCommand(@"
-                ALTER TABLE ""Asset_OrganisationSettings""
-                    ADD COLUMN IF NOT EXISTS ""mscoa_use_dept_division"" BOOLEAN NOT NULL DEFAULT TRUE;", conn);
-            mscoaDeptDivCmd.CommandTimeout = 15;
-            await mscoaDeptDivCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("mscoa_use_dept_division column patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("mscoa_use_dept_division column patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Patch: Seed Const_Asset_Run_Type with default depreciation run types if the table is empty.
-        // The depreciation run endpoint returns 400 when no run types exist.
-        // "Distinctive" is the primary daily-rate run type used throughout the system.
-        try
-        {
-            await using var runTypeCmd = new NpgsqlCommand(@"
-                INSERT INTO ""Const_Asset_Run_Type"" (""RunType_ID"", ""RunTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                SELECT 1, 'Distinctive', 1, NOW(), 1
-                WHERE NOT EXISTS (SELECT 1 FROM ""Const_Asset_Run_Type"" WHERE ""RunType_ID"" = 1);
-
-                INSERT INTO ""Const_Asset_Run_Type"" (""RunType_ID"", ""RunTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                SELECT 2, 'Monthly', 1, NOW(), 1
-                WHERE NOT EXISTS (SELECT 1 FROM ""Const_Asset_Run_Type"" WHERE ""RunType_ID"" = 2);
-
-                INSERT INTO ""Const_Asset_Run_Type"" (""RunType_ID"", ""RunTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                SELECT 3, 'Annual', 1, NOW(), 1
-                WHERE NOT EXISTS (SELECT 1 FROM ""Const_Asset_Run_Type"" WHERE ""RunType_ID"" = 3);", conn);
-            runTypeCmd.CommandTimeout = 15;
-            await runTypeCmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Const_Asset_Run_Type seed patch applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Const_Asset_Run_Type seed patch had errors (non-fatal): {Message}", ex.Message);
-        }
-
-        // Data fix: mark Heritage asset types as NoUsefuleLife and clear RUL for non-depreciable assets
-        try
-        {
-            await using var cmd = new NpgsqlCommand(@"
-                UPDATE ""Const_AssetType_Sys""
-                SET    ""NoUsefuleLife"" = 1
-                WHERE  LOWER(""AssetTypeDesc"") LIKE '%heritage%'
-                  AND  COALESCE(""NoUsefuleLife"", 0) = 0;
-
-                UPDATE ""Asset_Register_Items""
-                SET    ""RemainingUsefulLife""    = NULL,
-                       ""UsefulLifeMonthComponent"" = NULL
-                WHERE  ""AssetType_ID"" IN (
-                           SELECT ""AssetType_ID"" FROM ""Const_AssetType_Sys""
-                           WHERE  COALESCE(""NoUsefuleLife"", 0) = 1)
-                  AND  COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0;
-
-                UPDATE ""Asset_Register_Items""
-                SET    ""RemainingUsefulLife""    = NULL,
-                       ""UsefulLifeMonthComponent"" = NULL
-                WHERE  ""AssetCategory_ID"" IN (
-                           SELECT ""AssetCategoryID"" FROM ""Const_AssetCategory_sys""
-                           WHERE  LOWER(""AssetCategoryDesc"") LIKE '%land%')
-                  AND  COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0;", conn);
-            cmd.CommandTimeout = 30;
-            await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("Non-depreciable asset RUL data fix applied successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Non-depreciable asset RUL data fix had errors (non-fatal): {Message}", ex.Message);
-        }
     }
 
     private static string ConvertToNpgsqlConnectionString(string databaseUrl)
@@ -1075,10 +651,20 @@ public class DbConnectionFactory
         if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
         {
             var uri = new Uri(databaseUrl);
-            var userInfo = uri.UserInfo.Split(':');
-            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-            var sslModeStr = query["sslmode"] ?? "prefer";
-            var sslMode = sslModeStr switch { "require" => SslMode.Require, "disable" => SslMode.Disable, "prefer" => SslMode.Prefer, _ => SslMode.Prefer };
+            var userInfo = uri.UserInfo.Split(':', 2);
+            var qs = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            // Azure PostgreSQL Flexible Server: VerifyFull requires the DigiCert root CA
+            // to be explicitly trusted by Npgsql. Use Require (encrypted, no cert chain
+            // validation) which is sufficient for Azure managed services.
+            var sslMode = (qs["sslmode"] ?? "prefer") switch
+            {
+                "disable"     => SslMode.Disable,
+                "require"     => SslMode.Require,
+                "prefer"      => SslMode.Prefer,
+                "verify-full" => SslMode.Require,   // Azure: use Require, not VerifyFull
+                "verify-ca"   => SslMode.Require,
+                _             => SslMode.Prefer
+            };
             var builder = new NpgsqlConnectionStringBuilder
             {
                 Host = uri.Host,
@@ -1087,7 +673,6 @@ public class DbConnectionFactory
                 Username = Uri.UnescapeDataString(userInfo[0]),
                 Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "",
                 SslMode = sslMode,
-                TrustServerCertificate = true,
                 CommandTimeout = 600
             };
             return builder.ConnectionString;

@@ -5,7 +5,11 @@ export const routes: Routes = [
   // Login is disabled — every visitor lands directly inside the shell with
   // an auto-created local admin session. The legacy /login and
   // /supplier-login URLs redirect to the dashboard so old links keep working.
-  { path: 'login', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'login', loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent) },
+  // Dedicated popup redirect page for MSAL — must stay outside the shell so no
+  // navigation or handleRedirectPromise() fires, allowing the main window to
+  // read the auth code from the popup URL and close it automatically.
+  { path: 'auth-redirect', loadComponent: () => import('./features/auth-redirect/auth-redirect.component').then(m => m.AuthRedirectComponent) },
   { path: 'supplier-login', redirectTo: 'dashboard', pathMatch: 'full' },
   {
     path: '',
@@ -46,6 +50,8 @@ export const routes: Routes = [
       { path: 'afs', loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
       { path: 'ins', loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
       { path: 'overtime', loadChildren: () => import('@platinumv3/overtime').then(m => m.OVERTIME_ROUTES) },
+      { path: 'sharepoint', loadComponent: () => import('./features/sharepoint/sharepoint.component').then(m => m.SharepointComponent) },
+      { path: 'sharepoint/uat-assets', loadComponent: () => import('./features/sharepoint/uat-assets.component').then(m => m.UatAssetsComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]

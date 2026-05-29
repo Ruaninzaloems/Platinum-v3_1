@@ -59,7 +59,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
       if (err.status === 401 && !req.url.includes('/auth/')) {
-        auth.logout().catch(() => router.navigate(['/login']));
+        // Soft teardown: don't persist the logged-out flag, so an expected
+        // upstream 401 (e.g. the SCM Azure API without a real JWT) doesn't
+        // permanently suppress the auto-admin session on the next reload.
+        auth.logout(false).catch(() => router.navigate(['/login']));
       }
       return throwError(() => err);
     })

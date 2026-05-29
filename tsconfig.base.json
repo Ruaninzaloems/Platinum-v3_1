@@ -26,7 +26,8 @@
       "@platinumv3/pos": ["libs/pos/src/index.ts"],
       "@platinumv3/scm": ["libs/scm/src/index.ts"],
       "@platinumv3/ins": ["libs/ins/src/index.ts"],
-      "@platinumv3/overtime": ["libs/overtime/src/index.ts"]
+      "@platinumv3/overtime": ["libs/overtime/src/index.ts"],
+      "@platinumv3/shared/graph": ["libs/shared/graph/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
