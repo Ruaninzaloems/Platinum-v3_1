@@ -202,11 +202,23 @@ interface EditableColumn {
             <!-- Header row -->
             <div class="list-row header-row" [style.grid-template-columns]="gridCols()">
               <div class="col-icon"></div>
-              <div class="col-name">Name</div>
-              <div class="col-size">Size</div>
-              <div class="col-modified">Modified</div>
+              <div class="col-name sortable" [class.sorted]="sortField()==='name'"
+                   (click)="toggleSort('name')">
+                Name <span class="sort-ind">{{ sortArrow('name') }}</span>
+              </div>
+              <div class="col-size sortable" [class.sorted]="sortField()==='size'"
+                   (click)="toggleSort('size')">
+                Size <span class="sort-ind">{{ sortArrow('size') }}</span>
+              </div>
+              <div class="col-modified sortable" [class.sorted]="sortField()==='modified'"
+                   (click)="toggleSort('modified')">
+                Modified <span class="sort-ind">{{ sortArrow('modified') }}</span>
+              </div>
               @for (col of metaColumns(); track col.name) {
-                <div class="col-meta">{{ col.displayName }}</div>
+                <div class="col-meta sortable" [class.sorted]="sortField()===col.name"
+                     (click)="toggleSort(col.name)">
+                  {{ col.displayName }} <span class="sort-ind">{{ sortArrow(col.name) }}</span>
+                </div>
               }
               <div class="col-actions"></div>
             </div>
@@ -279,32 +291,37 @@ interface EditableColumn {
 
           <!-- Pagination -->
           <div class="pagination-bar">
-            <div class="page-size">
-              <label>Per page:</label>
-              <select [ngModel]="pageSize()" (ngModelChange)="setPageSize(+$event)">
-                @for (opt of pageSizeOptions; track opt) {
-                  <option [value]="opt">{{ opt }}</option>
-                }
-              </select>
+            <div class="page-summary">
+              Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ totalItems() }}
             </div>
-            <div class="page-nav">
-              <button mat-icon-button matTooltip="First page"
-                      [disabled]="currentPage() === 1" (click)="firstPage()">
-                <mat-icon>first_page</mat-icon>
-              </button>
-              <button mat-icon-button matTooltip="Previous page"
-                      [disabled]="currentPage() === 1" (click)="prevPage()">
-                <mat-icon>chevron_left</mat-icon>
-              </button>
-              <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
-              <button mat-icon-button matTooltip="Next page"
-                      [disabled]="currentPage() >= totalPages()" (click)="nextPage()">
-                <mat-icon>chevron_right</mat-icon>
-              </button>
-              <button mat-icon-button matTooltip="Last page"
-                      [disabled]="currentPage() >= totalPages()" (click)="lastPage()">
-                <mat-icon>last_page</mat-icon>
-              </button>
+            <div class="page-controls">
+              <div class="page-size">
+                <label>Rows per page:</label>
+                <select [ngModel]="pageSize()" (ngModelChange)="setPageSize(+$event)">
+                  @for (opt of pageSizeOptions; track opt) {
+                    <option [value]="opt">{{ opt }}</option>
+                  }
+                </select>
+              </div>
+              <div class="page-nav">
+                <button mat-icon-button matTooltip="First page"
+                        [disabled]="currentPage() === 1" (click)="firstPage()">
+                  <mat-icon>first_page</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Previous page"
+                        [disabled]="currentPage() === 1" (click)="prevPage()">
+                  <mat-icon>chevron_left</mat-icon>
+                </button>
+                <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
+                <button mat-icon-button matTooltip="Next page"
+                        [disabled]="currentPage() >= totalPages()" (click)="nextPage()">
+                  <mat-icon>chevron_right</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Last page"
+                        [disabled]="currentPage() >= totalPages()" (click)="lastPage()">
+                  <mat-icon>last_page</mat-icon>
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -585,6 +602,15 @@ interface EditableColumn {
     .header-row .col-meta { color: #64748b; }
     .col-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0; }
 
+    /* Sortable column headers */
+    .header-row .sortable {
+      cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: .25rem;
+    }
+    .header-row .sortable:hover { color: #3f51b5; }
+    .header-row .sorted { color: #3f51b5; }
+    .sort-ind { font-size: .65rem; line-height: 1; }
+
     .item-name {
       font-size: .875rem; font-weight: 600; color: #0f172a;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -606,6 +632,8 @@ interface EditableColumn {
       background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
       flex-shrink: 0;
     }
+    .page-summary { font-size: .82rem; color: #64748b; }
+    .page-controls { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
     .page-size {
       display: flex; align-items: center; gap: .5rem;
       font-size: .82rem; color: #64748b;
@@ -711,6 +739,10 @@ export class UatAssetsComponent implements OnInit {
   pageSize    = signal(10);
   currentPage = signal(1);
 
+  // ── Sorting ───────────────────────────────────────────────────────────────
+  sortField = signal<string>('');
+  sortDir   = signal<'asc' | 'desc'>('asc');
+
   // ── Metadata / dialogs ────────────────────────────────────────────────────
   /** Editable SharePoint columns discovered from the library (data-driven). */
   metaColumns = signal<EditableColumn[]>([]);
@@ -734,22 +766,81 @@ export class UatAssetsComponent implements OnInit {
     return `40px 1fr 90px 160px ${meta} 130px`.replace(/\s+/g, ' ').trim();
   });
 
-  sortedItems = computed(() => [
-    ...this.items().filter(i =>  i.folder),
-    ...this.items().filter(i => !i.folder),
-  ]);
+  /** Folders are always grouped before files; the chosen column sorts within each group. */
+  sortedItems = computed(() => {
+    const field = this.sortField();
+    const folders = this.items().filter(i =>  i.folder);
+    const files   = this.items().filter(i => !i.folder);
+    if (!field) return [...folders, ...files];
+
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
+    const cmp = (a: DriveItem, b: DriveItem) => {
+      const av = this.sortValue(a, field);
+      const bv = this.sortValue(b, field);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return  1 * dir;
+      return 0;
+    };
+    return [...folders.sort(cmp), ...files.sort(cmp)];
+  });
 
   filteredItems = computed(() => {
     const q = this.filterText().toLowerCase().trim();
     return q ? this.sortedItems().filter(i => i.name.toLowerCase().includes(q)) : this.sortedItems();
   });
 
-  totalPages = computed(() => Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize())));
+  totalItems = computed(() => this.filteredItems().length);
+  totalPages = computed(() => Math.max(1, Math.ceil(this.totalItems() / this.pageSize())));
 
   pagedItems = computed(() => {
     const start = (this.currentPage() - 1) * this.pageSize();
     return this.filteredItems().slice(start, start + this.pageSize());
   });
+
+  /** 1-based index of the first row shown on the current page (0 when empty). */
+  rangeStart = computed(() => this.totalItems() === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1);
+  /** Index of the last row shown on the current page. */
+  rangeEnd   = computed(() => Math.min(this.currentPage() * this.pageSize(), this.totalItems()));
+
+  /** Sort key extractor — handles built-in columns and discovered metadata columns. */
+  private sortValue(item: DriveItem, field: string): string | number {
+    switch (field) {
+      case 'name':     return (item.name ?? '').toLowerCase();
+      case 'size':     return item.folder ? -1 : (item.size ?? 0);
+      case 'modified': return item.lastModifiedDateTime ? Date.parse(item.lastModifiedDateTime) : 0;
+      default: {
+        const col = this.metaColumns().find(c => c.name === field);
+        const raw = item.listItem?.fields?.[field];
+        if (col?.type === 'number') {
+          const n = Number(raw);
+          return raw === null || raw === undefined || raw === '' || isNaN(n) ? -Infinity : n;
+        }
+        if (col?.type === 'dateTime') {
+          const ms = raw ? Date.parse(raw) : NaN;
+          return isNaN(ms) ? -Infinity : ms;
+        }
+        if (col?.type === 'boolean')  return raw ? 1 : 0;
+        return (raw ?? '').toString().toLowerCase();
+      }
+    }
+  }
+
+  /** Toggle sort on a column (asc → desc → asc); switching columns starts ascending. */
+  toggleSort(field: string): void {
+    if (this.sortField() === field) {
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
+    this.currentPage.set(1);
+  }
+
+  /** Sort indicator glyph for a header (empty when the column isn't the active sort). */
+  sortArrow(field: string): string {
+    if (this.sortField() !== field) return '';
+    return this.sortDir() === 'asc' ? '▲' : '▼';
+  }
 
   constructor() {
     // Keep current page within bounds when the result set shrinks
