@@ -45,6 +45,15 @@ export interface Drive {
   webUrl      : string;
 }
 
+export interface ListColumn {
+  name        : string;
+  displayName : string;
+  readOnly   ?: boolean;
+  hidden     ?: boolean;
+  choice     ?: { choices: string[] };
+  text       ?: unknown;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GraphService {
   private http    = inject(HttpClient);
@@ -218,6 +227,58 @@ export class GraphService {
     const headers = await this.headers();
     await firstValueFrom(
       this.http.delete(`${GRAPH}/drives/${driveId}/items/${itemId}`, { headers })
+    );
+  }
+
+  // ── Metadata (SharePoint list columns) ───────────────────────────────────
+
+  /** List the columns defined on a drive's underlying SharePoint list. */
+  async getDriveColumns(driveId: string): Promise<ListColumn[]> {
+    const resp = await this.get<{ value: ListColumn[] }>(`/drives/${driveId}/list/columns`);
+    return resp.value;
+  }
+
+  /** Read the SharePoint metadata (list item fields) for a drive item. */
+  async getItemFields(driveId: string, itemId: string): Promise<Record<string, any>> {
+    return this.get<Record<string, any>>(`/drives/${driveId}/items/${itemId}/listItem/fields`);
+  }
+
+  /** Update the SharePoint metadata (list item fields) for a drive item. */
+  async updateItemFields(
+    driveId: string, itemId: string, fields: Record<string, any>
+  ): Promise<Record<string, any>> {
+    const token   = await this.msAuth.getGraphToken();
+    const headers = new HttpHeaders({
+      Authorization : `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    });
+    try {
+      return await firstValueFrom(
+        this.http.patch<Record<string, any>>(
+          `${GRAPH}/drives/${driveId}/items/${itemId}/listItem/fields`, fields, { headers }
+        )
+      );
+    } catch (err: any) {
+      const body     = err?.error;
+      const graphMsg = body?.error?.message ?? body?.message ?? null;
+      const status   = err?.status ?? '';
+      throw new Error(
+        graphMsg
+          ? `Graph API error ${status}: ${graphMsg}`
+          : `Failed to update metadata (HTTP ${status}). Check that the app has Sites.ReadWrite.All permission.`
+      );
+    }
+  }
+
+  /** Rename a drive item (changes the file name and its SharePoint URL). */
+  async renameItem(driveId: string, itemId: string, newName: string): Promise<DriveItem> {
+    const token   = await this.msAuth.getGraphToken();
+    const headers = new HttpHeaders({
+      Authorization : `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    });
+    return firstValueFrom(
+      this.http.patch<DriveItem>(`${GRAPH}/drives/${driveId}/items/${itemId}`, { name: newName }, { headers })
     );
   }
 }

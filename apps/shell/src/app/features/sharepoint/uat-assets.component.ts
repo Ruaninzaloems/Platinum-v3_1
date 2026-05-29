@@ -240,6 +240,10 @@ interface BreadcrumbItem { id: string; name: string; }
                         <mat-icon>open_in_new</mat-icon>
                         <span>Open in SharePoint</span>
                       </button>
+                      <button mat-menu-item (click)="openEdit(item)">
+                        <mat-icon>edit</mat-icon>
+                        <span>Edit metadata</span>
+                      </button>
                       <button mat-menu-item (click)="download(item)">
                         <mat-icon>download</mat-icon>
                         <span>Download</span>
@@ -286,6 +290,107 @@ interface BreadcrumbItem { id: string; name: string; }
             </div>
           </div>
         }
+      }
+
+      <!-- ── Edit metadata dialog ────────────────────────────────────────── -->
+      @if (editOpen()) {
+        <div class="modal-backdrop" (click)="closeEdit()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-head">
+              <h2>Edit document</h2>
+              <button mat-icon-button (click)="closeEdit()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="modal-body">
+              <div class="field">
+                <label>Name</label>
+                <input type="text" [ngModel]="editName()" (ngModelChange)="editName.set($event)">
+                <small class="hint">Renaming changes the file's URL in SharePoint.</small>
+              </div>
+              <div class="field">
+                <label>emsID</label>
+                <input type="text" placeholder="emsID"
+                       [ngModel]="editEmsId()" (ngModelChange)="editEmsId.set($event)">
+                <small class="hint">SharePoint column: <code>emsID</code></small>
+              </div>
+              <div class="field">
+                <label>Description</label>
+                <textarea rows="3" placeholder="Description"
+                          [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)"></textarea>
+                <small class="hint">SharePoint column: <code>description</code></small>
+              </div>
+              <div class="field">
+                <label>DocVersion</label>
+                <select [ngModel]="editDocVersion()" (ngModelChange)="editDocVersion.set($event)">
+                  <option value="">— None —</option>
+                  @for (c of docVersionChoices(); track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
+                </select>
+                <small class="hint">SharePoint column: <code>DocVersion</code></small>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button mat-stroked-button (click)="closeEdit()" [disabled]="editSaving()">Cancel</button>
+              <button mat-raised-button color="primary" (click)="saveEdit()" [disabled]="editSaving() || !editName().trim()">
+                {{ editSaving() ? 'Saving…' : 'Save changes' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ── Add document details (upload) dialog ────────────────────────── -->
+      @if (uploadDialogOpen()) {
+        <div class="modal-backdrop" (click)="cancelUploadDialog()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-head">
+              <h2>Add document details</h2>
+              <button mat-icon-button (click)="cancelUploadDialog()"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="modal-body">
+              <div class="field">
+                <label>Files to upload ({{ pendingFiles().length }})</label>
+                <div class="file-chips">
+                  @for (f of pendingFiles(); track f.name) {
+                    <div class="file-chip">
+                      <mat-icon>{{ getFileIcon(f.name) }}</mat-icon>
+                      <span class="fc-name" [matTooltip]="f.name">{{ f.name }}</span>
+                      <span class="fc-size">{{ formatSize(f.size) }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="field">
+                <label>emsID</label>
+                <input type="text" placeholder="emsID"
+                       [ngModel]="uploadEmsId()" (ngModelChange)="uploadEmsId.set($event)">
+                <small class="hint">SharePoint column: <code>emsID</code></small>
+              </div>
+              <div class="field">
+                <label>Description</label>
+                <textarea rows="3" placeholder="Description"
+                          [ngModel]="uploadDescription()" (ngModelChange)="uploadDescription.set($event)"></textarea>
+                <small class="hint">SharePoint column: <code>description</code></small>
+              </div>
+              <div class="field">
+                <label>DocVersion</label>
+                <select [ngModel]="uploadDocVersion()" (ngModelChange)="uploadDocVersion.set($event)">
+                  <option value="">— None —</option>
+                  @for (c of docVersionChoices(); track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
+                </select>
+                <small class="hint">SharePoint column: <code>DocVersion</code></small>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button mat-stroked-button (click)="cancelUploadDialog()" [disabled]="uploading()">Cancel</button>
+              <button mat-raised-button color="primary" (click)="confirmUpload()" [disabled]="uploading()">
+                {{ uploading() ? 'Uploading…' : 'Upload' }}
+              </button>
+            </div>
+          </div>
+        </div>
       }
     </div>
   `,
@@ -466,6 +571,53 @@ interface BreadcrumbItem { id: string; name: string; }
     /* ── Row actions menu ────────────────────────────────────────────────── */
     .menu-danger { color: #dc2626; }
     .menu-danger mat-icon { color: #dc2626; }
+
+    /* ── Modal dialog ────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(15, 23, 42, .45);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal {
+      width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+      display: flex; flex-direction: column;
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.1rem 1.5rem .5rem;
+    }
+    .modal-head h2 { margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a; }
+    .modal-body { padding: .5rem 1.5rem 1rem; display: flex; flex-direction: column; gap: 1.1rem; }
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+    .field label { font-size: .85rem; font-weight: 700; color: #0f172a; }
+    .field input, .field textarea, .field select {
+      width: 100%; box-sizing: border-box;
+      padding: .55rem .7rem; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: .9rem; color: #0f172a; background: #fff; outline: none;
+      font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: #3f51b5; }
+    .field textarea { resize: vertical; min-height: 70px; }
+    .field .hint { font-size: .75rem; color: #94a3b8; }
+    .field .hint code {
+      background: #f1f5f9; color: #475569; padding: .05rem .35rem;
+      border-radius: 4px; font-size: .72rem;
+    }
+    .file-chips { display: flex; flex-direction: column; gap: .4rem; }
+    .file-chip {
+      display: flex; align-items: center; gap: .6rem;
+      padding: .55rem .7rem; background: #f8fafc;
+      border: 1px solid #e2e8f0; border-radius: 8px; font-size: .85rem;
+    }
+    .file-chip mat-icon { color: #3f51b5; font-size: 20px; width: 20px; height: 20px; }
+    .fc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; }
+    .fc-size { color: #64748b; font-size: .78rem; }
+    .modal-foot {
+      display: flex; align-items: center; justify-content: flex-end; gap: .6rem;
+      padding: .75rem 1.5rem 1.25rem;
+    }
   `]
 })
 export class UatAssetsComponent implements OnInit {
@@ -495,6 +647,23 @@ export class UatAssetsComponent implements OnInit {
   pageSizeOptions = [10, 25, 50, 100];
   pageSize    = signal(10);
   currentPage = signal(1);
+
+  // ── Metadata / dialogs ────────────────────────────────────────────────────
+  docVersionChoices = signal<string[]>([]);
+
+  editOpen        = signal(false);
+  editSaving      = signal(false);
+  editItem        = signal<DriveItem | null>(null);
+  editName        = signal('');
+  editEmsId       = signal('');
+  editDescription = signal('');
+  editDocVersion  = signal('');
+
+  uploadDialogOpen  = signal(false);
+  pendingFiles      = signal<File[]>([]);
+  uploadEmsId       = signal('');
+  uploadDescription = signal('');
+  uploadDocVersion  = signal('');
 
   uploadQueue = signal<{ name: string; done: boolean; error: string }[]>([]);
 
@@ -579,6 +748,7 @@ export class UatAssetsComponent implements OnInit {
 
       console.log('[UatAssets] Using drive:', drive.name, drive.id);
       this.driveId.set(drive.id);
+      this.loadColumnChoices(drive.id);
       await this.loadFolder('root');
     } catch (e: any) {
       const msg = e?.message ?? String(e);
@@ -645,17 +815,48 @@ export class UatAssetsComponent implements OnInit {
     e.stopPropagation();
     this.dragOver.set(false);
     const files = Array.from(e.dataTransfer?.files ?? []);
-    if (files.length) await this.uploadFiles(files);
+    if (files.length) this.openUploadDialog(files);
   }
 
   async onFilesSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
-    if (files.length) await this.uploadFiles(files);
+    if (files.length) this.openUploadDialog(files);
   }
 
-  private async uploadFiles(files: File[]): Promise<void> {
+  /** Open the "Add document details" dialog so the user can enter metadata before upload. */
+  openUploadDialog(files: File[]): void {
+    if (!this.driveId()) {
+      this.snack.open('Library not ready — please wait for it to finish loading.', 'Close', { duration: 4000 });
+      return;
+    }
+    this.pendingFiles.set(files);
+    this.uploadEmsId.set('');
+    this.uploadDescription.set('');
+    this.uploadDocVersion.set('');
+    this.uploadDialogOpen.set(true);
+  }
+
+  cancelUploadDialog(): void {
+    if (this.uploading()) return;
+    this.uploadDialogOpen.set(false);
+    this.pendingFiles.set([]);
+  }
+
+  async confirmUpload(): Promise<void> {
+    const files = this.pendingFiles();
+    if (!files.length) { this.uploadDialogOpen.set(false); return; }
+    await this.uploadFiles(files, this.buildFields(
+      this.uploadEmsId(), this.uploadDescription(), this.uploadDocVersion()
+    ));
+    if (!this.uploading()) {
+      this.uploadDialogOpen.set(false);
+      this.pendingFiles.set([]);
+    }
+  }
+
+  private async uploadFiles(files: File[], fields: Record<string, any>): Promise<void> {
     if (!this.driveId()) {
       this.snack.open('Library not ready — please wait for it to finish loading.', 'Close', { duration: 4000 });
       return;
@@ -663,6 +864,7 @@ export class UatAssetsComponent implements OnInit {
 
     const bc       = this.breadcrumbs();
     const folderId = bc.length ? bc[bc.length - 1].id : 'root';
+    const hasMeta  = Object.keys(fields).length > 0;
 
     console.log('[UatAssets] uploadFiles — driveId:', this.driveId(), 'folderId:', folderId);
 
@@ -672,7 +874,14 @@ export class UatAssetsComponent implements OnInit {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        await this.graph.uploadFile(this.driveId(), folderId, file);
+        const uploaded = await this.graph.uploadFile(this.driveId(), folderId, file);
+        if (hasMeta) {
+          try {
+            await this.graph.updateItemFields(this.driveId(), uploaded.id, fields);
+          } catch (metaErr: any) {
+            this.snack.open(`Uploaded "${file.name}" but metadata failed: ${metaErr?.message ?? metaErr}`, 'Close', { duration: 5000 });
+          }
+        }
         this.uploadQueue.update(q => q.map((item, idx) =>
           idx === i ? { ...item, done: true } : item
         ));
@@ -726,6 +935,81 @@ export class UatAssetsComponent implements OnInit {
       this.snack.open(`"${item.name}" deleted.`, 'Close', { duration: 3000 });
     } catch (e: any) {
       this.snack.open('Delete failed: ' + (e?.message ?? e), 'Close', { duration: 4000 });
+    }
+  }
+
+  // ── Metadata ──────────────────────────────────────────────────────────────
+
+  /** Load DocVersion choice options from the library's column definitions (best-effort). */
+  private async loadColumnChoices(driveId: string): Promise<void> {
+    try {
+      const cols = await this.graph.getDriveColumns(driveId);
+      const docVersion = cols.find(c =>
+        c.name?.toLowerCase() === 'docversion' || c.displayName?.toLowerCase() === 'docversion');
+      this.docVersionChoices.set(docVersion?.choice?.choices ?? []);
+    } catch (e: any) {
+      console.warn('[UatAssets] Could not load column choices:', e?.message ?? e);
+      this.docVersionChoices.set([]);
+    }
+  }
+
+  /** Build a metadata payload, omitting empty values. */
+  private buildFields(emsID: string, description: string, docVersion: string): Record<string, any> {
+    const fields: Record<string, any> = {};
+    if (emsID.trim())       fields['emsID']       = emsID.trim();
+    if (description.trim()) fields['description'] = description.trim();
+    if (docVersion)         fields['DocVersion']  = docVersion;
+    return fields;
+  }
+
+  async openEdit(item: DriveItem): Promise<void> {
+    this.editItem.set(item);
+    this.editName.set(item.name);
+    this.editEmsId.set('');
+    this.editDescription.set('');
+    this.editDocVersion.set('');
+    this.editOpen.set(true);
+    try {
+      const fields = await this.graph.getItemFields(this.driveId(), item.id);
+      this.editEmsId.set(fields?.['emsID'] ?? '');
+      this.editDescription.set(fields?.['description'] ?? '');
+      this.editDocVersion.set(fields?.['DocVersion'] ?? '');
+    } catch (e: any) {
+      this.snack.open('Could not load metadata: ' + (e?.message ?? e), 'Close', { duration: 5000 });
+    }
+  }
+
+  closeEdit(): void {
+    if (this.editSaving()) return;
+    this.editOpen.set(false);
+    this.editItem.set(null);
+  }
+
+  async saveEdit(): Promise<void> {
+    const item = this.editItem();
+    if (!item) return;
+    const newName = this.editName().trim();
+    if (!newName) return;
+
+    this.editSaving.set(true);
+    try {
+      if (newName !== item.name) {
+        await this.graph.renameItem(this.driveId(), item.id, newName);
+      }
+      // Always send the three managed columns so cleared values persist.
+      await this.graph.updateItemFields(this.driveId(), item.id, {
+        emsID       : this.editEmsId().trim(),
+        description : this.editDescription().trim(),
+        DocVersion  : this.editDocVersion() || null,
+      });
+      this.snack.open('Document updated.', 'Close', { duration: 3000 });
+      this.editOpen.set(false);
+      this.editItem.set(null);
+      await this.reload();
+    } catch (e: any) {
+      this.snack.open('Save failed: ' + (e?.message ?? e), 'Close', { duration: 5000 });
+    } finally {
+      this.editSaving.set(false);
     }
   }
 
