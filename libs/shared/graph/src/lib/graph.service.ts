@@ -35,6 +35,7 @@ export interface DriveItem {
   file            ?: { mimeType: string };
   folder          ?: { childCount: number };
   parentReference ?: { driveId: string; id: string };
+  listItem        ?: { id?: string; fields?: Record<string, any> };
   '@microsoft.graph.downloadUrl'?: string;
 }
 
@@ -51,7 +52,15 @@ export interface ListColumn {
   readOnly   ?: boolean;
   hidden     ?: boolean;
   choice     ?: { choices: string[] };
-  text       ?: unknown;
+  text       ?: { allowMultipleLines?: boolean };
+  note       ?: unknown;
+  boolean    ?: unknown;
+  number     ?: unknown;
+  currency   ?: unknown;
+  dateTime   ?: unknown;
+  personOrGroup ?: unknown;
+  lookup     ?: unknown;
+  calculated ?: unknown;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -122,11 +131,12 @@ export class GraphService {
 
   // ── Files & Folders ────────────────────────────────────────────────────────
 
-  /** List files/folders in a drive root or specific folder. */
+  /** List files/folders in a drive root or specific folder, with SharePoint metadata expanded. */
   async getChildren(driveId: string, folderId: string = 'root'): Promise<DriveItem[]> {
-    const path = folderId === 'root'
+    const base = folderId === 'root'
       ? `/drives/${driveId}/root/children`
       : `/drives/${driveId}/items/${folderId}/children`;
+    const path = `${base}?$expand=listItem($expand=fields)`;
     const resp = await this.get<{ value: DriveItem[] }>(path);
     return resp.value;
   }

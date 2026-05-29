@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { GraphService, DriveItem, Drive, SharePointSite } from '@platinumv3/shared/graph';
+import { GraphService, DriveItem, Drive, SharePointSite, ListColumn } from '@platinumv3/shared/graph';
 import { MsAuthService } from '@platinumv3/shared/auth';
 import { FormsModule } from '@angular/forms';
 
@@ -19,6 +19,15 @@ const SITE_PATH  = '/sites/Sebata2';
 const LIBRARY    = 'UatAssets';
 
 interface BreadcrumbItem { id: string; name: string; }
+
+type ColumnType = 'text' | 'note' | 'choice' | 'boolean' | 'number' | 'dateTime';
+
+interface EditableColumn {
+  name        : string;   // SharePoint internal name (used for read/write)
+  displayName : string;   // human-friendly label
+  type        : ColumnType;
+  choices    ?: string[];
+}
 
 @Component({
   selector: 'app-uat-assets',
@@ -191,17 +200,21 @@ interface BreadcrumbItem { id: string; name: string; }
         } @else {
           <div class="list-container">
             <!-- Header row -->
-            <div class="list-row header-row">
+            <div class="list-row header-row" [style.grid-template-columns]="gridCols()">
               <div class="col-icon"></div>
               <div class="col-name">Name</div>
               <div class="col-size">Size</div>
               <div class="col-modified">Modified</div>
+              @for (col of metaColumns(); track col.name) {
+                <div class="col-meta">{{ col.displayName }}</div>
+              }
               <div class="col-actions"></div>
             </div>
 
             <!-- Data rows -->
             @for (item of pagedItems(); track item.id) {
               <div class="list-row" [class.folder-row]="item.folder"
+                   [style.grid-template-columns]="gridCols()"
                    (dblclick)="openItem(item)">
                 <div class="col-icon">
                   <mat-icon [class.folder-color]="item.folder"
@@ -223,6 +236,11 @@ interface BreadcrumbItem { id: string; name: string; }
                 <div class="col-modified">
                   {{ item.lastModifiedDateTime | date:'dd MMM yyyy HH:mm' }}
                 </div>
+                @for (col of metaColumns(); track col.name) {
+                  <div class="col-meta" [matTooltip]="fieldDisplay(item, col)">
+                    {{ fieldDisplay(item, col) || '—' }}
+                  </div>
+                }
                 <div class="col-actions">
                   <button mat-icon-button class="kebab-btn" matTooltip="Actions"
                           [matMenuTriggerFor]="rowMenu"
@@ -306,28 +324,45 @@ interface BreadcrumbItem { id: string; name: string; }
                 <input type="text" [ngModel]="editName()" (ngModelChange)="editName.set($event)">
                 <small class="hint">Renaming changes the file's URL in SharePoint.</small>
               </div>
-              <div class="field">
-                <label>emsID</label>
-                <input type="text" placeholder="emsID"
-                       [ngModel]="editEmsId()" (ngModelChange)="editEmsId.set($event)">
-                <small class="hint">SharePoint column: <code>emsID</code></small>
-              </div>
-              <div class="field">
-                <label>Description</label>
-                <textarea rows="3" placeholder="Description"
-                          [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)"></textarea>
-                <small class="hint">SharePoint column: <code>description</code></small>
-              </div>
-              <div class="field">
-                <label>DocVersion</label>
-                <select [ngModel]="editDocVersion()" (ngModelChange)="editDocVersion.set($event)">
-                  <option value="">— None —</option>
-                  @for (c of docVersionChoices(); track c) {
-                    <option [value]="c">{{ c }}</option>
+              @if (metaLoading()) {
+                <div class="meta-loading"><mat-spinner diameter="20"></mat-spinner> Loading metadata…</div>
+              }
+              @for (col of metaColumns(); track col.name) {
+                <div class="field">
+                  <label>{{ col.displayName }}</label>
+                  @switch (col.type) {
+                    @case ('choice') {
+                      <select [ngModel]="editValues()[col.name]" (ngModelChange)="setEditValue(col.name, $event)">
+                        <option value="">— None —</option>
+                        @for (c of col.choices; track c) { <option [value]="c">{{ c }}</option> }
+                      </select>
+                    }
+                    @case ('note') {
+                      <textarea rows="3" [ngModel]="editValues()[col.name]"
+                                (ngModelChange)="setEditValue(col.name, $event)"></textarea>
+                    }
+                    @case ('boolean') {
+                      <label class="check">
+                        <input type="checkbox" [ngModel]="!!editValues()[col.name]"
+                               (ngModelChange)="setEditValue(col.name, $event)"> Yes
+                      </label>
+                    }
+                    @case ('number') {
+                      <input type="number" [ngModel]="editValues()[col.name]"
+                             (ngModelChange)="setEditValue(col.name, $event)">
+                    }
+                    @case ('dateTime') {
+                      <input type="date" [ngModel]="editValues()[col.name]"
+                             (ngModelChange)="setEditValue(col.name, $event)">
+                    }
+                    @default {
+                      <input type="text" [ngModel]="editValues()[col.name]"
+                             (ngModelChange)="setEditValue(col.name, $event)">
+                    }
                   }
-                </select>
-                <small class="hint">SharePoint column: <code>DocVersion</code></small>
-              </div>
+                  <small class="hint">SharePoint column: <code>{{ col.name }}</code></small>
+                </div>
+              }
             </div>
             <div class="modal-foot">
               <button mat-stroked-button (click)="closeEdit()" [disabled]="editSaving()">Cancel</button>
@@ -360,28 +395,42 @@ interface BreadcrumbItem { id: string; name: string; }
                   }
                 </div>
               </div>
-              <div class="field">
-                <label>emsID</label>
-                <input type="text" placeholder="emsID"
-                       [ngModel]="uploadEmsId()" (ngModelChange)="uploadEmsId.set($event)">
-                <small class="hint">SharePoint column: <code>emsID</code></small>
-              </div>
-              <div class="field">
-                <label>Description</label>
-                <textarea rows="3" placeholder="Description"
-                          [ngModel]="uploadDescription()" (ngModelChange)="uploadDescription.set($event)"></textarea>
-                <small class="hint">SharePoint column: <code>description</code></small>
-              </div>
-              <div class="field">
-                <label>DocVersion</label>
-                <select [ngModel]="uploadDocVersion()" (ngModelChange)="uploadDocVersion.set($event)">
-                  <option value="">— None —</option>
-                  @for (c of docVersionChoices(); track c) {
-                    <option [value]="c">{{ c }}</option>
+              @for (col of metaColumns(); track col.name) {
+                <div class="field">
+                  <label>{{ col.displayName }}</label>
+                  @switch (col.type) {
+                    @case ('choice') {
+                      <select [ngModel]="uploadValues()[col.name]" (ngModelChange)="setUploadValue(col.name, $event)">
+                        <option value="">— None —</option>
+                        @for (c of col.choices; track c) { <option [value]="c">{{ c }}</option> }
+                      </select>
+                    }
+                    @case ('note') {
+                      <textarea rows="3" [ngModel]="uploadValues()[col.name]"
+                                (ngModelChange)="setUploadValue(col.name, $event)"></textarea>
+                    }
+                    @case ('boolean') {
+                      <label class="check">
+                        <input type="checkbox" [ngModel]="!!uploadValues()[col.name]"
+                               (ngModelChange)="setUploadValue(col.name, $event)"> Yes
+                      </label>
+                    }
+                    @case ('number') {
+                      <input type="number" [ngModel]="uploadValues()[col.name]"
+                             (ngModelChange)="setUploadValue(col.name, $event)">
+                    }
+                    @case ('dateTime') {
+                      <input type="date" [ngModel]="uploadValues()[col.name]"
+                             (ngModelChange)="setUploadValue(col.name, $event)">
+                    }
+                    @default {
+                      <input type="text" [ngModel]="uploadValues()[col.name]"
+                             (ngModelChange)="setUploadValue(col.name, $event)">
+                    }
                   }
-                </select>
-                <small class="hint">SharePoint column: <code>DocVersion</code></small>
-              </div>
+                  <small class="hint">SharePoint column: <code>{{ col.name }}</code></small>
+                </div>
+              }
             </div>
             <div class="modal-foot">
               <button mat-stroked-button (click)="cancelUploadDialog()" [disabled]="uploading()">Cancel</button>
@@ -529,6 +578,11 @@ interface BreadcrumbItem { id: string; name: string; }
     .col-name { display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: .4rem 0; }
     .col-size { font-size: .82rem; color: #64748b; }
     .col-modified { font-size: .82rem; color: #64748b; }
+    .col-meta {
+      font-size: .82rem; color: #475569;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: .5rem;
+    }
+    .header-row .col-meta { color: #64748b; }
     .col-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0; }
 
     .item-name {
@@ -605,6 +659,15 @@ interface BreadcrumbItem { id: string; name: string; }
       background: #f1f5f9; color: #475569; padding: .05rem .35rem;
       border-radius: 4px; font-size: .72rem;
     }
+    .field .check {
+      flex-direction: row; align-items: center; gap: .5rem;
+      font-weight: 500; font-size: .9rem; color: #0f172a;
+    }
+    .field .check input { width: auto; }
+    .meta-loading {
+      display: flex; align-items: center; gap: .6rem;
+      font-size: .85rem; color: #64748b;
+    }
     .file-chips { display: flex; flex-direction: column; gap: .4rem; }
     .file-chip {
       display: flex; align-items: center; gap: .6rem;
@@ -649,23 +712,27 @@ export class UatAssetsComponent implements OnInit {
   currentPage = signal(1);
 
   // ── Metadata / dialogs ────────────────────────────────────────────────────
-  docVersionChoices = signal<string[]>([]);
+  /** Editable SharePoint columns discovered from the library (data-driven). */
+  metaColumns = signal<EditableColumn[]>([]);
 
-  editOpen        = signal(false);
-  editSaving      = signal(false);
-  editItem        = signal<DriveItem | null>(null);
-  editName        = signal('');
-  editEmsId       = signal('');
-  editDescription = signal('');
-  editDocVersion  = signal('');
+  editOpen    = signal(false);
+  editSaving  = signal(false);
+  metaLoading = signal(false);
+  editItem    = signal<DriveItem | null>(null);
+  editName    = signal('');
+  editValues  = signal<Record<string, any>>({});
 
-  uploadDialogOpen  = signal(false);
-  pendingFiles      = signal<File[]>([]);
-  uploadEmsId       = signal('');
-  uploadDescription = signal('');
-  uploadDocVersion  = signal('');
+  uploadDialogOpen = signal(false);
+  pendingFiles     = signal<File[]>([]);
+  uploadValues     = signal<Record<string, any>>({});
 
   uploadQueue = signal<{ name: string; done: boolean; error: string }[]>([]);
+
+  /** CSS grid template for list rows — widens with each metadata column. */
+  gridCols = computed(() => {
+    const meta = this.metaColumns().map(() => 'minmax(110px,1fr)').join(' ');
+    return `40px 1fr 90px 160px ${meta} 130px`.replace(/\s+/g, ' ').trim();
+  });
 
   sortedItems = computed(() => [
     ...this.items().filter(i =>  i.folder),
@@ -748,7 +815,7 @@ export class UatAssetsComponent implements OnInit {
 
       console.log('[UatAssets] Using drive:', drive.name, drive.id);
       this.driveId.set(drive.id);
-      this.loadColumnChoices(drive.id);
+      await this.loadMetaColumns(drive.id);
       await this.loadFolder('root');
     } catch (e: any) {
       const msg = e?.message ?? String(e);
@@ -832,9 +899,9 @@ export class UatAssetsComponent implements OnInit {
       return;
     }
     this.pendingFiles.set(files);
-    this.uploadEmsId.set('');
-    this.uploadDescription.set('');
-    this.uploadDocVersion.set('');
+    const seed: Record<string, any> = {};
+    for (const c of this.metaColumns()) seed[c.name] = c.type === 'boolean' ? false : '';
+    this.uploadValues.set(seed);
     this.uploadDialogOpen.set(true);
   }
 
@@ -844,12 +911,14 @@ export class UatAssetsComponent implements OnInit {
     this.pendingFiles.set([]);
   }
 
+  setUploadValue(name: string, val: any): void {
+    this.uploadValues.update(v => ({ ...v, [name]: val }));
+  }
+
   async confirmUpload(): Promise<void> {
     const files = this.pendingFiles();
     if (!files.length) { this.uploadDialogOpen.set(false); return; }
-    await this.uploadFiles(files, this.buildFields(
-      this.uploadEmsId(), this.uploadDescription(), this.uploadDocVersion()
-    ));
+    await this.uploadFiles(files, this.buildPayload(this.uploadValues(), true));
     if (!this.uploading()) {
       this.uploadDialogOpen.set(false);
       this.pendingFiles.set([]);
@@ -940,42 +1009,115 @@ export class UatAssetsComponent implements OnInit {
 
   // ── Metadata ──────────────────────────────────────────────────────────────
 
-  /** Load DocVersion choice options from the library's column definitions (best-effort). */
-  private async loadColumnChoices(driveId: string): Promise<void> {
+  /** Discover the library's user-editable columns (data-driven; best-effort). */
+  private async loadMetaColumns(driveId: string): Promise<void> {
     try {
       const cols = await this.graph.getDriveColumns(driveId);
-      const docVersion = cols.find(c =>
-        c.name?.toLowerCase() === 'docversion' || c.displayName?.toLowerCase() === 'docversion');
-      this.docVersionChoices.set(docVersion?.choice?.choices ?? []);
+      const editable = cols
+        .map(c => this.toEditableColumn(c))
+        .filter((c): c is EditableColumn => c !== null);
+      this.metaColumns.set(editable);
     } catch (e: any) {
-      console.warn('[UatAssets] Could not load column choices:', e?.message ?? e);
-      this.docVersionChoices.set([]);
+      console.warn('[UatAssets] Could not load library columns:', e?.message ?? e);
+      this.metaColumns.set([]);
     }
   }
 
-  /** Build a metadata payload, omitting empty values. */
-  private buildFields(emsID: string, description: string, docVersion: string): Record<string, any> {
-    const fields: Record<string, any> = {};
-    if (emsID.trim())       fields['emsID']       = emsID.trim();
-    if (description.trim()) fields['description'] = description.trim();
-    if (docVersion)         fields['DocVersion']  = docVersion;
-    return fields;
+  /** Map a raw Graph column to an editable column, or null if it should be hidden. */
+  private toEditableColumn(c: ListColumn): EditableColumn | null {
+    if (c.readOnly || c.hidden || c.calculated) return null;
+    if (!c.name || c.name.startsWith('_')) return null;
+    // System/auto columns we never want users editing in this view.
+    const DENY = new Set(['Title', 'ContentType', 'FileLeafRef']);
+    if (DENY.has(c.name)) return null;
+
+    if (c.choice)             return { name: c.name, displayName: c.displayName || c.name, type: 'choice', choices: c.choice.choices ?? [] };
+    if (c.boolean)            return { name: c.name, displayName: c.displayName || c.name, type: 'boolean' };
+    if (c.number || c.currency) return { name: c.name, displayName: c.displayName || c.name, type: 'number' };
+    if (c.dateTime)           return { name: c.name, displayName: c.displayName || c.name, type: 'dateTime' };
+    if (c.note)               return { name: c.name, displayName: c.displayName || c.name, type: 'note' };
+    if (c.text)               return { name: c.name, displayName: c.displayName || c.name, type: c.text.allowMultipleLines ? 'note' : 'text' };
+    return null; // skip person, lookup, and other complex types
+  }
+
+  /** Format a metadata field value for display in the list view. */
+  fieldDisplay(item: DriveItem, col: EditableColumn): string {
+    const v = item.listItem?.fields?.[col.name];
+    if (v === null || v === undefined || v === '') return '';
+    if (col.type === 'boolean') return v ? 'Yes' : 'No';
+    if (col.type === 'dateTime') {
+      const d = new Date(v);
+      return isNaN(+d) ? String(v) : d.toLocaleDateString();
+    }
+    return String(v);
+  }
+
+  /** Seed a form value from a raw field value, formatting for the input type. */
+  private seedValue(col: EditableColumn, raw: any): any {
+    if (raw === null || raw === undefined) return col.type === 'boolean' ? false : '';
+    if (col.type === 'boolean') return !!raw;
+    if (col.type === 'dateTime') {
+      const d = new Date(raw);
+      return isNaN(+d) ? '' : d.toISOString().slice(0, 10);
+    }
+    return raw;
+  }
+
+  /**
+   * Build a metadata payload from form values using internal column names.
+   * When omitEmpty is true (upload) blank values are skipped; otherwise (edit)
+   * all columns are sent so cleared values persist.
+   */
+  private buildPayload(values: Record<string, any>, omitEmpty = false): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const c of this.metaColumns()) {
+      const raw = values[c.name];
+      const isBlank = raw === '' || raw === null || raw === undefined;
+      // Booleans are always sent (the checkbox state is explicit); other types
+      // are skipped when blank in upload mode so we don't write empty values.
+      if (omitEmpty && isBlank && c.type !== 'boolean') continue;
+
+      switch (c.type) {
+        case 'boolean':  out[c.name] = !!raw; break;
+        case 'number':   out[c.name] = isBlank ? null : Number(raw); break;
+        case 'dateTime': {
+          const ms = isBlank ? NaN : Date.parse(raw);
+          out[c.name] = isNaN(ms) ? null : new Date(ms).toISOString();
+          break;
+        }
+        case 'choice':   out[c.name] = raw || null; break;
+        default:         out[c.name] = isBlank ? '' : String(raw).trim();
+      }
+    }
+    return out;
+  }
+
+  setEditValue(name: string, val: any): void {
+    this.editValues.update(v => ({ ...v, [name]: val }));
   }
 
   async openEdit(item: DriveItem): Promise<void> {
     this.editItem.set(item);
     this.editName.set(item.name);
-    this.editEmsId.set('');
-    this.editDescription.set('');
-    this.editDocVersion.set('');
+
+    // Seed from the already-expanded fields so the dialog shows values instantly.
+    const seedFrom = (fields: Record<string, any> | undefined) => {
+      const next: Record<string, any> = {};
+      for (const c of this.metaColumns()) next[c.name] = this.seedValue(c, fields?.[c.name]);
+      this.editValues.set(next);
+    };
+    seedFrom(item.listItem?.fields);
     this.editOpen.set(true);
+
+    // Refresh from the server to be certain values are current.
+    this.metaLoading.set(true);
     try {
       const fields = await this.graph.getItemFields(this.driveId(), item.id);
-      this.editEmsId.set(fields?.['emsID'] ?? '');
-      this.editDescription.set(fields?.['description'] ?? '');
-      this.editDocVersion.set(fields?.['DocVersion'] ?? '');
+      seedFrom(fields);
     } catch (e: any) {
       this.snack.open('Could not load metadata: ' + (e?.message ?? e), 'Close', { duration: 5000 });
+    } finally {
+      this.metaLoading.set(false);
     }
   }
 
@@ -996,12 +1138,10 @@ export class UatAssetsComponent implements OnInit {
       if (newName !== item.name) {
         await this.graph.renameItem(this.driveId(), item.id, newName);
       }
-      // Always send the three managed columns so cleared values persist.
-      await this.graph.updateItemFields(this.driveId(), item.id, {
-        emsID       : this.editEmsId().trim(),
-        description : this.editDescription().trim(),
-        DocVersion  : this.editDocVersion() || null,
-      });
+      const payload = this.buildPayload(this.editValues(), false);
+      if (Object.keys(payload).length) {
+        await this.graph.updateItemFields(this.driveId(), item.id, payload);
+      }
       this.snack.open('Document updated.', 'Close', { duration: 3000 });
       this.editOpen.set(false);
       this.editItem.set(null);
