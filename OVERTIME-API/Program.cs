@@ -2,6 +2,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PlatinumOvertime_API.Configuration;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Mappings;
@@ -117,7 +118,8 @@ if (integrationOptions.UseMock || string.IsNullOrWhiteSpace(integrationOptions.B
         {
             inner = new DbEmployeesPlatinumIntegrationService(
                 inner,
-                sp.GetRequiredService<IServiceScopeFactory>());
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IMemoryCache>());
         }
         return inner;
     });
@@ -132,9 +134,9 @@ else
 }
 
 // ---------- Dev seeders for legacy Payroll_* tables ----------
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<PositionDataSeeder>();
 builder.Services.AddScoped<EmployeeDataSeeder>();
-builder.Services.AddScoped<OrgChartSeeder>();
 builder.Services.AddScoped<SalaryHeadDataSeeder>();
 builder.Services.AddScoped<AAAAConfigSettingsSeeder>();
 builder.Services.AddScoped<ConstCycleSeeder>();
@@ -254,7 +256,6 @@ using (var scope = app.Services.CreateScope())
     {
         await RunSeeder("PositionData", () => scope.ServiceProvider.GetRequiredService<PositionDataSeeder>().SeedIfNeededAsync());
         await RunSeeder("EmployeeData", () => scope.ServiceProvider.GetRequiredService<EmployeeDataSeeder>().SeedIfNeededAsync());
-        await RunSeeder("OrgChart", () => scope.ServiceProvider.GetRequiredService<OrgChartSeeder>().SeedIfNeededAsync());
         await RunSeeder("SalaryHead", () => scope.ServiceProvider.GetRequiredService<SalaryHeadDataSeeder>().SeedIfNeededAsync());
         await RunSeeder("AAAAConfigSettings", () => scope.ServiceProvider.GetRequiredService<AAAAConfigSettingsSeeder>().SeedIfNeededAsync());
         await RunSeeder("ConstCycle", () => scope.ServiceProvider.GetRequiredService<ConstCycleSeeder>().SeedIfNeededAsync());
