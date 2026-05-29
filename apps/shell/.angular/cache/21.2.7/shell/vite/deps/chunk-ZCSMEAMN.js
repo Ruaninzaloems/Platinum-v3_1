@@ -24,12 +24,12 @@ import {
   _CdkPrivateStyleLoader
 } from "./chunk-RH6YDMAF.js";
 import {
-  Platform
-} from "./chunk-L7GSUTUC.js";
-import {
   coerceElement,
   coerceNumberProperty
 } from "./chunk-57WP2MZF.js";
+import {
+  Platform
+} from "./chunk-L7GSUTUC.js";
 import {
   APP_ID,
   Directive,
@@ -2420,4 +2420,4 @@ export {
   removeAriaReferencedId,
   AriaDescriber
 };
-//# sourceMappingURL=chunk-ZTV2KSGO.js.map
+//# sourceMappingURL=chunk-ZCSMEAMN.js.map

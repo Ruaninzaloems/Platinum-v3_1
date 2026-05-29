@@ -8,7 +8,7 @@ import {
 } from "./chunk-YR3Z6H6T.js";
 import {
   ObserversModule
-} from "./chunk-ZTV2KSGO.js";
+} from "./chunk-ZCSMEAMN.js";
 import {
   BidiModule
 } from "./chunk-JPXPF4SI.js";
@@ -48,4 +48,4 @@ var MatFormFieldModule = class _MatFormFieldModule {
 export {
   MatFormFieldModule
 };
-//# sourceMappingURL=chunk-52WBSNSV.js.map
+//# sourceMappingURL=chunk-YA6BKAEA.js.map

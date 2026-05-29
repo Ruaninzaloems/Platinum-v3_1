@@ -38,7 +38,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint';
 
 @Component({
   selector: 'app-shell',
@@ -71,6 +71,8 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                     <span class="brand-module">Assets</span>
                   } @else if (activeModule() === 'overtime') {
                     <span class="brand-module">Overtime</span>
+                  } @else if (activeModule() === 'sharepoint') {
+                    <span class="brand-module">SharePoint</span>
                   }
                 </div>
               </div>
@@ -104,6 +106,9 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </button>
               <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
                 <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
+              </button>
+              <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
+                <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
               </button>
             </div>
           }
@@ -321,6 +326,19 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 <span>{{item.label}}</span>
               </a>
             }
+          } @else if (activeModule() === 'sharepoint') {
+            <a class="nav-link" routerLink="/sharepoint" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">
+              <mat-icon class="nav-icon">home</mat-icon>
+              <span>Document Browser</span>
+            </a>
+            <div style="padding:6px 16px 4px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">
+              Pinned Libraries
+            </div>
+            <a class="nav-link sub-item" routerLink="/sharepoint/uat-assets" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">folder_open</mat-icon>
+              <span>UatAssets</span>
+            </a>
+            <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -333,6 +351,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             @else if (activeModule() === 'budget') { v1.0 · MFMA Budget }
             @else if (activeModule() === 'afs') { v4.0 · GRAP/MFMA AFS }
             @else if (activeModule() === 'overtime') { v1.0 · Overtime Mgmt }
+            @else if (activeModule() === 'sharepoint') { Microsoft 365 · SharePoint }
             @else { v1.0 · GRAP Compliant }
           }
         </div>
@@ -509,6 +528,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     else if (url.startsWith('/budget')) mod = 'budget';
     else if (url.startsWith('/afs')) mod = 'afs';
     else if (url.startsWith('/overtime')) mod = 'overtime';
+    else if (url.startsWith('/sharepoint')) mod = 'sharepoint'; // covers /sharepoint and /sharepoint/uat-assets
     this.activeModule.set(mod);
   }
 
@@ -523,7 +543,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       insights: '/ins',
       budget: '/budget',
       afs: '/afs',
-      overtime: '/overtime'
+      overtime: '/overtime',
+      sharepoint: '/sharepoint'
     };
     this.router.navigate([routeMap[mod]]);
   }
