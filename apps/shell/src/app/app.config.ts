@@ -9,7 +9,6 @@ import {
   PublicClientApplication,
 } from '@azure/msal-browser';
 import {
-  MsalModule,
   MsalService,
   MsalGuard,
   MsalBroadcastService,
@@ -22,28 +21,30 @@ import { routes } from './app.routes';
 import { authInterceptor } from '@platinumv3/shared/auth';
 import { AZURE_AD, GRAPH_SCOPES } from './msal.config';
 
-// ── MSAL instance factory ──────────────────────────────────────────────────
-export function msalInstanceFactory(): IPublicClientApplication {
-  return new PublicClientApplication({
-    auth: {
-      clientId   : AZURE_AD.CLIENT_ID,
-      authority  : `https://login.microsoftonline.com/${AZURE_AD.TENANT_ID}`,
-      // Main redirect URI (used for full-page redirect fallback).
-      redirectUri: AZURE_AD.REDIRECT_URI,
-      postLogoutRedirectUri: AZURE_AD.REDIRECT_URI,
+// ── MSAL singleton instance ────────────────────────────────────────────────
+// Created once here so that main.ts can call initialize() on the SAME object
+// that Angular DI will inject everywhere. Using useFactory would create a
+// second instance and MSAL's internal state would be split across two objects,
+// causing the popup loginPopup() promise to never resolve.
+export const msalInstance: IPublicClientApplication = new PublicClientApplication({
+  auth: {
+    clientId   : AZURE_AD.CLIENT_ID,
+    authority  : `https://login.microsoftonline.com/${AZURE_AD.TENANT_ID}`,
+    // Main redirect URI (used for full-page redirect fallback).
+    redirectUri: AZURE_AD.REDIRECT_URI,
+    postLogoutRedirectUri: AZURE_AD.REDIRECT_URI,
+  },
+  cache: {
+    cacheLocation: BrowserCacheLocation.LocalStorage,
+  },
+  system: {
+    loggerOptions: {
+      logLevel         : LogLevel.Warning,
+      loggerCallback   : (level, msg) => console.warn('[MSAL]', msg),
+      piiLoggingEnabled: false,
     },
-    cache: {
-      cacheLocation: BrowserCacheLocation.LocalStorage,
-    },
-    system: {
-      loggerOptions: {
-        logLevel         : LogLevel.Warning,
-        loggerCallback   : (level, msg) => console.warn('[MSAL]', msg),
-        piiLoggingEnabled: false,
-      },
-    },
-  });
-}
+  },
+});
 
 // ── MSAL Guard config (used by MsalGuard on protected routes) ─────────────
 const msalGuardConfig: MsalGuardConfiguration = {
@@ -60,7 +61,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
 
     // ── MSAL providers ──────────────────────────────────────────────────
-    { provide: MSAL_INSTANCE,        useFactory: msalInstanceFactory },
+    { provide: MSAL_INSTANCE,        useValue: msalInstance },
     { provide: MSAL_GUARD_CONFIG,    useValue: msalGuardConfig },
     { provide: MSAL_INTERCEPTOR_CONFIG, useValue: { interactionType: 'popup', protectedResourceMap: new Map() } },
     MsalService,

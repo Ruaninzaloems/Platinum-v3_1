@@ -2,15 +2,15 @@ import {
   normalizePassiveListenerOptions
 } from "./chunk-JUJEZ4FJ.js";
 import {
-  BreakpointObserver
-} from "./chunk-7JX4MFQQ.js";
-import {
   _VisuallyHiddenLoader,
   _setInnerHtml
 } from "./chunk-4CO5QW4B.js";
 import {
   DomSanitizer
 } from "./chunk-W5ZEON3D.js";
+import {
+  BreakpointObserver
+} from "./chunk-7JX4MFQQ.js";
 import {
   isFakeMousedownFromScreenReader,
   isFakeTouchstartFromScreenReader
@@ -24,12 +24,12 @@ import {
   _CdkPrivateStyleLoader
 } from "./chunk-RH6YDMAF.js";
 import {
+  Platform
+} from "./chunk-L7GSUTUC.js";
+import {
   coerceElement,
   coerceNumberProperty
 } from "./chunk-57WP2MZF.js";
-import {
-  Platform
-} from "./chunk-L7GSUTUC.js";
 import {
   APP_ID,
   Directive,
@@ -2420,4 +2420,4 @@ export {
   removeAriaReferencedId,
   AriaDescriber
 };
-//# sourceMappingURL=chunk-ZCSMEAMN.js.map
+//# sourceMappingURL=chunk-IPHOB4WF.js.map

@@ -1,17 +1,40 @@
 import {
+  AuthenticationScheme,
+  BrowserPerformanceClient,
+  BrowserRootPerformanceEvents_exports,
+  EventHandler,
+  EventMessageUtils,
+  EventType,
+  JsonWebTokenTypes,
+  LocalStorage,
+  MemoryStorage,
+  OIDC_DEFAULT_SCOPES,
+  PromptValue,
+  PublicClientApplication,
+  ResponseMode,
+  SessionStorage,
+  SignedHttpRequest,
+  createNestablePublicClientApplication,
+  createStandardPublicClientApplication,
+  isPlatformBrokerAvailable,
+  loadExternalTokens,
+  stubbedPublicClientApplication,
+  version
+} from "./chunk-4JDYQH42.js";
+import {
+  BrowserPerformanceMeasurement
+} from "./chunk-KQPLH7PO.js";
+import {
   ApiId,
   AuthError,
   AuthErrorCodes_exports,
   AuthenticationHeaderParser,
-  AuthenticationScheme,
   AzureCloudInstance,
   BrowserAuthError,
   BrowserAuthErrorCodes_exports,
   BrowserCacheLocation,
   BrowserConfigurationAuthError,
   BrowserConfigurationAuthErrorCodes_exports,
-  BrowserPerformanceClient,
-  BrowserRootPerformanceEvents_exports,
   BrowserUtils_exports,
   CacheLookupPolicy,
   ClientAuthError,
@@ -19,40 +42,19 @@ import {
   ClientConfigurationError,
   ClientConfigurationErrorCodes_exports,
   DEFAULT_IFRAME_TIMEOUT_MS,
-  EventHandler,
-  EventMessageUtils,
-  EventType,
   InteractionRequiredAuthError,
   InteractionRequiredAuthErrorCodes_exports,
   InteractionStatus,
   InteractionType,
-  JsonWebTokenTypes,
-  LocalStorage,
   LogLevel,
   Logger,
-  MemoryStorage,
   NavigationClient,
-  OIDC_DEFAULT_SCOPES,
-  PromptValue,
   ProtocolMode,
-  PublicClientApplication,
-  ResponseMode,
   ServerError,
-  SessionStorage,
-  SignedHttpRequest,
   StubPerformanceClient,
   WrapperSKU,
-  createNestablePublicClientApplication,
-  createStandardPublicClientApplication,
-  enforceResourceParameter,
-  isPlatformBrokerAvailable,
-  loadExternalTokens,
-  stubbedPublicClientApplication,
-  version
-} from "./chunk-XNQ7MVSM.js";
-import {
-  BrowserPerformanceMeasurement
-} from "./chunk-KQPLH7PO.js";
+  enforceResourceParameter
+} from "./chunk-ILSSUSQM.js";
 import "./chunk-7WUTQBRG.js";
 export {
   ApiId,

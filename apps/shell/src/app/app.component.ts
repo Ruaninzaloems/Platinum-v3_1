@@ -13,18 +13,12 @@ export class AppComponent implements OnInit {
   private msal = inject(MsalService);
 
   ngOnInit(): void {
-    // If we're inside an MSAL popup window, do NOT call handleRedirectPromise().
-    // The auth code must stay in the URL so the main window's MSAL can read
-    // it and close the popup. Calling handleRedirectPromise() here would
-    // consume the code first and break the popup flow.
-    if (window.opener && window.opener !== window) {
-      return;
-    }
-
-    // Main window: process any pending redirect response (covers the
-    // popup-fallback redirect flow on browsers that block popups).
-    this.msal.instance.initialize().then(() =>
-      this.msal.instance.handleRedirectPromise()
-    ).catch(() => {});
+    // This only runs in the main window — the popup is handled in main.ts
+    // via broadcastResponseToMainFrame() before Angular ever bootstraps.
+    //
+    // Call handleRedirectPromise() to process any pending full-page redirect
+    // response (covers the popup-fallback redirect flow on browsers that
+    // block popups, or when loginRedirect() is used explicitly).
+    this.msal.instance.handleRedirectPromise().catch(() => {});
   }
 }

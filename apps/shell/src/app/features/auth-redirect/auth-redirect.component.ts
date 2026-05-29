@@ -1,13 +1,13 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { MsalService } from '@azure/msal-angular';
+import { Component } from '@angular/core';
 
 /**
- * Minimal page shown inside the MSAL popup window after Azure AD authenticates.
+ * Shown at /auth-redirect only when a user navigates there manually in the
+ * main window (not during the normal popup flow).
  *
- * The main window's MSAL polls the popup URL, reads the auth code, and calls
- * popup.close() automatically. This component just shows a spinner and does
- * NOTHING else — it must not navigate or call handleRedirectPromise(), which
- * would consume the auth code before the main window can read it.
+ * In the popup flow, main.ts intercepts the /auth-redirect URL BEFORE
+ * Angular bootstraps and calls broadcastResponseToMainFrame() from
+ * @azure/msal-browser/redirect-bridge, which broadcasts the auth code to
+ * the main window and closes the popup — Angular never renders here.
  */
 @Component({
   selector: 'app-auth-redirect',
@@ -33,16 +33,4 @@ import { MsalService } from '@azure/msal-angular';
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
-export class AuthRedirectComponent implements OnInit {
-  private msal = inject(MsalService);
-
-  ngOnInit(): void {
-    // MSAL v3+ uses BroadcastChannel for popup flow.
-    // The popup MUST call initialize() + handleRedirectPromise() so MSAL can
-    // detect the popup context and forward the auth result to the main window
-    // via BroadcastChannel. MSAL will NOT navigate — it closes the popup itself.
-    this.msal.instance.initialize()
-      .then(() => this.msal.instance.handleRedirectPromise())
-      .catch(err => console.warn('[AuthRedirect]', err));
-  }
-}
+export class AuthRedirectComponent {}

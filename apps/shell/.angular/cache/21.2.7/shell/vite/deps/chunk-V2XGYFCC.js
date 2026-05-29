@@ -1,6 +1,6 @@
 import {
   MatRipple
-} from "./chunk-YLGXYNZY.js";
+} from "./chunk-NDNJ6V2O.js";
 import {
   BidiModule
 } from "./chunk-JPXPF4SI.js";
@@ -40,4 +40,4 @@ var MatRippleModule = class _MatRippleModule {
 export {
   MatRippleModule
 };
-//# sourceMappingURL=chunk-QFDQFGYR.js.map
+//# sourceMappingURL=chunk-V2XGYFCC.js.map

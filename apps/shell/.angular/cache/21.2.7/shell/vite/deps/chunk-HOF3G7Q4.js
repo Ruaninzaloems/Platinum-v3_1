@@ -2,7 +2,7 @@ import {
   MAT_RIPPLE_GLOBAL_OPTIONS,
   RippleRenderer,
   defaultRippleAnimationConfig
-} from "./chunk-YLGXYNZY.js";
+} from "./chunk-NDNJ6V2O.js";
 import {
   _animationsDisabled
 } from "./chunk-7JX4MFQQ.js";
@@ -153,4 +153,4 @@ var MatRippleLoader = class _MatRippleLoader {
 export {
   MatRippleLoader
 };
-//# sourceMappingURL=chunk-SPRDBYXA.js.map
+//# sourceMappingURL=chunk-HOF3G7Q4.js.map
