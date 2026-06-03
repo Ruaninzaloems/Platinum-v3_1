@@ -1,0 +1,392 @@
+@if (tableContextMenu().visible) {
+  <div class="table-ctx-menu"
+       [style.left.px]="tableContextMenu().x"
+       [style.top.px]="tableContextMenu().y"
+       (click)="$event.stopPropagation()">
+    <div class="ctx-section-label">Rows</div>
+    <button class="ctx-item" type="button" (click)="ctxInsertRowAbove()">
+      <mat-icon class="ctx-icon">vertical_align_top</mat-icon> Insert Row Above
+    </button>
+    <button class="ctx-item" type="button" (click)="ctxInsertRowBelow()">
+      <mat-icon class="ctx-icon">vertical_align_bottom</mat-icon> Insert Row Below
+    </button>
+    <button class="ctx-item ctx-danger" type="button" (click)="ctxDeleteRow()">
+      <mat-icon class="ctx-icon">delete_sweep</mat-icon> Delete Row
+    </button>
+    <div class="ctx-sep"></div>
+    <div class="ctx-section-label">Columns</div>
+    <button class="ctx-item" type="button" (click)="ctxInsertColLeft()">
+      <mat-icon class="ctx-icon">arrow_back</mat-icon> Insert Column Left
+    </button>
+    <button class="ctx-item" type="button" (click)="ctxInsertColRight()">
+      <mat-icon class="ctx-icon">arrow_forward</mat-icon> Insert Column Right
+    </button>
+    <button class="ctx-item ctx-danger" type="button" (click)="ctxDeleteCol()">
+      <mat-icon class="ctx-icon">delete_sweep</mat-icon> Delete Column
+    </button>
+  </div>
+}
+
+<div class="config-page">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Email Templates</h1>
+      <p class="page-subtitle">Configure notification emails sent when transactions are approved</p>
+    </div>
+    @if (activeTab() === 'templates') {
+      <div class="header-actions">
+        <button mat-flat-button class="btn-primary" (click)="openCreate()" [disabled]="showForm()">
+          <mat-icon>add</mat-icon> New Template
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Native Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab() === 'templates'" (click)="activeTab.set('templates')">Templates</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'log'" (click)="activeTab.set('log')">Email Log</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'tokens'" (click)="activeTab.set('tokens')">Token Reference</button>
+  </div>
+
+  <!-- ===== TAB: Templates ===== -->
+  @if (activeTab() === 'templates') {
+
+    <!-- Template Form -->
+    @if (showForm()) {
+      <div class="form-card">
+        <h3 class="form-title">{{ editingId() ? 'Edit Template' : 'New Template' }}</h3>
+
+        <!-- Row 1: Transaction Type + Subject -->
+        <div class="form-row">
+          <div class="form-field">
+            <label>Transaction Type *</label>
+            <select class="form-input" [(ngModel)]="form.TransactionType">
+              <option value="" disabled>Select type</option>
+              @for (type of transactionTypes; track type) {
+                <option [value]="type">{{ type }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Template Title / Subject *</label>
+            <input type="text" class="form-input" [(ngModel)]="form.TemplateTitle"
+              (focus)="onFieldFocus($event, 'TemplateTitle')"
+              placeholder="e.g. Depreciation Run Approved — FY {FinancialYear}" />
+          </div>
+        </div>
+
+        <!-- Token insert bar (visible once a transaction type is selected) -->
+        @if (form.TransactionType) {
+          <div class="token-insert-bar">
+            <span class="token-insert-label">
+              <mat-icon class="token-insert-icon">data_object</mat-icon>
+              Insert:
+            </span>
+            @for (t of getTokensForType(form.TransactionType); track t.token) {
+              <button class="token-chip" type="button" (click)="insertToken(t.token)" [matTooltip]="t.description">{{ t.token }}</button>
+            }
+            <span class="token-insert-hint">{{ getInsertHint() }}</span>
+          </div>
+        }
+
+        <div class="form-row">
+          <div class="form-field">
+            <label>Recipient Emails (one per line) *</label>
+            <textarea class="form-input form-textarea" [(ngModel)]="form.RecipientEmails" rows="3"
+              placeholder="manager@municipality.gov.za&#10;finance@municipality.gov.za"></textarea>
+            <span class="field-hint">Enter one email address per line</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <div class="editor-label-row">
+              <label>Message Body *</label>
+              <button type="button" class="insert-table-btn" (click)="insertTable()" [disabled]="!quillInstance" matTooltip="Insert a 3-column table at the cursor position">
+                <mat-icon class="insert-table-icon">table_chart</mat-icon> Insert Table
+              </button>
+            </div>
+            <quill-editor
+              class="quill-body-editor"
+              [modules]="quillModules"
+              [(ngModel)]="form.MessageContent"
+              (onFocus)="onQuillFocus()"
+              (onEditorCreated)="onEditorCreated($event)"
+              placeholder="Dear Finance Team, An impairment has been approved for asset {AssetId}...">
+            </quill-editor>
+            <span class="field-hint">Use the toolbar to format text, insert images, or click Insert Table to add a data table. Right-click any table cell to insert/delete rows and columns. Drag the cell edge to resize columns. Token chips can be pasted into table cells.</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="checkbox-label">
+              <input type="checkbox" [checked]="form.IsActive === 1"
+                (change)="form.IsActive = $any($event.target).checked ? 1 : 0" /> Active
+            </label>
+          </div>
+        </div>
+        <!-- Live Preview Panel -->
+        @if (showPreview()) {
+          <div class="preview-panel">
+            <div class="preview-panel-header">
+              <mat-icon class="preview-header-icon">preview</mat-icon>
+              <span class="preview-header-title">Email Preview</span>
+              <span class="preview-header-badge">Sample data</span>
+            </div>
+            <div class="preview-subject-row">
+              <span class="preview-label">Subject:</span>
+              <span class="preview-subject-text">{{ getPreviewSubject() || '(no subject entered)' }}</span>
+            </div>
+            <div class="preview-body-wrap">
+              <span class="preview-label">Body:</span>
+              <div class="preview-body-html" [innerHTML]="getPreviewBody() || '(no body entered)'"></div>
+            </div>
+            @if (hasUnresolvedTokens(getPreviewSubject()) || hasUnresolvedTokens(getPreviewBody())) {
+              <div class="preview-warn">
+                <mat-icon class="preview-warn-icon">warning</mat-icon>
+                One or more tokens could not be resolved — check for typos in your placeholders.
+              </div>
+            }
+          </div>
+        }
+
+        <div class="form-actions">
+          <button mat-stroked-button type="button" (click)="togglePreview()" [class.preview-active]="showPreview()">
+            <mat-icon>{{ showPreview() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            {{ showPreview() ? 'Hide Preview' : 'Preview' }}
+          </button>
+          <button mat-stroked-button (click)="cancelForm()">Cancel</button>
+          <button mat-flat-button class="btn-primary" (click)="saveTemplate()" [disabled]="saving()">
+            <mat-icon>save</mat-icon> {{ saving() ? 'Saving...' : 'Save Template' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Templates Table -->
+    <div class="table-card">
+      @if (loading()) {
+        <div class="empty-state">Loading templates...</div>
+      } @else if (templates().length === 0) {
+        <div class="empty-state">No templates configured. Click <strong>New Template</strong> to add one.</div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Transaction Type</th>
+              <th>Subject / Title</th>
+              <th>Recipients</th>
+              <th>Status</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of templates(); track row.id) {
+              <tr>
+                <td><span class="type-badge">{{ row.TransactionType }}</span></td>
+                <td class="desc-cell">{{ row.TemplateTitle }}</td>
+                <td class="muted-cell">{{ getRecipientCount(row.RecipientEmails) }} recipient(s)</td>
+                <td>
+                  <span class="status-badge" [class.active]="row.IsActive === 1">
+                    {{ getActiveLabel(row.IsActive) }}
+                  </span>
+                </td>
+                <td class="actions-cell">
+                  <button mat-icon-button (click)="openEdit(row)">
+                    <mat-icon class="action-icon edit">edit</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="deleteTemplate(row.id!)">
+                    <mat-icon class="action-icon delete">delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- ===== TAB: Email Log ===== -->
+  @if (activeTab() === 'log') {
+
+    <!-- Summary Stats -->
+    @if (logSummaryLoading()) {
+      <div class="filter-bar"><span class="muted-cell">Loading delivery stats...</span></div>
+    } @else if (logSummary()) {
+      <div class="stat-bar">
+        <div class="stat-card stat-sent">
+          <mat-icon>mark_email_read</mat-icon>
+          <div class="stat-body">
+            <span class="stat-value">{{ logSummary()!.totalSent }}</span>
+            <span class="stat-label">Total Sent</span>
+          </div>
+        </div>
+        <div class="stat-card stat-failed">
+          <mat-icon>error_outline</mat-icon>
+          <div class="stat-body">
+            <span class="stat-value">{{ logSummary()!.totalFailed }}</span>
+            <span class="stat-label">Total Failed</span>
+          </div>
+        </div>
+        <div class="stat-card stat-30sent">
+          <mat-icon>schedule_send</mat-icon>
+          <div class="stat-body">
+            <span class="stat-value">{{ logSummary()!.last30DaysSent }}</span>
+            <span class="stat-label">Sent (30 Days)</span>
+          </div>
+        </div>
+        <div class="stat-card stat-30failed">
+          <mat-icon>report_problem</mat-icon>
+          <div class="stat-body">
+            <span class="stat-value">{{ logSummary()!.last30DaysFailed }}</span>
+            <span class="stat-label">Failed (30 Days)</span>
+          </div>
+        </div>
+        <div class="stat-card stat-rate">
+          <mat-icon>percent</mat-icon>
+          <div class="stat-body">
+            <span class="stat-value">{{ getFailureRate(logSummary()!) }}</span>
+            <span class="stat-label">Failure Rate (30 Days)</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="form-field" style="min-width:200px">
+        <label>Filter by Status</label>
+        <select class="form-input" [(ngModel)]="logFilterStatus" (ngModelChange)="applyLogFilter()">
+          <option value="">All Statuses</option>
+          <option value="Success">Sent</option>
+          <option value="Failed">Failed</option>
+        </select>
+      </div>
+      <div class="form-field" style="min-width:220px">
+        <label>Filter by Transaction Type</label>
+        <select class="form-input" [(ngModel)]="logFilterType" (ngModelChange)="applyLogFilter()">
+          <option value="">All Types</option>
+          @for (type of transactionTypes; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+      </div>
+      <button mat-stroked-button (click)="clearLogFilter()" style="align-self:flex-end">
+        <mat-icon>clear</mat-icon> Clear
+      </button>
+      <button mat-stroked-button (click)="loadEmailLog()" style="align-self:flex-end">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+    </div>
+
+    <!-- Log Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <mat-icon style="color:#64748b">history</mat-icon>
+        <span class="table-title">Delivery History</span>
+        <span class="muted-cell">{{ logTotalCount() }} record(s) — most recent first</span>
+      </div>
+      @if (logLoading()) {
+        <div class="empty-state">Loading email log...</div>
+      } @else if (logEntries().length === 0) {
+        <div class="empty-state">
+          <mat-icon style="font-size:36px;width:36px;height:36px;color:#cbd5e1">mark_email_unread</mat-icon>
+          <p>No email log records found for the selected filters.</p>
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date Sent</th>
+              <th>Transaction Type</th>
+              <th>Recipients</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of logEntries(); track row.id) {
+              <tr [class.row-failed]="row.Status === 'Failed'">
+                <td class="date-cell">{{ formatDate(row.SentAt) }}</td>
+                <td><span class="type-badge">{{ row.TransactionType }}</span></td>
+                <td class="truncate-cell" [matTooltip]="row.Recipients">{{ row.Recipients }}</td>
+                <td class="truncate-cell">{{ row.Subject }}</td>
+                <td>
+                  <span [class]="getStatusClass(row.Status)">
+                    {{ row.Status === 'Success' ? 'Sent' : row.Status }}
+                  </span>
+                </td>
+                <td>
+                  @if (hasError(row)) {
+                    <button mat-icon-button [matTooltip]="row.ErrorMessage" (click)="toggleLogExpand(row.id)">
+                      <mat-icon class="action-icon delete">error_outline</mat-icon>
+                    </button>
+                  } @else {
+                    <span class="muted-cell">—</span>
+                  }
+                </td>
+              </tr>
+              @if (expandedLogId() === row.id && hasError(row)) {
+                <tr>
+                  <td colspan="6" style="padding:0">
+                    <div class="error-panel">
+                      <div class="error-panel-header">
+                        <mat-icon style="color:#991b1b;font-size:16px;width:16px;height:16px">error_outline</mat-icon>
+                        <span>Error details — log #{{ row.id }}</span>
+                        <button mat-icon-button (click)="expandedLogId.set(null)" style="margin-left:auto">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </div>
+                      <pre class="error-text">{{ row.ErrorMessage }}</pre>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="logTotalCount()"
+          [pageIndex]="logPage()"
+          [pageSize]="logPageSize()"
+          [pageSizeOptions]="[25, 50, 100]"
+          (page)="onLogPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      }
+    </div>
+  }
+
+  <!-- ===== TAB: Token Reference ===== -->
+  @if (activeTab() === 'tokens') {
+    <div class="form-card">
+      <h3 class="form-title">Available Template Tokens</h3>
+      <p class="field-hint" style="margin-bottom:16px">
+        Paste these placeholders into your template subject or body. Each is replaced with live transaction data when the email is sent. In the template editor, focus a field and click any token chip to insert at the cursor.
+      </p>
+
+      <div class="token-type-bar">
+        @for (type of transactionTypes; track type) {
+          <button class="token-type-btn" [class.active]="selectedTokenType() === type" (click)="selectedTokenType.set(type)">
+            {{ type }}
+          </button>
+        }
+      </div>
+
+      <div class="token-grid">
+        @for (t of getTokensForType(selectedTokenType()); track t.token) {
+          <div class="token-card" (click)="copyToken(t.token)" [matTooltip]="'Click to copy'">
+            <span class="token-badge">{{ t.token }}</span>
+            <span class="token-desc">{{ t.description }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+</div>

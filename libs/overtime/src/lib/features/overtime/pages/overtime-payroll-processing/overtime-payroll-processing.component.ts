@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -43,6 +43,7 @@ interface PayrollCyclePeriodDto {
 @Component({
   selector: 'app-overtime-payroll-processing',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, MatDatepickerModule],
   providers: [
     provideNativeDateAdapter(),
@@ -69,7 +70,7 @@ interface PayrollCyclePeriodDto {
       <!-- ── FILTER BAR ───────────────────────────────────────────────── -->
       <div class="filter-bar">
         <div class="filter-group">
-          <label class="filter-label">From <span class="required-star">*</span></label>
+          <label class="filter-label">From</label>
           <div class="date-field-wrap">
             <input class="filter-input date-field" readonly
                    [matDatepicker]="fromPicker"
@@ -80,7 +81,7 @@ interface PayrollCyclePeriodDto {
           </div>
         </div>
         <div class="filter-group">
-          <label class="filter-label">To <span class="required-star">*</span></label>
+          <label class="filter-label">To</label>
           <div class="date-field-wrap">
             <input class="filter-input date-field" readonly
                    [matDatepicker]="toPicker"
@@ -91,7 +92,7 @@ interface PayrollCyclePeriodDto {
           </div>
         </div>
         <div class="filter-group">
-          <label class="filter-label">Cycle <span class="required-star">*</span></label>
+          <label class="filter-label">Cycle</label>
           <select class="filter-select" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()">
             <option [ngValue]="null">Select cycle…</option>
             @for (c of cycles(); track c.cycleId) {
@@ -100,7 +101,7 @@ interface PayrollCyclePeriodDto {
           </select>
         </div>
         <div class="filter-group">
-          <label class="filter-label">Period <span class="required-star">*</span></label>
+          <label class="filter-label">Period</label>
           <select class="filter-select" [(ngModel)]="selectedPeriodId"
                   [disabled]="!selectedCycleId || periodsLoading()">
             <option [ngValue]="null">
@@ -133,8 +134,7 @@ interface PayrollCyclePeriodDto {
           </select>
         </div>
         <button class="btn btn-primary" type="button" (click)="runSearch()"
-                [disabled]="loading() || !canSearch()"
-                [matTooltip]="canSearch() ? '' : 'Date From, Date To, Cycle and Period are required'">
+                [disabled]="loading()">
           <mat-icon>search</mat-icon>
           <span>Search</span>
         </button>
@@ -156,7 +156,7 @@ interface PayrollCyclePeriodDto {
       @if (!searched() && !loading()) {
         <div class="empty-state">
           <mat-icon>filter_alt</mat-icon>
-          <p>Select a date range and cycle, then click <strong>Search</strong> to load transactions.</p>
+          <p>Click <strong>Search</strong> to load all pending payroll transactions, or apply filters to narrow results.</p>
         </div>
       }
 
@@ -488,12 +488,6 @@ export class OvertimePayrollProcessingComponent implements OnInit {
     this.filterDivisionId = null;
   }
 
-  /** All four required filter fields must be set before Search is allowed. */
-  canSearch(): boolean {
-    return !!this.filterFromDate && !!this.filterToDate
-        && !!this.selectedCycleId && !!this.selectedPeriodId;
-  }
-
   /** Converts a Date to yyyy-mm-dd without UTC shift. */
   private dateToIso(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -565,10 +559,10 @@ export class OvertimePayrollProcessingComponent implements OnInit {
       if (r?.isSuccess && r.data) {
         this.summary.set(r.data);
       } else {
-        this.snack.open(r?.errors?.[0] ?? 'Search failed.', 'OK', { duration: 4000 });
+        this.snack.open(r?.message || r?.errors?.[0] || 'Search failed.', 'OK', { duration: 4000 });
       }
     } catch (e: any) {
-      this.snack.open(e?.error?.errors?.[0] ?? 'Failed to load transactions.', 'OK', { duration: 4000 });
+      this.snack.open(e?.error?.message || e?.error?.errors?.[0] || 'Failed to load transactions.', 'OK', { duration: 4000 });
     } finally {
       this.loading.set(false);
       this.searched.set(true);
@@ -591,10 +585,10 @@ export class OvertimePayrollProcessingComponent implements OnInit {
         this.selectedPeriodId = null;
         await this.runSearch();
       } else {
-        this.snack.open(r?.errors?.[0] ?? 'Send to payroll failed.', 'OK', { duration: 5000 });
+        this.snack.open(r?.message || r?.errors?.[0] || 'Send to payroll failed.', 'OK', { duration: 5000 });
       }
     } catch (e: any) {
-      this.snack.open(e?.error?.errors?.[0] ?? 'Send to payroll failed.', 'OK', { duration: 5000 });
+      this.snack.open(e?.error?.message || e?.error?.errors?.[0] || 'Send to payroll failed.', 'OK', { duration: 5000 });
     } finally {
       this.sending.set(false);
     }

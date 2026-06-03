@@ -18,6 +18,9 @@ import {
 import "./chunk-6S24FBVI.js";
 import "./chunk-CZW6SUH7.js";
 import {
+  BidiModule
+} from "./chunk-JPXPF4SI.js";
+import {
   _CdkPrivateStyleLoader
 } from "./chunk-RH6YDMAF.js";
 import "./chunk-L7GSUTUC.js";
@@ -25,9 +28,6 @@ import "./chunk-57WP2MZF.js";
 import "./chunk-MVWRHIZE.js";
 import "./chunk-M6TROWNH.js";
 import "./chunk-JTYEZAXU.js";
-import {
-  BidiModule
-} from "./chunk-JPXPF4SI.js";
 import {
   ChangeDetectionStrategy,
   Component,

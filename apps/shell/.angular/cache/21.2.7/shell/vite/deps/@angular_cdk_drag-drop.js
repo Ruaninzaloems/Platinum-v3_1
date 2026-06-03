@@ -1,12 +1,4 @@
 import {
-  CdkScrollable,
-  CdkScrollableModule,
-  ScrollDispatcher,
-  ViewportRuler
-} from "./chunk-W55BYLBC.js";
-import "./chunk-BGG2XZKT.js";
-import "./chunk-LGVK2JKN.js";
-import {
   _IdGenerator,
   isFakeMousedownFromScreenReader,
   isFakeTouchstartFromScreenReader
@@ -19,6 +11,17 @@ import {
   coerceArray
 } from "./chunk-CZW6SUH7.js";
 import {
+  CdkScrollable,
+  CdkScrollableModule,
+  ScrollDispatcher,
+  ViewportRuler
+} from "./chunk-NSAAUXQM.js";
+import "./chunk-BGG2XZKT.js";
+import "./chunk-LGVK2JKN.js";
+import {
+  Directionality
+} from "./chunk-JPXPF4SI.js";
+import {
   _CdkPrivateStyleLoader
 } from "./chunk-RH6YDMAF.js";
 import "./chunk-L7GSUTUC.js";
@@ -28,9 +31,6 @@ import {
 } from "./chunk-57WP2MZF.js";
 import "./chunk-M6TROWNH.js";
 import "./chunk-JTYEZAXU.js";
-import {
-  Directionality
-} from "./chunk-JPXPF4SI.js";
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,

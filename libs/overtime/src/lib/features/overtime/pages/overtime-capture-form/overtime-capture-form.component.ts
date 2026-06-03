@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,15 +10,18 @@ import { MatTableModule } from '@angular/material/table';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDatepickerModule, MatCalendarCellCssClasses } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Subject } from 'rxjs';
 
 import { LookupService } from '../../../../core/services/lookup.service';
 import { OvertimeTransactionsService } from '../../../../core/services/overtime-transactions.service';
+import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
 import { WorkflowService } from '../../../../core/services/workflow.service';
 import { UserContextService } from '../../../../core/services/user-context.service';
 import {
@@ -28,16 +31,63 @@ import {
   WorkflowStatus
 } from '../../../../core/models/overtime-workflow.model';
 import { EmployeeLookup } from '../../../../core/models/position-approval.model';
+import { TimeInputComponent } from '../../../../shared/components/time-input/time-input.component';
+
+const SA_PUBLIC_HOLIDAYS = new Set<string>([
+  // 2024
+  '2024-01-01', '2024-03-21', '2024-03-29', '2024-04-01',
+  '2024-04-27', '2024-04-28', '2024-05-01', '2024-06-16', '2024-06-17',
+  '2024-08-09', '2024-09-24', '2024-12-16', '2024-12-25', '2024-12-26',
+  // 2025
+  '2025-01-01', '2025-03-21', '2025-04-18', '2025-04-21',
+  '2025-04-27', '2025-04-28', '2025-05-01', '2025-06-16',
+  '2025-08-09', '2025-09-24', '2025-12-16', '2025-12-25', '2025-12-26',
+  // 2026
+  '2026-01-01', '2026-03-21', '2026-04-03', '2026-04-06',
+  '2026-04-27', '2026-05-01', '2026-06-16',
+  '2026-08-09', '2026-08-10', '2026-09-24', '2026-12-16', '2026-12-25', '2026-12-26',
+  // 2027
+  '2027-01-01', '2027-03-21', '2027-03-22', '2027-03-26', '2027-03-29',
+  '2027-04-27', '2027-05-01', '2027-06-16',
+  '2027-08-09', '2027-09-24', '2027-12-16', '2027-12-25', '2027-12-26',
+]);
+
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+@Component({
+  selector: 'app-duplicate-date-confirm-dialog',
+  standalone: true,
+  imports: [CommonModule, MatDialogModule, MatButtonModule],
+  template: `
+    <h2 mat-dialog-title>Duplicate Date Warning</h2>
+    <mat-dialog-content>
+      <p>A claim for this employee, overtime type, and date already exists.</p>
+      <p>Are you sure you want to submit another claim for the same date?</p>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button [mat-dialog-close]="false">Cancel</button>
+      <button mat-flat-button color="warn" [mat-dialog-close]="true">Submit Anyway</button>
+    </mat-dialog-actions>
+  `
+})
+export class DuplicateDateConfirmDialog {
+  ref = inject(MatDialogRef<DuplicateDateConfirmDialog>);
+}
 
 @Component({
   selector: 'app-overtime-capture-form',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterLink, FormsModule, DatePipe, DecimalPipe,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatIconModule, MatTableModule, MatAutocompleteModule,
     MatProgressSpinnerModule, MatTooltipModule,
-    MatDatepickerModule, MatNativeDateModule
+    MatDatepickerModule, MatNativeDateModule,
+    MatDialogModule, MatButtonModule,
+    TimeInputComponent
   ],
   template: `
     <div class="page-content capture-page">
@@ -66,13 +116,13 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
 
           @if (!editId()) {
             <div class="form-group" style="max-width: 520px;">
-              <label>EMPLOYEE NUMBER <span class="required">*</span></label>
+              <label>EMPLOYEE <span class="required">*</span></label>
               <input class="form-control"
                      type="text"
                      [(ngModel)]="searchTerm"
                      (ngModelChange)="onSearch($event)"
                      [matAutocomplete]="auto"
-                     placeholder="Search by employee number or name">
+                     placeholder="Search by employee ID, position ID, first name or surname">
             </div>
             <mat-autocomplete #auto="matAutocomplete"
                               panelClass="picker-panel"
@@ -137,28 +187,37 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
                 <div class="date-field-wrap">
                   <input class="form-control date-field" readonly
                          [matDatepicker]="overtimePicker"
-                         [(ngModel)]="overtimeDateValue"
+                         [value]="overtimeDateValue"
+                         (dateChange)="onOvertimeDateChange($event.value)"
                          placeholder="dd/mm/yyyy"
                          [disabled]="viewOnly()" />
                   <mat-datepicker-toggle class="date-toggle" [for]="overtimePicker"></mat-datepicker-toggle>
-                  <mat-datepicker #overtimePicker></mat-datepicker>
+                  <mat-datepicker #overtimePicker [dateClass]="calendarDateClass"></mat-datepicker>
                 </div>
+                @if (specialDayLabel()) {
+                  <div class="special-day-badge">
+                    <mat-icon>info</mat-icon>
+                    <span>{{ specialDayLabel() }}</span>
+                  </div>
+                }
               </div>
 
               <div class="form-group">
                 <label>Start time</label>
-                <input class="form-control" type="text"
-                       placeholder="HH:MM" maxlength="5"
-                       [(ngModel)]="startTime" [disabled]="viewOnly()"
-                       (ngModelChange)="recalcHours()">
+                <app-time-input
+                  [value]="startTime"
+                  [disabled]="viewOnly()"
+                  (valueChange)="startTime = $event; recalcHours()">
+                </app-time-input>
               </div>
 
               <div class="form-group">
                 <label>End time</label>
-                <input class="form-control" type="text"
-                       placeholder="HH:MM" maxlength="5"
-                       [(ngModel)]="endTime" [disabled]="viewOnly()"
-                       (ngModelChange)="recalcHours()">
+                <app-time-input
+                  [value]="endTime"
+                  [disabled]="viewOnly()"
+                  (valueChange)="endTime = $event; recalcHours()">
+                </app-time-input>
               </div>
 
               <div class="form-group">
@@ -182,6 +241,15 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
                 </select>
                 @if (loadingTypes()) {
                   <span class="form-hint">Loading types…</span>
+                }
+                @if (noOvertimeTypes()) {
+                  <div class="no-types-warning">
+                    <mat-icon>link_off</mat-icon>
+                    <span>The employee is not linked to an overtime salary transaction.
+                      To link an overtime salary transaction, go to
+                      <strong>Employee &gt; Employee Details</strong> and add it on the
+                      <strong>Salary Transaction</strong> tab.</span>
+                  </div>
                 }
               </div>
 
@@ -215,27 +283,94 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
               </div>
             </div>
 
-            @if (!viewOnly()) {
-              <div class="upload-area" [class.has-file]="!!pendingFile()"
-                   role="button"
-                   [attr.aria-label]="pendingFile() ? 'Replace attached document' : 'Attach supporting PDF document'"
-                   (click)="fileInput.click()" tabindex="0"
-                   (keydown.enter)="fileInput.click(); $event.preventDefault()"
-                   (keydown.space)="fileInput.click(); $event.preventDefault()">
-                <mat-icon>{{ pendingFile() ? 'description' : 'cloud_upload' }}</mat-icon>
-                <div>
-                  <strong>{{ pendingFile() ? pendingFile()!.name : 'Attach supporting document' }}</strong>
-                </div>
-                <div class="upload-hint">PDF only · max 5 MB</div>
-                @if (pendingFile()) {
-                  <button class="btn" type="button" style="margin-top:8px;"
-                          (click)="$event.stopPropagation(); pendingFile.set(null)">
-                    <mat-icon>close</mat-icon><span>Clear</span>
-                  </button>
-                }
+            @if (!viewOnly() && wouldExceedLimit()) {
+              <div class="limit-warning">
+                <mat-icon>warning_amber</mat-icon>
+                <span>{{ limitWarningMessage() }}</span>
               </div>
-              <input #fileInput type="file" accept="application/pdf" hidden
-                     (change)="onFile($event)">
+            }
+
+            @if (excessApproverMissing()) {
+              <div class="excess-approver-warning">
+                <mat-icon>person_off</mat-icon>
+                <span>
+                  No excess approver is configured for this position — this transaction cannot be
+                  submitted until one is set up. Please contact your system administrator.
+                </span>
+              </div>
+            }
+
+            @if (!viewOnly()) {
+              @if (existingDoc()) {
+                <!-- Existing document — show when editing a transaction that already has one -->
+                <div class="existing-doc-card">
+                  <mat-icon class="existing-doc-icon">description</mat-icon>
+                  <div class="existing-doc-info">
+                    <span class="existing-doc-name">{{ existingDoc()!.fileName }}</span>
+                    <span class="existing-doc-meta">
+                      {{ (existingDoc()!.sizeBytes / 1024).toFixed(1) }} KB
+                      · Uploaded {{ existingDoc()!.uploadedAt | date:'dd/MM/yyyy' }}
+                    </span>
+                  </div>
+                  <div class="existing-doc-actions">
+                    <a class="btn"
+                       [href]="docViewUrl(existingDoc()!.id)"
+                       target="_blank" rel="noopener"
+                       matTooltip="Open document in new tab">
+                      <mat-icon>open_in_new</mat-icon><span>View</span>
+                    </a>
+                    <button class="btn existing-doc-remove"
+                            type="button"
+                            [disabled]="removingDoc()"
+                            matTooltip="Remove document so a replacement can be attached"
+                            (click)="removeDoc()">
+                      <mat-icon>delete_outline</mat-icon>
+                      <span>{{ removingDoc() ? 'Removing…' : 'Remove' }}</span>
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <!-- No existing doc — show the upload drop-zone -->
+                <div class="upload-area" [class.has-file]="!!pendingFile()"
+                     role="button"
+                     [attr.aria-label]="pendingFile() ? 'Replace attached document' : 'Attach supporting PDF document'"
+                     (click)="fileInput.click()" tabindex="0"
+                     (keydown.enter)="fileInput.click(); $event.preventDefault()"
+                     (keydown.space)="fileInput.click(); $event.preventDefault()">
+                  <mat-icon>{{ pendingFile() ? 'description' : 'cloud_upload' }}</mat-icon>
+                  <div>
+                    <strong>{{ pendingFile() ? pendingFile()!.name : 'Attach supporting document' }}</strong>
+                  </div>
+                  <div class="upload-hint">PDF only · max 5 MB</div>
+                  @if (pendingFile()) {
+                    <button class="btn" type="button" style="margin-top:8px;"
+                            (click)="$event.stopPropagation(); pendingFile.set(null)">
+                      <mat-icon>close</mat-icon><span>Clear</span>
+                    </button>
+                  }
+                </div>
+                <input #fileInput type="file" accept="application/pdf" hidden
+                       (change)="onFile($event)">
+              }
+            } @else if (loadedTx()?.documents?.length) {
+              <!-- View-only: still let the approver open the document -->
+              <div class="existing-doc-card">
+                <mat-icon class="existing-doc-icon">description</mat-icon>
+                <div class="existing-doc-info">
+                  <span class="existing-doc-name">{{ loadedTx()!.documents[0].fileName }}</span>
+                  <span class="existing-doc-meta">
+                    {{ (loadedTx()!.documents[0].sizeBytes / 1024).toFixed(1) }} KB
+                    · Uploaded {{ loadedTx()!.documents[0].uploadedAt | date:'dd/MM/yyyy' }}
+                  </span>
+                </div>
+                <div class="existing-doc-actions">
+                  <a class="btn"
+                     [href]="docViewUrl(loadedTx()!.documents[0].id)"
+                     target="_blank" rel="noopener">
+                    <mat-icon>open_in_new</mat-icon><span>View</span>
+                  </a>
+                </div>
+              </div>
             }
           </div>
 
@@ -384,6 +519,13 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
   styles: [`
     .capture-page { display: flex; flex-direction: column; gap: 0; max-width: 1100px; }
     .date-field-wrap { position: relative; display: flex; align-items: center; }
+    .special-day-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 6px; padding: 4px 10px;
+      background: #fff3cd; border: 1px solid #f0c040;
+      border-radius: 6px; font-size: 12px; font-weight: 600; color: #856404;
+    }
+    .special-day-badge mat-icon { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
     .date-field { padding-right: 34px !important; cursor: pointer; }
     .date-toggle { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); }
     .date-toggle button { width: 30px !important; height: 30px !important; padding: 0 !important; }
@@ -445,9 +587,99 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
     }
     .amt-val { font-size: 18px; font-weight: 700; color: #0c4a6e; }
 
+    /* Hours limit warning ----------------------------------------- */
+    .limit-warning {
+      display: flex; align-items: flex-start; gap: 8px;
+      margin-top: 10px; padding: 10px 14px;
+      background: #fff7ed; border: 1px solid #f97316;
+      border-radius: 8px; color: #9a3412;
+      font-size: 13px; line-height: 1.5;
+    }
+    .limit-warning mat-icon {
+      color: #f97316; flex-shrink: 0;
+      font-size: 18px; width: 18px; height: 18px; margin-top: 1px;
+    }
+
+    /* Excess-approver-missing warning ----------------------------- */
+    .excess-approver-warning {
+      display: flex; align-items: flex-start; gap: 8px;
+      margin-top: 10px; padding: 10px 14px;
+      background: #fef2f2; border: 1px solid #ef4444;
+      border-radius: 8px; color: #991b1b;
+      font-size: 13px; line-height: 1.5;
+    }
+    .excess-approver-warning mat-icon {
+      color: #ef4444; flex-shrink: 0;
+      font-size: 18px; width: 18px; height: 18px; margin-top: 1px;
+    }
+
+    /* No salary-transaction-linked warning ------------------------- */
+    .no-types-warning {
+      display: flex; align-items: flex-start; gap: 8px;
+      margin-top: 8px; padding: 10px 14px;
+      background: #fef2f2; border: 1px solid #ef4444;
+      border-radius: 8px; color: #991b1b;
+      font-size: 13px; line-height: 1.5;
+    }
+    .no-types-warning mat-icon {
+      color: #ef4444; flex-shrink: 0;
+      font-size: 18px; width: 18px; height: 18px; margin-top: 2px;
+    }
+
     /* Upload area extras ------------------------------------------ */
     .upload-area { margin-top: 12px; }
     .upload-hint { font-size: 11px; margin-top: 4px; }
+
+    /* Existing document card ------------------------------------- */
+    .existing-doc-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+    }
+    .existing-doc-icon {
+      color: #16a34a;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    .existing-doc-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .existing-doc-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #15803d;
+      overflow-wrap: anywhere;
+    }
+    .existing-doc-meta {
+      font-size: 11px;
+      color: #64748b;
+    }
+    .existing-doc-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .existing-doc-remove {
+      background: #fee2e2;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+    .existing-doc-remove:hover:not(:disabled) {
+      background: #fecaca;
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
 
     /* Payroll classification subtitle ----------------------------- */
     .form-section-subtitle {
@@ -596,9 +828,11 @@ import { EmployeeLookup } from '../../../../core/models/position-approval.model'
 export class OvertimeCaptureFormComponent implements OnInit {
   private lookups = inject(LookupService);
   private txService = inject(OvertimeTransactionsService);
+  private configSvc = inject(OvertimeConfigService);
   private wf = inject(WorkflowService);
   private user = inject(UserContextService);
   private snack = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -609,6 +843,18 @@ export class OvertimeCaptureFormComponent implements OnInit {
   currentStatusLabel = signal<string>('');
   loadedTx = signal<OvertimeTransactionDto | null>(null);
   loadingTx = signal(false);
+
+  // True when the saved transaction is flagged as excess but has no excess
+  // approver snapshotted on the row — meaning the position approval config
+  // is incomplete. In this state the server will block submission with a
+  // clear error; this signal drives the companion warning banner so the
+  // capturer sees the problem before hitting "Save & submit".
+  excessApproverMissing = computed(() => {
+    const tx = this.loadedTx();
+    // Use the authoritative ID field (same field the server checks in SubmitAsync)
+    // rather than the display name, which may be absent if name resolution fails.
+    return !!tx?.isExcess && !tx?.excessApproverEmployeeId;
+  });
   // viewOnly: false when Requested or Returned (always editable), and also
   // false when Recommended and the current user is the original capturer
   // (allows recall-and-correct before the recommender has acted).
@@ -670,9 +916,9 @@ export class OvertimeCaptureFormComponent implements OnInit {
     return [
       { label: 'Capturer',        display: capturerName,                                                          subDisplay: capturerSub,  muted: !tx.capturedBy,               timestamp: tx.createdAt ?? null,              timestampPrefix: 'Created', comment: null },
       { label: 'Approval Status', display: tx.statusLabel || '—',                                                 subDisplay: null,          muted: !tx.statusLabel,              timestamp: null,                              timestampPrefix: '',        comment: null },
-      { label: 'Recommender',     display: tx.recommenderEmployeeName || '—',                                     subDisplay: null,          muted: !tx.recommenderEmployeeName,  timestamp: recommenderEv?.actionedAt ?? null, timestampPrefix: 'Signed',  comment: recommenderEv?.comments ?? null },
-      { label: 'Approver',        display: tx.approverEmployeeName || '—',                                        subDisplay: null,          muted: !tx.approverEmployeeName,     timestamp: approverEv?.actionedAt ?? null,    timestampPrefix: 'Signed',  comment: approverEv?.comments ?? null },
-      { label: 'Excess Approver', display: tx.excessApproverEmployeeName || (tx.isExcess ? '—' : 'Not applicable'), subDisplay: null,        muted: !tx.excessApproverEmployeeName, timestamp: excessApproverEv?.actionedAt ?? null, timestampPrefix: 'Signed', comment: excessApproverEv?.comments ?? null },
+      { label: 'Recommender',     display: tx.recommenderEmployeeName || '—',                                       subDisplay: tx.recommenderPositionDescription || null,    muted: !tx.recommenderEmployeeName,    timestamp: recommenderEv?.actionedAt ?? null,    timestampPrefix: 'Signed', comment: recommenderEv?.comments ?? null },
+      { label: 'Approver',        display: tx.approverEmployeeName || '—',                                         subDisplay: tx.approverPositionDescription || null,       muted: !tx.approverEmployeeName,       timestamp: approverEv?.actionedAt ?? null,      timestampPrefix: 'Signed', comment: approverEv?.comments ?? null },
+      { label: 'Excess Approver', display: tx.excessApproverEmployeeName || (tx.isExcess ? '—' : 'Not applicable'), subDisplay: tx.excessApproverPositionDescription || null, muted: !tx.excessApproverEmployeeName, timestamp: excessApproverEv?.actionedAt ?? null, timestampPrefix: 'Signed', comment: excessApproverEv?.comments ?? null },
     ];
   });
 
@@ -751,7 +997,8 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   searchTerm = '';
   private search$ = new Subject<string>();
-  suggestions = toSignal(
+  private _hideSuggestions = signal(false);
+  private _rawSuggestions = toSignal(
     this.search$.pipe(
       debounceTime(250),
       distinctUntilChanged(),
@@ -759,9 +1006,26 @@ export class OvertimeCaptureFormComponent implements OnInit {
     ),
     { initialValue: [] as EmployeeLookup[] }
   );
+  suggestions = computed(() => this._hideSuggestions() ? [] as EmployeeLookup[] : (this._rawSuggestions() ?? []));
 
   employee = signal<EmployeeLookup | null>(null);
   overtimeDate = signal(todayIso());
+
+  calendarDateClass = (date: Date): MatCalendarCellCssClasses => {
+    const iso = toIsoDate(date);
+    if (SA_PUBLIC_HOLIDAYS.has(iso)) return 'cal-holiday';
+    if (date.getDay() === 0) return 'cal-sunday';
+    return '';
+  };
+
+  specialDayLabel = computed((): string | null => {
+    const iso = this.overtimeDate();
+    if (!iso) return null;
+    if (SA_PUBLIC_HOLIDAYS.has(iso)) return 'Public Holiday — Overtime × 2';
+    const [y, m, d] = iso.split('-').map(Number);
+    if (new Date(y, m - 1, d).getDay() === 0) return 'Sunday — Overtime × 2';
+    return null;
+  });
   startTime: string | null = null;
   endTime: string | null = null;
   hours = 0;
@@ -770,11 +1034,15 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   overtimeTypes = signal<OvertimeTypeOption[]>([]);
   loadingTypes = signal(false);
+  noOvertimeTypes = computed(() =>
+    !!this.employee() && !this.loadingTypes() && this.overtimeTypes().length === 0
+  );
   history = signal<OvertimeTransactionDto[]>([]);
   loadingHistory = signal(false);
   hoursThisMonth = computed(() =>
     this.history()
-      .filter(r => isSameMonth(r.overtimeDate, this.overtimeDate()))
+      .filter(r => r.status !== WorkflowStatus.Rejected
+               && isSameMonth(r.overtimeDate, this.overtimeDate()))
       .reduce((s, r) => s + (r.hours || 0), 0)
   );
 
@@ -807,15 +1075,45 @@ export class OvertimeCaptureFormComponent implements OnInit {
   });
   previewing = signal(false);
 
-  pendingFile = signal<File | null>(null);
-  saving = signal(false);
+  pendingFile  = signal<File | null>(null);
+  removingDoc  = signal(false);
+  saving       = signal(false);
+
+  existingDoc = computed(() => this.loadedTx()?.documents?.[0] ?? null);
+
+  exceptionalMax = signal(60);
 
   ngOnInit(): void {
+    this.configSvc.get().subscribe({
+      next: cfg => { if (cfg?.exceptionalMaximumOvertimeHours) this.exceptionalMax.set(cfg.exceptionalMaximumOvertimeHours); },
+      error: () => {}
+    });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.editId.set(id);
       this.loadForEdit(id);
     }
+  }
+
+  wouldExceedLimit(): boolean {
+    if (!this.hours || this.hours <= 0) return false;
+    const max = this.exceptionalMax();
+    const originalHours = this.editId() ? (this.loadedTx()?.hours ?? 0) : 0;
+    if (this.editId() && this.hours <= originalHours) return false;
+    const projectedTotal = this.hoursThisMonth() - originalHours + this.hours;
+    return projectedTotal > max;
+  }
+
+  limitWarningMessage(): string {
+    const max = this.exceptionalMax();
+    const originalHours = this.editId() ? (this.loadedTx()?.hours ?? 0) : 0;
+    const existing = this.hoursThisMonth() - originalHours;
+    const projected = existing + this.hours;
+    const remaining = max - existing;
+    return `This employee already has ${existing.toFixed(2)} hours captured this month. ` +
+           `Adding ${this.hours} hours would bring the total to ${projected.toFixed(2)} hours, ` +
+           `exceeding the ${max}-hour maximum. ` +
+           `You can add at most ${remaining > 0 ? remaining.toFixed(2) : '0'} more hours.`;
   }
 
   statusClass(status: number | null): string {
@@ -950,6 +1248,11 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.overtimeDate.set((tx.overtimeDate || '').slice(0, 10));
     this.startTime    = (tx.startTime || '').slice(0, 5) || null;
     this.endTime      = (tx.endTime || '').slice(0, 5) || null;
+    // Derive end time from start + hours when the DB didn't store it
+    // (e.g. capturer entered hours directly without setting end time).
+    if (!this.endTime && this.startTime && tx.hours > 0) {
+      this.endTime = this.calcEndTime(this.startTime, tx.hours);
+    }
     this.hours        = tx.hours;
     this.salaryHeadId = tx.salaryHeadId;
     this.reason       = tx.reason ?? '';
@@ -964,10 +1267,15 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.loadHistory(tx.employeeId);
   }
 
-  onSearch(t: string): void { this.search$.next(t); }
+  onSearch(t: string): void {
+    this._hideSuggestions.set(false);
+    this.search$.next(t);
+  }
 
   onEmployeePicked(e: EmployeeLookup | string): void {
     if (typeof e === 'string') return;
+    // Synchronously hide all options so the panel cannot re-open via _handleFocus
+    this._hideSuggestions.set(true);
     this.employee.set(e);
     this.searchTerm = `${e.employeeNumber} - ${e.fullName}`;
     this.salaryHeadId = null;
@@ -977,6 +1285,7 @@ export class OvertimeCaptureFormComponent implements OnInit {
   }
 
   private loadTypes(empId: string): void {
+    this.overtimeTypes.set([]);   // clear stale data before the new request
     this.loadingTypes.set(true);
     this.txService.overtimeTypesForEmployee(empId).subscribe({
       next: ts => { this.overtimeTypes.set(ts ?? []); this.loadingTypes.set(false); },
@@ -992,14 +1301,19 @@ export class OvertimeCaptureFormComponent implements OnInit {
     });
   }
 
+  private _cachedDateValue: { iso: string; date: Date } | null = null;
+
   get overtimeDateValue(): Date | null {
     const iso = this.overtimeDate();
     if (!iso) return null;
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    if (this._cachedDateValue?.iso !== iso) {
+      const [y, m, d] = iso.split('-').map(Number);
+      this._cachedDateValue = { iso, date: new Date(y, m - 1, d) };
+    }
+    return this._cachedDateValue.date;
   }
 
-  set overtimeDateValue(val: Date | null) {
+  onOvertimeDateChange(val: Date | null): void {
     if (!val) return;
     const y = val.getFullYear();
     const m = String(val.getMonth() + 1).padStart(2, '0');
@@ -1018,7 +1332,23 @@ export class OvertimeCaptureFormComponent implements OnInit {
     }
   }
 
-  onHoursChange(): void { this.refreshAmount(); }
+  onHoursChange(): void {
+    // When hours are entered directly and a start time is already set,
+    // calculate the corresponding end time so it is always stored and shown.
+    if (this.startTime && this.hours > 0) {
+      this.endTime = this.calcEndTime(this.startTime, this.hours);
+    }
+    this.refreshAmount();
+  }
+
+  /** Returns "HH:mm" for startTime + hours (handles overnight crossings). */
+  private calcEndTime(startTime: string, hours: number): string {
+    const [sh, sm] = startTime.split(':').map(n => +n);
+    const totalMins = sh * 60 + sm + Math.round(hours * 60);
+    const eh = Math.floor(totalMins / 60) % 24;
+    const em = totalMins % 60;
+    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+  }
 
   onTypeChange(): void { this.refreshAmount(); }
 
@@ -1036,6 +1366,29 @@ export class OvertimeCaptureFormComponent implements OnInit {
     }).subscribe({
       next: a => { this.amountPreview.set(a); this.previewing.set(false); },
       error: () => { this.previewing.set(false); this.amountPreview.set(null); }
+    });
+  }
+
+  docViewUrl(documentId: string): string {
+    return this.txService.documentDownloadUrl(this.editId()!, documentId);
+  }
+
+  removeDoc(): void {
+    const id  = this.editId();
+    const doc = this.existingDoc();
+    if (!id || !doc) return;
+    this.removingDoc.set(true);
+    this.txService.deleteDocument(id, doc.id).subscribe({
+      next: () => {
+        this.removingDoc.set(false);
+        const tx = this.loadedTx();
+        if (tx) this.loadedTx.set({ ...tx, documents: tx.documents.filter(d => d.id !== doc.id) });
+        this.snack.open('Document removed.', 'OK', { duration: 2500 });
+      },
+      error: e => {
+        this.removingDoc.set(false);
+        this.snack.open(`Remove failed: ${e?.error?.message ?? e?.message ?? 'Unknown error'}`, 'OK', { duration: 4000 });
+      }
     });
   }
 
@@ -1057,12 +1410,14 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   canSave(): boolean {
     return !!this.employee()
+        && !this.noOvertimeTypes()
         && !!this.salaryHeadId
         && this.hours > 0
-        && !!this.overtimeDate();
+        && !!this.overtimeDate()
+        && !this.wouldExceedLimit();
   }
 
-  save(submit: boolean): void {
+  save(submit: boolean, skipDuplicateDateCheck = false): void {
     const emp = this.employee()!;
     this.saving.set(true);
 
@@ -1074,12 +1429,21 @@ export class OvertimeCaptureFormComponent implements OnInit {
         endTime: this.endTime,
         hours: this.hours,
         salaryHeadId: this.salaryHeadId!,
-        reason: this.reason || null
+        reason: this.reason || null,
+        skipDuplicateDateCheck
       }).subscribe({
         next: tx => this.afterCreate(tx, submit),
         error: e => {
           this.saving.set(false);
-          this.snack.open(`Save failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 });
+          const msg: string = e?.error?.message ?? e?.message ?? '';
+          if (msg.startsWith('DUPLICATE_DATETIME_ERROR:')) {
+            this.snack.open(
+              'An overtime claim with an overlapping (or identical) time range already exists for this date. This claim cannot be submitted.',
+              'Dismiss', { duration: 8000 });
+            return;
+          }
+          if (msg.startsWith('DUPLICATE_DATE_WARNING:')) { this.confirmDuplicateDate(submit); return; }
+          this.snack.open(`Save failed: ${msg}`, 'Dismiss', { duration: 8000 });
         }
       });
       return;
@@ -1092,23 +1456,50 @@ export class OvertimeCaptureFormComponent implements OnInit {
       endTime: this.endTime,
       hours: this.hours,
       salaryHeadId: this.salaryHeadId!,
-      reason: this.reason || null
+      reason: this.reason || null,
+      skipDuplicateDateCheck
     }).subscribe({
       next: tx => this.afterCreate(tx, submit),
       error: e => {
         this.saving.set(false);
-        this.snack.open(`Save failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 });
+        const msg: string = e?.error?.message ?? e?.message ?? '';
+        if (msg.startsWith('DUPLICATE_DATETIME_ERROR:')) {
+          this.snack.open(
+            'An overtime claim with an overlapping (or identical) time range already exists for this date. This claim cannot be submitted.',
+            'Dismiss', { duration: 8000 });
+          return;
+        }
+        if (msg.startsWith('DUPLICATE_DATE_WARNING:')) { this.confirmDuplicateDate(submit); return; }
+        this.snack.open(`Save failed: ${msg}`, 'Dismiss', { duration: 8000 });
       }
     });
   }
 
+  private confirmDuplicateDate(submit: boolean): void {
+    const ref = this.dialog.open(DuplicateDateConfirmDialog, { backdropClass: 'po-transparent-backdrop' });
+    ref.afterClosed().subscribe(confirmed => {
+      if (confirmed) this.save(submit, true);
+    });
+  }
+
   private afterCreate(tx: OvertimeTransactionDto, submit: boolean): void {
+    // Populate loadedTx and editId from the saved transaction so that:
+    // (a) the excess-approver-missing warning banner can render immediately
+    //     if the row is excess with no approver configured, and
+    // (b) a subsequent submit error leaves the form in a coherent edit state.
+    this.loadedTx.set(tx);
+    if (!this.editId()) {
+      this.editId.set(tx.id);
+      this.currentStatus.set(tx.status);
+      this.currentStatusLabel.set(tx.statusLabel);
+    }
+
     const file = this.pendingFile();
     const finish = () => {
       if (submit) {
         this.wf.submit(tx.id).subscribe({
           next: () => this.done('Submitted for recommendation.'),
-          error: e => { this.saving.set(false); this.snack.open(`Submit failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 }); }
+          error: e => { this.saving.set(false); this.snack.open(`Submit failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 8000 }); }
         });
       } else {
         this.done('Saved as draft.');

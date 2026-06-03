@@ -14,11 +14,11 @@ import {
   _animationsDisabled
 } from "./chunk-7JX4MFQQ.js";
 import {
-  _CdkPrivateStyleLoader
-} from "./chunk-RH6YDMAF.js";
-import {
   BidiModule
 } from "./chunk-JPXPF4SI.js";
+import {
+  _CdkPrivateStyleLoader
+} from "./chunk-RH6YDMAF.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -660,4 +660,4 @@ export {
   MatMiniFabAnchor,
   MatButtonModule
 };
-//# sourceMappingURL=chunk-FPWHVFNC.js.map
+//# sourceMappingURL=chunk-RCIRYOSX.js.map

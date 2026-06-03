@@ -78,16 +78,16 @@ export class ConfigLandingComponent {
       icon: 'category',
       color: '#2563eb',
       items: [
-        { label: 'Asset Types', route: '/config/asset-types', icon: 'label' },
-        { label: 'Asset Categories', route: '/config/asset-categories', icon: 'folder' },
-        { label: 'Asset Sub-Categories', route: '/config/asset-sub-categories', icon: 'folder_open' },
-        { label: 'Asset Classes', route: '/config/asset-classes', icon: 'class' },
-        { label: 'Asset Statuses', route: '/config/asset-statuses', icon: 'toggle_on' },
-        { label: 'Asset Project Statuses', route: '/config/asset-project-statuses', icon: 'assignment_turned_in' },
-        { label: 'Asset Conditions', route: '/config/asset-conditions', icon: 'thermostat' },
-        { label: 'Component Types', route: '/config/component-types', icon: 'build' },
-        { label: 'Measurement Types', route: '/config/measurement-types', icon: 'straighten' },
-        { label: 'Municipal Services', route: '/config/cidms-municipal-services', icon: 'location_city' },
+        { label: 'Asset Types', route: '/assets/config/asset-types', icon: 'label' },
+        { label: 'Asset Categories', route: '/assets/config/asset-categories', icon: 'folder' },
+        { label: 'Asset Sub-Categories', route: '/assets/config/asset-sub-categories', icon: 'folder_open' },
+        { label: 'Asset Classes', route: '/assets/config/asset-classes', icon: 'class' },
+        { label: 'Asset Statuses', route: '/assets/config/asset-statuses', icon: 'toggle_on' },
+        { label: 'Asset Project Statuses', route: '/assets/config/asset-project-statuses', icon: 'assignment_turned_in' },
+        { label: 'Asset Conditions', route: '/assets/config/asset-conditions', icon: 'thermostat' },
+
+        { label: 'Measurement Types', route: '/assets/config/measurement-types', icon: 'straighten' },
+        { label: 'Municipal Services', route: '/assets/config/cidms-municipal-services', icon: 'location_city' },
       ]
     },
     {
@@ -95,8 +95,11 @@ export class ConfigLandingComponent {
       icon: 'swap_horiz',
       color: '#059669',
       items: [
-        { label: 'Transaction Types', route: '/config/transaction-types', icon: 'receipt_long' },
-        { label: 'mSCOA Settings', route: '/config/mscoa', icon: 'account_tree' },
+        { label: 'Transaction Types', route: '/assets/config/transaction-types', icon: 'receipt_long' },
+        { label: 'RUL Adjustment Indicators', route: '/assets/config/rul-adjustment-indicators', icon: 'tune' },
+        { label: 'mSCOA Settings', route: '/assets/config/mscoa', icon: 'account_tree' },
+        { label: 'Clearing Accounts', route: '/assets/config/clearing-accounts', icon: 'account_balance_wallet' },
+        { label: 'Email Templates', route: '/assets/config/email-templates', icon: 'email' },
       ]
     },
     {
@@ -104,10 +107,10 @@ export class ConfigLandingComponent {
       icon: 'star_rate',
       color: '#d97706',
       items: [
-        { label: 'Criticality Grades', route: '/config/criticality-grades', icon: 'warning' },
-        { label: 'Health Grades', route: '/config/health-grades', icon: 'favorite' },
-        { label: 'Performance Grades', route: '/config/performance-grades', icon: 'speed' },
-        { label: 'Utilisation Grades', route: '/config/utilisation-grades', icon: 'pie_chart' },
+        { label: 'Criticality Grades', route: '/assets/config/criticality-grades', icon: 'warning' },
+        { label: 'Health Grades', route: '/assets/config/health-grades', icon: 'favorite' },
+        { label: 'Performance Grades', route: '/assets/config/performance-grades', icon: 'speed' },
+        { label: 'Utilisation Grades', route: '/assets/config/utilisation-grades', icon: 'pie_chart' },
       ]
     },
     {
@@ -115,8 +118,10 @@ export class ConfigLandingComponent {
       icon: 'build',
       color: '#0891b2',
       items: [
-        { label: 'Service Groups', route: '/config/service-groups', icon: 'groups' },
-        { label: 'Lead Times', route: '/config/lead-times', icon: 'schedule' },
+        { label: 'Maintenance Types', route: '/assets/config/maint-types', icon: 'category' },
+        { label: 'Maintenance Frequencies', route: '/assets/config/maint-frequencies', icon: 'repeat' },
+        { label: 'Service Groups', route: '/assets/config/service-groups', icon: 'groups' },
+        { label: 'Lead Times', route: '/assets/config/lead-times', icon: 'schedule' },
       ]
     },
     {
@@ -124,7 +129,7 @@ export class ConfigLandingComponent {
       icon: 'account_tree',
       color: '#7c3aed',
       items: [
-        { label: 'Tree View (All Levels)', route: '/config/cidms-hierarchy', icon: 'account_tree' },
+        { label: 'Tree View (All Levels)', route: '/assets/config/cidms-hierarchy', icon: 'account_tree' },
       ]
     }
   ];

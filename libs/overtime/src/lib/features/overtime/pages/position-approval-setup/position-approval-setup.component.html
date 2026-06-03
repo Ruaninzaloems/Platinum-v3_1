@@ -285,8 +285,8 @@
             <table class="import-preview-table">
               <thead>
                 <tr>
-                  <th>Position ID</th>
-                  <th>Reports To</th>
+                  <th>Top Post</th>
+                  <th>Bottom Post</th>
                   <th>Start Date</th>
                   <th>End Date</th>
                 </tr>
@@ -353,11 +353,13 @@
           <button mat-button type="button" (click)="closeImportDialog()" [disabled]="importConfirming()">
             Cancel
           </button>
-          <button mat-raised-button color="primary" type="button"
-                  [disabled]="importConfirming() || (importValidation()?.acceptedRows ?? 0) === 0"
-                  (click)="confirmImport()">
-            {{ importConfirming() ? 'Applying…' : 'Confirm Import' }}
-          </button>
+          @if ((importValidation()?.errorRows ?? 0) === 0) {
+            <button mat-raised-button color="primary" type="button"
+                    [disabled]="importConfirming() || (importValidation()?.acceptedRows ?? 0) === 0"
+                    (click)="confirmImport()">
+              {{ importConfirming() ? 'Applying…' : 'Confirm Import' }}
+            </button>
+          }
         </div>
 
       </div>
@@ -381,6 +383,12 @@
             <div class="config-subtitle">
               {{ selectedPositionCode() || p.id }} — {{ selectedPositionDescription() }}
             </div>
+            @if (selectedPositionEmployee()) {
+              <div class="config-employee">
+                <mat-icon>person</mat-icon>
+                <span>{{ selectedPositionEmployee() }}</span>
+              </div>
+            }
           </div>
         </div>
 
@@ -530,36 +538,11 @@
             </div>
             <div class="section-body">
               <table mat-table [dataSource]="actingRows()" class="full-width compact-table">
-                <ng-container matColumnDef="employee">
-                  <th mat-header-cell *matHeaderCellDef>Acting Employee</th>
-                  <td mat-cell *matCellDef="let row">
-                    <div class="picker-input">
-                      <mat-icon class="picker-icon">search</mat-icon>
-                      <input type="text" class="picker-native" [matAutocomplete]="aaEmp"
-                             [value]="row.controls.actingEmployeeName.value"
-                             (input)="onActingEmployeeInput($event, row)"
-                             placeholder="Search employee">
-                      <mat-autocomplete #aaEmp="matAutocomplete"
-                                        panelClass="picker-panel"
-                                        [autoActiveFirstOption]="true">
-                        <mat-option
-                          *ngFor="let e of filterEmployees(row.controls.actingEmployeeName.value)"
-                          [value]="e.fullName"
-                          (onSelectionChange)="setActingEmployee(row, e)"
-                          class="picker-option">
-                          <span class="picker-id">{{ e.employeeNumber }}</span>
-                          <span class="picker-desc">{{ e.fullName }}</span>
-                          <span *ngIf="e.positionDescription" class="picker-code">{{ e.positionDescription }}</span>
-                        </mat-option>
-                      </mat-autocomplete>
-                    </div>
-                  </td>
-                </ng-container>
-
                 <ng-container matColumnDef="position">
                   <th mat-header-cell *matHeaderCellDef>Acting In Position</th>
                   <td mat-cell *matCellDef="let row">
-                    <div class="picker-input">
+                    <div class="picker-input"
+                         [class.picker-input--error]="row.controls.actingInPositionId.invalid && row.controls.actingInPositionId.touched">
                       <mat-icon class="picker-icon">search</mat-icon>
                       <input type="text" class="picker-native" [matAutocomplete]="aaPos"
                              [value]="row.controls.actingInPositionDescription.value"
@@ -578,6 +561,34 @@
                         </mat-option>
                       </mat-autocomplete>
                     </div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empId">
+                  <th mat-header-cell *matHeaderCellDef>Emp ID</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.actingInPositionId.value)?.employeeId || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empCode">
+                  <th mat-header-cell *matHeaderCellDef>Emp Code</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.actingInPositionId.value)?.employeeCode || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empFirstName">
+                  <th mat-header-cell *matHeaderCellDef>First Name</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.actingInPositionId.value)?.employeeFirstName || '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="empSurname">
+                  <th mat-header-cell *matHeaderCellDef>Surname</th>
+                  <td mat-cell *matCellDef="let row" class="emp-info-cell">
+                    {{ positionMap().get(row.controls.actingInPositionId.value)?.employeeSurname || '—' }}
                   </td>
                 </ng-container>
 
@@ -628,7 +639,7 @@
           <div class="config-actions">
             <button mat-button type="button" (click)="backToList()">Cancel</button>
             <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving()"
+                    [disabled]="saving()"
                     class="save-btn">
               {{ saving() ? 'Saving…' : 'Save Position Configuration' }}
             </button>

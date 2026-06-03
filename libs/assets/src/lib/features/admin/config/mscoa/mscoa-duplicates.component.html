@@ -1,0 +1,129 @@
+<div class="config-page">
+
+  <div class="breadcrumb">
+    <button mat-button class="back-btn" (click)="backToSettings()"><mat-icon>arrow_back</mat-icon> Back to mSCOA Settings</button>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">Duplicate mSCOA Settings</span>
+  </div>
+
+  <div class="page-header" style="margin-top:16px">
+    <div>
+      <h1 class="page-title">Duplicate mSCOA Settings</h1>
+      <p class="page-subtitle">Identify and remove duplicate AssetConfig_mSCOA rows that cause duplicate lines in the Depreciation Schedule report</p>
+    </div>
+    @if (searched() && results().length > 0) {
+      <div class="header-actions">
+        <button mat-stroked-button (click)="exportCsv()"><mat-icon>download</mat-icon> Export CSV</button>
+        <button mat-stroked-button (click)="exportExcel()" [disabled]="exportingExcel()">
+          @if (exportingExcel()) { <mat-spinner diameter="14" style="display:inline-block;margin-right:4px"></mat-spinner> }
+          <mat-icon>table_chart</mat-icon> Export Excel
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="dup-info-banner">
+    <mat-icon style="color:#b45309;font-size:18px;vertical-align:middle;margin-right:6px">warning</mat-icon>
+    <span>Duplicate rows share the same <strong>Financial Year + Type + Category + Sub Category + Measurement Type</strong> combination (optionally also Department/Division). The Depreciation Schedule report JOINs on these keys — each duplicate row produces an extra output line. Delete all but one row per group to fix the report.</span>
+  </div>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="filter-field">
+        <label>Financial Year</label>
+        <select class="form-input" [(ngModel)]="filterFinYear">
+          <option value="">All Years</option>
+          @for (fy of finYears(); track fy) {
+            <option [value]="fy">{{fy}}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Transaction Type</label>
+        <select class="form-input" [(ngModel)]="filterTransactionTypeId">
+          <option value="">All Types</option>
+          @for (t of txnTypeDefs(); track t.id) {
+            <option [value]="t.id">{{t.name}}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-field" style="min-width:auto;flex:0">
+        <label>&nbsp;</label>
+        <label class="checkbox-label" style="padding:8px 0">
+          <input type="checkbox" [(ngModel)]="includeDeptDiv"> Include Dept/Division in duplicate key
+        </label>
+      </div>
+      <div class="filter-actions">
+        <button mat-flat-button class="btn-primary" (click)="search()" [disabled]="loading()">
+          @if (loading()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+          <mat-icon>search</mat-icon> Find Duplicates
+        </button>
+        <button mat-stroked-button (click)="clearFilter()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else if (searched()) {
+    @if (results().length === 0) {
+      <div class="dup-empty-state">
+        <mat-icon style="font-size:48px;color:#22c55e">check_circle</mat-icon>
+        <p>No duplicates found with the selected filters.</p>
+      </div>
+    } @else {
+      <div class="dup-summary-bar">
+        <span class="dup-summary-chip"><strong>{{totalCount()}}</strong> duplicate rows across <strong>{{groupCount()}}</strong> groups</span>
+        <span class="dup-summary-hint">Delete all but one row per group to resolve duplicates.</span>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fin Year</th>
+              <th>Asset Type</th>
+              <th>Category</th>
+              <th>Sub Category</th>
+              <th>Measurement Type</th>
+              <th>Status</th>
+              <th>Department</th>
+              <th>Division</th>
+              <th style="text-align:center">Group Size</th>
+              <th class="actions-col">Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of results(); track item.id) {
+              <tr [class]="isDeleting(item.id) ? 'row-deleting' : ''">
+                <td><span class="id-badge">{{item.id}}</span></td>
+                <td><span class="fin-year-badge">{{item.finYear}}</span></td>
+                <td class="desc-cell">{{item.typeDesc || '—'}}</td>
+                <td>{{item.categoryDesc || '—'}}</td>
+                <td>{{item.subCategoryDesc || '—'}}</td>
+                <td>{{item.measurementTypeName || '—'}}</td>
+                <td>{{item.statusDesc || '—'}}</td>
+                <td>{{item.departmentDesc || '—'}}</td>
+                <td>{{item.divisionDesc || '—'}}</td>
+                <td style="text-align:center">
+                  <span class="dup-count-badge">{{item.duplicateGroupCount}}</span>
+                </td>
+                <td class="actions-cell">
+                  <button mat-icon-button matTooltip="Delete this row and its transaction type mappings" (click)="confirmDelete(item)" [disabled]="deleting() !== null">
+                    @if (isDeleting(item.id)) {
+                      <mat-spinner diameter="18"></mat-spinner>
+                    } @else {
+                      <mat-icon class="action-icon delete">delete</mat-icon>
+                    }
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+</div>

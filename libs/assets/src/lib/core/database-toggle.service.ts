@@ -1,6 +1,10 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DatabaseBackend = 'postgresql' | 'sqlserver';
+// Proxy targets defined in apps/shell/proxy.conf.json
+const PG_API    = '/api';       // → localhost:3000 (PostgreSQL)
+const MSSQL_API = '/ASSETS-API'; // → localhost:3001 (SQL Server), rewritten to /api
+
+export type DatabaseBackend = 'postgresql' | 'sqlserver' | 'hybrid';
 
 export interface SharedTable {
   key: string;
@@ -52,13 +56,22 @@ export const SHARED_TABLES: SharedTable[] = [
 export class DatabaseToggleService {
   private static readonly STORAGE_KEY = 'preferredApi';
   private static readonly TABLE_SOURCES_KEY = 'tableDataSources';
+  private static readonly MIGRATION_KEY = 'preferredApi_v3migrated';
 
   activeBackend = signal<DatabaseBackend>(this.loadPreference());
   tableSources = signal<Record<string, DatabaseBackend>>(this.loadTableSources());
   readonly tableOverrides = this.tableSources;
 
   get apiPrefix(): string {
-    return '/api';
+    return this.activeBackend() === 'postgresql' ? PG_API : MSSQL_API;
+  }
+
+  /** Cycles through postgresql → sqlserver → hybrid → postgresql */
+  cycleBackend(): void {
+    const current = this.activeBackend();
+    if (current === 'postgresql') this.setBackend('sqlserver');
+    else if (current === 'sqlserver') this.setBackend('hybrid');
+    else this.setBackend('postgresql');
   }
 
   tableSource(tableKey: string): DatabaseBackend {
@@ -66,66 +79,53 @@ export class DatabaseToggleService {
   }
 
   getTableBackend(tableKey: string): DatabaseBackend {
-    var override = this.tableSources()[tableKey];
-    if (override) {
-      return override;
-    }
-    return this.activeBackend();
+    const backend = this.activeBackend();
+    if (backend === 'postgresql') return 'postgresql';
+    if (backend === 'sqlserver') return 'sqlserver';
+    // hybrid: use per-table override if set, otherwise default to sqlserver
+    const override = this.tableSources()[tableKey];
+    if (override === 'postgresql' || override === 'sqlserver') return override;
+    return 'sqlserver';
   }
 
   getTablePrefix(tableKey: string): string {
-    var override = this.tableSources()[tableKey];
-    if (override === 'postgresql') {
-      return '/api';
-    }
-    if (override === 'sqlserver') {
-      return '/ASSETS-API';
-    }
-    return this.activeBackend() === 'postgresql' ? '/api' : '/ASSETS-API';
+    const backend = this.activeBackend();
+    if (backend === 'postgresql') return PG_API;
+    if (backend === 'sqlserver') return MSSQL_API;
+    // hybrid: per-table override
+    const override = this.tableSources()[tableKey];
+    return override === 'postgresql' ? PG_API : MSSQL_API;
   }
 
   getTableUrl(tableKey: string): string {
-    var table = SHARED_TABLES.find(function(t) { return t.key === tableKey; });
-    if (!table) {
-      return this.getTablePrefix(tableKey) + '/' + tableKey;
+    const table = SHARED_TABLES.find(t => t.key === tableKey);
+    const backend = this.activeBackend();
+
+    if (backend === 'postgresql') {
+      return PG_API + '/' + (table ? table.psqlRoute : tableKey);
     }
-    var override = this.tableSources()[tableKey];
-    if (override === 'sqlserver') {
-      return '/ASSETS-API/' + table.mssqlRoute;
+    if (backend === 'sqlserver') {
+      return MSSQL_API + '/' + (table ? table.mssqlRoute : tableKey);
     }
+    // hybrid: per-table override, default to sqlserver
+    const override = this.tableSources()[tableKey];
     if (override === 'postgresql') {
-      return '/api/' + table.psqlRoute;
+      return PG_API + '/' + (table ? table.psqlRoute : tableKey);
     }
-    return this.activeBackend() === 'postgresql'
-      ? '/api/' + table.psqlRoute
-      : '/ASSETS-API/' + table.mssqlRoute;
+    return MSSQL_API + '/' + (table ? table.mssqlRoute : tableKey);
   }
 
   setBackend(backend: DatabaseBackend): void {
     this.activeBackend.set(backend);
-    try {
-      localStorage.setItem(DatabaseToggleService.STORAGE_KEY, backend);
-    } catch (_) {}
-    if (backend === 'postgresql') {
-      var cleaned = this.stripSqlServerOverrides(this.tableSources());
-      if (cleaned !== null) {
-        this.tableSources.set(cleaned);
-        this.persistTableSources(cleaned);
-      }
-    }
+    try { localStorage.setItem(DatabaseToggleService.STORAGE_KEY, backend); } catch (_) {}
   }
 
   setTableSource(tableKey: string, backend: DatabaseBackend | 'inherit'): void {
-    var sources = { ...this.tableSources() };
-    if (backend === 'inherit') {
-      delete sources[tableKey];
-    } else {
-      sources[tableKey] = backend;
-    }
+    const sources = { ...this.tableSources() };
+    if (backend === 'inherit') delete sources[tableKey];
+    else sources[tableKey] = backend;
     this.tableSources.set(sources);
-    try {
-      localStorage.setItem(DatabaseToggleService.TABLE_SOURCES_KEY, JSON.stringify(sources));
-    } catch (_) {}
+    try { localStorage.setItem(DatabaseToggleService.TABLE_SOURCES_KEY, JSON.stringify(sources)); } catch (_) {}
   }
 
   setTableBackend(tableKey: string, backend: DatabaseBackend | 'inherit'): void {
@@ -134,59 +134,30 @@ export class DatabaseToggleService {
 
   resetTableOverrides(): void {
     this.tableSources.set({});
-    try {
-      localStorage.removeItem(DatabaseToggleService.TABLE_SOURCES_KEY);
-    } catch (_) {}
+    try { localStorage.removeItem(DatabaseToggleService.TABLE_SOURCES_KEY); } catch (_) {}
   }
 
   private loadPreference(): DatabaseBackend {
     try {
-      var stored = localStorage.getItem(DatabaseToggleService.STORAGE_KEY);
-      if (stored === 'sqlserver') {
-        return 'sqlserver';
+      const migrated = localStorage.getItem(DatabaseToggleService.MIGRATION_KEY);
+      const stored   = localStorage.getItem(DatabaseToggleService.STORAGE_KEY);
+      // One-time migration: old 'sqlserver' default → 'hybrid'
+      if (!migrated && stored === 'sqlserver') {
+        localStorage.setItem(DatabaseToggleService.STORAGE_KEY, 'hybrid');
+        localStorage.setItem(DatabaseToggleService.MIGRATION_KEY, '1');
+        return 'hybrid';
       }
+      if (!migrated) localStorage.setItem(DatabaseToggleService.MIGRATION_KEY, '1');
+      if (stored === 'postgresql' || stored === 'sqlserver' || stored === 'hybrid') return stored;
     } catch (_) {}
     return 'postgresql';
   }
 
   private loadTableSources(): Record<string, DatabaseBackend> {
     try {
-      var stored = localStorage.getItem(DatabaseToggleService.TABLE_SOURCES_KEY);
-      if (stored) {
-        var parsed: Record<string, DatabaseBackend> = JSON.parse(stored);
-        if (this.loadPreference() === 'postgresql') {
-          var cleaned = this.stripSqlServerOverrides(parsed);
-          if (cleaned !== null) {
-            this.persistTableSources(cleaned);
-            return cleaned;
-          }
-        }
-        return parsed;
-      }
+      const stored = localStorage.getItem(DatabaseToggleService.TABLE_SOURCES_KEY);
+      if (stored) return JSON.parse(stored) as Record<string, DatabaseBackend>;
     } catch (_) {}
     return {};
-  }
-
-  private stripSqlServerOverrides(sources: Record<string, DatabaseBackend>): Record<string, DatabaseBackend> | null {
-    var cleaned: Record<string, DatabaseBackend> = {};
-    var didStrip = false;
-    for (var key in sources) {
-      if (sources[key] === 'sqlserver') {
-        didStrip = true;
-      } else {
-        cleaned[key] = sources[key];
-      }
-    }
-    return didStrip ? cleaned : null;
-  }
-
-  private persistTableSources(sources: Record<string, DatabaseBackend>): void {
-    try {
-      if (Object.keys(sources).length === 0) {
-        localStorage.removeItem(DatabaseToggleService.TABLE_SOURCES_KEY);
-      } else {
-        localStorage.setItem(DatabaseToggleService.TABLE_SOURCES_KEY, JSON.stringify(sources));
-      }
-    } catch (_) {}
   }
 }

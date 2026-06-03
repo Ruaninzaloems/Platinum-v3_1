@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ApiService } from '../../../core/api.service';
 import { OrgSettingsService } from '../../../core/org-settings.service';
 import * as XLSX from 'xlsx';
@@ -13,7 +14,7 @@ import * as XLSX from 'xlsx';
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, MatProgressSpinnerModule, MatSnackBarModule, MatCheckboxModule],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.css'
 })
@@ -34,7 +35,8 @@ export class ReportsComponent implements OnInit {
     subCategoryId: '',
     measurementTypeId: '',
     statusId: '',
-    assetItemId: ''
+    assetItemId: '',
+    acquisitionsOnly: false
   };
 
   depGenerating = signal(false);
@@ -90,7 +92,8 @@ export class ReportsComponent implements OnInit {
     subCategoryId: '',
     measurementTypeId: '',
     statusId: '',
-    assetItemId: ''
+    assetItemId: '',
+    acquisitionsOnly: false
   };
 
   disposalFilters: any = {
@@ -117,6 +120,7 @@ export class ReportsComponent implements OnInit {
   assetSubCategories = signal<any[]>([]);
   measurementTypes = signal<any[]>([]);
   assetStatuses = signal<any[]>([]);
+  departments = signal<any[]>([]);
 
   showLocFilters = signal(false);
   locGenerating = signal(false);
@@ -152,7 +156,71 @@ export class ReportsComponent implements OnInit {
     { id: 'prior-year-adj', title: 'Prior Year Adjustments', description: 'Approved prior year adjustment transactions', icon: 'history', color: 'purple', tags: ['GRAP 3', 'AFS Note'] },
     { id: 'prior-period-adj', title: 'Prior Period Adjustments', description: 'Approved prior period adjustment transactions', icon: 'update', color: 'green', tags: ['GRAP 3', 'mSCOA'] },
     { id: 'custom-far', title: 'Custom FAR', description: 'Select and order any of the 130+ FAR fields', icon: 'tune', color: 'teal', tags: ['Custom', 'FAR', 'GRAP 17'] },
+    { id: 'measurement-model-compliance', title: 'Measurement Model Compliance Report', description: 'Assets whose measurement type conflicts with the current model', icon: 'rule', color: 'red', tags: ['GRAP 17', 'Compliance'] },
+    { id: 'mscoa-prefix-errors', title: 'mSCOA Prefix Errors', description: 'mSCOA vote-field mappings whose SCOA account-code prefix does not match the required prefix rule', icon: 'error_outline', color: 'red', tags: ['mSCOA', 'Compliance', 'SCOA'] },
+    { id: 'mscoa-missing-settings', title: 'Missing mSCOA Settings', description: 'Asset combinations that have no GL mapping for the selected financial year and transaction type', icon: 'search_off', color: 'orange', tags: ['mSCOA', 'Compliance', 'GL'] },
+    { id: 'asset-gl', title: 'Asset GL Transactions', description: 'General ledger lines linked to asset transactions (mSCOA-coded)', icon: 'account_balance', color: 'teal', tags: ['GL', 'mSCOA', 'GRAP 17'] },
+    { id: 'mscoa-settings', title: 'mSCOA Settings Report', description: 'All configured mSCOA vote field mappings with full SCOA codes per transaction slot', icon: 'settings', color: 'teal', tags: ['mSCOA', 'Compliance', 'GL'] },
+    { id: 'asset-transfer', title: 'Asset Transfer Report', description: 'Bulk asset transfers: From/To classification, amounts transferred, and GL document numbers', icon: 'swap_horiz', color: 'blue', tags: ['mSCOA', 'GRAP 17', 'GL'] },
+    { id: 'rul-adjustment-impact', title: 'RUL Adjustment Impact Report', description: 'Full-year depreciation before vs. after RUL adjustments — closing acc. dep., current value, and remaining RUL at year end', icon: 'trending_up', color: 'purple', tags: ['Depreciation', 'RUL', 'GRAP 17'] },
   ];
+
+  showComplianceFilters = signal(false);
+  complianceGenerating = signal(false);
+  complianceReportGenerated = signal(false);
+  complianceReportData = signal<any[]>([]);
+  complianceOrgModel = signal<string>('');
+  complianceReportSubtitle = signal('');
+  compliancePage = signal(0);
+  compliancePageSize = 20;
+  complianceFilters: any = { typeId: '', categoryId: '', departmentId: '' };
+
+  prefixViolGenerating = signal(false);
+  prefixViolGenerated = signal(false);
+  prefixViolData = signal<any[]>([]);
+  prefixViolPage = signal(0);
+  readonly prefixViolPageSize = 20;
+  prefixViolFilters: any = { finYear: '', transactionType: '', assetType: '', category: '', subCategory: '', department: '', division: '' };
+
+  showMissingMscoaFilters = signal(false);
+  missingMscoaGenerating = signal(false);
+  missingMscoaGenerated = signal(false);
+  missingMscoaData = signal<any[]>([]);
+  missingMscoaIncompleteData = signal<any[]>([]);
+  missingMscoaUseDeptDiv = signal(false);
+  missingMscoaPage = signal(0);
+  readonly missingMscoaPageSize = 20;
+  missingMscoaIncompletePage = signal(0);
+  readonly missingMscoaIncompletePageSize = 20;
+  missingMscoaFilters: any = { finYear: '', transactionTypeId: '' };
+  transactionTypeDefs = signal<any[]>([]);
+
+  prefixViolFilteredData(): any[] {
+    const f = this.prefixViolFilters;
+    return this.prefixViolData().filter((row: any) => {
+      if (f.finYear && (row.finYear || '') !== f.finYear) return false;
+      if (f.transactionType && (row.transactionTypeName || '') !== f.transactionType) return false;
+      if (f.assetType && (row.assetTypeName || '') !== f.assetType) return false;
+      if (f.category && (row.categoryName || '') !== f.category) return false;
+      if (f.subCategory && (row.subCategoryName || '') !== f.subCategory) return false;
+      if (f.department && (row.departmentName || '') !== f.department) return false;
+      if (f.division && (row.divisionName || '') !== f.division) return false;
+      return true;
+    });
+  }
+
+  prefixViolUniqueValues(field: string): string[] {
+    const seen = new Set<string>();
+    this.prefixViolData().forEach((row: any) => { if (row[field]) seen.add(String(row[field])); });
+    return Array.from(seen).sort();
+  }
+
+  onPrefixViolFilterChange(): void { this.prefixViolPage.set(0); }
+
+  resetPrefixViolFilters(): void {
+    this.prefixViolFilters = { finYear: '', transactionType: '', assetType: '', category: '', subCategory: '', department: '', division: '' };
+    this.prefixViolPage.set(0);
+  }
 
   revFilters: any = { finYear: '', fromPeriod: 1, toPeriod: 12, typeId: '', categoryId: '', subCategoryId: '', measurementTypeId: '', statusId: '', assetItemId: '' };
   impFilters: any = { finYear: '', fromPeriod: 1, toPeriod: 12, typeId: '', categoryId: '', subCategoryId: '', measurementTypeId: '', statusId: '', assetItemId: '' };
@@ -196,6 +264,33 @@ export class ReportsComponent implements OnInit {
   ppaReportData = signal<any[]>([]);
   ppaReportSubtitle = signal('');
   ppaReportGenerated = signal(false);
+
+  showAssetGlFilters = signal(false);
+  assetGlGenerating = signal(false);
+  assetGlReportData = signal<any[]>([]);
+  assetGlReportSubtitle = signal('');
+  assetGlReportGenerated = signal(false);
+  assetGlTransactionTypes = signal<any[]>([]);
+  assetGlFinYears = signal<string[]>([]);
+  assetGlProcessingMonths = signal<number[]>([]);
+  assetGlFilters: any = { finYear: '', processingMonth: '', transactionTypeId: '' };
+
+  showMscoaSettingsFilters = signal(false);
+  mscoaSettingsGenerating = signal(false);
+  mscoaSettingsGenerated = signal(false);
+  mscoaSettingsData = signal<any[]>([]);
+  mscoaSettingsSubtitle = signal('');
+  mscoaSettingsPage = signal(0);
+  readonly mscoaSettingsPageSize = 20;
+  mscoaSettingsPagedRows: any;
+  mscoaSettingsTotalPages: any;
+  mscoaSettingsDepts = signal<any[]>([]);
+  mscoaSettingsDivs = signal<any[]>([]);
+  mscoaSettingsFilterCategories = signal<any[]>([]);
+  mscoaSettingsFilterSubCategories = signal<any[]>([]);
+  mscoaSettingsFilterDivisions = signal<any[]>([]);
+  mscoaSettingsFilters: any = { finYear: '', typeId: '', categoryId: '', subCategoryId: '', departmentId: '', divisionId: '' };
+  useDeptDivision = computed(() => this.orgSettings.settings()?.mscoa_use_dept_division !== false);
 
   showAfsFilters = signal(false);
   afsGenerating = signal(false);
@@ -421,7 +516,8 @@ export class ReportsComponent implements OnInit {
   customFarFilters: any = {
     finYear: '', fromPeriod: 1, toPeriod: 12,
     typeId: '', categoryId: '', subCategoryId: '',
-    measurementTypeId: '', statusId: '', assetItemId: ''
+    measurementTypeId: '', statusId: '', assetItemId: '',
+    acquisitionsOnly: false
   };
 
   getReportIconColor(color: string): string {
@@ -480,6 +576,20 @@ export class ReportsComponent implements OnInit {
       if (!rows || rows.length === 0) return 0;
       return Math.ceil(rows.length / this.customFarPageSize);
     });
+    this.mscoaSettingsPagedRows = computed(() => {
+      var data = this.mscoaSettingsData();
+      if (!data || data.length === 0) return [];
+      var start = this.mscoaSettingsPage() * this.mscoaSettingsPageSize;
+      var end = start + this.mscoaSettingsPageSize;
+      var result: any[] = [];
+      for (var i = start; i < end && i < data.length; i++) { result.push(data[i]); }
+      return result;
+    });
+    this.mscoaSettingsTotalPages = computed(() => {
+      var data = this.mscoaSettingsData();
+      if (!data || data.length === 0) return 0;
+      return Math.ceil(data.length / this.mscoaSettingsPageSize);
+    });
   }
 
   ngOnInit() {
@@ -519,6 +629,7 @@ export class ReportsComponent implements OnInit {
     this.api.getMeasurementTypes().subscribe({ next: function(this: ReportsComponent, d: any[]) { this.measurementTypes.set(d); }.bind(this) });
     this.api.getAssetStatuses().subscribe({ next: function(this: ReportsComponent, d: any[]) { this.assetStatuses.set(d); }.bind(this) });
     this.api.getDisposalMethods().subscribe({ next: function(this: ReportsComponent, d: any[]) { this.disposalMethods.set(d); }.bind(this) });
+    this.api.getDepartments().subscribe({ next: function(this: ReportsComponent, d: any) { var arr = Array.isArray(d) ? d : (d && d.data ? d.data : []); this.departments.set(arr); }.bind(this), error: function() {} });
   }
 
   isValueCol(col: string): boolean {
@@ -533,6 +644,16 @@ export class ReportsComponent implements OnInit {
   formatRand(val: number): string {
     if (val == null || isNaN(val)) return 'R 0.00';
     return 'R ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatDisposalNum(val: number): string {
+    if (val == null || isNaN(val)) return '0.00';
+    return val.toFixed(2);
+  }
+
+  formatDepNum(val: number): string {
+    if (val == null || isNaN(val)) return '0';
+    return val % 1 === 0 ? String(Math.round(val)) : val.toFixed(2);
   }
 
   farColumns: string[] = [];
@@ -618,6 +739,10 @@ export class ReportsComponent implements OnInit {
     if (this.depFilters.measurementTypeId) { params.measurementTypeId = this.depFilters.measurementTypeId; }
     if (this.depFilters.statusId) { params.statusId = this.depFilters.statusId; }
     if (this.depFilters.assetItemId) { params.assetId = this.depFilters.assetItemId; }
+    if (this.depFilters.acquisitionsOnly) {
+      params.acquisitionsOnly = true;
+      if (!this.depFilters.finYear) { params.acquisitionsAllYears = true; }
+    }
     this.api.getDepreciationScheduleReport(params).subscribe({
       next: function(res: any) {
         var data: any[] = Array.isArray(res) ? res : (res.data || []);
@@ -901,8 +1026,9 @@ export class ReportsComponent implements OnInit {
       '</body></html>';
   }
 
-  depColumns(): string[] {
-    return [
+  depColumns = computed(() => {
+    var isCostModel = this.orgSettings.settings()?.measurement_model?.toLowerCase() === 'cost model';
+    var cols = [
       'Asset Register Item ID', 'Asset Description', 'Asset Type', 'Asset Category', 'Asset Sub-Category',
       'Asset Class', 'Measurement Type', 'Asset Status', 'Financial Status', 'Asset Condition',
       'Depreciation Method', 'General Ledger Document Number', 'In Service Date', 'Scheduled Date',
@@ -911,12 +1037,17 @@ export class ReportsComponent implements OnInit {
       'Days From Last Run', 'Purchase Amount (R)',
       'Accumulated Depreciation Opening (R)', 'Accumulated Depreciation Closing (R)',
       'Accumulated Depreciation Current Year (R)', 'Depreciation Value (R)',
-      'Depreciation Offset Opening Balance (R)', 'Depreciation Offset (R)', 'Depreciation Offset Closing Balance (R)',
+    ];
+    if (!isCostModel) {
+      cols.push('Depreciation Offset Opening Balance (R)', 'Depreciation Offset (R)', 'Depreciation Offset Closing Balance (R)');
+    }
+    cols.push(
       'Carrying Value (R)',
       'Planning Project (Debit)', 'SCOA Item Code (Debit)', 'Planning Project (Credit)', 'SCOA Item Code (Credit)',
       'Approve Status'
-    ];
-  }
+    );
+    return cols;
+  });
 
   depRowValue(row: any, col: string): string {
     var map: Record<string, string> = {
@@ -982,7 +1113,7 @@ export class ReportsComponent implements OnInit {
       if (isNaN(d.getTime())) return '';
       return d.toLocaleDateString('en-ZA');
     }
-    return this.formatRand(Number(val));
+    return this.formatDepNum(Number(val));
   }
 
   isDepValueCol(col: string): boolean {
@@ -1153,7 +1284,7 @@ export class ReportsComponent implements OnInit {
         col === 'Document Number') {
       return String(val);
     }
-    return this.formatRand(Number(val));
+    return this.formatDisposalNum(Number(val));
   }
 
   isDisposalValueCol(col: string): boolean {
@@ -1271,6 +1402,34 @@ export class ReportsComponent implements OnInit {
       this.openCustomFarFilters();
       return;
     }
+    if (reportId === 'measurement-model-compliance') {
+      this.openComplianceFilters();
+      return;
+    }
+    if (reportId === 'mscoa-prefix-errors') {
+      this.generateMscoaPrefixReport();
+      return;
+    }
+    if (reportId === 'mscoa-missing-settings') {
+      this.openMissingMscoaFilters();
+      return;
+    }
+    if (reportId === 'asset-gl') {
+      this.openAssetGlFilters();
+      return;
+    }
+    if (reportId === 'mscoa-settings') {
+      this.openMscoaSettingsFilters();
+      return;
+    }
+    if (reportId === 'asset-transfer') {
+      this.openTransferFilters();
+      return;
+    }
+    if (reportId === 'rul-adjustment-impact') {
+      this.openRulImpactFilters();
+      return;
+    }
 
     this.generating.set(true);
     this.reportData.set(null);
@@ -1374,6 +1533,10 @@ export class ReportsComponent implements OnInit {
     if (this.farFilters.subCategoryId) { params.subCategoryId = this.farFilters.subCategoryId; }
     if (this.farFilters.statusId) { params.assetStatus = this.farFilters.statusId; }
     if (this.farFilters.assetItemId) { params.assetId = this.farFilters.assetItemId; }
+    if (this.farFilters.acquisitionsOnly) {
+      params.acquisitionsOnly = true;
+      if (!this.farFilters.finYear) { params.acquisitionsAllYears = true; }
+    }
     this.api.getFarReport(params).subscribe({
       next: (res: any) => {
         this.farData = res.data || [];
@@ -1409,9 +1572,7 @@ export class ReportsComponent implements OnInit {
 
   buildFarColumnHeaders(): string[] {
     return [
-      'FinYear',
-      'AssetClass_ID', 'Asset_SubCategory_ID', 'AssetCategory_ID', 'AssetType_ID', 'AssetStatus_ID',
-      'GIS_ID', 'ErfNumber', 'AssetRegisterItem_ID', 'MunicipalAssetID',
+      'FinYear', 'AssetRegisterItem_ID', 'MunicipalAssetID',
       'ParentAssetRegisterItem_ID', 'MainAssetDescription', 'MainAssetID',
       'Description', 'OldBarCode', 'Barcode', 'ImageRef',
       'AssetTypeDesc', 'AssetCategoryDesc', 'Asset_SubCategoryDescription', 'AssetClassDesc',
@@ -1632,8 +1793,7 @@ export class ReportsComponent implements OnInit {
   buildFarExcelHeaders(): string[] {
     return [
       'Financial Year',
-      'Asset Class ID', 'Sub Category ID', 'Category ID', 'Type ID', 'Status ID',
-      'GIS ID', 'ERF Number', 'Asset Register Item ID', 'Municipal Asset ID',
+      'Asset Register Item ID', 'Municipal Asset ID',
       'Parent Asset ID', 'Main Asset Description', 'Main Asset ID',
       'Description', 'Old Barcode', 'Barcode', 'Image Ref',
       'Asset Type', 'Asset Category', 'Sub Category', 'Asset Class',
@@ -2063,7 +2223,7 @@ export class ReportsComponent implements OnInit {
       'Acc. Imp. Opening (R)', 'Acc. Imp. Movement (R)', 'Acc. Imp. Closing (R)',
       'Reval Reserve Imp. Opening (R)', 'Reval Reserve Imp. Closing (R)', 'Impairment Surplus (R)',
       'Cost Opening (R)', 'Cost Closing (R)', 'Acc. Dep. Opening (R)', 'Acc. Dep. Closing (R)',
-      'Remaining Useful Life (Months)', 'Reason', 'Approval Status'];
+      'Remaining Useful Life (Months)', 'Reason', 'Approval Status', 'Document Number'];
   }
 
   impRowValue(row: any, col: string): string {
@@ -2080,7 +2240,8 @@ export class ReportsComponent implements OnInit {
       'Impairment Surplus (R)': 'impairmentSurplus',
       'Cost Opening (R)': 'costOpening', 'Cost Closing (R)': 'costClosing',
       'Acc. Dep. Opening (R)': 'accDepOpening', 'Acc. Dep. Closing (R)': 'accDepClosing',
-      'Remaining Useful Life (Months)': 'remainingUsefulLife', 'Reason': 'reason', 'Approval Status': 'approvalStatus'
+      'Remaining Useful Life (Months)': 'remainingUsefulLife', 'Reason': 'reason', 'Approval Status': 'approvalStatus',
+      'Document Number': 'documentNumber'
     };
     var key = map[col]; if (!key) return '';
     var val = row[key]; if (val === null || val === undefined) return '';
@@ -2089,7 +2250,8 @@ export class ReportsComponent implements OnInit {
     if (col === 'Description' || col === 'Asset Type' || col === 'Category' || col === 'Sub-Category' ||
         col === 'Measurement Type' || col === 'Status' || col === 'Department' || col === 'Division' ||
         col === 'Cash/Non-Cash' || col === 'Infra/Non-Infra' ||
-        col === 'Financial Year' || col === 'Reason' || col === 'Approval Status') { return String(val); }
+        col === 'Financial Year' || col === 'Reason' || col === 'Approval Status' ||
+        col === 'Document Number') { return String(val); }
     return this.formatRand(Number(val));
   }
 
@@ -2171,7 +2333,7 @@ export class ReportsComponent implements OnInit {
       'Acc. Imp. Reversal Opening (R)', 'Imp. Reversal Movement (R)', 'Acc. Imp. Reversal Closing (R)',
       'Reval Reserve Imp. Opening (R)', 'Reval Reserve Imp. Closing (R)', 'Impairment Surplus (R)',
       'Cost Opening (R)', 'Cost Closing (R)', 'Acc. Dep. Opening (R)', 'Acc. Dep. Closing (R)',
-      'Remaining Useful Life (Months)', 'Reason', 'Approval Status'];
+      'Remaining Useful Life (Months)', 'Reason', 'Approval Status', 'Document Number'];
   }
 
   impRevRowValue(row: any, col: string): string {
@@ -2191,7 +2353,8 @@ export class ReportsComponent implements OnInit {
       'Impairment Surplus (R)': 'impairmentSurplus',
       'Cost Opening (R)': 'costOpening', 'Cost Closing (R)': 'costClosing',
       'Acc. Dep. Opening (R)': 'accDepOpening', 'Acc. Dep. Closing (R)': 'accDepClosing',
-      'Remaining Useful Life (Months)': 'remainingUsefulLife', 'Reason': 'reason', 'Approval Status': 'approvalStatus'
+      'Remaining Useful Life (Months)': 'remainingUsefulLife', 'Reason': 'reason', 'Approval Status': 'approvalStatus',
+      'Document Number': 'documentNumber'
     };
     var key = map[col]; if (!key) return '';
     var val = row[key]; if (val === null || val === undefined) return '';
@@ -2200,7 +2363,8 @@ export class ReportsComponent implements OnInit {
     if (col === 'Description' || col === 'Asset Type' || col === 'Category' || col === 'Sub-Category' ||
         col === 'Measurement Type' || col === 'Status' || col === 'Department' || col === 'Division' ||
         col === 'Cash/Non-Cash' || col === 'Infra/Non-Infra' ||
-        col === 'Financial Year' || col === 'Reason' || col === 'Approval Status') { return String(val); }
+        col === 'Financial Year' || col === 'Reason' || col === 'Approval Status' ||
+        col === 'Document Number') { return String(val); }
     return this.formatRand(Number(val));
   }
 
@@ -2879,6 +3043,10 @@ export class ReportsComponent implements OnInit {
     if (self.customFarFilters.measurementTypeId) { params.measurementTypeId = self.customFarFilters.measurementTypeId; }
     if (self.customFarFilters.statusId) { params.assetStatus = self.customFarFilters.statusId; }
     if (self.customFarFilters.assetItemId) { params.assetId = self.customFarFilters.assetItemId; }
+    if (self.customFarFilters.acquisitionsOnly) {
+      params.acquisitionsOnly = true;
+      if (!self.customFarFilters.finYear) { params.acquisitionsAllYears = true; }
+    }
     self.api.getFarReport(params).subscribe({
       next: function(res: any) {
         var data = res.data || [];
@@ -3071,5 +3239,1315 @@ export class ReportsComponent implements OnInit {
     XLSX.utils.book_append_sheet(wb, ws, 'Custom FAR');
     XLSX.writeFile(wb, 'custom_far_' + new Date().toISOString().split('T')[0] + '.xlsx');
     self.snackBar.open('Exported ' + rows.length + ' records to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  openComplianceFilters() {
+    this.complianceReportData.set([]);
+    this.complianceReportSubtitle.set('');
+    this.complianceReportGenerated.set(false);
+    this.showComplianceFilters.set(true);
+    this.showFarFilters.set(false);
+    this.showDepFilters.set(false);
+    this.showDisposalFilters.set(false);
+    this.showRevFilters.set(false);
+    this.showImpFilters.set(false);
+    this.showImpRevFilters.set(false);
+    this.showRefurbFilters.set(false);
+    this.showPyaFilters.set(false);
+    this.showPpaFilters.set(false);
+    this.showAfsFilters.set(false);
+    this.showLocFilters.set(false);
+    this.showCustomFarFilters.set(false);
+  }
+
+  applyComplianceFilters() {
+    this.showComplianceFilters.set(false);
+    this.complianceGenerating.set(true);
+    this.complianceReportData.set([]);
+    this.complianceReportSubtitle.set('');
+    this.complianceReportGenerated.set(false);
+    var self = this;
+    var params: any = {};
+    if (this.complianceFilters.typeId) { params.typeId = this.complianceFilters.typeId; }
+    if (this.complianceFilters.categoryId) { params.categoryId = this.complianceFilters.categoryId; }
+    if (this.complianceFilters.departmentId) { params.departmentId = this.complianceFilters.departmentId; }
+    this.api.getMeasurementModelComplianceReport(params).subscribe({
+      next: function(res: any) {
+        var data: any[] = Array.isArray(res) ? res : (res.conflicts || []);
+        var orgModel: string = res.orgModel || '';
+        self.compliancePage.set(0);
+        self.complianceReportData.set(data);
+        self.complianceOrgModel.set(orgModel);
+        self.complianceReportSubtitle.set('Org Model: ' + (orgModel || 'Not configured') + ' \u2014 ' + data.length + ' conflicting asset(s) found');
+        self.complianceGenerating.set(false);
+        self.complianceReportGenerated.set(true);
+      },
+      error: function() {
+        self.complianceGenerating.set(false);
+        self.snackBar.open('Failed to generate Measurement Model Compliance Report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  complianceColumns(): string[] {
+    return [
+      'Asset ID', 'Description', 'Barcode', 'Asset Type', 'Category', 'Sub Category',
+      'Asset Class', 'Measurement Type', 'No Depreciation Flag',
+      'Asset Status', 'Department', 'Acquisition Date', 'In Service Date',
+      'Remaining Useful Life (Months)', 'Conflict Reason'
+    ];
+  }
+
+  complianceRowValue(row: any, col: string): string {
+    var orgModel = this.complianceOrgModel();
+    switch (col) {
+      case 'Asset ID': return row.assetId != null ? String(row.assetId) : '';
+      case 'Description': return row.description || '';
+      case 'Barcode': return row.barcode || '';
+      case 'Asset Type': return row.assetType || '';
+      case 'Category': return row.assetCategory || '';
+      case 'Sub Category': return row.assetSubCategory || '';
+      case 'Asset Class': return row.assetClass || '';
+      case 'Measurement Type': return row.measurementType || '';
+      case 'No Depreciation Flag': return row.noDepreciation ? 'Yes (Revaluation)' : 'No (Cost)';
+      case 'Asset Status': return row.assetStatus || '';
+      case 'Department': return row.department || '';
+      case 'Acquisition Date': {
+        if (!row.acquisitionDate) return '';
+        var d = new Date(row.acquisitionDate);
+        return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-ZA');
+      }
+      case 'In Service Date': {
+        if (!row.inServiceDate) return '';
+        var d2 = new Date(row.inServiceDate);
+        return isNaN(d2.getTime()) ? '' : d2.toLocaleDateString('en-ZA');
+      }
+      case 'Remaining Useful Life (Months)': return row.remainingUsefulLifeMonths != null ? String(row.remainingUsefulLifeMonths) : '0';
+      case 'Conflict Reason': {
+        var measName = (row.measurementType || '').toLowerCase();
+        if (orgModel === 'Cost' && measName.includes('revaluation')) {
+          return 'Revaluation-type measurement assigned under Cost model';
+        }
+        if (orgModel === 'Revaluation' && measName.includes('cost')) {
+          return 'Cost-type measurement assigned under Revaluation model';
+        }
+        return 'Incompatible with current model';
+      }
+      default: return '';
+    }
+  }
+
+  compliancePagedRows() {
+    var data = this.complianceReportData();
+    var start = this.compliancePage() * this.compliancePageSize;
+    return data.slice(start, start + this.compliancePageSize);
+  }
+
+  complianceTotalPages() {
+    return Math.max(1, Math.ceil(this.complianceReportData().length / this.compliancePageSize));
+  }
+
+  exportComplianceExcel() {
+    var self = this;
+    var data = this.complianceReportData();
+    if (!data || data.length === 0) return;
+    var cols = this.complianceColumns();
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['Measurement Model Compliance Report']);
+    wsData.push(['Org Model: ' + this.complianceOrgModel()]);
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Records: ' + data.length]);
+    wsData.push([]);
+    wsData.push(cols);
+    for (var ri = 0; ri < data.length; ri++) {
+      var rowArr: any[] = [];
+      for (var ci = 0; ci < cols.length; ci++) {
+        rowArr.push(self.complianceRowValue(data[ri], cols[ci]));
+      }
+      wsData.push(rowArr);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    var colWidths: any[] = [];
+    for (var wi = 0; wi < cols.length; wi++) { colWidths.push({ wch: 24 }); }
+    ws['!cols'] = colWidths;
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Compliance');
+    var fileName = 'measurement_model_compliance_' + new Date().toISOString().split('T')[0] + '.xlsx';
+    XLSX.writeFile(wb, fileName);
+    this.snackBar.open('Exported ' + data.length + ' records to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  generateMscoaPrefixReport() {
+    var self = this;
+    this.prefixViolGenerating.set(true);
+    this.prefixViolGenerated.set(false);
+    this.prefixViolData.set([]);
+    this.prefixViolPage.set(0);
+    this.api.getMscoaPrefixViolations().subscribe({
+      next: function(data: any[]) {
+        self.prefixViolData.set(data || []);
+        self.prefixViolGenerating.set(false);
+        self.prefixViolGenerated.set(true);
+      },
+      error: function() {
+        self.prefixViolGenerating.set(false);
+        self.snackBar.open('Failed to generate mSCOA Prefix Violations report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  prefixViolPagedRows() {
+    var data = this.prefixViolFilteredData();
+    var start = this.prefixViolPage() * this.prefixViolPageSize;
+    return data.slice(start, start + this.prefixViolPageSize);
+  }
+
+  prefixViolTotalPages() {
+    return Math.max(1, Math.ceil(this.prefixViolFilteredData().length / this.prefixViolPageSize));
+  }
+
+  openMissingMscoaFilters(): void {
+    if (!this.missingMscoaFilters.finYear) {
+      this.missingMscoaFilters = { finYear: this.getActiveFinancialYear() || '', transactionTypeId: '' };
+    }
+    if (this.transactionTypeDefs().length === 0) {
+      this.api.getMscoaTransactionTypeDefs().subscribe({
+        next: (defs: any[]) => this.transactionTypeDefs.set(defs),
+        error: () => {
+          this.snackBar.open('Failed to load transaction types. Please refresh and try again.', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+        }
+      });
+    }
+    this.showMissingMscoaFilters.set(true);
+    this.missingMscoaGenerated.set(false);
+  }
+
+  generateMissingMscoa(): void {
+    var f = this.missingMscoaFilters;
+    if (!f.finYear || !f.transactionTypeId) {
+      this.snackBar.open('Please select a Financial Year and Transaction Type.', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      return;
+    }
+    this.showMissingMscoaFilters.set(false);
+    this.missingMscoaGenerating.set(true);
+    this.missingMscoaGenerated.set(false);
+    this.api.getMissingMscoaSettings(f.finYear, f.transactionTypeId).subscribe({
+      next: (res: any) => {
+        this.missingMscoaData.set(res.rows || []);
+        this.missingMscoaIncompleteData.set(res.incompleteRows || []);
+        this.missingMscoaUseDeptDiv.set(!!res.useDeptDivision);
+        this.missingMscoaPage.set(0);
+        this.missingMscoaIncompletePage.set(0);
+        this.missingMscoaGenerating.set(false);
+        this.missingMscoaGenerated.set(true);
+      },
+      error: () => {
+        this.missingMscoaGenerating.set(false);
+        this.snackBar.open('Failed to generate the Missing mSCOA Settings report. Please try again.', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  missingMscoaPagedRows(): any[] {
+    var start = this.missingMscoaPage() * this.missingMscoaPageSize;
+    return this.missingMscoaData().slice(start, start + this.missingMscoaPageSize);
+  }
+
+  missingMscoaTotalPages(): number {
+    return Math.max(1, Math.ceil(this.missingMscoaData().length / this.missingMscoaPageSize));
+  }
+
+  missingMscoaIncompletePagedRows(): any[] {
+    var start = this.missingMscoaIncompletePage() * this.missingMscoaIncompletePageSize;
+    return this.missingMscoaIncompleteData().slice(start, start + this.missingMscoaIncompletePageSize);
+  }
+
+  missingMscoaIncompleteTotalPages(): number {
+    return Math.max(1, Math.ceil(this.missingMscoaIncompleteData().length / this.missingMscoaIncompletePageSize));
+  }
+
+  exportMissingMscoaExcel(): void {
+    var data = this.missingMscoaData();
+    var incData = this.missingMscoaIncompleteData();
+    if ((!data || data.length === 0) && (!incData || incData.length === 0)) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['Missing / Incomplete mSCOA Settings Report']);
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Fin Year: ' + this.missingMscoaFilters.finYear + '  |  Transaction Type ID: ' + this.missingMscoaFilters.transactionTypeId]);
+    wsData.push(['Missing (no mapping): ' + data.length + '   Incomplete (broken vote legs): ' + incData.length]);
+    wsData.push([]);
+    if (data.length > 0) {
+      wsData.push(['--- Missing GL Mappings (no configuration record exists) ---']);
+      var missCols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type'];
+      if (useDd) { missCols.push('Department'); missCols.push('Division'); }
+      missCols.push('Asset Count');
+      wsData.push(missCols);
+      for (var ri = 0; ri < data.length; ri++) {
+        var row = data[ri];
+        var r: any[] = [row.assetTypeName || '', row.categoryName || '', row.subCategoryName || '', row.measurementTypeName || ''];
+        if (useDd) { r.push(row.departmentName || ''); r.push(row.divisionName || ''); }
+        r.push(row.assetCount || 0);
+        wsData.push(r);
+      }
+      wsData.push([]);
+    }
+    if (incData.length > 0) {
+      wsData.push(['--- Incomplete GL Mappings (configuration exists but vote legs unresolvable) ---']);
+      var incCols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type', 'Status'];
+      if (useDd) { incCols.push('Department'); incCols.push('Division'); }
+      incCols.push('Asset Count'); incCols.push('Incomplete Reason');
+      wsData.push(incCols);
+      for (var ii = 0; ii < incData.length; ii++) {
+        var irow = incData[ii];
+        var ir: any[] = [irow.assetTypeName || '', irow.categoryName || '', irow.subCategoryName || '', irow.measurementTypeName || '', irow.statusName || ''];
+        if (useDd) { ir.push(irow.departmentName || ''); ir.push(irow.divisionName || ''); }
+        ir.push(irow.assetCount || 0);
+        ir.push(irow.incompleteReason || '');
+        wsData.push(ir);
+      }
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = Array(12).fill({ wch: 26 });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'mSCOA Diagnostics');
+    XLSX.writeFile(wb, 'mscoa_missing_settings_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    this.snackBar.open('Exported to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportMissingOnlyExcel(): void {
+    var data = this.missingMscoaData();
+    if (!data || data.length === 0) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['Missing GL Mappings Report']);
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Fin Year: ' + this.missingMscoaFilters.finYear + '  |  Transaction Type ID: ' + this.missingMscoaFilters.transactionTypeId]);
+    wsData.push(['Missing rows (no configuration record exists): ' + data.length]);
+    wsData.push([]);
+    var cols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type'];
+    if (useDd) { cols.push('Department'); cols.push('Division'); }
+    cols.push('Asset Count');
+    wsData.push(cols);
+    for (var ri = 0; ri < data.length; ri++) {
+      var row = data[ri];
+      var r: any[] = [row.assetTypeName || '', row.categoryName || '', row.subCategoryName || '', row.measurementTypeName || ''];
+      if (useDd) { r.push(row.departmentName || ''); r.push(row.divisionName || ''); }
+      r.push(row.assetCount || 0);
+      wsData.push(r);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = Array(10).fill({ wch: 26 });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Missing GL Mappings');
+    XLSX.writeFile(wb, 'missing_gl_mappings_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    this.snackBar.open('Missing GL Mappings exported to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportIncompleteGlMappingsExcel(): void {
+    var incData = this.missingMscoaIncompleteData();
+    if (!incData || incData.length === 0) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['Incomplete GL Mappings Report']);
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Fin Year: ' + this.missingMscoaFilters.finYear + '  |  Transaction Type ID: ' + this.missingMscoaFilters.transactionTypeId]);
+    wsData.push(['Incomplete rows (configuration exists but vote legs unresolvable): ' + incData.length]);
+    wsData.push([]);
+    var incCols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type', 'Status'];
+    if (useDd) { incCols.push('Department'); incCols.push('Division'); }
+    incCols.push('Asset Count');
+    incCols.push('Incomplete Reason');
+    wsData.push(incCols);
+    for (var ii = 0; ii < incData.length; ii++) {
+      var irow = incData[ii];
+      var ir: any[] = [irow.assetTypeName || '', irow.categoryName || '', irow.subCategoryName || '', irow.measurementTypeName || '', irow.statusName || ''];
+      if (useDd) { ir.push(irow.departmentName || ''); ir.push(irow.divisionName || ''); }
+      ir.push(irow.assetCount || 0);
+      ir.push(irow.incompleteReason || '');
+      wsData.push(ir);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = Array(12).fill({ wch: 28 });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Incomplete GL Mappings');
+    XLSX.writeFile(wb, 'incomplete_gl_mappings_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    this.snackBar.open('Incomplete GL Mappings exported to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportAllGlIssuesExcel(): void {
+    var data = this.missingMscoaData();
+    var incData = this.missingMscoaIncompleteData();
+    if ((!data || data.length === 0) && (!incData || incData.length === 0)) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var wb = XLSX.utils.book_new();
+
+    var missData: any[][] = [];
+    missData.push([]);
+    missData.push(['Missing GL Mappings Report']);
+    missData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    missData.push(['Fin Year: ' + this.missingMscoaFilters.finYear + '  |  Transaction Type ID: ' + this.missingMscoaFilters.transactionTypeId]);
+    missData.push(['Missing rows (no configuration record exists): ' + (data ? data.length : 0)]);
+    missData.push([]);
+    var missCols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type'];
+    if (useDd) { missCols.push('Department'); missCols.push('Division'); }
+    missCols.push('Asset Count');
+    missData.push(missCols);
+    if (data && data.length > 0) {
+      for (var ri = 0; ri < data.length; ri++) {
+        var row = data[ri];
+        var r: any[] = [row.assetTypeName || '', row.categoryName || '', row.subCategoryName || '', row.measurementTypeName || ''];
+        if (useDd) { r.push(row.departmentName || ''); r.push(row.divisionName || ''); }
+        r.push(row.assetCount || 0);
+        missData.push(r);
+      }
+    }
+    var wsMiss = XLSX.utils.aoa_to_sheet(missData);
+    wsMiss['!cols'] = Array(10).fill({ wch: 26 });
+    XLSX.utils.book_append_sheet(wb, wsMiss, 'Missing GL Mappings');
+
+    var incWsData: any[][] = [];
+    incWsData.push([]);
+    incWsData.push(['Incomplete GL Mappings Report']);
+    incWsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    incWsData.push(['Fin Year: ' + this.missingMscoaFilters.finYear + '  |  Transaction Type ID: ' + this.missingMscoaFilters.transactionTypeId]);
+    incWsData.push(['Incomplete rows (configuration exists but vote legs unresolvable): ' + (incData ? incData.length : 0)]);
+    incWsData.push([]);
+    var incCols = ['Asset Type', 'Category', 'Sub Category', 'Measurement Type', 'Status'];
+    if (useDd) { incCols.push('Department'); incCols.push('Division'); }
+    incCols.push('Asset Count');
+    incCols.push('Incomplete Reason');
+    incWsData.push(incCols);
+    if (incData && incData.length > 0) {
+      for (var ii = 0; ii < incData.length; ii++) {
+        var irow = incData[ii];
+        var ir: any[] = [irow.assetTypeName || '', irow.categoryName || '', irow.subCategoryName || '', irow.measurementTypeName || '', irow.statusName || ''];
+        if (useDd) { ir.push(irow.departmentName || ''); ir.push(irow.divisionName || ''); }
+        ir.push(irow.assetCount || 0);
+        ir.push(irow.incompleteReason || '');
+        incWsData.push(ir);
+      }
+    }
+    var wsInc = XLSX.utils.aoa_to_sheet(incWsData);
+    wsInc['!cols'] = Array(12).fill({ wch: 28 });
+    XLSX.utils.book_append_sheet(wb, wsInc, 'Incomplete GL Mappings');
+
+    XLSX.writeFile(wb, 'gl_mapping_issues_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    this.snackBar.open('All GL Issues exported to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  printMissingMscoaReport(): void {
+    var self = this;
+    var data = this.missingMscoaData();
+    var incData = this.missingMscoaIncompleteData();
+    if ((!data || data.length === 0) && (!incData || incData.length === 0)) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var buildTable = function(rows: any[], colDefs: {label: string; key: string}[]) {
+      var hdr = colDefs.map(function(c) {
+        return '<th style="border:1px solid #cbd5e1;padding:6px 8px;background:#1e293b;color:#fff;white-space:nowrap;font-size:11px">' + self.htmlEsc(c.label) + '</th>';
+      }).join('');
+      var body = rows.map(function(row: any) {
+        return '<tr>' + colDefs.map(function(c) {
+          return '<td style="border:1px solid #e2e8f0;padding:4px 8px;font-size:11px;white-space:nowrap">' + self.htmlEsc(row[c.key] != null ? String(row[c.key]) : '') + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+      return '<table style="border-collapse:collapse;width:100%;min-width:max-content;margin-bottom:24px"><thead><tr>' + hdr + '</tr></thead><tbody>' + body + '</tbody></table>';
+    };
+    var missCols: {label: string; key: string}[] = [
+      {label: 'Asset Type', key: 'assetTypeName'}, {label: 'Category', key: 'categoryName'},
+      {label: 'Sub Category', key: 'subCategoryName'}, {label: 'Measurement Type', key: 'measurementTypeName'}
+    ];
+    if (useDd) { missCols.push({label: 'Department', key: 'departmentName'}); missCols.push({label: 'Division', key: 'divisionName'}); }
+    missCols.push({label: 'Asset Count', key: 'assetCount'});
+    var incCols: {label: string; key: string}[] = [
+      {label: 'Asset Type', key: 'assetTypeName'}, {label: 'Category', key: 'categoryName'},
+      {label: 'Sub Category', key: 'subCategoryName'}, {label: 'Measurement Type', key: 'measurementTypeName'},
+      {label: 'Status', key: 'statusName'}
+    ];
+    if (useDd) { incCols.push({label: 'Department', key: 'departmentName'}); incCols.push({label: 'Division', key: 'divisionName'}); }
+    incCols.push({label: 'Asset Count', key: 'assetCount'}); incCols.push({label: 'Incomplete Reason', key: 'incompleteReason'});
+    var body = '';
+    if (data.length > 0) {
+      body += '<h2 style="font-size:14px;margin:16px 0 6px;color:#c2410c">Missing GL Mappings (' + data.length + ') — No configuration record exists</h2>';
+      body += buildTable(data, missCols);
+    }
+    if (incData.length > 0) {
+      body += '<h2 style="font-size:14px;margin:16px 0 6px;color:#b45309">Incomplete GL Mappings (' + incData.length + ') — Configuration exists but vote legs unresolvable</h2>';
+      body += buildTable(incData, incCols);
+    }
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>mSCOA GL Diagnostics</title><style>'
+      + 'body{font-family:Arial,sans-serif;margin:20px;color:#0f172a}'
+      + 'h1{font-size:18px;margin:0 0 4px}'
+      + '.subtitle{font-size:12px;color:#64748b;margin-bottom:16px}'
+      + '@media print{@page{margin:10mm;size:landscape}button{display:none}}'
+      + '</style></head><body>'
+      + '<h1>mSCOA GL Diagnostics Report</h1>'
+      + '<div class="subtitle">Fin Year: ' + self.htmlEsc(self.missingMscoaFilters.finYear)
+      + ' &mdash; Generated: ' + new Date().toLocaleDateString('en-ZA')
+      + ' &mdash; Missing: ' + data.length + ' &mdash; Incomplete: ' + incData.length + '</div>'
+      + body
+      + '<script>window.onload=function(){window.print();}<\/script>'
+      + '</body></html>';
+    var win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
+  printMissingOnlyReport(): void {
+    var self = this;
+    var data = this.missingMscoaData();
+    if (!data || data.length === 0) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var missCols: {label: string; key: string}[] = [
+      {label: 'Asset Type', key: 'assetTypeName'}, {label: 'Category', key: 'categoryName'},
+      {label: 'Sub Category', key: 'subCategoryName'}, {label: 'Measurement Type', key: 'measurementTypeName'}
+    ];
+    if (useDd) { missCols.push({label: 'Department', key: 'departmentName'}); missCols.push({label: 'Division', key: 'divisionName'}); }
+    missCols.push({label: 'Asset Count', key: 'assetCount'});
+    var hdr = missCols.map(function(c) {
+      return '<th style="border:1px solid #fed7aa;padding:6px 8px;background:#c2410c;color:#fff;white-space:nowrap;font-size:11px">' + self.htmlEsc(c.label) + '</th>';
+    }).join('');
+    var body = data.map(function(row: any) {
+      return '<tr>' + missCols.map(function(c) {
+        return '<td style="border:1px solid #fed7aa;padding:4px 8px;font-size:11px;white-space:nowrap">' + self.htmlEsc(row[c.key] != null ? String(row[c.key]) : '') + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    var table = '<table style="border-collapse:collapse;width:100%;min-width:max-content;margin-bottom:24px"><thead><tr>' + hdr + '</tr></thead><tbody>' + body + '</tbody></table>';
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Missing GL Mappings</title><style>'
+      + 'body{font-family:Arial,sans-serif;margin:20px;color:#0f172a}'
+      + 'h1{font-size:18px;margin:0 0 4px;color:#c2410c}'
+      + '.subtitle{font-size:12px;color:#64748b;margin-bottom:16px}'
+      + '@media print{@page{margin:10mm;size:landscape}button{display:none}}'
+      + '</style></head><body>'
+      + '<h1>Missing GL Mappings Report</h1>'
+      + '<div class="subtitle">Fin Year: ' + self.htmlEsc(self.missingMscoaFilters.finYear)
+      + ' &mdash; Generated: ' + new Date().toLocaleDateString('en-ZA')
+      + ' &mdash; Missing: ' + data.length + '</div>'
+      + '<h2 style="font-size:14px;margin:16px 0 6px;color:#c2410c">Missing GL Mappings (' + data.length + ') — No configuration record exists</h2>'
+      + table
+      + '<script>window.onload=function(){window.print();}<\/script>'
+      + '</body></html>';
+    var win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
+  printIncompleteGlMappingsReport(): void {
+    var self = this;
+    var incData = this.missingMscoaIncompleteData();
+    if (!incData || incData.length === 0) return;
+    var useDd = this.missingMscoaUseDeptDiv();
+    var incCols: {label: string; key: string}[] = [
+      {label: 'Asset Type', key: 'assetTypeName'}, {label: 'Category', key: 'categoryName'},
+      {label: 'Sub Category', key: 'subCategoryName'}, {label: 'Measurement Type', key: 'measurementTypeName'},
+      {label: 'Status', key: 'statusName'}
+    ];
+    if (useDd) { incCols.push({label: 'Department', key: 'departmentName'}); incCols.push({label: 'Division', key: 'divisionName'}); }
+    incCols.push({label: 'Asset Count', key: 'assetCount'}); incCols.push({label: 'Incomplete Reason', key: 'incompleteReason'});
+    var hdr = incCols.map(function(c) {
+      return '<th style="border:1px solid #cbd5e1;padding:6px 8px;background:#1e293b;color:#fff;white-space:nowrap;font-size:11px">' + self.htmlEsc(c.label) + '</th>';
+    }).join('');
+    var body = incData.map(function(row: any) {
+      return '<tr>' + incCols.map(function(c) {
+        return '<td style="border:1px solid #e2e8f0;padding:4px 8px;font-size:11px;white-space:nowrap">' + self.htmlEsc(row[c.key] != null ? String(row[c.key]) : '') + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    var table = '<table style="border-collapse:collapse;width:100%;min-width:max-content;margin-bottom:24px"><thead><tr>' + hdr + '</tr></thead><tbody>' + body + '</tbody></table>';
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Incomplete GL Mappings</title><style>'
+      + 'body{font-family:Arial,sans-serif;margin:20px;color:#0f172a}'
+      + 'h1{font-size:18px;margin:0 0 4px}'
+      + '.subtitle{font-size:12px;color:#64748b;margin-bottom:16px}'
+      + '@media print{@page{margin:10mm;size:landscape}button{display:none}}'
+      + '</style></head><body>'
+      + '<h1>Incomplete GL Mappings Report</h1>'
+      + '<div class="subtitle">Fin Year: ' + self.htmlEsc(self.missingMscoaFilters.finYear)
+      + ' &mdash; Generated: ' + new Date().toLocaleDateString('en-ZA')
+      + ' &mdash; Incomplete: ' + incData.length + '</div>'
+      + '<h2 style="font-size:14px;margin:16px 0 6px;color:#b45309">Incomplete GL Mappings (' + incData.length + ') — Configuration exists but vote legs unresolvable</h2>'
+      + table
+      + '<script>window.onload=function(){window.print();}<\/script>'
+      + '</body></html>';
+    var win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
+
+  exportPrefixViolExcel() {
+    var data = this.prefixViolFilteredData();
+    if (!data || data.length === 0) return;
+    var cols = ['Fin Year', 'Transaction Type', 'Asset Type', 'Category', 'Sub Category', 'Department', 'Division', 'Vote Key', 'Field Label', 'Actual SCOA Code', 'Required Prefix'];
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['mSCOA SCOA Account-Code Prefix Violations']);
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Violations: ' + data.length]);
+    wsData.push([]);
+    wsData.push(cols);
+    for (var ri = 0; ri < data.length; ri++) {
+      var row = data[ri];
+      wsData.push([
+        row.finYear || '', row.transactionTypeName || '', row.assetTypeName || '',
+        row.categoryName || '', row.subCategoryName || '', row.departmentName || '', row.divisionName || '',
+        row.voteKey || '', row.fieldLabel || '', row.actualScoaCode || '', row.requiredPrefix || ''
+      ]);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = cols.map(function() { return { wch: 22 }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Prefix Violations');
+    XLSX.writeFile(wb, 'mscoa_prefix_violations_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    this.snackBar.open('Exported ' + data.length + ' violation(s) to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  printPrefixViolReport() {
+    var self = this;
+    var data = this.prefixViolFilteredData();
+    if (!data || data.length === 0) return;
+    var cols = ['Fin Year', 'Transaction Type', 'Asset Type', 'Category', 'Sub Category', 'Department', 'Division', 'Vote Key', 'Field Label', 'Actual SCOA Code', 'Required Prefix'];
+    var fieldKeys = ['finYear', 'transactionTypeName', 'assetTypeName', 'categoryName', 'subCategoryName', 'departmentName', 'divisionName', 'voteKey', 'fieldLabel', 'actualScoaCode', 'requiredPrefix'];
+    var headerCells = cols.map(function(c) {
+      return '<th style="border:1px solid #cbd5e1;padding:6px 8px;background:#1e293b;color:#fff;white-space:nowrap;font-size:11px">' + self.htmlEsc(c) + '</th>';
+    }).join('');
+    var bodyRows = data.map(function(row: any) {
+      var cells = fieldKeys.map(function(k) {
+        return '<td style="border:1px solid #e2e8f0;padding:4px 8px;font-size:11px;white-space:nowrap">' + self.htmlEsc(row[k] != null ? String(row[k]) : '') + '</td>';
+      }).join('');
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>mSCOA Prefix Errors</title><style>'
+      + 'body{font-family:Arial,sans-serif;margin:20px;color:#0f172a}'
+      + 'h1{font-size:18px;margin:0 0 4px}'
+      + '.subtitle{font-size:12px;color:#64748b;margin-bottom:16px}'
+      + 'table{border-collapse:collapse;width:100%;min-width:max-content}'
+      + '@media print{@page{margin:10mm;size:landscape}button{display:none}}'
+      + '</style></head><body>'
+      + '<h1>mSCOA Prefix Errors</h1>'
+      + '<div class="subtitle">Generated: ' + new Date().toLocaleDateString('en-ZA') + ' &mdash; ' + data.length + ' violation(s)</div>'
+      + '<table><thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table>'
+      + '<script>window.onload=function(){window.print();}<\/script>'
+      + '</body></html>';
+    var win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  }
+
+  incompleteReasonBadgeStyle(reason: string): string {
+    let bg = '#f1f5f9'; let color = '#475569'; let border = '#cbd5e1';
+    if (reason && reason.indexOf('vote not loaded') !== -1) { bg = '#fffbeb'; color = '#b45309'; border = '#fde68a'; }
+    else if (reason && reason.indexOf('not found') !== -1) { bg = '#fee2e2'; color = '#dc2626'; border = '#fca5a5'; }
+    return 'display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;background:' + bg + ';color:' + color + ';border:1px solid ' + border;
+  }
+
+  // ─── Asset GL Transactions Report ─────────────────────────────────────────
+
+  openAssetGlFilters(): void {
+    this.assetGlReportData.set([]); this.assetGlReportSubtitle.set(''); this.assetGlReportGenerated.set(false);
+    this.assetGlFilters = { finYear: '', processingMonth: '', transactionTypeId: '' };
+    this.assetGlFinYears.set([]); this.assetGlProcessingMonths.set([]); this.assetGlTransactionTypes.set([]);
+    this.showAssetGlFilters.set(true);
+    this.showFarFilters.set(false); this.showDepFilters.set(false); this.showDisposalFilters.set(false);
+    this.showRevFilters.set(false); this.showImpFilters.set(false); this.showImpRevFilters.set(false);
+    this.showRefurbFilters.set(false); this.showPyaFilters.set(false); this.showPpaFilters.set(false);
+    this.showAfsFilters.set(false); this.showComplianceFilters.set(false); this.showMissingMscoaFilters.set(false);
+    this.loadAssetGlFilterOptions();
+  }
+
+  loadAssetGlFilterOptions(): void {
+    var self = this;
+    var params: any = {};
+    if (this.assetGlFilters.finYear) params['finYear'] = this.assetGlFilters.finYear;
+    if (this.assetGlFilters.processingMonth) params['processingMonth'] = this.assetGlFilters.processingMonth;
+    this.api.getAssetGlFilterOptions(params).subscribe({
+      next: function(res: any) {
+        self.assetGlFinYears.set(res.finYears || []);
+        self.assetGlProcessingMonths.set(res.processingMonths || []);
+        self.assetGlTransactionTypes.set(res.transactionTypes || []);
+      },
+      error: function() {}
+    });
+  }
+
+  onAssetGlFinYearChange(): void {
+    this.assetGlFilters.processingMonth = '';
+    this.assetGlFilters.transactionTypeId = '';
+    this.assetGlProcessingMonths.set([]);
+    this.assetGlTransactionTypes.set([]);
+    this.loadAssetGlFilterOptions();
+  }
+
+  onAssetGlProcessingMonthChange(): void {
+    this.assetGlFilters.transactionTypeId = '';
+    this.assetGlTransactionTypes.set([]);
+    this.loadAssetGlFilterOptions();
+  }
+
+  assetGlMonthLabel(month: number): string {
+    var labels: { [k: number]: string } = {
+      1: 'P1 — July', 2: 'P2 — August', 3: 'P3 — September', 4: 'P4 — October',
+      5: 'P5 — November', 6: 'P6 — December', 7: 'P7 — January', 8: 'P8 — February',
+      9: 'P9 — March', 10: 'P10 — April', 11: 'P11 — May', 12: 'P12 — June'
+    };
+    return labels[month] || ('P' + month);
+  }
+
+  applyAssetGlFilters(): void {
+    this.showAssetGlFilters.set(false);
+    this.assetGlGenerating.set(true);
+    this.assetGlReportData.set([]); this.assetGlReportSubtitle.set(''); this.assetGlReportGenerated.set(false);
+    var self = this;
+    var finYear = this.assetGlFilters.finYear || this.getActiveFinancialYear();
+    var params: any = { finYear: finYear };
+    if (this.assetGlFilters.processingMonth) { params['processingMonth'] = this.assetGlFilters.processingMonth; }
+    if (this.assetGlFilters.transactionTypeId) { params['transactionTypeId'] = this.assetGlFilters.transactionTypeId; }
+    this.api.getAssetGlReport(params).subscribe({
+      next: function(res: any) {
+        var data: any[] = Array.isArray(res) ? res : (res.data || []);
+        self.assetGlReportData.set(data);
+        var subtitle = 'Asset GL Transactions — FY ' + finYear;
+        if (self.assetGlFilters.processingMonth) { subtitle += ' | P' + self.assetGlFilters.processingMonth; }
+        if (self.assetGlFilters.transactionTypeId) {
+          var tt = self.assetGlTransactionTypes().find(function(t: any) { return String(t.documentTypeId) === String(self.assetGlFilters.transactionTypeId); });
+          subtitle += ' | ' + (tt ? tt.documentTypeDesc : 'Type ' + self.assetGlFilters.transactionTypeId);
+        }
+        subtitle += ' — ' + data.length + ' records';
+        self.assetGlReportSubtitle.set(subtitle);
+        self.assetGlGenerating.set(false); self.assetGlReportGenerated.set(true);
+      },
+      error: function() {
+        self.assetGlGenerating.set(false);
+        self.snackBar.open('Failed to generate Asset GL report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  assetGlColumns(): string[] {
+    return [
+      'GL ID', 'Document No', 'Financial Year', 'Period', 'Posting Date',
+      'Transaction Type', 'Transaction Details',
+      'Debit (R)', 'Credit (R)', 'Total (R)',
+      'SCOA Item Code', 'SCOA Item Desc',
+      'Fund Code', 'Fund Desc',
+      'Function Code', 'Function Desc',
+      'Project Code', 'Project Desc',
+      'Costing Code', 'Costing Desc',
+      'Region Code', 'Region Desc',
+      'Municipal Class', 'Municipal Class Desc'
+    ];
+  }
+
+  assetGlRowValue(row: any, col: string): string {
+    var map: Record<string, string> = {
+      'GL ID': 'genLedgerId', 'Document No': 'documentNumber', 'Financial Year': 'finYear',
+      'Period': 'processingMonth', 'Posting Date': 'postingDate',
+      'Transaction Type': 'transactionType', 'Transaction Details': 'transactionDetails',
+      'Debit (R)': 'debit', 'Credit (R)': 'credit', 'Total (R)': 'total',
+      'SCOA Item Code': 'scoaItemCode', 'SCOA Item Desc': 'scoaItemDesc',
+      'Fund Code': 'scoaFundCode', 'Fund Desc': 'scoaFundDesc',
+      'Function Code': 'scoaFunctionCode', 'Function Desc': 'scoaFunctionDesc',
+      'Project Code': 'scoaProjectCode', 'Project Desc': 'scoaProjectDesc',
+      'Costing Code': 'scoaCostingCode', 'Costing Desc': 'scoaCostingDesc',
+      'Region Code': 'scoaRegionCode', 'Region Desc': 'scoaRegionDesc',
+      'Municipal Class': 'municipalClass', 'Municipal Class Desc': 'municipalClassDesc'
+    };
+    var key = map[col]; if (!key) { return ''; }
+    var val = row[key]; if (val === null || val === undefined) { return ''; }
+    if (col === 'Debit (R)' || col === 'Credit (R)' || col === 'Total (R)') { return Number(val).toFixed(2); }
+    return String(val);
+  }
+
+  isAssetGlAmountCol(col: string): boolean {
+    return col === 'Debit (R)' || col === 'Credit (R)' || col === 'Total (R)';
+  }
+
+  assetGlTotals(): { debit: string; credit: string; total: string } {
+    var data = this.assetGlReportData();
+    var debit = 0; var credit = 0;
+    for (var i = 0; i < data.length; i++) { debit += Number(data[i]['debit'] || 0); credit += Number(data[i]['credit'] || 0); }
+    return { debit: debit.toFixed(2), credit: credit.toFixed(2), total: (debit - credit).toFixed(2) };
+  }
+
+  exportAssetGlExcel(): void {
+    var data = this.assetGlReportData();
+    if (!data || data.length === 0) { return; }
+    var cols = this.assetGlColumns();
+    var self = this;
+    var wsData: any[][] = [
+      [],
+      ['Asset GL Transactions Report'],
+      ['FY ' + (this.assetGlFilters.finYear || this.getActiveFinancialYear())],
+      ['Generated: ' + new Date().toLocaleDateString('en-ZA')],
+      ['Records: ' + data.length],
+      [],
+      cols
+    ];
+    for (var ri = 0; ri < data.length; ri++) {
+      var rowArr: any[] = [];
+      for (var ci = 0; ci < cols.length; ci++) {
+        var v = self.assetGlRowValue(data[ri], cols[ci]);
+        rowArr.push(self.isAssetGlAmountCol(cols[ci]) ? parseFloat(v) : v);
+      }
+      wsData.push(rowArr);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = cols.map(function() { return { wch: 20 }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asset GL');
+    XLSX.writeFile(wb, 'asset_gl_transactions_' + new Date().toISOString().substring(0, 10) + '.xlsx');
+    this.snackBar.open('Exported ' + data.length + ' records to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportAssetGlCsv(): void {
+    var data = this.assetGlReportData();
+    if (!data || data.length === 0) { return; }
+    var cols = this.assetGlColumns();
+    var self = this;
+    var csv = cols.map(function(c: string) { return '"' + c + '"'; }).join(',') + '\n';
+    for (var ri = 0; ri < data.length; ri++) {
+      var rowParts: string[] = [];
+      for (var ci = 0; ci < cols.length; ci++) {
+        var v = self.assetGlRowValue(data[ri], cols[ci]);
+        rowParts.push('"' + String(v).split('"').join('""') + '"');
+      }
+      csv += rowParts.join(',') + '\n';
+    }
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url = window.URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'asset_gl_transactions_' + new Date().toISOString().substring(0, 10) + '.csv');
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    this.snackBar.open('Exported ' + data.length + ' records to CSV', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  // ─── mSCOA Settings Report ─────────────────────────────────────────────────
+
+  openMscoaSettingsFilters(): void {
+    this.mscoaSettingsFilters = { finYear: this.getActiveFinancialYear(), typeId: '', categoryId: '', subCategoryId: '', departmentId: '', divisionId: '' };
+    this.mscoaSettingsFilterCategories.set([]); this.mscoaSettingsFilterSubCategories.set([]); this.mscoaSettingsFilterDivisions.set([]);
+    this.showMscoaSettingsFilters.set(true);
+    this.showFarFilters.set(false); this.showDepFilters.set(false); this.showDisposalFilters.set(false);
+    this.showRevFilters.set(false); this.showImpFilters.set(false); this.showImpRevFilters.set(false);
+    this.showRefurbFilters.set(false); this.showPyaFilters.set(false); this.showPpaFilters.set(false);
+    this.showAfsFilters.set(false); this.showComplianceFilters.set(false); this.showMissingMscoaFilters.set(false);
+    this.showAssetGlFilters.set(false);
+    var self = this;
+    this.api.getMscoaDepartments().subscribe({
+      next: function(data: any[]) { self.mscoaSettingsDepts.set(data || []); },
+      error: function() {}
+    });
+  }
+
+  onMscoaSettingsTypeChange(): void {
+    this.mscoaSettingsFilters.categoryId = '';
+    this.mscoaSettingsFilters.subCategoryId = '';
+    this.mscoaSettingsFilterSubCategories.set([]);
+    if (!this.mscoaSettingsFilters.typeId) { this.mscoaSettingsFilterCategories.set([]); return; }
+    var self = this;
+    this.api.getAssetCategoriesList({ typeId: this.mscoaSettingsFilters.typeId }).subscribe({
+      next: function(data: any[]) { self.mscoaSettingsFilterCategories.set(data); },
+      error: function() {}
+    });
+  }
+
+  onMscoaSettingsCategoryChange(): void {
+    this.mscoaSettingsFilters.subCategoryId = '';
+    if (!this.mscoaSettingsFilters.categoryId) { this.mscoaSettingsFilterSubCategories.set([]); return; }
+    var self = this;
+    this.api.getAssetSubCategoriesList({ typeId: this.mscoaSettingsFilters.typeId, categoryId: this.mscoaSettingsFilters.categoryId }).subscribe({
+      next: function(data: any[]) { self.mscoaSettingsFilterSubCategories.set(data); },
+      error: function() {}
+    });
+  }
+
+  onMscoaSettingsDeptChange(): void {
+    this.mscoaSettingsFilters.divisionId = '';
+    this.mscoaSettingsFilterDivisions.set([]);
+    if (!this.mscoaSettingsFilters.departmentId) { return; }
+    var self = this;
+    this.api.getMscoaDivisions(parseInt(this.mscoaSettingsFilters.departmentId)).subscribe({
+      next: function(data: any[]) { self.mscoaSettingsFilterDivisions.set(data || []); },
+      error: function() {}
+    });
+  }
+
+  applyMscoaSettingsFilters(): void {
+    this.showMscoaSettingsFilters.set(false);
+    this.mscoaSettingsGenerating.set(true);
+    this.mscoaSettingsData.set([]); this.mscoaSettingsSubtitle.set(''); this.mscoaSettingsGenerated.set(false);
+    this.mscoaSettingsPage.set(0);
+    var self = this;
+    var params: any = {};
+    var finYear = this.mscoaSettingsFilters.finYear || this.getActiveFinancialYear();
+    params['finYear'] = finYear;
+    if (this.mscoaSettingsFilters.typeId) params['typeId'] = this.mscoaSettingsFilters.typeId;
+    if (this.mscoaSettingsFilters.categoryId) params['categoryId'] = this.mscoaSettingsFilters.categoryId;
+    if (this.mscoaSettingsFilters.subCategoryId) params['subCategoryId'] = this.mscoaSettingsFilters.subCategoryId;
+    if (this.mscoaSettingsFilters.departmentId) params['departmentId'] = this.mscoaSettingsFilters.departmentId;
+    if (this.mscoaSettingsFilters.divisionId) params['divisionId'] = this.mscoaSettingsFilters.divisionId;
+    this.api.getMscoaSettingsReport(params).subscribe({
+      next: function(res: any) {
+        var data: any[] = Array.isArray(res) ? res : [];
+        self.mscoaSettingsData.set(data);
+        var subtitle = 'mSCOA Settings — FY ' + finYear;
+        if (self.mscoaSettingsFilters.typeId) {
+          var t = self.assetTypes().find(function(x: any) { return String(x.assetType_ID || x.id) === String(self.mscoaSettingsFilters.typeId); });
+          if (t) subtitle += ' | ' + (t.assetTypeDesc || t.name || '');
+        }
+        subtitle += ' — ' + data.length + ' records';
+        self.mscoaSettingsSubtitle.set(subtitle);
+        self.mscoaSettingsGenerating.set(false); self.mscoaSettingsGenerated.set(true);
+      },
+      error: function() {
+        self.mscoaSettingsGenerating.set(false);
+        self.snackBar.open('Failed to generate mSCOA Settings report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  mscoaSettingsColumns(): string[] {
+    return [
+      'mSCOA ID', 'Fin Year', 'Asset Type', 'Category', 'Sub Category',
+      'Measurement Type', 'Status', 'Department', 'Division', 'Transaction Type', 'Transaction Description', 'Transaction Subtype',
+      'Project Item ID', 'Project Code / Name',
+      'SCOA Item Code', 'SCOA Item Desc',
+      'Fund Code', 'Fund Desc',
+      'Function Code', 'Function Desc',
+      'Region Code', 'Region Desc',
+      'Costing Code', 'Costing Desc',
+      'Project Code', 'Project Desc',
+      'Municipal Classification'
+    ];
+  }
+
+  mscoaSettingsRowValue(row: any, col: string): string {
+    var map: Record<string, string> = {
+      'mSCOA ID': 'mscoaId', 'Fin Year': 'finYear', 'Asset Type': 'assetType',
+      'Category': 'category', 'Sub Category': 'subCategory', 'Measurement Type': 'measurementType',
+      'Status': 'status', 'Department': 'departmentDesc', 'Division': 'divisionDesc',
+      'Transaction Type': 'transactionType',
+      'Transaction Description': 'transactionDescription', 'Transaction Subtype': 'transactionSubtype',
+      'Project Item ID': 'projectItemId', 'Project Code / Name': 'projectCodeName',
+      'SCOA Item Code': 'scoaItemCode', 'SCOA Item Desc': 'scoaItemDesc',
+      'Fund Code': 'scoaFundCode', 'Fund Desc': 'scoaFundDesc',
+      'Function Code': 'scoaFunctionCode', 'Function Desc': 'scoaFunctionDesc',
+      'Region Code': 'scoaRegionCode', 'Region Desc': 'scoaRegionDesc',
+      'Costing Code': 'scoaCostingCode', 'Costing Desc': 'scoaCostingDesc',
+      'Project Code': 'scoaProjectCode', 'Project Desc': 'scoaProjectDesc',
+      'Municipal Classification': 'municipalClassification'
+    };
+    var key = map[col]; if (!key) return '';
+    var val = row[key]; if (val === null || val === undefined) return '';
+    return String(val);
+  }
+
+  mscoaSettingsNextPage(): void { if (this.mscoaSettingsPage() < this.mscoaSettingsTotalPages() - 1) { this.mscoaSettingsPage.set(this.mscoaSettingsPage() + 1); } }
+  mscoaSettingsPrevPage(): void { if (this.mscoaSettingsPage() > 0) { this.mscoaSettingsPage.set(this.mscoaSettingsPage() - 1); } }
+  mscoaSettingsGoToPage(n: number): void { if (n >= 0 && n < this.mscoaSettingsTotalPages()) { this.mscoaSettingsPage.set(n); } }
+
+  exportMscoaSettingsExcel(): void {
+    var self = this;
+    var params: any = {};
+    var finYear = this.mscoaSettingsFilters.finYear || this.getActiveFinancialYear();
+    params['finYear'] = finYear;
+    if (this.mscoaSettingsFilters.typeId) params['typeId'] = this.mscoaSettingsFilters.typeId;
+    if (this.mscoaSettingsFilters.categoryId) params['categoryId'] = this.mscoaSettingsFilters.categoryId;
+    if (this.mscoaSettingsFilters.subCategoryId) params['subCategoryId'] = this.mscoaSettingsFilters.subCategoryId;
+    if (this.mscoaSettingsFilters.departmentId) params['departmentId'] = this.mscoaSettingsFilters.departmentId;
+    if (this.mscoaSettingsFilters.divisionId) params['divisionId'] = this.mscoaSettingsFilters.divisionId;
+    this.api.getMscoaSettingsReportExcel(params).subscribe({
+      next: function(blob: Blob) {
+        var url = window.URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'mscoa_settings_' + new Date().toISOString().substring(0, 10) + '.xlsx');
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        self.snackBar.open('Excel download started', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      },
+      error: function() {
+        self.snackBar.open('Excel export failed', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  // ── Asset Transfer Report ─────────────────────────────────────────────────
+  showTransferFilters = signal(false);
+  transferGenerating = signal(false);
+  transferReportGenerated = signal(false);
+  transferReportData = signal<any[]>([]);
+  transferReportSubtitle = signal('');
+  transferFilters: any = { finYear: '', assetId: '' };
+
+  readonly transferCols = [
+    'TransferId', 'AssetRegisterItemId', 'AssetDescription', 'Barcode',
+    'TransferDate', 'FinYear',
+    'FromAssetTypeDesc', 'ToAssetTypeDesc',
+    'FromAssetCategoryDesc', 'ToAssetCategoryDesc',
+    'FromAssetSubCategoryDesc', 'ToAssetSubCategoryDesc',
+    'FromAssetClassDesc', 'ToAssetClassDesc',
+    'FromMeasurementTypeDesc', 'ToMeasurementTypeDesc',
+    'FromAssetStatusDesc', 'ToAssetStatusDesc',
+    'FromDepartment', 'ToDepartment',
+    'FromDivision', 'ToDivision',
+    'FromIsInfrastructure', 'ToIsInfrastructure',
+    'CostTransferred', 'AccDepTransferred', 'AccImpTransferred',
+    'RevalReserveTransferred', 'DepOffsetTransferred', 'CatchUpDepPosted',
+    'DocumentNumber', 'Status'
+  ];
+
+  readonly transferColLabels: Record<string, string> = {
+    TransferId: 'Transfer ID',
+    AssetRegisterItemId: 'Asset ID',
+    AssetDescription: 'Asset Description',
+    Barcode: 'Barcode',
+    TransferDate: 'Transfer Date',
+    FinYear: 'Financial Year',
+    FromAssetTypeDesc: 'From Asset Type',
+    ToAssetTypeDesc: 'To Asset Type',
+    FromAssetCategoryDesc: 'From Category',
+    ToAssetCategoryDesc: 'To Category',
+    FromAssetSubCategoryDesc: 'From Sub-Category',
+    ToAssetSubCategoryDesc: 'To Sub-Category',
+    FromAssetClassDesc: 'From Asset Class',
+    ToAssetClassDesc: 'To Asset Class',
+    FromMeasurementTypeDesc: 'From Measurement Type',
+    ToMeasurementTypeDesc: 'To Measurement Type',
+    FromAssetStatusDesc: 'From Status',
+    ToAssetStatusDesc: 'To Status',
+    FromDepartment: 'From Department',
+    ToDepartment: 'To Department',
+    FromDivision: 'From Division',
+    ToDivision: 'To Division',
+    FromIsInfrastructure: 'From Infrastructure?',
+    ToIsInfrastructure: 'To Infrastructure?',
+    CostTransferred: 'Cost Transferred',
+    AccDepTransferred: 'Acc. Dep. Transferred',
+    AccImpTransferred: 'Acc. Imp. Transferred',
+    RevalReserveTransferred: 'Reval Reserve Transferred',
+    DepOffsetTransferred: 'Dep. Offset Transferred',
+    CatchUpDepPosted: 'Catch-up Dep. Posted',
+    DocumentNumber: 'Document Number',
+    Status: 'Status'
+  };
+
+  transferColLabel(col: string): string {
+    return this.transferColLabels[col] || col;
+  }
+
+  readonly transferAmountCols = new Set([
+    'CostTransferred', 'AccDepTransferred', 'AccImpTransferred',
+    'RevalReserveTransferred', 'DepOffsetTransferred', 'CatchUpDepPosted'
+  ]);
+
+  transferRowValue(row: any, col: string): string {
+    var val = row[col];
+    if (val === null || val === undefined) return '';
+    if (this.transferAmountCols.has(col)) {
+      var n = Number(val);
+      if (isNaN(n)) return String(val);
+      return n.toFixed(2);
+    }
+    if (col === 'TransferDate') {
+      try { return new Date(val).toLocaleDateString('en-ZA'); } catch { return String(val); }
+    }
+    return String(val);
+  }
+
+  openTransferFilters() {
+    this.transferReportData.set([]);
+    this.transferReportSubtitle.set('');
+    this.transferReportGenerated.set(false);
+    this.showTransferFilters.set(true);
+  }
+
+  applyTransferFilters() {
+    this.showTransferFilters.set(false);
+    this.transferGenerating.set(true);
+    this.transferReportData.set([]);
+    this.transferReportSubtitle.set('');
+    this.transferReportGenerated.set(false);
+    var self = this;
+    var params: any = {};
+    if (this.transferFilters.finYear) { params['finYear'] = this.transferFilters.finYear; }
+    if (this.transferFilters.assetId) { params['assetId'] = this.transferFilters.assetId; }
+    this.api.getTransferReport(params).subscribe({
+      next: function(res: any) {
+        var data: any[] = Array.isArray(res) ? res : (res.data || []);
+        self.transferReportData.set(data);
+        var subtitle = 'Asset Transfer Report';
+        if (self.transferFilters.finYear) { subtitle += ' \u2014 FY ' + self.transferFilters.finYear; }
+        subtitle += ' \u2014 ' + data.length + ' records';
+        self.transferReportSubtitle.set(subtitle);
+        self.transferGenerating.set(false);
+        self.transferReportGenerated.set(true);
+      },
+      error: function() {
+        self.transferGenerating.set(false);
+        self.snackBar.open('Failed to generate Transfer Report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  exportTransferExcel() {
+    var self = this;
+    var data = this.transferReportData();
+    if (!data || data.length === 0) return;
+    var cols = this.transferCols;
+    var wsData: any[][] = [];
+    wsData.push([]);
+    wsData.push(['Asset Transfer Report']);
+    if (this.transferFilters.finYear) { wsData.push(['FY ' + this.transferFilters.finYear]); }
+    wsData.push(['Generated: ' + new Date().toLocaleDateString('en-ZA')]);
+    wsData.push(['Records: ' + data.length]);
+    wsData.push([]);
+    wsData.push(cols.map(function(c: string) { return self.transferColLabel(c); }));
+    for (var ri = 0; ri < data.length; ri++) {
+      var rowArr: any[] = [];
+      for (var ci = 0; ci < cols.length; ci++) { rowArr.push(self.transferRowValue(data[ri], cols[ci])); }
+      wsData.push(rowArr);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = cols.map(function() { return { wch: 22 }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transfer Report');
+    XLSX.writeFile(wb, 'transfer_report_' + new Date().toISOString().split('T')[0] + '.xlsx');
+    self.snackBar.open('Exported ' + data.length + ' records to Excel', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportTransferCsv() {
+    var self = this;
+    var data = this.transferReportData();
+    if (!data || data.length === 0) return;
+    var cols = this.transferCols;
+    var lines: string[] = [];
+    lines.push(cols.map(function(c: string) { return '"' + self.transferColLabel(c).replace(/"/g, '""') + '"'; }).join(','));
+    for (var ri = 0; ri < data.length; ri++) {
+      var cells: string[] = [];
+      for (var ci = 0; ci < cols.length; ci++) {
+        var v = self.transferRowValue(data[ri], cols[ci]);
+        if (v === null || v === undefined || v === '') { cells.push(''); }
+        else { cells.push('"' + String(v).replace(/"/g, '""') + '"'); }
+      }
+      lines.push(cells.join(','));
+    }
+    var csv = lines.join('\r\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'transfer_report_' + new Date().toISOString().split('T')[0] + '.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    self.snackBar.open('Exported ' + data.length + ' records to CSV', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  showRulImpactFilters = signal(false);
+  rulImpactGenerating = signal(false);
+  rulImpactReportGenerated = signal(false);
+  rulImpactReportData = signal<any[]>([]);
+  rulImpactReportSubtitle = signal('');
+  rulImpactFilters: any = { finYear: '' };
+
+  rulImpactTotals = computed(() => {
+    var data = this.rulImpactReportData();
+    var totalDepWithout = 0;
+    var totalDepWith = 0;
+    for (var i = 0; i < data.length; i++) {
+      totalDepWithout += Number(data[i]['DepWithoutRulAdj']) || 0;
+      totalDepWith += Number(data[i]['DepWithRulAdj']) || 0;
+    }
+    return {
+      count: data.length,
+      totalDepWithout: totalDepWithout,
+      totalDepWith: totalDepWith,
+      variance: totalDepWith - totalDepWithout
+    };
+  });
+
+  rulImpactFmtAmt(n: number): string {
+    var abs = n < 0 ? -n : n;
+    var parts = abs.toFixed(2).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (n < 0 ? '-' : '') + 'R ' + parts.join('.');
+  }
+
+  readonly rulImpactCols = [
+    'FinancialYear', 'AssetRegisterItemId', 'AssetTypeDesc', 'AssetCategoryDesc',
+    'AssetSubCategoryDesc', 'AssetClassDesc', 'AssetStatusDesc', 'MeasurementTypeDesc',
+    'CostClosingBalance', 'AccDepOpeningBalance',
+    'DepWithoutRulAdj', 'DepWithRulAdj',
+    'DepClosingWithout', 'DepClosingWith',
+    'ImpairmentClosingBalance', 'DisposalValue',
+    'CurrentValueWithout', 'CurrentValueWith',
+    'RulMonthsWithout', 'RulMonthsWith'
+  ];
+
+  readonly rulImpactColLabels: Record<string, string> = {
+    FinancialYear: 'Financial Year',
+    AssetRegisterItemId: 'Asset ID',
+    AssetTypeDesc: 'Asset Type',
+    AssetCategoryDesc: 'Category',
+    AssetSubCategoryDesc: 'Sub-Category',
+    AssetClassDesc: 'Asset Class',
+    AssetStatusDesc: 'Status',
+    MeasurementTypeDesc: 'Measurement Type',
+    CostClosingBalance: 'Cost (Closing)',
+    AccDepOpeningBalance: 'Acc. Dep. (Opening)',
+    DepWithoutRulAdj: 'Dep. Without Adj (Full Year)',
+    DepWithRulAdj: 'Dep. With Adj (Full Year)',
+    DepClosingWithout: 'Acc. Dep. Closing (Without)',
+    DepClosingWith: 'Acc. Dep. Closing (With)',
+    ImpairmentClosingBalance: 'Impairment (Closing)',
+    DisposalValue: 'Disposal Value',
+    CurrentValueWithout: 'Current Value (Without)',
+    CurrentValueWith: 'Current Value (With)',
+    RulMonthsWithout: 'RUL Months at YE (Without)',
+    RulMonthsWith: 'RUL Months at YE (With)'
+  };
+
+  rulImpactColLabel(col: string): string {
+    return this.rulImpactColLabels[col] || col;
+  }
+
+  readonly rulImpactAmountCols = new Set([
+    'CostClosingBalance', 'AccDepOpeningBalance',
+    'DepWithoutRulAdj', 'DepWithRulAdj',
+    'DepClosingWithout', 'DepClosingWith',
+    'ImpairmentClosingBalance', 'DisposalValue',
+    'CurrentValueWithout', 'CurrentValueWith'
+  ]);
+
+  rulImpactRowValue(row: any, col: string): string {
+    var val = row[col];
+    if (val === null || val === undefined) return '';
+    if (this.rulImpactAmountCols.has(col)) {
+      var n = Number(val);
+      if (isNaN(n)) return String(val);
+      return n.toFixed(2);
+    }
+    return String(val);
+  }
+
+  openRulImpactFilters() {
+    this.rulImpactReportData.set([]);
+    this.rulImpactReportSubtitle.set('');
+    this.rulImpactReportGenerated.set(false);
+    this.showRulImpactFilters.set(true);
+  }
+
+  applyRulImpactFilters() {
+    this.showRulImpactFilters.set(false);
+    this.rulImpactGenerating.set(true);
+    this.rulImpactReportData.set([]);
+    this.rulImpactReportSubtitle.set('');
+    this.rulImpactReportGenerated.set(false);
+    var self = this;
+    var params: any = {};
+    if (this.rulImpactFilters.finYear) { params['finYear'] = this.rulImpactFilters.finYear; }
+    this.api.getRulAdjustmentImpactReport(params).subscribe({
+      next: function(res: any) {
+        var data: any[] = Array.isArray(res) ? res : (res.data || []);
+        self.rulImpactReportData.set(data);
+        var subtitle = 'RUL Adjustment Impact Report';
+        if (self.rulImpactFilters.finYear) { subtitle += ' \u2014 FY ' + self.rulImpactFilters.finYear; }
+        subtitle += ' \u2014 ' + data.length + ' records';
+        self.rulImpactReportSubtitle.set(subtitle);
+        self.rulImpactGenerating.set(false);
+        self.rulImpactReportGenerated.set(true);
+      },
+      error: function() {
+        self.rulImpactGenerating.set(false);
+        self.snackBar.open('Failed to generate RUL Adjustment Impact Report', 'OK', { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  exportRulImpactExcel() {
+    var self = this;
+    var params: any = {};
+    if (this.rulImpactFilters.finYear) { params['finYear'] = this.rulImpactFilters.finYear; }
+    this.api.getRulAdjustmentImpactExport(params).subscribe({
+      next: function(blob: Blob) {
+        var url = window.URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'rul_adjustment_impact_' + new Date().toISOString().split('T')[0] + '.xlsx');
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        self.snackBar.open('Excel export downloaded', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      },
+      error: function() {
+        self.snackBar.open('Excel export failed', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
+  }
+
+  exportRulImpactCsv() {
+    var self = this;
+    var data = this.rulImpactReportData();
+    if (!data || data.length === 0) return;
+    var cols = this.rulImpactCols;
+    var totals = this.rulImpactTotals();
+    var lines: string[] = [];
+    lines.push(cols.map(function(c: string) { return '"' + self.rulImpactColLabel(c).replace(/"/g, '""') + '"'; }).join(','));
+    for (var ri = 0; ri < data.length; ri++) {
+      var cells: string[] = [];
+      for (var ci = 0; ci < cols.length; ci++) {
+        var v = self.rulImpactRowValue(data[ri], cols[ci]);
+        if (v === null || v === undefined || v === '') { cells.push(''); }
+        else { cells.push('"' + String(v).replace(/"/g, '""') + '"'); }
+      }
+      lines.push(cells.join(','));
+    }
+    var totalCells: string[] = [];
+    for (var ti = 0; ti < cols.length; ti++) {
+      var tc = cols[ti];
+      if (tc === 'FinancialYear') { totalCells.push('"TOTALS (' + totals.count + ' assets)"'); }
+      else if (tc === 'DepWithoutRulAdj') { totalCells.push('"' + totals.totalDepWithout.toFixed(2) + '"'); }
+      else if (tc === 'DepWithRulAdj') { totalCells.push('"' + totals.totalDepWith.toFixed(2) + '"'); }
+      else if (tc === 'AssetRegisterItemId') { totalCells.push('"Variance (With-Without): ' + totals.variance.toFixed(2) + '"'); }
+      else { totalCells.push(''); }
+    }
+    lines.push(totalCells.join(','));
+    var csv = lines.join('\r\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'rul_adjustment_impact_' + new Date().toISOString().split('T')[0] + '.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    self.snackBar.open('Exported ' + data.length + ' records to CSV', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+  }
+
+  exportMscoaSettingsCsv(): void {
+    var self = this;
+    var params: any = {};
+    var finYear = this.mscoaSettingsFilters.finYear || this.getActiveFinancialYear();
+    params['finYear'] = finYear;
+    if (this.mscoaSettingsFilters.typeId) params['typeId'] = this.mscoaSettingsFilters.typeId;
+    if (this.mscoaSettingsFilters.categoryId) params['categoryId'] = this.mscoaSettingsFilters.categoryId;
+    if (this.mscoaSettingsFilters.subCategoryId) params['subCategoryId'] = this.mscoaSettingsFilters.subCategoryId;
+    if (this.mscoaSettingsFilters.departmentId) params['departmentId'] = this.mscoaSettingsFilters.departmentId;
+    if (this.mscoaSettingsFilters.divisionId) params['divisionId'] = this.mscoaSettingsFilters.divisionId;
+    this.api.getMscoaSettingsReportCsv(params).subscribe({
+      next: function(blob: Blob) {
+        var url = window.URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'mscoa_settings_' + new Date().toISOString().substring(0, 10) + '.csv');
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        self.snackBar.open('CSV download started', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      },
+      error: function() {
+        self.snackBar.open('CSV export failed', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+    });
   }
 }

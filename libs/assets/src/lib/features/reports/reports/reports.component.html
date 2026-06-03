@@ -6,7 +6,7 @@
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:flex-start">
   @for (report of reportTypes; track report.title) {
     <div (click)="generateReport(report.id)"
-      style="cursor:pointer;background:white;border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;width:360px;flex:0 0 360px;box-sizing:border-box;transition:all .15s"
+      style="cursor:pointer;background:white;border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;width:360px;flex:0 0 360px;box-sizing:border-box;transition:all .15s;min-height:115px;display:flex;flex-direction:column;justify-content:space-between"
       onmouseenter="this.style.borderColor='#6366f1';this.style.background='#f5f3ff'"
       onmouseleave="this.style.borderColor='#e2e8f0';this.style.background='white'">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;overflow:hidden">
@@ -99,8 +99,8 @@
           <label class="filter-label">Asset Status</label>
           <select [(ngModel)]="disposalFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
-              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            @for (s of assetStatuses(); track s.assetStatusId) {
+              <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
@@ -204,8 +204,8 @@
           <label class="filter-label">Status</label>
           <select [(ngModel)]="farFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
-              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            @for (s of assetStatuses(); track s.assetStatusId) {
+              <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
@@ -214,11 +214,14 @@
           <input type="text" [(ngModel)]="farFilters.assetItemId" class="filter-input" placeholder="e.g. 12345">
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button mat-stroked-button (click)="showFarFilters.set(false)" style="font-size:13px">Cancel</button>
-        <button mat-flat-button color="primary" (click)="applyFarFilters()" style="font-size:13px">
-          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Apply Filters
-        </button>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <mat-checkbox [(ngModel)]="farFilters.acquisitionsOnly" style="font-size:13px;color:#374151">Acquisitions Only</mat-checkbox>
+        <div style="display:flex;gap:8px">
+          <button mat-stroked-button (click)="showFarFilters.set(false)" style="font-size:13px">Cancel</button>
+          <button mat-flat-button color="primary" (click)="applyFarFilters()" style="font-size:13px">
+            <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Apply Filters
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -300,8 +303,8 @@
           <label class="filter-label">Status</label>
           <select [(ngModel)]="depFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
-              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            @for (s of assetStatuses(); track s.assetStatusId) {
+              <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
@@ -310,11 +313,14 @@
           <input type="text" [(ngModel)]="depFilters.assetItemId" class="filter-input" placeholder="e.g. 12345">
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button mat-stroked-button (click)="showDepFilters.set(false)" style="font-size:13px">Cancel</button>
-        <button mat-flat-button style="background:#7c3aed;color:#fff;font-size:13px" (click)="applyDepFilters()">
-          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
-        </button>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <mat-checkbox [(ngModel)]="depFilters.acquisitionsOnly" style="font-size:13px;color:#374151">Acquisitions Only</mat-checkbox>
+        <div style="display:flex;gap:8px">
+          <button mat-stroked-button (click)="showDepFilters.set(false)" style="font-size:13px">Cancel</button>
+          <button mat-flat-button style="background:#7c3aed;color:#fff;font-size:13px" (click)="applyDepFilters()">
+            <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -507,7 +513,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="revFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="revFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -613,7 +619,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="impFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="impFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -719,7 +725,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="impRevFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="impRevFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -825,7 +831,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="refurbFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="refurbFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -931,7 +937,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="pyaFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="pyaFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -1037,7 +1043,7 @@
         <div class="filter-field"><label class="filter-label">Asset Status</label>
           <select [(ngModel)]="ppaFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) { <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option> }
+            @for (s of assetStatuses(); track s.assetStatusId) { <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
           </select></div>
         <div class="filter-field"><label class="filter-label">Asset Register ID</label>
           <input type="number" [(ngModel)]="ppaFilters.assetItemId" class="filter-input" placeholder="Specific asset ID…" /></div>
@@ -1890,8 +1896,8 @@
           <label class="filter-label">Status</label>
           <select [(ngModel)]="customFarFilters.statusId" class="filter-input">
             <option value="">All Statuses</option>
-            @for (s of assetStatuses(); track s.assetStatus_ID || s.id) {
-              <option [value]="s.assetStatus_ID || s.id">{{s.assetStatusDesc || s.name}}</option>
+            @for (s of assetStatuses(); track s.assetStatusId) {
+              <option [value]="s.assetStatusId">{{s.assetStatusDesc}}</option>
             }
           </select>
         </div>
@@ -1968,13 +1974,16 @@
         </div>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
-        <button mat-stroked-button (click)="showCustomFarFilters.set(false)" style="font-size:13px">Cancel</button>
-        <button mat-flat-button style="background:#0d9488;color:#fff;font-size:13px"
-                [disabled]="customFarSelectedKeys().length === 0" (click)="applyCustomFarFilters()">
-          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon>
-          Generate ({{customFarSelectedKeys().length}} cols)
-        </button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+        <mat-checkbox [(ngModel)]="customFarFilters.acquisitionsOnly" style="font-size:13px;color:#374151">Acquisitions Only</mat-checkbox>
+        <div style="display:flex;gap:8px">
+          <button mat-stroked-button (click)="showCustomFarFilters.set(false)" style="font-size:13px">Cancel</button>
+          <button mat-flat-button style="background:#0d9488;color:#fff;font-size:13px"
+                  [disabled]="customFarSelectedKeys().length === 0" (click)="applyCustomFarFilters()">
+            <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon>
+            Generate ({{customFarSelectedKeys().length}} cols)
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -2052,6 +2061,1019 @@
           <button mat-stroked-button style="min-width:36px;padding:0 8px" [disabled]="customFarPage() >= customFarTotalPages() - 1" (click)="customFarPage.set(customFarTotalPages() - 1)">
             <mat-icon style="font-size:16px">last_page</mat-icon>
           </button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (showComplianceFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#ef4444">rule</mat-icon> Measurement Model Compliance Report Filters
+      </h2>
+      <button mat-icon-button (click)="showComplianceFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="filter-field">
+          <label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="complianceFilters.typeId" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetTypeId ?? t.AssetType_ID) {
+              <option [value]="t.assetTypeId ?? t.AssetType_ID">{{t.assetTypeDesc ?? t.AssetTypeDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="complianceFilters.categoryId" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of assetCategories(); track c.assetCategoryId ?? c.AssetCategoryID) {
+              <option [value]="c.assetCategoryId ?? c.AssetCategoryID">{{c.assetCategoryDesc ?? c.AssetCategoryDesc}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Department</label>
+          <select [(ngModel)]="complianceFilters.departmentId" class="filter-input">
+            <option value="">All Departments</option>
+            @for (d of departments(); track d.id) {
+              <option [value]="d.id">{{d.description}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showComplianceFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#ef4444;color:#fff;font-size:13px" (click)="applyComplianceFilters()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (complianceGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Measurement Model Compliance Report...</div>
+  </div>
+}
+
+@if (complianceReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#ef4444">rule</mat-icon> Measurement Model Compliance Report
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{complianceReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (complianceReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportComplianceExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openComplianceFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (complianceReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#22c55e;display:block;margin:0 auto 12px">check_circle</mat-icon>
+        No conflicting assets found. All assets are compatible with the current measurement model ({{complianceOrgModel()}}).
+      </div>
+    } @else {
+      <div style="padding:12px 20px;background:#fef2f2;border-bottom:1px solid #fecaca;display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#ef4444;font-size:18px">warning</mat-icon>
+        <span style="font-size:13px;color:#b91c1c;font-weight:600">
+          {{complianceReportData().length}} asset(s) have measurement types incompatible with the current <strong>{{complianceOrgModel()}}</strong> model.
+        </span>
+      </div>
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:1800px">
+          <thead>
+            <tr>
+              @for (col of complianceColumns(); track col) {
+                <th>{{col}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of compliancePagedRows(); track $index) {
+              <tr>
+                @for (col of complianceColumns(); track col) {
+                  <td>{{complianceRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (complianceTotalPages() > 1) {
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e8f0;margin-top:8px;padding-left:20px;padding-right:20px">
+          <div style="font-size:12px;color:#64748b">
+            Showing {{compliancePage() * compliancePageSize + 1}}–{{compliancePage() * compliancePageSize + compliancePagedRows().length}} of {{complianceReportData().length}} records
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="compliancePage.set(0)" [disabled]="compliancePage() === 0">
+              <mat-icon style="font-size:16px">first_page</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="compliancePage.set(compliancePage() - 1)" [disabled]="compliancePage() === 0">
+              <mat-icon style="font-size:16px">chevron_left</mat-icon>
+            </button>
+            <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{compliancePage() + 1}} of {{complianceTotalPages()}}</span>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="compliancePage.set(compliancePage() + 1)" [disabled]="compliancePage() >= complianceTotalPages() - 1">
+              <mat-icon style="font-size:16px">chevron_right</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="compliancePage.set(complianceTotalPages() - 1)" [disabled]="compliancePage() >= complianceTotalPages() - 1">
+              <mat-icon style="font-size:16px">last_page</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+
+@if (prefixViolGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating mSCOA Prefix Violations Report...</div>
+  </div>
+}
+
+@if (prefixViolGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#ef4444">error_outline</mat-icon> mSCOA Prefix Errors
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">
+          {{prefixViolFilteredData().length}}{{prefixViolFilteredData().length !== prefixViolData().length ? ' of ' + prefixViolData().length : ''}} violation(s) found — mSCOA vote-field mappings whose SCOA code does not match the required account-code prefix
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (prefixViolData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="printPrefixViolReport()">
+            <mat-icon>print</mat-icon> Print
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportPrefixViolExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="generateMscoaPrefixReport()">
+          <mat-icon>refresh</mat-icon> Refresh
+        </button>
+        <button mat-icon-button style="color:#64748b" title="Close report" (click)="prefixViolGenerated.set(false)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+    @if (prefixViolData().length > 0) {
+      <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Financial Year</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:110px" [(ngModel)]="prefixViolFilters.finYear" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('finYear'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Transaction Type</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:140px" [(ngModel)]="prefixViolFilters.transactionType" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('transactionTypeName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Asset Type</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:130px" [(ngModel)]="prefixViolFilters.assetType" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('assetTypeName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Category</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:130px" [(ngModel)]="prefixViolFilters.category" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('categoryName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Sub Category</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:120px" [(ngModel)]="prefixViolFilters.subCategory" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('subCategoryName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Department</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:120px" [(ngModel)]="prefixViolFilters.department" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('departmentName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Division</label>
+          <select class="form-input" style="font-size:12px;padding:4px 8px;min-width:110px" [(ngModel)]="prefixViolFilters.division" (ngModelChange)="onPrefixViolFilterChange()">
+            <option value="">All</option>
+            @for (v of prefixViolUniqueValues('divisionName'); track v) { <option [value]="v">{{v}}</option> }
+          </select>
+        </div>
+        <button mat-stroked-button style="font-size:12px;border-color:#e2e8f0;height:30px;line-height:30px;padding:0 10px" (click)="resetPrefixViolFilters()">
+          <mat-icon style="font-size:14px;line-height:14px">filter_alt_off</mat-icon> Clear
+        </button>
+        <span style="font-size:12px;color:#64748b;margin-left:4px;align-self:center">
+          Showing {{prefixViolFilteredData().length}} of {{prefixViolData().length}}
+        </span>
+      </div>
+    }
+    @if (prefixViolData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#22c55e;display:block;margin:0 auto 12px">check_circle</mat-icon>
+        No prefix violations found. All mSCOA vote-field SCOA codes comply with their required prefixes.
+      </div>
+    } @else {
+      <div style="padding:12px 20px;background:#fef2f2;border-bottom:1px solid #fecaca;display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#ef4444;font-size:18px">warning</mat-icon>
+        <span style="font-size:13px;color:#b91c1c;font-weight:600">
+          {{prefixViolFilteredData().length}} mSCOA vote-field mapping(s) have SCOA codes that do not match their required prefix.
+        </span>
+      </div>
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:1600px">
+          <thead>
+            <tr>
+              <th>Fin Year</th>
+              <th>Transaction Type</th>
+              <th>Asset Type</th>
+              <th>Category</th>
+              <th>Sub Category</th>
+              <th>Department</th>
+              <th>Division</th>
+              <th>Vote Key</th>
+              <th>Field Label</th>
+              <th>Actual SCOA Code</th>
+              <th>Required Prefix</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of prefixViolPagedRows(); track $index) {
+              <tr>
+                <td>{{row.finYear || ''}}</td>
+                <td>{{row.transactionTypeName || ''}}</td>
+                <td>{{row.assetTypeName || ''}}</td>
+                <td>{{row.categoryName || ''}}</td>
+                <td>{{row.subCategoryName || ''}}</td>
+                <td>{{row.departmentName || ''}}</td>
+                <td>{{row.divisionName || ''}}</td>
+                <td><code style="font-size:12px;background:#f1f5f9;padding:2px 5px;border-radius:3px">{{row.voteKey || ''}}</code></td>
+                <td>{{row.fieldLabel || ''}}</td>
+                <td style="font-weight:600;color:#dc2626">{{row.actualScoaCode || ''}}</td>
+                <td><span style="background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:10px;font-size:12px;font-weight:700">{{row.requiredPrefix || ''}}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (prefixViolTotalPages() > 1) {
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e8f0;margin-top:8px;padding-left:20px;padding-right:20px">
+          <div style="font-size:12px;color:#64748b">
+            Showing {{prefixViolPage() * prefixViolPageSize + 1}}–{{prefixViolPage() * prefixViolPageSize + prefixViolPagedRows().length}} of {{prefixViolFilteredData().length}} records
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="prefixViolPage.set(0)" [disabled]="prefixViolPage() === 0">
+              <mat-icon style="font-size:16px">first_page</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="prefixViolPage.set(prefixViolPage() - 1)" [disabled]="prefixViolPage() === 0">
+              <mat-icon style="font-size:16px">chevron_left</mat-icon>
+            </button>
+            <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{prefixViolPage() + 1}} of {{prefixViolTotalPages()}}</span>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="prefixViolPage.set(prefixViolPage() + 1)" [disabled]="prefixViolPage() >= prefixViolTotalPages() - 1">
+              <mat-icon style="font-size:16px">chevron_right</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="prefixViolPage.set(prefixViolTotalPages() - 1)" [disabled]="prefixViolPage() >= prefixViolTotalPages() - 1">
+              <mat-icon style="font-size:16px">last_page</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+
+@if (showMissingMscoaFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#f97316">filter_list</mat-icon> Missing mSCOA Settings — Filters
+      </h2>
+      <button mat-icon-button (click)="showMissingMscoaFilters.set(false)" style="color:#64748b">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <input type="text" [(ngModel)]="missingMscoaFilters.finYear" class="filter-input" placeholder="e.g. 2024/2025" />
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Transaction Type</label>
+          <select [(ngModel)]="missingMscoaFilters.transactionTypeId" class="filter-input">
+            <option value="">— Select —</option>
+            @for (td of transactionTypeDefs(); track td.id) {
+              <option [value]="td.id">{{td.name}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button mat-stroked-button (click)="showMissingMscoaFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button style="background:#f97316;color:#fff;font-size:13px" (click)="generateMissingMscoa()">
+          <mat-icon style="font-size:18px;margin-right:4px">play_arrow</mat-icon> Generate
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (missingMscoaGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Checking mSCOA coverage...</div>
+  </div>
+}
+
+@if (missingMscoaGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#f97316">search_off</mat-icon> Missing mSCOA Settings
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">
+          Fin Year: {{missingMscoaFilters.finYear}}
+          &mdash; {{missingMscoaData().length}} missing
+          &mdash; {{missingMscoaIncompleteData().length}} incomplete GL mapping(s)
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (missingMscoaData().length > 0 || missingMscoaIncompleteData().length > 0) {
+          <button mat-stroked-button style="border-color:#f97316;color:#c2410c;font-size:13px" (click)="exportAllGlIssuesExcel()">
+            <mat-icon style="color:#f97316">output</mat-icon> Export All GL Issues
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportMissingMscoaExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="printMissingMscoaReport()">
+            <mat-icon>print</mat-icon> Print
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openMissingMscoaFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (missingMscoaData().length === 0 && missingMscoaIncompleteData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#22c55e;display:block;margin:0 auto 12px">check_circle</mat-icon>
+        All active asset combinations have a complete mSCOA GL mapping with valid vote legs for this financial year and transaction type.
+      </div>
+    } @else {
+      @if (missingMscoaData().length > 0) {
+        <div style="padding:10px 20px;background:#fff7ed;border-bottom:1px solid #fed7aa;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#f97316;font-size:18px">warning</mat-icon>
+          <span style="font-size:13px;color:#c2410c;font-weight:600">
+            Missing GL Mappings — {{missingMscoaData().length}} combination(s) have no mSCOA configuration record and cannot post transactions.
+          </span>
+          <button mat-stroked-button style="margin-left:auto;border-color:#f97316;color:#c2410c;font-size:12px" (click)="exportMissingOnlyExcel()">
+            <mat-icon style="font-size:16px;color:#f97316">table_chart</mat-icon> Export Excel
+          </button>
+          <button mat-stroked-button style="border-color:#f97316;color:#c2410c;font-size:12px" (click)="printMissingOnlyReport()">
+            <mat-icon style="font-size:16px;color:#f97316">print</mat-icon> Print Missing Rows
+          </button>
+        </div>
+        <div style="max-height:500px;overflow:auto">
+          <table class="data-table far-table" style="min-width:900px">
+            <thead>
+              <tr>
+                <th>Asset Type</th>
+                <th>Category</th>
+                <th>Sub Category</th>
+                <th>Measurement Type</th>
+                @if (missingMscoaUseDeptDiv()) {
+                  <th>Department</th>
+                  <th>Division</th>
+                }
+                <th style="text-align:right">Asset Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of missingMscoaPagedRows(); track $index) {
+                <tr>
+                  <td>{{row.assetTypeName || ''}}</td>
+                  <td>{{row.categoryName || ''}}</td>
+                  <td>{{row.subCategoryName || ''}}</td>
+                  <td>{{row.measurementTypeName || ''}}</td>
+                  @if (missingMscoaUseDeptDiv()) {
+                    <td>{{row.departmentName || ''}}</td>
+                    <td>{{row.divisionName || ''}}</td>
+                  }
+                  <td style="text-align:right;font-weight:600;color:#dc2626">{{row.assetCount}}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (missingMscoaTotalPages() > 1) {
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid #e2e8f0">
+            <div style="font-size:12px;color:#64748b">
+              Showing {{missingMscoaPage() * missingMscoaPageSize + 1}}–{{missingMscoaPage() * missingMscoaPageSize + missingMscoaPagedRows().length}} of {{missingMscoaData().length}} records
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaPage.set(0)" [disabled]="missingMscoaPage() === 0">
+                <mat-icon style="font-size:16px">first_page</mat-icon>
+              </button>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaPage.set(missingMscoaPage() - 1)" [disabled]="missingMscoaPage() === 0">
+                <mat-icon style="font-size:16px">chevron_left</mat-icon>
+              </button>
+              <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{missingMscoaPage() + 1}} of {{missingMscoaTotalPages()}}</span>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaPage.set(missingMscoaPage() + 1)" [disabled]="missingMscoaPage() >= missingMscoaTotalPages() - 1">
+                <mat-icon style="font-size:16px">chevron_right</mat-icon>
+              </button>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaPage.set(missingMscoaTotalPages() - 1)" [disabled]="missingMscoaPage() >= missingMscoaTotalPages() - 1">
+                <mat-icon style="font-size:16px">last_page</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+      }
+      @if (missingMscoaIncompleteData().length > 0) {
+        <div style="padding:10px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#d97706;font-size:18px">error_outline</mat-icon>
+          <span style="font-size:13px;color:#b45309;font-weight:600;flex:1">
+            Incomplete GL Mappings — {{missingMscoaIncompleteData().length}} combination(s) have a configuration record but one or more vote legs cannot be resolved.
+          </span>
+          <button mat-stroked-button style="font-size:12px;min-height:30px;line-height:30px;padding:0 12px;color:#b45309;border-color:#d97706" (click)="exportIncompleteGlMappingsExcel()">
+            <mat-icon style="font-size:15px;vertical-align:middle;margin-right:4px">file_download</mat-icon>
+            Export Incomplete Rows
+          </button>
+          <button mat-stroked-button style="font-size:12px;min-height:30px;line-height:30px;padding:0 12px;color:#b45309;border-color:#d97706" (click)="printIncompleteGlMappingsReport()">
+            <mat-icon style="font-size:15px;vertical-align:middle;margin-right:4px">print</mat-icon>
+            Print Incomplete Rows
+          </button>
+        </div>
+        <div style="max-height:500px;overflow:auto">
+          <table class="data-table far-table" style="min-width:1050px">
+            <thead>
+              <tr>
+                <th>Asset Type</th>
+                <th>Category</th>
+                <th>Sub Category</th>
+                <th>Measurement Type</th>
+                <th>Status</th>
+                @if (missingMscoaUseDeptDiv()) {
+                  <th>Department</th>
+                  <th>Division</th>
+                }
+                <th style="text-align:right">Asset Count</th>
+                <th>Incomplete Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of missingMscoaIncompletePagedRows(); track $index) {
+                <tr>
+                  <td>{{row.assetTypeName || ''}}</td>
+                  <td>{{row.categoryName || ''}}</td>
+                  <td>{{row.subCategoryName || ''}}</td>
+                  <td>{{row.measurementTypeName || ''}}</td>
+                  <td>{{row.statusName || ''}}</td>
+                  @if (missingMscoaUseDeptDiv()) {
+                    <td>{{row.departmentName || ''}}</td>
+                    <td>{{row.divisionName || ''}}</td>
+                  }
+                  <td style="text-align:right;font-weight:600;color:#b45309">{{row.assetCount}}</td>
+                  <td style="padding-top:4px;padding-bottom:4px">
+                    @if (row.incompleteReason) {
+                      <span [style]="incompleteReasonBadgeStyle(row.incompleteReason)">{{row.incompleteReason}}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (missingMscoaIncompleteTotalPages() > 1) {
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid #e2e8f0">
+            <div style="font-size:12px;color:#64748b">
+              Showing {{missingMscoaIncompletePage() * missingMscoaIncompletePageSize + 1}}–{{missingMscoaIncompletePage() * missingMscoaIncompletePageSize + missingMscoaIncompletePagedRows().length}} of {{missingMscoaIncompleteData().length}} records
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaIncompletePage.set(0)" [disabled]="missingMscoaIncompletePage() === 0">
+                <mat-icon style="font-size:16px">first_page</mat-icon>
+              </button>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaIncompletePage.set(missingMscoaIncompletePage() - 1)" [disabled]="missingMscoaIncompletePage() === 0">
+                <mat-icon style="font-size:16px">chevron_left</mat-icon>
+              </button>
+              <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{missingMscoaIncompletePage() + 1}} of {{missingMscoaIncompleteTotalPages()}}</span>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaIncompletePage.set(missingMscoaIncompletePage() + 1)" [disabled]="missingMscoaIncompletePage() >= missingMscoaIncompleteTotalPages() - 1">
+                <mat-icon style="font-size:16px">chevron_right</mat-icon>
+              </button>
+              <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="missingMscoaIncompletePage.set(missingMscoaIncompleteTotalPages() - 1)" [disabled]="missingMscoaIncompletePage() >= missingMscoaIncompleteTotalPages() - 1">
+                <mat-icon style="font-size:16px">last_page</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    }
+  </div>
+}
+
+@if (showAssetGlFilters()) {
+  <div style="position:fixed;inset:0;z-index:1200;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(15,23,42,0.18);width:480px;max-width:96vw;padding:32px 32px 24px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+        <mat-icon style="color:#0f766e;font-size:26px;width:26px;height:26px">account_balance</mat-icon>
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#1e293b">Asset GL Transactions</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">GL lines linked to asset transactions</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Financial Year <span style="color:#dc2626">*</span></label>
+          <select [(ngModel)]="assetGlFilters.finYear" (ngModelChange)="onAssetGlFinYearChange()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#1e293b">
+            <option value="">— Select Financial Year —</option>
+            @for (yr of assetGlFinYears(); track yr) {
+              <option [value]="yr">{{yr}}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Processing Month</label>
+          <select [(ngModel)]="assetGlFilters.processingMonth" (ngModelChange)="onAssetGlProcessingMonthChange()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#1e293b">
+            <option value="">All Months</option>
+            @for (m of assetGlProcessingMonths(); track m) {
+              <option [value]="m">{{assetGlMonthLabel(m)}}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Transaction Type</label>
+          <select [(ngModel)]="assetGlFilters.transactionTypeId" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#1e293b">
+            <option value="">All Transaction Types</option>
+            @for (t of assetGlTransactionTypes(); track t.documentTypeId) {
+              <option [value]="t.documentTypeId">{{t.documentTypeDesc}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">
+        <button mat-stroked-button (click)="showAssetGlFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button color="primary" (click)="applyAssetGlFilters()" [disabled]="!assetGlFilters.finYear" style="font-size:13px;background:#0f766e">
+          <mat-icon style="font-size:16px;margin-right:4px">bar_chart</mat-icon>Generate Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (assetGlGenerating()) {
+  <div style="position:fixed;inset:0;z-index:1100;background:rgba(15,23,42,0.35);display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 8px 40px rgba(15,23,42,0.18)">
+      <mat-spinner diameter="44"></mat-spinner>
+      <div style="font-size:15px;font-weight:600;color:#1e293b">Generating Asset GL Report…</div>
+      <div style="font-size:12px;color:#64748b">Querying general ledger — this may take a moment</div>
+    </div>
+  </div>
+}
+
+@if (showMscoaSettingsFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#0f766e">settings</mat-icon> mSCOA Settings Report Filters
+      </h2>
+      <button mat-icon-button (click)="showMscoaSettingsFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="mscoaSettingsFilters.finYear" class="filter-input">
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset Type</label>
+          <select [(ngModel)]="mscoaSettingsFilters.typeId" (ngModelChange)="onMscoaSettingsTypeChange()" class="filter-input">
+            <option value="">All Types</option>
+            @for (t of assetTypes(); track t.assetType_ID || t.id) {
+              <option [value]="t.assetType_ID || t.id">{{t.assetTypeDesc || t.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Category</label>
+          <select [(ngModel)]="mscoaSettingsFilters.categoryId" (ngModelChange)="onMscoaSettingsCategoryChange()" class="filter-input">
+            <option value="">All Categories</option>
+            @for (c of mscoaSettingsFilterCategories(); track c.assetCategoryID || c.id) {
+              <option [value]="c.assetCategoryID || c.id">{{c.assetCategoryDesc || c.name}}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Sub Category</label>
+          <select [(ngModel)]="mscoaSettingsFilters.subCategoryId" class="filter-input">
+            <option value="">All Sub Categories</option>
+            @for (s of mscoaSettingsFilterSubCategories(); track s.asset_SubCategory_ID || s.id) {
+              <option [value]="s.asset_SubCategory_ID || s.id">{{s.asset_SubCategoryDescription || s.name}}</option>
+            }
+          </select>
+        </div>
+        @if (useDeptDivision()) {
+          <div class="filter-field">
+            <label class="filter-label">Department</label>
+            <select [(ngModel)]="mscoaSettingsFilters.departmentId" (ngModelChange)="onMscoaSettingsDeptChange()" class="filter-input">
+              <option value="">All Departments</option>
+              @for (d of mscoaSettingsDepts(); track d.id) {
+                <option [value]="d.id">{{d.description}}</option>
+              }
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="filter-label">Division</label>
+            <select [(ngModel)]="mscoaSettingsFilters.divisionId" class="filter-input">
+              <option value="">All Divisions</option>
+              @for (d of mscoaSettingsFilterDivisions(); track d.id) {
+                <option [value]="d.id">{{d.description}}</option>
+              }
+            </select>
+          </div>
+        }
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+        <button mat-stroked-button (click)="showMscoaSettingsFilters.set(false)" style="font-size:13px">Cancel</button>
+        <button mat-flat-button (click)="applyMscoaSettingsFilters()" style="font-size:13px;background:#0f766e;color:#fff">
+          <mat-icon style="font-size:16px;margin-right:4px">bar_chart</mat-icon>Generate Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (mscoaSettingsGenerating()) {
+  <div style="position:fixed;inset:0;z-index:1100;background:rgba(15,23,42,0.35);display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 8px 40px rgba(15,23,42,0.18)">
+      <mat-spinner diameter="44"></mat-spinner>
+      <div style="font-size:15px;font-weight:600;color:#1e293b">Generating mSCOA Settings Report…</div>
+      <div style="font-size:12px;color:#64748b">Querying vote field mappings — this may take a moment</div>
+    </div>
+  </div>
+}
+
+@if (mscoaSettingsGenerated()) {
+  <div style="margin-top:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#1e293b">mSCOA Settings Report</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{mscoaSettingsSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button mat-stroked-button (click)="openMscoaSettingsFilters()" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px">
+          <mat-icon style="font-size:15px;margin-right:4px">tune</mat-icon>Filters
+        </button>
+        <button mat-stroked-button (click)="exportMscoaSettingsExcel()" [disabled]="mscoaSettingsData().length === 0" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px;color:#166534;border-color:#16a34a">
+          <mat-icon style="font-size:15px;margin-right:4px">table_view</mat-icon>Excel
+        </button>
+        <button mat-stroked-button (click)="exportMscoaSettingsCsv()" [disabled]="mscoaSettingsData().length === 0" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px;color:#0f766e;border-color:#0f766e">
+          <mat-icon style="font-size:15px;margin-right:4px">download</mat-icon>CSV
+        </button>
+      </div>
+    </div>
+    @if (mscoaSettingsData().length === 0) {
+      <div style="text-align:center;padding:48px;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;width:40px;height:40px;color:#cbd5e1;display:block;margin:0 auto 12px">search_off</mat-icon>
+        No mSCOA settings found for the selected filters.
+      </div>
+    } @else {
+      <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:2400px">
+          <thead>
+            <tr style="background:#f1f5f9;position:sticky;top:0;z-index:2">
+              @for (col of mscoaSettingsColumns(); track col) {
+                <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e2e8f0;white-space:nowrap">{{col}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of mscoaSettingsPagedRows(); track $index; let i = $index) {
+              <tr [style.background]="i % 2 === 0 ? '#fff' : '#f8fafc'">
+                @for (col of mscoaSettingsColumns(); track col) {
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;color:#1e293b">{{mscoaSettingsRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (mscoaSettingsTotalPages() > 1) {
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e8f0;margin-top:8px">
+          <div style="font-size:12px;color:#64748b">
+            Showing {{mscoaSettingsPage() * mscoaSettingsPageSize + 1}}–{{mscoaSettingsPage() * mscoaSettingsPageSize + mscoaSettingsPagedRows().length}} of {{mscoaSettingsData().length}} records
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="mscoaSettingsGoToPage(0)" [disabled]="mscoaSettingsPage() === 0">
+              <mat-icon style="font-size:16px">first_page</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="mscoaSettingsPrevPage()" [disabled]="mscoaSettingsPage() === 0">
+              <mat-icon style="font-size:16px">chevron_left</mat-icon>
+            </button>
+            <span style="font-size:12px;color:#1e293b;font-weight:600;padding:0 8px">Page {{mscoaSettingsPage() + 1}} of {{mscoaSettingsTotalPages()}}</span>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="mscoaSettingsNextPage()" [disabled]="mscoaSettingsPage() >= mscoaSettingsTotalPages() - 1">
+              <mat-icon style="font-size:16px">chevron_right</mat-icon>
+            </button>
+            <button mat-stroked-button style="font-size:12px;min-height:28px;line-height:28px;padding:0 10px" (click)="mscoaSettingsGoToPage(mscoaSettingsTotalPages() - 1)" [disabled]="mscoaSettingsPage() >= mscoaSettingsTotalPages() - 1">
+              <mat-icon style="font-size:16px">last_page</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+
+@if (assetGlReportGenerated()) {
+  <div style="margin-top:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#1e293b">Asset GL Transactions</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{assetGlReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button mat-stroked-button (click)="openAssetGlFilters()" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px">
+          <mat-icon style="font-size:15px;margin-right:4px">tune</mat-icon>Filters
+        </button>
+        <button mat-stroked-button (click)="exportAssetGlExcel()" [disabled]="assetGlReportData().length === 0" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px;color:#166534;border-color:#16a34a">
+          <mat-icon style="font-size:15px;margin-right:4px">table_view</mat-icon>Excel
+        </button>
+        <button mat-stroked-button (click)="exportAssetGlCsv()" [disabled]="assetGlReportData().length === 0" style="font-size:12px;min-height:32px;line-height:32px;padding:0 12px;color:#0f766e;border-color:#0f766e">
+          <mat-icon style="font-size:15px;margin-right:4px">download</mat-icon>CSV
+        </button>
+      </div>
+    </div>
+    @if (assetGlReportData().length === 0) {
+      <div style="text-align:center;padding:48px;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;width:40px;height:40px;color:#cbd5e1;display:block;margin:0 auto 12px">search_off</mat-icon>
+        No GL transactions found for the selected filters.
+      </div>
+    } @else {
+      <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1800px">
+          <thead>
+            <tr style="background:#f1f5f9;position:sticky;top:0;z-index:2">
+              @for (col of assetGlColumns(); track col) {
+                <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #e2e8f0;white-space:nowrap"
+                    [style.text-align]="isAssetGlAmountCol(col) ? 'right' : 'left'">{{col}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of assetGlReportData(); track row.genLedgerId; let i = $index) {
+              <tr [style.background]="i % 2 === 0 ? '#fff' : '#f8fafc'">
+                @for (col of assetGlColumns(); track col) {
+                  <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;color:#1e293b"
+                      [style.text-align]="isAssetGlAmountCol(col) ? 'right' : 'left'"
+                      [style.font-weight]="col === 'Total (R)' ? '600' : 'normal'"
+                      [style.color]="col === 'Total (R)' ? '#0f766e' : '#1e293b'">{{assetGlRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr style="background:#f1f5f9;font-weight:700">
+              <td colspan="7" style="padding:8px 10px;border-top:2px solid #e2e8f0;font-size:12px;color:#374151">
+                TOTAL — {{assetGlReportData().length}} records
+              </td>
+              <td style="padding:8px 10px;border-top:2px solid #e2e8f0;text-align:right;color:#1e293b">{{assetGlTotals().debit}}</td>
+              <td style="padding:8px 10px;border-top:2px solid #e2e8f0;text-align:right;color:#1e293b">{{assetGlTotals().credit}}</td>
+              <td style="padding:8px 10px;border-top:2px solid #e2e8f0;text-align:right;color:#0f766e">{{assetGlTotals().total}}</td>
+              <td colspan="14" style="padding:8px 10px;border-top:2px solid #e2e8f0"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showTransferFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#3b82f6">filter_list</mat-icon> Asset Transfer Report Filters
+      </h2>
+      <button mat-icon-button (click)="showTransferFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="transferFilters.finYear" class="filter-input">
+            <option value="">All Years</option>
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select>
+        </div>
+        <div class="filter-field">
+          <label class="filter-label">Asset ID (optional)</label>
+          <input type="number" [(ngModel)]="transferFilters.assetId" class="filter-input" placeholder="e.g. 12345" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button mat-stroked-button (click)="showTransferFilters.set(false)" style="border-color:#e2e8f0">Cancel</button>
+        <button mat-flat-button color="primary" (click)="applyTransferFilters()">
+          <mat-icon>search</mat-icon> Generate Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (transferGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating Asset Transfer Report...</div>
+  </div>
+}
+
+@if (transferReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#3b82f6">swap_horiz</mat-icon> Asset Transfer Report
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{transferReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (transferReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportTransferCsv()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportTransferExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openTransferFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (transferReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No asset transfer records found for the selected filters.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2400px">
+          <thead>
+            <tr>
+              @for (col of transferCols; track col) {
+                <th [style.text-align]="transferAmountCols.has(col) ? 'right' : 'left'">{{transferColLabel(col)}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of transferReportData(); track $index) {
+              <tr>
+                @for (col of transferCols; track col) {
+                  <td [style.text-align]="transferAmountCols.has(col) ? 'right' : 'left'">{{transferRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}
+
+@if (showRulImpactFilters()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <mat-icon style="color:#8b5cf6">trending_up</mat-icon> RUL Adjustment Impact Report Filters
+      </h2>
+      <button mat-icon-button (click)="showRulImpactFilters.set(false)" style="color:#64748b"><mat-icon>close</mat-icon></button>
+    </div>
+    <div style="padding:20px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+        <div class="filter-field">
+          <label class="filter-label">Financial Year</label>
+          <select [(ngModel)]="rulImpactFilters.finYear" class="filter-input">
+            <option value="">All Years</option>
+            @for (fy of financialYearOptions; track fy) { <option [value]="fy">{{fy}}</option> }
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button mat-stroked-button (click)="showRulImpactFilters.set(false)" style="border-color:#e2e8f0">Cancel</button>
+        <button mat-flat-button color="primary" (click)="applyRulImpactFilters()">
+          <mat-icon>search</mat-icon> Generate Report
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (rulImpactGenerating()) {
+  <div class="card-container" style="padding:40px;text-align:center;margin-bottom:24px">
+    <mat-spinner diameter="32" style="margin:0 auto 12px"></mat-spinner>
+    <div style="font-size:14px;color:#64748b">Generating RUL Adjustment Impact Report...</div>
+  </div>
+}
+
+@if (rulImpactReportGenerated()) {
+  <div class="card-container" style="margin-bottom:24px">
+    <div class="card-title-bar">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">
+          <mat-icon style="color:#8b5cf6">trending_up</mat-icon> RUL Adjustment Impact Report
+        </h2>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">{{rulImpactReportSubtitle()}}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        @if (rulImpactReportData().length > 0) {
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRulImpactCsv()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+          <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="exportRulImpactExcel()">
+            <mat-icon>table_chart</mat-icon> Export Excel
+          </button>
+        }
+        <button mat-stroked-button style="border-color:#e2e8f0;font-size:13px" (click)="openRulImpactFilters()">
+          <mat-icon>filter_list</mat-icon> Filters
+        </button>
+      </div>
+    </div>
+    @if (rulImpactReportData().length === 0) {
+      <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+        <mat-icon style="font-size:40px;color:#cbd5e1;display:block;margin:0 auto 12px">inbox</mat-icon>
+        No RUL adjustment records found for the selected financial year.
+      </div>
+    } @else {
+      <div style="max-height:600px;overflow:auto">
+        <table class="data-table far-table" style="min-width:2800px">
+          <thead>
+            <tr>
+              @for (col of rulImpactCols; track col) {
+                <th [style.text-align]="rulImpactAmountCols.has(col) ? 'right' : 'left'">{{rulImpactColLabel(col)}}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rulImpactReportData(); track $index) {
+              <tr>
+                @for (col of rulImpactCols; track col) {
+                  <td [style.text-align]="rulImpactAmountCols.has(col) ? 'right' : 'left'">{{rulImpactRowValue(row, col)}}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px;background:#f8fafc;border-top:2px solid #e2e8f0;margin-top:0">
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Assets Affected</div>
+          <div style="font-size:22px;font-weight:700;color:#1e293b">{{rulImpactTotals().count}}</div>
+        </div>
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Total Dep. Without RUL Adj</div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;font-variant-numeric:tabular-nums">{{rulImpactFmtAmt(rulImpactTotals().totalDepWithout)}}</div>
+        </div>
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Total Dep. With RUL Adj</div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;font-variant-numeric:tabular-nums">{{rulImpactFmtAmt(rulImpactTotals().totalDepWith)}}</div>
+        </div>
+        <div style="background:white;border-radius:8px;padding:14px 16px"
+          [style.border]="rulImpactTotals().variance >= 0 ? '1px solid #bbf7d0' : '1px solid #fecaca'">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px"
+            [style.color]="rulImpactTotals().variance >= 0 ? '#16a34a' : '#dc2626'">Variance (With − Without)</div>
+          <div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums"
+            [style.color]="rulImpactTotals().variance >= 0 ? '#16a34a' : '#dc2626'">
+            {{rulImpactFmtAmt(rulImpactTotals().variance)}}
+          </div>
         </div>
       </div>
     }

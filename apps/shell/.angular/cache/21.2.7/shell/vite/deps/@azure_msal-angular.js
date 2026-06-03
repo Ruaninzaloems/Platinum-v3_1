@@ -3,6 +3,9 @@ import {
 } from "./chunk-VEKBZFTK.js";
 import "./chunk-KQPLH7PO.js";
 import {
+  Router
+} from "./chunk-5UBC4ULN.js";
+import {
   BrowserConfigurationAuthError,
   BrowserUtils_exports,
   InteractionStatus,
@@ -10,9 +13,6 @@ import {
   NavigationClient,
   WrapperSKU
 } from "./chunk-HBZCMK7R.js";
-import {
-  Router
-} from "./chunk-5UBC4ULN.js";
 import "./chunk-OTGSOXUT.js";
 import "./chunk-5TGOBOYD.js";
 import "./chunk-MVWRHIZE.js";

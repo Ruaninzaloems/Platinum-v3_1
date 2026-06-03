@@ -26,6 +26,7 @@ export interface MeDto {
   canAccessPayroll: boolean;
   canAccessEnquiry: boolean;
   availableUsers?: MeDto[];
+  actingForUserIds?: string[];
 }
 
 // -----------------------------------------------------------------------
@@ -119,8 +120,12 @@ export interface OvertimeTransactionDto {
   status: WorkflowStatus;
   statusLabel: string;
   recommenderEmployeeName?: string | null;
+  recommenderPositionDescription?: string | null;
   approverEmployeeName?: string | null;
+  approverPositionDescription?: string | null;
+  excessApproverEmployeeId?: string | null;
   excessApproverEmployeeName?: string | null;
+  excessApproverPositionDescription?: string | null;
   payrollCapturerEmployeeName?: string | null;
   payrollApproverEmployeeName?: string | null;
   currentAssigneeUserId?: string | null;
@@ -144,6 +149,7 @@ export interface CreateOvertimeTransactionRequest {
   reason?: string | null;
   legacyDepartmentId?: number | null;
   legacyDivisionId?: number | null;
+  skipDuplicateDateCheck?: boolean;
 }
 
 export interface UpdateOvertimeTransactionRequest {
@@ -155,6 +161,7 @@ export interface UpdateOvertimeTransactionRequest {
   reason?: string | null;
   legacyDepartmentId?: number | null;
   legacyDivisionId?: number | null;
+  skipDuplicateDateCheck?: boolean;
 }
 
 export interface AmountPreviewRequest {
@@ -184,10 +191,10 @@ export interface WorkflowActionRequest {
 }
 
 export const WORKFLOW_STATUS_LABEL: Record<WorkflowStatus, string> = {
-  [WorkflowStatus.Requested]: 'Requested',
-  [WorkflowStatus.Recommended]: 'Recommended',
-  [WorkflowStatus.ApprovedForPayment]: 'Approved for Payment',
-  [WorkflowStatus.AwaitingPayrollApproval]: 'Awaiting Payroll Approval',
+  [WorkflowStatus.Requested]: 'Captured',
+  [WorkflowStatus.Recommended]: 'Awaiting Recommendation',
+  [WorkflowStatus.ApprovedForPayment]: 'Awaiting Approval',
+  [WorkflowStatus.AwaitingPayrollApproval]: 'Awaiting Payroll',
   [WorkflowStatus.Processed]: 'Processed',
   [WorkflowStatus.Returned]: 'Returned',
   [WorkflowStatus.Rejected]: 'Rejected'

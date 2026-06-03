@@ -4,6 +4,9 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../environment';
 import { ApiResponse } from '../models/api-response.model';
 import { PaginatedResponse } from '../models/position-approval.model';
+
+export const DUPLICATE_DATE_WARNING_PREFIX = 'DUPLICATE_DATE_WARNING:';
+
 import {
   AmountPreviewDto,
   AmountPreviewRequest,
@@ -72,13 +75,19 @@ export class OvertimeTransactionsService {
   create(req: CreateOvertimeTransactionRequest): Observable<OvertimeTransactionDto> {
     return this.http.post<ApiResponse<OvertimeTransactionDto>>(
       `${this.base}/overtime-transactions`, req
-    ).pipe(map(r => r.data));
+    ).pipe(map(r => {
+      if (!r.isSuccess) throw { isDuplicateDateWarning: r.message?.startsWith(DUPLICATE_DATE_WARNING_PREFIX), message: r.message };
+      return r.data;
+    }));
   }
 
   update(id: string, req: UpdateOvertimeTransactionRequest): Observable<OvertimeTransactionDto> {
     return this.http.put<ApiResponse<OvertimeTransactionDto>>(
       `${this.base}/overtime-transactions/${id}`, req
-    ).pipe(map(r => r.data));
+    ).pipe(map(r => {
+      if (!r.isSuccess) throw { isDuplicateDateWarning: r.message?.startsWith(DUPLICATE_DATE_WARNING_PREFIX), message: r.message };
+      return r.data;
+    }));
   }
 
   delete(id: string): Observable<boolean> {
@@ -104,6 +113,12 @@ export class OvertimeTransactionsService {
     fd.append('file', file, file.name);
     return this.http.post<ApiResponse<OvertimeDocumentDto>>(
       `${this.base}/overtime-transactions/${id}/documents`, fd
+    ).pipe(map(r => r.data));
+  }
+
+  deleteDocument(transactionId: string, documentId: string): Observable<boolean> {
+    return this.http.delete<ApiResponse<boolean>>(
+      `${this.base}/overtime-transactions/${transactionId}/documents/${documentId}`
     ).pipe(map(r => r.data));
   }
 

@@ -5,18 +5,18 @@ import {
   CDK_VIRTUAL_SCROLL_VIEWPORT,
   ScrollingModule,
   ViewportRuler
-} from "./chunk-W55BYLBC.js";
+} from "./chunk-NSAAUXQM.js";
 import {
   _RecycleViewRepeaterStrategy,
   _ViewRepeaterOperation,
   isDataSource
 } from "./chunk-BGG2XZKT.js";
 import {
-  Platform
-} from "./chunk-L7GSUTUC.js";
-import {
   Directionality
 } from "./chunk-JPXPF4SI.js";
+import {
+  Platform
+} from "./chunk-L7GSUTUC.js";
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -2331,4 +2331,4 @@ export {
   CdkTextColumn,
   CdkTableModule
 };
-//# sourceMappingURL=chunk-EWPCNZZF.js.map
+//# sourceMappingURL=chunk-NJF4OG2F.js.map

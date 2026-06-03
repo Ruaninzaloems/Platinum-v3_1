@@ -5,11 +5,11 @@ import {
   DomSanitizer
 } from "./chunk-OTGSOXUT.js";
 import {
-  HttpClient
-} from "./chunk-MVWRHIZE.js";
-import {
   BidiModule
 } from "./chunk-JPXPF4SI.js";
+import {
+  HttpClient
+} from "./chunk-MVWRHIZE.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -728,4 +728,4 @@ export {
   MatIcon,
   MatIconModule
 };
-//# sourceMappingURL=chunk-VY2NK6NG.js.map
+//# sourceMappingURL=chunk-GTBBGUWG.js.map

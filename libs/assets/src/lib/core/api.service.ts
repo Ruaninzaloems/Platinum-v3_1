@@ -45,6 +45,9 @@ export class ApiService {
   downloadAssetTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-types/import-template`, { responseType: 'blob' });
   }
+  exportAssetTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-types/export`, { responseType: 'blob' });
+  }
 
   getAssetStatuses(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/asset-statuses`);
@@ -64,6 +67,9 @@ export class ApiService {
   }
   downloadAssetStatusTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-statuses/import-template`, { responseType: 'blob' });
+  }
+  exportAssetStatuses(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-statuses/export`, { responseType: 'blob' });
   }
 
   getAssetCategoriesList(params?: any): Observable<any[]> {
@@ -87,6 +93,9 @@ export class ApiService {
   downloadAssetCategoryTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-categories/import-template`, { responseType: 'blob' });
   }
+  exportAssetCategories(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-categories/export`, { responseType: 'blob' });
+  }
 
   getAssetSubCategoriesList(params?: any): Observable<any[]> {
     let httpParams = new HttpParams();
@@ -109,6 +118,9 @@ export class ApiService {
   downloadAssetSubCategoryTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-sub-categories/import-template`, { responseType: 'blob' });
   }
+  exportAssetSubCategories(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-sub-categories/export`, { responseType: 'blob' });
+  }
 
   getAssetProjectStatuses(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/asset-project-statuses`);
@@ -121,6 +133,9 @@ export class ApiService {
   }
   deleteAssetProjectStatus(id: number): Observable<any> {
     return this.http.delete(`${this.apiPrefix}/asset-project-statuses/${id}`);
+  }
+  exportAssetProjectStatuses(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-project-statuses/export`, { responseType: 'blob' });
   }
 
   getMonths(): Observable<any[]> {
@@ -284,9 +299,16 @@ export class ApiService {
   downloadAssetClassTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-classes/import-template`, { responseType: 'blob' });
   }
+  exportAssetClasses(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-classes/export`, { responseType: 'blob' });
+  }
 
-  getMeasurementTypes(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiPrefix}/measurement-types`);
+  getMeasurementTypes(params?: { typeId?: number; model?: string }): Observable<any[]> {
+    const parts: string[] = [];
+    if (params?.typeId) parts.push(`typeId=${params.typeId}`);
+    if (params?.model && params.model !== 'Mixed') parts.push(`model=${encodeURIComponent(params.model)}`);
+    const qp = parts.length ? `?${parts.join('&')}` : '';
+    return this.http.get<any[]>(`${this.apiPrefix}/measurement-types${qp}`);
   }
   createMeasurementType(data: any): Observable<any> {
     return this.http.post(`${this.apiPrefix}/measurement-types`, data);
@@ -303,6 +325,9 @@ export class ApiService {
   }
   downloadMeasurementTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/measurement-types/import-template`, { responseType: 'blob' });
+  }
+  exportMeasurementTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/measurement-types/export`, { responseType: 'blob' });
   }
 
   getCriticalityGrades(): Observable<any[]> {
@@ -324,6 +349,9 @@ export class ApiService {
   downloadCriticalityGradeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/criticality-grades/import-template`, { responseType: 'blob' });
   }
+  exportCriticalityGrades(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/criticality-grades/export`, { responseType: 'blob' });
+  }
 
   getHealthGrades(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/health-grades`);
@@ -343,6 +371,9 @@ export class ApiService {
   }
   downloadHealthGradeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/health-grades/import-template`, { responseType: 'blob' });
+  }
+  exportHealthGrades(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/health-grades/export`, { responseType: 'blob' });
   }
 
   getPerformanceGrades(): Observable<any[]> {
@@ -364,6 +395,9 @@ export class ApiService {
   downloadPerformanceGradeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/performance-grades/import-template`, { responseType: 'blob' });
   }
+  exportPerformanceGrades(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/performance-grades/export`, { responseType: 'blob' });
+  }
 
   getUtilisationGrades(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/utilisation-grades`);
@@ -383,6 +417,9 @@ export class ApiService {
   }
   downloadUtilisationGradeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/utilisation-grades/import-template`, { responseType: 'blob' });
+  }
+  exportUtilisationGrades(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/utilisation-grades/export`, { responseType: 'blob' });
   }
 
   getDepreciationMethods(): Observable<any[]> {
@@ -408,6 +445,9 @@ export class ApiService {
   downloadCidmsAccountingGroupTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-accounting-groups/import-template`, { responseType: 'blob' });
   }
+  exportCidmsAccountingGroups(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-accounting-groups/export`, { responseType: 'blob' });
+  }
 
   getCidmsAccountingSubGroups(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/cidms-accounting-sub-groups`);
@@ -427,6 +467,9 @@ export class ApiService {
   }
   downloadCidmsAccountingSubGroupTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-accounting-sub-groups/import-template`, { responseType: 'blob' });
+  }
+  exportCidmsAccountingSubGroups(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-accounting-sub-groups/export`, { responseType: 'blob' });
   }
 
   getCidmsMunicipalServices(): Observable<any[]> {
@@ -448,6 +491,9 @@ export class ApiService {
   downloadCidmsMunicipalServiceTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-municipal-services/import-template`, { responseType: 'blob' });
   }
+  exportCidmsMunicipalServices(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-municipal-services/export`, { responseType: 'blob' });
+  }
 
   getCidmsClasses(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/cidms-classes`);
@@ -467,6 +513,9 @@ export class ApiService {
   }
   downloadCidmsClassTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-classes/import-template`, { responseType: 'blob' });
+  }
+  exportCidmsClasses(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-classes/export`, { responseType: 'blob' });
   }
 
   getCidmsGroupTypes(): Observable<any[]> {
@@ -488,6 +537,9 @@ export class ApiService {
   downloadCidmsGroupTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-group-types/import-template`, { responseType: 'blob' });
   }
+  exportCidmsGroupTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-group-types/export`, { responseType: 'blob' });
+  }
 
   getCidmsAssetTypes(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/cidms-asset-types`);
@@ -507,6 +559,9 @@ export class ApiService {
   }
   downloadCidmsAssetTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-asset-types/import-template`, { responseType: 'blob' });
+  }
+  exportCidmsAssetTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-asset-types/export`, { responseType: 'blob' });
   }
 
   getCidmsComponentTypes(): Observable<any[]> {
@@ -528,6 +583,9 @@ export class ApiService {
   downloadCidmsComponentTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-component-types/import-template`, { responseType: 'blob' });
   }
+  exportCidmsComponentTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-component-types/export`, { responseType: 'blob' });
+  }
 
   getCidmsSubComponentTypes(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/cidms-sub-component-types`);
@@ -547,6 +605,9 @@ export class ApiService {
   }
   downloadCidmsSubComponentTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/cidms-sub-component-types/import-template`, { responseType: 'blob' });
+  }
+  exportCidmsSubComponentTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/cidms-sub-component-types/export`, { responseType: 'blob' });
   }
 
   getAssets(params?: any): Observable<any> {
@@ -817,8 +878,17 @@ export class ApiService {
   updateServiceGroup(id: number, data: any): Observable<any> {
     return this.http.put(`${this.apiPrefix}/maintenance-service-groups/${id}`, data);
   }
+  exportLeadTimes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/maintenance-lead-times/export`, { responseType: 'blob' });
+  }
+  exportServiceGroups(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/maintenance-service-groups/export`, { responseType: 'blob' });
+  }
   getMaintenanceWorkOrders(requestId: number): Observable<any> {
     return this.http.get(`${this.apiPrefix}/maintenance-work-orders/by-request/${requestId}`);
+  }
+  getMaintenanceWorkOrdersByPlan(planId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maintenance-work-orders/by-plan/${planId}`);
   }
   createMaintenanceWorkOrder(data: any): Observable<any> {
     return this.http.post(`${this.apiPrefix}/maintenance-work-orders`, data);
@@ -840,6 +910,63 @@ export class ApiService {
   }
   deleteMaintenanceWorkOrderDetail(id: number): Observable<any> {
     return this.http.delete(`${this.apiPrefix}/maintenance-work-order-details/${id}`);
+  }
+
+  getAllWorkOrders(params?: any): Observable<any[]> {
+    let url = `${this.apiPrefix}/maintenance-work-orders`;
+    if (params) {
+      const qs = Object.keys(params).filter(k => params[k] != null && params[k] !== '').map(k => `${k}=${encodeURIComponent(params[k])}`).join('&');
+      if (qs) url += '?' + qs;
+    }
+    return this.http.get<any[]>(url);
+  }
+  getWorkOrderById(id: number): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/maintenance-work-orders/${id}`);
+  }
+  submitWorkOrder(id: number): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/submit`, {});
+  }
+  approveWorkOrder(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/approve`, data);
+  }
+  rejectWorkOrder(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/reject`, data);
+  }
+  startWorkOrder(id: number): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/start`, {});
+  }
+  completeWorkOrder(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/complete`, data);
+  }
+  closeWorkOrder(id: number): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/close`, {});
+  }
+  cancelWorkOrder(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/cancel`, data);
+  }
+  getWorkOrderAssignments(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maintenance-work-orders/${id}/assignments`);
+  }
+  addWorkOrderAssignment(id: number, data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maintenance-work-orders/${id}/assignments`, data);
+  }
+  updateWorkOrderAssignment(id: number, assignmentId: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiPrefix}/maintenance-work-orders/${id}/assignments/${assignmentId}`, data);
+  }
+  deleteWorkOrderAssignment(id: number, assignmentId: number): Observable<any> {
+    return this.http.delete(`${this.apiPrefix}/maintenance-work-orders/${id}/assignments/${assignmentId}`);
+  }
+  getWorkOrderApprovals(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maintenance-work-orders/${id}/approvals`);
+  }
+  getWorkOrderAuditTrail(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maintenance-work-orders/${id}/audit-trail`);
+  }
+  getWorkOrderStatuses(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/work-order-statuses`);
+  }
+  getWorkOrderTypes(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/work-order-types`);
   }
 
   getDepartments(): Observable<any> {
@@ -900,6 +1027,18 @@ export class ApiService {
   }
   clearTestData(): Observable<any> {
     return this.http.post(`${this.apiPrefix}/admin/clear-test-data`, {});
+  }
+
+  populateSummaryAll(finYear?: string, finPeriod?: number, assetId?: number | null): Observable<any> {
+    const body: any = {};
+    if (finYear) body['FinYear'] = finYear;
+    if (finPeriod) body['FinPeriod'] = finPeriod;
+    if (assetId) body['AssetId'] = assetId;
+    return this.http.post(`${this.apiPrefix}/admin/populate-summary`, body);
+  }
+
+  getPopulateSummaryProgress(jobId: string): Observable<any> {
+    return this.http.get(`${this.apiPrefix}/admin/populate-summary/progress/${jobId}`);
   }
 
   getInsights(params?: any): Observable<any> {
@@ -996,6 +1135,24 @@ export class ApiService {
     return this.http.get(`${this.apiPrefix}/reports/disposal-report`, { params: httpParams });
   }
 
+  getTransferReport(params?: any): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get(`${this.apiPrefix}/reports/transfer-report`, { params: httpParams });
+  }
+
+  getRulAdjustmentImpactReport(params?: any): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get(`${this.apiPrefix}/reports/rul-adjustment-impact`, { params: httpParams });
+  }
+
+  getRulAdjustmentImpactExport(params?: any): Observable<Blob> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get(`${this.apiPrefix}/reports/rul-adjustment-impact/export`, { params: httpParams, responseType: 'blob' });
+  }
+
   getFarDrilldown(params: any): Observable<any> {
     let httpParams = new HttpParams();
     Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined) { httpParams = httpParams.set(key, params[key]); } });
@@ -1042,6 +1199,18 @@ export class ApiService {
     let httpParams = new HttpParams();
     if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
     return this.http.get<any[]>(`${this.apiPrefix}/reports/prior-period-adjustments-report`, { params: httpParams });
+  }
+
+  getAssetGlReport(params?: any): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get<any[]>(`${this.apiPrefix}/reports/asset-gl`, { params: httpParams });
+  }
+
+  getAssetGlFilterOptions(params?: any): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get<any>(`${this.apiPrefix}/reports/asset-gl/filter-options`, { params: httpParams });
   }
 
   getFarTransactionDrilldown(params: { assetId: number; period: number; finYear?: string }): Observable<any> {
@@ -1147,6 +1316,9 @@ export class ApiService {
   downloadAssetConditionTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-conditions/import-template`, { responseType: 'blob' });
   }
+  exportAssetConditions(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-conditions/export`, { responseType: 'blob' });
+  }
 
   getComponentTypes(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/component-types`);
@@ -1167,6 +1339,9 @@ export class ApiService {
   downloadComponentTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/component-types/import-template`, { responseType: 'blob' });
   }
+  exportComponentTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/component-types/export`, { responseType: 'blob' });
+  }
 
   getTransactionTypes(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/asset-config-transaction-types`);
@@ -1186,6 +1361,31 @@ export class ApiService {
   }
   downloadTransactionTypeTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiPrefix}/asset-config-transaction-types/import-template`, { responseType: 'blob' });
+  }
+  exportTransactionTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-config-transaction-types/export`, { responseType: 'blob' });
+  }
+  getRulAdjustmentIndicators(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/rul-adjustment-indicators`);
+  }
+  createRulAdjustmentIndicator(data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/rul-adjustment-indicators`, data);
+  }
+  updateRulAdjustmentIndicator(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiPrefix}/rul-adjustment-indicators/${id}`, data);
+  }
+  deleteRulAdjustmentIndicator(id: number): Observable<any> {
+    return this.http.delete(`${this.apiPrefix}/rul-adjustment-indicators/${id}`);
+  }
+  importRulAdjustmentIndicators(file: File): Observable<any> {
+    const fd = new FormData(); fd.append('file', file);
+    return this.http.post(`${this.apiPrefix}/rul-adjustment-indicators/import`, fd);
+  }
+  downloadRulAdjustmentIndicatorTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/rul-adjustment-indicators/import-template`, { responseType: 'blob' });
+  }
+  exportRulAdjustmentIndicators(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/rul-adjustment-indicators/export`, { responseType: 'blob' });
   }
 
   getUploadTypes(): Observable<any[]> {
@@ -1221,8 +1421,8 @@ export class ApiService {
   getUploadedItemsByRun(runId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiPrefix}/bulk-upload/uploaded-items/${runId}`);
   }
-  approveBulkUpload(id: number, financialYear: string): Observable<any> {
-    return this.http.post(`${this.apiPrefix}/bulk-upload/jobs/${id}/approve`, { financialYear });
+  approveBulkUpload(id: number, financialYear: string, userId?: number | null): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/bulk-upload/jobs/${id}/approve`, { financialYear, userId });
   }
   rejectBulkUpload(id: number): Observable<any> {
     return this.http.post(`${this.apiPrefix}/bulk-upload/jobs/${id}/reject`, {});
@@ -1345,11 +1545,20 @@ export class ApiService {
   approveDepreciationBatch(data: any): Observable<any> {
     return this.http.post(`${this.apiPrefix}/depreciation/approve`, data);
   }
+  approveDepreciationScheduleItem(itemId: number): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/depreciation/schedule-items/${itemId}/approve`, {});
+  }
   rebuildDepSummaries(data: any): Observable<any> {
     return this.http.post(`${this.apiPrefix}/depreciation/rebuild-summaries`, data);
   }
+  markDepWorkflowComplete(scheduleId: number): Observable<any> {
+    return this.http.post(`/api/depreciation/complete-workflow/${scheduleId}`, {});
+  }
   getDepRebuildProgress(key: string): Observable<any> {
     return this.http.get(`${this.apiPrefix}/depreciation/rebuild-progress/${key}`);
+  }
+  getDepApprovalProgress(itemId: number): Observable<any> {
+    return this.http.get(`${this.apiPrefix}/depreciation/schedule-items/${itemId}/approve-progress`);
   }
   getDepreciationScheduleDetails(scheduleId: number, ids?: string, itemId?: number): Observable<any[]> {
     let httpParams = new HttpParams();
@@ -1358,9 +1567,8 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiPrefix}/depreciation/schedule-items/` + scheduleId + '/details', { params: httpParams });
   }
   exportDepreciationScheduleDetails(scheduleId: number, itemId?: number): string {
-    var url = `${this.apiPrefix}/depreciation/schedule-items/` + scheduleId + '/export';
-    if (itemId) url = url + '?itemId=' + itemId;
-    return url;
+    const query = itemId ? `?itemId=${itemId}` : '';
+    return `${this.apiPrefix}/depreciation/schedule-items/${scheduleId}/details/export${query}`;
   }
   getDepreciationScheduleById(scheduleId: number): Observable<any> {
     return this.http.get(`${this.apiPrefix}/depreciation/schedules/` + scheduleId);
@@ -1480,6 +1688,47 @@ export class ApiService {
     return this.http.delete(`${this.apiPrefix}/asset-config-mscoa/transaction-types/${ttId}`);
   }
 
+  downloadMscoaTemplate(txnType: string): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-config-mscoa/import-template/${encodeURIComponent(txnType)}`, { responseType: 'blob' });
+  }
+  exportMscoa(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/asset-config-mscoa/export`, { responseType: 'blob' });
+  }
+
+  importMscoa(txnType: string, formData: FormData, overwriteDuplicates?: boolean): Observable<any> {
+    const url = `${this.apiPrefix}/asset-config-mscoa/import/${encodeURIComponent(txnType)}${overwriteDuplicates ? '?overwriteDuplicates=true' : ''}`;
+    return this.http.post(url, formData);
+  }
+
+  getMscoaDuplicates(params?: { finYear?: string; transactionTypeId?: string | number; includeDeptDiv?: boolean }): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (params) {
+      if (params.finYear) httpParams = httpParams.set('finYear', params.finYear);
+      if (params.transactionTypeId !== null && params.transactionTypeId !== undefined && params.transactionTypeId !== '') httpParams = httpParams.set('transactionTypeId', String(params.transactionTypeId));
+      if (params.includeDeptDiv !== undefined) httpParams = httpParams.set('includeDeptDiv', String(params.includeDeptDiv));
+    }
+    return this.http.get<any[]>(`${this.apiPrefix}/asset-config-mscoa/duplicates`, { params: httpParams });
+  }
+  getMscoaDuplicatesExcel(params?: { finYear?: string; transactionTypeId?: string | number; includeDeptDiv?: boolean }): Observable<Blob> {
+    let httpParams = new HttpParams();
+    if (params) {
+      if (params.finYear) httpParams = httpParams.set('finYear', params.finYear);
+      if (params.transactionTypeId !== null && params.transactionTypeId !== undefined && params.transactionTypeId !== '') httpParams = httpParams.set('transactionTypeId', String(params.transactionTypeId));
+      if (params.includeDeptDiv !== undefined) httpParams = httpParams.set('includeDeptDiv', String(params.includeDeptDiv));
+    }
+    return this.http.get(`${this.apiPrefix}/asset-config-mscoa/duplicates/export`, { params: httpParams, responseType: 'blob' });
+  }
+
+  getMscoaPrefixViolations(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/asset-config-mscoa/prefix-violations`);
+  }
+
+  getMissingMscoaSettings(finYear: string, transactionTypeId: number | string): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/asset-config-mscoa/missing-settings`, {
+      params: { finYear, transactionTypeId: String(transactionTypeId) }
+    });
+  }
+
   getUnitOfIssues(): Observable<any[]> {
     return this.http.get<any[]>(`${this.getTableUrl('unit-of-issue')}`);
   }
@@ -1490,9 +1739,10 @@ export class ApiService {
     return this.http.get<any[]>(`${this.getTableUrl('plan-projects')}`, { params });
   }
 
-  getPlanProjectItems(projectId: number, finYear?: string): Observable<any[]> {
+  getPlanProjectItems(projectId: number, finYear?: string, prefix?: string): Observable<any[]> {
     let params = new HttpParams().set('projectId', projectId);
     if (finYear) params = params.set('finYear', finYear);
+    if (prefix) params = params.set('prefix', prefix);
     return this.http.get<any[]>(`${this.getTableUrl('plan-project-items')}/scoa`, { params });
   }
 
@@ -1528,6 +1778,20 @@ export class ApiService {
     return this.http.get<any[]>(this.dbToggle.getTableUrl('employees'));
   }
 
+  getEmployeeById(id: number): Observable<any> {
+    return this.http.get<any>(this.dbToggle.getTableUrl('employees') + '/' + id);
+  }
+
+  getEmployeesPage(params?: { page?: number; pageSize?: number; search?: string }): Observable<{ items: any[]; totalCount: number }> {
+    let httpParams = new HttpParams();
+    if (params) {
+      if (params.page != null) httpParams = httpParams.set('page', String(params.page));
+      if (params.pageSize != null) httpParams = httpParams.set('pageSize', String(params.pageSize));
+      if (params.search != null && params.search !== '') httpParams = httpParams.set('search', params.search);
+    }
+    return this.http.get<{ items: any[]; totalCount: number }>(this.dbToggle.getTableUrl('employees'), { params: httpParams });
+  }
+
   getVerificationLookupTowns(): Observable<any[]> {
     return this.http.get<any[]>(this.dbToggle.getTableUrl('towns'));
   }
@@ -1560,7 +1824,7 @@ export class ApiService {
     return this.http.get<any[]>(this.dbToggle.getTableUrl('rooms'), { params });
   }
   getVerificationLookupOwnerships(): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-registers/lookups/ownerships');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-registers/lookups/ownerships`);
   }
   getVerificationLookupDivisions(): Observable<any[]> {
     return this.http.get<any[]>(this.dbToggle.getTableUrl('divisions'));
@@ -1572,11 +1836,11 @@ export class ApiService {
   getVerificationRegisters(params?: { isHistory?: number }): Observable<any[]> {
     let httpParams = new HttpParams();
     if (params && params.isHistory !== undefined) httpParams = httpParams.set('isHistory', String(params.isHistory));
-    return this.http.get<any[]>('/api/verification-registers', { params: httpParams });
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-registers`, { params: httpParams });
   }
 
   getVerificationRegister(id: number): Observable<any> {
-    return this.http.get('/api/verification-registers/' + id);
+    return this.http.get(`${this.apiPrefix}/verification-registers/` + id);
   }
 
   getVerificationReport(params: { registerId: number; reportType: string; assetClassIds?: number[] }): Observable<any[]> {
@@ -1586,183 +1850,191 @@ export class ApiService {
     if (params.assetClassIds && params.assetClassIds.length > 0) {
       httpParams = httpParams.set('assetClassIds', params.assetClassIds.join(','));
     }
-    return this.http.get<any[]>('/api/verification-registers/report', { params: httpParams });
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-registers/report`, { params: httpParams });
   }
 
   generateVerificationName(registerType: string): Observable<any> {
-    return this.http.get('/api/verification-registers/generate-name', { params: new HttpParams().set('registerType', registerType) });
+    return this.http.get(`${this.apiPrefix}/verification-registers/generate-name`, { params: new HttpParams().set('registerType', registerType) });
   }
 
   getVerificationPreviewItems(params: any): Observable<any[]> {
     let httpParams = new HttpParams();
     Object.keys(params).forEach(function(k) { if (params[k] !== null && params[k] !== undefined && params[k] !== '') { httpParams = httpParams.set(k, params[k]); } });
-    return this.http.get<any[]>('/api/verification-registers/preview-items', { params: httpParams });
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-registers/preview-items`, { params: httpParams });
   }
 
   createVerificationRegister(data: any): Observable<any> {
-    return this.http.post('/api/verification-registers', data);
+    return this.http.post(`${this.apiPrefix}/verification-registers`, data);
   }
 
   createVerificationItems(registerId: number, assetIds: number[]): Observable<any> {
-    return this.http.post('/api/verification-registers/' + registerId + '/create-items', assetIds);
+    return this.http.post(`${this.apiPrefix}/verification-registers/` + registerId + '/create-items', assetIds);
   }
 
   moveVerificationToHistory(id: number): Observable<any> {
-    return this.http.post('/api/verification-registers/' + id + '/move-to-history', {});
+    return this.http.post(`${this.apiPrefix}/verification-registers/` + id + '/move-to-history', {});
   }
 
   deleteVerificationRegister(id: number): Observable<any> {
-    return this.http.delete('/api/verification-registers/' + id);
+    return this.http.delete(`${this.apiPrefix}/verification-registers/` + id);
   }
 
   getRegisterTeamMembers(registerId: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-registers/' + registerId + '/team-members');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-registers/` + registerId + '/team-members');
   }
 
   addRegisterTeamMember(registerId: number, member: any): Observable<any> {
-    return this.http.post('/api/verification-registers/' + registerId + '/team-members', member);
+    return this.http.post(`${this.apiPrefix}/verification-registers/` + registerId + '/team-members', member);
   }
 
   removeRegisterTeamMember(registerId: number, memberId: number): Observable<any> {
-    return this.http.delete('/api/verification-registers/' + registerId + '/team-members/' + memberId);
+    return this.http.delete(`${this.apiPrefix}/verification-registers/` + registerId + '/team-members/' + memberId);
   }
 
   syncPlanTeam(registerId: number, planId: number): Observable<any> {
-    return this.http.post('/api/verification-registers/' + registerId + '/sync-plan-team/' + planId, {});
+    return this.http.post(`${this.apiPrefix}/verification-registers/` + registerId + '/sync-plan-team/' + planId, {});
   }
 
   getRegisterDashboardStats(registerId: number): Observable<any> {
-    return this.http.get<any>('/api/verification-registers/' + registerId + '/dashboard-stats');
+    return this.http.get<any>(`${this.apiPrefix}/verification-registers/` + registerId + '/dashboard-stats');
   }
 
-  getVerificationItems(registerId: number, params?: { tab?: string; search?: string }): Observable<any[]> {
+  getVerificationItems(registerId: number, params?: { tab?: string; search?: string; page?: number; pageSize?: number }): Observable<{ items: any[], totalCount: number }> {
     let httpParams = new HttpParams();
     if (params?.tab) httpParams = httpParams.set('tab', params.tab);
     if (params?.search) httpParams = httpParams.set('search', params.search);
-    return this.http.get<any[]>('/api/verification-items/by-register/' + registerId, { params: httpParams });
+    if (params?.page) httpParams = httpParams.set('page', String(params.page));
+    if (params?.pageSize) httpParams = httpParams.set('pageSize', String(params.pageSize));
+    return this.http.get<{ items: any[], totalCount: number }>(`${this.apiPrefix}/verification-items/by-register/` + registerId, { params: httpParams });
   }
 
   getVerificationItem(id: number): Observable<any> {
-    return this.http.get('/api/verification-items/' + id);
+    return this.http.get(`${this.apiPrefix}/verification-items/` + id);
   }
 
   updateVerificationItem(id: number, data: any): Observable<any> {
-    return this.http.put('/api/verification-items/' + id, data);
+    return this.http.put(`${this.apiPrefix}/verification-items/` + id, data);
   }
 
   submitVerificationItems(itemIds: number[]): Observable<any> {
-    return this.http.post('/api/verification-items/submit', itemIds);
+    return this.http.post(`${this.apiPrefix}/verification-items/submit`, itemIds);
   }
 
   approveVerificationItems(itemIds: number[]): Observable<any> {
-    return this.http.post('/api/verification-items/approve', itemIds);
+    return this.http.post(`${this.apiPrefix}/verification-items/approve`, itemIds);
   }
 
   backToManageVerificationItems(data: { itemIds: number[]; reason: string }): Observable<any> {
-    return this.http.post('/api/verification-items/back-to-manage', data);
+    return this.http.post(`${this.apiPrefix}/verification-items/back-to-manage`, data);
   }
 
   getVerificationAuditTrail(itemId: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-items/' + itemId + '/audit-trail');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-items/` + itemId + '/audit-trail');
   }
 
   getAssetVerificationAuditTrail(assetId: string): Observable<any[]> {
-    return this.http.get<any[]>('/api/assets/' + assetId + '/verification-audit-trail');
+    return this.http.get<any[]>(`${this.apiPrefix}/assets/` + assetId + '/verification-audit-trail');
   }
 
   matchCsvAssets(values: string[]): Observable<any[]> {
-    return this.http.post<any[]>('/api/verification-registers/match-csv-assets', values);
+    return this.http.post<any[]>(`${this.apiPrefix}/verification-registers/match-csv-assets`, values);
   }
 
   exportVerificationCsv(registerId: number): Observable<Blob> {
-    return this.http.get('/api/verification-items/by-register/' + registerId + '/export-csv', { responseType: 'blob' });
+    return this.http.get(`${this.apiPrefix}/verification-items/by-register/` + registerId + '/export-csv', { responseType: 'blob' });
   }
 
   importVerificationCsv(registerId: number, file: File): Observable<any> {
     var formData = new FormData();
     formData.append('file', file);
-    return this.http.post('/api/verification-items/by-register/' + registerId + '/import-csv', formData);
+    return this.http.post(`${this.apiPrefix}/verification-items/by-register/` + registerId + '/import-csv', formData);
   }
 
   getVerificationMapItems(registerId: number, statusFilter?: string): Observable<any[]> {
     var params = new HttpParams();
     if (statusFilter) params = params.set('statusFilter', statusFilter);
-    return this.http.get<any[]>('/api/verification-items/by-register/' + registerId + '/map-items', { params });
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-items/by-register/` + registerId + '/map-items', { params });
   }
 
   getVerificationPlans(params?: any): Observable<any[]> {
     var httpParams = new HttpParams();
     if (params) { Object.keys(params).forEach(function(key: string) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
-    return this.http.get<any[]>('/api/verification-plans', { params: httpParams });
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-plans`, { params: httpParams });
   }
 
   getVerificationPlan(id: number): Observable<any> {
-    return this.http.get('/api/verification-plans/' + id);
+    return this.http.get(`${this.apiPrefix}/verification-plans/` + id);
   }
 
   createVerificationPlan(data: any): Observable<any> {
-    return this.http.post('/api/verification-plans', data);
+    return this.http.post(`${this.apiPrefix}/verification-plans`, data);
   }
 
   amendVerificationPlan(id: number, data: any): Observable<any> {
-    return this.http.put('/api/verification-plans/' + id + '/amend', data);
+    return this.http.put(`${this.apiPrefix}/verification-plans/` + id + '/amend', data);
   }
 
   approveVerificationPlan(id: number, data: any): Observable<any> {
-    return this.http.post('/api/verification-plans/' + id + '/approve', data);
+    return this.http.post(`${this.apiPrefix}/verification-plans/` + id + '/approve', data);
   }
 
   deleteVerificationPlan(id: number): Observable<any> {
-    return this.http.delete('/api/verification-plans/' + id);
+    return this.http.delete(`${this.apiPrefix}/verification-plans/` + id);
   }
 
   getVerificationPlanTeamMembers(planId: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-plans/' + planId + '/team-members');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-plans/` + planId + '/team-members');
   }
 
   addVerificationPlanTeamMember(planId: number, data: any): Observable<any> {
-    return this.http.post('/api/verification-plans/' + planId + '/team-members', data);
+    return this.http.post(`${this.apiPrefix}/verification-plans/` + planId + '/team-members', data);
   }
 
   removeVerificationPlanTeamMember(planId: number, memberId: number): Observable<any> {
-    return this.http.delete('/api/verification-plans/' + planId + '/team-members/' + memberId);
+    return this.http.delete(`${this.apiPrefix}/verification-plans/` + planId + '/team-members/' + memberId);
   }
 
   getVerificationPlanApprovals(planId: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-plans/' + planId + '/approvals');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-plans/` + planId + '/approvals');
   }
 
   getVerificationPlanAuditTrail(planId: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/verification-plans/' + planId + '/audit-trail');
+    return this.http.get<any[]>(`${this.apiPrefix}/verification-plans/` + planId + '/audit-trail');
   }
 
   getVerificationPlanExport(planId: number): Observable<any> {
-    return this.http.get('/api/verification-plans/' + planId + '/export');
+    return this.http.get(`${this.apiPrefix}/verification-plans/` + planId + '/export');
   }
 
-  uploadDocument(file: File, entityType: string, entityId: string, description?: string): Observable<any> {
+  uploadDocument(file: File, entityType: string, entityId: string | null, description?: string, assetRegisterItemId?: number | null, transactionType?: string): Observable<any> {
     var formData = new FormData();
     formData.append('file', file);
     formData.append('entity_type', entityType);
-    formData.append('entity_id', entityId);
+    if (entityId != null) formData.append('entity_id', entityId);
     if (description) formData.append('description', description);
-    return this.http.post('/api/documents/upload', formData);
+    if (assetRegisterItemId != null) formData.append('assetRegisterItemId', String(assetRegisterItemId));
+    if (transactionType) formData.append('transactionType', transactionType);
+    return this.http.post(`${this.apiPrefix}/documents/upload`, formData);
   }
 
   getDocuments(entityType: string, entityId: string): Observable<any[]> {
-    return this.http.get<any[]>('/api/documents/' + entityType + '/' + entityId);
+    return this.http.get<any[]>(`${this.apiPrefix}/documents/` + entityType + '/' + entityId);
+  }
+
+  getDocumentsByAsset(assetRegisterItemId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/documents/by-asset/` + assetRegisterItemId);
   }
 
   downloadDocument(id: number): void {
-    window.open('/api/documents/download/' + id, '_blank');
+    window.open(`${this.apiPrefix}/documents/download/` + id, '_blank');
   }
 
   deleteDocument(id: number): Observable<any> {
-    return this.http.delete('/api/documents/' + id);
+    return this.http.delete(`${this.apiPrefix}/documents/` + id);
   }
 
   getRoomsWithAssets(): Observable<any[]> {
-    return this.http.get<any[]>('/api/reports/rooms-with-assets');
+    return this.http.get<any[]>(`${this.apiPrefix}/reports/rooms-with-assets`);
   }
 
   getLocationContentReport(filters?: { fromRoom?: string | null; toRoom?: string | null; custodianId?: number | null; departmentId?: number | null; divisionId?: number | null }): Observable<any[]> {
@@ -1774,119 +2046,153 @@ export class ApiService {
       if (filters.departmentId != null) params['departmentId'] = filters.departmentId;
       if (filters.divisionId != null) params['divisionId'] = filters.divisionId;
     }
-    return this.http.get<any[]>('/api/reports/location-content', { params });
+    return this.http.get<any[]>(`${this.apiPrefix}/reports/location-content`, { params });
   }
 
   getLocationContentFilters(): Observable<any> {
-    return this.http.get<any>('/api/reports/location-content-filters');
+    return this.http.get<any>(`${this.apiPrefix}/reports/location-content-filters`);
+  }
+
+  getMeasurementModelComplianceReport(params?: any): Observable<any> {
+    let httpParams = new HttpParams();
+    if (params) { Object.keys(params).forEach(function(key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') { httpParams = httpParams.set(key, params[key]); } }); }
+    return this.http.get<any>(`${this.apiPrefix}/reports/measurement-model-compliance`, { params: httpParams });
   }
 
   getPriorYearAdjustmentTypes(): Observable<any[]> {
-    return this.http.get<any[]>('/api/prior-year-adjustments/types');
+    return this.http.get<any[]>(`${this.apiPrefix}/prior-year-adjustments/types`);
   }
 
   searchAssetsForPriorYear(params: any): Observable<any[]> {
-    return this.http.get<any[]>('/api/prior-year-adjustments/search', { params });
+    return this.http.get<any[]>(`${this.apiPrefix}/prior-year-adjustments/search`, { params });
   }
 
   calculatePriorYearAdjustment(body: any): Observable<any> {
-    return this.http.post<any>('/api/prior-year-adjustments/calculate', body);
+    return this.http.post<any>(`${this.apiPrefix}/prior-year-adjustments/calculate`, body);
   }
 
   submitPriorYearAdjustment(body: any): Observable<any> {
-    return this.http.post<any>('/api/prior-year-adjustments/submit', body);
+    return this.http.post<any>(`${this.apiPrefix}/prior-year-adjustments/submit`, body);
   }
 
   getPriorYearAdjustments(params?: any): Observable<any[]> {
-    return this.http.get<any[]>('/api/prior-year-adjustments', { params });
+    return this.http.get<any[]>(`${this.apiPrefix}/prior-year-adjustments`, { params });
   }
 
   getPriorYearAdjustmentById(id: number): Observable<any> {
-    return this.http.get<any>('/api/prior-year-adjustments/' + id);
+    return this.http.get<any>(`${this.apiPrefix}/prior-year-adjustments/` + id);
   }
 
   approvePriorYearAdjustment(id: number, body: any): Observable<any> {
-    return this.http.post<any>('/api/prior-year-adjustments/' + id + '/approve', body);
+    return this.http.post<any>(`${this.apiPrefix}/prior-year-adjustments/` + id + '/approve', body);
   }
 
   rejectPriorYearAdjustment(id: number, body: any): Observable<any> {
-    return this.http.post<any>('/api/prior-year-adjustments/' + id + '/reject', body);
+    return this.http.post<any>(`${this.apiPrefix}/prior-year-adjustments/` + id + '/reject', body);
   }
 
   uploadPriorYearDocument(id: number, file: File): Observable<any> {
     var form = new FormData();
     form.append('file', file);
-    return this.http.post<any>('/api/prior-year-adjustments/' + id + '/documents', form);
+    return this.http.post<any>(`${this.apiPrefix}/prior-year-adjustments/` + id + '/documents', form);
   }
 
   downloadPriorYearDocument(id: number, docId: number): void {
-    window.open('/api/prior-year-adjustments/' + id + '/documents/' + docId + '/download', '_blank');
+    window.open(`${this.apiPrefix}/prior-year-adjustments/` + id + '/documents/' + docId + '/download', '_blank');
   }
 
   getPriorYearDocuments(id: number): Observable<any[]> {
-    return this.http.get<any[]>('/api/prior-year-adjustments/' + id + '/documents');
+    return this.http.get<any[]>(`${this.apiPrefix}/prior-year-adjustments/` + id + '/documents');
   }
 
   exportPriorYearTransactions(id: number): void {
-    window.open('/api/prior-year-adjustments/' + id + '/transactions/export', '_blank');
+    window.open(`${this.apiPrefix}/prior-year-adjustments/` + id + '/transactions/export', '_blank');
   }
 
   getBulkTransactionTemplate(type: string): Observable<Blob> {
-    return this.http.get('/api/bulk-transactions/template/' + type, { responseType: 'blob' });
+    return this.http.get(`${this.apiPrefix}/bulk-transactions/template/` + type, { responseType: 'blob' });
   }
 
   downloadBulkTransactionTemplate(type: string): void {
-    window.open('/api/bulk-transactions/template/' + type, '_blank');
+    this.getBulkTransactionTemplate(type).subscribe({
+      next: function(blob: Blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'BulkTransaction_' + type + '_Template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      },
+      error: function() {}
+    });
   }
 
   uploadBulkTransactions(file: File, transactionType: string): Observable<any> {
     var fd = new FormData();
     fd.append('file', file);
     fd.append('transactionType', transactionType);
-    return this.http.post<any>('/api/bulk-transactions/upload', fd);
+    return this.http.post<any>(`${this.apiPrefix}/bulk-transactions/upload`, fd);
   }
 
   getBulkTransactionJobs(): Observable<any[]> {
-    return this.http.get<any[]>('/api/bulk-transactions/jobs');
+    return this.http.get<any[]>(`${this.apiPrefix}/bulk-transactions/jobs`);
   }
 
   getBulkTransactionJobItems(jobId: number, type?: string): Observable<any> {
     var params = type ? '?type=' + type : '';
-    return this.http.get<any>('/api/bulk-transactions/jobs/' + jobId + '/items' + params);
+    return this.http.get<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/items' + params);
   }
 
   approveBulkTransactionJob(jobId: number): Observable<any> {
-    return this.http.post<any>('/api/bulk-transactions/jobs/' + jobId + '/approve', {});
+    return this.http.post<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/approve', {});
   }
 
   rejectBulkTransactionJob(jobId: number, reason: string): Observable<any> {
-    return this.http.post<any>('/api/bulk-transactions/jobs/' + jobId + '/reject', { reason: reason });
+    return this.http.post<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/reject', { reason: reason });
+  }
+
+  getBulkTransactionJobProgress(jobId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/progress');
+  }
+
+  retryBulkTransactionErrors(jobId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/retry-errors', {});
+  }
+
+  reverseBulkTransactionJob(jobId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/reverse', {});
+  }
+
+  getRulApprovalData(jobId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/bulk-transactions/jobs/` + jobId + '/rul-approval-data');
   }
 
   downloadBulkRefurbTemplate(): void {
-    window.open('/api/bulk-refurb/template', '_blank');
+    window.open(`${this.apiPrefix}/bulk-refurb/template`, '_blank');
   }
 
   uploadBulkRefurb(file: File): Observable<any> {
     var fd = new FormData();
     fd.append('file', file);
-    return this.http.post<any>('/api/bulk-refurb/upload', fd);
+    return this.http.post<any>(`${this.apiPrefix}/bulk-refurb/upload`, fd);
   }
 
   getBulkRefurbJobs(): Observable<any[]> {
-    return this.http.get<any[]>('/api/bulk-refurb/jobs');
+    return this.http.get<any[]>(`${this.apiPrefix}/bulk-refurb/jobs`);
   }
 
   getBulkRefurbJobItems(jobId: number): Observable<any> {
-    return this.http.get<any>('/api/bulk-refurb/jobs/' + jobId + '/items');
+    return this.http.get<any>(`${this.apiPrefix}/bulk-refurb/jobs/` + jobId + '/items');
   }
 
   approveBulkRefurbJob(jobId: number): Observable<any> {
-    return this.http.post<any>('/api/bulk-refurb/jobs/' + jobId + '/approve', {});
+    return this.http.post<any>(`${this.apiPrefix}/bulk-refurb/jobs/` + jobId + '/approve', {});
   }
 
   rejectBulkRefurbJob(jobId: number, reason: string): Observable<any> {
-    return this.http.post<any>('/api/bulk-refurb/jobs/' + jobId + '/reject', { reason: reason });
+    return this.http.post<any>(`${this.apiPrefix}/bulk-refurb/jobs/` + jobId + '/reject', { reason: reason });
   }
 
   getPriorPeriodAdjustmentTypes(): Observable<any[]> {
@@ -1949,6 +2255,14 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiPrefix}/acquisitions`);
   }
 
+  getGrnDocuments(grnId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/acquisitions/grn-documents/${grnId}`);
+  }
+
+  getGrnDocumentFileUrl(grnId: number, documentId: number): string {
+    return `${this.apiPrefix}/acquisitions/grn-documents/${grnId}/file/${documentId}`;
+  }
+
   createScmAcquisition(data: any): Observable<any> {
     return this.http.post(`${this.apiPrefix}/acquisitions/scm`, data);
   }
@@ -1994,5 +2308,280 @@ export class ApiService {
     if (params.finYear) httpParams = httpParams.set('finYear', params.finYear);
     httpParams = httpParams.set('categoryId', params.categoryId);
     return this.http.get<any[]>(`${this.apiPrefix}/reports/afs-reconciliation/drilldown`, { params: httpParams });
+  }
+
+  getMaintTypes(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maint-types`);
+  }
+
+  getAllMaintTypes(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maint-types?includeDisabled=true`);
+  }
+
+  createMaintType(data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maint-types`, data);
+  }
+
+  updateMaintType(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiPrefix}/maint-types/${id}`, data);
+  }
+
+  deleteMaintType(id: number): Observable<any> {
+    return this.http.delete(`${this.apiPrefix}/maint-types/${id}`);
+  }
+  exportMaintTypes(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/maint-types/export`, { responseType: 'blob' });
+  }
+
+  getMaintFrequencies(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maint-frequencies`);
+  }
+
+  getAllMaintFrequencies(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/maint-frequencies?includeDisabled=true`);
+  }
+
+  createMaintFrequency(data: any): Observable<any> {
+    return this.http.post(`${this.apiPrefix}/maint-frequencies`, data);
+  }
+
+  updateMaintFrequency(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiPrefix}/maint-frequencies/${id}`, data);
+  }
+
+  deleteMaintFrequency(id: number): Observable<any> {
+    return this.http.delete(`${this.apiPrefix}/maint-frequencies/${id}`);
+  }
+  exportMaintFrequencies(): Observable<Blob> {
+    return this.http.get(`${this.apiPrefix}/maint-frequencies/export`, { responseType: 'blob' });
+  }
+
+  getPlannedMaintPlans(params?: { isActive?: boolean; maintTypeId?: number; assetClassId?: number; departmentId?: number; finYear?: number }): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (params) {
+      if (params.isActive !== undefined && params.isActive !== null) httpParams = httpParams.set('isActive', String(params.isActive));
+      if (params.maintTypeId)  httpParams = httpParams.set('maintTypeId',  String(params.maintTypeId));
+      if (params.assetClassId) httpParams = httpParams.set('assetClassId', String(params.assetClassId));
+      if (params.departmentId) httpParams = httpParams.set('departmentId', String(params.departmentId));
+      if (params.finYear)      httpParams = httpParams.set('finYear',      String(params.finYear));
+    }
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans`, { params: httpParams });
+  }
+
+  getPlannedMaintPlan(id: number): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/planned-maint-plans/${id}`);
+  }
+
+  getPlannedMaintPlansByAsset(assetId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans/by-asset/${assetId}`);
+  }
+
+  createPlannedMaintPlan(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/planned-maint-plans`, data);
+  }
+
+  updatePlannedMaintPlan(id: number, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiPrefix}/planned-maint-plans/${id}`, data);
+  }
+
+  deletePlannedMaintPlan(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiPrefix}/planned-maint-plans/${id}`);
+  }
+
+  getPlannedMaintActivities(planId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-activities/by-plan/${planId}`);
+  }
+
+  createPlannedMaintActivity(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/planned-maint-activities`, data);
+  }
+
+  updatePlannedMaintActivity(id: number, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiPrefix}/planned-maint-activities/${id}`, data);
+  }
+
+  deletePlannedMaintActivity(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiPrefix}/planned-maint-activities/${id}`);
+  }
+
+  getPlannedMaintSchedule(planId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-schedule/by-plan/${planId}`);
+  }
+
+  generatePlannedMaintSchedule(planId: number, count: number): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/planned-maint-schedule/generate/${planId}?count=${count}`, {});
+  }
+
+  updatePlannedMaintSchedule(id: number, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiPrefix}/planned-maint-schedule/${id}`, data);
+  }
+
+  raiseWorkOrderFromSchedule(scheduleId: number, data?: any): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/planned-maint-schedule/${scheduleId}/raise-work-order`, data || {});
+  }
+
+  getPlannedMaintKpiSummary(maintTypeId?: number, assetClassId?: number, departmentId?: number, finYear?: number): Observable<any> {
+    let params = new HttpParams();
+    if (maintTypeId   != null) params = params.set('maintTypeId',   maintTypeId.toString());
+    if (assetClassId  != null) params = params.set('assetClassId',  assetClassId.toString());
+    if (departmentId  != null) params = params.set('departmentId',  departmentId.toString());
+    if (finYear       != null) params = params.set('finYear',       finYear.toString());
+    return this.http.get<any>(`${this.apiPrefix}/planned-maint-plans/kpi-summary`, { params });
+  }
+
+  getPlannedMaintCompliance(maintTypeId?: number, assetClassId?: number, departmentId?: number, finYear?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (maintTypeId   != null) params = params.set('maintTypeId',   maintTypeId.toString());
+    if (assetClassId  != null) params = params.set('assetClassId',  assetClassId.toString());
+    if (departmentId  != null) params = params.set('departmentId',  departmentId.toString());
+    if (finYear       != null) params = params.set('finYear',       finYear.toString());
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans/compliance`, { params });
+  }
+
+  getPlannedMaintDeferredMaintenance(maintTypeId?: number, assetClassId?: number, departmentId?: number, finYear?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (maintTypeId   != null) params = params.set('maintTypeId',   maintTypeId.toString());
+    if (assetClassId  != null) params = params.set('assetClassId',  assetClassId.toString());
+    if (departmentId  != null) params = params.set('departmentId',  departmentId.toString());
+    if (finYear       != null) params = params.set('finYear',       finYear.toString());
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans/deferred-maintenance`, { params });
+  }
+
+  getPlannedMaintBudgetVsActual(maintTypeId?: number, assetClassId?: number, departmentId?: number, finYear?: number): Observable<any> {
+    let params = new HttpParams();
+    if (maintTypeId   != null) params = params.set('maintTypeId',   maintTypeId.toString());
+    if (assetClassId  != null) params = params.set('assetClassId',  assetClassId.toString());
+    if (departmentId  != null) params = params.set('departmentId',  departmentId.toString());
+    if (finYear       != null) params = params.set('finYear',       finYear.toString());
+    return this.http.get<any>(`${this.apiPrefix}/planned-maint-plans/budget-vs-actual`, { params });
+  }
+
+  getPlannedMaintPreviewAssets(params?: { search?: string; assetTypeId?: number; categoryId?: number; pageSize?: number }): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (params) {
+      if (params.search      != null) httpParams = httpParams.set('search',      params.search);
+      if (params.assetTypeId != null) httpParams = httpParams.set('assetTypeId', params.assetTypeId.toString());
+      if (params.categoryId  != null) httpParams = httpParams.set('categoryId',  params.categoryId.toString());
+      if (params.pageSize    != null) httpParams = httpParams.set('pageSize',     params.pageSize.toString());
+    }
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans/preview-assets`, { params: httpParams });
+  }
+
+  getPlannedMaintPlanAssets(planId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/planned-maint-plans/${planId}/assets`);
+  }
+
+  setPlannedMaintPlanAssets(planId: number, assetIds: number[]): Observable<any[]> {
+    return this.http.put<any[]>(`${this.apiPrefix}/planned-maint-plans/${planId}/assets`, assetIds);
+  }
+
+  addPlannedMaintPlanAsset(planId: number, assetId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/planned-maint-plans/${planId}/assets/${assetId}`, {});
+  }
+
+  removePlannedMaintPlanAsset(planId: number, assetId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiPrefix}/planned-maint-plans/${planId}/assets/${assetId}`);
+  }
+
+  getClearingAccounts(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiPrefix}/clearing-accounts`);
+  }
+
+  addClearingAccount(planProjectItemId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/clearing-accounts`, { planProjectItem_ID: planProjectItemId });
+  }
+
+  deleteClearingAccount(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiPrefix}/clearing-accounts/${id}`);
+  }
+
+  getClearingBalance(): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/analytics/clearing-balance`);
+  }
+
+  getEmailSettings(): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/email-settings`);
+  }
+
+  saveEmailSettings(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/email-settings`, data);
+  }
+
+  testEmailSettings(toEmail: string): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/email-settings/test`, { toEmail });
+  }
+
+  getEmailTemplates(transactionType?: string): Observable<any[]> {
+    let url = `${this.apiPrefix}/email-templates`;
+    if (transactionType) url += `?transactionType=${encodeURIComponent(transactionType)}`;
+    return this.http.get<any[]>(url);
+  }
+
+  getEmailTemplate(id: number): Observable<any> {
+    return this.http.get<any>(`${this.apiPrefix}/email-templates/${id}`);
+  }
+
+  createEmailTemplate(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiPrefix}/email-templates`, data);
+  }
+
+  updateEmailTemplate(id: number, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiPrefix}/email-templates/${id}`, data);
+  }
+
+  deleteEmailTemplate(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiPrefix}/email-templates/${id}`);
+  }
+
+  getEmailLog(params?: { status?: string; transactionType?: string; page?: number; pageSize?: number }): Observable<any> {
+    let url = `${this.apiPrefix}/email-log`;
+    const parts: string[] = [];
+    if (params?.status) parts.push(`status=${encodeURIComponent(params.status)}`);
+    if (params?.transactionType) parts.push(`transactionType=${encodeURIComponent(params.transactionType)}`);
+    if (params?.page) parts.push(`page=${params.page}`);
+    if (params?.pageSize) parts.push(`pageSize=${params.pageSize}`);
+    if (parts.length) url += '?' + parts.join('&');
+    return this.http.get<any>(url);
+  }
+
+  getEmailLogSummary(params?: { status?: string; transactionType?: string }): Observable<{ totalSent: number; totalFailed: number; last30DaysSent: number; last30DaysFailed: number }> {
+    const parts: string[] = [];
+    if (params?.status) parts.push(`status=${encodeURIComponent(params.status)}`);
+    if (params?.transactionType) parts.push(`transactionType=${encodeURIComponent(params.transactionType)}`);
+    const qs = parts.length ? '?' + parts.join('&') : '';
+    return this.http.get<any>(`${this.apiPrefix}/email-log/summary${qs}`);
+  }
+
+  getMscoaSettingsReport(params?: { finYear?: string; typeId?: number | string; categoryId?: number | string; subCategoryId?: number | string; departmentId?: number | string; divisionId?: number | string }): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach(function(key) {
+        var val = (params as any)[key];
+        if (val !== null && val !== undefined && val !== '') { httpParams = httpParams.set(key, String(val)); }
+      });
+    }
+    return this.http.get<any[]>(`${this.apiPrefix}/reports/mscoa-settings`, { params: httpParams });
+  }
+
+  getMscoaSettingsReportExcel(params?: { finYear?: string; typeId?: number | string; categoryId?: number | string; subCategoryId?: number | string; departmentId?: number | string; divisionId?: number | string }): Observable<Blob> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach(function(key) {
+        var val = (params as any)[key];
+        if (val !== null && val !== undefined && val !== '') { httpParams = httpParams.set(key, String(val)); }
+      });
+    }
+    return this.http.get(`${this.apiPrefix}/reports/mscoa-settings/excel`, { params: httpParams, responseType: 'blob' });
+  }
+
+  getMscoaSettingsReportCsv(params?: { finYear?: string; typeId?: number | string; categoryId?: number | string; subCategoryId?: number | string; departmentId?: number | string; divisionId?: number | string }): Observable<Blob> {
+    let httpParams = new HttpParams();
+    if (params) {
+      Object.keys(params).forEach(function(key) {
+        var val = (params as any)[key];
+        if (val !== null && val !== undefined && val !== '') { httpParams = httpParams.set(key, String(val)); }
+      });
+    }
+    return this.http.get(`${this.apiPrefix}/reports/mscoa-settings/csv`, { params: httpParams, responseType: 'blob' });
   }
 }

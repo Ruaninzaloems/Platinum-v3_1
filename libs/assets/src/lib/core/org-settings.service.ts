@@ -9,6 +9,9 @@ export interface OrgSettings {
   mscoa_enabled: boolean;
   measurement_model: string;
   approval_method: string;
+  gl_use_inbox: boolean;
+  gl_led_target: string;
+  mscoa_use_dept_division: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

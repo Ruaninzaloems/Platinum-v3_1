@@ -1,11 +1,11 @@
 import {
-  SharedResizeObserver
-} from "./chunk-HIAMQA2O.js";
-import {
   CdkPortal,
   CdkPortalOutlet,
   TemplatePortal
 } from "./chunk-KSY2NWQE.js";
+import {
+  SharedResizeObserver
+} from "./chunk-HIAMQA2O.js";
 import {
   MAT_RIPPLE_GLOBAL_OPTIONS,
   MatRipple
@@ -16,12 +16,6 @@ import {
 import "./chunk-PIKEOEJD.js";
 import "./chunk-3UUS4QCM.js";
 import "./chunk-3KO4LJWO.js";
-import {
-  CdkScrollable,
-  ViewportRuler
-} from "./chunk-W55BYLBC.js";
-import "./chunk-BGG2XZKT.js";
-import "./chunk-LGVK2JKN.js";
 import {
   CdkMonitorFocus,
   CdkObserveContent,
@@ -44,6 +38,16 @@ import {
 import "./chunk-6S24FBVI.js";
 import "./chunk-CZW6SUH7.js";
 import {
+  CdkScrollable,
+  ViewportRuler
+} from "./chunk-NSAAUXQM.js";
+import "./chunk-BGG2XZKT.js";
+import "./chunk-LGVK2JKN.js";
+import {
+  BidiModule,
+  Directionality
+} from "./chunk-JPXPF4SI.js";
+import {
   _CdkPrivateStyleLoader
 } from "./chunk-RH6YDMAF.js";
 import {
@@ -53,10 +57,6 @@ import "./chunk-57WP2MZF.js";
 import "./chunk-MVWRHIZE.js";
 import "./chunk-M6TROWNH.js";
 import "./chunk-JTYEZAXU.js";
-import {
-  BidiModule,
-  Directionality
-} from "./chunk-JPXPF4SI.js";
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,

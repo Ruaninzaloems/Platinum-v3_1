@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -11,7 +11,8 @@ import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angu
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { forkJoin, filter, map, distinctUntilChanged } from 'rxjs';
+import { MatMenuModule } from '@angular/material/menu';
+import { forkJoin, filter, map, distinctUntilChanged, of, catchError } from 'rxjs';
 import { toObservable, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { OvertimeTransactionsService } from '../../../../core/services/overtime-transactions.service';
@@ -64,14 +65,35 @@ export class CommentDialogComponent {
   comment = '';
 }
 
+// ── Module-level pure helpers (used only inside computed signals, never in templates) ──
+function captureStatusClass(status: number): string {
+  switch (status) {
+    case WorkflowStatus.Processed: return 'status-approved';
+    case WorkflowStatus.Returned:  return 'status-returned';
+    case WorkflowStatus.Rejected:  return 'status-rejected';
+    default:                       return 'status-pending';
+  }
+}
+function captureLevelLabel(status: WorkflowStatus): string {
+  switch (status) {
+    case WorkflowStatus.Requested:               return 'LV1';
+    case WorkflowStatus.Recommended:             return 'LV2';
+    case WorkflowStatus.ApprovedForPayment:      return 'LV3';
+    case WorkflowStatus.AwaitingPayrollApproval: return 'LV4';
+    default: return '';
+  }
+}
+
 @Component({
   selector: 'app-overtime-capture',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, RouterLink,
     MatIconModule, MatPaginatorModule,
     MatProgressSpinnerModule, MatTooltipModule,
-    MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule
+    MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule,
+    MatMenuModule
   ],
   template: `
     <div class="page-content overtime-page">
@@ -148,6 +170,31 @@ export class CommentDialogComponent {
             </span>
           </div>
         } @else {
+          @if (selectedIds().size > 0) {
+            <div class="bulk-toolbar">
+              <span class="bulk-count">{{ selectedIds().size }} selected</span>
+              @if (bulkCanActCount() > 0) {
+                <button class="btn btn-bulk-success" type="button" (click)="bulkApprove()">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>Approve All ({{ bulkCanActCount() }})</span>
+                </button>
+                <button class="btn btn-bulk-warning" type="button" (click)="bulkReturn()">
+                  <mat-icon>undo</mat-icon>
+                  <span>Return All ({{ bulkCanActCount() }})</span>
+                </button>
+              }
+              @if (bulkCanRejectCount() > 0) {
+                <button class="btn btn-bulk-danger" type="button" (click)="bulkReject()">
+                  <mat-icon>cancel</mat-icon>
+                  <span>Reject All ({{ bulkCanRejectCount() }})</span>
+                </button>
+              }
+              <button class="btn btn-bulk-clear" type="button" (click)="clearSelection()">
+                <mat-icon>close</mat-icon>
+                <span>Clear</span>
+              </button>
+            </div>
+          }
           <div class="grid-scroll">
             <table class="grid-table">
               <thead>
@@ -163,6 +210,7 @@ export class CommentDialogComponent {
                   <th class="num-col">Amount</th>
                   <th>Date</th>
                   <th>Status</th>
+                  <th class="doc-col">Docs</th>
                   <th class="actions-col">Actions</th>
                 </tr>
               </thead>
@@ -171,7 +219,7 @@ export class CommentDialogComponent {
                   <tr (click)="view(r)">
                     <td class="cb-col" (click)="$event.stopPropagation()">
                       <input type="checkbox"
-                             [checked]="isSelected(r)"
+                             [checked]="selectedIds().has(r.id.toString())"
                              (change)="toggleRow(r, $event)" />
                     </td>
                     <td>
@@ -186,22 +234,43 @@ export class CommentDialogComponent {
                     <td class="date-col">{{ r.overtimeDate | date:'dd/MM/yyyy' }}</td>
                     <td>
                       <div class="status-cell">
-                        <span class="status-badge" [ngClass]="statusClass(r.status)">
+                        <span class="status-badge" [ngClass]="r._sc">
                           {{ r.statusLabel }}
                         </span>
-                        @if (levelLabel(r.status)) {
-                          <span class="level-badge">{{ levelLabel(r.status) }}</span>
+                        @if (r._ll) {
+                          <span class="level-badge">{{ r._ll }}</span>
                         }
                       </div>
+                    </td>
+                    <td class="doc-col" (click)="$event.stopPropagation()">
+                      @if (!r.documents || r.documents.length === 0) {
+                        <span class="no-doc">—</span>
+                      } @else if (r.documents.length === 1) {
+                        <button class="action-btn doc-btn"
+                                type="button"
+                                [matTooltip]="r.documents[0].fileName"
+                                (click)="openDoc(r.id, r.documents[0].id)">
+                          <mat-icon>attach_file</mat-icon>
+                        </button>
+                      } @else {
+                        <button class="action-btn doc-btn"
+                                type="button"
+                                [matTooltip]="r.documents.length + ' documents attached'"
+                                [matMenuTriggerFor]="docMenu"
+                                [matMenuTriggerData]="{ tx: r }">
+                          <mat-icon>attach_file</mat-icon>
+                          <span class="doc-count">{{ r.documents.length }}</span>
+                        </button>
+                      }
                     </td>
                     <td class="actions-col" (click)="$event.stopPropagation()">
                       <div class="action-bar">
                         <button class="action-btn info"
                                 type="button"
-                                [attr.aria-label]="canEdit(r) ? 'Edit overtime' : 'View overtime'"
-                                [matTooltip]="canEdit(r) ? 'Edit overtime' : 'View overtime'"
+                                [attr.aria-label]="r._canEdit ? 'Edit overtime' : 'View overtime'"
+                                [matTooltip]="r._canEdit ? 'Edit overtime' : 'View overtime'"
                                 (click)="view(r)">
-                          <mat-icon>{{ canEdit(r) ? 'edit' : 'visibility' }}</mat-icon>
+                          <mat-icon>{{ r._canEdit ? 'edit' : 'visibility' }}</mat-icon>
                         </button>
                         @if ((r.status === 0 || r.status === 5) && r.capturedBy) {
                           <button class="action-btn primary"
@@ -212,7 +281,7 @@ export class CommentDialogComponent {
                             <mat-icon>send</mat-icon>
                           </button>
                         }
-                        @if (canAct(r)) {
+                        @if (r._canAct) {
                           <button class="action-btn success"
                                   type="button"
                                   aria-label="Approve or advance"
@@ -228,7 +297,7 @@ export class CommentDialogComponent {
                             <mat-icon>undo</mat-icon>
                           </button>
                         }
-                        @if (canAct(r) || canCapturerReject(r)) {
+                        @if (r._canAct || r._canCapturerReject) {
                           <button class="action-btn danger"
                                   type="button"
                                   aria-label="Reject"
@@ -255,6 +324,18 @@ export class CommentDialogComponent {
         }
       </div>
     </div>
+
+    <!-- Shared doc dropdown for rows with multiple documents -->
+    <mat-menu #docMenu="matMenu">
+      <ng-template matMenuContent let-tx="tx">
+        @for (doc of tx.documents; track doc.id) {
+          <button mat-menu-item (click)="openDoc(tx.id, doc.id)">
+            <mat-icon>description</mat-icon>
+            <span>{{ doc.fileName }}</span>
+          </button>
+        }
+      </ng-template>
+    </mat-menu>
   `,
   styles: [`
     /* ── Filter bar ── */
@@ -331,6 +412,84 @@ export class CommentDialogComponent {
     .status-badge.status-rejected { background:#fee2e2; color:#dc2626; }
     .status-badge.status-returned { background:#fef3c7; color:#d97706; }
 
+    /* ── Bulk action toolbar ── */
+    .bulk-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+    }
+    .bulk-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e40af;
+      margin-right: 4px;
+    }
+    .btn-bulk-success,
+    .btn-bulk-warning,
+    .btn-bulk-danger,
+    .btn-bulk-clear {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .btn-bulk-success          { background:#d1fae5; color:#059669; border-color:#a7f3d0; }
+    .btn-bulk-success:hover    { background:#a7f3d0; color:#047857; }
+    .btn-bulk-warning          { background:#fef3c7; color:#d97706; border-color:#fde68a; }
+    .btn-bulk-warning:hover    { background:#fde68a; color:#b45309; }
+    .btn-bulk-danger           { background:#fee2e2; color:#dc2626; border-color:#fecaca; }
+    .btn-bulk-danger:hover     { background:#fecaca; color:#b91c1c; }
+    .btn-bulk-clear            { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+    .btn-bulk-clear:hover      { background:#e2e8f0; color:#475569; }
+    .btn-bulk-success mat-icon,
+    .btn-bulk-warning mat-icon,
+    .btn-bulk-danger mat-icon,
+    .btn-bulk-clear mat-icon   { font-size:16px; width:16px; height:16px; }
+
+    /* ── Document indicator column ── */
+    .doc-col {
+      width: 60px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .no-doc {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    .doc-btn {
+      background: #f0fdf4;
+      color: #16a34a;
+      border-color: #bbf7d0;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 6px;
+    }
+    .doc-btn:hover:not(:disabled) {
+      background: #dcfce7;
+      color: #15803d;
+      border-color: #86efac;
+    }
+    .doc-count {
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
     @media (max-width: 720px) {
       .page-header { align-items: stretch; }
       .page-header-actions { width: 100%; justify-content: flex-end; }
@@ -347,6 +506,29 @@ export class OvertimeCaptureComponent {
 
   // ── Raw data ──
   allRows  = signal<OvertimeTransactionDto[]>([]);
+
+  // ── Pre-compute per-row values once on data load, not on every CD tick ──
+  private augmentedRows = computed(() => {
+    const me             = this.user.me()?.userId ?? '';
+    const actingForUsers = this.user.me()?.actingForUserIds ?? [];
+    return this.allRows().map(r => ({
+      ...r,
+      _sc: captureStatusClass(r.status),
+      _ll: captureLevelLabel(r.status),
+      _canEdit: r.status === WorkflowStatus.Requested
+             || r.status === WorkflowStatus.Returned
+             || (r.status === WorkflowStatus.Recommended && r.capturedBy === me),
+      _canAct:  (r.currentAssigneeUserId === me
+             || (!!r.currentAssigneeUserId && actingForUsers.includes(r.currentAssigneeUserId)))
+             && r.status !== WorkflowStatus.Processed
+             && r.status !== WorkflowStatus.Rejected
+             && r.status !== WorkflowStatus.Returned,
+      _canCapturerReject: r.capturedBy === me
+             && (r.status === WorkflowStatus.Requested
+              || r.status === WorkflowStatus.Recommended
+              || r.status === WorkflowStatus.Returned),
+    }));
+  });
   loading  = signal(false);
   pageIndex = signal(0);
   pageSize  = signal(25);
@@ -362,7 +544,7 @@ export class OvertimeCaptureComponent {
 
   // ── Derived: filtered rows ──
   filteredRows = computed(() => {
-    let rows = this.allRows();
+    let rows = this.augmentedRows();
     const status     = this.filterStatus();
     const salaryHead = this.filterSalaryHead();
     const dept       = this.filterDepartment();
@@ -415,6 +597,17 @@ export class OvertimeCaptureComponent {
     return page.every(r => sel.has(r.id.toString()));
   });
 
+  // ── Bulk action derived counts (over ALL filtered rows, not just current page) ──
+  bulkCanActCount = computed(() => {
+    const sel = this.selectedIds();
+    return this.augmentedRows().filter(r => sel.has(r.id.toString()) && r._canAct).length;
+  });
+
+  bulkCanRejectCount = computed(() => {
+    const sel = this.selectedIds();
+    return this.augmentedRows().filter(r => sel.has(r.id.toString()) && (r._canAct || r._canCapturerReject)).length;
+  });
+
   constructor() {
     toObservable(this.user.me)
       .pipe(
@@ -424,6 +617,11 @@ export class OvertimeCaptureComponent {
         takeUntilDestroyed()
       )
       .subscribe(() => this.load());
+  }
+
+  // ── Documents ──
+  openDoc(transactionId: string, documentId: string): void {
+    window.open(this.txService.documentDownloadUrl(transactionId, documentId), '_blank');
   }
 
   // ── Load ──
@@ -505,6 +703,10 @@ export class OvertimeCaptureComponent {
     this.selectedIds.set(next);
   }
 
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
   // ── Row helpers ──
 
   /** True only when the current user is the workflow assignee for this row
@@ -539,27 +741,58 @@ export class OvertimeCaptureComponent {
         || (r.status === WorkflowStatus.Recommended && r.capturedBy === me);
   }
 
-  statusClass(status: number): string {
-    switch (status) {
-      case WorkflowStatus.Processed: return 'status-approved';
-      case WorkflowStatus.Returned:  return 'status-returned';
-      case WorkflowStatus.Rejected:  return 'status-rejected';
-      default:                       return 'status-pending';
-    }
-  }
-
-  levelLabel(status: WorkflowStatus): string {
-    switch (status) {
-      case WorkflowStatus.Requested:                return 'LV1';
-      case WorkflowStatus.Recommended:              return 'LV2';
-      case WorkflowStatus.ApprovedForPayment:       return 'LV3';
-      case WorkflowStatus.AwaitingPayrollApproval:  return 'LV4';
-      default: return '';
-    }
-  }
 
   view(r: OvertimeTransactionDto): void {
     this.router.navigate(['/overtime/capture', r.id]);
+  }
+
+  // ── Bulk workflow actions ──
+
+  /** Wraps a call so the forkJoin batch always settles; null = failed. */
+  private bulkSettle<T>(obs: ReturnType<typeof this.wf.approve>) {
+    return obs.pipe(catchError(() => of(null)));
+  }
+
+  private bulkSnack(verb: string, results: (unknown | null)[]): void {
+    const ok   = results.filter(r => r !== null).length;
+    const fail = results.filter(r => r === null).length;
+    const msg  = fail > 0
+      ? `${ok} ${verb}${ok !== 1 ? '' : ''}, ${fail} failed — retry individually.`
+      : `${ok} ${verb}.`;
+    this.snack.open(msg, 'OK', { duration: fail > 0 ? 5000 : 3000 });
+  }
+
+  bulkApprove(): void {
+    const sel = this.selectedIds();
+    const targets = this.augmentedRows().filter(r => sel.has(r.id.toString()) && r._canAct);
+    if (!targets.length) return;
+    forkJoin(targets.map(r => this.bulkSettle(this.wf.approve(r.id)))).subscribe(results => {
+      this.bulkSnack('approved', results);
+      this.clearSelection();
+      this.load();
+    });
+  }
+
+  bulkReturn(): void {
+    const sel = this.selectedIds();
+    const targets = this.augmentedRows().filter(r => sel.has(r.id.toString()) && r._canAct);
+    if (!targets.length) return;
+    forkJoin(targets.map(r => this.bulkSettle(this.wf.return(r.id, { comments: '' })))).subscribe(results => {
+      this.bulkSnack('returned', results);
+      this.clearSelection();
+      this.load();
+    });
+  }
+
+  bulkReject(): void {
+    const sel = this.selectedIds();
+    const targets = this.augmentedRows().filter(r => sel.has(r.id.toString()) && (r._canAct || r._canCapturerReject));
+    if (!targets.length) return;
+    forkJoin(targets.map(r => this.bulkSettle(this.wf.reject(r.id, { comments: '' })))).subscribe(results => {
+      this.bulkSnack('rejected', results);
+      this.clearSelection();
+      this.load();
+    });
   }
 
   // ── Workflow actions ──
