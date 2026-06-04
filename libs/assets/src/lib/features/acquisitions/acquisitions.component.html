@@ -230,12 +230,18 @@
 
       <div class="wizard-steps">
         @for (s of wizardSteps; track s.key) {
-          <button class="step-btn" [class.active]="wizardStep() === s.key" [class.done]="isStepDone(s.key)" (click)="goToStep(s.key)">
+          <button class="step-btn" [class.active]="wizardStep() === s.key && !showGrnDocs()" [class.done]="isStepDone(s.key) && !showGrnDocs()" (click)="goToStep(s.key)">
             {{s.label}}
+          </button>
+        }
+        @if (activeTab() === 'scm' && na.grnId) {
+          <button class="step-btn" style="border-left:2px solid #e2e8f0;margin-left:4px" [class.active]="showGrnDocs()" (click)="showGrnDocs.set(true); loadGrnDocuments(na.grnId)">
+            <mat-icon style="font-size:14px;vertical-align:middle;margin-right:3px">attach_file</mat-icon>Documents
           </button>
         }
       </div>
 
+      @if (!showGrnDocs()) {
       <!-- STEP 1: Classification -->
         <div class="step-body" [class.step-hidden]="wizardStep() !== 'classification'">
           <div class="form-grid-2">
@@ -280,9 +286,9 @@
               </select>
             </div>
             <div class="field-group">
-              <label class="field-label">Measurement Type</label>
-              <select class="form-input" [(ngModel)]="na.measurementTypeId">
-                <option [value]="0">— Select —</option>
+              <label class="field-label">Measurement Type @if (naMeasurementEnabled()) { * }</label>
+              <select class="form-input" [disabled]="!naMeasurementEnabled()" [style.background]="naMeasurementEnabled() ? '' : '#f8fafc'" [(ngModel)]="na.measurementTypeId">
+                <option [value]="0">{{ naMeasurementEnabled() ? '— Select —' : 'N/A – asset type' }}</option>
                 @for (m of measurementTypes(); track m.measurementTypeId) {
                   <option [value]="m.measurementTypeId">{{m.measurementTypeDesc}}</option>
                 }
@@ -301,8 +307,8 @@
               <label class="field-label">Condition</label>
               <select class="form-input" [(ngModel)]="na.conditionId">
                 <option [value]="0">— Select —</option>
-                @for (c of assetConditions(); track c.assetCondition_ID) {
-                  <option [value]="c.assetCondition_ID">{{c.assetConditionDesc}}</option>
+                @for (c of assetConditions(); track c.assetConditionId) {
+                  <option [value]="c.assetConditionId">{{c.assetConditionDesc}}</option>
                 }
               </select>
             </div>
@@ -323,6 +329,22 @@
               <input type="number" class="form-input" [(ngModel)]="na.acquisitionCost" placeholder="0.00" />
             </div>
           </div>
+          @if (activeTab() === 'scm' && scmSelectedRow) {
+            <div class="form-grid-2" style="margin-top:8px">
+              <div class="field-group">
+                <label class="field-label">PROJECT</label>
+                <input type="text" class="form-input" readonly
+                  [value]="na.projectId != null ? (na.projectId + ' | ' + na.projectName) : ''"
+                  style="background:#f8fafc;color:#475569;cursor:default" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">SCOA ITEM</label>
+                <input type="text" class="form-input" readonly
+                  [value]="na.scoaDesc"
+                  style="background:#f8fafc;color:#475569;cursor:default" />
+              </div>
+            </div>
+          }
           @if (activeTab() === 'scm') {
             <div class="info-row">
               <mat-icon style="color:#3b82f6;font-size:16px">info</mat-icon>
@@ -398,12 +420,11 @@
             </div>
             <div class="field-group">
               <label class="field-label">Custodian</label>
-              <select class="form-input" [(ngModel)]="na.custodianId">
-                <option [value]="0">— Select Custodian —</option>
-                @for (e of employees(); track e.employeeId) {
-                  <option [value]="e.employeeId">{{e.firstName}} {{e.surname}}</option>
-                }
-              </select>
+              <app-employee-select
+                [(ngModel)]="na.custodianId"
+                placeholder="— Select Custodian —"
+                selectClass="form-input"
+              ></app-employee-select>
             </div>
             <div class="field-group">
               <label class="field-label">Asset Ownership</label>
@@ -534,6 +555,75 @@
           </button>
         }
       </div>
+      }
+
+      <!-- DOCUMENTS PANEL -->
+      @if (showGrnDocs()) {
+        <div class="step-body">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <mat-icon style="color:#3b82f6">attach_file</mat-icon>
+            <span style="font-size:14px;font-weight:600;color:#1e293b">GRN Documents</span>
+            <span style="font-size:12px;color:#64748b">GRN ID: {{na.grnId}}</span>
+          </div>
+          @if (grnDocsLoading()) {
+            <div class="loading-row"><mat-spinner diameter="24"></mat-spinner><span>Loading documents…</span></div>
+          } @else if (grnDocs().length === 0) {
+            <div style="padding:32px;text-align:center;color:#64748b;font-size:14px">
+              <mat-icon style="font-size:36px;display:block;margin:0 auto 10px;color:#94a3b8">folder_open</mat-icon>
+              No documents found for GRN {{na.grnId}}.
+            </div>
+          } @else {
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:90px">Document ID</th>
+                    <th>Document Name</th>
+                    <th>Date Captured</th>
+                    <th style="width:120px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (doc of grnDocs(); track doc.documentId) {
+                    <tr [style.background]="selectedGrnDoc()?.documentId === doc.documentId ? '#eff6ff' : ''">
+                      <td><strong>{{doc.documentId}}</strong></td>
+                      <td>{{doc.documentName || '—'}}</td>
+                      <td>{{formatDate(doc.dateCaptured)}}</td>
+                      <td>
+                        @if (doc.documentPath) {
+                          <div style="display:flex;gap:6px;align-items:center">
+                            @if (isPreviewableGrnDoc(doc)) {
+                              <button class="btn-secondary" style="padding:3px 8px;font-size:12px" (click)="previewGrnDocument(doc)" [title]="selectedGrnDoc()?.documentId === doc.documentId ? 'Close preview' : 'Preview'">
+                                <mat-icon style="font-size:14px;vertical-align:middle">{{selectedGrnDoc()?.documentId === doc.documentId ? 'visibility_off' : 'visibility'}}</mat-icon>
+                              </button>
+                            }
+                            <button class="btn-secondary" style="padding:3px 8px;font-size:12px" (click)="openGrnDocument(doc)" title="Open in new tab">
+                              <mat-icon style="font-size:14px;vertical-align:middle">open_in_new</mat-icon>
+                            </button>
+                          </div>
+                        } @else {
+                          <span style="color:#94a3b8;font-size:12px">No path</span>
+                        }
+                      </td>
+                    </tr>
+                    @if (selectedGrnDoc()?.documentId === doc.documentId) {
+                      <tr>
+                        <td colspan="4" style="padding:12px;background:#f8fafc;border-top:1px solid #e2e8f0">
+                          @if (isGrnDocPdf(doc)) {
+                            <embed [src]="getGrnDocumentPreviewUrl(doc)" type="application/pdf" style="width:100%;height:500px;border:1px solid #cbd5e1;border-radius:4px" />
+                          } @else {
+                            <img [src]="getGrnDocumentPreviewUrl(doc)" [alt]="doc.documentName || 'Document preview'" style="max-width:100%;max-height:500px;display:block;border:1px solid #cbd5e1;border-radius:4px;object-fit:contain" />
+                          }
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
     </div>
   }
 
@@ -549,19 +639,92 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Asset ID</th><th>Description</th><th>Barcode</th><th>Acquisition Date</th><th>Cost</th><th>Supplier</th>
+                  <th>Asset ID</th><th>Description</th><th>Barcode</th><th>Acquisition Date</th><th>Cost</th><th>Supplier</th><th>Documents</th>
                 </tr>
               </thead>
               <tbody>
                 @for (row of listGroupedScm(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.barcode || '—'}}</td>
                     <td>{{formatDate(row.acquisitionDate)}}</td>
                     <td>{{formatCurrency(row.purchaseAmount)}}</td>
                     <td>{{row.supplierName || '—'}}</td>
+                    <td>
+                      @if (row.grnId) {
+                        <button class="btn-secondary" style="padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:4px" (click)="openListGrnDocs(row, $event)" [title]="listExpandedAssetId() === row.assetId ? 'Hide documents' : 'View GRN documents'">
+                          <mat-icon style="font-size:14px;line-height:14px;width:14px;height:14px">{{listExpandedAssetId() === row.assetId ? 'folder_open' : 'folder'}}</mat-icon>
+                          Documents
+                        </button>
+                      } @else {
+                        <span style="color:#94a3b8;font-size:12px">—</span>
+                      }
+                    </td>
                   </tr>
+                  @if (listExpandedAssetId() === row.assetId) {
+                    <tr>
+                      <td colspan="7" style="padding:0;background:#f8fafc;border-top:1px solid #e2e8f0">
+                        <div style="padding:16px">
+                          <div style="font-weight:600;font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+                            <mat-icon style="font-size:16px;line-height:16px;width:16px;height:16px">description</mat-icon>
+                            GRN Documents (GRN ID: {{row.grnId}})
+                          </div>
+                          @if (listGrnDocsLoading()) {
+                            <div style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:13px">
+                              <mat-spinner diameter="16"></mat-spinner> Loading documents…
+                            </div>
+                          } @else if (listGrnDocs().length === 0) {
+                            <div style="color:#94a3b8;font-size:13px">No documents found for this GRN.</div>
+                          } @else {
+                            <table class="data-table" style="font-size:12px">
+                              <thead>
+                                <tr>
+                                  <th>Document Name</th><th>File Type</th><th>Date Captured</th><th>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (doc of listGrnDocs(); track doc.documentId) {
+                                  <tr>
+                                    <td>{{doc.documentName || '—'}}</td>
+                                    <td>{{doc.fileType || '—'}}</td>
+                                    <td>{{formatDate(doc.dateCaptured)}}</td>
+                                    <td>
+                                      @if (doc.documentPath) {
+                                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                          @if (isPreviewableListGrnDoc(doc)) {
+                                            <button class="btn-secondary" style="padding:3px 8px;font-size:12px" (click)="previewListGrnDocument(doc)" [title]="listSelectedGrnDoc()?.documentId === doc.documentId ? 'Close preview' : 'Preview'">
+                                              <mat-icon style="font-size:14px;vertical-align:middle">{{listSelectedGrnDoc()?.documentId === doc.documentId ? 'visibility_off' : 'visibility'}}</mat-icon>
+                                            </button>
+                                          }
+                                          <button class="btn-secondary" style="padding:3px 8px;font-size:12px" (click)="openListGrnDocument(doc)" title="Open in new tab">
+                                            <mat-icon style="font-size:14px;vertical-align:middle">open_in_new</mat-icon>
+                                          </button>
+                                        </div>
+                                      } @else {
+                                        <span style="color:#94a3b8;font-size:12px">No path</span>
+                                      }
+                                    </td>
+                                  </tr>
+                                  @if (listSelectedGrnDoc()?.documentId === doc.documentId) {
+                                    <tr>
+                                      <td colspan="4" style="padding:12px;background:#ffffff;border-top:1px solid #e2e8f0">
+                                        @if (isListGrnDocPdf(doc)) {
+                                          <embed [src]="getListGrnDocumentPreviewUrl(doc)" type="application/pdf" style="width:100%;height:500px;border:1px solid #cbd5e1;border-radius:4px" />
+                                        } @else {
+                                          <img [src]="getListGrnDocumentPreviewUrl(doc)" [alt]="doc.documentName || 'Document preview'" style="max-width:100%;max-height:500px;display:block;border:1px solid #cbd5e1;border-radius:4px;object-fit:contain" />
+                                        }
+                                      </td>
+                                    </tr>
+                                  }
+                                }
+                              </tbody>
+                            </table>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
@@ -579,7 +742,7 @@
               </thead>
               <tbody>
                 @for (row of listGroupedInventory(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.barcode || '—'}}</td>
@@ -604,7 +767,7 @@
               </thead>
               <tbody>
                 @for (row of listGroupedDonation(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.donorName || '—'}}</td>

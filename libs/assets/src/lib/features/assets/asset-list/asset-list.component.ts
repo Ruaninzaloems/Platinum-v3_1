@@ -13,12 +13,13 @@ import { Component, OnInit, signal, computed } from '@angular/core';
   import { OrgSettingsService } from '../../../core/org-settings.service';
   import { CidmsPickerComponent } from '../../../shared/cidms-picker/cidms-picker.component';
   import { CidmsChainResult } from '../../../core/cidms-level-config';
+  import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
   import * as XLSX from 'xlsx';
 
   @Component({
     selector: 'app-asset-list',
     standalone: true,
-    imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatProgressSpinnerModule, MatSnackBarModule, CidmsPickerComponent],
+    imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatProgressSpinnerModule, MatSnackBarModule, CidmsPickerComponent, EmployeeSelectComponent],
     templateUrl: './asset-list.component.html',
     styleUrls: ['./asset-list.component.css']
   })
@@ -51,6 +52,11 @@ import { Component, OnInit, signal, computed } from '@angular/core';
   filteredCategories = signal<any[]>([]);
   filteredSubCategories = signal<any[]>([]);
   noClassMessage = signal('');
+  naNoUsefulLife = signal(false);
+  naRequireStatus = signal(false);
+  naDepreciationDisabled = signal(false);
+  naShowRevalMethod = signal(false);
+  naMeasurementEnabled = signal(true);
 
   newTowns = signal<any[]>([]);
   newSuburbs = signal<any[]>([]);
@@ -60,7 +66,6 @@ import { Component, OnInit, signal, computed } from '@angular/core';
   newFloors = signal<any[]>([]);
   newRooms = signal<any[]>([]);
   showNewCidmsPicker = signal(false);
-  newEmployees = signal<any[]>([]);
   newDivisions = signal<any[]>([]);
   unitOfIssues = signal<any[]>([]);
   newFilteredDivisions = signal<any[]>([]);
@@ -104,7 +109,8 @@ import { Component, OnInit, signal, computed } from '@angular/core';
       movementInRevaluationReserve: 0, revaluationDate: '', revaluationValue: 0,
       impairmentDate: '', depreciationOffset: 0, deemedCost: 0,
       depreciationCurrentYear: 0, impairmentCurrentYear: 0, impairmentReversalAmount: 0,
-      depreciationMethod: '', usefulLifeMonths: 0, remainingUsefulLifeMonths: 0,
+      depreciationMethod: '', depreciationMethodId: 0, revaluationMethod: 'restatement',
+      usefulLifeMonths: 0, remainingUsefulLifeMonths: 0,
       condition: 'Good', acquisitionDate: '', commissioningDate: '', inServiceDate: '',
       verificationDate: '', verificationDoneById: 0, yearConstructed: null, forecastReplacementYear: null,
       departmentId: 0, divisionId: 0, custodianId: 0, custodianIdNumber: '', assetOwnership: '',
@@ -133,6 +139,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.noClassMessage.set('');
     if (!classId) {
       this.na.assetClassName = '';
+      this.naNoUsefulLife.set(false);
+      this.naRequireStatus.set(false);
+      this.naDepreciationDisabled.set(false);
+      this.naShowRevalMethod.set(false);
       return;
     }
     var classes = this.filteredClasses();
@@ -141,33 +151,71 @@ import { Component, OnInit, signal, computed } from '@angular/core';
       if (classes[i].assetClass_ID === classId) { cls = classes[i]; break; }
     }
     if (!cls) { return; }
+    this.applyNewAssetClassRules(cls);
+  }
 
+  private applyNewAssetClassRules(cls: any): void {
     this.na.assetClassName = cls.assetClassDesc;
 
-    var usefulMonths = cls.usefulLifeInMonths || 0;
+    var selectedTypeId = this.na.typeId;
+    var allTypes = this.assetTypes();
+    var matchedType: any = null;
+    for (var ti = 0; ti < allTypes.length; ti++) {
+      if (Number(allTypes[ti].assetTypeId) === Number(selectedTypeId)) { matchedType = allTypes[ti]; break; }
+    }
+    var noUsefulLife = matchedType?.noUsefulLife === 1 || matchedType?.noUsefulLife === true;
+    this.naNoUsefulLife.set(noUsefulLife);
+    var usefulMonths = noUsefulLife ? 0 : (cls.usefulLifeInMonths || 0);
     this.na.usefulLifeMonths = usefulMonths;
     this.na.remainingUsefulLifeMonths = usefulMonths;
 
-    if (cls.assetDepreciationMethod_ID) {
-      var dms = this.depreciationMethods();
-      for (var j = 0; j < dms.length; j++) {
-        if (dms[j].assetDepreciationMethod_ID === cls.assetDepreciationMethod_ID) {
-          this.na.depreciationMethod = dms[j].assetDepreciationMethodDesc;
-          break;
-        }
-      }
+    var selectedCategoryId = this.na.categoryId;
+    var allCats = this.filteredCategories();
+    var matchedCategory: any = null;
+    for (var ci = 0; ci < allCats.length; ci++) {
+      if (Number(allCats[ci].assetCategoryId) === Number(selectedCategoryId)) { matchedCategory = allCats[ci]; break; }
+    }
+    var requireStatus = matchedCategory?.requireStatus === 1 || matchedCategory?.requireStatus === true;
+    this.naRequireStatus.set(requireStatus);
+    if (cls.assetStatus_ID && requireStatus) {
+      this.na.assetStatusId = cls.assetStatus_ID;
+    } else if (!requireStatus) {
+      this.na.assetStatusId = 0;
     }
 
-    if (cls.assetStatus_ID) {
-      this.na.assetStatusId = cls.assetStatus_ID;
-      var sts = this.assetStatuses();
-      for (var k = 0; k < sts.length; k++) {
-        if (sts[k].assetStatusId === cls.assetStatus_ID) {
-          this.na.status = sts[k].assetStatusDesc;
-          break;
-        }
-      }
+    this.na.depreciationMethodId = cls.assetDepreciationMethod_ID || 0;
+
+    if (cls.assetMeasurement_ID) {
+      this.na.measurementTypeId = cls.assetMeasurement_ID;
+      this.applyNewAssetMeasurementTypeRules(cls.assetMeasurement_ID);
     }
+
+    if (cls.revaluationMethod) {
+      this.na.revaluationMethod = cls.revaluationMethod;
+    }
+  }
+
+  onMeasurementTypeChange(measurementTypeId: number): void {
+    this.na.measurementTypeId = measurementTypeId;
+    this.applyNewAssetMeasurementTypeRules(measurementTypeId);
+  }
+
+  private applyNewAssetMeasurementTypeRules(measurementTypeId: number): void {
+    var mts = this.measurementTypes();
+    var mt: any = null;
+    for (var i = 0; i < mts.length; i++) {
+      if (Number(mts[i].measurementTypeId) === Number(measurementTypeId)) { mt = mts[i]; break; }
+    }
+    if (!mt) {
+      this.naDepreciationDisabled.set(false);
+      this.naShowRevalMethod.set(false);
+      return;
+    }
+    var noDepreciation = mt.noDepreciation === 1 || mt.noDepreciation === true;
+    this.naDepreciationDisabled.set(noDepreciation);
+    if (noDepreciation) { this.na.depreciationMethodId = 0; }
+    var mtDesc = (mt.measurementTypeDesc || '').toLowerCase().trim();
+    this.naShowRevalMethod.set(mtDesc === 'revaluation module');
   }
 
   private loadClassesForHierarchy(): void {
@@ -178,6 +226,8 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     }
     var params: any = { typeId: this.na.typeId, categoryId: this.na.categoryId };
     if (this.na.subCategoryId) { params.subCategoryId = this.na.subCategoryId; }
+    var clsModel = this.orgSettings.settings()?.measurement_model;
+    if (clsModel && clsModel !== 'Mixed') { params.model = clsModel; }
     this.api.getAssetClassesList(params).subscribe({
       next: function(this: AssetListComponent, res: any) {
         var list = Array.isArray(res) ? res : (res.data || []);
@@ -208,6 +258,11 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.filteredSubCategories.set([]);
     this.filteredClasses.set([]);
     this.noClassMessage.set('');
+    this.naNoUsefulLife.set(false);
+    this.naRequireStatus.set(false);
+    this.naDepreciationDisabled.set(false);
+    this.naShowRevalMethod.set(false);
+    this.na.measurementTypeId = 0;
     var matchedType: any = null;
     var types = this.assetTypes();
     for (var i = 0; i < types.length; i++) {
@@ -216,8 +271,15 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.na.assetTypeName = matchedType ? matchedType.assetTypeDesc : '';
     if (typeId) {
       this.loadCategoriesForType(typeId);
+      var model = this.orgSettings.settings()?.measurement_model || undefined;
+      this.api.getMeasurementTypes({ typeId: typeId, model: model }).subscribe((mt: any[]) => {
+        this.measurementTypes.set(mt);
+        this.naMeasurementEnabled.set(mt.length > 0);
+        if (mt.length === 0) { this.naDepreciationDisabled.set(true); this.naShowRevalMethod.set(false); }
+      });
     } else {
       this.filteredCategories.set([]);
+      this.naMeasurementEnabled.set(true);
     }
   }
 
@@ -228,6 +290,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.na.assetClassId = 0;
     this.na.assetClassName = '';
     this.noClassMessage.set('');
+    this.naNoUsefulLife.set(false);
+    this.naRequireStatus.set(false);
+    this.naDepreciationDisabled.set(false);
+    this.naShowRevalMethod.set(false);
     var matchedCat: any = null;
     var cats = this.allCategories();
     for (var i = 0; i < cats.length; i++) {
@@ -247,6 +313,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.na.assetClassId = 0;
     this.na.assetClassName = '';
     this.noClassMessage.set('');
+    this.naNoUsefulLife.set(false);
+    this.naRequireStatus.set(false);
+    this.naDepreciationDisabled.set(false);
+    this.naShowRevalMethod.set(false);
     var matchedSub: any = null;
     var subs = this.filteredSubCategories();
     for (var i = 0; i < subs.length; i++) {
@@ -290,6 +360,27 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     return 'N/A';
   }
 
+  hasMeasurementConflict(asset: any): boolean {
+    var model = (this.orgSettings.settings()?.measurement_model || '').toLowerCase();
+    if (!model || model === 'mixed') return false;
+    if (!asset.measurementType) return false;
+    var measName = (asset.measurementType || '').toLowerCase();
+    if (model === 'cost' && measName.includes('revaluation')) return true;
+    if (model === 'revaluation' && measName.includes('cost')) return true;
+    return false;
+  }
+
+  getMeasurementConflictMessage(asset: any): string {
+    var model = (this.orgSettings.settings()?.measurement_model || '').toLowerCase();
+    if (model === 'cost') {
+      return 'This asset uses a Revaluation measurement type but the organisation model is set to Cost.';
+    }
+    if (model === 'revaluation') {
+      return 'This asset uses a Cost measurement type but the organisation model is set to Revaluation.';
+    }
+    return 'Measurement type conflicts with the active organisation model.';
+  }
+
   getCurrentFinYear(): string {
     var s = this.orgSettings.settings();
     if (s && s.financial_year) return s.financial_year;
@@ -322,17 +413,13 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     return num;
   }
 
-  onNewCustodianChange(id: number) {
-    this.na.custodianId = id;
-    this.na.custodianIdNumber = '';
-    if (!id) { return; }
-    var employees = this.newEmployees();
-    for (var i = 0; i < employees.length; i++) {
-      if (employees[i].employeeId === id) {
-        this.na.custodianIdNumber = this.maskIdNumber(employees[i].idNo || '');
-        break;
-      }
+  onNewCustodianChange(emp: any) {
+    if (!emp) {
+      this.na.custodianIdNumber = '';
+      return;
     }
+    this.na.custodianId = emp.employeeId;
+    this.na.custodianIdNumber = this.maskIdNumber(emp.idNo || '');
   }
 
   onNewDepartmentChange(id: number) {
@@ -378,23 +465,11 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     this.api.getAssetCategoriesList().subscribe(function(this: AssetListComponent, c: any[]) { this.allCategories.set(c); this.filterCategories.set(c); }.bind(this));
     this.api.getAssetSubCategoriesList().subscribe(function(this: AssetListComponent, sc: any[]) { this.allSubCategories.set(sc); }.bind(this));
     this.api.getAssetStatuses().subscribe(function(this: AssetListComponent, s: any[]) { this.assetStatuses.set(s); }.bind(this));
-    this.api.getMeasurementTypes().subscribe(function(this: AssetListComponent, mt: any[]) { this.measurementTypes.set(mt); }.bind(this));
+    this.orgSettings.whenLoaded().subscribe((s: any) => {
+      this.api.getMeasurementTypes({ model: s?.measurement_model || undefined }).subscribe((mt: any[]) => { this.measurementTypes.set(mt); });
+    });
     this.api.getUnitOfIssues().subscribe(function(this: AssetListComponent, u: any[]) { this.unitOfIssues.set(u); }.bind(this));
     this.api.getDepreciationMethods().subscribe(function(this: AssetListComponent, dm: any[]) { this.depreciationMethods.set(dm); }.bind(this));
-    this.api.getEmployees().subscribe(function(this: AssetListComponent, e: any[]) {
-      e.sort(function(a: any, b: any) {
-        var as = (a.surname || '').toLowerCase();
-        var bs = (b.surname || '').toLowerCase();
-        if (as < bs) { return -1; }
-        if (as > bs) { return 1; }
-        var af = (a.firstName || '').toLowerCase();
-        var bf = (b.firstName || '').toLowerCase();
-        if (af < bf) { return -1; }
-        if (af > bf) { return 1; }
-        return 0;
-      });
-      this.newEmployees.set(e);
-    }.bind(this));
     this.api.getVerificationLookupDivisions().subscribe(function(this: AssetListComponent, d: any[]) { this.newDivisions.set(d); }.bind(this));
     this.api.getConstFundingSources().subscribe(function(this: AssetListComponent, r: any[]) { this.createConstFundingSources.set(Array.isArray(r) ? r : []); }.bind(this));
     this.loadAssets();
@@ -634,7 +709,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     def('sc2', 'Asset_SubCategory_ID', this.na.subCategoryId);
     def('cls2', 'AssetClass_ID', this.na.assetClassId);
     def('mt2', 'MeasurementType_ID', this.na.measurementTypeId);
-    def('sts', 'AssetStatus_ID', this.na.assetStatusId);
+    payload['AssetStatus_ID'] = this.naRequireStatus() ? (this.na.assetStatusId || null) : null;
     def('b', 'Barcode', this.na.barcode);
     def('ob', 'OldBarCode', this.na.oldBarcode);
     def('pi', 'ParentAssetRegisterItem_ID', this.na.parentAssetId);
@@ -661,8 +736,11 @@ import { Component, OnInit, signal, computed } from '@angular/core';
     def('vb', 'VerificationDoneBy', this.na.verificationDoneById);
     def('yc', 'YearConstructed', this.na.yearConstructed);
     def('fr', 'ForecastReplacementYear', this.na.forecastReplacementYear);
-    def('ul', 'UsefulLifeMonthComponent', this.na.usefulLifeMonths);
+    payload['UsefulLifeMonthComponent'] = this.naNoUsefulLife() ? 0 : (this.na.usefulLifeMonths || 0);
+    payload['UsefulLifeYearComponent'] = this.naNoUsefulLife() ? 0 : Math.floor((this.na.usefulLifeMonths || 0) / 12);
     def('ru', 'RemainingUsefulLife', this.na.remainingUsefulLifeMonths);
+    payload['AssetDepreciationMethod_ID'] = this.naDepreciationDisabled() ? null : (this.na.depreciationMethodId || null);
+    payload['RevaluationMethod'] = this.naShowRevalMethod() ? (this.na.revaluationMethod || null) : null;
     def('co', 'AssetCondition_ID', this.na.condition === 'Good' ? 0 : 0);
     def('u', 'UoM', this.na.uomId);
     def('q', 'Quantity', this.na.quantity);
@@ -748,7 +826,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
         self.snackBar.open('Asset ' + newId + ' registered successfully', 'View', {
           duration: 5000, horizontalPosition: 'end', verticalPosition: 'top'
         }).onAction().subscribe(function() {
-          if (newId) self.router.navigate(['/assets/assets', newId]);
+          if (newId) self.router.navigate(['/assets', newId]);
         });
         self.showNewAssetForm = false;
         self.formStep = 'details';

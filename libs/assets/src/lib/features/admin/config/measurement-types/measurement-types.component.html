@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset measurement unit types</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Measurement Type</button>
     </div>
@@ -19,6 +20,18 @@
           <input type="text" class="form-input" [(ngModel)]="formData.name" placeholder="Enter measurement type description">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
+        </div>
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.noDepreciation === 1" (change)="onNoDepreciationChange($event)"> No Depreciation
+          </label>
+        </div>
+      </div>
       <div class="form-actions">
         <button mat-stroked-button (click)="cancelForm()">Cancel</button>
         <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.name">{{editingId() ? 'Update' : 'Create'}}</button>
@@ -31,13 +44,18 @@
   } @else {
     <div class="table-card">
       <table class="data-table">
-        <thead><tr><th>ID</th><th>Description</th><th>Status</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
+        <thead><tr><th>ID</th><th>Description</th><th>Status</th><th class="flag-col">No Depreciation</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
         <tbody>
-          @for (item of items(); track item.assetMeasurement_ID) {
+          @for (item of items(); track item.measurementTypeId) {
             <tr>
-              <td class="id-cell">{{item.assetMeasurement_ID}}</td>
-              <td class="desc-cell">{{item.name}}</td>
+              <td class="id-cell">{{item.measurementTypeId}}</td>
+              <td class="desc-cell">{{item.measurementTypeDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
+              <td class="flag-cell">
+                <mat-icon class="flag-icon" [class.flag-on]="item.noDepreciation === 1" [matTooltip]="item.noDepreciation === 1 ? 'No Depreciation' : 'Depreciation Applies'">
+                  {{item.noDepreciation === 1 ? 'check_circle' : 'remove_circle_outline'}}
+                </mat-icon>
+              </td>
               <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>
               <td class="actions-cell">
                 <button mat-icon-button (click)="openEdit(item)"><mat-icon class="action-icon edit">edit</mat-icon></button>

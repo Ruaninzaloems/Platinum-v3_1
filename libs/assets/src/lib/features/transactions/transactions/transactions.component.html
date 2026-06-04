@@ -207,45 +207,22 @@
           <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
             <div style="display:flex;flex-direction:column;align-items:center">
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
-                [style.background]="depApproveStep() >= 3 ? '#16a34a' : depApproveStep() === 2 ? '#2563eb' : '#e2e8f0'"
+                [style.background]="depApproveStep() >= 4 ? '#16a34a' : depApproveStep() >= 2 ? '#2563eb' : '#e2e8f0'"
                 [style.color]="depApproveStep() >= 2 ? 'white' : '#94a3b8'">
-                @if (depApproveStep() >= 3) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
-              </div>
-              <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
-                [style.background]="depApproveStep() >= 3 ? '#16a34a' : '#e2e8f0'"></div>
-            </div>
-            <div style="padding-top:4px">
-              <div style="font-size:14px;font-weight:600"
-                [style.color]="depApproveStep() === 2 ? '#2563eb' : depApproveStep() >= 3 ? '#16a34a' : '#94a3b8'">
-                Submitting Journal Entries
-              </div>
-              <div style="font-size:12px;margin-top:2px"
-                [style.color]="depApproveStep() === 2 ? '#3b82f6' : depApproveStep() >= 3 ? '#15803d' : '#cbd5e1'">
-                @if (depApproveStep() === 2) { Creating GL entries and posting depreciation journals... }
-                @else if (depApproveStep() >= 3) { All journal entries posted }
-                @else { Pending }
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
-            <div style="display:flex;flex-direction:column;align-items:center">
-              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
-                [style.background]="depApproveStep() >= 4 ? '#16a34a' : depApproveStep() === 3 ? '#2563eb' : '#e2e8f0'"
-                [style.color]="depApproveStep() >= 3 ? 'white' : '#94a3b8'">
-                @if (depApproveStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
+                @if (depApproveStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
               </div>
               <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
                 [style.background]="depApproveStep() >= 4 ? '#16a34a' : '#e2e8f0'"></div>
             </div>
             <div style="padding-top:4px">
               <div style="font-size:14px;font-weight:600"
-                [style.color]="depApproveStep() === 3 ? '#2563eb' : depApproveStep() >= 4 ? '#16a34a' : '#94a3b8'">
-                Updating Asset Register
+                [style.color]="depApproveStep() >= 2 && depApproveStep() < 4 ? '#2563eb' : depApproveStep() >= 4 ? '#16a34a' : '#94a3b8'">
+                Generating Transactions
               </div>
               <div style="font-size:12px;margin-top:2px"
-                [style.color]="depApproveStep() === 3 ? '#3b82f6' : depApproveStep() >= 4 ? '#15803d' : '#cbd5e1'">
-                @if (depApproveStep() === 3) { Refreshing asset balances and carrying amounts... }
-                @else if (depApproveStep() >= 4) { Asset register updated }
+                [style.color]="depApproveStep() >= 2 && depApproveStep() < 4 ? '#3b82f6' : depApproveStep() >= 4 ? '#15803d' : '#cbd5e1'">
+                @if (depApproveStep() >= 2 && depApproveStep() < 4) { Creating and posting transactions... }
+                @else if (depApproveStep() >= 4) { Transactions created and posted }
                 @else { Pending }
               </div>
             </div>
@@ -255,7 +232,7 @@
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
                 [style.background]="depApproveStep() >= 5 ? '#16a34a' : depApproveStep() === 4 ? '#2563eb' : '#e2e8f0'"
                 [style.color]="depApproveStep() >= 4 ? 'white' : '#94a3b8'">
-                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
+                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
               </div>
               <div style="width:2px;flex:1;min-height:20px;margin-top:4px"
                 [style.background]="depApproveStep() >= 5 ? '#16a34a' : '#e2e8f0'"></div>
@@ -278,7 +255,7 @@
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
                 [style.background]="depApproveStep() >= 5 ? '#16a34a' : '#e2e8f0'"
                 [style.color]="depApproveStep() >= 5 ? 'white' : '#94a3b8'">
-                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 5 }
+                @if (depApproveStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
               </div>
             </div>
             <div style="padding-top:4px">
@@ -328,8 +305,19 @@
       <div style="padding:20px 24px">
         @for (asset of glValidationErrors(); track asset.assetRegisterItemId) {
           <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
-            <div style="padding:10px 14px;background:#f8fafc;font-size:13px;font-weight:600;color:#334155;border-bottom:1px solid #e5e7eb">
-              @if (glValidationTxnType() === 'Depreciation') { {{asset.assetDescription}} } @else { Asset #{{asset.assetRegisterItemId}} — {{asset.assetDescription}} }
+            <div style="padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e5e7eb">
+              <div style="font-size:13px;font-weight:600;color:#334155">
+                @if (glValidationTxnType() === 'Depreciation') { {{asset.assetDescription}} } @else { Asset #{{asset.assetRegisterItemId}} — {{asset.assetDescription}} }
+              </div>
+              @if (asset.subCategoryName || asset.measurementTypeName || asset.statusName || asset.deptName || asset.divName) {
+                <div style="font-size:11px;color:#64748b;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+                  @if (asset.subCategoryName) {<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px">{{asset.subCategoryName}}</span>}
+                  @if (asset.measurementTypeName) {<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px">{{asset.measurementTypeName}}</span>}
+                  @if (asset.statusName) {<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px">{{asset.statusName}}</span>}
+                  @if (asset.deptName) {<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px">{{asset.deptName}}</span>}
+                  @if (asset.divName) {<span style="background:#e2e8f0;border-radius:3px;padding:1px 5px">{{asset.divName}}</span>}
+                </div>
+              }
             </div>
             @for (leg of asset.legs; track leg.leg) {
               @if (!leg.valid) {
@@ -380,7 +368,8 @@
 <mat-tab-group animationDuration="200ms">
 
   <!-- DEPRECIATION RUN TAB -->
-  <mat-tab label="Depreciation Run">
+  <mat-tab>
+    <ng-template matTabLabel>Depreciation Run @if (depDocCount() > 0) { <span class="tab-doc-count">{{depDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       @if (approvalMethod() === 'Automated') {
       <div class="form-card" style="max-width:1100px">
@@ -494,7 +483,7 @@
             </div>
             <div class="form-field">
               <label>Period *</label>
-              <select [(ngModel)]="depSelectedPeriod" class="form-input">
+              <select [(ngModel)]="depSelectedPeriod" class="form-input" (ngModelChange)="onDepPeriodChange()">
                 @for (pm of periodMonths; track pm.value) {
                   <option [ngValue]="pm.value" [disabled]="depCompletedPeriods().includes(pm.value)">
                     @if (depCompletedPeriods().includes(pm.value)) { ✓ Period {{pm.value}} ({{pm.label}}) — Completed } @else { Period {{pm.value}} ({{pm.label}}) }
@@ -515,6 +504,13 @@
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1e40af">
               <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">info</mat-icon>
               Scheduled Date (period end): <strong>{{getScheduledDateForPeriod()}}</strong> — FY {{depSelectedFinYear}}, Period {{depSelectedPeriod}} ({{getPeriodLabel(depSelectedPeriod)}})
+            </div>
+          }
+
+          @if (depPeriodApprovedNote()) {
+            <div style="background:#fffbeb;border:1px solid #fcd34d;padding:10px 14px;border-radius:6px;color:#92400e;font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+              <mat-icon style="font-size:18px;width:18px;height:18px;color:#d97706;flex-shrink:0">lock</mat-icon>
+              <span>{{depPeriodApprovedNote()}}</span>
             </div>
           }
 
@@ -552,6 +548,7 @@
               </div>
             </div>
           </div>
+          <app-asset-document-panel [assetId]="0" [entityId]="depRunResult().scheduleId" entityType="Depreciation Run" (documentsChanged)="onDepDocumentsChanged($event)"></app-asset-document-panel>
           <button mat-stroked-button (click)="depRunResult.set(null)" style="margin-top:8px">
             <mat-icon style="margin-right:4px">refresh</mat-icon> New Run
           </button>
@@ -563,7 +560,8 @@
   </mat-tab>
 
   <!-- REVALUATION TAB -->
-  <mat-tab label="Revaluation">
+  <mat-tab>
+    <ng-template matTabLabel>Revaluation @if (revalDocCount() > 0) { <span class="tab-doc-count">{{revalDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       <div class="form-card" style="max-width:900px">
         <h3 class="section-title">
@@ -712,12 +710,16 @@
             </button>
             <button mat-stroked-button (click)="clearRevalAsset()">Cancel</button>
           </div>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Revaluation" (documentsChanged)="onRevalDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (revalSuccess()) {
           <div class="success-msg">
             <mat-icon style="font-size:16px">check_circle</mat-icon> Revaluation submitted successfully (including catch-up depreciation)
           </div>
+          @if (revalLastAssetId() > 0) {
+            <app-asset-document-panel [assetId]="revalLastAssetId()" [entityId]="revalLastEntityId()" entityType="Revaluation" (documentsChanged)="onRevalDocumentsChanged($event)"></app-asset-document-panel>
+          }
         }
 
       </div>
@@ -725,7 +727,8 @@
   </mat-tab>
 
   <!-- IMPAIRMENT TAB -->
-  <mat-tab label="Impairment">
+  <mat-tab>
+    <ng-template matTabLabel>Impairment @if (impairDocCount() > 0) { <span class="tab-doc-count">{{impairDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       <div class="form-card" style="max-width:900px">
         <h3 class="section-title">
@@ -880,19 +883,24 @@
             </button>
             <button mat-stroked-button (click)="clearImpairAsset()">Cancel</button>
           </div>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Impairment" (documentsChanged)="onImpairDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (impairSuccess()) {
           <div class="success-msg">
             <mat-icon style="font-size:16px">check_circle</mat-icon> Impairment submitted for workflow approval (including catch-up depreciation)
           </div>
+          @if (impairLastAssetId() > 0) {
+            <app-asset-document-panel [assetId]="impairLastAssetId()" [entityId]="impairLastEntityId()" entityType="Impairment" (documentsChanged)="onImpairDocumentsChanged($event)"></app-asset-document-panel>
+          }
         }
       </div>
     </div>
   </mat-tab>
 
   <!-- IMPAIRMENT REVERSAL TAB -->
-  <mat-tab label="Impairment Reversal">
+  <mat-tab>
+    <ng-template matTabLabel>Impairment Reversal @if (reversalDocCount() > 0) { <span class="tab-doc-count">{{reversalDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       <div class="form-card" style="max-width:900px">
         <h3 class="section-title">
@@ -1066,6 +1074,7 @@
               </button>
               <button mat-stroked-button (click)="clearReversalAsset()">Cancel</button>
             </div>
+            <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Impairment Reversal" (documentsChanged)="onReversalDocumentsChanged($event)"></app-asset-document-panel>
           }
         }
 
@@ -1073,6 +1082,9 @@
           <div class="success-msg">
             <mat-icon style="font-size:16px">check_circle</mat-icon> Impairment reversal submitted for workflow approval
           </div>
+          @if (reversalLastAssetId() > 0) {
+            <app-asset-document-panel [assetId]="reversalLastAssetId()" [entityId]="reversalLastEntityId()" entityType="Impairment Reversal" (documentsChanged)="onReversalDocumentsChanged($event)"></app-asset-document-panel>
+          }
         }
 
       </div>
@@ -1080,7 +1092,8 @@
   </mat-tab>
 
   <!-- DISPOSAL TAB -->
-  <mat-tab label="Disposal">
+  <mat-tab>
+    <ng-template matTabLabel>Disposal @if (disposalDocCount() > 0) { <span class="tab-doc-count">{{disposalDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       <div class="form-card" style="max-width:900px">
         <h3 class="section-title">
@@ -1154,7 +1167,7 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="form-field">
               <label>Disposal Date *</label>
-              <input type="date" [(ngModel)]="disposalForm.disposal_date" class="form-input" [max]="todayDate" [min]="effectiveMinDate(disposalAssetLastDepDate())" (change)="onDisposalDateChange()">
+              <input type="date" [(ngModel)]="disposalForm.disposal_date" class="form-input" [max]="todayDate" [min]="disposalAssetLastDepDate()" (change)="onDisposalDateChange()">
               @if (disposalDateError()) {
                 <span class="date-error">{{disposalDateError()}}</span>
               }
@@ -1218,6 +1231,7 @@
             </button>
             <button mat-stroked-button (click)="clearDisposalAsset()">Cancel</button>
           </div>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Disposal" (documentsChanged)="onDisposalDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (disposalError()) {
@@ -1227,6 +1241,9 @@
           <div class="success-msg">
             <mat-icon style="font-size:16px">check_circle</mat-icon> Disposal request submitted for MFMA S.14 approval workflow (including catch-up depreciation)
           </div>
+          @if (disposalLastAssetId() > 0) {
+            <app-asset-document-panel [assetId]="disposalLastAssetId()" [entityId]="disposalLastEntityId()" entityType="Disposal" (documentsChanged)="onDisposalDocumentsChanged($event)"></app-asset-document-panel>
+          }
         }
 
       </div>
@@ -1235,7 +1252,8 @@
 
 
   <!-- REFURBISHMENT TAB -->
-  <mat-tab label="Refurbishment">
+  <mat-tab>
+    <ng-template matTabLabel>Refurbishment @if (refurbDocCount() > 0) { <span class="tab-doc-count">{{refurbDocCount()}}</span> }</ng-template>
     <div style="padding:20px">
       <div class="form-card" style="max-width:900px">
         <h3 class="section-title">
@@ -1410,6 +1428,7 @@
             </button>
             <button mat-stroked-button (click)="clearRefurbAsset()">Cancel</button>
           </div>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Refurbishment" (documentsChanged)="onRefurbDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (refurbError()) {
@@ -1419,6 +1438,9 @@
           <div class="success-msg">
             <mat-icon style="font-size:16px">check_circle</mat-icon> Refurbishment submitted for workflow approval
           </div>
+          @if (refurbLastAssetId() > 0) {
+            <app-asset-document-panel [assetId]="refurbLastAssetId()" [entityId]="refurbLastEntityId()" entityType="Refurbishment" (documentsChanged)="onRefurbDocumentsChanged($event)"></app-asset-document-panel>
+          }
         }
 
       </div>

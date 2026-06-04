@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset performance grade classifications</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()">
         <mat-icon>upload_file</mat-icon> Import from Excel
       </button>
@@ -21,6 +22,13 @@
         <div class="form-field">
           <label>Performance Grade *</label>
           <input type="text" class="form-input" [(ngModel)]="formData.performanceGradeDesc" placeholder="Enter performance grade description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
       </div>
       <div class="form-actions">
@@ -47,9 +55,9 @@
           </tr>
         </thead>
         <tbody>
-          @for (item of items(); track item.performanceGrade_ID) {
+          @for (item of items(); track item.performanceGradeId) {
             <tr>
-              <td class="id-cell">{{item.performanceGrade_ID}}</td>
+              <td class="id-cell">{{item.performanceGradeId}}</td>
               <td class="desc-cell">{{item.performanceGradeDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
               <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>

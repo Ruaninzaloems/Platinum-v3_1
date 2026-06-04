@@ -1700,29 +1700,14 @@ CREATE TABLE IF NOT EXISTS "Asset_AiInsights" (
 );
 
 
-INSERT INTO "Asset_AiInsights" ("insight_type", "severity", "title", "message", "recommendation", "confidence_score", "legislation_ref", "entity_type", "is_dismissed")
+INSERT INTO "Asset_AiInsights" ("insight_type", "severity", "description", "entity_type", "is_dismissed")
 SELECT * FROM (VALUES
-  ('Depreciation', 'warning', 'Assets Approaching End of Useful Life',
-   'Several infrastructure assets have a remaining useful life of less than 12 months. These assets may require replacement or refurbishment planning in the upcoming budget cycle.',
-   'Initiate a condition assessment for assets with RUL < 12 months and include replacement costs in the Medium-Term Revenue and Expenditure Framework (MTREF).',
-   88, 'GRAP 17.56 / MFMA §19', 'Asset', FALSE),
-  ('Impairment', 'critical', 'Unreviewed Impairment Indicators Detected',
-   'A number of assets have condition ratings of Poor or Very Poor but have not had an impairment review conducted in the current financial year. This may result in carrying amounts that exceed recoverable service amounts.',
-   'Conduct formal impairment assessments for all assets rated Poor or Very Poor in accordance with GRAP 26. Document findings in the asset register before year-end.',
-   92, 'GRAP 26.10 / MFMA §63', 'Asset', FALSE),
-  ('Revaluation', 'info', 'Revaluation Cycle Due for Infrastructure Assets',
-   'Infrastructure assets under the revaluation model are approaching the 3-year revaluation cycle. The next revaluation date is within 6 months. Carrying amounts may materially differ from fair value if not updated.',
-   'Engage a registered valuer to perform a desktop or full revaluation before the end of the financial year to ensure GRAP 17.39–42 compliance.',
-   80, 'GRAP 17.39–42', 'Asset', FALSE),
-  ('Disposal', 'warning', 'Disposed Assets Still Reflected in Register',
-   'Assets with a recorded disposal date have non-zero carrying amounts still appearing in the active asset register. This inflates total asset values reported to Council.',
-   'Review all disposal records to confirm the derecognition journal has been processed. Ensure profit or loss on disposal is correctly disclosed per GRAP 17.67.',
-   90, 'GRAP 17.67 / mSCOA Seg 6', 'Disposal', FALSE),
-  ('Compliance', 'info', 'Annual Asset Verification Not Yet Completed',
-   'The annual physical verification of assets has not been recorded for the current financial year. MFMA requires municipalities to verify the existence and condition of all assets annually.',
-   'Schedule a physical asset count and update condition ratings in the asset register. Retain sign-off documentation for the external audit.',
-   85, 'MFMA §63 / AG Audit Finding', 'Asset', FALSE)
-) AS v("insight_type","severity","title","message","recommendation","confidence_score","legislation_ref","entity_type","is_dismissed")
+  ('Depreciation', 'warning', 'Assets Approaching End of Useful Life: Several infrastructure assets have a remaining useful life of less than 12 months.', 'Asset', FALSE),
+  ('Impairment', 'critical', 'Unreviewed Impairment Indicators Detected: Assets rated Poor or Very Poor have not had an impairment review this financial year.', 'Asset', FALSE),
+  ('Revaluation', 'info', 'Revaluation Cycle Due for Infrastructure Assets: Assets are approaching the 3-year revaluation cycle.', 'Asset', FALSE),
+  ('Disposal', 'warning', 'Disposed Assets Still Reflected in Register: Assets with a disposal date have non-zero carrying amounts in the active register.', 'Disposal', FALSE),
+  ('Compliance', 'info', 'Annual Asset Verification Not Yet Completed: Physical verification has not been recorded for the current financial year.', 'Asset', FALSE)
+) AS v("insight_type","severity","description","entity_type","is_dismissed")
 WHERE NOT EXISTS (SELECT 1 FROM "Asset_AiInsights" WHERE "is_dismissed" = FALSE LIMIT 1);
 
 INSERT INTO "Asset_OrganisationSettings" ("municipality_name", "financial_year", "financial_year_start_month", "current_period", "current_period_month", "mscoa_enabled", "measurement_model")

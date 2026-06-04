@@ -319,6 +319,7 @@
                 @if (wo.amount != null) {
                   <span class="wo-amount">R {{wo.amount | number:'1.2-2'}}</span>
                 }
+                <button mat-icon-button class="action-btn" title="Open full work order" (click)="openWorkOrderDetail(wo.maintenanceWorksOrderId); $event.stopPropagation()"><mat-icon>open_in_new</mat-icon></button>
                 @if (!form.isApproved) {
                   <button mat-icon-button class="action-btn" (click)="editWorkOrder(wo); $event.stopPropagation()"><mat-icon>edit</mat-icon></button>
                   <button mat-icon-button class="action-btn danger" (click)="deleteWorkOrder(wo); $event.stopPropagation()"><mat-icon>delete</mat-icon></button>

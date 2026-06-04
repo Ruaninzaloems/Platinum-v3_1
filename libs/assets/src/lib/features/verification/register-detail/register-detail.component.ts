@@ -13,14 +13,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../core/api.service';
+import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
 
 @Component({
   selector: 'app-register-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule, MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule],
+  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule, MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule, EmployeeSelectComponent],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/assets/verification/register"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/verification/register"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:20px;font-weight:700;color:#1e293b;margin:0">{{register?.registerName || 'Loading...'}}</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">
@@ -61,7 +62,7 @@ import { ApiService } from '../../../core/api.service';
           <div class="search-row">
             <mat-form-field appearance="outline" style="width:300px">
               <mat-label>Search items</mat-label>
-              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="loadItems()">
+              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="searchItems()">
               <mat-icon matSuffix>search</mat-icon>
             </mat-form-field>
             <button mat-stroked-button (click)="exportCsv()" style="height:40px;white-space:nowrap" [disabled]="exportingCsv">
@@ -363,6 +364,13 @@ import { ApiService } from '../../../core/api.service';
               </tbody>
             </table>
           </div>
+          @if (totalItems > pageSize) {
+            <div class="pagination-bar">
+              <button mat-icon-button (click)="prevPage()" [disabled]="currentPage === 1"><mat-icon>chevron_left</mat-icon></button>
+              <span>Page {{currentPage}} of {{totalPages}} &nbsp;·&nbsp; {{totalItems | number}} items total</span>
+              <button mat-icon-button (click)="nextPage()" [disabled]="currentPage === totalPages"><mat-icon>chevron_right</mat-icon></button>
+            </div>
+          }
         </div>
       }
 
@@ -371,7 +379,7 @@ import { ApiService } from '../../../core/api.service';
           <div class="manage-toolbar">
             <mat-form-field appearance="outline" style="width:280px">
               <mat-label>Search</mat-label>
-              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="loadItems()">
+              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="searchItems()">
             </mat-form-field>
             <div class="col-group-toggles">
               <button class="grp-btn" [class.active]="showGroup['identity']" (click)="toggleGroup('identity')">Identity</button>
@@ -505,8 +513,8 @@ import { ApiService } from '../../../core/api.service';
                       <td>
                         <select class="inline-select" [(ngModel)]="item.measurementTypeId" (ngModelChange)="item._dirty = true">
                           <option [ngValue]="null">--</option>
-                          @for (mt of measurementTypes; track mt.assetConfig_MeasurementType_ID) {
-                            <option [ngValue]="mt.assetConfig_MeasurementType_ID">{{mt.name}}</option>
+                          @for (mt of measurementTypes; track mt.measurementTypeId) {
+                            <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option>
                           }
                         </select>
                       </td>
@@ -527,16 +535,16 @@ import { ApiService } from '../../../core/api.service';
                       <td>
                         <select class="inline-select" [(ngModel)]="item.assetConditionId" (ngModelChange)="item._dirty = true">
                           <option [ngValue]="null">--</option>
-                          @for (c of conditions; track c.assetCondition_ID) {
-                            <option [ngValue]="c.assetCondition_ID">{{c.assetConditionDesc}}</option>
+                          @for (c of conditions; track c.assetConditionId) {
+                            <option [ngValue]="c.assetConditionId">{{c.assetConditionDesc}}</option>
                           }
                         </select>
                       </td>
                       <td>
                         <select class="inline-select" [(ngModel)]="item.assetStatusId" (ngModelChange)="item._dirty = true">
                           <option [ngValue]="null">--</option>
-                          @for (s of assetStatuses; track s.assetStatus_ID) {
-                            <option [ngValue]="s.assetStatus_ID">{{s.assetStatusDesc}}</option>
+                          @for (s of assetStatuses; track s.assetStatusId) {
+                            <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option>
                           }
                         </select>
                       </td>
@@ -625,12 +633,13 @@ import { ApiService } from '../../../core/api.service';
                         </select>
                       </td>
                       <td>
-                        <select class="inline-select" [(ngModel)]="item.custodianId" (ngModelChange)="item._dirty = true" style="width:140px">
-                          <option [ngValue]="null">--</option>
-                          @for (e of employees; track e.employeeId) {
-                            <option [ngValue]="e.employeeId">{{e.surname}}, {{e.firstName}}</option>
-                          }
-                        </select>
+                        <app-employee-select
+                          [(ngModel)]="item.custodianId"
+                          placeholder="--"
+                          selectClass="inline-select"
+                          selectStyle="width:140px"
+                          (selectionChange)="item._dirty = true"
+                        ></app-employee-select>
                       </td>
                       <td><input type="text" class="inline-input" style="width:100px" [(ngModel)]="item.custodianIdNumber" (ngModelChange)="item._dirty = true"></td>
                       <td>
@@ -701,6 +710,13 @@ import { ApiService } from '../../../core/api.service';
               </tbody>
             </table>
           </div>
+          @if (totalItems > pageSize) {
+            <div class="pagination-bar">
+              <button mat-icon-button (click)="prevPage()" [disabled]="currentPage === 1"><mat-icon>chevron_left</mat-icon></button>
+              <span>Page {{currentPage}} of {{totalPages}} &nbsp;·&nbsp; {{totalItems | number}} items total</span>
+              <button mat-icon-button (click)="nextPage()" [disabled]="currentPage === totalPages"><mat-icon>chevron_right</mat-icon></button>
+            </div>
+          }
         </div>
       }
 
@@ -709,7 +725,7 @@ import { ApiService } from '../../../core/api.service';
           <div class="manage-toolbar">
             <mat-form-field appearance="outline" style="width:280px">
               <mat-label>Search</mat-label>
-              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="loadItems()">
+              <input matInput [(ngModel)]="searchTerm" (keyup.enter)="searchItems()">
             </mat-form-field>
             <div class="col-group-toggles">
               <button class="grp-btn" [class.active]="showGroup['identity']" (click)="toggleGroup('identity')">Identity</button>
@@ -1009,6 +1025,13 @@ import { ApiService } from '../../../core/api.service';
               </tbody>
             </table>
           </div>
+          @if (totalItems > pageSize) {
+            <div class="pagination-bar">
+              <button mat-icon-button (click)="prevPage()" [disabled]="currentPage === 1"><mat-icon>chevron_left</mat-icon></button>
+              <span>Page {{currentPage}} of {{totalPages}} &nbsp;·&nbsp; {{totalItems | number}} items total</span>
+              <button mat-icon-button (click)="nextPage()" [disabled]="currentPage === totalPages"><mat-icon>chevron_right</mat-icon></button>
+            </div>
+          }
         </div>
       }
 
@@ -1071,14 +1094,14 @@ import { ApiService } from '../../../core/api.service';
                     <input matInput [(ngModel)]="regDetailNewMember.employeeName">
                   </mat-form-field>
                 } @else {
-                  <mat-form-field appearance="outline" style="flex:1;min-width:200px;margin-bottom:-1.25em">
-                    <mat-label>Employee</mat-label>
-                    <mat-select [(ngModel)]="regDetailNewMember.employeeId">
-                      @for (e of employees; track e.employeeId) {
-                        <mat-option [value]="e.employeeId">{{e.surname}}, {{e.firstName}}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
+                  <div style="flex:1;min-width:200px">
+                    <app-employee-select
+                      [(ngModel)]="regDetailNewMember.employeeId"
+                      placeholder="-- Select --"
+                      selectClass="field-input"
+                      (selectionChange)="onRegDetailNewMemberSelected($event)"
+                    ></app-employee-select>
+                  </div>
                 }
                 <button mat-flat-button style="background:#059669;color:white;border-radius:8px;height:42px;white-space:nowrap" (click)="addRegDetailMember()" [disabled]="regDetailAddingMember">
                   <mat-icon>person_add</mat-icon> Add Member
@@ -1206,6 +1229,7 @@ import { ApiService } from '../../../core/api.service';
       background:#dcfce7; color:#15803d; font-size:13px; margin-bottom:10px;
     }
     .import-result.import-error { background:#fee2e2; color:#b91c1c; }
+    .pagination-bar { display:flex; align-items:center; gap:8px; padding:10px 16px; font-size:13px; color:#64748b; border-top:1px solid #e2e8f0; background:white; border-radius:0 0 8px 8px; }
     .map-legend-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:4px; vertical-align:middle; }
     .dialog-overlay {
       position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4);
@@ -1220,7 +1244,8 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
   register: any = null;
   items: any[] = [];
   conditions: any[] = [];
-  employees: any[] = [];
+  employeeNameCache = new Map<number, string>();
+  private empFetchPending = new Set<number>();
   registerTeamMembers: any[] = [];
   regDetailNewMember: any = { isExternal: false, employeeId: null, employeeName: '' };
   regDetailAddingMember = false;
@@ -1241,6 +1266,9 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
   loading = true;
   activeTab = 'overview';
   searchTerm = '';
+  currentPage = 1;
+  pageSize = 50;
+  totalItems = 0;
 
   showGroup: Record<string, boolean> = {
     identity: true,
@@ -1280,7 +1308,6 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     this.loadRegister();
     forkJoin({
       conditions: this.api.getAssetConditions(),
-      employees: this.api.getEmployees(),
       measurementTypes: this.api.getMeasurementTypes(),
       uoms: this.api.getUnitOfIssues(),
       assetStatuses: this.api.getAssetStatuses(),
@@ -1298,7 +1325,6 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: function(this: RegisterDetailComponent, res: any) {
         this.conditions = res.conditions;
-        this.employees = res.employees;
         this.measurementTypes = res.measurementTypes;
         this.uoms = res.uoms;
         this.assetStatuses = res.assetStatuses;
@@ -1401,6 +1427,10 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  onRegDetailNewMemberSelected(emp: any) {
+    this.regDetailNewMember.employeeName = emp ? (emp.surname + ', ' + emp.firstName) : '';
+  }
+
   onRegDetailExternalToggle() {
     this.regDetailNewMember.employeeId = null;
     this.regDetailNewMember.employeeName = '';
@@ -1437,20 +1467,28 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  get totalPages(): number { return Math.max(1, Math.ceil(this.totalItems / this.pageSize)); }
+
+  searchItems() { this.currentPage = 1; this.loadItems(); }
+  prevPage() { if (this.currentPage > 1) { this.currentPage--; this.loadItems(); } }
+  nextPage() { if (this.currentPage < this.totalPages) { this.currentPage++; this.loadItems(); } }
+
   loadItems() {
     this.loading = true;
-    var params: any = {};
+    var self = this;
+    var params: any = { page: this.currentPage, pageSize: this.pageSize };
     if (this.activeTab === 'manage') params.tab = 'manage';
     else if (this.activeTab === 'approve') params.tab = 'approve';
     if (this.searchTerm) params.search = this.searchTerm;
     this.api.getVerificationItems(this.registerId, params).subscribe({
-      next: function(this: RegisterDetailComponent, data: any[]) {
-        this.items = data;
-        this.loading = false;
-        this.manageSelected.clear();
-        this.approveSelected.clear();
-      }.bind(this),
-      error: function(this: RegisterDetailComponent) { this.loading = false; }.bind(this)
+      next: function(res: { items: any[], totalCount: number }) {
+        self.items = res.items;
+        self.totalItems = res.totalCount;
+        self.loading = false;
+        self.manageSelected.clear();
+        self.approveSelected.clear();
+      },
+      error: function() { self.loading = false; }
     });
   }
 
@@ -1462,6 +1500,7 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     if ((tab === 'manage' || tab === 'approve') && this.register?.isHistory) return;
     this.activeTab = tab;
     this.searchTerm = '';
+    this.currentPage = 1;
     if (tab === 'approve') {
       this.showGroup['identity'] = true;
       this.showGroup['physical'] = true;
@@ -1811,11 +1850,11 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
     var id = Number(rawValue);
     var match: any;
     if (fieldName === 'AssetCondition_ID') {
-      match = this.conditions.find(function(c: any) { return c.assetCondition_ID === id; });
+      match = this.conditions.find(function(c: any) { return c.assetConditionId === id; });
       return match ? match.assetConditionDesc : '(unknown)';
     }
     if (fieldName === 'AssetStatus_ID') {
-      match = this.assetStatuses.find(function(s: any) { return s.assetStatus_ID === id; });
+      match = this.assetStatuses.find(function(s: any) { return s.assetStatusId === id; });
       return match ? match.assetStatusDesc : '(unknown)';
     }
     if (fieldName === 'Town_ID') {
@@ -1847,8 +1886,8 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
       return match ? match.description : '(unknown)';
     }
     if (fieldName === 'MeasurementType_ID') {
-      match = this.measurementTypes.find(function(mt: any) { return mt.assetConfig_MeasurementType_ID === id; });
-      return match ? match.name : '(unknown)';
+      match = this.measurementTypes.find(function(mt: any) { return mt.measurementTypeId === id; });
+      return match ? match.measurementTypeDesc : '(unknown)';
     }
     if (fieldName === 'UoM') {
       match = this.uoms.find(function(u: any) { return u.unitOfIssueId === id; });
@@ -1863,8 +1902,21 @@ export class RegisterDetailComponent implements OnInit, OnDestroy {
       return match ? match.description : '(unknown)';
     }
     if (fieldName === 'Custodian_ID' || fieldName === 'VerificationDoneBy') {
-      match = this.employees.find(function(e: any) { return e.employeeId === id; });
-      return match ? (match.surname + ', ' + match.firstName) : '(unknown)';
+      if (!id) { return '(unknown)'; }
+      const numId = Number(id);
+      if (this.employeeNameCache.has(numId)) { return this.employeeNameCache.get(numId)!; }
+      if (!this.empFetchPending.has(numId)) {
+        this.empFetchPending.add(numId);
+        const self = this;
+        this.api.getEmployeeById(numId).subscribe({
+          next: function(e: any) {
+            if (e) { self.employeeNameCache.set(numId, e.surname + ', ' + e.firstName); }
+            self.empFetchPending.delete(numId);
+          },
+          error: function() { self.empFetchPending.delete(numId); }
+        });
+      }
+      return 'Employee #' + numId;
     }
     if (fieldName === 'AssetOwnership_ID') {
       match = this.lookupOwnerships.find(function(o: any) { return o.id === id; });

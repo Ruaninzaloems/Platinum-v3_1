@@ -1566,9 +1566,10 @@ export class ApiService {
     if (itemId) httpParams = httpParams.set('itemId', String(itemId));
     return this.http.get<any[]>(`${this.apiPrefix}/depreciation/schedule-items/` + scheduleId + '/details', { params: httpParams });
   }
-  exportDepreciationScheduleDetails(scheduleId: number, itemId?: number): string {
-    const query = itemId ? `?itemId=${itemId}` : '';
-    return `${this.apiPrefix}/depreciation/schedule-items/${scheduleId}/details/export${query}`;
+  exportDepreciationScheduleDetails(scheduleId: number, itemId?: number): Observable<any[]> {
+    let httpParams = new HttpParams();
+    if (itemId) httpParams = httpParams.set('itemId', String(itemId));
+    return this.http.get<any[]>(`${this.apiPrefix}/depreciation/schedule-items/` + scheduleId + '/details', { params: httpParams });
   }
   getDepreciationScheduleById(scheduleId: number): Observable<any> {
     return this.http.get(`${this.apiPrefix}/depreciation/schedules/` + scheduleId);

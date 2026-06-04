@@ -7,6 +7,7 @@
     <div class="tab-bar">
       <button class="tab-btn" [class.active]="activeTab === 'capture'" (click)="activeTab = 'capture'">
         <mat-icon>edit_note</mat-icon> Capture Adjustment
+        @if (pyaDocCount() > 0) { <span class="tab-doc-count">{{pyaDocCount()}}</span> }
       </button>
       <button class="tab-btn" [class.active]="activeTab === 'review'" (click)="activeTab = 'review'; loadReviewList()">
         <mat-icon>rule</mat-icon> Review Queue
@@ -455,15 +456,30 @@
           }
         </div>
 
-        <div class="form-actions" style="margin-top:20px">
-          <button class="submit-btn" (click)="submit()" [disabled]="!canSubmit()">
-            @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
-            @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
-            {{submitting ? 'Submitting...' : 'Submit for Approval'}}
-          </button>
-          <button class="ghost-btn" (click)="goBackCapture(3)">Edit Values</button>
-          <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
-        </div>
+        @if (!submitSuccess) {
+          @if (getPyaAssetId() > 0) {
+            <app-asset-document-panel [assetId]="getPyaAssetId()" entityType="Prior Year Adjustment" (documentsChanged)="onPyaDocumentsChanged($event)"></app-asset-document-panel>
+          }
+          <div class="form-actions" style="margin-top:20px">
+            <button class="submit-btn" (click)="submit()" [disabled]="!canSubmit()">
+              @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+              @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
+              {{submitting ? 'Submitting...' : 'Submit for Approval'}}
+            </button>
+            <button class="ghost-btn" (click)="goBackCapture(3)">Edit Values</button>
+            <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
+          </div>
+        } @else {
+          <div class="success-msg" style="margin-top:16px">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Adjustment submitted and awaiting approval
+          </div>
+          @if (lastSubmittedPyaAssetId > 0) {
+            <app-asset-document-panel [assetId]="lastSubmittedPyaAssetId" [entityId]="lastSubmittedId" entityType="Prior Year Adjustment" (documentsChanged)="onPyaDocumentsChanged($event)"></app-asset-document-panel>
+          }
+          <div class="form-actions" style="margin-top:20px">
+            <button class="ghost-btn" (click)="resetCapture()">Submit Another Adjustment</button>
+          </div>
+        }
       </div>
     }
   }

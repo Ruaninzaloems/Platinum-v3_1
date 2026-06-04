@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, Signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -7,11 +7,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
+import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
 
 @Component({
   selector: 'app-wip-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, EmployeeSelectComponent],
   templateUrl: './wip-list.component.html',
   styleUrls: ['./wip-list.component.css']
 })
@@ -20,7 +21,6 @@ export class WipListComponent implements OnInit {
   statuses = signal<any[]>([]);
   departments = signal<any[]>([]);
   divisions = signal<any[]>([]);
-  employees = signal<any[]>([]);
   planProjects = signal<any[]>([]);
   fundingSources = signal<any[]>([]);
   loading = signal(true);
@@ -39,19 +39,19 @@ export class WipListComponent implements OnInit {
 
   totalProjects = computed(function(this: WipListComponent) { return this.projects().length; }.bind(this));
 
-  totalContractValue = computed((): number => {
+  totalContractValue: Signal<number> = computed(function(this: WipListComponent) {
     let sum = 0;
     const list = this.projects();
     for (let i = 0; i < list.length; i++) { sum += Number(list[i].contractValue) || 0; }
     return sum;
-  });
+  }.bind(this));
 
-  totalWipClosing = computed((): number => {
+  totalWipClosing: Signal<number> = computed(function(this: WipListComponent) {
     let sum = 0;
     const list = this.projects();
     for (let i = 0; i < list.length; i++) { sum += Number(list[i].wipClosingBalance) || 0; }
     return sum;
-  });
+  }.bind(this));
 
   constructor(private api: ApiService, private router: Router, private snack: MatSnackBar) {}
 
@@ -84,10 +84,6 @@ export class WipListComponent implements OnInit {
     });
     this.api.getDivisions().subscribe({
       next: function(this: WipListComponent, r: any) { this.divisions.set(Array.isArray(r) ? r : []); }.bind(this),
-      error: function() {}
-    });
-    this.api.getEmployees().subscribe({
-      next: function(this: WipListComponent, r: any) { this.employees.set(Array.isArray(r) ? r : []); }.bind(this),
       error: function() {}
     });
     this.api.getPlanProjects().subscribe({
@@ -215,7 +211,7 @@ export class WipListComponent implements OnInit {
 
   clearFilters() { this.filterFinYear = ''; this.filterStatus = ''; this.loadProjects(); }
 
-  viewProject(id: number) { this.router.navigate(['/assets/wip', id]); }
+  viewProject(id: number) { this.router.navigate(['/wip', id]); }
 
   formatCurrency(val: any): string {
     const n = Number(val);

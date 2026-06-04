@@ -52,6 +52,8 @@ export const routes: Routes = [
       { path: 'overtime', loadChildren: () => import('@platinumv3/overtime').then(m => m.OVERTIME_ROUTES) },
       { path: 'sharepoint', loadComponent: () => import('./features/sharepoint/sharepoint.component').then(m => m.SharepointComponent) },
       { path: 'sharepoint/uat-assets', loadComponent: () => import('./features/sharepoint/uat-assets.component').then(m => m.UatAssetsComponent) },
+      { path: 'admin-settings', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
+      { path: 'admin-settings/:module', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]

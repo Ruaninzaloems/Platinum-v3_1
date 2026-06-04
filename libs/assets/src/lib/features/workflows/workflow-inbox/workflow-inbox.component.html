@@ -30,6 +30,11 @@
             <span style="font-size:14px;font-weight:500;color:#1e293b">Disposal</span>
             @if (txVerifyDisposal()) { <mat-icon style="color:#16a34a;font-size:18px;margin-left:auto">check_circle</mat-icon> }
           </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;transition:background 0.15s" [style.background]="txVerifyCalcs() ? '#f0fdf4' : 'white'" [style.border-color]="txVerifyCalcs() ? '#86efac' : '#e2e8f0'">
+            <input type="checkbox" [checked]="txVerifyCalcs()" (change)="setTxVerifyCalcs($event)" style="width:17px;height:17px;accent-color:#16a34a;cursor:pointer">
+            <span style="font-size:14px;font-weight:500;color:#1e293b">I have verified that all depreciation calculations for this period are mathematically correct and the schedule is ready for approval</span>
+            @if (txVerifyCalcs()) { <mat-icon style="color:#16a34a;font-size:18px;flex-shrink:0;margin-left:auto">check_circle</mat-icon> }
+          </label>
         </div>
         @if (txVerifyError()) {
           <div style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">{{txVerifyError()}}</div>
@@ -40,6 +45,105 @@
             @if (txVerifySubmitting()) { Processing... } @else { Apply }
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (approvingItemId() > 0) {
+  <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:14px;max-width:520px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.35);overflow:hidden">
+
+      <!-- Header -->
+      <div style="background:#1e293b;padding:14px 20px;display:flex;align-items:center;gap:10px">
+        <mat-spinner diameter="20" style="--mdc-circular-progress-active-indicator-color:white;flex-shrink:0"></mat-spinner>
+        <span style="font-size:15px;font-weight:700;color:white;flex:1">Approving Schedule Group</span>
+        @if (approveAllQueue().length > 0) {
+          <span style="background:rgba(255,255,255,0.15);color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">
+            {{depApprovalAssetPct()}}%
+          </span>
+          <span style="background:rgba(255,255,255,0.15);color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">
+            Group {{approveAllIndex() + 1}} of {{approveAllQueue().length}}
+          </span>
+        }
+      </div>
+
+      <div style="padding:18px 20px 20px">
+
+        <!-- Group ID banner -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid #2563eb">
+          <mat-icon style="color:#2563eb;font-size:17px;width:17px;height:17px;flex-shrink:0">layers</mat-icon>
+          <span style="font-size:12px;color:#334155">Group <strong>#{{approvingItemId()}}</strong> — posting GL entries and rebuilding transaction summaries</span>
+        </div>
+
+        <!-- Group detail fields -->
+        @if (getApprovingItemData(); as grp) {
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-bottom:14px">
+            @if (getScheduleItemVal(grp, 'AssetTypeName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Asset Type</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'AssetTypeName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'CategoryName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Asset Category</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'CategoryName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'SubCategoryName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Sub Category</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'SubCategoryName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'MeasurementTypeName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Measurement Type</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'MeasurementTypeName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'StatusName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Asset Status</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'StatusName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'DepartmentName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Department</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'DepartmentName')}}</span>
+              </div>
+            }
+            @if (getScheduleItemVal(grp, 'DivisionName')) {
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8">Division</span>
+                <span style="font-size:12px;color:#1e293b;font-weight:500">{{getScheduleItemVal(grp, 'DivisionName')}}</span>
+              </div>
+            }
+          </div>
+          <div style="height:1px;background:#e2e8f0;margin-bottom:12px"></div>
+        }
+
+        <!-- Progress bar -->
+        @if (depRebuildProgress().total > 0) {
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:12px;color:#64748b">Rebuilding asset summaries</span>
+              <span style="font-size:12px;font-weight:700;color:#2563eb">
+                {{depRebuildProgress().done}} / {{depRebuildProgress().total}} assets
+                ({{((depRebuildProgress().done / depRebuildProgress().total) * 100) | number:'1.0-0'}}%)
+              </span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="(depRebuildProgress().done / depRebuildProgress().total) * 100" style="border-radius:4px"></mat-progress-bar>
+          </div>
+        } @else {
+          <div style="margin-bottom:10px">
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px">Posting GL entries...</div>
+            <mat-progress-bar mode="indeterminate" style="border-radius:4px"></mat-progress-bar>
+          </div>
+        }
+        <p style="font-size:12px;color:#94a3b8;margin:10px 0 0;text-align:center">Please wait — do not close this window</p>
       </div>
     </div>
   </div>
@@ -125,7 +229,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Transaction Date</div>
-                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.ImpairmentDate') || detailField('transaction.impairmentDate') | date:'yyyy-MM-dd'}}</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{(detailField('transaction.ImpairmentDate') || detailField('transaction.impairmentDate')) | date:'yyyy-MM-dd':'UTC'}}</div>
               </div>
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Financial Year</div>
@@ -135,9 +239,16 @@
 
             @if (detailField('projected.catchUpDays')) {
               <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:16px">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e">
-                  <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
-                  Catch-up Depreciation
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#92400e">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
+                    Catch-up Depreciation
+                  </div>
+                  @if (isDetailApproved()) {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#d1fae5;color:#065f46">Stored · confirmed at approval</span>
+                  } @else {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e0f2fe;color:#0369a1">Live estimate</span>
+                  }
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
                   <div>
@@ -208,7 +319,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Disposal Date</div>
-                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.DisposalDate') || detailField('transaction.disposalDate') | date:'yyyy-MM-dd'}}</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{(detailField('transaction.DisposalDate') || detailField('transaction.disposalDate')) | date:'yyyy-MM-dd':'UTC'}}</div>
               </div>
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Disposal Method</div>
@@ -220,11 +331,18 @@
               </div>
             </div>
 
-            @if (detailField('projected.catchUpDays')) {
+            @if (detailField('projected.catchUpDep')) {
               <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:16px">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e">
-                  <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
-                  Catch-up Depreciation
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#92400e">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
+                    Catch-up Depreciation
+                  </div>
+                  @if (isDetailApproved()) {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#d1fae5;color:#065f46">Stored · confirmed at approval</span>
+                  } @else {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e0f2fe;color:#0369a1">Live estimate</span>
+                  }
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
                   <div>
@@ -280,7 +398,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Revaluation Date</div>
-                <div style="font-size:14px;font-weight:600;color:#1e293b">{{detailField('transaction.RevalutionDate') || detailField('transaction.revalutionDate') | date:'yyyy-MM-dd'}}</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b">{{(detailField('transaction.RevalutionDate') || detailField('transaction.revalutionDate')) | date:'yyyy-MM-dd':'UTC'}}</div>
               </div>
               <div>
                 <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:3px">Revaluation Model</div>
@@ -292,6 +410,44 @@
                 </div>
               </div>
             </div>
+
+            @if (detailField('projected.catchUpDays')) {
+              <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:14px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#92400e">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">trending_down</mat-icon>
+                    Catch-up Depreciation
+                  </div>
+                  @if (isDetailApproved()) {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#d1fae5;color:#065f46">Stored · confirmed at approval</span>
+                  } @else {
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e0f2fe;color:#0369a1">Live estimate</span>
+                  }
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Days</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailField('projected.catchUpDays')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Daily Rate</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.dailyRate')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Depreciation Amount</div>
+                    <div style="font-size:13px;font-weight:600;color:#78350f">{{detailCurrency('projected.catchUpDep')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Carrying Before</div>
+                    <div style="font-size:13px;color:#78350f">{{detailCurrency('projected.carryingBeforeCatchUp')}}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Adjusted Carrying Amount</div>
+                    <div style="font-size:13px;font-weight:700;color:#0369a1">{{detailCurrency('projected.adjustedCarrying')}}</div>
+                  </div>
+                </div>
+              </div>
+            }
 
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
               <div style="background:#f1f5f9;border-radius:8px;padding:12px">
@@ -320,6 +476,46 @@
               </div>
             </div>
           }
+
+          <div style="margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">attach_file</mat-icon>
+              <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b">Supporting Documents</span>
+              @if (!detailDocsLoading()) {
+                <span style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px">{{detailDocs().length}}</span>
+              }
+            </div>
+            @if (detailDocsLoading()) {
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 0;color:#94a3b8;font-size:13px">
+                <mat-spinner diameter="16"></mat-spinner>
+                <span>Loading documents...</span>
+              </div>
+            } @else if (detailDocs().length === 0) {
+              <div style="text-align:center;padding:20px 0;color:#94a3b8;font-size:13px">
+                <mat-icon style="font-size:28px;width:28px;height:28px;display:block;margin:0 auto 6px">folder_open</mat-icon>
+                No supporting documents attached
+              </div>
+            } @else {
+              <div style="display:flex;flex-direction:column;gap:6px">
+                @for (doc of detailDocs(); track doc.id) {
+                  <div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+                    <mat-icon style="color:#3b82f6;font-size:20px;width:20px;height:20px;flex-shrink:0">description</mat-icon>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{doc.file_name}}</div>
+                      <div style="font-size:11px;color:#94a3b8;margin-top:1px">
+                        {{formatFileSize(doc.file_size)}}
+                        @if (doc.transaction_type) { · <span style="color:#64748b">{{doc.transaction_type}}</span> }
+                        @if (doc.uploaded_at) { · {{doc.uploaded_at | date:'dd MMM yyyy'}} }
+                      </div>
+                    </div>
+                    <button mat-icon-button style="flex-shrink:0" title="Download" (click)="downloadDetailDoc(doc)">
+                      <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">download</mat-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
 
         </div>
       }
@@ -354,7 +550,7 @@
   </div>
 }
 
-@if (depPosting()) {
+@if (depPosting() && approvingItemId() === 0) {
   <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
     <div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden">
       <div style="background:#1e293b;padding:18px 24px;display:flex;align-items:center;gap:10px">
@@ -388,43 +584,21 @@
           <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
             <div style="display:flex;flex-direction:column;align-items:center">
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
-                [style.background]="depPostStep() >= 3 ? '#16a34a' : depPostStep() === 2 ? '#2563eb' : '#e2e8f0'"
+                [style.background]="depPostStep() >= 4 ? '#16a34a' : depPostStep() >= 2 ? '#2563eb' : '#e2e8f0'"
                 [style.color]="depPostStep() >= 2 ? 'white' : '#94a3b8'">
-                @if (depPostStep() >= 3) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
-              </div>
-              <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 3 ? '#16a34a' : '#e2e8f0'"></div>
-            </div>
-            <div style="padding-top:4px">
-              <div style="font-size:14px;font-weight:600"
-                [style.color]="depPostStep() === 2 ? '#2563eb' : depPostStep() >= 3 ? '#16a34a' : '#94a3b8'">
-                Submitting Journal Entries
-              </div>
-              <div style="font-size:12px;margin-top:2px"
-                [style.color]="depPostStep() === 2 ? '#3b82f6' : depPostStep() >= 3 ? '#15803d' : '#cbd5e1'">
-                @if (depPostStep() === 2) { Creating GL entries and posting depreciation journals... }
-                @else if (depPostStep() >= 3) { All journal entries posted }
-                @else { Pending }
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:14px;padding-bottom:20px">
-            <div style="display:flex;flex-direction:column;align-items:center">
-              <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
-                [style.background]="depPostStep() >= 4 ? '#16a34a' : depPostStep() === 3 ? '#2563eb' : '#e2e8f0'"
-                [style.color]="depPostStep() >= 3 ? 'white' : '#94a3b8'">
-                @if (depPostStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
+                @if (depPostStep() >= 4) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 2 }
               </div>
               <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 4 ? '#16a34a' : '#e2e8f0'"></div>
             </div>
             <div style="padding-top:4px">
               <div style="font-size:14px;font-weight:600"
-                [style.color]="depPostStep() === 3 ? '#2563eb' : depPostStep() >= 4 ? '#16a34a' : '#94a3b8'">
-                Updating Asset Register
+                [style.color]="depPostStep() >= 2 && depPostStep() < 4 ? '#2563eb' : depPostStep() >= 4 ? '#16a34a' : '#94a3b8'">
+                Generating Transactions
               </div>
               <div style="font-size:12px;margin-top:2px"
-                [style.color]="depPostStep() === 3 ? '#3b82f6' : depPostStep() >= 4 ? '#15803d' : '#cbd5e1'">
-                @if (depPostStep() === 3) { Refreshing asset balances and carrying amounts... }
-                @else if (depPostStep() >= 4) { Asset register updated }
+                [style.color]="depPostStep() >= 2 && depPostStep() < 4 ? '#3b82f6' : depPostStep() >= 4 ? '#15803d' : '#cbd5e1'">
+                @if (depPostStep() >= 2 && depPostStep() < 4) { Creating and posting transactions... }
+                @else if (depPostStep() >= 4) { Transactions created and posted }
                 @else { Pending }
               </div>
             </div>
@@ -434,7 +608,7 @@
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
                 [style.background]="depPostStep() >= 5 ? '#16a34a' : depPostStep() === 4 ? '#2563eb' : '#e2e8f0'"
                 [style.color]="depPostStep() >= 4 ? 'white' : '#94a3b8'">
-                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
+                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 3 }
               </div>
               <div style="width:2px;flex:1;min-height:20px;margin-top:4px" [style.background]="depPostStep() >= 5 ? '#16a34a' : '#e2e8f0'"></div>
             </div>
@@ -465,7 +639,7 @@
               <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0"
                 [style.background]="depPostStep() >= 5 ? '#16a34a' : '#e2e8f0'"
                 [style.color]="depPostStep() >= 5 ? 'white' : '#94a3b8'">
-                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 5 }
+                @if (depPostStep() >= 5) { <mat-icon style="font-size:18px;width:18px;height:18px">check</mat-icon> } @else { 4 }
               </div>
             </div>
             <div style="padding-top:4px">
@@ -610,9 +784,9 @@
               </tr>
             </thead>
             <tbody>
-              @for (sch of pendingSchedules(); track sch.depreciationSchedule_ID) {
+              @for (sch of pendingSchedules(); track sch.depreciationScheduleId) {
                 <tr>
-                  <td>{{sch.depreciationSchedule_ID}}</td>
+                  <td>{{sch.depreciationScheduleId}}</td>
                   <td>{{sch.finYear}}</td>
                   <td>{{sch.runDate ? (sch.runDate | date:'yyyy-MM-dd HH:mm') : '—'}}</td>
                   <td class="value-cell">{{sch.totalAssets || 0}}</td>
@@ -627,33 +801,33 @@
                       @if (approvalMethod() !== 'Automated') {
                         @if (isApprovalVerified(sch)) {
                           <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:500">
-                            <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Verified
+                            <mat-icon style="font-size:14px;width:14px;height:14px">check_circle</mat-icon> Validated
                           </span>
                           <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
                             (click)="approveVerifiedDepSchedule(sch)"
-                            [disabled]="approvingId() > 0 || depPosting() || rejectingScheduleId() > 0">
-                            @if (approvingId() === sch.depreciationSchedule_ID || depPosting()) { Approving... } @else { Approve }
+                            [disabled]="approvingId() > 0 || depPosting() || rejectingScheduleId() > 0 || approvingItemId() > 0">
+                            @if (depPosting() || approvingItemId() > 0) { Approving ({{approveAllIndex() + 1}}/{{approveAllQueue().length > 0 ? approveAllQueue().length : '…'}})... } @else { Approve All }
                           </button>
                         } @else {
                           <button mat-flat-button color="primary" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
                             (click)="openTxVerifyModal(sch)"
-                            [disabled]="approvingId() > 0 || txVerifySubmitting() || rejectingScheduleId() > 0">
-                            @if (approvingId() === sch.depreciationSchedule_ID) { Approving... } @else { Validate & Approve }
+                            [disabled]="approvingId() > 0 || txVerifySubmitting() || rejectingScheduleId() > 0 || approvingItemId() > 0">
+                            Validate
                           </button>
                         }
                         <button mat-stroked-button color="warn" style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
-                          (click)="rejectDepreciation(sch.depreciationSchedule_ID)"
+                          (click)="rejectDepreciation(sch.depreciationScheduleId)"
                           [disabled]="approvingId() > 0 || depPosting() || rejectingScheduleId() > 0">
-                          @if (rejectingScheduleId() === sch.depreciationSchedule_ID) { Rejecting... } @else { Reject }
+                          @if (rejectingScheduleId() === sch.depreciationScheduleId) { Rejecting... } @else { Reject }
                         </button>
                       }
                       <button mat-stroked-button style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
-                        (click)="toggleScheduleDetails(sch.depreciationSchedule_ID)"
+                        (click)="toggleScheduleDetails(sch.depreciationScheduleId)"
                         [disabled]="depScheduleItemsLoading()">
-                        @if (depDetailScheduleId() === sch.depreciationSchedule_ID && depScheduleItems().length > 0) { Hide Details } @else { View Details }
+                        @if (depDetailScheduleId() === sch.depreciationScheduleId && depScheduleItems().length > 0) { Hide Details } @else { View Details }
                       </button>
                       <button mat-stroked-button style="font-size:12px;padding:2px 12px;min-height:28px;line-height:28px"
-                        (click)="exportScheduleDetail(sch.depreciationSchedule_ID)"
+                        (click)="exportScheduleDetail(sch.depreciationScheduleId)"
                         title="Export all detail to Excel">
                         <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle">file_download</mat-icon> Excel
                       </button>
@@ -713,7 +887,21 @@
                         <td class="value-cell">{{getScheduleItemVal(si, 'TotalAssets') || 0}}</td>
                         <td class="value-cell" style="font-weight:600;color:#f59e0b">{{formatCurrency(getScheduleItemVal(si, 'TotalDepreciation'))}}</td>
                         <td>
-                          <div style="display:flex;gap:4px">
+                          <div style="display:flex;gap:4px;flex-wrap:wrap">
+                            @if (approvalMethod() !== 'Automated') {
+                              @if (isItemApproved(si)) {
+                                <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;white-space:nowrap">
+                                  <mat-icon style="font-size:13px;width:13px;height:13px">check_circle</mat-icon> Approved
+                                </span>
+                              } @else {
+                                <button mat-flat-button color="primary" style="font-size:11px;padding:1px 8px;min-height:24px;line-height:24px"
+                                  (click)="approveScheduleItem(getItemId(si)); $event.stopPropagation()"
+                                  [disabled]="!isScheduleVerified(depDetailScheduleId()) || approvingItemId() > 0 || approvingId() > 0 || depPosting()"
+                                  [title]="!isScheduleVerified(depDetailScheduleId()) ? 'Validate the schedule first before approving groups' : ''">
+                                  @if (approvingItemId() === getItemId(si)) { Approving... } @else { Approve }
+                                </button>
+                              }
+                            }
                             <button mat-stroked-button style="font-size:11px;padding:1px 8px;min-height:24px;line-height:24px"
                               (click)="toggleScheduleItemDetail(depDetailScheduleId(), getItemId(si)); $event.stopPropagation()">
                               @if (isItemExpanded(getItemId(si))) { Hide Detail } @else { View Detail }
@@ -752,10 +940,12 @@
                                         <th class="value-cell">Dep. Period</th>
                                         <th class="value-cell">Accum. Dep.</th>
                                         <th class="value-cell">Carrying Amt</th>
-                                        <th class="value-cell">Reval Reserve</th>
-                                        <th class="value-cell">Dep Offset Open</th>
-                                        <th class="value-cell">Dep Offset</th>
-                                        <th class="value-cell">Dep Offset Close</th>
+                                        @if (!isCostModel()) {
+                                          <th class="value-cell">Reval Reserve</th>
+                                          <th class="value-cell">Dep Offset Open</th>
+                                          <th class="value-cell">Dep Offset</th>
+                                          <th class="value-cell">Dep Offset Close</th>
+                                        }
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -772,10 +962,12 @@
                                           <td class="value-cell" style="font-weight:600;color:#f59e0b">{{getDetailVal(d, 'DepreciationForPeriod') | number:'1.2-2'}}</td>
                                           <td class="value-cell">{{getDetailVal(d, 'AccumulatedDepreciation') | number:'1.2-2'}}</td>
                                           <td class="value-cell">{{getDetailVal(d, 'CarryingAmount') | number:'1.2-2'}}</td>
-                                          <td class="value-cell">{{getDetailVal(d, 'AccumulatedRevaluationReserveClosingBalance') | number:'1.2-2'}}</td>
-                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetOpeningBalance') | number:'1.2-2'}}</td>
-                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffset') | number:'1.2-2'}}</td>
-                                          <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetClosingBalance') | number:'1.2-2'}}</td>
+                                          @if (!isCostModel()) {
+                                            <td class="value-cell">{{getDetailVal(d, 'AccumulatedRevaluationReserveClosingBalance') | number:'1.2-2'}}</td>
+                                            <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetOpeningBalance') | number:'1.2-2'}}</td>
+                                            <td class="value-cell">{{getDetailVal(d, 'DepreciationOffset') | number:'1.2-2'}}</td>
+                                            <td class="value-cell">{{getDetailVal(d, 'DepreciationOffsetClosingBalance') | number:'1.2-2'}}</td>
+                                          }
                                         </tr>
                                       }
                                     </tbody>

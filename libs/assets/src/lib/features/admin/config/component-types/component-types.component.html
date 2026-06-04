@@ -5,6 +5,9 @@
         <p class="page-subtitle">Manage asset component type classifications</p>
       </div>
       <div class="header-actions">
+        <button mat-stroked-button (click)="exportToExcel()">
+          <mat-icon>download</mat-icon> Export to Excel
+        </button>
         <button mat-stroked-button (click)="openImport()">
           <mat-icon>upload_file</mat-icon> Import from Excel
         </button>
@@ -23,7 +26,14 @@
             <input type="text" class="form-input" [(ngModel)]="formData.asset_Component_Description" placeholder="Enter component type description">
           </div>
         </div>
-        <div class="form-actions">
+        <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
           <button mat-stroked-button (click)="cancelForm()">Cancel</button>
           <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.asset_Component_Description">
             {{editingId() ? 'Update' : 'Create'}}

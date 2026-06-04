@@ -88,7 +88,7 @@
               <div style="margin:8px 0;padding:10px 14px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:8px">
                 <mat-icon style="color:#d97706;font-size:18px">warning</mat-icon>
                 <span style="font-size:13px;color:#92400e">{{noClassMessage()}}</span>
-                <a routerLink="/assets/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
+                <a routerLink="/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
               </div>
             }
 
@@ -97,26 +97,39 @@
             </div>
             <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
               <div class="detail-field">
-                <label>Measurement Type *</label>
-                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.measurementTypeId">
-                  <option [ngValue]="0">Select...</option>
+                <label>Measurement Type @if (naMeasurementEnabled()) { * }</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:{{naMeasurementEnabled()?'':'#f8fafc'}}" [disabled]="!naMeasurementEnabled()" [ngModel]="na.measurementTypeId" (ngModelChange)="onMeasurementTypeChange($event)">
+                  <option [ngValue]="0">{{ naMeasurementEnabled() ? 'Select...' : 'N/A – asset type' }}</option>
                   @for (mt of measurementTypes(); track mt.measurementTypeId) { <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option> }
                 </select>
               </div>
               <div class="detail-field">
-                <label>Asset Status *</label>
-                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.assetStatusId">
-                  <option [ngValue]="0">Select...</option>
+                <label>Asset Status @if (naRequireStatus()) { * }</label>
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:{{naRequireStatus()?'':'#f8fafc'}}" [disabled]="!naRequireStatus()" [(ngModel)]="na.assetStatusId">
+                  <option [ngValue]="0">{{ naRequireStatus() ? 'Select...' : 'N/A – class does not require status' }}</option>
                   @for (s of assetStatuses(); track s.assetStatusId) { <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
                 </select>
               </div>
               <div class="detail-field">
                 <label>Depreciation Method</label>
-                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.depreciationMethod">
-                  <option value="">Select...</option>
-                  @for (dm of depreciationMethods(); track dm.assetDepreciationMethod_ID) { <option [value]="dm.assetDepreciationMethodDesc">{{dm.assetDepreciationMethodDesc}}</option> }
+                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:{{naDepreciationDisabled()?'#f8fafc':''}}" [disabled]="naDepreciationDisabled()" [(ngModel)]="na.depreciationMethodId">
+                  <option [ngValue]="0">{{ naDepreciationDisabled() ? 'N/A – measurement type' : 'Select...' }}</option>
+                  @for (dm of depreciationMethods(); track dm.assetDepreciationMethod_ID) { <option [ngValue]="dm.assetDepreciationMethod_ID">{{dm.assetDepreciationMethodDesc}}</option> }
                 </select>
               </div>
+              @if (naShowRevalMethod()) {
+              <div class="detail-field">
+                <label>Revaluation Method *</label>
+                <div style="display:flex;gap:16px;align-items:center;padding:8px 0">
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+                    <input type="radio" name="naRevalMethod" value="restatement" [(ngModel)]="na.revaluationMethod" /> Restatement
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+                    <input type="radio" name="naRevalMethod" value="elimination" [(ngModel)]="na.revaluationMethod" /> Elimination
+                  </label>
+                </div>
+              </div>
+              }
               <div class="detail-field">
                 <label>Financial Status</label>
                 <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.financialStatus">
@@ -409,8 +422,8 @@
             </div>
             <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr">
               <div class="detail-field">
-                <label>Useful Life (Total Months) *</label>
-                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [(ngModel)]="na.usefulLifeMonths" min="0" />
+                <label>Useful Life (Total Months) @if (!naNoUsefulLife()) { * }</label>
+                <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:{{naNoUsefulLife()?'#f8fafc':''}}" [(ngModel)]="na.usefulLifeMonths" min="0" [readonly]="naNoUsefulLife()" [placeholder]="naNoUsefulLife() ? 'N/A – class has no useful life' : ''" />
               </div>
               <div class="detail-field">
                 <label>Remaining Useful Life (Months)</label>
@@ -444,10 +457,11 @@
               </div>
               <div class="detail-field">
                 <label>Verification Done By</label>
-                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.verificationDoneById" (ngModelChange)="na.verificationDoneById=$event">
-                  <option [ngValue]="0">Select employee...</option>
-                  @for (e of newEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
-                </select>
+                <app-employee-select
+                  [(ngModel)]="na.verificationDoneById"
+                  placeholder="Select employee..."
+                  selectStyle="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"
+                ></app-employee-select>
               </div>
               <div class="detail-field">
                 <label>Year Constructed</label>
@@ -511,10 +525,12 @@
               </div>
               <div class="detail-field">
                 <label>Custodian *</label>
-                <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="na.custodianId" (ngModelChange)="onNewCustodianChange($event)">
-                  <option [ngValue]="0">Select employee...</option>
-                  @for (e of newEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}}</option> }
-                </select>
+                <app-employee-select
+                  [(ngModel)]="na.custodianId"
+                  placeholder="Select employee..."
+                  selectStyle="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"
+                  (selectionChange)="onNewCustodianChange($event)"
+                ></app-employee-select>
               </div>
               <div class="detail-field">
                 <label>Custodian ID Number (auto)</label>
@@ -848,7 +864,7 @@
           </thead>
           <tbody>
             @for (asset of assets(); track asset.assetId) {
-              <tr [routerLink]="['/assets/assets', asset.assetId]" style="cursor:pointer">
+              <tr [routerLink]="['/assets', asset.assetId]" style="cursor:pointer">
                 <td class="ref-cell">{{asset.assetId}}</td>
                 <td class="desc-cell" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{asset.description}}</td>
                 <td style="font-size:12px;color:#475569">{{asset.assetTypeName}}</td>
@@ -863,7 +879,14 @@
                 </td>
                 <td class="value-cell">{{asset.costClosingBalance | number:'1.2-2'}}</td>
                 <td class="value-cell" style="font-weight:600">{{asset.carryingAmount | number:'1.2-2'}}</td>
-                <td style="font-size:12px;color:#475569">{{asset.measurementType}}</td>
+                <td style="font-size:12px;color:#475569">
+                  <span style="display:inline-flex;align-items:center;gap:4px">
+                    {{asset.measurementType}}
+                    @if (hasMeasurementConflict(asset)) {
+                      <mat-icon style="font-size:14px;width:14px;height:14px;color:#d97706;flex-shrink:0" [title]="getMeasurementConflictMessage(asset)">warning</mat-icon>
+                    }
+                  </span>
+                </td>
               </tr>
             } @empty {
               <tr><td colspan="9" style="text-align:center;padding:40px;color:#94a3b8">No assets found matching your criteria</td></tr>

@@ -1,0 +1,493 @@
+<div class="page-header">
+  <div>
+    <h1>Planned Maintenance</h1>
+    <p class="subtitle">Asset maintenance plans, schedules and compliance tracking</p>
+  </div>
+  <button class="btn-primary" (click)="openCreateWizard()">
+    <mat-icon>add</mat-icon> New Plan
+  </button>
+</div>
+
+<div class="kpi-row">
+  @if (kpiLoading()) {
+    <div class="kpi-card kpi-loading"><mat-spinner diameter="24"></mat-spinner></div>
+  } @else {
+    <div class="kpi-card">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.totalPlans ?? totalCount()}}</div>
+        <div class="kpi-label">Total Plans</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#3b82f6">assignment</mat-icon>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.activePlans ?? activeCount()}}</div>
+        <div class="kpi-label">Active Plans</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#10b981">check_circle</mat-icon>
+    </div>
+    <div class="kpi-card" [class.kpi-danger]="(kpi()?.overdueEntries ?? 0) > 0">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.overdueEntries ?? 0}}</div>
+        <div class="kpi-label">Overdue Entries</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#ef4444">warning</mat-icon>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.scheduledThisMonth ?? 0}}</div>
+        <div class="kpi-label">Scheduled This Month</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#6366f1">calendar_today</mat-icon>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.completedThisMonth ?? 0}}</div>
+        <div class="kpi-label">Completed This Month</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#10b981">task_alt</mat-icon>
+    </div>
+    <div class="kpi-card" [class.kpi-danger]="(kpi()?.compliancePct ?? 100) < 80">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.compliancePct ?? 100}}%</div>
+        <div class="kpi-label">Compliance Rate</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#f59e0b">verified</mat-icon>
+    </div>
+    <div class="kpi-card" [class.kpi-warn]="(kpi()?.plannedVsActualPct ?? 0) > 100">
+      <div class="kpi-content">
+        <div class="kpi-value">{{kpi()?.plannedVsActualPct ?? 0}}%</div>
+        <div class="kpi-label">Actual vs Estimated</div>
+      </div>
+      <mat-icon class="kpi-icon" style="color:#8b5cf6">bar_chart</mat-icon>
+    </div>
+  }
+</div>
+
+
+<div class="filter-bar">
+  <input type="text" [(ngModel)]="filterSearch" placeholder="Search plans…" (input)="null">
+  <select [(ngModel)]="filterFinYear" (ngModelChange)="onFilterChange()">
+    <option value="">All Financial Years</option>
+    @for (fy of finYearOptions; track fy.value) {
+      <option [value]="fy.value">FY {{fy.label}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterType" (ngModelChange)="onFilterChange()">
+    <option value="">All Types</option>
+    @for (t of maintTypes(); track t.maintTypeId) {
+      <option [value]="t.maintTypeId">{{t.maintTypeDesc}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterAssetClass" (ngModelChange)="onFilterChange()">
+    <option value="">All Asset Classes</option>
+    @for (c of assetClasses(); track c.assetClass_ID) {
+      <option [value]="c.assetClass_ID">{{c.assetClassDesc}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterDepartment" (ngModelChange)="onFilterChange()">
+    <option value="">All Departments</option>
+    @for (d of departments(); track d.id) {
+      <option [value]="d.id">{{d.description}}</option>
+    }
+  </select>
+  <select [(ngModel)]="filterActive" (ngModelChange)="onFilterChange()">
+    <option value="true">Active</option>
+    <option value="false">Inactive</option>
+    <option value="">All</option>
+  </select>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn" [class.active]="activeTab() === 'plans'" (click)="setTab('plans')">
+    <mat-icon>list</mat-icon> Plans
+  </button>
+  <button class="tab-btn" [class.active]="activeTab() === 'compliance'" (click)="setTab('compliance')">
+    <mat-icon>verified</mat-icon> Compliance
+  </button>
+  <button class="tab-btn" [class.active]="activeTab() === 'deferred'" (click)="setTab('deferred')">
+    <mat-icon>warning</mat-icon> Deferred Maintenance
+  </button>
+  <button class="tab-btn" [class.active]="activeTab() === 'budget'" (click)="setTab('budget')">
+    <mat-icon>account_balance_wallet</mat-icon> Budget vs Actual
+  </button>
+</div>
+
+@if (activeTab() === 'plans') {
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Loading plans…</span>
+    </div>
+  } @else if (filteredItems().length === 0) {
+    <div class="empty-state">
+      <mat-icon>build_circle</mat-icon>
+      <h3>No maintenance plans found</h3>
+      <p>Create a plan to start scheduling asset maintenance.</p>
+    </div>
+  } @else {
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Plan Name</th>
+            <th>Assets</th>
+            <th>Type</th>
+            <th>Frequency</th>
+            <th>Est. Cost</th>
+            <th>Next Due</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (plan of filteredItems(); track plan.planId) {
+            <tr class="clickable-row" (click)="goToDetail(plan)">
+              <td>
+                <div class="plan-name">{{plan.planName}}</div>
+                @if (plan.description) {
+                  <div class="plan-desc">{{plan.description}}</div>
+                }
+              </td>
+              <td>
+                @if ((plan.assetCount ?? 0) > 0) {
+                  <span class="asset-count-badge">{{plan.assetCount}} asset{{plan.assetCount === 1 ? '' : 's'}}</span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>
+                <span class="type-badge" [class.capex]="plan.isCapex">{{plan.maintenanceTypeDesc}}</span>
+              </td>
+              <td>{{plan.frequencyDesc}}</td>
+              <td>{{formatCost(plan.estimatedCost)}}</td>
+              <td>{{formatDate(plan.nextScheduledDate)}}</td>
+              <td>
+                <span class="status-badge status-{{getStatusBadge(plan)}}">{{getStatusLabel(plan)}}</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab() === 'compliance') {
+  <div class="report-toolbar">
+    <span class="report-count">{{complianceRows().length}} entr{{complianceRows().length === 1 ? 'y' : 'ies'}}</span>
+    <button class="btn-print" (click)="printCompliance()" title="Print compliance report">
+      <mat-icon>print</mat-icon> Print
+    </button>
+  </div>
+  @if (complianceLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Loading compliance data…</span>
+    </div>
+  } @else if (complianceRows().length === 0) {
+    <div class="empty-state">
+      <mat-icon>verified</mat-icon>
+      <h3>No data</h3>
+      <p>No compliance entries found for the selected filters.</p>
+    </div>
+  } @else {
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>RAG</th>
+            <th>Asset ID</th>
+            <th>Asset</th>
+            <th>Asset Class</th>
+            <th>Plan</th>
+            <th>Type</th>
+            <th>Frequency</th>
+            <th>Has Plan</th>
+            <th>Last Completed</th>
+            <th>Next Due</th>
+            <th>Overdue</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of complianceRows(); track (row.assetId ?? 0) + '_' + (row.planId ?? 0)) {
+            <tr>
+              <td><span class="rag-dot {{ragClass(row.ragStatus)}}"></span></td>
+              <td><span class="barcode">{{row.assetId || '—'}}</span></td>
+              <td>
+                @if (row.assetBarcode || row.assetDescription) {
+                  <div class="asset-cell">
+                    <span class="barcode">{{row.assetBarcode}}</span>
+                    <span class="asset-label">{{row.assetDescription}}</span>
+                  </div>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>{{row.assetClassDesc || '—'}}</td>
+              <td>
+                @if (row.planId) {
+                  <span class="clickable-link" (click)="goToDetail(row)">{{row.planName}}</span>
+                } @else {
+                  <span class="muted">No plan</span>
+                }
+              </td>
+              <td>{{row.maintenanceTypeDesc || '—'}}</td>
+              <td>{{row.frequencyDesc || '—'}}</td>
+              <td>
+                @if (row.hasPlan) {
+                  <span class="badge-success" style="font-size:10px">Yes</span>
+                } @else {
+                  <span class="badge-danger" style="font-size:10px">No</span>
+                }
+              </td>
+              <td>{{formatDate(row.lastCompletionDate)}}</td>
+              <td>{{formatDate(row.nextDueDate)}}</td>
+              <td>
+                @if (row.overdueCount > 0) {
+                  <span class="badge-danger">{{row.overdueCount}}</span>
+                } @else {
+                  <span class="badge-success">0</span>
+                }
+              </td>
+              <td><span class="rag-label {{ragClass(row.ragStatus)}}">{{ragLabel(row.ragStatus)}}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab() === 'deferred') {
+  <div class="report-toolbar">
+    <span class="report-count">{{deferredRows().length}} overdue entr{{deferredRows().length === 1 ? 'y' : 'ies'}}</span>
+    <button class="btn-print" (click)="printDeferred()" title="Print deferred maintenance report">
+      <mat-icon>print</mat-icon> Print
+    </button>
+  </div>
+  @if (deferredLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Loading deferred maintenance…</span>
+    </div>
+  } @else if (deferredRows().length === 0) {
+    <div class="empty-state">
+      <mat-icon>check_circle</mat-icon>
+      <h3>No deferred maintenance</h3>
+      <p>All scheduled maintenance is up to date.</p>
+    </div>
+  } @else {
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable-th" (click)="sortDeferred('daysOverdue')">
+              Days Overdue <mat-icon class="sort-icon">{{sortIcon('daysOverdue')}}</mat-icon>
+            </th>
+            <th class="sortable-th" (click)="sortDeferred('planName')">
+              Plan Name <mat-icon class="sort-icon">{{sortIcon('planName')}}</mat-icon>
+            </th>
+            <th>Asset</th>
+            <th>Type</th>
+            <th>Frequency</th>
+            <th class="sortable-th" (click)="sortDeferred('scheduledDate')">
+              Scheduled Date <mat-icon class="sort-icon">{{sortIcon('scheduledDate')}}</mat-icon>
+            </th>
+            <th class="sortable-th" (click)="sortDeferred('estimatedCost')">
+              Est. Cost <mat-icon class="sort-icon">{{sortIcon('estimatedCost')}}</mat-icon>
+            </th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of sortedDeferred(); track row.scheduleId) {
+            <tr>
+              <td>
+                <span class="days-overdue" [class.critical]="row.daysOverdue > 30">{{row.daysOverdue}} days</span>
+              </td>
+              <td>
+                <span class="clickable-link" (click)="goToDetail(row)">{{row.planName}}</span>
+              </td>
+              <td>
+                @if (row.assetBarcode || row.assetDescription) {
+                  <div class="asset-cell">
+                    <span class="barcode">{{row.assetBarcode}}</span>
+                    <span class="asset-label">{{row.assetDescription}}</span>
+                  </div>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>{{row.maintenanceTypeDesc}}</td>
+              <td>{{row.frequencyDesc}}</td>
+              <td>{{formatDate(row.scheduledDate)}}</td>
+              <td>{{formatCost(row.estimatedCost)}}</td>
+              <td>{{row.notes || '—'}}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (activeTab() === 'budget') {
+  <div class="report-toolbar">
+    <span class="report-count">{{budgetPlans().length}} plan{{budgetPlans().length === 1 ? '' : 's'}}</span>
+    <button class="btn-print" (click)="printBudget()" title="Print budget vs actual report">
+      <mat-icon>print</mat-icon> Print
+    </button>
+  </div>
+  @if (budgetLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Loading budget data…</span>
+    </div>
+  } @else if (budgetPlans().length === 0) {
+    <div class="empty-state">
+      <mat-icon>account_balance_wallet</mat-icon>
+      <h3>No budget data</h3>
+      <p>No maintenance plans found.</p>
+    </div>
+  } @else {
+    <div class="budget-summary-bar">
+      <div class="budget-summary-item">
+        <span class="bs-label">Total Estimated</span>
+        <span class="bs-value">{{formatCost(budgetTotals().estimated)}}</span>
+      </div>
+      <div class="budget-summary-item">
+        <span class="bs-label">Total Actual</span>
+        <span class="bs-value">{{formatCost(budgetTotals().actual)}}</span>
+      </div>
+      <div class="budget-summary-item" [class.over-budget]="budgetTotals().variance > 0">
+        <span class="bs-label">Variance</span>
+        <span class="bs-value">{{formatCost(budgetTotals().variance)}}</span>
+      </div>
+      <div class="budget-summary-item">
+        <span class="bs-label">Actual vs Estimated</span>
+        <span class="bs-value">{{kpi()?.plannedVsActualPct ?? 0}}%</span>
+      </div>
+    </div>
+
+    <div class="budget-group-toggle">
+      <span class="toggle-label">Group by:</span>
+      <button class="toggle-btn" [class.active]="budgetGroupMode() === 'type'" (click)="budgetGroupMode.set('type')">Maintenance Type</button>
+      <button class="toggle-btn" [class.active]="budgetGroupMode() === 'assetClass'" (click)="budgetGroupMode.set('assetClass')">Asset Class</button>
+    </div>
+
+    @if (budgetGroupMode() === 'type' && budgetByType().length > 0) {
+      <div class="section-title">By Maintenance Type</div>
+      <div class="table-container" style="margin-bottom:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Maintenance Type</th>
+              <th>Plans</th>
+              <th>Completed / Total</th>
+              <th>Estimated Cost</th>
+              <th>Actual Cost</th>
+              <th>Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of budgetByType(); track g.groupKey) {
+              <tr>
+                <td><strong>{{g.groupKey || '—'}}</strong></td>
+                <td>{{g.planCount}}</td>
+                <td><span class="completion-ratio">{{g.completedEntries}} / {{g.totalEntries}}</span></td>
+                <td>{{formatCost(g.estimatedCost)}}</td>
+                <td>{{formatCost(g.actualCost)}}</td>
+                <td><span [class]="varianceClass(g.variance)">{{formatCost(g.variance)}}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (budgetGroupMode() === 'assetClass' && budgetByAssetClass().length > 0) {
+      <div class="section-title">By Asset Class</div>
+      <div class="table-container" style="margin-bottom:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset Class</th>
+              <th>Plans</th>
+              <th>Completed / Total</th>
+              <th>Estimated Cost</th>
+              <th>Actual Cost</th>
+              <th>Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of budgetByAssetClass(); track g.groupKey) {
+              <tr>
+                <td><strong>{{g.groupKey || '—'}}</strong></td>
+                <td>{{g.planCount}}</td>
+                <td><span class="completion-ratio">{{g.completedEntries}} / {{g.totalEntries}}</span></td>
+                <td>{{formatCost(g.estimatedCost)}}</td>
+                <td>{{formatCost(g.actualCost)}}</td>
+                <td><span [class]="varianceClass(g.variance)">{{formatCost(g.variance)}}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="section-title">By Plan</div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Plan Name</th>
+            <th>Asset</th>
+            <th>Type</th>
+            <th>Completed / Total</th>
+            <th>Estimated Cost</th>
+            <th>Actual Cost</th>
+            <th>Variance</th>
+            <th>Var %</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of budgetPlans(); track row.planId) {
+            <tr>
+              <td>
+                <span class="clickable-link" (click)="goToDetail(row)">{{row.planName}}</span>
+              </td>
+              <td>
+                @if (row.assetBarcode || row.assetDescription) {
+                  <div class="asset-cell">
+                    <span class="barcode">{{row.assetBarcode}}</span>
+                    <span class="asset-label">{{row.assetDescription}}</span>
+                  </div>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>{{row.maintenanceTypeDesc}}</td>
+              <td>
+                <span class="completion-ratio">{{row.completedEntries}} / {{row.totalEntries}}</span>
+              </td>
+              <td>{{formatCost(row.estimatedCost)}}</td>
+              <td>{{formatCost(row.actualCost)}}</td>
+              <td>
+                <span [class]="varianceClass(row.variance)">{{formatCost(row.variance)}}</span>
+              </td>
+              <td>
+                @if (row.estimatedCost) {
+                  <span [class]="varianceClass(row.variance)">{{row.variancePct > 0 ? '+' : ''}}{{row.variancePct}}%</span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

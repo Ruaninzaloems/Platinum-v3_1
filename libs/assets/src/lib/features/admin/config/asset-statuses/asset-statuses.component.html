@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset status definitions</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Status</button>
     </div>
@@ -17,6 +18,13 @@
         <div class="form-field">
           <label>Asset Status</label>
           <input type="text" class="form-input" [(ngModel)]="formData.assetStatusDesc" placeholder="Enter status description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
       </div>
       <div class="form-actions">
@@ -33,9 +41,9 @@
       <table class="data-table">
         <thead><tr><th>ID</th><th>Status Description</th><th>Status</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
         <tbody>
-          @for (item of items(); track item.assetStatus_ID) {
+          @for (item of items(); track item.assetStatusId) {
             <tr>
-              <td class="id-cell">{{item.assetStatus_ID}}</td>
+              <td class="id-cell">{{item.assetStatusId}}</td>
               <td class="desc-cell">{{item.assetStatusDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>
               <td class="date-cell">{{item.dateCaptured | date:'mediumDate'}}</td>

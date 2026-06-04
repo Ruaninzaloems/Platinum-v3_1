@@ -7,8 +7,8 @@
     "proxyTimeout": 600000
   },
   "/ASSETS-API": {
-    "target": "http://localhost:3001",
-    "secure": false,
+    "target": "https://platinum-assets-api.azurewebsites.net",
+    "secure": true,
     "changeOrigin": true,
     "pathRewrite": { "^/ASSETS-API": "/api" }
   },

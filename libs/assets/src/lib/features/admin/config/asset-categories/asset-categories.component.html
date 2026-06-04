@@ -5,6 +5,7 @@
       <p class="page-subtitle">Manage asset category classifications</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
       <button mat-stroked-button (click)="openImport()"><mat-icon>upload_file</mat-icon> Import from Excel</button>
       <button mat-flat-button class="btn-primary" (click)="openAdd()"><mat-icon>add</mat-icon> Add Category</button>
     </div>
@@ -15,8 +16,8 @@
       <label>Filter by Asset Type</label>
       <select class="form-input" (change)="onFilterChange($any($event.target).value)">
         <option value="">All Types</option>
-        @for (t of assetTypes(); track t.assetType_ID) {
-          <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+        @for (t of assetTypes(); track t.assetTypeId) {
+          <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
         }
       </select>
     </div>
@@ -30,14 +31,21 @@
           <label>Asset Type *</label>
           <select class="form-input" [(ngModel)]="formData.typeID">
             <option [ngValue]="null" disabled>Select asset type</option>
-            @for (t of assetTypes(); track t.assetType_ID) {
-              <option [ngValue]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+            @for (t of assetTypes(); track t.assetTypeId) {
+              <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option>
             }
           </select>
         </div>
         <div class="form-field">
           <label>Asset Category</label>
           <input type="text" class="form-input" [(ngModel)]="formData.assetCategoryDesc" placeholder="Enter category description">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
         </div>
       </div>
       <div class="form-actions">
@@ -54,9 +62,9 @@
       <table class="data-table">
         <thead><tr><th>ID</th><th>Asset Type</th><th>Category Description</th><th>Status</th><th>Date Captured</th><th class="actions-col">Actions</th></tr></thead>
         <tbody>
-          @for (item of items(); track item.assetCategoryID) {
+          @for (item of items(); track item.assetCategoryId) {
             <tr>
-              <td class="id-cell">{{item.assetCategoryID}}</td>
+              <td class="id-cell">{{item.assetCategoryId}}</td>
               <td><span class="type-badge">{{getTypeName(item.typeID)}}</span></td>
               <td class="desc-cell">{{item.assetCategoryDesc}}</td>
               <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>

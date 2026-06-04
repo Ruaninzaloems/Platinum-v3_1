@@ -10,15 +10,16 @@ import { ApiService } from '../../../core/api.service';
 import { HasUnsavedChanges } from '../../../core/unsaved-changes.guard';
 import { BaseChartDirective } from 'ng2-charts';
 import { Chart, registerables } from 'chart.js';
+import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-plan-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, BaseChartDirective],
+  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatSnackBarModule, BaseChartDirective, EmployeeSelectComponent],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/assets/verification/planning"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/verification/planning"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:20px;font-weight:700;color:#1e293b;margin:0">{{plan?.planName || 'Loading...'}}</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">
@@ -76,8 +77,8 @@ Chart.register(...registerables);
                 <div class="detail-item"><label>Start Date</label><span>{{formatDate(plan.plannedStartDate)}}</span></div>
                 <div class="detail-item"><label>End Date</label><span>{{formatDate(plan.plannedEndDate)}}</span></div>
                 <div class="detail-item full"><label>Scope of Work</label><span>{{plan.scopeOfWork || '--'}}</span></div>
-                <div class="detail-item full"><label>Asset Types</label><span>{{formatJsonArray(plan.assetTypes, assetTypes, 'assetType_ID', 'assetTypeDesc')}}</span></div>
-                <div class="detail-item full"><label>Asset Categories</label><span>{{formatJsonArray(plan.assetCategories, categories, 'assetCategoryID', 'assetCategoryDesc')}}</span></div>
+                <div class="detail-item full"><label>Asset Types</label><span>{{formatJsonArray(plan.assetTypes, assetTypes, 'assetTypeId', 'assetTypeDesc')}}</span></div>
+                <div class="detail-item full"><label>Asset Categories</label><span>{{formatJsonArray(plan.assetCategories, categories, 'assetCategoryId', 'assetCategoryDesc')}}</span></div>
                 <div class="detail-item"><label>Town</label><span>{{plan.townDesc || '--'}}</span></div>
                 <div class="detail-item"><label>Suburb</label><span>{{plan.suburbDesc || '--'}}</span></div>
                 <div class="detail-item"><label>Building</label><span>{{plan.buildingDesc || '--'}}</span></div>
@@ -106,8 +107,8 @@ Chart.register(...registerables);
                     <button type="button" class="toggle-all-btn" (click)="toggleAllTypes()">{{allTypesSelected() ? 'None' : 'All'}}</button>
                   </label>
                   <select multiple class="field-input multi-select" [(ngModel)]="editForm.selectedAssetTypes">
-                    @for (t of assetTypes; track t.assetType_ID) {
-                      <option [value]="t.assetType_ID">{{t.assetTypeDesc}}</option>
+                    @for (t of assetTypes; track t.assetTypeId) {
+                      <option [value]="t.assetTypeId">{{t.assetTypeDesc}}</option>
                     }
                   </select>
                 </div>
@@ -116,8 +117,8 @@ Chart.register(...registerables);
                     <button type="button" class="toggle-all-btn" (click)="toggleAllCategories()">{{allCategoriesSelected() ? 'None' : 'All'}}</button>
                   </label>
                   <select multiple class="field-input multi-select" [(ngModel)]="editForm.selectedCategories">
-                    @for (c of editFilteredCategories; track c.assetCategoryID) {
-                      <option [value]="c.assetCategoryID">{{c.assetCategoryDesc}}</option>
+                    @for (c of editFilteredCategories; track c.assetCategoryId) {
+                      <option [value]="c.assetCategoryId">{{c.assetCategoryDesc}}</option>
                     }
                   </select>
                 </div>
@@ -241,12 +242,12 @@ Chart.register(...registerables);
                   } @else {
                     <div class="field-group">
                       <label class="field-label">Employee</label>
-                      <select class="field-input" [(ngModel)]="newMember.employeeId" (change)="onNewMemberEmployeeSelect()">
-                        <option [value]="null">-- Select --</option>
-                        @for (e of employees; track e.employeeId) {
-                          <option [value]="e.employeeId">{{e.surname}}, {{e.firstName}}</option>
-                        }
-                      </select>
+                      <app-employee-select
+                        [(ngModel)]="newMember.employeeId"
+                        placeholder="-- Select --"
+                        selectClass="field-input"
+                        (selectionChange)="onNewMemberEmployeeSelect($event)"
+                      ></app-employee-select>
                     </div>
                   }
                 </div>
@@ -493,12 +494,12 @@ Chart.register(...registerables);
           } @else {
             <div class="field-group" style="margin-bottom:12px">
               <label class="field-label">Select Employee *</label>
-              <select class="field-input" [(ngModel)]="approveForm.approvedBy" (change)="onApproverEmployeeSelect()">
-                <option [value]="null">-- Select --</option>
-                @for (e of employees; track e.employeeId) {
-                  <option [value]="e.employeeId">{{e.surname}}, {{e.firstName}}</option>
-                }
-              </select>
+              <app-employee-select
+                [(ngModel)]="approveForm.approvedBy"
+                placeholder="-- Select --"
+                selectClass="field-input"
+                (selectionChange)="onApproverEmployeeSelect($event)"
+              ></app-employee-select>
             </div>
           }
           <div class="field-group" style="margin-bottom:12px">
@@ -605,7 +606,6 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
   towns: any[] = [];
   suburbs: any[] = [];
   buildings: any[] = [];
-  employees: any[] = [];
   registers: any[] = [];
 
   newMember: any = { role: 'Verification Officers', employeeId: null, employeeName: '', isExternal: false, contactNumber: '' };
@@ -681,7 +681,7 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
       this.editForm.selectedAssetTypes = [];
     } else {
       var ids: number[] = [];
-      for (var i = 0; i < this.assetTypes.length; i++) ids.push(this.assetTypes[i].assetType_ID);
+      for (var i = 0; i < this.assetTypes.length; i++) ids.push(this.assetTypes[i].assetTypeId);
       this.editForm.selectedAssetTypes = ids;
     }
   }
@@ -692,7 +692,7 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
       this.editForm.selectedCategories = [];
     } else {
       var ids: number[] = [];
-      for (var i = 0; i < cats.length; i++) ids.push(cats[i].assetCategoryID);
+      for (var i = 0; i < cats.length; i++) ids.push(cats[i].assetCategoryId);
       this.editForm.selectedCategories = ids;
     }
   }
@@ -740,7 +740,6 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
       towns: this.api.getVerificationLookupTowns(),
       suburbs: this.api.getVerificationLookupSuburbs(),
       buildings: this.api.getVerificationLookupBuildings(),
-      employees: this.api.getEmployees(),
       registers: this.api.getVerificationRegisters({ isHistory: 0 })
     }).subscribe({
       next: function(data: any) {
@@ -749,7 +748,6 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
         self.towns = data.towns || [];
         self.suburbs = data.suburbs || [];
         self.buildings = data.buildings || [];
-        self.employees = data.employees || [];
         self.registers = data.registers || [];
       }
     });
@@ -1031,15 +1029,8 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
     }
   }
 
-  onApproverEmployeeSelect() {
-    if (this.approveForm.approvedBy) {
-      for (var i = 0; i < this.employees.length; i++) {
-        if (this.employees[i].employeeId === this.approveForm.approvedBy) {
-          this.approveForm.approvedByName = this.employees[i].surname + ', ' + this.employees[i].firstName;
-          break;
-        }
-      }
-    }
+  onApproverEmployeeSelect(emp: any) {
+    this.approveForm.approvedByName = emp ? (emp.surname + ', ' + emp.firstName) : '';
   }
 
   onApprovalFileSelected(event: any) {
@@ -1105,14 +1096,6 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
   addTeamMember() {
     var self = this;
     var name = this.newMember.employeeName;
-    if (!this.newMember.isExternal && this.newMember.employeeId) {
-      for (var i = 0; i < this.employees.length; i++) {
-        if (this.employees[i].employeeId === this.newMember.employeeId) {
-          name = this.employees[i].surname + ', ' + this.employees[i].firstName;
-          break;
-        }
-      }
-    }
     if (!name && !this.newMember.employeeId) {
       this.snackBar.open('Select an employee or enter a name', 'OK', { duration: 3000 });
       return;
@@ -1154,15 +1137,8 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
     }
   }
 
-  onNewMemberEmployeeSelect() {
-    if (this.newMember.employeeId) {
-      for (var i = 0; i < this.employees.length; i++) {
-        if (this.employees[i].employeeId === this.newMember.employeeId) {
-          this.newMember.employeeName = this.employees[i].surname + ', ' + this.employees[i].firstName;
-          break;
-        }
-      }
-    }
+  onNewMemberEmployeeSelect(emp: any) {
+    this.newMember.employeeName = emp ? (emp.surname + ', ' + emp.firstName) : '';
   }
 
   onFileSelected(event: any) {
@@ -1261,7 +1237,7 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
         for (var ti = 0; ti < typesArr.length; ti++) {
           var matchType: any = null;
           for (var tj = 0; tj < this.assetTypes.length; tj++) {
-            if (this.assetTypes[tj].assetType_ID === typesArr[ti]) { matchType = this.assetTypes[tj]; break; }
+            if (this.assetTypes[tj].assetTypeId === typesArr[ti]) { matchType = this.assetTypes[tj]; break; }
           }
           typeLabels.push(matchType ? matchType.assetTypeDesc : typesArr[ti]);
         }
@@ -1275,7 +1251,7 @@ export class PlanDetailComponent implements OnInit, HasUnsavedChanges {
         for (var ci = 0; ci < catsArr.length; ci++) {
           var matchCat: any = null;
           for (var cj = 0; cj < this.categories.length; cj++) {
-            if (this.categories[cj].assetCategoryID === catsArr[ci]) { matchCat = this.categories[cj]; break; }
+            if (this.categories[cj].assetCategoryId === catsArr[ci]) { matchCat = this.categories[cj]; break; }
           }
           catLabels.push(matchCat ? matchCat.assetCategoryDesc : catsArr[ci]);
         }

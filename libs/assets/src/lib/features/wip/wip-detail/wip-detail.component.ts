@@ -7,11 +7,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../../core/api.service';
+import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
 
 @Component({
   selector: 'app-wip-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, EmployeeSelectComponent],
   templateUrl: './wip-detail.component.html',
   styleUrls: ['./wip-detail.component.css']
 })
@@ -28,7 +29,8 @@ export class WipDetailComponent implements OnInit {
   fundingSources = signal<any[]>([]);
   departments = signal<any[]>([]);
   divisions = signal<any[]>([]);
-  employees = signal<any[]>([]);
+  employeeNameCache = new Map<number, string>();
+  private empFetchPending = new Set<number>();
   planProjects = signal<any[]>([]);
   vendors = signal<any[]>([]);
   financialYears: string[] = [];
@@ -101,10 +103,6 @@ export class WipDetailComponent implements OnInit {
       next: function(this: WipDetailComponent, r: any) { this.divisions.set(Array.isArray(r) ? r : []); }.bind(this),
       error: function() {}
     });
-    this.api.getEmployees().subscribe({
-      next: function(this: WipDetailComponent, r: any) { this.employees.set(Array.isArray(r) ? r : []); }.bind(this),
-      error: function() {}
-    });
     this.api.getPlanProjects().subscribe({
       next: function(this: WipDetailComponent, r: any) { this.planProjects.set(Array.isArray(r) ? r : []); }.bind(this),
       error: function() {}
@@ -159,11 +157,20 @@ export class WipDetailComponent implements OnInit {
 
   getCustodianName(id: any): string {
     if (!id) { return ''; }
-    const list = this.employees();
-    for (let i = 0; i < list.length; i++) {
-      if (Number(list[i].employeeId) === Number(id)) { return list[i].surname + ', ' + list[i].firstName; }
+    const numId = Number(id);
+    if (this.employeeNameCache.has(numId)) { return this.employeeNameCache.get(numId)!; }
+    if (!this.empFetchPending.has(numId)) {
+      this.empFetchPending.add(numId);
+      const self = this;
+      this.api.getEmployeeById(numId).subscribe({
+        next: function(e: any) {
+          if (e) { self.employeeNameCache.set(numId, e.surname + ', ' + e.firstName); }
+          self.empFetchPending.delete(numId);
+        },
+        error: function() { self.empFetchPending.delete(numId); }
+      });
     }
-    return String(id);
+    return 'Employee #' + numId;
   }
 
   getBudgetProjectName(id: any): string {
@@ -184,7 +191,7 @@ export class WipDetailComponent implements OnInit {
       }.bind(this),
       error: function(this: WipDetailComponent) {
         this.loading.set(false);
-        this.router.navigate(['/assets/wip']);
+        this.router.navigate(['/wip']);
       }.bind(this)
     });
   }

@@ -5,6 +5,9 @@
         <p class="page-subtitle">Manage asset condition classifications</p>
       </div>
       <div class="header-actions">
+        <button mat-stroked-button (click)="exportToExcel()">
+          <mat-icon>download</mat-icon> Export to Excel
+        </button>
         <button mat-stroked-button (click)="openImport()">
           <mat-icon>upload_file</mat-icon> Import from Excel
         </button>
@@ -27,7 +30,14 @@
           <input type="number" class="form-input" [(ngModel)]="formData.rating" placeholder="Enter rating">
         </div>
         </div>
-        <div class="form-actions">
+        <div class="form-row">
+        <div class="form-field">
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
           <button mat-stroked-button (click)="cancelForm()">Cancel</button>
           <button mat-flat-button class="btn-primary" (click)="save()" [disabled]="!formData.assetConditionDesc">
             {{editingId() ? 'Update' : 'Create'}}
@@ -52,9 +62,9 @@
             </tr>
           </thead>
           <tbody>
-            @for (item of items(); track item.assetCondition_ID) {
+            @for (item of items(); track item.assetConditionId) {
               <tr>
-                <td class="id-cell">{{item.assetCondition_ID}}</td>
+                <td class="id-cell">{{item.assetConditionId}}</td>
                 <td class="desc-cell">{{item.assetConditionDesc}}</td>
               <td>{{item.rating}}</td>
                 <td><span class="status-badge" [class.active]="item.enabled === 1">{{item.enabled === 1 ? 'Active' : 'Inactive'}}</span></td>

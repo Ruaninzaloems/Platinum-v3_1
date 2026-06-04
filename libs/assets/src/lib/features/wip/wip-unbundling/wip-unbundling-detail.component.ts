@@ -14,6 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialogModule } from '@angular/material/dialog';
 import { ApiService } from '../../../core/api.service';
+import { OrgSettingsService } from '../../../core/org-settings.service';
 import { CidmsPickerComponent } from '../../../shared/cidms-picker/cidms-picker.component';
 import { CidmsChainResult } from '../../../core/cidms-level-config';
 
@@ -30,10 +31,10 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
   ],
   template: `
     <div class="page-tabs">
-      <a class="page-tab" routerLink="/assets/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a class="page-tab" routerLink="/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <mat-icon>construction</mat-icon> WIP Register
       </a>
-      <a class="page-tab" routerLink="/assets/wip/unbundling" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a class="page-tab" routerLink="/wip/unbundling" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <mat-icon>category</mat-icon> Asset Unbundling
       </a>
     </div>
@@ -49,13 +50,13 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
       <div style="text-align:center;padding:80px">
         <mat-icon style="font-size:64px;width:64px;height:64px;color:#cbd5e1">error_outline</mat-icon>
         <h2 style="color:#475569">Project not found</h2>
-        <a routerLink="/assets/wip/unbundling" mat-stroked-button>Back to List</a>
+        <a routerLink="/wip/unbundling" mat-stroked-button>Back to List</a>
       </div>
     }
 
     @if (!loading() && project()) {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <a routerLink="/assets/wip/unbundling" mat-icon-button style="color:#64748b">
+        <a routerLink="/wip/unbundling" mat-icon-button style="color:#64748b">
           <mat-icon>arrow_back</mat-icon>
         </a>
         <div>
@@ -819,21 +820,21 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
                           <label>Asset Type *</label>
                           <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" [ngModel]="aef.editTypeId" (ngModelChange)="onAEditTypeChange($event)">
                             <option [ngValue]="0">Select type...</option>
-                            @for (t of assetTypes(); track t.assetType_ID) { <option [ngValue]="t.assetType_ID">{{t.assetTypeDesc}}</option> }
+                            @for (t of assetTypes(); track t.assetTypeId) { <option [ngValue]="t.assetTypeId">{{t.assetTypeDesc}}</option> }
                           </select>
                         </div>
                         <div class="edit-field">
                           <label>Category *</label>
                           <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" [ngModel]="aef.editCategoryId" (ngModelChange)="onAEditCategoryChange($event)" [disabled]="!aef.editTypeId">
                             <option [ngValue]="0">Select category...</option>
-                            @for (c of aFilteredCategories(); track c.assetCategoryID) { <option [ngValue]="c.assetCategoryID">{{c.assetCategoryDesc}}</option> }
+                            @for (c of aFilteredCategories(); track c.assetCategoryId) { <option [ngValue]="c.assetCategoryId">{{c.assetCategoryDesc}}</option> }
                           </select>
                         </div>
                         <div class="edit-field">
                           <label>Sub-Category</label>
                           <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" [ngModel]="aef.editSubCategoryId" (ngModelChange)="onAEditSubCategoryChange($event)" [disabled]="!aef.editCategoryId">
                             <option [ngValue]="0">Select sub-category...</option>
-                            @for (sc of aFilteredSubCategories(); track sc.asset_SubCategory_ID) { <option [ngValue]="sc.asset_SubCategory_ID">{{sc.asset_SubCategoryDescription}}</option> }
+                            @for (sc of aFilteredSubCategories(); track sc.assetSubCategoryId) { <option [ngValue]="sc.assetSubCategoryId">{{sc.assetSubCategoryDesc}}</option> }
                           </select>
                         </div>
                         <div class="edit-field" style="grid-column:span 3">
@@ -856,14 +857,14 @@ import { CidmsChainResult } from '../../../core/cidms-level-config';
                           <label>Asset Status</label>
                           <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" [ngModel]="aef.editStatusId" (ngModelChange)="aef.editStatusId=$event">
                             <option [ngValue]="0">Select...</option>
-                            @for (s of assetStatuses(); track s.assetStatus_ID) { <option [ngValue]="s.assetStatus_ID">{{s.assetStatusDesc}}</option> }
+                            @for (s of assetStatuses(); track s.assetStatusId) { <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
                           </select>
                         </div>
                         <div class="edit-field">
-                          <label>Measurement Type</label>
-                          <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box" [ngModel]="aef.editMeasurementTypeId" (ngModelChange)="aef.editMeasurementTypeId=$event">
-                            <option [ngValue]="0">Select...</option>
-                            @for (mt of measurementTypes(); track mt.assetConfig_MeasurementType_ID) { <option [ngValue]="mt.assetConfig_MeasurementType_ID">{{mt.name}}</option> }
+                          <label>Measurement Type @if (wipMeasEnabled()) { * }</label>
+                          <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box;background:{{wipMeasEnabled()?'':'#f8fafc'}}" [disabled]="!wipMeasEnabled()" [ngModel]="aef.editMeasurementTypeId" (ngModelChange)="aef.editMeasurementTypeId=$event">
+                            <option [ngValue]="0">{{ wipMeasEnabled() ? 'Select...' : 'N/A – asset type' }}</option>
+                            @for (mt of measurementTypes(); track mt.measurementTypeId) { <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option> }
                           </select>
                         </div>
                         <div class="edit-field">
@@ -1422,6 +1423,7 @@ export class WipUnbundlingDetailComponent implements OnInit {
   assetCategories = signal<any[]>([]);
   assetSubCategories = signal<any[]>([]);
   measurementTypes = signal<any[]>([]);
+  wipMeasEnabled = signal(true);
   assetStatuses = signal<any[]>([]);
 
   costDistLoading = signal(false);
@@ -1469,7 +1471,8 @@ export class WipUnbundlingDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private orgSettings: OrgSettingsService
   ) {}
 
   ngOnInit() {
@@ -1634,9 +1637,11 @@ export class WipUnbundlingDetailComponent implements OnInit {
 
   loadMeasurementTypes() {
     var self = this;
-    self.api.getMeasurementTypes().subscribe({
-      next: function(data: any[]) { self.measurementTypes.set(data || []); },
-      error: function() {}
+    self.orgSettings.whenLoaded().subscribe(function(s: any) {
+      self.api.getMeasurementTypes({ model: s?.measurement_model || undefined }).subscribe({
+        next: function(data: any[]) { self.measurementTypes.set(data || []); },
+        error: function() {}
+      });
     });
   }
 
@@ -2716,7 +2721,7 @@ export class WipUnbundlingDetailComponent implements OnInit {
     var typeName = a.assetTypeName || '';
     if (typeName) {
       for (var i = 0; i < types.length; i++) {
-        if (types[i].assetTypeDesc === typeName) { self.aef.editTypeId = types[i].assetType_ID; break; }
+        if (types[i].assetTypeDesc === typeName) { self.aef.editTypeId = types[i].assetTypeId; break; }
       }
     }
     if (self.aef.editTypeId) {
@@ -2726,7 +2731,7 @@ export class WipUnbundlingDetailComponent implements OnInit {
           var catName = a.categoryName || '';
           if (catName) {
             for (var j = 0; j < cats.length; j++) {
-              if (cats[j].assetCategoryDesc === catName) { self.aef.editCategoryId = cats[j].assetCategoryID; break; }
+              if (cats[j].assetCategoryDesc === catName) { self.aef.editCategoryId = cats[j].assetCategoryId; break; }
             }
           }
           if (self.aef.editCategoryId) {
@@ -2736,7 +2741,7 @@ export class WipUnbundlingDetailComponent implements OnInit {
                 var subName = a.subCategoryName || '';
                 if (subName) {
                   for (var k = 0; k < subs.length; k++) {
-                    if (subs[k].asset_SubCategoryDescription === subName) { self.aef.editSubCategoryId = subs[k].asset_SubCategory_ID; break; }
+                    if (subs[k].assetSubCategoryDesc === subName) { self.aef.editSubCategoryId = subs[k].assetSubCategoryId; break; }
                   }
                 }
                 self.loadAFilteredClasses();
@@ -2754,14 +2759,14 @@ export class WipUnbundlingDetailComponent implements OnInit {
     var statusName = a.status || '';
     if (statusName) {
       for (var si = 0; si < statuses.length; si++) {
-        if (statuses[si].assetStatusDesc === statusName) { self.aef.editStatusId = statuses[si].assetStatus_ID; break; }
+        if (statuses[si].assetStatusDesc === statusName) { self.aef.editStatusId = statuses[si].assetStatusId; break; }
       }
     }
     var mTypes = self.measurementTypes();
     var mtName = a.measurementType || '';
     if (mtName) {
       for (var mi = 0; mi < mTypes.length; mi++) {
-        if (mTypes[mi].name === mtName) { self.aef.editMeasurementTypeId = mTypes[mi].assetConfig_MeasurementType_ID; break; }
+        if (mTypes[mi].measurementTypeDesc === mtName) { self.aef.editMeasurementTypeId = mTypes[mi].measurementTypeId; break; }
       }
     }
     self.api.getFinancialStatuses().subscribe({
@@ -2863,6 +2868,8 @@ export class WipUnbundlingDetailComponent implements OnInit {
     }
     var params: any = { typeId: self.aef.editTypeId, categoryId: self.aef.editCategoryId };
     if (self.aef.editSubCategoryId) { params.subCategoryId = self.aef.editSubCategoryId; }
+    var clsModel = self.orgSettings.settings()?.measurement_model;
+    if (clsModel && clsModel !== 'Mixed') { params.model = clsModel; }
     self.api.getAssetClassesList(params).subscribe({
       next: function(res: any) {
         var list = Array.isArray(res) ? res : (res.data || []);
@@ -2888,13 +2895,22 @@ export class WipUnbundlingDetailComponent implements OnInit {
     this.aef.editCategoryId = 0;
     this.aef.editSubCategoryId = 0;
     this.aef.editClassId = 0;
+    this.aef.editMeasurementTypeId = 0;
     this.aFilteredSubCategories.set([]);
     this.aFilteredClasses.set([]);
     this.aNoClassMessage.set('');
-    if (!typeId) { this.aFilteredCategories.set([]); return; }
+    if (!typeId) { this.aFilteredCategories.set([]); this.wipMeasEnabled.set(true); return; }
     var self = this;
     self.api.getAssetCategoriesList({ typeId: typeId }).subscribe({
       next: function(cats: any[]) { self.aFilteredCategories.set(cats); },
+      error: function() {}
+    });
+    var model = this.orgSettings.settings()?.measurement_model || undefined;
+    this.api.getMeasurementTypes({ typeId: typeId, model: model }).subscribe({
+      next: function(mt: any[]) {
+        self.measurementTypes.set(mt || []);
+        self.wipMeasEnabled.set(mt.length > 0);
+      },
       error: function() {}
     });
   }
@@ -2936,7 +2952,7 @@ export class WipUnbundlingDetailComponent implements OnInit {
         if (list[i].assetStatus_ID) {
           var sts = self.assetStatuses();
           for (var j = 0; j < sts.length; j++) {
-            if (sts[j].assetStatus_ID === list[i].assetStatus_ID) { self.aef.editStatusId = sts[j].assetStatus_ID; break; }
+            if (sts[j].assetStatusId === list[i].assetStatus_ID) { self.aef.editStatusId = sts[j].assetStatusId; break; }
           }
         }
         break;

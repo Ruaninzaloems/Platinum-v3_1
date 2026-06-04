@@ -422,9 +422,15 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
               <span class="period-badge">FY {{activeFinYear()}} · P{{activePeriod()}}</span>
             </div>
             <div style="flex:1"></div>
-            <button class="db-toggle" [class.sqlserver]="dbToggle.activeBackend() === 'sqlserver'" (click)="toggleDatabase()" [matTooltip]="dbToggle.activeBackend() === 'postgresql' ? 'Using PostgreSQL — click to switch to SQL Server' : 'Using SQL Server — click to switch to PostgreSQL'">
+            <button class="db-toggle"
+              [class.sqlserver]="dbToggle.activeBackend() === 'sqlserver'"
+              [class.hybrid]="dbToggle.activeBackend() === 'hybrid'"
+              (click)="toggleDatabase()"
+              [matTooltip]="dbToggle.activeBackend() === 'postgresql' ? 'Mode: PostgreSQL — click to switch to SQL Server' : dbToggle.activeBackend() === 'sqlserver' ? 'Mode: SQL Server — click to switch to Hybrid' : 'Mode: Hybrid — click to switch to PostgreSQL'">
               <mat-icon style="font-size:16px">storage</mat-icon>
-              @if (dbToggle.activeBackend() === 'postgresql') { <span>PostgreSQL</span> } @else { <span>SQL Server</span> }
+              @if (dbToggle.activeBackend() === 'postgresql') { <span>PostgreSQL</span> }
+              @else if (dbToggle.activeBackend() === 'sqlserver') { <span>SQL Server</span> }
+              @else { <span>Hybrid</span> }
             </button>
             <span class="audit-badge"><mat-icon style="font-size:14px">verified</mat-icon> Clean Audit</span>
             <button mat-icon-button
@@ -571,6 +577,8 @@ type AppModule = 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'bu
     .db-toggle:hover { background: #c8e6c9; }
     .db-toggle.sqlserver { background: #e3f2fd; color: #1565c0; }
     .db-toggle.sqlserver:hover { background: #bbdefb; }
+    .db-toggle.hybrid { background: #f3e5f5; color: #6a1b9a; }
+    .db-toggle.hybrid:hover { background: #e1bee7; }
     .content-area { flex: 1; overflow-y: auto; padding: 24px; background: #f8f9fb; }
     @media (max-width: 768px) {
       .municipality-name, .period-badge, .audit-badge { display: none; }
@@ -1207,11 +1215,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   toggleDatabase() {
-    if (this.dbToggle.activeBackend() === 'postgresql') {
-      this.dbToggle.setBackend('sqlserver');
-    } else {
-      this.dbToggle.setBackend('postgresql');
-    }
+    this.dbToggle.cycleBackend(); // postgresql → sqlserver → hybrid → postgresql
   }
 
   toggleGroup(title: string) {
@@ -1325,6 +1329,6 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   onLogout() {
-    this.authService.logout();
+    this.authService.clearSession();
   }
 }

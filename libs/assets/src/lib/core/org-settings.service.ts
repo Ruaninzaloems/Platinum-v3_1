@@ -1,5 +1,9 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { DatabaseToggleService } from './database-toggle.service';
+import { AuthService } from './auth.service';
 
 export interface OrgSettings {
   municipality_name: string;
@@ -16,26 +20,50 @@ export interface OrgSettings {
 
 @Injectable({ providedIn: 'root' })
 export class OrgSettingsService {
-  private readonly PG_API = '/api';
-
   settings = signal<OrgSettings | null>(null);
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private dbToggle: DatabaseToggleService, private auth: AuthService) {
     this.load();
   }
 
   load() {
-    this.http.get<OrgSettings>(`${this.PG_API}/settings`).subscribe({
-      next: (s) => {
-        if (s) {
-          this.settings.set(s);
+    var self = this;
+    this.http.get<OrgSettings>(`${this.dbToggle.apiPrefix}/settings`).subscribe({
+      next: function(s) {
+        if (!s) return;
+        var base = s;
+        var userId = self.auth.getCurrentUserId();
+        if (userId !== null) {
+          self.http.get<any>(`${self.dbToggle.apiPrefix}/user-processing-months/current?userId=${userId}`).subscribe({
+            next: function(upm) {
+              var pm = upm && (upm.processingMonth ?? upm.ProcessingMonth);
+              if (pm !== null && pm !== undefined && !isNaN(Number(pm))) {
+                self.settings.set(Object.assign({}, base, { current_period_month: Number(pm) }));
+              } else {
+                self.settings.set(base);
+              }
+            },
+            error: function() {
+              self.settings.set(base);
+            }
+          });
+        } else {
+          self.settings.set(base);
         }
       },
-      error: () => {}
+      error: function() {}
     });
   }
 
   save(data: any) {
-    return this.http.put<OrgSettings>(`${this.PG_API}/settings`, data);
+    return this.http.put<OrgSettings>(`${this.dbToggle.apiPrefix}/settings`, data);
+  }
+
+  whenLoaded(): Observable<OrgSettings> {
+    const current = this.settings();
+    if (current) return of(current);
+    return this.http.get<OrgSettings>(`${this.dbToggle.apiPrefix}/settings`).pipe(
+      tap((s: OrgSettings) => { if (s) this.settings.set(s); })
+    );
   }
 }

@@ -8,13 +8,16 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   import { MatDialogModule } from '@angular/material/dialog';
   import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   import { ApiService } from '../../../core/api.service';
+  import { OrgSettingsService } from '../../../core/org-settings.service';
   import { CidmsPickerComponent } from '../../../shared/cidms-picker/cidms-picker.component';
   import { CidmsChainResult } from '../../../core/cidms-level-config';
+  import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
+  import { AssetDocumentPanelComponent } from '../../../shared/asset-document-panel/asset-document-panel.component';
 
   @Component({
     selector: 'app-asset-detail',
     standalone: true,
-    imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatDialogModule, MatSnackBarModule, CidmsPickerComponent],
+    imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatDialogModule, MatSnackBarModule, CidmsPickerComponent, EmployeeSelectComponent, AssetDocumentPanelComponent],
     templateUrl: './asset-detail.component.html',
     styleUrls: ['./asset-detail.component.css']
   })
@@ -38,6 +41,11 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   transferTxns = signal<any[]>([]);
   activeTab = signal('details');
   schedule = signal<any>(null);
+
+  assetNumericId = computed(() => {
+    var a = this.asset();
+    return Number(a?.assetId || a?.assetRegisterItem_ID || a?.id) || 0;
+  });
 
   sched(field: string): number {
     var s = this.schedule();
@@ -82,8 +90,10 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     return Math.max(0, this.costClosingCalc() - this.depClosingCalc() - this.impClosingCalc());
   });
 
+  docCount = computed(() => this.documents().length);
+
   visibleTabs = computed(() => {
-    const tabs = [
+    const tabs: { key: string; label: string; badge?: number }[] = [
       { key: 'details', label: 'Details' },
       { key: 'cost', label: 'Cost Movement' },
       { key: 'depreciation', label: 'Depreciation' },
@@ -96,7 +106,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
       { key: 'disposal', label: 'Disposal' },
       { key: 'location', label: 'Location' },
       { key: 'funding', label: 'Funding Sources' },
-      { key: 'documents', label: 'Documents' },
+      { key: 'documents', label: 'Documents', badge: this.docCount() },
       { key: 'audit', label: 'Audit History' },
     );
     return tabs;
@@ -118,6 +128,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   editAssetTypes = signal<any[]>([]);
   editAssetStatuses = signal<any[]>([]);
   editMeasurementTypes = signal<any[]>([]);
+  efMeasurementEnabled = signal(true);
   editDepreciationMethods = signal<any[]>([]);
   editFilteredClasses = signal<any[]>([]);
   editFilteredCategories = signal<any[]>([]);
@@ -130,7 +141,6 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   editUtilisationGrades = signal<any[]>([]);
   editHealthGrades = signal<any[]>([]);
   editCidmsSubComponentTypes = signal<any[]>([]);
-  editEmployees = signal<any[]>([]);
   editDivisions = signal<any[]>([]);
   editFilteredDivisions = signal<any[]>([]);
   editTowns = signal<any[]>([]);
@@ -140,6 +150,11 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   editBuildings = signal<any[]>([]);
   editFloors = signal<any[]>([]);
   editRooms = signal<any[]>([]);
+
+  efNoUsefulLife = signal(false);
+  efRequireStatus = signal(false);
+  efDepreciationDisabled = signal(false);
+  efShowRevalMethod = signal(false);
 
   fundingRows = signal<any[]>([]);
   fundingLoading = signal(false);
@@ -155,7 +170,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   transferForm = { department: '', location: '', reason: '' };
   disposalForm = { method: '', date: '', value: 0, reason: '' };
 
-  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private snackBar: MatSnackBar) {}
+  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private snackBar: MatSnackBar, private orgSettings: OrgSettingsService) {}
 
   ngOnDestroy() {
     this.destroyLocationMap();
@@ -230,14 +245,17 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
         console.log('[AssetDetail] Asset loaded:', a?.assetId, 'fields:', a ? Object.keys(a).length : 0);
         this.asset.set(a);
         this.populateEditForm(a);
-        this.documents.set([
-          { name: 'Purchase Order - PO-2024-' + (a.assetId || a.id), type: 'pdf', size: '245 KB', date: this.formatDate(a.acquisitionDate) },
-          { name: 'Verification Certificate - VC-' + (a.assetId || a.id), type: 'pdf', size: '128 KB', date: this.formatDate(a.verificationDate) },
-        ]);
         this.loading.set(false);
         this.loadTransactions(a.assetId);
         this.loadVerificationAuditTrail(a.assetId);
         this.loadFunding(Number(a.assetId));
+        var assetNumericId = Number(a?.assetId || a?.assetRegisterItem_ID || a?.id) || 0;
+        if (assetNumericId > 0) {
+          this.api.getDocumentsByAsset(assetNumericId).subscribe({
+            next: function(this: AssetDetailComponent, rows: any[]) { this.documents.set(rows || []); }.bind(this),
+            error: function(this: AssetDetailComponent) { this.documents.set([]); }.bind(this)
+          });
+        }
         this.api.getAssetApprovals({ status: 'Pending', type: 'Edit', assetId: a.assetId }).subscribe({
           next: function(this: AssetDetailComponent, items: any[]) {
             if (items && items.length > 0) {
@@ -318,16 +336,24 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     return result;
   }
 
+  onDocumentsChanged(docs: any[]) {
+    this.documents.set(docs || []);
+  }
+
   loadTransactions(assetId: string) {
     this.api.getAssetTransactions(assetId).subscribe({
       next: (txns: any[]) => {
         const all = txns || [];
         this.transactions.set(all);
         this.depreciationTxns.set(all.filter(t => t.transaction_type === 'depreciation'));
-        this.impairmentTxns.set(all.filter(t => t.transaction_type === 'impairment' || t.transaction_type === 'impairment_reversal'));
-        this.revaluationTxns.set(all.filter(t => t.transaction_type === 'revaluation'));
-        this.disposalTxns.set(all.filter(t => t.transaction_type === 'disposal'));
+        const impTxns = all.filter(t => t.transaction_type === 'impairment' || t.transaction_type === 'impairment_reversal');
+        this.impairmentTxns.set(impTxns);
+        const revalTxns = all.filter(t => t.transaction_type === 'revaluation');
+        this.revaluationTxns.set(revalTxns);
+        const dispTxns = all.filter(t => t.transaction_type === 'disposal');
+        this.disposalTxns.set(dispTxns);
         this.transferTxns.set(all.filter(t => t.transaction_type === 'transfer'));
+
       },
       error: () => {
         this.transactions.set([]);
@@ -346,6 +372,55 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
         this.schedule.set(null);
       }.bind(this)
     });
+  }
+
+  getEntityDocs(entityType: string): any[] {
+    var all = this.documents();
+    var result: any[] = [];
+    var target = entityType.toLowerCase().trim();
+    for (var i = 0; i < all.length; i++) {
+      var d = all[i];
+      var et = (d.entity_type || d.EntityType || d.transaction_type || d.TransactionType || '').toLowerCase().trim();
+      if (et === target || (target === 'impairment' && (et === 'impairment reversal' || et === 'impairment_reversal'))) {
+        result.push(d);
+      }
+    }
+    return result;
+  }
+
+  getDocFileName(doc: any): string {
+    return doc.file_name || doc.FileName || '';
+  }
+
+  getDocFileSize(doc: any): string {
+    var bytes = Number(doc.file_size || doc.FileSize) || 0;
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  getDocUploadDate(doc: any): string {
+    var val = doc.uploaded_at || doc.DateCaptured || doc.dateCaptured || '';
+    if (!val) return '';
+    return new Date(val).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  getDocDownloadId(doc: any): number {
+    return Number(doc.id ?? doc.Document_ID ?? doc.document_id) || 0;
+  }
+
+  formatFileSize(bytes: number | null | undefined): string {
+    if (!bytes) return '0 KB';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  downloadTxDoc(doc: any) {
+    var id = this.getDocDownloadId(doc);
+    if (!id) return;
+    this.api.downloadDocument(id);
   }
 
   formatTransactionDate(val: string | null | undefined): string {
@@ -434,6 +509,31 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     return 'status-badge status-' + status.toLowerCase().replace(/ /g, '_');
   }
 
+  hasMeasurementConflict(): boolean {
+    var a = this.asset();
+    if (!a) return false;
+    var model = (this.orgSettings.settings()?.measurement_model || '').toLowerCase();
+    if (!model || model === 'mixed') return false;
+    if (!a.measurementType) return false;
+    var measName = (a.measurementType || '').toLowerCase();
+    if (model === 'cost' && measName.includes('revaluation')) return true;
+    if (model === 'revaluation' && measName.includes('cost')) return true;
+    return false;
+  }
+
+  getMeasurementConflictMessage(): string {
+    var model = (this.orgSettings.settings()?.measurement_model || '').toLowerCase();
+    var a = this.asset();
+    var typeName = a?.measurementType || 'the assigned measurement type';
+    if (model === 'cost') {
+      return 'This asset uses "' + typeName + '" (Revaluation) but the organisation model is set to Cost. Please review and update the asset\'s measurement type.';
+    }
+    if (model === 'revaluation') {
+      return 'This asset uses "' + typeName + '" (Cost) but the organisation model is set to Revaluation. Please review and update the asset\'s measurement type.';
+    }
+    return 'The asset\'s measurement type conflicts with the active organisation model. Please review and update.';
+  }
+
   hasRevaluationData(): boolean {
     const a = this.asset();
     return a && a.measurementType === 'Revaluation Module' && (a.accumulatedRevaluationsClosing > 0 || a.accumulatedRevaluationsOpening > 0);
@@ -482,6 +582,8 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
       editClassId: Number(a.assetClassId) || 0,
       editStatusId: Number(a.assetStatusId) || 0,
       editMeasurementTypeId: Number(a.measurementTypeId) || 0,
+      editDepreciationMethodId: Number(a.assetDepreciationMethodId) || Number(a.depreciationMethodId) || 0,
+      revaluationMethod: a.revaluationMethod || 'restatement',
       editFinancialStatusId: Number(a.financialStatusId) || 0,
       editConditionId: Number(a.assetConditionId) || 0,
       editCriticalityGradeId: Number(a.criticalityGrade) || 0,
@@ -665,18 +767,25 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
         }
       }.bind(this));
 
-      this.api.getMeasurementTypes().subscribe(function(this: AssetDetailComponent, mt: any[]) {
-        this.editMeasurementTypes.set(mt);
-        if (!this.ef.editMeasurementTypeId) {
-          var a = this.asset();
-          var mtName = a ? a.measurementType : '';
-          if (mtName) {
-            for (var i = 0; i < mt.length; i++) {
-              if (mt[i].measurementTypeDesc === mtName) { this.ef.editMeasurementTypeId = mt[i].measurementTypeId; break; }
+      this.orgSettings.whenLoaded().subscribe((s: any) => {
+        var typeIdForFilter = this.ef.editTypeId || undefined;
+        this.api.getMeasurementTypes({ typeId: typeIdForFilter, model: s?.measurement_model || undefined }).subscribe(function(this: AssetDetailComponent, mt: any[]) {
+          this.editMeasurementTypes.set(mt);
+          this.efMeasurementEnabled.set(mt.length > 0 || !typeIdForFilter);
+          if (!this.ef.editMeasurementTypeId) {
+            var a = this.asset();
+            var mtName = a ? a.measurementType : '';
+            if (mtName) {
+              for (var i = 0; i < mt.length; i++) {
+                if (mt[i].measurementTypeDesc === mtName) { this.ef.editMeasurementTypeId = mt[i].measurementTypeId; break; }
+              }
             }
           }
-        }
-      }.bind(this));
+          if (this.ef.editMeasurementTypeId) {
+            this.applyMeasurementTypeRules(this.ef.editMeasurementTypeId);
+          }
+        }.bind(this));
+      });
 
       this.api.getDepreciationMethods().subscribe(function(this: AssetDetailComponent, dm: any[]) {
         this.editDepreciationMethods.set(dm);
@@ -689,7 +798,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
           var condName = a ? a.condition : '';
           if (condName) {
             for (var i = 0; i < conds.length; i++) {
-              if (conds[i].assetConditionDesc === condName) { this.ef.editConditionId = conds[i].assetCondition_ID; break; }
+              if (conds[i].assetConditionDesc === condName) { this.ef.editConditionId = conds[i].assetConditionId; break; }
             }
           }
         }
@@ -731,21 +840,6 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
           return 0;
         });
         this.editCidmsSubComponentTypes.set(sc);
-      }.bind(this));
-
-      this.api.getEmployees().subscribe(function(this: AssetDetailComponent, emps: any[]) {
-        emps.sort(function(a: any, b: any) {
-          var as = (a.surname || '').toLowerCase();
-          var bs = (b.surname || '').toLowerCase();
-          if (as < bs) { return -1; }
-          if (as > bs) { return 1; }
-          var af = (a.firstName || '').toLowerCase();
-          var bf = (b.firstName || '').toLowerCase();
-          if (af < bf) { return -1; }
-          if (af > bf) { return 1; }
-          return 0;
-        });
-        this.editEmployees.set(emps);
       }.bind(this));
 
       this.api.getDepartments().subscribe(function(this: AssetDetailComponent, d: any) {
@@ -971,6 +1065,10 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     this.editNoClassMessage.set('');
     if (!classId) {
       this.ef.assetClassName = '';
+      this.efNoUsefulLife.set(false);
+      this.efRequireStatus.set(false);
+      this.efDepreciationDisabled.set(false);
+      this.efShowRevalMethod.set(false);
       return;
     }
     var classes = this.editFilteredClasses();
@@ -979,26 +1077,61 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
       if (classes[i].assetClass_ID === classId) { cls = classes[i]; break; }
     }
     if (!cls) { return; }
+    this.applyAllClassRules(cls);
+  }
+
+  private applyAllClassRules(cls: any): void {
     this.ef.assetClassName = cls.assetClassDesc;
-    var usefulMonths = cls.usefulLifeInMonths || 0;
-    this.ef.usefulLifeTotal = usefulMonths;
-    if (cls.assetDepreciationMethod_ID) {
-      var dms = this.editDepreciationMethods();
-      for (var j = 0; j < dms.length; j++) {
-        if (dms[j].assetDepreciationMethod_ID === cls.assetDepreciationMethod_ID) {
-          break;
-        }
-      }
+
+    var editTypeId = this.ef.editTypeId;
+    var selectedType = this.editAssetTypes().find(function(t: any) { return Number(t.assetTypeId) === Number(editTypeId); });
+    var noUsefulLife = selectedType?.noUsefulLife === 1 || selectedType?.noUsefulLife === true;
+    this.efNoUsefulLife.set(noUsefulLife);
+    this.ef.usefulLifeTotal = noUsefulLife ? 0 : (cls.usefulLifeInMonths || 0);
+
+    var editCategoryId = this.ef.editCategoryId;
+    var selectedCat = this.editFilteredCategories().find(function(c: any) { return Number(c.assetCategoryId) === Number(editCategoryId); });
+    var requireStatus = selectedCat?.requireStatus === 1 || selectedCat?.requireStatus === true;
+    this.efRequireStatus.set(requireStatus);
+    if (cls.assetStatus_ID && requireStatus) {
+      this.ef.editStatusId = cls.assetStatus_ID;
+    } else if (!requireStatus) {
+      this.ef.editStatusId = 0;
     }
-    if (cls.assetStatus_ID) {
-      var sts = this.editAssetStatuses();
-      for (var k = 0; k < sts.length; k++) {
-        if (sts[k].assetStatusId === cls.assetStatus_ID) {
-          this.ef.editStatusId = sts[k].assetStatusId;
-          break;
-        }
-      }
+
+    this.ef.editDepreciationMethodId = cls.assetDepreciationMethod_ID || 0;
+
+    if (cls.assetMeasurement_ID) {
+      this.ef.editMeasurementTypeId = cls.assetMeasurement_ID;
+      this.applyMeasurementTypeRules(cls.assetMeasurement_ID);
     }
+
+    if (cls.revaluationMethod) {
+      this.ef.revaluationMethod = cls.revaluationMethod;
+    }
+  }
+
+  private applyMeasurementTypeRules(measurementTypeId: number): void {
+    var mts = this.editMeasurementTypes();
+    var mt: any = null;
+    for (var i = 0; i < mts.length; i++) {
+      if (Number(mts[i].measurementTypeId) === Number(measurementTypeId)) { mt = mts[i]; break; }
+    }
+    if (!mt) {
+      this.efDepreciationDisabled.set(false);
+      this.efShowRevalMethod.set(false);
+      return;
+    }
+    var noDepreciation = mt.noDepreciation === 1 || mt.noDepreciation === true;
+    this.efDepreciationDisabled.set(noDepreciation);
+    if (noDepreciation) { this.ef.editDepreciationMethodId = 0; }
+    var mtDesc = (mt.measurementTypeDesc || '').toLowerCase().trim();
+    this.efShowRevalMethod.set(mtDesc === 'revaluation module');
+  }
+
+  onEditMeasurementTypeChange(measurementTypeId: number): void {
+    this.ef.editMeasurementTypeId = measurementTypeId;
+    this.applyMeasurementTypeRules(measurementTypeId);
   }
 
   private loadEditClassesForHierarchy(): void {
@@ -1009,6 +1142,8 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     }
     var params: any = { typeId: this.ef.editTypeId, categoryId: this.ef.editCategoryId };
     if (this.ef.editSubCategoryId) { params.subCategoryId = this.ef.editSubCategoryId; }
+    var clsModel = this.orgSettings.settings()?.measurement_model;
+    if (clsModel && clsModel !== 'Mixed') { params.model = clsModel; }
     this.api.getAssetClassesList(params).subscribe({
       next: function(this: AssetDetailComponent, res: any) {
         var list = Array.isArray(res) ? res : (res.data || []);
@@ -1034,9 +1169,21 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
               }
             }
           }
+          if (this.ef.editClassId) {
+            this.applyClassRulesFromList(this.ef.editClassId, list);
+          }
         }
       }.bind(this)
     });
+  }
+
+  private applyClassRulesFromList(classId: number, list: any[]): void {
+    var cls: any = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].assetClass_ID === classId) { cls = list[i]; break; }
+    }
+    if (!cls) { return; }
+    this.applyAllClassRules(cls);
   }
 
   onEditTypeChange(typeId: number): void {
@@ -1050,18 +1197,30 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     this.editFilteredSubCategories.set([]);
     this.editFilteredClasses.set([]);
     this.editNoClassMessage.set('');
+    this.efNoUsefulLife.set(false);
+    this.efRequireStatus.set(false);
+    this.efDepreciationDisabled.set(false);
+    this.efShowRevalMethod.set(false);
     var matchedType: any = null;
     var types = this.editAssetTypes();
     for (var i = 0; i < types.length; i++) {
       if (types[i].assetTypeId === typeId) { matchedType = types[i]; break; }
     }
     this.ef.assetTypeName = matchedType ? matchedType.assetTypeDesc : '';
+    this.ef.editMeasurementTypeId = 0;
     if (typeId) {
       this.api.getAssetCategoriesList({ typeId: typeId }).subscribe(function(this: AssetDetailComponent, cats: any[]) {
         this.editFilteredCategories.set(cats);
       }.bind(this));
+      var model = this.orgSettings.settings()?.measurement_model || undefined;
+      this.api.getMeasurementTypes({ typeId: typeId, model: model }).subscribe(function(this: AssetDetailComponent, mt: any[]) {
+        this.editMeasurementTypes.set(mt);
+        this.efMeasurementEnabled.set(mt.length > 0);
+        if (mt.length === 0) { this.efDepreciationDisabled.set(true); this.efShowRevalMethod.set(false); }
+      }.bind(this));
     } else {
       this.editFilteredCategories.set([]);
+      this.efMeasurementEnabled.set(true);
     }
   }
 
@@ -1072,6 +1231,10 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     this.ef.editClassId = 0;
     this.ef.assetClassName = '';
     this.editNoClassMessage.set('');
+    this.efNoUsefulLife.set(false);
+    this.efRequireStatus.set(false);
+    this.efDepreciationDisabled.set(false);
+    this.efShowRevalMethod.set(false);
     var matchedCat: any = null;
     var cats = this.editFilteredCategories();
     for (var i = 0; i < cats.length; i++) {
@@ -1093,6 +1256,10 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     this.ef.editClassId = 0;
     this.ef.assetClassName = '';
     this.editNoClassMessage.set('');
+    this.efNoUsefulLife.set(false);
+    this.efRequireStatus.set(false);
+    this.efDepreciationDisabled.set(false);
+    this.efShowRevalMethod.set(false);
     var matchedSub: any = null;
     var subs = this.editFilteredSubCategories();
     for (var i = 0; i < subs.length; i++) {
@@ -1144,8 +1311,18 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     setVal('AssetCategory_ID', this.ef.editCategoryId);
     setVal('Asset_SubCategory_ID', this.ef.editSubCategoryId);
     setVal('AssetClass_ID', this.ef.editClassId);
-    setVal('AssetStatus_ID', this.ef.editStatusId);
+    if (!this.efRequireStatus()) {
+      payload['AssetStatus_ID'] = null;
+    } else {
+      setVal('AssetStatus_ID', this.ef.editStatusId);
+    }
     setVal('MeasurementType_ID', this.ef.editMeasurementTypeId);
+    if (this.efDepreciationDisabled()) {
+      payload['AssetDepreciationMethod_ID'] = null;
+    } else {
+      setVal('AssetDepreciationMethod_ID', this.ef.editDepreciationMethodId);
+    }
+    payload['RevaluationMethod'] = this.efShowRevalMethod() ? (this.ef.revaluationMethod || null) : null;
     setVal('Financial_Status_ID', this.ef.editFinancialStatusId);
     setVal('AssetCondition_ID', this.ef.editConditionId);
     setVal('InfrastructurOrNonInfrastructure', this.ef.infrastructureType);
@@ -1173,6 +1350,8 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
     setVal('YearConstructed', this.ef.yearConstructed);
     setVal('ForecastReplacementYear', this.ef.forecastReplacementYear);
     if (this.ef.remainingUsefulLifeTotal) { payload['RemainingUsefulLife'] = this.ef.remainingUsefulLifeTotal; payload['Remaining_Useful_Life_Year'] = Math.floor(this.ef.remainingUsefulLifeTotal / 12); }
+    payload['UsefulLifeMonthComponent'] = this.efNoUsefulLife() ? 0 : (this.ef.usefulLifeTotal || 0);
+    payload['UsefulLifeYearComponent'] = this.efNoUsefulLife() ? 0 : Math.floor((this.ef.usefulLifeTotal || 0) / 12);
     setVal('UoM', this.ef.uom);
     setVal('Quantity', this.ef.quantity);
     setVal('Dim1', this.ef.dim1);

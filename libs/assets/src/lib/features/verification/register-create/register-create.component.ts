@@ -6,14 +6,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../../core/api.service';
+import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
 
 @Component({
   selector: 'app-register-create',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule],
+  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, EmployeeSelectComponent],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-      <button mat-icon-button routerLink="/assets/verification/register"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/verification/register"><mat-icon>arrow_back</mat-icon></button>
       <div>
         <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">Create Verification Register</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">Select assets for physical verification</p>
@@ -101,12 +102,12 @@ import { ApiService } from '../../../core/api.service';
                 } @else {
                   <div class="field-group" style="flex:1;min-width:200px">
                     <label class="field-label">Employee</label>
-                    <select class="field-input" [(ngModel)]="newRegMember.employeeId">
-                      <option [value]="null">-- Select --</option>
-                      @for (emp of employees; track emp.employeeId) {
-                        <option [value]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
-                      }
-                    </select>
+                    <app-employee-select
+                      [(ngModel)]="newRegMember.employeeId"
+                      placeholder="-- Select --"
+                      selectClass="field-input"
+                      (selectionChange)="onNewRegMemberEmployeeSelected($event)"
+                    ></app-employee-select>
                   </div>
                 }
                 <button mat-stroked-button (click)="addRegMember()" style="gap:6px;white-space:nowrap;margin-bottom:2px">
@@ -322,7 +323,7 @@ export class RegisterCreateComponent implements OnInit, OnDestroy {
     { value: 'Custom', label: 'Custom', icon: 'tune', color: '#7c3aed', description: 'Custom selection of any asset type' }
   ];
 
-  employees: any[] = [];
+  newRegMemberEmployee: any = null;
   previewItems: any[] = [];
   selectedIds = new Set<number>();
   loadingPreview = false;
@@ -350,7 +351,6 @@ export class RegisterCreateComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.api.getAssetTypes().subscribe({ next: function(this: RegisterCreateComponent, d: any[]) { this.assetTypes = d; }.bind(this) });
     this.api.getAssetCategoriesList().subscribe({ next: function(this: RegisterCreateComponent, d: any[]) { this.categories = d; }.bind(this) });
-    this.api.getEmployees().subscribe({ next: function(this: RegisterCreateComponent, d: any[]) { this.employees = d; }.bind(this) });
   }
 
   ngOnDestroy() {
@@ -581,16 +581,17 @@ export class RegisterCreateComponent implements OnInit, OnDestroy {
     this.newRegMember.employeeName = '';
   }
 
+  onNewRegMemberEmployeeSelected(emp: any) {
+    this.newRegMemberEmployee = emp || null;
+  }
+
   addRegMember() {
     if (this.newRegMember.isExternal) {
       if (!(this.newRegMember.employeeName || '').trim()) return;
       this.regTeamMembers.push({ isExternal: true, employeeId: null, employeeName: this.newRegMember.employeeName.trim(), displayName: this.newRegMember.employeeName.trim() });
     } else {
       if (!this.newRegMember.employeeId) return;
-      var emp = null;
-      for (var i = 0; i < this.employees.length; i++) {
-        if (this.employees[i].employeeId === this.newRegMember.employeeId) { emp = this.employees[i]; break; }
-      }
+      var emp = this.newRegMemberEmployee;
       var already = false;
       for (var j = 0; j < this.regTeamMembers.length; j++) {
         if (!this.regTeamMembers[j].isExternal && this.regTeamMembers[j].employeeId === this.newRegMember.employeeId) { already = true; break; }
@@ -600,6 +601,7 @@ export class RegisterCreateComponent implements OnInit, OnDestroy {
       this.regTeamMembers.push({ isExternal: false, employeeId: this.newRegMember.employeeId, employeeName: name, displayName: name });
     }
     this.newRegMember = { isExternal: false, employeeId: null, employeeName: '' };
+    this.newRegMemberEmployee = null;
   }
 
   removeRegMember(index: number) {
@@ -629,7 +631,7 @@ export class RegisterCreateComponent implements OnInit, OnDestroy {
             self.api.createVerificationItems(registerId, ids).subscribe({
               next: function() {
                 self.creating = false;
-                self.router.navigate(['/assets/verification/register', registerId]);
+                self.router.navigate(['/verification/register', registerId]);
               },
               error: function() { self.creating = false; alert('Failed to add items to register'); }
             });

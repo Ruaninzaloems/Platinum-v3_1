@@ -7,6 +7,7 @@
     <div class="tab-bar">
       <button class="tab-btn" [class.active]="activeTab === 'capture'" (click)="activeTab = 'capture'">
         <mat-icon>edit_note</mat-icon> Capture Adjustment
+        @if (ppaDocCount() > 0) { <span class="tab-doc-count">{{ppaDocCount()}}</span> }
       </button>
       <button class="tab-btn" [class.active]="activeTab === 'review'" (click)="activeTab = 'review'; loadReviewList()">
         <mat-icon>rule</mat-icon> Review Queue
@@ -410,15 +411,30 @@
           This adjustment will be submitted for approval. On approval, a transaction will be posted to the target period and transaction summaries will be recalculated from that period forward. Existing transactions in subsequent periods remain unchanged and may require additional prior period adjustments if materially affected.
         </div>
 
-        <div class="form-actions">
-          <button class="submit-btn" (click)="submit()" [disabled]="submitting">
-            @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
-            @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
-            {{submitting ? 'Submitting...' : 'Submit for Approval'}}
-          </button>
-          <button class="ghost-btn" (click)="goBackCapture(5)">Back to GL Coding</button>
-          <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
-        </div>
+        @if (!submitSuccess) {
+          @if (getPpaAssetId() > 0) {
+            <app-asset-document-panel [assetId]="getPpaAssetId()" entityType="Prior Period Adjustment" (documentsChanged)="onPpaDocumentsChanged($event)"></app-asset-document-panel>
+          }
+          <div class="form-actions">
+            <button class="submit-btn" (click)="submit()" [disabled]="submitting">
+              @if (submitting) { <mat-spinner diameter="16" style="display:inline-block;vertical-align:middle;margin-right:6px"></mat-spinner> }
+              @else { <mat-icon style="font-size:18px;vertical-align:middle;margin-right:4px">send</mat-icon> }
+              {{submitting ? 'Submitting...' : 'Submit for Approval'}}
+            </button>
+            <button class="ghost-btn" (click)="goBackCapture(5)">Back to GL Coding</button>
+            <button class="ghost-btn" (click)="resetCapture()">Start Over</button>
+          </div>
+        } @else {
+          <div class="success-msg" style="margin-top:16px">
+            <mat-icon style="font-size:16px">check_circle</mat-icon> Adjustment submitted and awaiting approval
+          </div>
+          @if (lastSubmittedPpaAssetId > 0) {
+            <app-asset-document-panel [assetId]="lastSubmittedPpaAssetId" [entityId]="lastSubmittedId" entityType="Prior Period Adjustment" (documentsChanged)="onPpaDocumentsChanged($event)"></app-asset-document-panel>
+          }
+          <div class="form-actions">
+            <button class="ghost-btn" (click)="resetCapture()">Submit Another Adjustment</button>
+          </div>
+        }
       </div>
     }
   }

@@ -5,12 +5,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../../../core/api.service';
 
 @Component({
   selector: 'app-measurement-types',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './measurement-types.component.html',
   styleUrls: ['./measurement-types.component.css']
 })
@@ -19,7 +20,7 @@ export class MeasurementTypesComponent implements OnInit {
   loading = signal(true);
   showForm = signal(false);
   editingId = signal<number | null>(null);
-  formData = { name: '' };
+  formData = { name: '', enabled: 1, noDepreciation: 0 };
   showImport = signal(false);
   importFile = signal<File | null>(null);
   importing = signal(false);
@@ -38,9 +39,12 @@ export class MeasurementTypesComponent implements OnInit {
     });
   }
 
-  openAdd(): void { this.formData = { name: '' }; this.editingId.set(null); this.showForm.set(true); }
-  openEdit(item: any): void { this.formData = { name: item.name }; this.editingId.set(item.assetMeasurement_ID); this.showForm.set(true); }
+  openAdd(): void { this.formData = { name: '', enabled: 1, noDepreciation: 0 }; this.editingId.set(null); this.showForm.set(true); }
+  openEdit(item: any): void { this.formData = { name: item.measurementTypeDesc, enabled: item.enabled ?? 1, noDepreciation: item.noDepreciation ?? 0 }; this.editingId.set(item.measurementTypeId); this.showForm.set(true); }
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
+  onNoDepreciationChange(event: Event): void { this.formData.noDepreciation = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   save(): void {
     const id = this.editingId();
@@ -52,8 +56,8 @@ export class MeasurementTypesComponent implements OnInit {
   }
 
   confirmDelete(item: any): void {
-    if (confirm('Delete "' + item.name + '"?')) {
-      this.api.deleteMeasurementType(item.assetMeasurement_ID).subscribe({
+    if (confirm('Delete "' + item.measurementTypeDesc + '"?')) {
+      this.api.deleteMeasurementType(item.measurementTypeId).subscribe({
         next: function(this: MeasurementTypesComponent) { this.loadData(); this.snackBar.open('Deleted', 'OK', { duration: 3000 }); }.bind(this),
         error: function(this: MeasurementTypesComponent, err: any) { this.snackBar.open(err.error?.error || 'Delete failed', 'OK', { duration: 4000 }); }.bind(this)
       });
@@ -77,6 +81,12 @@ export class MeasurementTypesComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadMeasurementTypeTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'measurement_types_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportMeasurementTypes().subscribe({
+      next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'measurement_types_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

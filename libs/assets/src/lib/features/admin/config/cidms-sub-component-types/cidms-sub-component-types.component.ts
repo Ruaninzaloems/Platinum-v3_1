@@ -61,20 +61,23 @@ export class CidmsSubComponentTypesComponent implements OnInit {
     return 'None';
   }
 
-  openAdd(): void { this.formData = { assetCIDMSSubComponentTypeDesc: '', assetCIDMSComponentTypeID: null, infrastructure: 0, nature: 0 }; this.editingId.set(null); this.showForm.set(true); }
+  openAdd(): void { this.formData = { assetCIDMSSubComponentTypeDesc: '', assetCIDMSComponentTypeID: null, infrastructure: 0, nature: 0, enabled: 1 }; this.editingId.set(null); this.showForm.set(true); }
 
   openEdit(item: any): void {
     this.formData = {
       assetCIDMSSubComponentTypeDesc: item.assetCIDMSSubComponentTypeDesc,
       assetCIDMSComponentTypeID: item.assetCIDMSComponentTypeID,
       infrastructure: item.infrastructure || 0,
-      nature: item.nature || 0
+      nature: item.nature || 0,
+      enabled: item.enabled ?? 1
     };
     this.editingId.set(item.assetCIDMSSubComponentTypeID);
     this.showForm.set(true);
   }
 
   cancelForm(): void { this.showForm.set(false); this.editingId.set(null); }
+
+  onEnabledChange(event: Event): void { this.formData.enabled = (event.target as HTMLInputElement).checked ? 1 : 0; }
 
   onInfrastructureChange(checked: boolean): void {
     this.formData.infrastructure = checked ? 1 : 0;
@@ -86,7 +89,8 @@ export class CidmsSubComponentTypesComponent implements OnInit {
       assetCIDMSSubComponentTypeDesc: this.formData.assetCIDMSSubComponentTypeDesc,
       assetCIDMSComponentTypeID: this.formData.assetCIDMSComponentTypeID ? Number(this.formData.assetCIDMSComponentTypeID) : null,
       infrastructure: this.formData.infrastructure,
-      nature: this.formData.nature ? Number(this.formData.nature) : 0
+      nature: this.formData.nature ? Number(this.formData.nature) : 0,
+      enabled: this.formData.enabled
     };
     const obs = id ? this.api.updateCidmsSubComponentType(id, payload) : this.api.createCidmsSubComponentType(payload);
     obs.subscribe({
@@ -121,6 +125,12 @@ export class CidmsSubComponentTypesComponent implements OnInit {
   downloadTemplate(): void {
     this.api.downloadCidmsSubComponentTypeTemplate().subscribe({
       next: function(blob: Blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_sub_component_types_template.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
+
+  exportToExcel(): void {
+    this.api.exportCidmsSubComponentTypes().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'cidms_sub_component_types_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
     });
   }
 }

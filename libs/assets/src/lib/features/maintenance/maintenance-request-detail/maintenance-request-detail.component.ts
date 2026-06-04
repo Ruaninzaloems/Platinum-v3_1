@@ -180,7 +180,11 @@ export class MaintenanceRequestDetailComponent implements OnInit {
     });
   }
 
-  goBack() { this.router.navigate(['/assets/maintenance/requests']); }
+  goBack() { this.router.navigate(['/maintenance/requests']); }
+
+  openWorkOrderDetail(woId: number) {
+    this.router.navigate(['/maintenance/work-orders', woId]);
+  }
 
   setTab(tab: 'details' | 'workorders') { this.activeTab.set(tab); }
 

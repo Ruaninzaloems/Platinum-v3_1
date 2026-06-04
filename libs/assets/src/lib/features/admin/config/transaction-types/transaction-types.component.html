@@ -5,6 +5,7 @@
         <p class="page-subtitle">Manage asset transaction type configurations</p>
       </div>
       <div class="header-actions">
+        <button mat-stroked-button (click)="exportToExcel()"><mat-icon>download</mat-icon> Export to Excel</button>
         <button mat-stroked-button (click)="openImport()">
           <mat-icon>upload_file</mat-icon> Import from Excel
         </button>
@@ -21,6 +22,13 @@
           <div class="form-field">
             <label>Transaction Type *</label>
             <input type="text" class="form-input" [(ngModel)]="formData.name" placeholder="Enter transaction type description">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="checkbox-label">
+              <input type="checkbox" [checked]="formData.enabled === 1" (change)="onEnabledChange($event)"> Active
+            </label>
           </div>
         </div>
         <div class="form-actions">

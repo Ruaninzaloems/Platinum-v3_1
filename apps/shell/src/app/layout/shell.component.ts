@@ -7,6 +7,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '@platinumv3/shared/auth';
+import { DatabaseToggleService } from '@platinumv3/assets';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
@@ -38,7 +39,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint' | 'admin';
 
 @Component({
   selector: 'app-shell',
@@ -73,6 +74,8 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                     <span class="brand-module">Overtime</span>
                   } @else if (activeModule() === 'sharepoint') {
                     <span class="brand-module">SharePoint</span>
+                  } @else if (activeModule() === 'admin') {
+                    <span class="brand-module">Admin</span>
                   }
                 </div>
               </div>
@@ -109,6 +112,9 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </button>
               <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
                 <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
+              </button>
+              <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
+                <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
               </button>
             </div>
           }
@@ -339,6 +345,35 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <span>UatAssets</span>
             </a>
             <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
+          } @else if (activeModule() === 'admin') {
+            <div style="padding:6px 16px 4px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">API Config</div>
+            <a class="nav-link sub-item" routerLink="/admin-settings/assets" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">inventory_2</mat-icon><span>Assets</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/scm" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">local_shipping</mat-icon><span>SCM</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/pos" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">point_of_sale</mat-icon><span>POS</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/payroll" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">payments</mat-icon><span>Payroll</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/idp" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">assignment</mat-icon><span>IDP</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/budget" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">account_balance</mat-icon><span>Budget</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/afs" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">summarize</mat-icon><span>AFS</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/insights" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">insights</mat-icon><span>Performance</span>
+            </a>
+            <a class="nav-link sub-item" routerLink="/admin-settings/overtime" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">more_time</mat-icon><span>Overtime</span>
+            </a>
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -352,6 +387,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             @else if (activeModule() === 'afs') { v4.0 · GRAP/MFMA AFS }
             @else if (activeModule() === 'overtime') { v1.0 · Overtime Mgmt }
             @else if (activeModule() === 'sharepoint') { Microsoft 365 · SharePoint }
+            @else if (activeModule() === 'admin') { System Administration }
             @else { v1.0 · GRAP Compliant }
           }
         </div>
@@ -367,6 +403,18 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             <span class="period-badge">FY {{activeFinYear()}} · P{{activePeriod()}}</span>
           </div>
           <div style="flex:1"></div>
+          @if (activeModule() === 'assets') {
+            <button class="db-toggle"
+              [class.sqlserver]="dbToggle.activeBackend() === 'sqlserver'"
+              [class.hybrid]="dbToggle.activeBackend() === 'hybrid'"
+              (click)="dbToggle.cycleBackend()"
+              [matTooltip]="dbToggle.activeBackend() === 'postgresql' ? 'Mode: PostgreSQL — click to switch to SQL Server' : dbToggle.activeBackend() === 'sqlserver' ? 'Mode: SQL Server — click to switch to Hybrid' : 'Mode: Hybrid — click to switch to PostgreSQL'">
+              <mat-icon style="font-size:16px">storage</mat-icon>
+              @if (dbToggle.activeBackend() === 'postgresql') { <span>PostgreSQL</span> }
+              @else if (dbToggle.activeBackend() === 'sqlserver') { <span>SQL Server</span> }
+              @else { <span>Hybrid</span> }
+            </button>
+          }
           <span class="audit-badge"><mat-icon style="font-size:14px">verified</mat-icon> Clean Audit</span>
           <button mat-icon-button [matMenuTriggerFor]="userMenu" style="margin-left:8px">
             <div class="user-avatar">{{ userInitials() }}</div>
@@ -464,6 +512,16 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
       display: inline-flex; align-items: center; background: #e8f5e9; color: #2e7d32;
       font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 16px;
     }
+    .db-toggle {
+      display: inline-flex; align-items: center; gap: 6px; background: #e8f5e9; color: #2e7d32;
+      font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 16px; border: none;
+      cursor: pointer; margin-right: 8px; transition: all 0.2s;
+    }
+    .db-toggle:hover { background: #c8e6c9; }
+    .db-toggle.sqlserver { background: #e3f2fd; color: #1565c0; }
+    .db-toggle.sqlserver:hover { background: #bbdefb; }
+    .db-toggle.hybrid { background: #f3e5f5; color: #6a1b9a; }
+    .db-toggle.hybrid:hover { background: #e1bee7; }
     .audit-badge {
       display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: #92400e;
       font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 12px;
@@ -485,7 +543,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   private expandedGroups = signal<Set<string>>(new Set());
   private routeSub!: Subscription;
 
-  constructor(public authService: AuthService, private router: Router) {}
+  constructor(public authService: AuthService, private router: Router, public dbToggle: DatabaseToggleService) {}
 
   ngOnInit() {
     this.syncModuleFromUrl(this.router.url);
@@ -529,6 +587,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     else if (url.startsWith('/afs')) mod = 'afs';
     else if (url.startsWith('/overtime')) mod = 'overtime';
     else if (url.startsWith('/sharepoint')) mod = 'sharepoint'; // covers /sharepoint and /sharepoint/uat-assets
+    else if (url.startsWith('/admin-settings')) mod = 'admin'; // covers /admin-settings and /admin-settings/:module
     this.activeModule.set(mod);
   }
 
@@ -544,7 +603,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       budget: '/budget',
       afs: '/afs',
       overtime: '/overtime',
-      sharepoint: '/sharepoint'
+      sharepoint: '/sharepoint',
+      admin: '/admin-settings/assets'
     };
     this.router.navigate([routeMap[mod]]);
   }

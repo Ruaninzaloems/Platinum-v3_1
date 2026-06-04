@@ -4,7 +4,7 @@
   <div style="text-align:center;padding:80px;color:#94a3b8">Project not found</div>
 } @else {
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
-    <button mat-icon-button routerLink="/assets/wip" style="color:#64748b"><mat-icon>arrow_back</mat-icon></button>
+    <button mat-icon-button routerLink="/wip" style="color:#64748b"><mat-icon>arrow_back</mat-icon></button>
     <div>
       <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">{{project().projectName}}</h1>
       <div style="font-size:13px;color:#64748b;margin-top:2px">
@@ -205,12 +205,11 @@
           </div>
           <div>
             <div class="field-label">Custodian</div>
-            <select class="field-input" [(ngModel)]="editData.custodianId">
-              <option [ngValue]="null">Select Custodian</option>
-              @for (emp of employees(); track emp.employeeId) {
-                <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
-              }
-            </select>
+            <app-employee-select
+              [(ngModel)]="editData.custodianId"
+              placeholder="Select Custodian"
+              selectClass="field-input"
+            ></app-employee-select>
           </div>
           <div><div class="field-label">Latitude</div><input class="field-input" [(ngModel)]="editData.latitude" /></div>
           <div><div class="field-label">Longitude</div><input class="field-input" [(ngModel)]="editData.longitude" /></div>

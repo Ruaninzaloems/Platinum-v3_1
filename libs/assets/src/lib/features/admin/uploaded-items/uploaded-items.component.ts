@@ -7,6 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../../core/api.service';
+import { AuthService } from '../../../core/auth.service';
 
 @Component({
   selector: 'app-uploaded-items',
@@ -34,7 +35,7 @@ export class UploadedItemsComponent implements OnInit, OnDestroy {
   jobFinancialYears: { [jobId: number]: string } = {};
   private progressInterval: any = null;
 
-  constructor(private api: ApiService, private snackBar: MatSnackBar) {}
+  constructor(private api: ApiService, private snackBar: MatSnackBar, private auth: AuthService) {}
 
   ngOnInit(): void {
     this.buildFinancialYears();
@@ -115,7 +116,7 @@ export class UploadedItemsComponent implements OnInit, OnDestroy {
     this.approvingJobId.set(job.id);
     this.approveProgress.set({ phase: 'starting', percent: 2, message: 'Starting approval...' });
     this.startApprovePolling(job.id);
-    this.api.approveBulkUpload(job.id, fy).subscribe({
+    this.api.approveBulkUpload(job.id, fy, this.auth.getCurrentUserId()).subscribe({
       next: function(this: UploadedItemsComponent, result: any) {
         this.stopPolling();
         this.approveProgress.set({ phase: 'complete', percent: 100, message: 'Approved! ' + result.approvedRecords + ' records added.' });
@@ -132,7 +133,7 @@ export class UploadedItemsComponent implements OnInit, OnDestroy {
         this.stopPolling();
         this.approvingJobId.set(null);
         this.approveProgress.set(null);
-        this.snackBar.open(err.error?.error || 'Approval failed', 'OK', { duration: 5000 });
+        this.snackBar.open(err.error?.detail || err.error?.error || 'Approval failed', 'OK', { duration: 8000 });
       }.bind(this)
     });
   }

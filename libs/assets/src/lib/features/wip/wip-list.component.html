@@ -1,8 +1,8 @@
 <div class="page-tabs">
-  <a class="page-tab active" routerLink="/assets/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+  <a class="page-tab active" routerLink="/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
     <mat-icon>construction</mat-icon> WIP Register
   </a>
-  <a class="page-tab" routerLink="/assets/wip/unbundling" routerLinkActive="active">
+  <a class="page-tab" routerLink="/wip/unbundling" routerLinkActive="active">
     <mat-icon>category</mat-icon> Asset Unbundling
   </a>
 </div>
@@ -94,12 +94,11 @@
       </div>
       <div>
         <label class="form-label">Custodian</label>
-        <select class="form-input" [(ngModel)]="newProject.custodianId">
-          <option [ngValue]="null">Select Custodian</option>
-          @for (emp of employees(); track emp.employeeId) {
-            <option [ngValue]="emp.employeeId">{{emp.surname}}, {{emp.firstName}}</option>
-          }
-        </select>
+        <app-employee-select
+          [(ngModel)]="newProject.custodianId"
+          placeholder="Select Custodian"
+          selectClass="form-input"
+        ></app-employee-select>
       </div>
       <div>
         <label class="form-label">Latitude</label>

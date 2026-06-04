@@ -6,7 +6,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../core/api.service';
+import { OrgSettingsService } from '../../core/org-settings.service';
+import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
 
 type WizardStep = 'classification' | 'dates' | 'ownership' | 'location' | 'review';
 const WIZARD_STEP_ORDER: WizardStep[] = ['classification', 'dates', 'ownership', 'location', 'review'];
@@ -14,7 +17,7 @@ const WIZARD_STEP_ORDER: WizardStep[] = ['classification', 'dates', 'ownership',
 @Component({
   selector: 'app-acquisitions',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule, EmployeeSelectComponent],
   templateUrl: './acquisitions.component.html',
   styleUrls: ['./acquisitions.component.scss']
 })
@@ -53,9 +56,9 @@ export class AcquisitionsComponent implements OnInit {
   assetStatuses = signal<any[]>([]);
   assetConditions = signal<any[]>([]);
   measurementTypes = signal<any[]>([]);
+  naMeasurementEnabled = signal(true);
   departments = signal<any[]>([]);
   divisions = signal<any[]>([]);
-  employees = signal<any[]>([]);
   towns = signal<any[]>([]);
   suburbs = signal<any[]>([]);
   wards = signal<any[]>([]);
@@ -69,6 +72,17 @@ export class AcquisitionsComponent implements OnInit {
   filteredCategories = signal<any[]>([]);
   filteredSubCategories = signal<any[]>([]);
   filteredDivisions = signal<any[]>([]);
+
+  grnDocs = signal<any[]>([]);
+  grnDocsLoading = signal(false);
+  showGrnDocs = signal(false);
+  selectedGrnDoc = signal<any | null>(null);
+
+  listExpandedAssetId = signal<number | null>(null);
+  listGrnId = signal<number | null>(null);
+  listGrnDocs = signal<any[]>([]);
+  listGrnDocsLoading = signal(false);
+  listSelectedGrnDoc = signal<any | null>(null);
 
   na: any = this.emptyForm();
 
@@ -92,7 +106,7 @@ export class AcquisitionsComponent implements OnInit {
     return this.listItems().filter(function(i: any) { return i.acquisitionType === 'Donation'; });
   }.bind(this));
 
-  constructor(private api: ApiService, private snackBar: MatSnackBar, public router: Router) {}
+  constructor(private api: ApiService, private snackBar: MatSnackBar, public router: Router, private orgSettings: OrgSettingsService, private sanitizer: DomSanitizer) {}
 
   ngOnInit() {
     this.loadLookups();
@@ -114,7 +128,8 @@ export class AcquisitionsComponent implements OnInit {
       donorName: '', donorRegNumber: '', dateDonated: '',
       invoiceNo: '', paymentNo: '',
       grnId: null, inventoryId: null,
-      scmTransferId: null, invTransferId: null
+      scmTransferId: null, invTransferId: null,
+      projectItemId: null, projectId: null, projectName: '', scoaDesc: ''
     };
   }
 
@@ -124,9 +139,10 @@ export class AcquisitionsComponent implements OnInit {
     this.api.getAssetCategoriesList().subscribe(function(d: any) { self.allCategories.set(d || []); }, function() {});
     this.api.getAssetStatuses().subscribe(function(d: any) { self.assetStatuses.set(d || []); }, function() {});
     this.api.getAssetConditions().subscribe(function(d: any) { self.assetConditions.set(d || []); }, function() {});
-    this.api.getMeasurementTypes().subscribe(function(d: any) { self.measurementTypes.set(d || []); }, function() {});
+    this.orgSettings.whenLoaded().subscribe(function(s: any) {
+      self.api.getMeasurementTypes({ model: s?.measurement_model || undefined }).subscribe(function(d: any) { self.measurementTypes.set(d || []); }, function() {});
+    });
     this.api.getDepartments().subscribe(function(d: any) { self.departments.set(d || []); }, function() {});
-    this.api.getEmployees().subscribe(function(d: any) { self.employees.set(d || []); }, function() {});
     this.api.getVerificationLookupTowns().subscribe(function(d: any) { self.towns.set(d || []); }, function() {});
     this.api.getVerificationLookupWards().subscribe(function(d: any) { self.wards.set(d || []); }, function() {});
     this.api.getVerificationLookupBuildings().subscribe(function(d: any) { self.buildings.set(d || []); }, function() {});
@@ -182,6 +198,8 @@ export class AcquisitionsComponent implements OnInit {
     this.activeTab.set(tab);
     this.wizardVisible.set(tab === 'donation');
     this.wizardStep.set('classification');
+    this.showGrnDocs.set(false);
+    this.grnDocs.set([]);
     this.scmSelectedRow = null;
     this.invSelectedRow = null;
     this.scmTableCollapsed.set(false);
@@ -249,6 +267,8 @@ export class AcquisitionsComponent implements OnInit {
   selectScmRow(row: any) {
     var self = this;
     this.scmSelectedRow = row;
+    this.showGrnDocs.set(false);
+    this.grnDocs.set([]);
     this.na = this.emptyForm();
     this.na.scmTransferId    = row.transferId      != null ? row.transferId    : null;
     this.na.description      = row.description     || '';
@@ -279,11 +299,20 @@ export class AcquisitionsComponent implements OnInit {
     this.na.measurementTypeId = row.classMeasurementTypeId || 0;
     this.na.assetStatusId    = row.assetStatusId      || row.classAssetStatusId    || 0;
     this.na.usefulLifeMonths = row.usefulLifeMonths   || row.classUsefulLifeMonths || null;
-    // Load filtered categories for typeId (for type dropdown display)
+    this.na.projectItemId    = row.projectItemId  != null ? row.projectItemId  : null;
+    this.na.projectId        = row.projectId      != null ? row.projectId      : null;
+    this.na.projectName      = row.projectName    || '';
+    this.na.scoaDesc         = row.scoaDesc       || '';
+    // Load filtered categories + measurement types for typeId
     if (this.na.typeId) {
       var typeId = Number(this.na.typeId);
       this.api.getAssetCategoriesList({ typeId: typeId }).subscribe({
         next: function(cats: any[]) { self.filteredCategories.set(cats || []); },
+        error: function() {}
+      });
+      var model = this.orgSettings.settings()?.measurement_model || undefined;
+      this.api.getMeasurementTypes({ typeId: typeId, model: model }).subscribe({
+        next: function(mt: any[]) { self.measurementTypes.set(mt || []); self.naMeasurementEnabled.set(mt.length > 0); },
         error: function() {}
       });
     }
@@ -304,6 +333,8 @@ export class AcquisitionsComponent implements OnInit {
   selectInvRow(row: any) {
     var self = this;
     this.invSelectedRow = row;
+    this.showGrnDocs.set(false);
+    this.grnDocs.set([]);
     this.na = this.emptyForm();
     this.na.invTransferId    = row.itemId         != null ? row.itemId         : null;
     this.na.description      = row.description   || '';
@@ -322,11 +353,16 @@ export class AcquisitionsComponent implements OnInit {
     this.na.measurementTypeId = row.classMeasurementTypeId || 0;
     this.na.assetStatusId    = row.assetStatusId         || row.classAssetStatusId || 0;
     this.na.usefulLifeMonths = row.usefulLifeMonths      || row.classUsefulLifeMonths || null;
-    // Load filtered categories for typeId (for type dropdown display)
+    // Load filtered categories + measurement types for typeId
     if (this.na.typeId) {
       var typeId = Number(this.na.typeId);
       this.api.getAssetCategoriesList({ typeId: typeId }).subscribe({
         next: function(cats: any[]) { self.filteredCategories.set(cats || []); },
+        error: function() {}
+      });
+      var model2 = this.orgSettings.settings()?.measurement_model || undefined;
+      this.api.getMeasurementTypes({ typeId: typeId, model: model2 }).subscribe({
+        next: function(mt: any[]) { self.measurementTypes.set(mt || []); self.naMeasurementEnabled.set(mt.length > 0); },
         error: function() {}
       });
     }
@@ -338,6 +374,8 @@ export class AcquisitionsComponent implements OnInit {
   cancelWizard() {
     this.wizardVisible.set(false);
     this.wizardStep.set('classification');
+    this.showGrnDocs.set(false);
+    this.grnDocs.set([]);
     this.scmSelectedRow = null;
     this.invSelectedRow = null;
     this.scmTableCollapsed.set(false);
@@ -360,7 +398,145 @@ export class AcquisitionsComponent implements OnInit {
   }
 
   goToStep(step: WizardStep) {
+    this.showGrnDocs.set(false);
     this.wizardStep.set(step);
+  }
+
+  loadGrnDocuments(grnId: number) {
+    var self = this;
+    this.grnDocsLoading.set(true);
+    this.grnDocs.set([]);
+    this.selectedGrnDoc.set(null);
+    this.api.getGrnDocuments(grnId).subscribe(function(d: any) {
+      self.grnDocs.set(d || []);
+      self.grnDocsLoading.set(false);
+    }, function() {
+      self.grnDocsLoading.set(false);
+    });
+  }
+
+  previewGrnDocument(doc: any) {
+    if (this.selectedGrnDoc()?.documentId === doc.documentId) {
+      this.selectedGrnDoc.set(null);
+    } else {
+      this.selectedGrnDoc.set(doc);
+    }
+  }
+
+  getGrnDocumentPreviewUrl(doc: any): SafeResourceUrl {
+    var url = this.api.getGrnDocumentFileUrl(this.na.grnId, doc.documentId);
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  isPreviewableGrnDoc(doc: any): boolean {
+    var previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif'];
+    var mimeToExt: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/bmp': 'bmp',
+      'image/tiff': 'tiff'
+    };
+    if (doc?.fileType) {
+      var ft = doc.fileType.toLowerCase().trim();
+      if (mimeToExt[ft]) return true;
+      var normalized = ft.replace(/^\./, '');
+      if (previewable.includes(normalized)) return true;
+    }
+    if (!doc?.documentPath) return false;
+    var ext = doc.documentPath.split('.').pop()?.toLowerCase() || '';
+    return previewable.includes(ext);
+  }
+
+  isGrnDocPdf(doc: any): boolean {
+    if (doc?.fileType) {
+      var ft = doc.fileType.toLowerCase().trim();
+      return ft === 'application/pdf' || ft === 'pdf' || ft === '.pdf';
+    }
+    return (doc?.documentPath || '').toLowerCase().includes('.pdf');
+  }
+
+  openGrnDocument(doc: any) {
+    if (!doc?.documentPath) return;
+    window.open(this.api.getGrnDocumentFileUrl(this.na.grnId, doc.documentId), '_blank');
+  }
+
+  openListGrnDocs(row: any, event: Event) {
+    event.stopPropagation();
+    var assetId = row.assetId;
+    var grnId = row.grnId;
+    if (this.listExpandedAssetId() === assetId) {
+      this.listExpandedAssetId.set(null);
+      this.listGrnId.set(null);
+      this.listGrnDocs.set([]);
+      this.listSelectedGrnDoc.set(null);
+      return;
+    }
+    var self = this;
+    var currentAssetId = assetId;
+    this.listExpandedAssetId.set(assetId);
+    this.listGrnId.set(grnId);
+    this.listGrnDocs.set([]);
+    this.listSelectedGrnDoc.set(null);
+    this.listGrnDocsLoading.set(true);
+    this.api.getGrnDocuments(grnId).subscribe(function(d: any) {
+      if (self.listExpandedAssetId() !== currentAssetId) return;
+      self.listGrnDocs.set(d || []);
+      self.listGrnDocsLoading.set(false);
+    }, function() {
+      if (self.listExpandedAssetId() !== currentAssetId) return;
+      self.listGrnDocsLoading.set(false);
+    });
+  }
+
+  previewListGrnDocument(doc: any) {
+    if (this.listSelectedGrnDoc()?.documentId === doc.documentId) {
+      this.listSelectedGrnDoc.set(null);
+    } else {
+      this.listSelectedGrnDoc.set(doc);
+    }
+  }
+
+  getListGrnDocumentPreviewUrl(doc: any): SafeResourceUrl {
+    var url = this.api.getGrnDocumentFileUrl(this.listGrnId()!, doc.documentId);
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  isListGrnDocPdf(doc: any): boolean {
+    if (doc?.fileType) {
+      var ft = doc.fileType.toLowerCase().trim();
+      return ft === 'application/pdf' || ft === 'pdf' || ft === '.pdf';
+    }
+    return (doc?.documentPath || '').toLowerCase().includes('.pdf');
+  }
+
+  isPreviewableListGrnDoc(doc: any): boolean {
+    var previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif'];
+    var mimeToExt: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/bmp': 'bmp',
+      'image/tiff': 'tiff'
+    };
+    if (doc?.fileType) {
+      var ft = doc.fileType.toLowerCase().trim();
+      if (mimeToExt[ft]) return true;
+      var normalized = ft.replace(/^\./, '');
+      if (previewable.includes(normalized)) return true;
+    }
+    if (!doc?.documentPath) return false;
+    var ext = doc.documentPath.split('.').pop()?.toLowerCase() || '';
+    return previewable.includes(ext);
+  }
+
+  openListGrnDocument(doc: any) {
+    if (!doc?.documentPath) return;
+    window.open(this.api.getGrnDocumentFileUrl(this.listGrnId()!, doc.documentId), '_blank');
   }
 
   onTypeChange() {
@@ -369,14 +545,24 @@ export class AcquisitionsComponent implements OnInit {
     this.na.categoryId = 0;
     this.na.subCategoryId = 0;
     this.na.assetClassId = 0;
+    this.na.measurementTypeId = 0;
     this.filteredSubCategories.set([]);
     this.filteredClasses.set([]);
     if (!typeId) {
       this.filteredCategories.set([]);
+      this.naMeasurementEnabled.set(true);
       return;
     }
     this.api.getAssetCategoriesList({ typeId: typeId }).subscribe({
       next: function(cats: any[]) { self.filteredCategories.set(cats || []); },
+      error: function() {}
+    });
+    var model = this.orgSettings.settings()?.measurement_model || undefined;
+    this.api.getMeasurementTypes({ typeId: typeId, model: model }).subscribe({
+      next: function(mt: any[]) {
+        self.measurementTypes.set(mt || []);
+        self.naMeasurementEnabled.set(mt.length > 0);
+      },
       error: function() {}
     });
   }
@@ -400,6 +586,8 @@ export class AcquisitionsComponent implements OnInit {
     });
     var classParams: any = { categoryId: catId };
     if (typeId) { classParams.typeId = typeId; }
+    var clsModel = this.orgSettings.settings()?.measurement_model;
+    if (clsModel && clsModel !== 'Mixed') { classParams.model = clsModel; }
     this.api.getAssetClassesList(classParams).subscribe({
       next: function(res: any) { var arr = Array.isArray(res) ? res : (res?.items || res?.data || []); self.filteredClasses.set(arr); },
       error: function() {}
@@ -416,6 +604,8 @@ export class AcquisitionsComponent implements OnInit {
     var params: any = { categoryId: catId };
     if (typeId) { params.typeId = typeId; }
     if (subCatId) { params.subCategoryId = subCatId; }
+    var subCatModel = this.orgSettings.settings()?.measurement_model;
+    if (subCatModel && subCatModel !== 'Mixed') { params.model = subCatModel; }
     this.api.getAssetClassesList(params).subscribe({
       next: function(res: any) { var arr = Array.isArray(res) ? res : (res?.items || res?.data || []); self.filteredClasses.set(arr); },
       error: function() {}
@@ -533,7 +723,7 @@ export class AcquisitionsComponent implements OnInit {
       self.snackBar.open('Asset ' + newId + ' registered successfully', 'View', {
         duration: 5000, horizontalPosition: 'end', verticalPosition: 'top'
       }).onAction().subscribe(function() {
-        if (newId) self.router.navigate(['/assets/assets', newId]);
+        if (newId) self.router.navigate(['/assets', newId]);
       });
       self.cancelWizard();
       self.na = self.emptyForm();

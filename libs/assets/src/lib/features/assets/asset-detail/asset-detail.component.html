@@ -4,7 +4,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
         <div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <a routerLink="/assets/assets" style="color:#64748b;font-size:13px;display:flex;align-items:center;gap:4px;text-decoration:none"><mat-icon style="font-size:16px">arrow_back</mat-icon>Asset Register</a>
+            <a routerLink="/assets" style="color:#64748b;font-size:13px;display:flex;align-items:center;gap:4px;text-decoration:none"><mat-icon style="font-size:16px">arrow_back</mat-icon>Asset Register</a>
             <mat-icon style="font-size:16px;color:#cbd5e1">chevron_right</mat-icon>
             <span style="font-size:13px;font-weight:600;color:#1e293b">{{asset().assetId}}</span>
           </div>
@@ -44,6 +44,16 @@
           <div>
             <div style="font-size:13px;font-weight:600;color:#92400e">Edit Pending Approval</div>
             <div style="font-size:12px;color:#b45309;margin-top:2px">This asset has a pending edit awaiting approval in the Workflow Inbox. Editing is disabled until the approval is resolved.</div>
+          </div>
+        </div>
+      }
+
+      @if (hasMeasurementConflict()) {
+        <div style="background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+          <mat-icon style="color:#c2410c;font-size:20px;flex-shrink:0;margin-top:1px">warning</mat-icon>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#9a3412">Measurement Type Conflict</div>
+            <div style="font-size:12px;color:#c2410c;margin-top:2px">{{getMeasurementConflictMessage()}}</div>
           </div>
         </div>
       }
@@ -141,26 +151,46 @@
                 <div style="margin:8px 0;padding:10px 14px;background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;display:flex;align-items:center;gap:8px">
                   <mat-icon style="color:#d97706;font-size:18px">warning</mat-icon>
                   <span style="font-size:13px;color:#92400e">{{editNoClassMessage()}}</span>
-                  <a routerLink="/assets/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
+                  <a routerLink="/config/asset-classes" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:underline;white-space:nowrap">Create Asset Class</a>
                 </div>
               }
 
               <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Status &amp; Valuation</div>
               <div class="detail-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
                 <div class="detail-field">
-                  <label>Asset Status</label>
-                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editStatusId" (ngModelChange)="ef.editStatusId=$event">
-                    <option [ngValue]="0">Select...</option>
+                  <label>Asset Status <span style="font-size:11px;color:#94a3b8;font-weight:400">{{efRequireStatus() ? '(required by category)' : '(not required)'}}</span></label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editStatusId" (ngModelChange)="ef.editStatusId=$event" [disabled]="!efRequireStatus()">
+                    <option [ngValue]="0">{{efRequireStatus() ? 'Select...' : 'N/A — status not required'}}</option>
                     @for (s of editAssetStatuses(); track s.assetStatusId) { <option [ngValue]="s.assetStatusId">{{s.assetStatusDesc}}</option> }
                   </select>
                 </div>
                 <div class="detail-field">
-                  <label>Measurement Type</label>
-                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editMeasurementTypeId" (ngModelChange)="ef.editMeasurementTypeId=$event">
-                    <option [ngValue]="0">Select...</option>
+                  <label>Measurement Type @if (efMeasurementEnabled()) { * }</label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:{{efMeasurementEnabled()?'':'#f8fafc'}}" [disabled]="!efMeasurementEnabled()" [ngModel]="ef.editMeasurementTypeId" (ngModelChange)="onEditMeasurementTypeChange($event)">
+                    <option [ngValue]="0">{{ efMeasurementEnabled() ? 'Select...' : 'N/A – asset type' }}</option>
                     @for (mt of editMeasurementTypes(); track mt.measurementTypeId) { <option [ngValue]="mt.measurementTypeId">{{mt.measurementTypeDesc}}</option> }
                   </select>
                 </div>
+                <div class="detail-field">
+                  <label>Depreciation Method <span style="font-size:11px;color:#94a3b8;font-weight:400">(set by class / measurement type)</span></label>
+                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editDepreciationMethodId" (ngModelChange)="ef.editDepreciationMethodId=$event" [disabled]="efDepreciationDisabled()">
+                    <option [ngValue]="0">{{efDepreciationDisabled() ? 'N/A — no depreciation' : 'Select...'}}</option>
+                    @for (dm of editDepreciationMethods(); track dm.assetDepreciationMethod_ID) { <option [ngValue]="dm.assetDepreciationMethod_ID">{{dm.assetDepreciationMethodDesc}}</option> }
+                  </select>
+                </div>
+                @if (efShowRevalMethod()) {
+                  <div class="detail-field">
+                    <label>Revaluation Method <span style="font-size:11px;color:#94a3b8;font-weight:400">(set by class)</span></label>
+                    <div style="display:flex;gap:16px;padding:9px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#fff">
+                      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="radio" [(ngModel)]="ef.revaluationMethod" [value]="'restatement'" name="efRevalMethod"> Restatement
+                      </label>
+                      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="radio" [(ngModel)]="ef.revaluationMethod" [value]="'elimination'" name="efRevalMethod"> Elimination
+                      </label>
+                    </div>
+                  </div>
+                }
                 <div class="detail-field">
                   <label>Financial Status</label>
                   <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editFinancialStatusId" (ngModelChange)="ef.editFinancialStatusId=$event">
@@ -172,7 +202,7 @@
                   <label>Asset Condition</label>
                   <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editConditionId" (ngModelChange)="ef.editConditionId=$event">
                     <option [ngValue]="0">Select...</option>
-                    @for (c of editAssetConditions(); track c.assetCondition_ID) { <option [ngValue]="c.assetCondition_ID">{{c.assetConditionDesc}}</option> }
+                    @for (c of editAssetConditions(); track c.assetConditionId) { <option [ngValue]="c.assetConditionId">{{c.assetConditionDesc}}</option> }
                   </select>
                 </div>
               </div>
@@ -322,10 +352,11 @@
                 </div>
                 <div class="detail-field">
                   <label>Verification Done By</label>
-                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.verificationDoneBy" (ngModelChange)="ef.verificationDoneBy=$event">
-                    <option [ngValue]="0">Select employee...</option>
-                    @for (e of editEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
-                  </select>
+                  <app-employee-select
+                    [(ngModel)]="ef.verificationDoneBy"
+                    placeholder="Select employee..."
+                    selectStyle="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"
+                  ></app-employee-select>
                 </div>
                 <div class="detail-field">
                   <label>Capturer</label>
@@ -348,8 +379,8 @@
               <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Useful Life</div>
               <div class="detail-grid" style="grid-template-columns:1fr 1fr">
                 <div class="detail-field">
-                  <label>Useful Life (Total Months) <span style="font-size:11px;color:#94a3b8;font-weight:400">(set by asset class)</span></label>
-                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.usefulLifeTotal" readonly />
+                  <label>Useful Life (Total Months) <span style="font-size:11px;color:#94a3b8;font-weight:400">{{efNoUsefulLife() ? '(N/A — not applicable for this type)' : '(set by asset class)'}}</span></label>
+                  <input type="number" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#f8fafc;color:#64748b" [value]="ef.usefulLifeTotal" [placeholder]="efNoUsefulLife() ? 'N/A' : '0'" readonly />
                 </div>
                 <div class="detail-field">
                   <label>Remaining Useful Life (Months)</label>
@@ -585,10 +616,11 @@
                 </div>
                 <div class="detail-field">
                   <label>Custodian (Employee)</label>
-                  <select style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px" [ngModel]="ef.editCustodianId" (ngModelChange)="ef.editCustodianId=$event">
-                    <option [ngValue]="0">Select custodian...</option>
-                    @for (e of editEmployees(); track e.employeeId) { <option [ngValue]="e.employeeId">{{e.firstName}} {{e.surname}} ({{e.empCode}})</option> }
-                  </select>
+                  <app-employee-select
+                    [(ngModel)]="ef.editCustodianId"
+                    placeholder="Select custodian..."
+                    selectStyle="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"
+                  ></app-employee-select>
                 </div>
                 <div class="detail-field">
                   <label>Custodian ID Number</label>
@@ -936,8 +968,15 @@
               [style.color]="activeTab() === tab.key ? '#0f2b46' : '#64748b'"
               [style.border-bottom]="activeTab() === tab.key ? '2px solid #0f2b46' : '2px solid transparent'"
               [style.font-weight]="activeTab() === tab.key ? '600' : '400'"
-              style="padding:12px 18px;font-size:13px;background:none;border:none;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:color 0.15s">
+              style="padding:12px 18px;font-size:13px;background:none;border:none;cursor:pointer;white-space:nowrap;margin-bottom:-2px;transition:color 0.15s;display:flex;align-items:center;gap:6px">
               {{tab.label}}
+              @if (tab.badge != null) {
+                <span [style.background]="tab.badge > 0 ? '#0f2b46' : '#e2e8f0'"
+                      [style.color]="tab.badge > 0 ? '#fff' : '#94a3b8'"
+                      style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;font-size:11px;font-weight:600;padding:0 5px;line-height:1">
+                  {{tab.badge}}
+                </span>
+              }
             </button>
           }
         </div>
@@ -1277,6 +1316,31 @@
                 }
               </div>
             }
+            @if (getEntityDocs('revaluation').length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                  <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">attach_file</mat-icon>
+                  <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b">Supporting Documents</span>
+                  <span style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px">{{getEntityDocs('revaluation').length}}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  @for (doc of getEntityDocs('revaluation'); track getDocDownloadId(doc)) {
+                    <div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+                      <mat-icon style="color:#3b82f6;font-size:20px;width:20px;height:20px;flex-shrink:0">description</mat-icon>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{getDocFileName(doc)}}</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:1px">
+                          {{getDocFileSize(doc)}}{{getDocFileSize(doc) ? ' · ' : ''}}{{getDocUploadDate(doc)}}
+                        </div>
+                      </div>
+                      <button mat-icon-button style="flex-shrink:0" title="Download" (click)="downloadTxDoc(doc)">
+                        <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">download</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
         }
 
         @if (activeTab() === 'impairment') {
@@ -1343,6 +1407,31 @@
                     }
                   </div>
                 }
+              </div>
+            }
+            @if (getEntityDocs('impairment').length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                  <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">attach_file</mat-icon>
+                  <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b">Supporting Documents</span>
+                  <span style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px">{{getEntityDocs('impairment').length}}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  @for (doc of getEntityDocs('impairment'); track getDocDownloadId(doc)) {
+                    <div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+                      <mat-icon style="color:#3b82f6;font-size:20px;width:20px;height:20px;flex-shrink:0">description</mat-icon>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{getDocFileName(doc)}}</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:1px">
+                          {{getDocFileSize(doc)}}{{getDocFileSize(doc) ? ' · ' : ''}}{{getDocUploadDate(doc)}}
+                        </div>
+                      </div>
+                      <button mat-icon-button style="flex-shrink:0" title="Download" (click)="downloadTxDoc(doc)">
+                        <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">download</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
               </div>
             }
           </div>
@@ -1416,6 +1505,31 @@
                     }
                   </div>
                 }
+              </div>
+            }
+            @if (getEntityDocs('disposal').length > 0) {
+              <div class="form-card" style="margin-top:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                  <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">attach_file</mat-icon>
+                  <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b">Supporting Documents</span>
+                  <span style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px">{{getEntityDocs('disposal').length}}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  @for (doc of getEntityDocs('disposal'); track getDocDownloadId(doc)) {
+                    <div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+                      <mat-icon style="color:#3b82f6;font-size:20px;width:20px;height:20px;flex-shrink:0">description</mat-icon>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{getDocFileName(doc)}}</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:1px">
+                          {{getDocFileSize(doc)}}{{getDocFileSize(doc) ? ' · ' : ''}}{{getDocUploadDate(doc)}}
+                        </div>
+                      </div>
+                      <button mat-icon-button style="flex-shrink:0" title="Download" (click)="downloadTxDoc(doc)">
+                        <mat-icon style="color:#64748b;font-size:18px;width:18px;height:18px">download</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
               </div>
             }
           </div>
@@ -1542,49 +1656,12 @@
         @if (activeTab() === 'documents') {
           <div style="padding:24px">
             <div class="form-card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0;display:flex;align-items:center;gap:8px">
-                  <mat-icon style="color:#3b82f6;font-size:20px">folder</mat-icon> Documents ({{documents().length}})
-                </h3>
-                <button mat-flat-button style="background:#0f2b46;color:white" (click)="uploadDocument()"><mat-icon>upload</mat-icon> Upload</button>
-              </div>
-              @if (showUploadForm()) {
-                <div style="border:1px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:12px;background:#f8fafc">
-                  <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:8px">Upload Document</div>
-                  <input style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:8px" [(ngModel)]="newDocName" placeholder="Document name..." />
-                  <div style="display:flex;gap:8px;justify-content:flex-end">
-                    <button mat-stroked-button (click)="showUploadForm.set(false)">Cancel</button>
-                    <button mat-flat-button style="background:#0f2b46;color:white" (click)="confirmUpload()"><mat-icon>upload</mat-icon> Upload</button>
-                  </div>
-                </div>
-              }
-              @if (pendingDeleteDoc()) {
-                <div style="border:1px solid #ef4444;border-radius:8px;padding:12px;margin-bottom:12px;background:#fef2f2;display:flex;align-items:center;justify-content:space-between">
-                  <span style="font-size:13px;color:#991b1b">Delete "{{pendingDeleteDoc()}}"?</span>
-                  <div style="display:flex;gap:8px">
-                    <button mat-stroked-button (click)="pendingDeleteDoc.set(null)">Cancel</button>
-                    <button mat-flat-button style="background:#ef4444;color:white" (click)="confirmDeleteDoc()">Delete</button>
-                  </div>
-                </div>
-              }
-              @if (documents().length > 0) {
-                @for (doc of documents(); track doc.name) {
-                  <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px">
-                    <mat-icon style="color:#3b82f6;font-size:28px">{{getDocIcon(doc.type)}}</mat-icon>
-                    <div style="flex:1">
-                      <div style="font-size:13px;font-weight:500;color:#1e293b">{{doc.name}}</div>
-                      <div style="font-size:11px;color:#94a3b8">{{doc.size}} · {{doc.date}}</div>
-                    </div>
-                    <button mat-icon-button><mat-icon style="color:#64748b">download</mat-icon></button>
-                    <button mat-icon-button (click)="deleteDocument(doc.name)"><mat-icon style="color:#ef4444">delete</mat-icon></button>
-                  </div>
-                }
-              } @else if (!showUploadForm()) {
-                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:40px;text-align:center;color:#94a3b8;cursor:pointer" (click)="uploadDocument()">
-                  <mat-icon style="font-size:48px;margin-bottom:8px">cloud_upload</mat-icon>
-                  <div style="font-size:14px">Drop files here or click to attach documents</div>
-                  <div style="font-size:12px;margin-top:4px">Supports PDF, Images, Excel, Word</div>
-                </div>
+              <h3 style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 4px;display:flex;align-items:center;gap:8px">
+                <mat-icon style="color:#3b82f6;font-size:20px">folder</mat-icon> Asset Documents
+              </h3>
+              <p style="font-size:13px;color:#64748b;margin:0 0 4px">All documents attached to this asset across all transactions.</p>
+              @if (assetNumericId() > 0) {
+                <app-asset-document-panel [assetId]="assetNumericId()" entityType="" (documentsChanged)="onDocumentsChanged($event)"></app-asset-document-panel>
               }
             </div>
           </div>

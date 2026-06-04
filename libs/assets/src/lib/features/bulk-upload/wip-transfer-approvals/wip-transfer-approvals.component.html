@@ -129,6 +129,13 @@
             </div>
           }
 
+          @if (approveError()) {
+            <div class="approve-error-alert">
+              <mat-icon>error</mat-icon>
+              <span>{{approveError()}}</span>
+            </div>
+          }
+
           @if (isPending(selectedJob)) {
             <div class="form-body">
               <div class="section-card">

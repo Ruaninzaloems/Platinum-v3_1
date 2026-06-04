@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, Signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -65,22 +65,22 @@ export class ReconciliationComponent implements OnInit {
     { value: 11, label: 'P11 — May' }, { value: 12, label: 'P12 — June' }
   ];
 
-  totalAsset = computed(function(this: ReconciliationComponent) {
+  totalAsset: Signal<number> = computed(function(this: ReconciliationComponent): number {
     var rows = this.reconRows();
     var total = 0;
     for (var i = 0; i < rows.length; i++) { total += rows[i].assetTotal; }
     return total;
   }.bind(this));
 
-  totalGl = computed(function(this: ReconciliationComponent) {
+  totalGl: Signal<number> = computed(function(this: ReconciliationComponent): number {
     var rows = this.reconRows();
     var total = 0;
     for (var i = 0; i < rows.length; i++) { total += rows[i].glTotal; }
     return total;
   }.bind(this));
 
-  totalVariance = computed(function(this: ReconciliationComponent) {
-    return Math.round(((this.totalAsset() as number) - (this.totalGl() as number)) * 100) / 100;
+  totalVariance = computed(function(this: ReconciliationComponent): number {
+    return Math.round((this.totalAsset() - this.totalGl()) * 100) / 100;
   }.bind(this));
 
   allBalanced = computed(function(this: ReconciliationComponent) {

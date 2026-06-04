@@ -108,4 +108,10 @@ export class AssetProjectStatusesComponent implements OnInit {
       }.bind(this)
     });
   }
+
+  exportToExcel(): void {
+    this.api.exportAssetProjectStatuses().subscribe({
+      next: (blob: Blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'asset_project_statuses_export.xlsx'; a.click(); URL.revokeObjectURL(url); }
+    });
+  }
 }
