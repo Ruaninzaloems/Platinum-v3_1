@@ -14,10 +14,10 @@ import { ApiService } from '../../../core/api.service';
   imports: [RouterModule, CommonModule, MatIconModule, MatButtonModule, MatTableModule, MatChipsModule, MatProgressSpinnerModule],
   template: `
     <div class="page-tabs">
-      <a class="page-tab" routerLink="/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a class="page-tab" routerLink="/assets/wip" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <mat-icon>construction</mat-icon> WIP Register
       </a>
-      <a class="page-tab active" routerLink="/wip/unbundling" routerLinkActive="active">
+      <a class="page-tab active" routerLink="/assets/wip/unbundling" routerLinkActive="active">
         <mat-icon>category</mat-icon> Asset Unbundling
       </a>
     </div>
@@ -148,6 +148,6 @@ export class WipUnbundlingComponent implements OnInit {
   }
 
   openProject(id: number) {
-    this.router.navigate(['/wip/unbundling', id]);
+    this.router.navigate(['/assets/wip/unbundling', id]);
   }
 }

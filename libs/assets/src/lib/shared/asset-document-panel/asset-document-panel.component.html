@@ -15,6 +15,36 @@
     </label>
   </div>
 
+  @if (uploadQueue().length > 0) {
+    <div style="border-bottom:1px solid #e2e8f0;background:#fafbfc">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #eef2f6">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#475569">
+          Uploading {{uploadQueue().length}} file{{uploadQueue().length === 1 ? '' : 's'}}
+        </span>
+        <span style="font-size:11px;color:#16a34a;font-weight:600">{{uploadDoneCount()}} / {{uploadQueue().length}} done</span>
+      </div>
+      @for (q of uploadQueue(); track $index) {
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:12px;border-bottom:1px solid #f5f7fa">
+          <mat-icon style="font-size:16px;width:16px;height:16px;color:#94a3b8;flex-shrink:0">insert_drive_file</mat-icon>
+          <div style="flex:1;min-width:0;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{q.name}}</div>
+          @if (q.status === 'uploading') {
+            <span style="display:inline-flex;align-items:center;gap:6px;color:#2563eb;font-weight:500">
+              <mat-spinner diameter="13"></mat-spinner> Uploading…
+            </span>
+          } @else if (q.status === 'done') {
+            <span style="display:inline-flex;align-items:center;gap:4px;color:#16a34a;font-weight:600">
+              <mat-icon style="font-size:15px;width:15px;height:15px">check_circle</mat-icon> Uploaded
+            </span>
+          } @else {
+            <span style="display:inline-flex;align-items:center;gap:4px;color:#dc2626;font-weight:600" [title]="q.error || 'Failed'">
+              <mat-icon style="font-size:15px;width:15px;height:15px">error</mat-icon> Failed
+            </span>
+          }
+        </div>
+      }
+    </div>
+  }
+
   @if (pendingDeleteId()) {
     <div style="padding:8px 16px;background:#fef2f2;border-bottom:1px solid #fecaca;display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span style="font-size:12px;color:#991b1b">Delete "{{pendingDeleteName()}}"?</span>
@@ -41,9 +71,22 @@
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{getFileName(doc)}}</div>
             <div style="font-size:11px;color:#94a3b8">{{formatSize(doc)}}{{formatSize(doc) ? ' · ' : ''}}{{formatDate(doc)}}</div>
+            @if (getDescription(doc)) {
+              <div style="font-size:11px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                <mat-icon style="font-size:12px;width:12px;height:12px;vertical-align:middle;color:#94a3b8">notes</mat-icon>
+                {{getDescription(doc)}}
+              </div>
+            }
           </div>
-          @if (getTransactionType(doc)) {
+          @if (spMode()) {
+            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#e0f2fe;color:#0369a1;flex-shrink:0;white-space:nowrap" title="Stored in SharePoint">SharePoint</span>
+          } @else if (getTransactionType(doc)) {
             <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8;flex-shrink:0;white-space:nowrap">{{getTransactionType(doc)}}</span>
+          }
+          @if (spMode()) {
+            <button mat-icon-button style="width:30px;height:30px;line-height:30px" title="Open in SharePoint" (click)="openInBrowser(doc)">
+              <mat-icon style="font-size:17px;color:#64748b">open_in_new</mat-icon>
+            </button>
           }
           <button mat-icon-button style="width:30px;height:30px;line-height:30px" title="Download" (click)="download(doc)">
             <mat-icon style="font-size:17px;color:#64748b">download</mat-icon>

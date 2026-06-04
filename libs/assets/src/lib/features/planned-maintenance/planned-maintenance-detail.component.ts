@@ -249,7 +249,7 @@ export class PlannedMaintenanceDetailComponent implements OnInit {
     this.api.deletePlannedMaintPlan(this.planId).subscribe({
       next: function(this: PlannedMaintenanceDetailComponent) {
         this.snackBar.open('Plan deleted', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
-        this.router.navigate(['/maintenance/planned']);
+        this.router.navigate(['/assets/maintenance/planned']);
       }.bind(this),
       error: function(this: PlannedMaintenanceDetailComponent) {
         this.snackBar.open('Failed to delete plan', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
@@ -399,7 +399,7 @@ export class PlannedMaintenanceDetailComponent implements OnInit {
         var woId = res.workOrderId || res.id;
         this.snackBar.open('Work Order #' + (woId || '') + ' created', 'View', { duration: 6000, horizontalPosition: 'end', verticalPosition: 'top' })
           .onAction().subscribe(function(this: PlannedMaintenanceDetailComponent) {
-            if (woId) { this.router.navigate(['/maintenance/work-orders', woId]); }
+            if (woId) { this.router.navigate(['/assets/maintenance/work-orders', woId]); }
           }.bind(this));
       }.bind(this),
       error: function(this: PlannedMaintenanceDetailComponent, err: any) {
@@ -435,10 +435,10 @@ export class PlannedMaintenanceDetailComponent implements OnInit {
     return e !== null && e.scheduleId === entry.scheduleId;
   }
 
-  goBack() { this.router.navigate(['/maintenance/planned']); }
+  goBack() { this.router.navigate(['/assets/maintenance/planned']); }
 
   navigateToWorkOrder(woId: number) {
-    this.router.navigate(['/maintenance/work-orders', woId]);
+    this.router.navigate(['/assets/maintenance/work-orders', woId]);
   }
 
   formatDate(d: string): string {

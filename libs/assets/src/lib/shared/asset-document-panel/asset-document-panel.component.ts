@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
+import { SharePointConfigService } from '../../core/sharepoint-config.service';
 
 @Component({
   selector: 'app-asset-document-panel',
@@ -14,6 +15,7 @@ import { ApiService } from '../../core/api.service';
 })
 export class AssetDocumentPanelComponent implements OnInit, OnChanges {
   @Input() assetId: number = 0;
+  @Input() assetName: string = '';
   @Input() entityType: string = '';
   @Input() entityId: number | null = null;
   @Output() documentsChanged = new EventEmitter<any[]>();
@@ -24,7 +26,19 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
   pendingDeleteId = signal<number | null>(null);
   pendingDeleteName = signal<string>('');
 
-  constructor(private api: ApiService, private snackBar: MatSnackBar) {}
+  /** Per-file upload status shown during multi-file uploads. */
+  uploadQueue = signal<{ name: string; status: 'uploading' | 'done' | 'error'; error?: string }[]>([]);
+
+  /** True when the panel is sourcing documents from SharePoint (Admin → Assets toggle). */
+  spMode = signal(false);
+
+  private pendingDeleteDoc: any = null;
+
+  constructor(
+    private api: ApiService,
+    private snackBar: MatSnackBar,
+    private spConfig: SharePointConfigService,
+  ) {}
 
   ngOnInit() {
     if (this.assetId != null && this.assetId >= 0) {
@@ -39,6 +53,17 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
   }
 
   loadDocs() {
+    if (this.spConfig.isEnabled()) {
+      this.spMode.set(true);
+      this.loadSharePointDocs();
+    } else {
+      this.spMode.set(false);
+      this.loadLocalDocs();
+    }
+  }
+
+  /** Existing behaviour — list documents from the asset module's local storage. */
+  private loadLocalDocs() {
     var self = this;
     this.loading.set(true);
     this.api.getDocumentsByAsset(this.assetId).subscribe({
@@ -56,8 +81,33 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
     });
   }
 
+  /**
+   * List documents from the configured SharePoint library, filtered to the
+   * current asset via the library's AssetsID metadata column — mirrors the
+   * UatAssets page (file name, size, modified, description) and keeps the
+   * counter accurate.
+   */
+  private async loadSharePointDocs() {
+    this.loading.set(true);
+    try {
+      const normalized = await this.spConfig.listAssetDocuments(this.assetId);
+      this.docs.set(normalized);
+      this.loading.set(false);
+      this.documentsChanged.emit(normalized);
+    } catch (e: any) {
+      console.error('[AssetDocumentPanel] SharePoint load error:', e?.message ?? e);
+      this.docs.set([]);
+      this.loading.set(false);
+      this.documentsChanged.emit([]);
+    }
+  }
+
   filteredDocs(): any[] {
     var all = this.docs();
+    // SharePoint docs are already filtered to this asset by AssetsID.
+    if (this.spMode()) {
+      return all;
+    }
     if (!this.entityType || this.entityType === 'General') {
       return all;
     }
@@ -90,12 +140,23 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
   }
 
   uploadFiles(files: File[]) {
+    // Route to SharePoint when enabled in Admin → Assets, else use local storage.
+    if (this.spConfig.isEnabled()) {
+      this.uploadToSharePoint(files);
+    } else {
+      this.uploadToLocal(files);
+    }
+  }
+
+  /** Existing behaviour — store documents via the asset module's local file storage. */
+  private uploadToLocal(files: File[]) {
     var self = this;
     this.uploading.set(true);
+    this.uploadQueue.set(files.map(f => ({ name: f.name, status: 'uploading' as const })));
     var count = 0;
     var total = files.length;
     for (var i = 0; i < files.length; i++) {
-      (function(file: File) {
+      (function(file: File, idx: number) {
         self.api.uploadDocument(
           file,
           self.entityType || 'General',
@@ -105,43 +166,108 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
           self.entityType || 'General'
         ).subscribe({
           next: function() {
+            self.setQueueStatus(idx, 'done');
             count++;
-            if (count === total) {
-              self.uploading.set(false);
-              var msg = total === 1 ? 'Document uploaded' : total + ' documents uploaded';
-              self.snackBar.open(msg, 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
-              self.loadDocs();
-            }
+            if (count === total) { self.finishUpload(); }
           },
           error: function() {
+            self.setQueueStatus(idx, 'error', 'Upload failed');
             count++;
-            if (count === total) {
-              self.uploading.set(false);
-              self.snackBar.open('One or more files failed to upload', 'OK', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
-              self.loadDocs();
-            }
+            if (count === total) { self.finishUpload(); }
           }
         });
-      })(files[i]);
+      })(files[i], i);
     }
   }
 
+  /**
+   * Upload documents to the configured SharePoint library (default: UatAssets),
+   * tagging each file with the AssetsID (link to this asset) and saving the
+   * asset name as the document Description — same metadata model as UatAssets.
+   * Shows per-file upload status for multi-file uploads.
+   */
+  private async uploadToSharePoint(files: File[]) {
+    this.uploading.set(true);
+    this.uploadQueue.set(files.map(f => ({ name: f.name, status: 'uploading' as const })));
+
+    // Description stored in SharePoint = the asset's name.
+    const description = this.assetName || '';
+
+    for (let i = 0; i < files.length; i++) {
+      try {
+        await this.spConfig.uploadAssetDocument(this.assetId, files[i], description);
+        this.setQueueStatus(i, 'done');
+      } catch (err: any) {
+        this.setQueueStatus(i, 'error', err?.message || 'Upload failed');
+      }
+    }
+    this.finishUpload();
+  }
+
+  /** Count of files that finished uploading (for the queue header). */
+  uploadDoneCount(): number {
+    return this.uploadQueue().filter(q => q.status === 'done').length;
+  }
+
+  /** Update a single file's status in the upload queue. */
+  private setQueueStatus(idx: number, status: 'uploading' | 'done' | 'error', error?: string) {
+    this.uploadQueue.update(q => q.map((item, i) =>
+      i === idx ? { ...item, status, error } : item));
+  }
+
+  /** Common post-upload cleanup: refresh list, toast summary, clear queue. */
+  private finishUpload() {
+    this.uploading.set(false);
+    this.loadDocs();
+    const q = this.uploadQueue();
+    const done = q.filter(x => x.status === 'done').length;
+    const failed = q.filter(x => x.status === 'error').length;
+    if (failed === 0) {
+      this.snackBar.open(`${done} document${done === 1 ? '' : 's'} uploaded`, 'OK',
+        { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+    } else {
+      this.snackBar.open(`${done} uploaded, ${failed} failed`, 'Close',
+        { duration: 5000, horizontalPosition: 'end', verticalPosition: 'top' });
+    }
+    // Clear the queue after a short delay so the user sees the final statuses.
+    setTimeout(() => this.uploadQueue.set([]), 4000);
+  }
+
   confirmDelete(doc: any) {
-    this.pendingDeleteId.set(this.getDocId(doc));
+    this.pendingDeleteDoc = doc;
+    this.pendingDeleteId.set(doc.__sp ? -1 : this.getDocId(doc)); // -1 sentinel for SP so the banner shows
     this.pendingDeleteName.set(this.getFileName(doc));
   }
 
   cancelDelete() {
+    this.pendingDeleteDoc = null;
     this.pendingDeleteId.set(null);
     this.pendingDeleteName.set('');
   }
 
-  doDelete() {
-    var id = this.pendingDeleteId();
-    if (!id) {
+  async doDelete() {
+    var doc = this.pendingDeleteDoc;
+    if (!doc) {
       return;
     }
     var self = this;
+
+    // SharePoint-backed document
+    if (doc.__sp) {
+      try {
+        await this.spConfig.deleteAssetDocument(doc.__item);
+        this.snackBar.open('Document deleted from SharePoint', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
+      } catch (e: any) {
+        this.snackBar.open('Failed to delete: ' + (e?.message ?? e), 'Close', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+      this.cancelDelete();
+      this.loadDocs();
+      return;
+    }
+
+    // Local document
+    var id = this.getDocId(doc);
+    if (!id) { return; }
     this.api.deleteDocument(id).subscribe({
       next: function() {
         self.snackBar.open('Document deleted', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
@@ -155,8 +281,28 @@ export class AssetDocumentPanelComponent implements OnInit, OnChanges {
     });
   }
 
-  download(doc: any) {
+  async download(doc: any) {
+    if (doc.__sp) {
+      try {
+        await this.spConfig.downloadAssetDocument(doc.__item);
+      } catch (e: any) {
+        this.snackBar.open('Download failed: ' + (e?.message ?? e), 'Close', { duration: 4000, horizontalPosition: 'end', verticalPosition: 'top' });
+      }
+      return;
+    }
     this.api.downloadDocument(this.getDocId(doc));
+  }
+
+  /** Description shown for a document (SharePoint metadata or local transaction type). */
+  getDescription(doc: any): string {
+    return doc.description || '';
+  }
+
+  /** Open a SharePoint document in the browser. */
+  openInBrowser(doc: any) {
+    if (doc.__sp && doc.__item?.webUrl) {
+      window.open(doc.__item.webUrl, '_blank');
+    }
   }
 
   getDocId(doc: any): number {

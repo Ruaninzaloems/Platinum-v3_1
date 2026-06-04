@@ -194,7 +194,7 @@ export class PlanCreateComponent implements OnInit, OnDestroy {
       next: function(res: any) {
         self.saving.set(false);
         self.snackBar.open('Plan created', 'OK', { duration: 3000, horizontalPosition: 'end', verticalPosition: 'top' });
-        self.router.navigate(['/maintenance/planned', res.planId]);
+        self.router.navigate(['/assets/maintenance/planned', res.planId]);
       },
       error: function(err: any) {
         self.saving.set(false);
@@ -373,7 +373,7 @@ export class PlanCreateComponent implements OnInit, OnDestroy {
   }
 
   cancel() {
-    this.router.navigate(['/maintenance/planned']);
+    this.router.navigate(['/assets/maintenance/planned']);
   }
 
   formatCost(v: any): string {

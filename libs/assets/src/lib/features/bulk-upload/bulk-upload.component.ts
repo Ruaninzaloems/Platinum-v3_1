@@ -9,22 +9,22 @@ import { MatIconModule } from '@angular/material/icon';
   imports: [CommonModule, RouterModule, MatIconModule],
   template: `
     <div class="page-tabs">
-      <a class="page-tab" routerLink="/bulk-upload/jobs" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/jobs" routerLinkActive="active">
         <mat-icon>upload_file</mat-icon> Upload Jobs
       </a>
-      <a class="page-tab" routerLink="/bulk-upload/items" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/items" routerLinkActive="active">
         <mat-icon>fact_check</mat-icon> Upload Approvals
       </a>
-      <a class="page-tab" routerLink="/bulk-upload/wip-transfers" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/wip-transfers" routerLinkActive="active">
         <mat-icon>swap_horiz</mat-icon> WIP Transfers
       </a>
-      <a class="page-tab" routerLink="/bulk-upload/wip-approvals" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/wip-approvals" routerLinkActive="active">
         <mat-icon>assignment_turned_in</mat-icon> WIP Transfer Approvals
       </a>
-      <a class="page-tab" routerLink="/bulk-upload/bulk-transactions" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/bulk-transactions" routerLinkActive="active">
         <mat-icon>post_add</mat-icon> Bulk Transactions
       </a>
-      <a class="page-tab" routerLink="/bulk-upload/bulk-transaction-approvals" routerLinkActive="active">
+      <a class="page-tab" routerLink="/assets/bulk-upload/bulk-transaction-approvals" routerLinkActive="active">
         <mat-icon>rule</mat-icon> Bulk Transaction Approvals
       </a>
     </div>

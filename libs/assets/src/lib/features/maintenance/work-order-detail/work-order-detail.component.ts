@@ -721,6 +721,6 @@ export class WorkOrderDetailComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/maintenance/work-orders']);
+    this.router.navigate(['/assets/maintenance/work-orders']);
   }
 }

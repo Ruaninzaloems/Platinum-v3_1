@@ -114,7 +114,7 @@ export class PlannedMaintenanceListComponent implements OnInit {
   }
 
   openCreateWizard() {
-    this.router.navigate(['/maintenance/planned/create']);
+    this.router.navigate(['/assets/maintenance/planned/create']);
   }
 
   get currentFinYear(): number {
@@ -237,7 +237,7 @@ export class PlannedMaintenanceListComponent implements OnInit {
   }
 
   goToDetail(plan: any) {
-    this.router.navigate(['/maintenance/planned', plan.planId]);
+    this.router.navigate(['/assets/maintenance/planned', plan.planId]);
   }
 
   getStatusBadge(plan: any): string {

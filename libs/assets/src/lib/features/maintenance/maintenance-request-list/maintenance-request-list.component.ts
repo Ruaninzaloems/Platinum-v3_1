@@ -109,7 +109,7 @@ export class MaintenanceRequestListComponent implements OnInit {
   }
 
   openRequest(item: any) {
-    this.router.navigate(['/maintenance/requests', item.requestId]);
+    this.router.navigate(['/assets/maintenance/requests', item.requestId]);
   }
 
   emptyRequest() {

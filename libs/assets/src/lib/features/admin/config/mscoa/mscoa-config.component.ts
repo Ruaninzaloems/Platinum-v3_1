@@ -114,7 +114,7 @@ export class MscoaConfigComponent implements OnInit {
   constructor(private api: ApiService, private snackBar: MatSnackBar, private orgSettings: OrgSettingsService, private router: Router) {}
 
   goToDuplicates(): void {
-    this.router.navigate(['/config/mscoa/duplicates']);
+    this.router.navigate(['/assets/config/mscoa/duplicates']);
   }
 
   ngOnInit(): void {

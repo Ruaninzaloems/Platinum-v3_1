@@ -410,7 +410,7 @@ export class LoginComponent {
 
   constructor(private auth: AuthService, private router: Router) {
     if (auth.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/assets/dashboard']);
     }
   }
 
@@ -434,7 +434,7 @@ export class LoginComponent {
       this.loading.set(false);
 
       if (success) {
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/assets/dashboard']);
       } else {
         this.error.set('Invalid username or password');
       }

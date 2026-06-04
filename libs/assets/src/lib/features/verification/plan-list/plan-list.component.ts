@@ -15,12 +15,12 @@ import { ApiService } from '../../../core/api.service';
   imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatMenuModule],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/verification" style="margin-right:-4px"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/assets/verification" style="margin-right:-4px"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">Verification Plans</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">Plan and schedule asset verification activities</p>
       </div>
-      <button mat-flat-button color="primary" routerLink="/verification/planning/create" style="background:#059669;color:white;border-radius:8px">
+      <button mat-flat-button color="primary" routerLink="/assets/verification/planning/create" style="background:#059669;color:white;border-radius:8px">
         <mat-icon>add</mat-icon> Create Plan
       </button>
     </div>
@@ -40,7 +40,7 @@ import { ApiService } from '../../../core/api.service';
         <div class="empty-state">
           <mat-icon style="font-size:48px;width:48px;height:48px;color:#cbd5e1">event_note</mat-icon>
           <p style="margin:12px 0 0;color:#64748b">No verification plans found</p>
-          <button mat-stroked-button routerLink="/verification/planning/create" style="margin-top:12px">Create your first plan</button>
+          <button mat-stroked-button routerLink="/assets/verification/planning/create" style="margin-top:12px">Create your first plan</button>
         </div>
       } @else {
         <div class="table-container">
@@ -272,7 +272,7 @@ export class PlanListComponent implements OnInit {
   }
 
   openPlan(id: number) {
-    this.router.navigate(['/verification/planning', id]);
+    this.router.navigate(['/assets/verification/planning', id]);
   }
 
   exportPlan(plan: any) {

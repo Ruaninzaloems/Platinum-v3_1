@@ -13,6 +13,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   import { CidmsChainResult } from '../../../core/cidms-level-config';
   import { EmployeeSelectComponent } from '../../../shared/employee-select/employee-select.component';
   import { AssetDocumentPanelComponent } from '../../../shared/asset-document-panel/asset-document-panel.component';
+  import { SharePointConfigService } from '../../../core/sharepoint-config.service';
 
   @Component({
     selector: 'app-asset-detail',
@@ -170,7 +171,7 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
   transferForm = { department: '', location: '', reason: '' };
   disposalForm = { method: '', date: '', value: 0, reason: '' };
 
-  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private snackBar: MatSnackBar, private orgSettings: OrgSettingsService) {}
+  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router, private snackBar: MatSnackBar, private orgSettings: OrgSettingsService, private spConfig: SharePointConfigService) {}
 
   ngOnDestroy() {
     this.destroyLocationMap();
@@ -251,10 +252,18 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
         this.loadFunding(Number(a.assetId));
         var assetNumericId = Number(a?.assetId || a?.assetRegisterItem_ID || a?.id) || 0;
         if (assetNumericId > 0) {
-          this.api.getDocumentsByAsset(assetNumericId).subscribe({
-            next: function(this: AssetDetailComponent, rows: any[]) { this.documents.set(rows || []); }.bind(this),
-            error: function(this: AssetDetailComponent) { this.documents.set([]); }.bind(this)
-          });
+          if (this.spConfig.isEnabled()) {
+            // SharePoint mode — count documents tagged with this AssetsID so the
+            // Documents tab badge is accurate before the tab is opened.
+            this.spConfig.listAssetDocuments(assetNumericId)
+              .then(docs => this.documents.set(docs))
+              .catch(() => this.documents.set([]));
+          } else {
+            this.api.getDocumentsByAsset(assetNumericId).subscribe({
+              next: function(this: AssetDetailComponent, rows: any[]) { this.documents.set(rows || []); }.bind(this),
+              error: function(this: AssetDetailComponent) { this.documents.set([]); }.bind(this)
+            });
+          }
         }
         this.api.getAssetApprovals({ status: 'Pending', type: 'Edit', assetId: a.assetId }).subscribe({
           next: function(this: AssetDetailComponent, items: any[]) {

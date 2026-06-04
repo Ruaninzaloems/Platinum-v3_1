@@ -644,7 +644,7 @@
               </thead>
               <tbody>
                 @for (row of listGroupedScm(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.barcode || '—'}}</td>
@@ -742,7 +742,7 @@
               </thead>
               <tbody>
                 @for (row of listGroupedInventory(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.barcode || '—'}}</td>
@@ -767,7 +767,7 @@
               </thead>
               <tbody>
                 @for (row of listGroupedDonation(); track row.assetId) {
-                  <tr style="cursor:pointer" (click)="router.navigate(['/assets', row.assetId])">
+                  <tr style="cursor:pointer" (click)="router.navigate(['/assets/assets', row.assetId])">
                     <td>{{row.assetId}}</td>
                     <td>{{row.description}}</td>
                     <td>{{row.donorName || '—'}}</td>

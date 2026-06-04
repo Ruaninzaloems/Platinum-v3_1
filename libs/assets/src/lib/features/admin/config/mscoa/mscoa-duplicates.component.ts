@@ -169,6 +169,6 @@ export class MscoaDuplicatesComponent implements OnInit {
   }
 
   backToSettings(): void {
-    this.router.navigate(['/config/mscoa']);
+    this.router.navigate(['/assets/config/mscoa']);
   }
 }

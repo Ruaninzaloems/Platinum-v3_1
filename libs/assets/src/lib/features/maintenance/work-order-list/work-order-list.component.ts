@@ -101,7 +101,7 @@ export class WorkOrderListComponent implements OnInit {
   }
 
   openDetail(id: number) {
-    this.router.navigate(['/maintenance/work-orders', id]);
+    this.router.navigate(['/assets/maintenance/work-orders', id]);
   }
 
   openCreate() {
@@ -129,7 +129,7 @@ export class WorkOrderListComponent implements OnInit {
       next: function(wo: any) {
         self.creating.set(false);
         self.showCreateForm.set(false);
-        self.router.navigate(['/maintenance/work-orders', wo.maintenanceWorksOrderId]);
+        self.router.navigate(['/assets/maintenance/work-orders', wo.maintenanceWorksOrderId]);
       },
       error: function(e: any) {
         self.creating.set(false);
@@ -167,6 +167,6 @@ export class WorkOrderListComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/maintenance']);
+    this.router.navigate(['/assets/maintenance']);
   }
 }

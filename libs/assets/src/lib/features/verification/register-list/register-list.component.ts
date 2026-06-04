@@ -11,12 +11,12 @@ import { ApiService } from '../../../core/api.service';
   imports: [CommonModule, RouterModule, MatIconModule, MatButtonModule],
   template: `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <button mat-icon-button routerLink="/verification" style="margin-right:-4px"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button routerLink="/assets/verification" style="margin-right:-4px"><mat-icon>arrow_back</mat-icon></button>
       <div style="flex:1">
         <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0">Verification Registers</h1>
         <p style="font-size:13px;color:#64748b;margin:2px 0 0">Manage physical asset verification registers</p>
       </div>
-      <button mat-flat-button color="primary" routerLink="/verification/register/create" style="background:#2563eb;color:white;border-radius:8px">
+      <button mat-flat-button color="primary" routerLink="/assets/verification/register/create" style="background:#2563eb;color:white;border-radius:8px">
         <mat-icon>add</mat-icon> Create Register
       </button>
     </div>
@@ -38,7 +38,7 @@ import { ApiService } from '../../../core/api.service';
           <mat-icon style="font-size:48px;width:48px;height:48px;color:#cbd5e1">fact_check</mat-icon>
           <p style="margin:12px 0 0;color:#64748b">No {{activeTab}} verification registers found</p>
           @if (activeTab === 'active') {
-            <button mat-stroked-button routerLink="/verification/register/create" style="margin-top:12px">Create your first register</button>
+            <button mat-stroked-button routerLink="/assets/verification/register/create" style="margin-top:12px">Create your first register</button>
           }
         </div>
       } @else {
@@ -159,7 +159,7 @@ export class RegisterListComponent implements OnInit {
   }
 
   openRegister(id: number) {
-    this.router.navigate(['/verification/register', id]);
+    this.router.navigate(['/assets/verification/register', id]);
   }
 
   deleteRegister(reg: any, event: Event) {

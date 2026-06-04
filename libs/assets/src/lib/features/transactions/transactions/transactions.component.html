@@ -710,7 +710,7 @@
             </button>
             <button mat-stroked-button (click)="clearRevalAsset()">Cancel</button>
           </div>
-          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Revaluation" (documentsChanged)="onRevalDocumentsChanged($event)"></app-asset-document-panel>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" [assetName]="asset?.description || ''" entityType="Revaluation" (documentsChanged)="onRevalDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (revalSuccess()) {
@@ -883,7 +883,7 @@
             </button>
             <button mat-stroked-button (click)="clearImpairAsset()">Cancel</button>
           </div>
-          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Impairment" (documentsChanged)="onImpairDocumentsChanged($event)"></app-asset-document-panel>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" [assetName]="asset?.description || ''" entityType="Impairment" (documentsChanged)="onImpairDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (impairSuccess()) {
@@ -1074,7 +1074,7 @@
               </button>
               <button mat-stroked-button (click)="clearReversalAsset()">Cancel</button>
             </div>
-            <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Impairment Reversal" (documentsChanged)="onReversalDocumentsChanged($event)"></app-asset-document-panel>
+            <app-asset-document-panel [assetId]="getAssetNumericId(asset)" [assetName]="asset?.description || ''" entityType="Impairment Reversal" (documentsChanged)="onReversalDocumentsChanged($event)"></app-asset-document-panel>
           }
         }
 
@@ -1231,7 +1231,7 @@
             </button>
             <button mat-stroked-button (click)="clearDisposalAsset()">Cancel</button>
           </div>
-          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Disposal" (documentsChanged)="onDisposalDocumentsChanged($event)"></app-asset-document-panel>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" [assetName]="asset?.description || ''" entityType="Disposal" (documentsChanged)="onDisposalDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (disposalError()) {
@@ -1428,7 +1428,7 @@
             </button>
             <button mat-stroked-button (click)="clearRefurbAsset()">Cancel</button>
           </div>
-          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" entityType="Refurbishment" (documentsChanged)="onRefurbDocumentsChanged($event)"></app-asset-document-panel>
+          <app-asset-document-panel [assetId]="getAssetNumericId(asset)" [assetName]="asset?.description || ''" entityType="Refurbishment" (documentsChanged)="onRefurbDocumentsChanged($event)"></app-asset-document-panel>
         }
 
         @if (refurbError()) {

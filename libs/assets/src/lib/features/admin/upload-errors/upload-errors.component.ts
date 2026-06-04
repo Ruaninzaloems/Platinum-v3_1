@@ -80,6 +80,6 @@ export class UploadErrorsComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/bulk-upload/jobs']);
+    this.router.navigate(['/assets/bulk-upload/jobs']);
   }
 }

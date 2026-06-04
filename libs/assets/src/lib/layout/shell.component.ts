@@ -1177,7 +1177,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   openWorkflowInbox() {
-    this.router.navigate(['/workflows']);
+    this.router.navigate(['/assets/workflows']);
   }
 
   private setIframeLoading(mod: string) {
@@ -1210,7 +1210,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     } else if (mod === 'afs') {
       this.router.navigate(['/afs-view']);
     } else {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/assets/dashboard']);
     }
   }
 

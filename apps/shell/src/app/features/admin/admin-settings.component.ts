@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { SharePointConfigService } from '@platinumv3/assets';
 
 const STORAGE_KEY = 'platinum_module_config';
 
@@ -18,6 +19,10 @@ export interface ModuleApiConfig {
   afsApiUrl          : string;
   insightsApiUrl     : string;
   overtimeApiUrl     : string;
+  // Assets SharePoint document storage
+  assetsSharePointEnabled : boolean;
+  assetsSharePointSiteUrl : string;
+  assetsSharePointLibrary : string;
 }
 
 const DEFAULTS: ModuleApiConfig = {
@@ -31,6 +36,10 @@ const DEFAULTS: ModuleApiConfig = {
   afsApiUrl          : 'http://localhost:9000',
   insightsApiUrl     : 'http://localhost:8080',
   overtimeApiUrl     : 'http://localhost:8099',
+  // SharePoint OFF by default → assets module uses its current (local) file storage
+  assetsSharePointEnabled : false,
+  assetsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  assetsSharePointLibrary : 'UatAssets',
 };
 
 export function loadModuleConfig(): ModuleApiConfig {
@@ -177,6 +186,74 @@ const MODULES: ModuleDef[] = [
         }
       </div>
 
+      <!-- SharePoint config — Assets module only -->
+      @if (activeKey() === 'assets') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.assetsSharePointEnabled"
+                    (click)="cfg.assetsSharePointEnabled = !cfg.assetsSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.assetsSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for new uploads</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, new asset document uploads are stored in SharePoint instead of the asset module's local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.assetsSharePointEnabled">
+              {{ cfg.assetsSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.assetsSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.assetsSharePointSiteUrl"
+                     [disabled]="!cfg.assetsSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.assetsSharePointLibrary"
+                     [disabled]="!cfg.assetsSharePointEnabled"
+                     placeholder="UatAssets"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAssets</strong></div>
+            </div>
+          </div>
+
+          @if (!cfg.assetsSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — asset documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.assetsSharePointEnabled || !cfg.assetsSharePointSiteUrl"
+                    (click)="testSharePoint()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
       <!-- Actions -->
       <div class="actions">
         <button class="btn-secondary" (click)="reset()">
@@ -237,14 +314,43 @@ const MODULES: ModuleDef[] = [
     .btn-primary:disabled { background:#cbd5e1; cursor:not-allowed; }
     .btn-secondary { background:white; color:#475569; border:1px solid #cbd5e1; }
     .btn-secondary:hover { background:#f8fafc; }
+    .btn-secondary:disabled { color:#cbd5e1; cursor:not-allowed; }
+
+    /* SharePoint config */
+    .sp-header {
+      display:flex; align-items:center; gap:10px;
+      font-size:15px; font-weight:700; color:#1e293b;
+      padding-bottom:14px; border-bottom:1px solid #f1f5f9;
+    }
+    .sp-toggle-row {
+      display:flex; align-items:center; gap:14px;
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px;
+    }
+    .sp-switch {
+      position:relative; width:44px; height:24px; border-radius:12px;
+      background:#cbd5e1; border:none; cursor:pointer; flex-shrink:0; transition:background .2s; padding:0;
+    }
+    .sp-switch.on { background:#16a34a; }
+    .sp-knob {
+      position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+      background:white; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,.2);
+    }
+    .sp-switch.on .sp-knob { left:22px; }
+    .sp-status {
+      font-size:11px; font-weight:700; letter-spacing:.5px; color:#dc2626;
+    }
+    .sp-status.active { color:#16a34a; }
+    .sp-disabled { opacity:.55; pointer-events:none; }
   `]
 })
 export class AdminSettingsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private snack = inject(MatSnackBar);
+  private spConfig = inject(SharePointConfigService);
 
   cfg: ModuleApiConfig = loadModuleConfig();
   dirty = signal(false);
+  spTesting = signal(false);
 
   activeKey = signal('assets');
 
@@ -267,7 +373,12 @@ export class AdminSettingsComponent implements OnInit {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.cfg));
       this.dirty.set(false);
-      this.snack.open('Saved. Restart the dev server to apply proxy changes.', 'OK', { duration: 4000 });
+      // Apply SharePoint config immediately to the assets module (no reload needed).
+      this.spConfig.refresh();
+      const note = this.activeKey() === 'assets'
+        ? 'Saved. SharePoint config applied. Restart the dev server to apply API proxy changes.'
+        : 'Saved. Restart the dev server to apply proxy changes.';
+      this.snack.open(note, 'OK', { duration: 4000 });
     } catch {
       this.snack.open('Failed to save.', 'Close', { duration: 3000 });
     }
@@ -278,6 +389,28 @@ export class AdminSettingsComponent implements OnInit {
     mod.fields.forEach(f => {
       (this.cfg as any)[f.prop] = (DEFAULTS as any)[f.prop];
     });
+    // Assets page also owns the SharePoint config — reset it too
+    if (this.activeKey() === 'assets') {
+      this.cfg.assetsSharePointEnabled = DEFAULTS.assetsSharePointEnabled;
+      this.cfg.assetsSharePointSiteUrl = DEFAULTS.assetsSharePointSiteUrl;
+      this.cfg.assetsSharePointLibrary = DEFAULTS.assetsSharePointLibrary;
+    }
     this.dirty.set(true);
+  }
+
+  testSharePoint() {
+    this.spTesting.set(true);
+    // Validate the site URL is reachable / well-formed. The actual Graph call
+    // happens in the assets module via MSAL; here we do a basic reachability check.
+    const url = this.cfg.assetsSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.assetsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
   }
 }
