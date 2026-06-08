@@ -1,8 +1,14 @@
-import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, of, throwError, timer, Subject } from 'rxjs';
-import { timeout, switchMap, catchError, take } from 'rxjs/operators';
 import { environment } from '../../environment';
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams, HttpRequest, HttpEventType, HttpEvent } from '@angular/common/http';
+import { Observable, of, throwError, timer, Subject } from 'rxjs';
+import { timeout, switchMap, catchError, take, map, last, tap } from 'rxjs/operators';
+
+export interface UploadProgress {
+  progress: number;
+  done: boolean;
+  body?: any;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -109,6 +115,26 @@ export class ApiService {
     }
     return this.http.post<T>(`${this.baseUrl}${path}`, formData).pipe(
       timeout(120000)
+    );
+  }
+
+  uploadWithProgress(path: string, formData: FormData): Observable<UploadProgress> {
+    const req = new HttpRequest('POST', `${this.baseUrl}${path}`, formData, {
+      reportProgress: true,
+    });
+    return this.http.request(req).pipe(
+      timeout(300000),
+      map((event: HttpEvent<any>) => {
+        switch (event.type) {
+          case HttpEventType.UploadProgress:
+            const pct = event.total ? Math.round((100 * event.loaded) / event.total) : 0;
+            return { progress: pct, done: false } as UploadProgress;
+          case HttpEventType.Response:
+            return { progress: 100, done: true, body: event.body } as UploadProgress;
+          default:
+            return { progress: 0, done: false } as UploadProgress;
+        }
+      }),
     );
   }
 }

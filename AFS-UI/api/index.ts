@@ -44,7 +44,10 @@ async function isDbDown(): Promise<boolean> {
   try {
     await Promise.race([
       query('SELECT 1'),
-      new Promise((_r, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+      // Azure PostgreSQL (cross-region / cold pooled connections) can take several
+      // seconds on the first query — use a generous timeout so a slow-but-healthy
+      // DB isn't falsely marked down (which would serve demo/zero data for 60s).
+      new Promise((_r, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
     ]);
     dbKnownDown = false;
     return false;
@@ -210,6 +213,7 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
       bvaRows,
       glRowsRes,
       actRows,
+      itemTypeRows,
     ] = await Promise.all([
       query<{ status: string; n: number; avgc: number | null }>(
       `SELECT COALESCE(LOWER(status), 'unknown') AS status,
@@ -318,6 +322,17 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
          ORDER BY date DESC NULLS LAST
          LIMIT 10`
       ).catch(() => []),
+      // TB closing balances classified by mSCOA item type (first 2 chars of scoaItemCode):
+      //   IA=Assets, IL=Liabilities, LN=Net Assets, IR=Revenue, IE=Expenditure, IZ=Gains/Losses
+      query<{ itemtype: string; net: string; n: number }>(
+        `SELECT LEFT("scoaItemCode", 2) AS itemtype,
+                COALESCE(SUM(COALESCE("debitCloseBalance",0) - COALESCE("creditCloseBalance",0)), 0)::text AS net,
+                COUNT(*)::int AS n
+           FROM public.trial_balance_entries
+          WHERE ($1::text IS NULL OR "financialYearId" = $1::text)
+          GROUP BY LEFT("scoaItemCode", 2)`,
+        [fyIdText]
+      ).catch(() => []),
     ]);
 
     const compilationsByStatus: Record<string, number> = {};
@@ -370,6 +385,18 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
 
     const tbDebit = Number(tbSumRows[0]?.debit || 0);
     const tbCredit = Number(tbSumRows[0]?.credit || 0);
+
+    // Classify TB closing balances by mSCOA item type for the Financial Position cards.
+    // Credit-normal categories (Revenue, Liabilities, Net Assets) are shown as positive.
+    const itByType: Record<string, number> = {};
+    for (const r of (itemTypeRows || [])) itByType[(r.itemtype || '').toUpperCase()] = Number(r.net || 0);
+    const totalAssets      = itByType['IA'] || 0;
+    const totalLiabilities = Math.abs(itByType['IL'] || 0);
+    const netAssets        = Math.abs(itByType['LN'] || 0);
+    const totalRevenue     = Math.abs(itByType['IR'] || 0);
+    const totalExpenditure = itByType['IE'] || 0;
+    const gainsLosses      = itByType['IZ'] || 0;
+    const surplus          = totalRevenue - totalExpenditure + gainsLosses;
 
     const tbCategoryBreakdown = tbCatRows.map((r: any) => ({
       category: r.category,
@@ -449,6 +476,15 @@ app.get('/api/reports/dashboard', async (req, res, next) => {
         credit: tbCredit,
         net: tbDebit - tbCredit,
         rows: tbEntryCount,
+        // Financial Position figures expected by the dashboard cards
+        totalEntries: tbEntryCount,
+        totalAssets,
+        totalLiabilities,
+        netAssets,
+        totalRevenue,
+        totalExpenditure,
+        gainsLosses,
+        surplus,
       },
       tbCategoryBreakdown,
       budgetVsActual,

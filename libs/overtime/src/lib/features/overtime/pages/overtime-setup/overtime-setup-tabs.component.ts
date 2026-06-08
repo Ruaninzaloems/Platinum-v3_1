@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { OvertimeSetupComponent } from './overtime-setup.component';
 import { PositionApprovalSetupComponent } from '../position-approval-setup/position-approval-setup.component';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
@@ -8,6 +8,7 @@ type SetupTab = 'config' | 'position';
 @Component({
   selector: 'app-overtime-setup-tabs',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OvertimeSetupComponent, PositionApprovalSetupComponent],
   template: `
     <div class="page-content setup-shell">

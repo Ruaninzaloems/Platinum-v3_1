@@ -111,8 +111,8 @@ export interface ReportingRelationshipChange {
 }
 
 export interface ActingAppointmentChange {
-  actingEmployeeId: string;
-  actingInPositionId: string;
+  positionId: string;
+  actingPositionId: string;
   startDate: string;
   endDate: string;
 }

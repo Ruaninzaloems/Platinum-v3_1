@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
+import { DateInputComponent } from '../../../shared/components/date-input/date-input.component';
 
 @Component({
   selector: 'app-conditions',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './conditions.component.html',
   styleUrl: './conditions.component.css'
 })

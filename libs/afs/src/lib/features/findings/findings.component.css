@@ -50,6 +50,99 @@
   padding-top: 8px;
   border-top: 1px solid var(--platinum-border);
 }
+.drop-zone {
+  border: 2px dashed var(--platinum-border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fafbfc;
+  margin-bottom: 12px;
+}
+.drop-zone:hover {
+  border-color: var(--platinum-primary, #1976d2);
+  background: #f0f7ff;
+}
+.drop-zone-active {
+  border-color: var(--platinum-primary, #1976d2) !important;
+  background: #e3f2fd !important;
+  border-style: solid;
+}
+.drop-zone-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: var(--platinum-text-muted);
+  margin-bottom: 4px;
+}
+.drop-zone-active .drop-zone-icon {
+  color: var(--platinum-primary, #1976d2);
+}
+.drop-zone-text {
+  font-size: 13px;
+  color: var(--platinum-text);
+  font-weight: 500;
+}
+.drop-zone-hint {
+  font-size: 11px;
+  color: var(--platinum-text-muted);
+  margin-top: 4px;
+}
+.pending-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.pending-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+}
+.file-type-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--platinum-text-muted);
+}
+.pending-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-file-size {
+  color: #999;
+  font-size: 11px;
+}
+.file-done-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #4caf50;
+}
+.file-progress-pct {
+  color: var(--platinum-primary, #1976d2);
+  font-size: 11px;
+  font-weight: 500;
+}
+.file-progress-bar {
+  height: 3px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: -2px;
+}
+.file-progress-fill {
+  height: 100%;
+  background: var(--platinum-primary, #1976d2);
+  transition: width 0.2s;
+}
 @media (max-width: 900px) {
   .findings-table {
     table-layout: auto;

@@ -1,5 +1,5 @@
 import {
-  AfterViewInit, Component, DestroyRef, OnInit, ViewChild, computed, inject, signal
+  AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, OnInit, ViewChild, computed, inject, signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -16,7 +16,21 @@ import { MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSortModule, Sort, SortDirection } from '@angular/material/sort';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
+import {
+  MatNativeDateModule, DateAdapter,
+  MAT_DATE_LOCALE, MAT_DATE_FORMATS, MatDateFormats
+} from '@angular/material/core';
+import { EnGbDateAdapter } from '../../../../core/utils/en-gb-date-adapter';
+
+const DATE_FORMATS: MatDateFormats = {
+  parse:   { dateInput: { day: '2-digit', month: '2-digit', year: 'numeric' } },
+  display: {
+    dateInput:          { day: '2-digit', month: '2-digit', year: 'numeric' },
+    monthYearLabel:     { month: 'short', year: 'numeric' },
+    dateA11yLabel:      { day: 'numeric', month: 'long', year: 'numeric' },
+    monthYearA11yLabel: { month: 'long', year: 'numeric' },
+  },
+};
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -62,6 +76,7 @@ interface PositionApprovalForm {
 @Component({
   selector: 'app-position-approval-setup',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatAutocompleteModule,
@@ -69,6 +84,11 @@ interface PositionApprovalForm {
     MatPaginatorModule, MatSortModule, MatDatepickerModule, MatNativeDateModule,
     MatSnackBarModule, MatProgressBarModule, MatProgressSpinnerModule,
     MatTooltipModule, MatDividerModule
+  ],
+  providers: [
+    { provide: DateAdapter,      useClass: EnGbDateAdapter, deps: [MAT_DATE_LOCALE] },
+    { provide: MAT_DATE_LOCALE,  useValue: 'en-GB' },
+    { provide: MAT_DATE_FORMATS, useValue: DATE_FORMATS },
   ],
   templateUrl: './position-approval-setup.component.html',
   styleUrls: ['./position-approval-setup.component.scss']
@@ -80,6 +100,7 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
   private cfgSvc = inject(OvertimeConfigService);
   private snack = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
+  private cdr = inject(ChangeDetectorRef);
 
   // Module-level gating flag (Business Rule #1).
   multipleApprovalEnabled = signal<boolean>(false);
@@ -138,7 +159,7 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
     for (const p of this.allPositions()) m.set(p.id, p);
     return m;
   });
-  actingDisplayedColumns = ['employee', 'position', 'startDate', 'endDate', 'actions'];
+  actingDisplayedColumns = ['position', 'empId', 'empCode', 'empFirstName', 'empSurname', 'startDate', 'endDate', 'actions'];
 
   form: FormGroup<PositionApprovalForm> = this.fb.group<PositionApprovalForm>({
     isOvertimeRecommender: this.fb.nonNullable.control(false),
@@ -210,16 +231,6 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
         this.loadingConfig.set(false);
         this.snack.open('Failed to load module configuration', 'Dismiss', { duration: 3000 });
       }
-    });
-
-    // Pre-load lookup pools used by the inline reporting / acting row pickers.
-    this.lookups.positions().subscribe({
-      next: p => this.allPositions.set(p),
-      error: () => this.allPositions.set([])
-    });
-    this.lookups.employees().subscribe({
-      next: e => this.allEmployees.set(e),
-      error: () => this.allEmployees.set([])
     });
 
     // Debounced server-side search box above the grid (~300ms).
@@ -301,7 +312,24 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
   }
 
   // ---------- configure form ----------
+  private lookupsLoaded = false;
+
   openConfigure(position: PositionListItem | PositionLookup): void {
+    // Lazy-load the full position + employee pools only on the FIRST open.
+    // Loading 4,895 positions + 3,478 employees on every page load was adding
+    // ~400ms to the Setup page even when the user never opened the configure panel.
+    if (!this.lookupsLoaded) {
+      this.lookupsLoaded = true;
+      this.lookups.positions().subscribe({
+        next: p => this.allPositions.set(p),
+        error: () => this.allPositions.set([])
+      });
+      this.lookups.employees().subscribe({
+        next: e => this.allEmployees.set(e),
+        error: () => this.allEmployees.set([])
+      });
+    }
+
     this.selectedPosition.set(position);
     this.reportingRelationships.clear();
     this.actingAppointments.clear();
@@ -354,6 +382,17 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
       ?? (p as PositionLookup).positionCode ?? '';
   }
 
+  selectedPositionEmployee(): string {
+    const p = this.selectedPosition() as PositionListItem | null;
+    if (!p) return '';
+    const first   = p.employeeFirstName?.trim() ?? '';
+    const surname = p.employeeSurname?.trim()   ?? '';
+    const empId   = p.employeeId?.trim()        ?? '';
+    const name    = [first, surname].filter(Boolean).join(' ');
+    if (!name && !empId) return '';
+    return name ? `${name} (${empId})` : empId;
+  }
+
   // ---------- shared display helpers (used by inline row pickers) ----------
   /**
    * Strip the noise that the legacy Payroll_Position descriptions ship with:
@@ -392,6 +431,11 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
     return new Date(9999, 11, 31);
   }
 
+  static lastDayOfCurrentMonth(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  }
+
   /**
    * True when the given date represents the open-ended sentinel. We compare
    * year only because timezone shifts on toISOString round-trips can move the
@@ -422,9 +466,9 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
       actingInPositionDescription: this.fb.nonNullable.control(a?.actingInPositionDescription ?? ''),
       startDate: this.fb.control<Date | null>(a?.startDate ? new Date(a.startDate) : new Date(), Validators.required),
       // Acting endDate is required by the API; default Add (and any null
-      // from the API) to the open-ended sentinel instead of today.
+      // from the API) to the last day of the current month.
       endDate: this.fb.control<Date | null>(
-        a?.endDate ? new Date(a.endDate) : PositionApprovalSetupComponent.openEndedSentinel(),
+        a?.endDate ? new Date(a.endDate) : PositionApprovalSetupComponent.lastDayOfCurrentMonth(),
         Validators.required)
     }, { validators: [PositionApprovalSetupComponent.dateRangeOrder] });
   }
@@ -458,14 +502,17 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
   onReportingPositionInput(event: Event, row: FormGroup<ReportingRelationshipForm>): void {
     const target = event.target as HTMLInputElement;
     row.controls.reportsToPositionDescription.setValue(target.value);
+    this.cdr.markForCheck();
   }
   onActingEmployeeInput(event: Event, row: FormGroup<ActingAppointmentForm>): void {
     const target = event.target as HTMLInputElement;
     row.controls.actingEmployeeName.setValue(target.value);
+    this.cdr.markForCheck();
   }
   onActingPositionInput(event: Event, row: FormGroup<ActingAppointmentForm>): void {
     const target = event.target as HTMLInputElement;
     row.controls.actingInPositionDescription.setValue(target.value);
+    this.cdr.markForCheck();
   }
 
   filterPositions(query: string | null | undefined): PositionLookup[] {
@@ -488,18 +535,55 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
 
   setReportingPosition(row: FormGroup<ReportingRelationshipForm>, p: PositionLookup): void {
     row.patchValue({ reportsToPositionId: p.id, reportsToPositionDescription: p.description });
+    this.cdr.markForCheck();
   }
   setActingEmployee(row: FormGroup<ActingAppointmentForm>, e: EmployeeLookup): void {
     row.patchValue({ actingEmployeeId: e.id, actingEmployeeName: e.fullName });
+    this.cdr.markForCheck();
   }
   setActingPosition(row: FormGroup<ActingAppointmentForm>, p: PositionLookup): void {
-    row.patchValue({ actingInPositionId: p.id, actingInPositionDescription: p.description });
+    const empName = [p.employeeFirstName, p.employeeSurname].filter(Boolean).join(' ');
+    row.patchValue({
+      actingInPositionId: p.id,
+      actingInPositionDescription: p.description,
+      actingEmployeeId: p.employeeId ?? '',
+      actingEmployeeName: empName
+    });
+    this.cdr.markForCheck();
   }
 
   save(): void {
     const pos = this.selectedPosition();
-    if (!pos || this.form.invalid) return;
+    if (!pos) return;
+    this.form.markAllAsTouched();
+    if (this.form.invalid) {
+      const missingActingPos = this.actingRows().some(r => r.controls.actingInPositionId.invalid);
+      const missingActingEmp = this.actingRows().some(r => r.controls.actingEmployeeId.invalid);
+      if (missingActingPos) {
+        this.snack.open('Please select an "Acting In Position" for all acting appointments.', 'Dismiss', { duration: 5000 });
+      } else if (missingActingEmp) {
+        this.snack.open('Please select an acting employee for all acting appointment rows.', 'Dismiss', { duration: 5000 });
+      } else {
+        this.snack.open('Please complete all required fields before saving.', 'Dismiss', { duration: 5000 });
+      }
+      return;
+    }
     const v = this.form.getRawValue();
+
+    // Client-side guard: reject duplicate reporting relationships
+    const relKeySet = new Set<string>();
+    for (const r of v.reportingRelationships) {
+      if (!r.reportsToPositionId) continue;
+      const key = `${r.reportsToPositionId}|${r.startDate?.toISOString().slice(0, 10) ?? ''}`;
+      if (relKeySet.has(key)) {
+        this.snack.open(
+          `Duplicate reporting relationship: position ${r.reportsToPositionDescription || r.reportsToPositionId} appears more than once with the same start date.`,
+          'Dismiss', { duration: 5000 });
+        return;
+      }
+      relKeySet.add(key);
+    }
+
     this.saving.set(true);
 
     const payload: PositionApprovalConfig = {

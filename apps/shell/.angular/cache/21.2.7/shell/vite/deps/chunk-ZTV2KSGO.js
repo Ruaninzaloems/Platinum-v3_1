@@ -10,7 +10,7 @@ import {
 } from "./chunk-4CO5QW4B.js";
 import {
   DomSanitizer
-} from "./chunk-OTGSOXUT.js";
+} from "./chunk-W5ZEON3D.js";
 import {
   isFakeMousedownFromScreenReader,
   isFakeTouchstartFromScreenReader
@@ -2420,4 +2420,4 @@ export {
   removeAriaReferencedId,
   AriaDescriber
 };
-//# sourceMappingURL=chunk-54UPQDVF.js.map
+//# sourceMappingURL=chunk-ZTV2KSGO.js.map

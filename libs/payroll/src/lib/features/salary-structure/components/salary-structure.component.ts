@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
+import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 
 @Component({
   selector: 'app-salary-structure',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent, CurrencyZarPipe],
   templateUrl: './salary-structure.component.html',
   styleUrl: './salary-structure.component.css'
 })

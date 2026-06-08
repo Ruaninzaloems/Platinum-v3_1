@@ -8,7 +8,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { provideNativeDateAdapter, MAT_DATE_LOCALE, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
+import { DateAdapter, MAT_DATE_LOCALE, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
+import { EnGbDateAdapter } from '../../../../core/utils/en-gb-date-adapter';
 import { firstValueFrom } from 'rxjs';
 
 const DATE_FORMATS: MatDateFormats = {
@@ -38,6 +39,8 @@ interface PayrollCyclePeriodDto {
   cycleId?: number | null;
   taxYear?: string | null;
   financialYear?: string | null;
+  periodStartDate?: string | null;
+  periodEndDate?: string | null;
 }
 
 @Component({
@@ -46,7 +49,7 @@ interface PayrollCyclePeriodDto {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, MatDatepickerModule],
   providers: [
-    provideNativeDateAdapter(),
+    { provide: DateAdapter,       useClass: EnGbDateAdapter, deps: [MAT_DATE_LOCALE] },
     { provide: MAT_DATE_LOCALE,   useValue: 'en-GB' },
     { provide: MAT_DATE_FORMATS,  useValue: DATE_FORMATS },
   ],
@@ -70,29 +73,7 @@ interface PayrollCyclePeriodDto {
       <!-- ── FILTER BAR ───────────────────────────────────────────────── -->
       <div class="filter-bar">
         <div class="filter-group">
-          <label class="filter-label">From</label>
-          <div class="date-field-wrap">
-            <input class="filter-input date-field" readonly
-                   [matDatepicker]="fromPicker"
-                   [(ngModel)]="filterFromDate"
-                   placeholder="dd/mm/yyyy" />
-            <mat-datepicker-toggle class="date-toggle" [for]="fromPicker"></mat-datepicker-toggle>
-            <mat-datepicker #fromPicker></mat-datepicker>
-          </div>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">To</label>
-          <div class="date-field-wrap">
-            <input class="filter-input date-field" readonly
-                   [matDatepicker]="toPicker"
-                   [(ngModel)]="filterToDate"
-                   placeholder="dd/mm/yyyy" />
-            <mat-datepicker-toggle class="date-toggle" [for]="toPicker"></mat-datepicker-toggle>
-            <mat-datepicker #toPicker></mat-datepicker>
-          </div>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">Cycle</label>
+          <label class="filter-label">Cycle <span class="required-star">*</span></label>
           <select class="filter-select" [(ngModel)]="selectedCycleId" (ngModelChange)="onCycleChange()">
             <option [ngValue]="null">Select cycle…</option>
             @for (c of cycles(); track c.cycleId) {
@@ -101,9 +82,10 @@ interface PayrollCyclePeriodDto {
           </select>
         </div>
         <div class="filter-group">
-          <label class="filter-label">Period</label>
+          <label class="filter-label">Period <span class="required-star">*</span></label>
           <select class="filter-select" [(ngModel)]="selectedPeriodId"
-                  [disabled]="!selectedCycleId || periodsLoading()">
+                  [disabled]="!selectedCycleId || periodsLoading()"
+                  (ngModelChange)="onPeriodChange()">
             <option [ngValue]="null">
               @if (periodsLoading()) { Loading… }
               @else if (!selectedCycleId) { Select cycle first… }
@@ -116,6 +98,31 @@ interface PayrollCyclePeriodDto {
           </select>
         </div>
         <div class="filter-group">
+          <label class="filter-label">From</label>
+          <div class="date-field-wrap">
+            <input class="filter-input date-field" readonly
+                   [matDatepicker]="fromPicker"
+                   [(ngModel)]="filterFromDate"
+                   (dateChange)="clearGrid()"
+                   placeholder="dd/mm/yyyy" />
+            <mat-datepicker-toggle class="date-toggle" [for]="fromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #fromPicker></mat-datepicker>
+          </div>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">To</label>
+          <div class="date-field-wrap">
+            <input class="filter-input date-field" readonly
+                   [matDatepicker]="toPicker"
+                   [(ngModel)]="filterToDate"
+                   [max]="periodEndDate()"
+                   (dateChange)="clearGrid()"
+                   placeholder="dd/mm/yyyy" />
+            <mat-datepicker-toggle class="date-toggle" [for]="toPicker"></mat-datepicker-toggle>
+            <mat-datepicker #toPicker></mat-datepicker>
+          </div>
+        </div>
+        <div class="filter-group">
           <label class="filter-label">Department</label>
           <select class="filter-select" [(ngModel)]="filterDepartmentId" (ngModelChange)="onDeptChange()">
             <option [ngValue]="null">All Departments</option>
@@ -126,7 +133,8 @@ interface PayrollCyclePeriodDto {
         </div>
         <div class="filter-group">
           <label class="filter-label">Division</label>
-          <select class="filter-select" [(ngModel)]="filterDivisionId">
+          <select class="filter-select" [(ngModel)]="filterDivisionId"
+                  (ngModelChange)="clearGrid()">
             <option [ngValue]="null">All Divisions</option>
             @for (d of filteredDivisions(); track d.divisionId) {
               <option [ngValue]="d.divisionId">{{ d.divisionDesc }}</option>
@@ -134,7 +142,7 @@ interface PayrollCyclePeriodDto {
           </select>
         </div>
         <button class="btn btn-primary" type="button" (click)="runSearch()"
-                [disabled]="loading()">
+                [disabled]="loading() || !selectedCycleId || !selectedPeriodId">
           <mat-icon>search</mat-icon>
           <span>Search</span>
         </button>
@@ -156,7 +164,7 @@ interface PayrollCyclePeriodDto {
       @if (!searched() && !loading()) {
         <div class="empty-state">
           <mat-icon>filter_alt</mat-icon>
-          <p>Click <strong>Search</strong> to load all pending payroll transactions, or apply filters to narrow results.</p>
+          <p>Select a cycle and period, then click <strong>Search</strong> to load pending payroll transactions.</p>
         </div>
       }
 
@@ -190,12 +198,6 @@ interface PayrollCyclePeriodDto {
                 <span class="export-count">({{ selectedIds().size }})</span>
               }
             </button>
-            <select class="filter-select" [(ngModel)]="selectedPeriodId" [disabled]="!selectedCycleId">
-              <option [ngValue]="null">Select period…</option>
-              @for (p of periods(); track p.periodId) {
-                <option [ngValue]="p.periodId">{{ p.displayName }}</option>
-              }
-            </select>
             <button class="btn btn-primary"
                     type="button"
                     [disabled]="selectedIds().size === 0 || !selectedPeriodId || sending()"
@@ -458,6 +460,7 @@ export class OvertimePayrollProcessingComponent implements OnInit {
   cycles         = signal<ConstCycleDto[]>([]);
   periods        = signal<PayrollCyclePeriodDto[]>([]);
   periodsLoading = signal(false);
+  periodEndDate  = signal<Date | null>(null);
 
   // ── selection helpers ─────────────────────────────────────────────────
   allSelected  = computed(() => this.rows().length > 0 && this.rows().every(r => this.selectedIds().has(r.id)));
@@ -484,8 +487,26 @@ export class OvertimePayrollProcessingComponent implements OnInit {
   }
 
   // ── filter actions ────────────────────────────────────────────────────
+  clearGrid(): void {
+    this.summary.set(null);
+    this.searched.set(false);
+    this.selectedIds.set(new Set());
+  }
+
   onDeptChange(): void {
     this.filterDivisionId = null;
+    this.clearGrid();
+  }
+
+  onPeriodChange(): void {
+    this.clearGrid();
+    const p = this.periods().find(x => x.periodId === this.selectedPeriodId);
+    this.filterFromDate = p?.periodStartDate ? new Date(p.periodStartDate) : null;
+    const maxDate = p?.periodEndDate ? new Date(p.periodEndDate) : null;
+    this.periodEndDate.set(maxDate);
+    if (maxDate && this.filterToDate && this.filterToDate > maxDate) {
+      this.filterToDate = null;
+    }
   }
 
   /** Converts a Date to yyyy-mm-dd without UTC shift. */
@@ -501,6 +522,7 @@ export class OvertimePayrollProcessingComponent implements OnInit {
     this.filterDivisionId   = null;
     this.selectedCycleId    = null;
     this.selectedPeriodId   = null;
+    this.periodEndDate.set(null);
     this.periods.set([]);
     this.summary.set(null);
     this.searched.set(false);
@@ -521,7 +543,11 @@ export class OvertimePayrollProcessingComponent implements OnInit {
 
   // ── cycle / period ────────────────────────────────────────────────────
   async onCycleChange(): Promise<void> {
+    this.clearGrid();
     this.selectedPeriodId = null;
+    this.periodEndDate.set(null);
+    this.filterFromDate = null;
+    this.filterToDate = null;
     this.periods.set([]);
     if (this.selectedCycleId == null) return;
     this.periodsLoading.set(true);
@@ -531,8 +557,11 @@ export class OvertimePayrollProcessingComponent implements OnInit {
           `${this.base}/payroll-lookups/cycle-periods-open?cycleId=${this.selectedCycleId}`));
       if (r?.isSuccess && r.data) {
         this.periods.set(r.data);
-        // Auto-select if only one period available.
-        if (r.data.length === 1) this.selectedPeriodId = r.data[0].periodId;
+        // Auto-select if only one period available and wire the period-end cap.
+        if (r.data.length === 1) {
+          this.selectedPeriodId = r.data[0].periodId;
+          this.onPeriodChange();
+        }
       }
     } catch {
       this.snack.open('Failed to load periods.', 'OK', { duration: 3000 });

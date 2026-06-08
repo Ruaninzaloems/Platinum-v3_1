@@ -325,6 +325,7 @@ export interface RfiResponseItem {
   content: string;
   respondedBy: string;
   responseType: string;
+  attachmentIds?: string[];
   reviewStatus: string;
   reviewedBy?: string;
   reviewedAt?: string;
@@ -348,6 +349,7 @@ export interface AuditFinding {
   cause?: string;
   effect?: string;
   recommendation?: string;
+  rfiId?: string;
   evidenceIds?: string[];
   responses?: FindingResponseItem[];
   createdAt: string;

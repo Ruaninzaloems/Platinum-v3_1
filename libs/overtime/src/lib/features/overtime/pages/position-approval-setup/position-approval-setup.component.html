@@ -67,14 +67,14 @@
             {{ exportingReport() ? 'Exporting…' : 'Export Position Relationships Report' }}
           </button>
           <button mat-stroked-button type="button" class="toolbar-btn"
-                  matTooltip="Download a pre-filled Excel template to bulk-configure approval setup"
+                  matTooltip="Download your current position approval configuration as Excel to review and update"
                   (click)="downloadTemplate()">
             <mat-icon>download</mat-icon>
-            Download Template
+            Download Position Config
           </button>
           <button mat-stroked-button color="primary" type="button" class="toolbar-btn"
                   [disabled]="importLoading()"
-                  matTooltip="Upload a filled-in template to import approval configuration"
+                  matTooltip="Upload a position config file to replace the current approval configuration"
                   (click)="openImportFilePicker()">
             <mat-icon>upload_file</mat-icon>
             {{ importLoading() ? 'Validating…' : 'Import' }}
@@ -307,16 +307,16 @@
             <table class="import-preview-table">
               <thead>
                 <tr>
-                  <th>Employee ID</th>
-                  <th>Acting In Position</th>
+                  <th>Position ID</th>
+                  <th>Acting Position ID</th>
                   <th>Start Date</th>
                   <th>End Date</th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let a of v.actingAppointmentChanges">
-                  <td>{{ a.actingEmployeeId }}</td>
-                  <td>{{ a.actingInPositionId }}</td>
+                  <td>{{ a.positionId }}</td>
+                  <td>{{ a.actingPositionId }}</td>
                   <td>{{ a.startDate | date:'dd/MM/yyyy' }}</td>
                   <td>{{ a.endDate | date:'dd/MM/yyyy' }}</td>
                 </tr>

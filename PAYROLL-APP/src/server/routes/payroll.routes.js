@@ -859,7 +859,7 @@ router.post('/runs/:id/post-to-ledger', authenticate, async (req, res, next) => 
       lines
     };
 
-    const EXTERNAL_API_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+    const EXTERNAL_API_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
     const extRes = await globalThis.fetch(`${EXTERNAL_API_BASE}/gl-outbox`, {
       method: 'POST',
       headers: {
@@ -1251,7 +1251,7 @@ function allocateCreditScoa(txType, gl, pos, amount, debitFundId) {
   return { division, projectId, scoaItemId, functionId, regionId, fundId, planProjectItemId };
 }
 
-const PLAN_PROJECT_ITEMS_BY_YEAR_API = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev/planning/references/project-items-by-year';
+const PLAN_PROJECT_ITEMS_BY_YEAR_API = (process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev') + '/planning/references/project-items-by-year';
 
 async function loadPlanProjectItems(finYear) {
   try {

@@ -1,18 +1,22 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, DatePipe } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
 
 @Component({
   selector: 'app-overtime-setup',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, ReactiveFormsModule, DatePipe,
-    MatSlideToggleModule, MatSnackBarModule, MatIconModule
+    MatSlideToggleModule, MatSnackBarModule, MatIconModule,
+    MatDatepickerModule, MatNativeDateModule
   ],
   template: `
     <form [formGroup]="form" (ngSubmit)="save()" class="form-card">
@@ -37,11 +41,14 @@ import { OvertimeConfigService } from '../../../../core/services/overtime-config
         <div class="form-grid">
           <div class="form-group" [class.disabled]="!enabled()">
             <label>Start Date</label>
-            <input class="form-control" type="text" inputmode="numeric"
-                   placeholder="DD/MM/YYYY"
-                   maxlength="10"
-                   pattern="\\d{2}/\\d{2}/\\d{4}"
-                   formControlName="startDateStr">
+            <div class="date-field-wrap">
+              <input class="form-control date-field" readonly
+                     [matDatepicker]="startDatePicker"
+                     formControlName="startDate"
+                     placeholder="DD/MM/YYYY" />
+              <mat-datepicker-toggle class="date-toggle" [for]="startDatePicker"></mat-datepicker-toggle>
+              <mat-datepicker #startDatePicker></mat-datepicker>
+            </div>
           </div>
           <div class="form-group"><!-- spacer --></div>
 
@@ -102,6 +109,10 @@ import { OvertimeConfigService } from '../../../../core/services/overtime-config
       margin-bottom: 16px;
     }
     .form-group.disabled label { color: var(--text-muted); }
+    .date-field-wrap { position: relative; display: flex; align-items: center; }
+    .date-field { padding-right: 34px !important; cursor: pointer; }
+    .date-toggle { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); }
+    .date-toggle button { width: 30px !important; height: 30px !important; padding: 0 !important; }
   `]
 })
 export class OvertimeSetupComponent implements OnInit {
@@ -117,7 +128,7 @@ export class OvertimeSetupComponent implements OnInit {
 
   form = this.fb.group({
     allowOvertimeMultipleApproval: [false],
-    startDateStr: [''],
+    startDate: [null as Date | null],
     countingPeriodStartDay: [1, [Validators.required, Validators.min(1), Validators.max(31)]],
     countingPeriodEndDay: [31, [Validators.required, Validators.min(1), Validators.max(31)]],
     maximumMonthlyOvertimeHours: [40, [Validators.required, Validators.min(0)]],
@@ -164,7 +175,7 @@ export class OvertimeSetupComponent implements OnInit {
   }
 
   private dependentControls = [
-    'startDateStr',
+    'startDate',
     'countingPeriodStartDay',
     'countingPeriodEndDay',
     'maximumMonthlyOvertimeHours',
@@ -192,7 +203,7 @@ export class OvertimeSetupComponent implements OnInit {
       next: cfg => {
         this.form.patchValue({
           allowOvertimeMultipleApproval: cfg.allowOvertimeMultipleApproval,
-          startDateStr: OvertimeSetupComponent.toDisplayDate(cfg.startDate),
+          startDate: cfg.startDate ? new Date(cfg.startDate) : null,
           countingPeriodStartDay: cfg.countingPeriodStartDay,
           countingPeriodEndDay: cfg.countingPeriodEndDay,
           maximumMonthlyOvertimeHours: cfg.maximumMonthlyOvertimeHours,
@@ -210,7 +221,7 @@ export class OvertimeSetupComponent implements OnInit {
     this.saving.set(true);
     this.svc.update({
       allowOvertimeMultipleApproval: v.allowOvertimeMultipleApproval ?? false,
-      startDate: OvertimeSetupComponent.parseDisplayDate(v.startDateStr ?? ''),
+      startDate: v.startDate ? v.startDate.toISOString() : null,
       countingPeriodStartDay: Number(v.countingPeriodStartDay),
       countingPeriodEndDay: Number(v.countingPeriodEndDay),
       maximumMonthlyOvertimeHours: Number(v.maximumMonthlyOvertimeHours),

@@ -256,6 +256,13 @@
   font-size: 13px;
   color: #64748b;
 }
+.config-employee {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+  mat-icon { font-size: 15px; width: 15px; height: 15px; color: #94a3b8; }
+}
 
 .config-form { display: flex; flex-direction: column; gap: 12px; }
 
@@ -400,6 +407,13 @@
 .picker-input:focus-within {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+}
+.picker-input--error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.10) !important;
+}
+.picker-input--error .picker-icon {
+  color: #ef4444;
 }
 .picker-input .picker-icon {
   color: #94a3b8;

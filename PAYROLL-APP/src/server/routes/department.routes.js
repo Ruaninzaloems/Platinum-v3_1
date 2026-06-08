@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 
-const EXTERNAL_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+const EXTERNAL_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
 const CACHE_TTL = 5 * 60 * 1000;
 
 let deptCache = { data: null, ts: 0 };

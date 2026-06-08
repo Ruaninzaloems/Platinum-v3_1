@@ -1,4 +1,13 @@
 import { Pool } from 'pg';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+// Load the monorepo root .env so AZURE_POSTGRES_URL (the AFS database) is
+// available even when this API is started without exported env vars.
+// (db.ts lives at AFS-UI/api/, so the root .env is two levels up.)
+const __dir = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: resolve(__dir, '../../.env') });
 
 // Accepts either a postgresql:// URL or an ADO-style key=value connection string.
 function buildPoolConfig(raw: string): ConstructorParameters<typeof Pool>[0] {

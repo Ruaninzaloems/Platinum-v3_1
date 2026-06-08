@@ -4,7 +4,7 @@ const { authenticate } = require('../middleware/auth');
 const { auditLog } = require('../middleware/auditLog');
 const { query: dbQuery } = require('../config/database');
 
-const EXTERNAL_API_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+const EXTERNAL_API_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
 
 const projectNameCache = new Map();
 const regionNameCache = new Map();

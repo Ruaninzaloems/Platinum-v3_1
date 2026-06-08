@@ -1,10 +1,15 @@
 const { Pool } = require('pg');
 
+const connectionString = process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL;
+// Azure PostgreSQL requires SSL; relax cert validation (DigiCert chain not bundled locally).
+const isAzure = (connectionString || '').includes('.postgres.database.azure.com');
+
 const pool = new Pool({
-  connectionString: process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL,
+  connectionString,
+  ssl: isAzure ? { rejectUnauthorized: false } : undefined,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 15000,
 });
 
 pool.on('error', (err) => {

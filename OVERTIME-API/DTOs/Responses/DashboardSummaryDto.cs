@@ -13,4 +13,10 @@ public class DashboardSummaryDto
     public int AwaitingPayrollApproval   { get; init; }
     public int CapturedByMeInProgress    { get; init; }
     public int ReturnedToMe              { get; init; }
+
+    // ── System-wide "at a glance" stats ──────────────────────────────────────
+    public int     TotalTransactionsThisTaxYear { get; init; }
+    public decimal TotalHoursThisTaxYear        { get; init; }
+    public int     TotalProcessedThisTaxYear    { get; init; }
+    public int     TotalInProgress              { get; init; }
 }

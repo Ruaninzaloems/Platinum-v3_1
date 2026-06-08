@@ -181,6 +181,10 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <mat-icon class="nav-icon">dashboard</mat-icon>
               <span>Dashboard</span>
             </a>
+            <a class="nav-link" routerLink="/payroll/ess" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">badge</mat-icon>
+              <span>Employee Self-Service</span>
+            </a>
             @for (group of payrollNavGroups; track group.title) {
               <div class="nav-group">
                 <button class="nav-group-header" (click)="toggleGroup(group.title)">
@@ -190,11 +194,33 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 </button>
                 @if (isGroupExpanded(group.title)) {
                   <div class="nav-group-items">
-                    @for (item of group.items; track item.label) {
-                      <a class="nav-link sub-item" [routerLink]="'/payroll' + item.route" routerLinkActive="active-link">
-                        <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
-                        <span>{{item.label}}</span>
-                      </a>
+                    @if (group.subGroups) {
+                      @for (sub of group.subGroups; track sub.label) {
+                        <div class="nav-sub-group">
+                          <button class="nav-sub-group-header" (click)="toggleGroup(group.title + '/' + sub.label)">
+                            <mat-icon class="nav-icon">{{sub.icon}}</mat-icon>
+                            <span class="nav-sub-group-title">{{sub.label}}</span>
+                            <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded(group.title + '/' + sub.label)">chevron_right</mat-icon>
+                          </button>
+                          @if (isGroupExpanded(group.title + '/' + sub.label)) {
+                            <div class="nav-sub-group-items">
+                              @for (child of sub.children; track child.label) {
+                                <a class="nav-link sub-sub-item" [routerLink]="'/payroll' + child.route" routerLinkActive="active-link">
+                                  <span>{{child.label}}</span>
+                                </a>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    }
+                    @if (group.items) {
+                      @for (item of group.items; track item.label) {
+                        <a class="nav-link sub-item" [routerLink]="'/payroll' + item.route" routerLinkActive="active-link">
+                          <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
+                          <span>{{item.label}}</span>
+                        </a>
+                      }
                     }
                   </div>
                 }
@@ -804,78 +830,109 @@ export class ShellComponent implements OnInit, OnDestroy {
     }
   ];
 
-  payrollNavGroups: NavGroup[] = [
+  // Mirrors the standalone Payroll sidebar (client/src/app/layout/sidebar).
+  // Dashboard + Employee Self-Service are rendered as top-level links above.
+  // Routes are prefixed with /payroll by the template.
+  payrollNavGroups: BudgetNavGroup[] = [
     {
       title: 'HR Management', icon: 'people',
       items: [
-        { label: 'Employees', icon: 'badge', route: '/employees' },
         { label: 'Job Profiles', icon: 'description', route: '/job-profiles' },
         { label: 'Positions', icon: 'work', route: '/positions' },
         { label: 'Organogram', icon: 'account_tree', route: '/organogram' },
-        { label: 'Employee Self-Service', icon: 'person', route: '/ess' }
+        { label: 'Employees', icon: 'badge', route: '/employees' },
+        { label: 'Salary Structure', icon: 'tune', route: '/salary-structure' }
       ]
     },
     {
       title: 'Payroll', icon: 'payments',
       items: [
-        { label: 'Payroll Overview', icon: 'dashboard', route: '' },
-        { label: 'Payroll Run', icon: 'play_circle', route: '/run' },
-        { label: 'Payslip View', icon: 'receipt_long', route: '/payslip-view' },
-        { label: 'Wages', icon: 'monetization_on', route: '/wages' },
-        { label: 'Claims', icon: 'request_quote', route: '/claims' },
-        { label: 'Salary Structure', icon: 'tune', route: '/salary-structure' }
-      ]
-    },
-    {
-      title: 'Benefits & Deductions', icon: 'account_balance_wallet',
-      items: [
-        { label: 'Benefits', icon: 'health_and_safety', route: '/benefits' },
-        { label: 'Medical Aid Schemes', icon: 'local_hospital', route: '/medical-aid-schemes' },
-        { label: 'Retirement Funds', icon: 'savings', route: '/retirement-funds' },
-        { label: 'Trade Unions', icon: 'groups', route: '/trade-unions' },
-        { label: 'Pay Points', icon: 'point_of_sale', route: '/pay-points' }
-      ]
-    },
-    {
-      title: 'Leave & Time', icon: 'event_available',
-      items: [
-        { label: 'Leave Management', icon: 'event_note', route: '/leave' },
-        { label: 'Time & Attendance', icon: 'schedule', route: '/time' }
-      ]
-    },
-    {
-      title: 'Performance & Skills', icon: 'trending_up',
-      items: [
-        { label: 'Performance', icon: 'assessment', route: '/performance' },
-        { label: 'Skills Audit', icon: 'school', route: '/skills' },
-        { label: 'Disciplinary', icon: 'gavel', route: '/disciplinary' },
-        { label: 'Recruitment', icon: 'person_search', route: '/recruitment' }
+        { label: 'Payslips', icon: 'receipt_long', route: '/payroll/payslip-view' },
+        { label: 'Payroll Run', icon: 'play_circle', route: '/payroll/run' }
+      ],
+      subGroups: [
+        {
+          label: 'Transactions', icon: 'swap_horiz',
+          children: [
+            { label: 'Wages', icon: 'monetization_on', route: '/payroll/wages' },
+            { label: 'Claims', icon: 'request_quote', route: '/payroll/claims' }
+          ]
+        }
       ]
     },
     {
       title: 'Reports', icon: 'bar_chart',
       items: [
-        { label: 'Reports Centre', icon: 'summarize', route: '/reports' }
+        { label: 'Reports', icon: 'summarize', route: '/reports' }
       ]
     },
     {
-      title: 'Settings', icon: 'settings',
-      items: [
-        { label: 'Municipality', icon: 'location_city', route: '/settings/municipality' },
-        { label: 'Constants', icon: 'numbers', route: '/settings/constants' },
-        { label: 'Employee Types', icon: 'category', route: '/settings/employee-types' },
-        { label: 'Task Grades', icon: 'grade', route: '/settings/task-grades' },
-        { label: 'Conditions', icon: 'rule', route: '/settings/conditions' },
-        { label: 'Tax Tables', icon: 'table_chart', route: '/settings/tax' },
-        { label: 'IRP5 Source Codes', icon: 'code', route: '/settings/irp5-source-codes' },
-        { label: 'Leave Types', icon: 'event', route: '/settings/leave-types' },
-        { label: 'Salary Heads', icon: 'payments', route: '/settings/salary-heads' },
-        { label: 'Payroll Cycles', icon: 'loop', route: '/settings/payroll-cycles' },
-        { label: 'GL Integration', icon: 'sync', route: '/settings/gl-integration' },
-        { label: 'Bank Settings', icon: 'account_balance', route: '/settings/bank' },
-        { label: 'Security', icon: 'security', route: '/settings/security' },
-        { label: 'Workflows', icon: 'linear_scale', route: '/settings/workflows' },
-        { label: 'Data Conversion', icon: 'cloud_upload', route: '/settings/data-conversion' }
+      title: 'Configuration', icon: 'settings',
+      subGroups: [
+        {
+          label: 'Company', icon: 'business',
+          children: [
+            { label: 'Municipality Details', icon: 'location_city', route: '/settings/municipality' },
+            { label: 'Constants', icon: 'numbers', route: '/settings/constants' }
+          ]
+        },
+        {
+          label: 'HR Structure', icon: 'account_tree',
+          children: [
+            { label: 'Employee Sub Types', icon: 'category', route: '/settings/employee-types' },
+            { label: 'Conditions of Service', icon: 'rule', route: '/settings/conditions' },
+            { label: 'Task Grades & Notches', icon: 'grade', route: '/settings/task-grades' },
+            { label: 'Upper Limits', icon: 'vertical_align_top', route: '/settings/upper-limits' },
+            { label: 'Employment Change Reasons', icon: 'sync_alt', route: '/settings/employment-changes' }
+          ]
+        },
+        {
+          label: 'Payroll Setup', icon: 'tune',
+          children: [
+            { label: 'Tax Tables', icon: 'table_chart', route: '/settings/tax' },
+            { label: 'IRP5 Source Codes', icon: 'code', route: '/settings/irp5-source-codes' },
+            { label: 'Payroll Cycles', icon: 'loop', route: '/settings/payroll-cycles' },
+            { label: 'Tax Year Setup', icon: 'event', route: '/settings/tax-year-setup' },
+            { label: 'Payroll Periods', icon: 'date_range', route: '/payroll' }
+          ]
+        },
+        {
+          label: 'Benefits', icon: 'health_and_safety',
+          children: [
+            { label: 'Medical Aid Schemes', icon: 'local_hospital', route: '/medical-aid-schemes' },
+            { label: 'Retirement Funds', icon: 'savings', route: '/retirement-funds' },
+            { label: 'Trade Unions', icon: 'groups', route: '/trade-unions' }
+          ]
+        },
+        {
+          label: 'Pay Structure', icon: 'account_balance_wallet',
+          children: [
+            { label: 'Pay Points', icon: 'point_of_sale', route: '/pay-points' },
+            { label: 'Salary Transactions', icon: 'payments', route: '/settings/salary-heads' },
+            { label: 'Salary Transaction Groups', icon: 'list_alt', route: '/settings/salary-trans-groups' },
+            { label: 'Payroll Constants', icon: 'numbers', route: '/payroll' },
+            { label: 'Claim Rates', icon: 'request_quote', route: '/settings/claim-rates' },
+            { label: 'Claim Types', icon: 'category', route: '/settings/claim-configurations' },
+            { label: 'GL Integration', icon: 'sync', route: '/settings/gl-integration' }
+          ]
+        },
+        {
+          label: 'Other', icon: 'more_horiz',
+          children: [
+            { label: 'Leave Management', icon: 'event_note', route: '/leave' },
+            { label: 'Time & Attendance', icon: 'schedule', route: '/time' },
+            { label: 'Staff Performance', icon: 'assessment', route: '/performance' },
+            { label: 'Disciplinary', icon: 'gavel', route: '/disciplinary' },
+            { label: 'Skills & Training', icon: 'school', route: '/skills' },
+            { label: 'Recruitment', icon: 'person_search', route: '/recruitment' },
+            { label: 'Leave Types', icon: 'event', route: '/settings/leave-types' },
+            { label: 'Leave Policies', icon: 'policy', route: '/settings/leave-policies' },
+            { label: 'Bank & Payments', icon: 'account_balance', route: '/settings/bank' },
+            { label: 'Security & RBAC', icon: 'security', route: '/settings/security' },
+            { label: 'Workflows', icon: 'linear_scale', route: '/settings/workflows' },
+            { label: 'Data Conversion', icon: 'cloud_upload', route: '/settings/data-conversion' }
+          ]
+        }
       ]
     }
   ];
@@ -1064,11 +1121,11 @@ export class ShellComponent implements OnInit, OnDestroy {
   ];
 
   overtimeNavItems: NavItem[] = [
+    { label: 'Dashboard', icon: 'dashboard', route: '/overtime/dashboard' },
     { label: 'Overtime Capture', icon: 'edit_note', route: '/overtime/capture' },
     { label: 'Overtime Enquiry', icon: 'search', route: '/overtime/enquiry' },
     { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing' },
     { label: 'Overtime Setup', icon: 'settings', route: '/overtime/setup' },
-    { label: 'Positions', icon: 'work', route: '/overtime/positions' },
   ];
 
   afsNavGroups: NavGroup[] = [

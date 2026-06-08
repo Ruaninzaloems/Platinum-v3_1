@@ -1,7 +1,13 @@
 import { Routes } from '@angular/router';
 
 export const OVERTIME_ROUTES: Routes = [
-  { path: '', redirectTo: 'capture', pathMatch: 'full' },
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  {
+    path: 'dashboard',
+    loadComponent: () =>
+      import('./features/dashboard/dashboard.component')
+        .then(m => m.DashboardComponent)
+  },
   {
     path: 'setup',
     loadComponent: () =>

@@ -120,25 +120,73 @@
                     </div>
                   }
 
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;" (click)="$event.stopPropagation()">
                     <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--platinum-navy);">
                       <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">attach_file</mat-icon>
                       Evidence Attachments ({{ findingDocuments().get(finding.id)?.length || 0 }})
                     </h4>
                     <div style="display: flex; gap: 8px;">
-                      <button mat-stroked-button (click)="uploadDocForFinding(finding.id); $event.stopPropagation()" matTooltip="Upload evidence for this finding">
-                        <mat-icon>cloud_upload</mat-icon> Upload
-                      </button>
                       <button mat-stroked-button (click)="linkDocToFinding(finding.id); $event.stopPropagation()" matTooltip="Link existing document as evidence">
                         <mat-icon>link</mat-icon> Link Existing
                       </button>
                     </div>
                   </div>
+
+                  <div
+                    class="drop-zone"
+                    [class.drop-zone-active]="isDragging()"
+                    (dragover)="onDragOver($event)"
+                    (dragleave)="onDragLeave($event)"
+                    (drop)="onDrop($event, finding.id)"
+                    (click)="findingFileInput.click(); $event.stopPropagation()"
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      #findingFileInput
+                      style="display: none;"
+                      (change)="onAttachFilesSelected($event, finding.id)"
+                    >
+                    <mat-icon class="drop-zone-icon">cloud_upload</mat-icon>
+                    <div class="drop-zone-text">
+                      @if (isDragging()) {
+                        Drop files here
+                      } @else {
+                        Drag & drop emails and documents here, or click to browse
+                      }
+                    </div>
+                    <div class="drop-zone-hint">PDF, Word, Excel, Email (.msg/.eml), Images — up to 100 MB each</div>
+                  </div>
+
+                  @if (attachUploadingFiles.length > 0) {
+                    <div class="pending-files-list">
+                      @for (f of attachUploadingFiles; track f.name; let i = $index) {
+                        <div class="pending-file-row">
+                          <mat-icon class="file-type-icon">{{ getFileIcon(f.name) }}</mat-icon>
+                          <span class="pending-file-name">{{ f.name }}</span>
+                          <span class="pending-file-size">{{ formatFileSize(f.size) }}</span>
+                          @if (attachFileProgress[i] >= 100) {
+                            <mat-icon class="file-done-icon">check_circle</mat-icon>
+                          } @else if (attachFileProgress[i] === -1) {
+                            <mat-icon style="color: var(--red-600, #dc2626);">error</mat-icon>
+                          } @else {
+                            <span class="file-progress-pct">{{ attachFileProgress[i] || 0 }}%</span>
+                          }
+                        </div>
+                        @if (attachFileProgress[i] >= 0 && attachFileProgress[i] < 100) {
+                          <div class="file-progress-bar">
+                            <div class="file-progress-fill" [style.width.%]="attachFileProgress[i]"></div>
+                          </div>
+                        }
+                      }
+                    </div>
+                  }
+
                   @if (findingDocuments().get(finding.id)?.length) {
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
                       @for (doc of findingDocuments().get(finding.id)!; track doc.id) {
                         <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: white; border: 1px solid var(--platinum-border); border-radius: 8px;">
-                          <mat-icon style="color: var(--platinum-text-muted);">insert_drive_file</mat-icon>
+                          <mat-icon style="color: var(--platinum-text-muted);">{{ getFileIcon(doc.originalName || doc.fileName) }}</mat-icon>
                           <div style="flex: 1;">
                             <div style="font-size: 13px; font-weight: 500;">{{ doc.originalName || doc.fileName }}</div>
                             <div style="font-size: 11px; color: var(--platinum-text-muted);">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date:'shortDate' }}</div>
@@ -149,8 +197,8 @@
                         </div>
                       }
                     </div>
-                  } @else {
-                    <div style="text-align: center; padding: 24px; color: var(--platinum-text-muted); font-size: 13px;">No evidence attachments yet.</div>
+                  } @else if (attachUploadingFiles.length === 0) {
+                    <div style="text-align: center; padding: 12px; color: var(--platinum-text-muted); font-size: 13px;">No evidence attachments yet.</div>
                   }
                 </td>
               </tr>

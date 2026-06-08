@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -25,9 +25,85 @@ interface ChainStep {
   tooltip: string;
 }
 
+// ── Module-level pure helpers (called only from computed signals, not from templates) ──
+function enquiryStatusClass(status: number): string {
+  switch (status) {
+    case WorkflowStatus.Processed: return 'status-approved';
+    case WorkflowStatus.Returned:  return 'status-returned';
+    case WorkflowStatus.Rejected:  return 'status-rejected';
+    default:                       return 'status-pending';
+  }
+}
+
+function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
+  const s          = r.status;
+  const isRejected = s === WorkflowStatus.Rejected;
+  const isReturned = s === WorkflowStatus.Returned;
+  const isExcess   = !!r.isExcess;
+
+  const capturer    = r.capturedByName ?? r.capturedByEmployeeName ?? r.capturedBy ?? 'Unknown';
+  const recommender = r.recommenderEmployeeName ?? '—';
+  const approver    = r.approverEmployeeName ?? '—';
+  const excess      = r.excessApproverEmployeeName ?? '—';
+
+  const st = (done: boolean): ChainStep['state'] => {
+    if (isRejected) return 'rejected';
+    if (done)       return 'done';
+    return 'pending';
+  };
+
+  const approveDone = s >= WorkflowStatus.AwaitingPayrollApproval;
+  const excessDone  = s >= WorkflowStatus.AwaitingPayrollApproval;
+
+  const steps: ChainStep[] = [
+    {
+      label:   'Captured',
+      icon:    isReturned ? 'undo' : 'person',
+      state:   isReturned ? 'returned' : isRejected ? 'rejected' : 'done',
+      tooltip: isReturned ? `Returned to capturer: ${capturer}` : `Captured by: ${capturer}`
+    },
+    {
+      label:   'Recommend',
+      icon:    'thumb_up',
+      state:   isReturned ? 'pending' : st(s >= WorkflowStatus.ApprovedForPayment),
+      tooltip: s >= WorkflowStatus.ApprovedForPayment
+             ? `Recommended by: ${recommender}` : 'Pending recommendation'
+    },
+    {
+      label:   'Approve',
+      icon:    'verified',
+      state:   isReturned ? 'pending' : st(approveDone),
+      tooltip: approveDone ? `Approved by: ${approver}` : 'Pending approval'
+    },
+  ];
+
+  if (isExcess) {
+    steps.push({
+      label:   'Excess',
+      icon:    'star',
+      state:   isReturned ? 'pending' : st(excessDone),
+      tooltip: excessDone ? `Excess approved by: ${excess}` : 'Pending excess approval'
+    });
+  }
+
+  steps.push({
+    label:   'Processed',
+    icon:    isRejected ? 'cancel' : 'check_circle',
+    state:   isRejected ? 'rejected'
+           : isReturned ? 'pending'
+           : st(s === WorkflowStatus.Processed),
+    tooltip: isRejected ? 'Rejected'
+           : s === WorkflowStatus.Processed ? 'Processed'
+           : 'Pending processing'
+  });
+
+  return steps;
+}
+
 @Component({
   selector: 'app-overtime-enquiry',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule,
     MatIconModule, MatPaginatorModule,
@@ -166,7 +242,7 @@ interface ChainStep {
                     </td>
                     <td class="chain-col">
                       <div class="chain-strip">
-                        @for (step of chainSteps(r); track step.label; let last = $last) {
+                        @for (step of r._steps; track step.label; let last = $last) {
                           <div class="chain-step"
                                [ngClass]="'step-' + step.state"
                                [matTooltip]="step.tooltip"
@@ -190,7 +266,7 @@ interface ChainStep {
                     <td class="date-col">{{ r.overtimeDate | date:'dd/MM/yyyy' }}</td>
                     @if (activeTab() === 'current') {
                       <td>
-                        <span class="status-badge" [ngClass]="statusClass(r.status)">
+                        <span class="status-badge" [ngClass]="r._sc">
                           {{ r.statusLabel }}
                         </span>
                       </td>
@@ -404,10 +480,23 @@ export class OvertimeEnquiryComponent {
 
   private optionRows = signal<OvertimeTransactionDto[]>([]);
 
+  // Pre-compute expensive per-row values once when data arrives
+  private augmentedRows = computed(() =>
+    this.allRows().map(r => ({
+      ...r,
+      _sc:    enquiryStatusClass(r.status),
+      _steps: buildChainSteps(r),
+    }))
+  );
+
+  // Memoised date-picker bridges (avoid new Date() on every CD tick)
+  private _fromCache: { iso: string; date: Date | null } = { iso: '', date: null };
+  private _toCache:   { iso: string; date: Date | null } = { iso: '', date: null };
+
   // On Current tab: client-side exclude Processed rows so the grid is clean.
   // On Processed tab: the API already returns only Processed rows.
   pagedRows = computed(() => {
-    const rows = this.allRows();
+    const rows = this.augmentedRows();
     if (this.activeTab() === 'current') {
       return rows.filter(r => r.status !== WorkflowStatus.Processed);
     }
@@ -547,8 +636,11 @@ export class OvertimeEnquiryComponent {
   get fromDateValue(): Date | null {
     const iso = this.filterFromDate();
     if (!iso) return null;
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    if (this._fromCache.iso !== iso) {
+      const [y, m, d] = iso.split('-').map(Number);
+      this._fromCache = { iso, date: new Date(y, m - 1, d) };
+    }
+    return this._fromCache.date;
   }
   set fromDateValue(val: Date | null) {
     this.filterFromDate.set(val ? dateToIso(val) : '');
@@ -558,8 +650,11 @@ export class OvertimeEnquiryComponent {
   get toDateValue(): Date | null {
     const iso = this.filterToDate();
     if (!iso) return null;
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    if (this._toCache.iso !== iso) {
+      const [y, m, d] = iso.split('-').map(Number);
+      this._toCache = { iso, date: new Date(y, m - 1, d) };
+    }
+    return this._toCache.date;
   }
   set toDateValue(val: Date | null) {
     this.filterToDate.set(val ? dateToIso(val) : '');
@@ -576,79 +671,6 @@ export class OvertimeEnquiryComponent {
     this.router.navigate(['/overtime/capture', r.id]);
   }
 
-  statusClass(status: number): string {
-    switch (status) {
-      case WorkflowStatus.Processed: return 'status-approved';
-      case WorkflowStatus.Returned:  return 'status-returned';
-      case WorkflowStatus.Rejected:  return 'status-rejected';
-      default:                       return 'status-pending';
-    }
-  }
-
-  chainSteps(r: OvertimeTransactionDto): ChainStep[] {
-    const s          = r.status;
-    const isRejected = s === WorkflowStatus.Rejected;
-    const isReturned = s === WorkflowStatus.Returned;
-    const isExcess   = !!r.isExcess;
-
-    const capturer    = r.capturedByName ?? r.capturedByEmployeeName ?? r.capturedBy ?? 'Unknown';
-    const recommender = r.recommenderEmployeeName ?? '—';
-    const approver    = r.approverEmployeeName ?? '—';
-    const excess      = r.excessApproverEmployeeName ?? '—';
-
-    const st = (done: boolean): ChainStep['state'] => {
-      if (isRejected) return 'rejected';
-      if (done)       return 'done';
-      return 'pending';
-    };
-
-    const approveDone = s >= WorkflowStatus.AwaitingPayrollApproval;
-    const excessDone  = s >= WorkflowStatus.AwaitingPayrollApproval;
-
-    const steps: ChainStep[] = [
-      {
-        label:   'Captured',
-        icon:    isReturned ? 'undo' : 'person',
-        state:   isReturned ? 'returned' : isRejected ? 'rejected' : 'done',
-        tooltip: isReturned ? `Returned to capturer: ${capturer}` : `Captured by: ${capturer}`
-      },
-      {
-        label:   'Recommend',
-        icon:    'thumb_up',
-        state:   isReturned ? 'pending' : st(s >= WorkflowStatus.ApprovedForPayment),
-        tooltip: s >= WorkflowStatus.ApprovedForPayment
-               ? `Recommended by: ${recommender}` : 'Pending recommendation'
-      },
-      {
-        label:   'Approve',
-        icon:    'verified',
-        state:   isReturned ? 'pending' : st(approveDone),
-        tooltip: approveDone ? `Approved by: ${approver}` : 'Pending approval'
-      },
-    ];
-
-    if (isExcess) {
-      steps.push({
-        label:   'Excess',
-        icon:    'star',
-        state:   isReturned ? 'pending' : st(excessDone),
-        tooltip: excessDone ? `Excess approved by: ${excess}` : 'Pending excess approval'
-      });
-    }
-
-    steps.push({
-      label:   'Processed',
-      icon:    isRejected ? 'cancel' : 'check_circle',
-      state:   isRejected ? 'rejected'
-             : isReturned ? 'pending'
-             : st(s === WorkflowStatus.Processed),
-      tooltip: isRejected ? 'Rejected'
-             : s === WorkflowStatus.Processed ? 'Processed'
-             : 'Pending processing'
-    });
-
-    return steps;
-  }
 }
 
 function dateToIso(d: Date): string {

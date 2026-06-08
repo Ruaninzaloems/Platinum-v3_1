@@ -23,6 +23,27 @@ export interface ModuleApiConfig {
   assetsSharePointEnabled : boolean;
   assetsSharePointSiteUrl : string;
   assetsSharePointLibrary : string;
+  // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
+  afsDbHost     : string;
+  afsDbPort     : string;
+  afsDbName     : string;
+  afsDbUser     : string;
+  afsDbPassword : string;
+  afsDbSslMode  : string;
+  // Overtime PostgreSQL database (maps to ConnectionStrings:OvertimeDb in OVERTIME-API)
+  overtimeDbHost     : string;
+  overtimeDbPort     : string;
+  overtimeDbName     : string;
+  overtimeDbUser     : string;
+  overtimeDbPassword : string;
+  overtimeDbSslMode  : string;
+  // Payroll PostgreSQL database (maps to AZURE_DATABASE_URL read by PAYROLL-APP)
+  payrollDbHost     : string;
+  payrollDbPort     : string;
+  payrollDbName     : string;
+  payrollDbUser     : string;
+  payrollDbPassword : string;
+  payrollDbSslMode  : string;
 }
 
 const DEFAULTS: ModuleApiConfig = {
@@ -40,6 +61,27 @@ const DEFAULTS: ModuleApiConfig = {
   assetsSharePointEnabled : false,
   assetsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   assetsSharePointLibrary : 'UatAssets',
+  // AFS database — separate "AFS" PostgreSQL on Azure
+  afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
+  afsDbPort     : '5432',
+  afsDbName     : 'AFS',
+  afsDbUser     : 'Admin_Dev',
+  afsDbPassword : 'NOP@ssword_123',
+  afsDbSslMode  : 'Require',
+  // Overtime database — separate "Overtime" PostgreSQL on Azure
+  overtimeDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
+  overtimeDbPort     : '5432',
+  overtimeDbName     : 'Overtime',
+  overtimeDbUser     : 'Admin_Dev',
+  overtimeDbPassword : 'NOP@ssword_123',
+  overtimeDbSslMode  : 'Require',
+  // Payroll database — separate "Payroll" PostgreSQL on Azure
+  payrollDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
+  payrollDbPort     : '5432',
+  payrollDbName     : 'Payroll',
+  payrollDbUser     : 'Admin_Dev',
+  payrollDbPassword : 'NOP@ssword_123',
+  payrollDbSslMode  : 'Require',
 };
 
 export function loadModuleConfig(): ModuleApiConfig {
@@ -254,6 +296,206 @@ const MODULES: ModuleDef[] = [
         </div>
       }
 
+      <!-- AFS Database config — AFS module only -->
+      @if (activeKey() === 'afs') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#336791">database</mat-icon>
+            <span>Database Configuration</span>
+            <span class="db-pill">PostgreSQL</span>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#336791">dns</mat-icon> Host</label>
+              <input class="field-input" [(ngModel)]="cfg.afsDbHost" (ngModelChange)="markDirty()"
+                     placeholder="platinum-postgre-sql.postgres.database.azure.com">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#64748b">lan</mat-icon> Port</label>
+              <input class="field-input" [(ngModel)]="cfg.afsDbPort" (ngModelChange)="markDirty()" placeholder="5432">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">storage</mat-icon> Database</label>
+              <input class="field-input" [(ngModel)]="cfg.afsDbName" (ngModelChange)="markDirty()" placeholder="AFS">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#7c3aed">person</mat-icon> Username</label>
+              <input class="field-input" [(ngModel)]="cfg.afsDbUser" (ngModelChange)="markDirty()" placeholder="Admin_Dev">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#dc2626">key</mat-icon> Password</label>
+              <input class="field-input" type="password" [(ngModel)]="cfg.afsDbPassword" (ngModelChange)="markDirty()" placeholder="••••••••">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#16a34a">lock</mat-icon> SSL Mode</label>
+              <input class="field-input" [(ngModel)]="cfg.afsDbSslMode" (ngModelChange)="markDirty()" placeholder="Require">
+            </div>
+          </div>
+
+          <!-- Connection string preview -->
+          <div class="conn-box">
+            <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">AZURE_POSTGRES_URL (AFS-UI/api)</div>
+              <code>{{ afsConnString() }}</code>
+            </div>
+          </div>
+
+          <div class="conn-box" style="background:#fffbeb;border-color:#fde68a">
+            <mat-icon style="font-size:14px;color:#d97706;flex-shrink:0">warning</mat-icon>
+            <div style="font-size:12px;color:#92400e">
+              The AFS API reads this from the <strong>.env</strong> (AZURE_POSTGRES_URL) at startup.
+              After saving, update <code>.env</code> with the connection string above and restart the AFS API.
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsDbHost || !cfg.afsDbName"
+                    (click)="testAfsDb()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Checking…' : 'Validate' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Overtime Database config — Overtime module only -->
+      @if (activeKey() === 'overtime') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#336791">database</mat-icon>
+            <span>Database Configuration</span>
+            <span class="db-pill">PostgreSQL</span>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#336791">dns</mat-icon> Host</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeDbHost" (ngModelChange)="markDirty()"
+                     placeholder="platinum-postgre-sql.postgres.database.azure.com">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#64748b">lan</mat-icon> Port</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeDbPort" (ngModelChange)="markDirty()" placeholder="5432">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">storage</mat-icon> Database</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeDbName" (ngModelChange)="markDirty()" placeholder="Overtime">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#7c3aed">person</mat-icon> Username</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeDbUser" (ngModelChange)="markDirty()" placeholder="Admin_Dev">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#dc2626">key</mat-icon> Password</label>
+              <input class="field-input" type="password" [(ngModel)]="cfg.overtimeDbPassword" (ngModelChange)="markDirty()" placeholder="••••••••">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#16a34a">lock</mat-icon> SSL Mode</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeDbSslMode" (ngModelChange)="markDirty()" placeholder="Require">
+            </div>
+          </div>
+
+          <!-- Connection string preview -->
+          <div class="conn-box">
+            <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">ConnectionStrings:OvertimeDb (OVERTIME-API)</div>
+              <code>{{ overtimeConnString() }}</code>
+            </div>
+          </div>
+
+          <div class="conn-box" style="background:#fffbeb;border-color:#fde68a">
+            <mat-icon style="font-size:14px;color:#d97706;flex-shrink:0">warning</mat-icon>
+            <div style="font-size:12px;color:#92400e">
+              The Overtime API reads this from <strong>OVERTIME-API/appsettings.json</strong> (ConnectionStrings:OvertimeDb)
+              at startup. After saving, update appsettings with the connection string above and restart the Overtime API.
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.overtimeDbHost || !cfg.overtimeDbName"
+                    (click)="testOvertimeDb()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Checking…' : 'Validate' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Payroll Database config — Payroll module only -->
+      @if (activeKey() === 'payroll') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#336791">database</mat-icon>
+            <span>Database Configuration</span>
+            <span class="db-pill">PostgreSQL</span>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#336791">dns</mat-icon> Host</label>
+              <input class="field-input" [(ngModel)]="cfg.payrollDbHost" (ngModelChange)="markDirty()"
+                     placeholder="platinum-postgre-sql.postgres.database.azure.com">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#64748b">lan</mat-icon> Port</label>
+              <input class="field-input" [(ngModel)]="cfg.payrollDbPort" (ngModelChange)="markDirty()" placeholder="5432">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">storage</mat-icon> Database</label>
+              <input class="field-input" [(ngModel)]="cfg.payrollDbName" (ngModelChange)="markDirty()" placeholder="Payroll">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#7c3aed">person</mat-icon> Username</label>
+              <input class="field-input" [(ngModel)]="cfg.payrollDbUser" (ngModelChange)="markDirty()" placeholder="Admin_Dev">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#dc2626">key</mat-icon> Password</label>
+              <input class="field-input" type="password" [(ngModel)]="cfg.payrollDbPassword" (ngModelChange)="markDirty()" placeholder="••••••••">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#16a34a">lock</mat-icon> SSL Mode</label>
+              <input class="field-input" [(ngModel)]="cfg.payrollDbSslMode" (ngModelChange)="markDirty()" placeholder="Require">
+            </div>
+          </div>
+
+          <div class="conn-box">
+            <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">AZURE_DATABASE_URL (PAYROLL-APP)</div>
+              <code>{{ payrollConnString() }}</code>
+            </div>
+          </div>
+
+          <div class="conn-box" style="background:#fffbeb;border-color:#fde68a">
+            <mat-icon style="font-size:14px;color:#d97706;flex-shrink:0">warning</mat-icon>
+            <div style="font-size:12px;color:#92400e">
+              The Payroll API reads this from the <strong>.env</strong> (AZURE_DATABASE_URL) at startup.
+              After saving, update <code>.env</code> with the connection string above and restart the Payroll API.
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.payrollDbHost || !cfg.payrollDbName"
+                    (click)="testPayrollDb()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Checking…' : 'Validate' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
       <!-- Actions -->
       <div class="actions">
         <button class="btn-secondary" (click)="reset()">
@@ -341,6 +583,10 @@ const MODULES: ModuleDef[] = [
     }
     .sp-status.active { color:#16a34a; }
     .sp-disabled { opacity:.55; pointer-events:none; }
+    .db-pill {
+      font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;
+      background:#e0f2fe; color:#0369a1; margin-left:4px;
+    }
   `]
 })
 export class AdminSettingsComponent implements OnInit {
@@ -395,7 +641,101 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.assetsSharePointSiteUrl = DEFAULTS.assetsSharePointSiteUrl;
       this.cfg.assetsSharePointLibrary = DEFAULTS.assetsSharePointLibrary;
     }
+    // AFS page owns the DB config — reset it too
+    if (this.activeKey() === 'afs') {
+      this.cfg.afsDbHost     = DEFAULTS.afsDbHost;
+      this.cfg.afsDbPort     = DEFAULTS.afsDbPort;
+      this.cfg.afsDbName     = DEFAULTS.afsDbName;
+      this.cfg.afsDbUser     = DEFAULTS.afsDbUser;
+      this.cfg.afsDbPassword = DEFAULTS.afsDbPassword;
+      this.cfg.afsDbSslMode  = DEFAULTS.afsDbSslMode;
+    }
+    // Overtime page owns the DB config — reset it too
+    if (this.activeKey() === 'overtime') {
+      this.cfg.overtimeDbHost     = DEFAULTS.overtimeDbHost;
+      this.cfg.overtimeDbPort     = DEFAULTS.overtimeDbPort;
+      this.cfg.overtimeDbName     = DEFAULTS.overtimeDbName;
+      this.cfg.overtimeDbUser     = DEFAULTS.overtimeDbUser;
+      this.cfg.overtimeDbPassword = DEFAULTS.overtimeDbPassword;
+      this.cfg.overtimeDbSslMode  = DEFAULTS.overtimeDbSslMode;
+    }
+    // Payroll page owns the DB config — reset it too
+    if (this.activeKey() === 'payroll') {
+      this.cfg.payrollDbHost     = DEFAULTS.payrollDbHost;
+      this.cfg.payrollDbPort     = DEFAULTS.payrollDbPort;
+      this.cfg.payrollDbName     = DEFAULTS.payrollDbName;
+      this.cfg.payrollDbUser     = DEFAULTS.payrollDbUser;
+      this.cfg.payrollDbPassword = DEFAULTS.payrollDbPassword;
+      this.cfg.payrollDbSslMode  = DEFAULTS.payrollDbSslMode;
+    }
     this.dirty.set(true);
+  }
+
+  /** Build the AZURE_POSTGRES_URL connection string from the AFS DB fields. */
+  afsConnString(): string {
+    const c = this.cfg;
+    return `Host=${c.afsDbHost};Port=${c.afsDbPort};Database=${c.afsDbName};Username=${c.afsDbUser};Password=••••••••;SslMode=${c.afsDbSslMode};CommandTimeout=600;Timeout=30`;
+  }
+
+  /** Validate the AFS DB config fields are complete and well-formed. */
+  testAfsDb() {
+    this.spTesting.set(true);
+    const c = this.cfg;
+    const ok = !!c.afsDbHost && !!c.afsDbPort && !!c.afsDbName && !!c.afsDbUser
+      && /^\d+$/.test(c.afsDbPort) && /\.postgres\.database\.azure\.com$|localhost|^\d/.test(c.afsDbHost);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`AFS DB config valid — database "${c.afsDbName}" on ${c.afsDbHost}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid AFS DB config — check Host, Port (numeric), Database and Username.', 'Close', { duration: 5000 });
+      }
+    }, 500);
+  }
+
+  /** Build the ConnectionStrings:OvertimeDb value from the Overtime DB fields. */
+  overtimeConnString(): string {
+    const c = this.cfg;
+    return `Host=${c.overtimeDbHost};Port=${c.overtimeDbPort};Database=${c.overtimeDbName};Username=${c.overtimeDbUser};Password=••••••••;SslMode=${c.overtimeDbSslMode};CommandTimeout=600;Timeout=30`;
+  }
+
+  /** Validate the Overtime DB config fields are complete and well-formed. */
+  testOvertimeDb() {
+    this.spTesting.set(true);
+    const c = this.cfg;
+    const ok = !!c.overtimeDbHost && !!c.overtimeDbPort && !!c.overtimeDbName && !!c.overtimeDbUser
+      && /^\d+$/.test(c.overtimeDbPort) && /\.postgres\.database\.azure\.com$|localhost|^\d/.test(c.overtimeDbHost);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`Overtime DB config valid — database "${c.overtimeDbName}" on ${c.overtimeDbHost}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid Overtime DB config — check Host, Port (numeric), Database and Username.', 'Close', { duration: 5000 });
+      }
+    }, 500);
+  }
+
+  /** Build the AZURE_DATABASE_URL value from the Payroll DB fields. */
+  payrollConnString(): string {
+    const c = this.cfg;
+    const ssl = (c.payrollDbSslMode || 'require').toLowerCase();
+    return `postgresql://${c.payrollDbUser}:••••••••@${c.payrollDbHost}:${c.payrollDbPort}/${c.payrollDbName}?sslmode=${ssl}`;
+  }
+
+  /** Validate the Payroll DB config fields are complete and well-formed. */
+  testPayrollDb() {
+    this.spTesting.set(true);
+    const c = this.cfg;
+    const ok = !!c.payrollDbHost && !!c.payrollDbPort && !!c.payrollDbName && !!c.payrollDbUser
+      && /^\d+$/.test(c.payrollDbPort) && /\.postgres\.database\.azure\.com$|localhost|^\d/.test(c.payrollDbHost);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`Payroll DB config valid — database "${c.payrollDbName}" on ${c.payrollDbHost}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid Payroll DB config — check Host, Port (numeric), Database and Username.', 'Close', { duration: 5000 });
+      }
+    }, 500);
   }
 
   testSharePoint() {

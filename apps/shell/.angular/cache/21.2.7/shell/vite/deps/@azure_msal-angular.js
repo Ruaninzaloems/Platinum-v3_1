@@ -1,10 +1,10 @@
 import {
+  Router
+} from "./chunk-G4DK3QUX.js";
+import {
   EventMessageUtils
 } from "./chunk-VEKBZFTK.js";
 import "./chunk-KQPLH7PO.js";
-import {
-  Router
-} from "./chunk-5UBC4ULN.js";
 import {
   BrowserConfigurationAuthError,
   BrowserUtils_exports,
@@ -13,13 +13,13 @@ import {
   NavigationClient,
   WrapperSKU
 } from "./chunk-HBZCMK7R.js";
-import "./chunk-OTGSOXUT.js";
+import "./chunk-W5ZEON3D.js";
 import "./chunk-5TGOBOYD.js";
-import "./chunk-MVWRHIZE.js";
 import {
   CommonModule,
   Location
 } from "./chunk-M6TROWNH.js";
+import "./chunk-MVWRHIZE.js";
 import "./chunk-JTYEZAXU.js";
 import {
   Component,
@@ -40,8 +40,8 @@ import {
   ɵɵdefineInjector,
   ɵɵinject
 } from "./chunk-OFYGUQ7M.js";
-import "./chunk-OUWWR32C.js";
 import "./chunk-HQ5HQZO3.js";
+import "./chunk-OUWWR32C.js";
 import {
   BehaviorSubject,
   EMPTY,

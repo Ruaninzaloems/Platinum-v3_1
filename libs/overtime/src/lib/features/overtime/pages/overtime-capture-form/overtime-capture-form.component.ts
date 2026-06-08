@@ -16,7 +16,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject } from 'rxjs';
 
 import { LookupService } from '../../../../core/services/lookup.service';
@@ -115,24 +115,27 @@ export class DuplicateDateConfirmDialog {
           </div>
 
           @if (!editId()) {
-            <div class="form-group" style="max-width: 520px;">
+            <div class="form-group emp-search-wrap" style="max-width: 520px;">
               <label>EMPLOYEE <span class="required">*</span></label>
               <input class="form-control"
                      type="text"
+                     autocomplete="off"
                      [(ngModel)]="searchTerm"
                      (ngModelChange)="onSearch($event)"
-                     [matAutocomplete]="auto"
+                     (focus)="onSearch(searchTerm)"
+                     (blur)="onSearchBlur()"
                      placeholder="Search by employee ID, position ID, first name or surname">
-            </div>
-            <mat-autocomplete #auto="matAutocomplete"
-                              panelClass="picker-panel"
-                              (optionSelected)="onEmployeePicked($event.option.value)">
-              @for (e of suggestions(); track e.id) {
-                <mat-option [value]="e">
-                  <span class="opt-line">{{ e.employeeNumber }} - {{ e.fullName }}</span>
-                </mat-option>
+              @if (suggestions().length > 0) {
+                <div class="emp-dropdown">
+                  @for (e of suggestions(); track e.id) {
+                    <button type="button" class="emp-option" (mousedown)="onEmployeePicked(e)">
+                      <span class="emp-opt-id">{{ e.employeeNumber }}</span>
+                      <span class="emp-opt-name">{{ e.fullName }}</span>
+                    </button>
+                  }
+                </div>
               }
-            </mat-autocomplete>
+            </div>
           }
 
           @if (employee()) {
@@ -225,6 +228,9 @@ export class DuplicateDateConfirmDialog {
                 <input class="form-control" type="number" min="0" step="0.25"
                        [(ngModel)]="hours" [disabled]="viewOnly()"
                        (ngModelChange)="onHoursChange()">
+                @if (hoursLabel) {
+                  <span style="display:block;margin-top:4px;font-size:0.78rem;color:#6c757d;">{{ hoursLabel }}</span>
+                }
               </div>
 
               <div class="form-group full-width">
@@ -518,6 +524,29 @@ export class DuplicateDateConfirmDialog {
   `,
   styles: [`
     .capture-page { display: flex; flex-direction: column; gap: 0; max-width: 1100px; }
+
+    /* Employee search dropdown (custom, signal-driven) */
+    .emp-search-wrap { position: relative; }
+    .emp-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;
+      margin-top: 4px; max-height: 320px; overflow-y: auto;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(15,23,42,0.12), 0 2px 6px rgba(15,23,42,0.06);
+      padding: 4px;
+    }
+    .emp-option {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 8px 10px; border: 0; background: transparent; cursor: pointer;
+      border-radius: 6px; text-align: left; font-size: 13px; color: #1e293b;
+    }
+    .emp-option:hover { background: #eef2ff; }
+    .emp-opt-id {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 48px; padding: 1px 8px; border-radius: 999px;
+      background: #eef2ff; color: #4338ca; font-size: 11px; font-weight: 600;
+      font-variant-numeric: tabular-nums; flex-shrink: 0;
+    }
+    .emp-opt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .date-field-wrap { position: relative; display: flex; align-items: center; }
     .special-day-badge {
       display: inline-flex; align-items: center; gap: 5px;
@@ -998,15 +1027,20 @@ export class OvertimeCaptureFormComponent implements OnInit {
   searchTerm = '';
   private search$ = new Subject<string>();
   private _hideSuggestions = signal(false);
-  private _rawSuggestions = toSignal(
-    this.search$.pipe(
-      debounceTime(250),
-      distinctUntilChanged(),
-      switchMap(t => t && t.length >= 2 ? this.lookups.employees(t) : of([] as EmployeeLookup[]))
-    ),
-    { initialValue: [] as EmployeeLookup[] }
-  );
-  suggestions = computed(() => this._hideSuggestions() ? [] as EmployeeLookup[] : (this._rawSuggestions() ?? []));
+  suggestions = signal<EmployeeLookup[]>([]);
+
+  // Custom signal-driven dropdown (replaces mat-autocomplete, which doesn't
+  // reliably open with async options under zoneless change detection).
+  // When results land, suggestions() updates and the @if/@for in the template
+  // renders the dropdown directly in the component view — no overlay timing.
+  private _searchSub = this.search$.pipe(
+    debounceTime(250),
+    distinctUntilChanged(),
+    switchMap(t => t && t.length >= 2 ? this.lookups.employees(t) : of([] as EmployeeLookup[])),
+    takeUntilDestroyed(),
+  ).subscribe(results => {
+    this.suggestions.set(this._hideSuggestions() ? [] : (results || []));
+  });
 
   employee = signal<EmployeeLookup | null>(null);
   overtimeDate = signal(todayIso());
@@ -1272,10 +1306,16 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.search$.next(t);
   }
 
+  /** Hide the dropdown shortly after blur (delay lets an option mousedown register). */
+  onSearchBlur(): void {
+    setTimeout(() => { this._hideSuggestions.set(true); this.suggestions.set([]); }, 150);
+  }
+
   onEmployeePicked(e: EmployeeLookup | string): void {
     if (typeof e === 'string') return;
-    // Synchronously hide all options so the panel cannot re-open via _handleFocus
+    // Hide the dropdown and lock in the selection.
     this._hideSuggestions.set(true);
+    this.suggestions.set([]);
     this.employee.set(e);
     this.searchTerm = `${e.employeeNumber} - ${e.fullName}`;
     this.salaryHeadId = null;
@@ -1321,13 +1361,23 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.overtimeDate.set(`${y}-${m}-${d}`);
   }
 
+  get hoursLabel(): string {
+    if (!this.hours || this.hours <= 0) return '';
+    const totalMins = Math.round(this.hours * 60);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
+
   recalcHours(): void {
     if (this.startTime && this.endTime) {
       const [sh, sm] = this.startTime.split(':').map(n => +n);
       const [eh, em] = this.endTime.split(':').map(n => +n);
       let mins = (eh * 60 + em) - (sh * 60 + sm);
       if (mins < 0) mins += 24 * 60; // crossed midnight
-      this.hours = Math.round((mins / 60) * 100) / 100;
+      this.hours = Math.round((mins / 60) * 10000) / 10000;
       this.refreshAmount();
     }
   }

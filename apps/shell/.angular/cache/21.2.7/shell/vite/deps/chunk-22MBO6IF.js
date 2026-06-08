@@ -3,7 +3,7 @@ import {
 } from "./chunk-4CO5QW4B.js";
 import {
   DomSanitizer
-} from "./chunk-OTGSOXUT.js";
+} from "./chunk-W5ZEON3D.js";
 import {
   BidiModule
 } from "./chunk-JPXPF4SI.js";
@@ -728,4 +728,4 @@ export {
   MatIcon,
   MatIconModule
 };
-//# sourceMappingURL=chunk-GTBBGUWG.js.map
+//# sourceMappingURL=chunk-22MBO6IF.js.map

@@ -54,6 +54,7 @@ public class OvertimeDbContext : DbContext
 
     /// <summary>Read-only projection of legacy Const_Cycle.</summary>
     public DbSet<ConstCycle> ConstCycles => Set<ConstCycle>();
+    public DbSet<ConstPayrollCycleMode> ConstPayrollCycleModes => Set<ConstPayrollCycleMode>();
 
     /// <summary>Read-only projection of legacy Const_Department.</summary>
     public DbSet<ConstDepartment> ConstDepartments => Set<ConstDepartment>();
@@ -361,6 +362,20 @@ public class OvertimeDbContext : DbContext
             e.Property(x => x.ModifierId).HasColumnName("ModifierID");
             e.Property(x => x.CycleTypeId).HasColumnName("CycleTypeID");
             e.Property(x => x.SkipInNewTaxYear).HasColumnName("SkipInNewTaxYear");
+        });
+
+        // Legacy Const_Payroll_CycleMode_sys — read-only (1 = Normal, 2 = Special).
+        b.Entity<ConstPayrollCycleMode>(e =>
+        {
+            e.ToTable("Const_Payroll_CycleMode_sys", t => t.ExcludeFromMigrations());
+            e.HasKey(x => x.CycleModeId);
+            e.Property(x => x.CycleModeId).HasColumnName("CycleMode_ID").ValueGeneratedNever();
+            e.Property(x => x.CycleModeDesc).HasColumnName("CycleModeDesc").HasMaxLength(200);
+            e.Property(x => x.Enabled).HasColumnName("Enabled");
+            e.Property(x => x.DateCaptured).HasColumnName("DateCaptured");
+            e.Property(x => x.CapturerId).HasColumnName("CapturerID");
+            e.Property(x => x.DateModified).HasColumnName("DateModified");
+            e.Property(x => x.ModifierId).HasColumnName("ModifierID");
         });
 
         // Legacy Const_Department — read-only.
