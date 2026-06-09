@@ -165,7 +165,11 @@
   color: #2563eb;
 }
 
-.tab-content {
+/* Renamed from .tab-content to avoid collision with the global
+   `.tab-content { display: none }` rule leaked by libs/payroll/_payroll-global.css,
+   which hid this AFS dashboard content (it switches tabs via @switch, not an
+   .active class, so the global rule kept it display:none). */
+.afs-tab-content {
   flex: 1;
   overflow-y: auto;
   background: #f8fafc;

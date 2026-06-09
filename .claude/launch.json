@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shell",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["ng", "serve", "--port", "5000", "--host", "0.0.0.0", "--proxy-config", "proxy.conf.json"],
+      "port": 5000
+    }
+  ]
+}

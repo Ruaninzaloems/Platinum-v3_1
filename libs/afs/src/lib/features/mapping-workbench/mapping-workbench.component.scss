@@ -199,6 +199,10 @@
 }
 
 .tab-content {
+  // display:block restores the pre-leak default — the global
+  // `.tab-content{display:none}` from libs/payroll/_payroll-global.css
+  // (a global style in apps/shell/angular.json) otherwise hides this content.
+  display: block;
   padding: 16px 0;
 }
 

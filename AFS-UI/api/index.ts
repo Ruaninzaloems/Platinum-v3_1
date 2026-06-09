@@ -16,6 +16,9 @@ import {
   demoMfmaSubmissions,
   demoMfmaReport,
 } from './demo';
+import { artRouter } from './art';
+import { platinumRouter } from './platinum';
+import { calculateRatios } from './ratios';
 
 function isDbUnavailable(err: any): boolean {
   const msg = String(err?.message || err || '').toLowerCase();
@@ -525,6 +528,19 @@ app.get('/api/compilations', async (_req, res, next) => {
 });
 
 // ────────────────────────────────────────────────────────────
+// Financial Ratios (ratios.ts) — TB baseline + optional EMS enrichment via ART.
+// Mirrors source reports.controller.ts @Get('ratios/:financialYearId').
+// ────────────────────────────────────────────────────────────
+app.get('/api/reports/ratios/:financialYearId', async (req, res, next) => {
+  try {
+    const data = await calculateRatios(String(req.params.financialYearId));
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ────────────────────────────────────────────────────────────
 // Demo-only sub-dashboard endpoints (returned when DB is unreachable)
 // ────────────────────────────────────────────────────────────
 app.get('/api/reports/findings-dashboard', (_req, res) => res.json(demoFindingsDashboard));
@@ -551,6 +567,14 @@ app.get('/api/platinum/sync/status', (_req, res) => res.json({ status: 'idle', l
 app.post('/api/platinum/sync/general-ledger', (_req, res) => res.json({ status: 'started' }));
 app.post('/api/platinum/sync/trial-balance', (_req, res) => res.json({ status: 'started' }));
 app.post('/api/platinum/sync/cancel', (_req, res) => res.json({ status: 'cancelled' }));
+
+// ────────────────────────────────────────────────────────────
+// ART (source-system) proxy  → /api/art/*   (art.ts, reads ART_API_URL/USER/PASS)
+// Platinum core financials proxy → /api/platinum/*  (platinum.ts, reads PLATINUM_API_URL)
+// The /api/platinum/sync/* stubs above remain (mutation endpoints are not proxied).
+// ────────────────────────────────────────────────────────────
+app.use('/api/art', artRouter);
+app.use('/api/platinum', platinumRouter);
 
 // ────────────────────────────────────────────────────────────
 // Centralised error handler
