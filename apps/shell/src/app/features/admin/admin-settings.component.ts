@@ -23,6 +23,10 @@ export interface ModuleApiConfig {
   assetsSharePointEnabled : boolean;
   assetsSharePointSiteUrl : string;
   assetsSharePointLibrary : string;
+  // Overtime SharePoint document storage
+  overtimeSharePointEnabled : boolean;
+  overtimeSharePointSiteUrl : string;
+  overtimeSharePointLibrary : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -61,6 +65,10 @@ const DEFAULTS: ModuleApiConfig = {
   assetsSharePointEnabled : false,
   assetsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   assetsSharePointLibrary : 'UatAssets',
+  // SharePoint OFF by default → overtime module uses its current (local) file storage
+  overtimeSharePointEnabled : false,
+  overtimeSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  overtimeSharePointLibrary : 'UatOvertime',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -286,6 +294,74 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.assetsSharePointEnabled || !cfg.assetsSharePointSiteUrl"
                     (click)="testSharePoint()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- SharePoint config — Overtime module only -->
+      @if (activeKey() === 'overtime') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.overtimeSharePointEnabled"
+                    (click)="cfg.overtimeSharePointEnabled = !cfg.overtimeSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.overtimeSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for new uploads</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, new overtime document uploads are stored in SharePoint instead of the overtime module's local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.overtimeSharePointEnabled">
+              {{ cfg.overtimeSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.overtimeSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeSharePointSiteUrl"
+                     [disabled]="!cfg.overtimeSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.overtimeSharePointLibrary"
+                     [disabled]="!cfg.overtimeSharePointEnabled"
+                     placeholder="UatOvertime"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatOvertime</strong></div>
+            </div>
+          </div>
+
+          @if (!cfg.overtimeSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — overtime documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.overtimeSharePointEnabled || !cfg.overtimeSharePointSiteUrl"
+                    (click)="testSharePointOvertime()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -650,7 +726,7 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.afsDbPassword = DEFAULTS.afsDbPassword;
       this.cfg.afsDbSslMode  = DEFAULTS.afsDbSslMode;
     }
-    // Overtime page owns the DB config — reset it too
+    // Overtime page owns the DB config + SharePoint config — reset them too
     if (this.activeKey() === 'overtime') {
       this.cfg.overtimeDbHost     = DEFAULTS.overtimeDbHost;
       this.cfg.overtimeDbPort     = DEFAULTS.overtimeDbPort;
@@ -658,6 +734,9 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.overtimeDbUser     = DEFAULTS.overtimeDbUser;
       this.cfg.overtimeDbPassword = DEFAULTS.overtimeDbPassword;
       this.cfg.overtimeDbSslMode  = DEFAULTS.overtimeDbSslMode;
+      this.cfg.overtimeSharePointEnabled = DEFAULTS.overtimeSharePointEnabled;
+      this.cfg.overtimeSharePointSiteUrl = DEFAULTS.overtimeSharePointSiteUrl;
+      this.cfg.overtimeSharePointLibrary = DEFAULTS.overtimeSharePointLibrary;
     }
     // Payroll page owns the DB config — reset it too
     if (this.activeKey() === 'payroll') {
@@ -748,6 +827,21 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.assetsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointOvertime() {
+    this.spTesting.set(true);
+    // Basic site-URL well-formedness check (mirrors the assets module's check).
+    const url = this.cfg.overtimeSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.overtimeSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

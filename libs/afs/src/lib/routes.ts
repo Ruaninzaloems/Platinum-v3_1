@@ -1,6 +1,47 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Routes, ResolveFn } from '@angular/router';
+import { map, catchError, of } from 'rxjs';
+import { ApiService } from './core/services/api.service';
+import { PeriodFilterService } from './core/services/period-filter.service';
+import { AuthService } from './core/services/auth.service';
+
+// Monorepo adaptation: the AFS lib's standalone layout/shell.component (the only
+// place that called loadFinancialYears() to populate PeriodFilterService) is NOT
+// mounted in the monorepo — apps/shell provides the chrome and AFS_ROUTES is a flat
+// list. As a result selectedFyId stayed '', so every compilation-gated page
+// ("Data Sources (TB)", "Opening Balance Control", "Mapping Workbench",
+// "Integrity Checks", …) reported "No Active Compilation". This resolver loads the
+// current financial year and seeds the period filter BEFORE any AFS route activates
+// (deterministic — also fixes direct navigation / reload, with no init race).
+const afsContextResolver: ResolveFn<boolean> = () => {
+  const pf = inject(PeriodFilterService);
+  const api = inject(ApiService);
+  const auth = inject(AuthService);
+  // apps/shell owns login, so the AFS lib's AuthService is otherwise empty and
+  // components that need user.tenantId (e.g. Mapping Workbench) fail their context
+  // guard. Establish the embedded session here — mirrors auth.guard's embedded-mode
+  // behaviour, but without its login redirect (which would break in the shell).
+  if (!auth.isAuthenticated()) auth.setEmbeddedSession();
+  if (pf.selectedFyId()) return true;
+  return api.get<any[]>('/admin/financial-years').pipe(
+    map((years) => {
+      const list = years || [];
+      const current = list.find((y: any) => y.isCurrent) || list[0];
+      if (current) {
+        pf.selectedFyId.set(current.id);
+        pf.selectedFyLabel.set(current.label);
+      }
+      return true;
+    }),
+    catchError(() => of(true)),
+  );
+};
 
 export const AFS_ROUTES: Routes = [
+  {
+    path: '',
+    resolve: { afsContext: afsContextResolver },
+    children: [
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   { path: 'dashboard', loadComponent: () => import('./features/dashboards/dashboard-container.component').then(m => m.DashboardContainerComponent) },
   { path: 'dashboards/cfo-executive', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -39,4 +80,6 @@ export const AFS_ROUTES: Routes = [
   { path: 'mapping-studio', loadComponent: () => import('./features/mapping-workbench/mapping-studio-fullscreen.component').then(m => m.MappingStudioFullscreenComponent) },
   { path: 'afs-versions', loadComponent: () => import('./features/afs-versions/afs-versions.component').then(m => m.AfsVersionsComponent) },
   { path: 'review/:token', loadComponent: () => import('./features/review/external-review.component').then(m => m.ExternalReviewComponent) },
+    ],
+  },
 ];

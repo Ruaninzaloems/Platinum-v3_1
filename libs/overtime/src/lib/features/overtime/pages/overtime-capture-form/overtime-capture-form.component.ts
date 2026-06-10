@@ -24,6 +24,7 @@ import { OvertimeTransactionsService } from '../../../../core/services/overtime-
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
 import { WorkflowService } from '../../../../core/services/workflow.service';
 import { UserContextService } from '../../../../core/services/user-context.service';
+import { OvertimeSharePointService, SpOvertimeDoc } from '../../../../core/services/overtime-sharepoint.service';
 import {
   OvertimeTransactionDto,
   OvertimeTypeOption,
@@ -307,7 +308,34 @@ export class DuplicateDateConfirmDialog {
             }
 
             @if (!viewOnly()) {
-              @if (existingDoc()) {
+              @if (usingSharePoint() && spDoc()) {
+                <!-- Existing SharePoint document (stored in the library configured in Admin → Overtime) -->
+                <div class="existing-doc-card">
+                  <mat-icon class="existing-doc-icon">cloud_done</mat-icon>
+                  <div class="existing-doc-info">
+                    <span class="existing-doc-name">{{ spDoc()!.fileName }}</span>
+                    <span class="existing-doc-meta">
+                      {{ (spDoc()!.sizeBytes / 1024).toFixed(1) }} KB
+                      · Uploaded {{ spDoc()!.uploadedAt | date:'dd/MM/yyyy' }} · SharePoint
+                    </span>
+                  </div>
+                  <div class="existing-doc-actions">
+                    <button class="btn" type="button"
+                            matTooltip="Open the SharePoint document"
+                            (click)="viewSpDoc()">
+                      <mat-icon>open_in_new</mat-icon><span>View</span>
+                    </button>
+                    <button class="btn existing-doc-remove"
+                            type="button"
+                            [disabled]="removingDoc()"
+                            matTooltip="Remove document so a replacement can be attached"
+                            (click)="removeSpDoc()">
+                      <mat-icon>delete_outline</mat-icon>
+                      <span>{{ removingDoc() ? 'Removing…' : 'Remove' }}</span>
+                    </button>
+                  </div>
+                </div>
+              } @else if (!usingSharePoint() && existingDoc()) {
                 <!-- Existing document — show when editing a transaction that already has one -->
                 <div class="existing-doc-card">
                   <mat-icon class="existing-doc-icon">description</mat-icon>
@@ -857,6 +885,7 @@ export class DuplicateDateConfirmDialog {
 export class OvertimeCaptureFormComponent implements OnInit {
   private lookups = inject(LookupService);
   private txService = inject(OvertimeTransactionsService);
+  private spOvertime = inject(OvertimeSharePointService);
   private configSvc = inject(OvertimeConfigService);
   private wf = inject(WorkflowService);
   private user = inject(UserContextService);
@@ -1115,6 +1144,13 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   existingDoc = computed(() => this.loadedTx()?.documents?.[0] ?? null);
 
+  // SharePoint document storage (Admin → Overtime → SharePoint config). When
+  // enabled, supporting PDFs are uploaded to / listed from SharePoint instead of
+  // the overtime API's local file storage.
+  usingSharePoint = signal(this.spOvertime.isEnabled());
+  spDoc = signal<SpOvertimeDoc | null>(null);
+  spBusy = signal(false);
+
   exceptionalMax = signal(60);
 
   ngOnInit(): void {
@@ -1254,6 +1290,10 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.loadedTx.set(tx);
     this.currentStatus.set(tx.status);
     this.currentStatusLabel.set(tx.statusLabel);
+
+    // When SharePoint storage is active, the supporting document lives in
+    // SharePoint (not the overtime API) — load it by OvertimeID metadata.
+    if (this.usingSharePoint()) this.loadSpDoc(tx.id);
 
     // Seed the card immediately with what the transaction already carries so
     // the UI isn't blank while the employee fetch is in flight.
@@ -1556,13 +1596,56 @@ export class OvertimeCaptureFormComponent implements OnInit {
       }
     };
     if (file) {
-      this.txService.uploadDocument(tx.id, file).subscribe({
-        next: () => finish(),
-        error: e => { this.saving.set(false); this.snack.open(`Upload failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 }); }
-      });
+      if (this.usingSharePoint()) {
+        // Upload to the SharePoint library configured in Admin → Overtime,
+        // tagged with the OvertimeID + Employee metadata so it can be listed
+        // back on edit and identified in the library.
+        const emp = this.employee();
+        const employeeLabel = emp ? `${emp.fullName} (#${emp.employeeNumber})` : (tx.employeeName || undefined);
+        this.spOvertime.uploadOvertimeDocument(tx.id, file, { description: this.reason || file.name, employee: employeeLabel })
+          .then(() => { this.pendingFile.set(null); finish(); })
+          .catch(e => { this.saving.set(false); this.snack.open(`SharePoint upload failed: ${e?.message ?? e}`, 'OK', { duration: 5000 }); });
+      } else {
+        this.txService.uploadDocument(tx.id, file).subscribe({
+          next: () => finish(),
+          error: e => { this.saving.set(false); this.snack.open(`Upload failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 }); }
+        });
+      }
     } else {
       finish();
     }
+  }
+
+  /** Load the SharePoint document (if any) for an overtime transaction. */
+  private loadSpDoc(id: string): void {
+    this.spOvertime.listOvertimeDocuments(id)
+      .then(docs => this.spDoc.set(docs[0] ?? null))
+      .catch(() => this.spDoc.set(null));
+  }
+
+  /** Open the SharePoint document in a new tab / download it. */
+  viewSpDoc(): void {
+    const doc = this.spDoc();
+    if (!doc) return;
+    this.spOvertime.downloadOvertimeDocument(doc.__item)
+      .catch(e => this.snack.open(`Open failed: ${e?.message ?? e}`, 'OK', { duration: 4000 }));
+  }
+
+  /** Remove the SharePoint document so a replacement can be attached. */
+  removeSpDoc(): void {
+    const doc = this.spDoc();
+    if (!doc) return;
+    this.removingDoc.set(true);
+    this.spOvertime.deleteOvertimeDocument(doc.__item)
+      .then(() => {
+        this.removingDoc.set(false);
+        this.spDoc.set(null);
+        this.snack.open('Document removed.', 'OK', { duration: 2500 });
+      })
+      .catch(e => {
+        this.removingDoc.set(false);
+        this.snack.open(`Remove failed: ${e?.message ?? e}`, 'OK', { duration: 4000 });
+      });
   }
 
   private done(msg: string): void {

@@ -371,6 +371,11 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <span>UatAssets</span>
             </a>
             <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
+            <a class="nav-link sub-item" routerLink="/sharepoint/uat-overtime" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">folder_open</mat-icon>
+              <span>UatOvertime</span>
+            </a>
+            <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
           } @else if (activeModule() === 'admin') {
             <div style="padding:6px 16px 4px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">API Config</div>
             <a class="nav-link sub-item" routerLink="/admin-settings/assets" routerLinkActive="active-link">
