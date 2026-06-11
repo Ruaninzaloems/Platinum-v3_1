@@ -74,7 +74,7 @@ declare var L: any;
 
       <div class="map-container card" data-testid="map-container">
         <div class="card-header">
-          <h2><span class="material-icon" style="font-size:18px;margin-right:6px;">satellite_alt</span> George Municipality — Project Locations</h2>
+          <h2><span class="material-icon" style="font-size:18px;margin-right:6px;">satellite_alt</span> Beaufort West Municipality — Project Locations</h2>
           <div class="legend">
             <span class="legend-item"><span class="legend-dot" style="background:#1565c0;"></span> Capital</span>
             <span class="legend-item"><span class="legend-dot" style="background:#ef6c00;"></span> Operational</span>

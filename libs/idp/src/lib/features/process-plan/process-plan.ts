@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { CycleStateService } from '../../core/services/cycle-state.service';
 import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-process-plan',
@@ -73,7 +74,7 @@ import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
         <div class="card milestones-card" data-testid="card-milestones">
           <div class="card-header">
             <h2>Milestones</h2>
-            <button class="btn btn-sm" (click)="showMilestoneForm.set(true)" data-testid="button-add-milestone">
+            <button class="btn btn-sm" (click)="startAddMilestone()" data-testid="button-add-milestone">
               <span class="material-icon" style="font-size:16px;">add</span> Add
             </button>
           </div>
@@ -86,11 +87,10 @@ import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
               </div>
               <div class="form-row">
                 <label class="checkbox-label"><input type="checkbox" [(ngModel)]="mf.isMandatory" data-testid="input-milestone-mandatory" /> Mandatory</label>
-                <div class="field" style="flex:1;"><label>Evidence URL</label><input [(ngModel)]="mf.evidenceUrl" placeholder="Link to evidence document" data-testid="input-milestone-evidence" /></div>
               </div>
               <div class="form-actions">
-                <button class="btn btn-secondary" (click)="showMilestoneForm.set(false)" data-testid="button-cancel-milestone">Cancel</button>
-                <button class="btn btn-primary" (click)="saveMilestone()" data-testid="button-save-milestone">Save</button>
+                <button class="btn btn-secondary" (click)="cancelMilestoneForm()" data-testid="button-cancel-milestone">Cancel</button>
+                <button class="btn btn-primary" (click)="saveMilestone()" data-testid="button-save-milestone">{{ editingMilestoneId ? 'Update' : 'Save' }}</button>
               </div>
             </div>
 
@@ -105,11 +105,36 @@ import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
                   <div class="milestone-meta">
                     <span *ngIf="m.assignedTo"><span class="material-icon" style="font-size:14px;">person</span> {{ m.assignedTo }}</span>
                     <span *ngIf="m.dueDate"><span class="material-icon" style="font-size:14px;">event</span> {{ m.dueDate | date:'dd MMM yyyy' }}</span>
-                    <span *ngIf="m.evidenceUrl" class="evidence-link"><span class="material-icon" style="font-size:14px;">attach_file</span> Evidence attached</span>
-                    <span *ngIf="!m.evidenceUrl && m.isMandatory" class="no-evidence"><span class="material-icon" style="font-size:14px;">warning</span> No evidence</span>
+                  </div>
+                  <div class="milestone-evidence" *ngIf="m.evidenceUrl">
+                    <div class="evidence-attached-row">
+                      <span class="material-icon" style="font-size:16px; color:#2e7d32;">check_circle</span>
+                      <span class="evidence-filename">{{ getEvidenceFilename(m.evidenceUrl) }}</span>
+                      <a class="evidence-action-btn view-btn" [href]="getEvidenceViewUrl(m.evidenceUrl)" target="_blank" [attr.data-testid]="'link-view-evidence-' + m.id">
+                        <span class="material-icon" style="font-size:14px;">visibility</span> View
+                      </a>
+                      <a class="evidence-action-btn download-btn" [href]="getEvidenceDownloadUrl(m.evidenceUrl)" target="_blank" [attr.data-testid]="'link-download-evidence-' + m.id">
+                        <span class="material-icon" style="font-size:14px;">download</span> Download
+                      </a>
+                      <label class="evidence-action-btn replace-btn" [attr.data-testid]="'button-reupload-' + m.id">
+                        <span class="material-icon" style="font-size:14px;">cloud_upload</span> Replace
+                        <input type="file" (change)="onUploadEvidence(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                      </label>
+                    </div>
+                  </div>
+                  <div class="milestone-evidence" *ngIf="!m.evidenceUrl">
+                    <label class="upload-evidence-btn" [attr.data-testid]="'button-upload-' + m.id">
+                      <span class="material-icon" style="font-size:16px;">cloud_upload</span>
+                      {{ uploadingMilestoneId === m.id ? 'Uploading...' : 'Upload evidence' }}
+                      <input type="file" (change)="onUploadEvidence(m, $event)" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                    </label>
+                    <span *ngIf="m.isMandatory" class="no-evidence"><span class="material-icon" style="font-size:14px;">warning</span> Required</span>
                   </div>
                 </div>
                 <div class="milestone-actions">
+                  <button class="icon-btn edit-btn" (click)="startEditMilestone(m)" [attr.data-testid]="'button-edit-' + m.id" title="Edit milestone">
+                    <span class="material-icon" style="font-size:16px;">edit</span>
+                  </button>
                   <select [ngModel]="m.status" (ngModelChange)="updateMilestoneStatus(m, $event)" [attr.data-testid]="'select-status-' + m.id + ''">
                     <option value="Not Started">Not Started</option>
                     <option value="In Progress">In Progress</option>
@@ -177,9 +202,23 @@ import { IdpProcessPhase, IdpMilestone } from '../../core/models/idp.models';
     .milestone-status-label[data-ms="completed"] { background: #e8f5e9; color: #1b5e20; }
     .milestone-meta { display: flex; gap: 12px; margin-top: 4px; font-size: 12px; color: var(--platinum-text-muted); }
     .milestone-meta span { display: flex; align-items: center; gap: 3px; }
-    .evidence-link { color: #2e7d32; }
-    .no-evidence { color: #ef6c00; }
+    .milestone-evidence { margin-top: 8px; }
+    .evidence-attached-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #e8f5e9; border-radius: 6px; font-size: 12px; }
+    .evidence-filename { color: #1b5e20; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .evidence-action-btn { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; text-decoration: none; border: 1px solid transparent; transition: all .15s; }
+    .view-btn { color: #1565c0; background: #e3f2fd; border-color: #90caf9; }
+    .view-btn:hover { background: #bbdefb; }
+    .download-btn { color: #2e7d32; background: #f1f8e9; border-color: #a5d6a7; }
+    .download-btn:hover { background: #c8e6c9; }
+    .replace-btn { color: #e65100; background: #fff3e0; border-color: #ffcc80; }
+    .replace-btn:hover { background: #ffe0b2; }
+    .upload-evidence-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--platinum-primary); cursor: pointer; font-size: 12px; padding: 6px 14px; border: 1px dashed var(--platinum-primary); border-radius: 6px; transition: all .15s; }
+    .upload-evidence-btn:hover { background: rgba(0,90,150,.06); }
+    .no-evidence { color: #ef6c00; display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 12px; }
+    .milestone-actions { display: flex; align-items: center; gap: 6px; }
     .milestone-actions select { font-size: 11px; padding: 3px 6px; }
+    .edit-btn { background: none; border: 1px solid var(--platinum-border); border-radius: 6px; padding: 4px; cursor: pointer; color: var(--platinum-text-muted); transition: all .15s; }
+    .edit-btn:hover { background: var(--platinum-surface-alt); color: var(--platinum-primary); border-color: var(--platinum-primary); }
     .milestone-form { background: var(--platinum-surface); border: 1px solid var(--platinum-border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
     .empty-full { text-align: center; padding: 60px; color: var(--platinum-text-muted); }
     .empty-full p { margin-top: 12px; }
@@ -190,7 +229,9 @@ export class ProcessPlanComponent implements OnInit {
   milestones = signal<IdpMilestone[]>([]);
   selectedPhaseId = signal(0);
   showMilestoneForm = signal(false);
-  mf: any = { title: '', assignedTo: '', dueDate: '', isMandatory: false, evidenceUrl: '' };
+  editingMilestoneId: number | null = null;
+  uploadingMilestoneId: number | null = null;
+  mf: any = { title: '', assignedTo: '', dueDate: '', isMandatory: false };
   private _progressCheck = signal<any>(null);
 
   constructor(private api: ApiService, private cycleState: CycleStateService) {}
@@ -220,21 +261,96 @@ export class ProcessPlanComponent implements OnInit {
     return !!m.dueDate && new Date(m.dueDate) < new Date() && m.status !== 'Completed';
   }
 
+  startAddMilestone() {
+    this.editingMilestoneId = null;
+    this.mf = { title: '', assignedTo: '', dueDate: '', isMandatory: false };
+    this.showMilestoneForm.set(true);
+  }
+
+  startEditMilestone(m: IdpMilestone) {
+    this.editingMilestoneId = m.id;
+    this.mf = {
+      title: m.title,
+      assignedTo: m.assignedTo || '',
+      dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split('T')[0] : '',
+      isMandatory: m.isMandatory,
+    };
+    this.showMilestoneForm.set(true);
+  }
+
+  cancelMilestoneForm() {
+    this.showMilestoneForm.set(false);
+    this.editingMilestoneId = null;
+    this.mf = { title: '', assignedTo: '', dueDate: '', isMandatory: false };
+  }
+
+  onUploadEvidence(m: IdpMilestone, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.uploadingMilestoneId = m.id;
+    this.api.uploadMilestoneEvidence(m.id, file).subscribe({
+      next: () => {
+        this.uploadingMilestoneId = null;
+        this.load(this.cycleState.activeCycleId());
+      },
+      error: (err: any) => {
+        this.uploadingMilestoneId = null;
+        alert(typeof err.error === 'string' ? err.error : 'Upload failed');
+      }
+    });
+  }
+
+  getEvidenceViewUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    // Monorepo adaptation: prefix with apiPrefix so the direct [href] routes through
+    // the shell proxy (/idp-app/api/* → IDP backend), matching ApiService.
+    return `${environment.apiPrefix}/api/milestones/evidence-file?path=${encodeURIComponent(url)}`;
+  }
+
+  getEvidenceDownloadUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${environment.apiPrefix}/api/milestones/evidence-file?path=${encodeURIComponent(url)}&download=true`;
+  }
+
+  getEvidenceFilename(url: string): string {
+    if (!url) return '';
+    const parts = url.split('/');
+    return parts[parts.length - 1] || 'evidence';
+  }
+
   saveMilestone() {
     const phase = this.selectedPhase();
     if (!phase) return;
     const cycleId = this.cycleState.activeCycleId();
-    this.api.createMilestone({ ...this.mf, phaseId: phase.id, cycleId, status: 'Not Started', progress: 0 }).subscribe(() => {
-      this.showMilestoneForm.set(false);
-      this.mf = { title: '', assignedTo: '', dueDate: '', isMandatory: false, evidenceUrl: '' };
-      this.load(cycleId);
-    });
+
+    if (this.editingMilestoneId) {
+      this.api.updateMilestone(this.editingMilestoneId, {
+        title: this.mf.title,
+        assignedTo: this.mf.assignedTo,
+        dueDate: this.mf.dueDate,
+        isMandatory: this.mf.isMandatory,
+      }).subscribe({
+        next: () => {
+          this.cancelMilestoneForm();
+          this.load(cycleId);
+        },
+        error: (err: any) => alert(typeof err.error === 'string' ? err.error : 'Failed to update milestone')
+      });
+    } else {
+      this.api.createMilestone({ ...this.mf, phaseId: phase.id, cycleId, status: 'Not Started', progress: 0 }).subscribe(() => {
+        this.cancelMilestoneForm();
+        this.load(cycleId);
+      });
+    }
   }
 
   updateMilestoneStatus(m: IdpMilestone, status: string) {
     this.api.updateMilestoneStatus(m.id, status).subscribe({
       next: () => this.load(this.cycleState.activeCycleId()),
-      error: (err: any) => alert(err.error || 'Cannot update status')
+      error: (err: any) => alert(typeof err.error === 'string' ? err.error : 'Cannot update status')
     });
   }
 }

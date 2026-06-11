@@ -61,6 +61,8 @@ export interface IdpStrategicObjective {
   alignmentTags?: string;
   ndpAlignment?: string;
   provincialAlignment?: string;
+  mtsfAlignment?: string;
+  iudfAlignment?: string;
   projects?: IdpProject[];
   createdBy?: number;
   createdDate: string;
