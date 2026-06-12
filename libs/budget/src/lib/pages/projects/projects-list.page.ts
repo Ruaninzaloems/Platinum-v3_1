@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -66,7 +66,7 @@ export class ProjectsListPage implements OnInit {
   get scoaTotalYear2() { return this.budgetLines.reduce((s, l) => s + (l.year2Amount || 0), 0); }
   get scoaTotalYear3() { return this.budgetLines.reduce((s, l) => s + (l.year3Amount || 0), 0); }
 
-  constructor(private api: ApiService, private router: Router) {}
+  constructor(private api: ApiService, private router: Router, private cdr: ChangeDetectorRef) {}
 
   captureNewProject() {
     this.router.navigate(['/projects/capture']);
@@ -77,17 +77,17 @@ export class ProjectsListPage implements OnInit {
   }
 
   ngOnInit() {
-    this.api.getDepartments().subscribe(d => this.departments = d);
-    this.api.getScoaItems().subscribe(d => this.scoaItems = d);
-    this.api.getScoaFunds().subscribe(d => this.scoaFunds = d);
-    this.api.getScoaFunctions().subscribe(d => this.scoaFunctions = d);
-    this.api.getScoaRegions().subscribe(d => this.scoaRegions = d);
-    this.api.getScoaCostings().subscribe(d => this.scoaCostings = d);
+    this.api.getDepartments().subscribe(d => { this.departments = d; this.cdr.markForCheck(); });
+    this.api.getScoaItems().subscribe(d => { this.scoaItems = d; this.cdr.markForCheck(); });
+    this.api.getScoaFunds().subscribe(d => { this.scoaFunds = d; this.cdr.markForCheck(); });
+    this.api.getScoaFunctions().subscribe(d => { this.scoaFunctions = d; this.cdr.markForCheck(); });
+    this.api.getScoaRegions().subscribe(d => { this.scoaRegions = d; this.cdr.markForCheck(); });
+    this.api.getScoaCostings().subscribe(d => { this.scoaCostings = d; this.cdr.markForCheck(); });
     this.loadProjects();
   }
 
   loadProjects() {
-    this.api.getProjects(this.filterDept || undefined, this.filterType || undefined).subscribe(p => this.projects = p);
+    this.api.getProjects(this.filterDept || undefined, this.filterType || undefined).subscribe(p => { this.projects = p; this.cdr.markForCheck(); });
   }
 
   formatCurrency(v: number | null | undefined): string {
