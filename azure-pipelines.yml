@@ -14,7 +14,8 @@
 trigger:
   branches:
     include:
-      - main          # deploy on push to main; change as needed
+      - Dev           # auto-run on every commit to Dev
+      - main          # (and main, if/when you promote there)
 
 variables:
   azureSubscription: 'EMS_Dev (04293d85-6ede-4d45-b918-d9c5738950b9)'   # exact ARM service connection name
@@ -33,7 +34,7 @@ stages:
     steps:
       - task: NodeTool@0
         inputs: { versionSpec: '22.x' }
-      - script: npm ci
+      - script: npm ci --legacy-peer-deps
         displayName: 'Install monorepo dependencies'
       - script: |
           cd apps/shell
@@ -135,7 +136,7 @@ stages:
         inputs: { versionSpec: '22.x' }
       - script: |
           cd AFS-UI/api
-          npm ci          # installs tsx (runtime) + pg + express
+          npm ci --legacy-peer-deps    # installs tsx (runtime) + pg + express
         displayName: 'Install AFS API deps'
       - task: AzureWebApp@1
         displayName: 'Deploy to Platinum-V3-AFS-Postgres-API'
@@ -155,7 +156,7 @@ stages:
         inputs: { versionSpec: '22.x' }
       - script: |
           cd PAYROLL-APP
-          npm ci
+          npm ci --legacy-peer-deps
         displayName: 'Install Payroll API deps'
       - task: AzureWebApp@1
         displayName: 'Deploy to Platinum-V3-Payroll-Postgres-API'
