@@ -16,6 +16,7 @@
  *   BUDGET_API_URL    e.g. https://platinum-budget-api.azurewebsites.net
  *   SCM_API_URL       e.g. https://platinum-scm-api.azurewebsites.net
  *   INSIGHTS_API_URL  e.g. https://platinum-insights-api.azurewebsites.net
+ *   OVERTIME_API_URL  e.g. https://platinum-overtime-api.azurewebsites.net
  *
  * Listens on PORT (provided by Azure App Service) or 5000 locally.
  */
@@ -57,6 +58,7 @@ const targets = {
   budget: process.env.BUDGET_API_URL,
   scm: process.env.SCM_API_URL,
   insights: process.env.INSIGHTS_API_URL,
+  overtime: process.env.OVERTIME_API_URL,
 };
 
 function mountProxy(prefix, targetUrl, rewriteTo) {
@@ -87,6 +89,7 @@ mountProxy('/payroll-app/api', targets.payroll, '/api/v1');
 mountProxy('/idp-app/api', targets.idp, '/api');
 mountProxy('/budget-app/api', targets.budget, '/api');
 mountProxy('/insights-app/api', targets.insights, '/api');
+mountProxy('/overtime-app/api', targets.overtime, '/api');
 
 // Legacy / direct ASSETS API paths
 mountProxy('/ASSETS-API', targets.assets, '/api');

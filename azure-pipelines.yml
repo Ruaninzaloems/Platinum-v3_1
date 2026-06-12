@@ -1,0 +1,168 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Platinum v3.1 — Azure DevOps CI/CD
+# Builds & deploys the main UI (shell) + the Postgres-backed APIs to Azure App Service.
+#
+# Secrets/DB connection strings are NOT here — they live in each web app's
+# App Settings (Portal). This pipeline only builds and pushes code.
+#
+# Prereqs (one-time, in Azure DevOps):
+#   • An ARM service connection named exactly = $(azureSubscription) below,
+#     scoped to the resource group that holds the web apps.
+#   • The web apps already created in the Portal (see the runbook).
+# ─────────────────────────────────────────────────────────────────────────────
+
+trigger:
+  branches:
+    include:
+      - main          # deploy on push to main; change as needed
+
+variables:
+  azureSubscription: 'Azure-Platinum'   # <-- your ARM service connection name
+  vmImage: 'ubuntu-latest'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Deploy
+  displayName: 'Build & Deploy'
+  jobs:
+
+  # ========== MAIN UI (Angular shell, Node runtime) ==========
+  - job: Shell_UI
+    displayName: 'Shell → Platinum-V3-UI'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: npm ci
+        displayName: 'Install monorepo dependencies'
+      - script: |
+          cd apps/shell
+          npx ng build --configuration production
+        displayName: 'Build Angular shell (prod)'
+      - script: |
+          set -e
+          PKG="$(Build.ArtifactStagingDirectory)/shell"
+          mkdir -p "$PKG"
+          cp apps/shell/server.js "$PKG/"
+          cp apps/shell/package.json "$PKG/"
+          cp -r dist/shell/browser "$PKG/browser"
+          # bundle the 3 runtime deps so the app starts without an Oryx build
+          (cd "$PKG" && npm install --omit=dev)
+        displayName: 'Assemble shell deploy package'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-UI'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-UI'
+          runtimeStack: 'NODE|22-lts'
+          package: '$(Build.ArtifactStagingDirectory)/shell'
+          startUpCommand: 'node server.js'
+
+  # ========== .NET POSTGRES APIs ==========
+  - job: IDP_API
+    displayName: 'IDP → Platinum-V3-IDP-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (IDP)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'IDP-UI/PlatinumIDP/PlatinumIDP.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/idp'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-IDP-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-IDP-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/idp/**/*.zip'
+
+  - job: Budget_API
+    displayName: 'Budget → Platinum-V3-Budget-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (Budget)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'BUDGET-APP/PlatinumBudget.Api/PlatinumBudget.Api.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/budget'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-Budget-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-Budget-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/budget/**/*.zip'
+
+  - job: Overtime_API
+    displayName: 'Overtime → Platinum-V3-Overtime-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (Overtime)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'OVERTIME-API/PlatinumOvertime-API.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/overtime'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-Overtime-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-Overtime-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/overtime/**/*.zip'
+
+  # ========== NODE POSTGRES APIs ==========
+  - job: AFS_API
+    displayName: 'AFS → Platinum-V3-AFS-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          cd AFS-UI/api
+          npm ci          # installs tsx (runtime) + pg + express
+        displayName: 'Install AFS API deps'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-AFS-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-AFS-Postgres-API'
+          runtimeStack: 'NODE|22-lts'
+          package: 'AFS-UI/api'
+          startUpCommand: 'npx tsx index.ts'
+
+  - job: Payroll_API
+    displayName: 'Payroll → Platinum-V3-Payroll-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          cd PAYROLL-APP
+          npm ci
+        displayName: 'Install Payroll API deps'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-Payroll-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-Payroll-Postgres-API'
+          runtimeStack: 'NODE|22-lts'
+          package: 'PAYROLL-APP'
+          startUpCommand: 'node src/server/index.js'   # adjust to PAYROLL-APP's real entry

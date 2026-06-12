@@ -132,17 +132,22 @@ dist
 # Replit debugger
 .breakpoints
 
-# .NET
-api/bin/
-api/obj/
-ASSETS-API/bin/
-ASSETS-API/obj/
-ASSETS-PSQL-API/bin/
-ASSETS-PSQL-API/obj/
+# .NET — ignore ALL build outputs across every project
+**/bin/
+**/obj/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
+
+# Build / deploy artifacts
+/dist/
+**/publish/
+*.zip
+
+# Oversized DB seed (157MB) — exceeds GitHub's 100MB limit; keep out of git
+# (the Budget DB is already seeded on Azure; restore/seed out-of-band if needed)
+BUDGET-APP/PlatinumBudget.Api/Data/SeedSystemConstants.sql
 
 
 .nx/cache

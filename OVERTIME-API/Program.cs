@@ -282,6 +282,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthorization();
+
+// DB connection test endpoint — verifies the Postgres (Overtime) connection.
+app.MapGet("/api/health/db", async (OvertimeDbContext db) =>
+{
+    try
+    {
+        var ok = await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = ok ? "ok" : "unreachable", db = "Overtime", connected = ok });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", db = "Overtime", connected = false, message = ex.Message }, statusCode: 503);
+    }
+});
+
 app.MapControllers();
 
 app.Run();

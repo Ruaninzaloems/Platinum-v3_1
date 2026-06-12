@@ -3427,6 +3427,20 @@ if (Directory.Exists(spaPath))
     });
 }
 
+// DB connection test endpoint — verifies the Postgres (Budget) connection.
+app.MapGet("/api/health/db", async (BudgetDbContext db) =>
+{
+    try
+    {
+        var ok = await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = ok ? "ok" : "unreachable", db = "Budget", connected = ok });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", db = "Budget", connected = false, message = ex.Message }, statusCode: 503);
+    }
+});
+
 app.MapControllers();
 
 if (Directory.Exists(spaPath))

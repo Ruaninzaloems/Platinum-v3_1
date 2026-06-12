@@ -114,6 +114,21 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseCors("AllowAngular");
+
+// DB connection test endpoint — verifies the Postgres (IDP) connection.
+app.MapGet("/api/health/db", async (IdpDbContext db) =>
+{
+    try
+    {
+        var ok = await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = ok ? "ok" : "unreachable", db = "IDP", connected = ok });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", db = "IDP", connected = false, message = ex.Message }, statusCode: 503);
+    }
+});
+
 app.MapControllers();
 
 var idpPort = Environment.GetEnvironmentVariable("PORT") ?? "8008";
