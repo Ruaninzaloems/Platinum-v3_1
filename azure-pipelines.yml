@@ -17,7 +17,7 @@ trigger:
       - main          # deploy on push to main; change as needed
 
 variables:
-  azureSubscription: 'Azure-Platinum'   # <-- your ARM service connection name
+  azureSubscription: 'EMS_Dev'   # ARM service connection to the EMS_Dev subscription
   vmImage: 'ubuntu-latest'
   buildConfiguration: 'Release'
 
