@@ -557,7 +557,46 @@ app.get('/api/reports/evidence-heatmap', (_req, res) => res.json(demoEvidenceHea
 app.get('/api/reports/mapping-audit', (_req, res) => res.json(demoMappingAudit));
 app.get('/api/reports/adjustments-register', (_req, res) => res.json(demoAdjustmentsRegister));
 app.get('/api/reports/integrity-checks', (_req, res) => res.json(demoIntegrityChecks));
-app.get('/api/working-papers', (_req, res) => res.json([]));
+// Working Papers — real CRUD against the AFS DB (ports server working-papers.service.ts).
+app.get('/api/working-papers', async (req, res, next) => {
+  if (await isDbDown()) return res.json([]);
+  try {
+    const conds: string[] = [];
+    const params: any[] = [];
+    if (req.query.compilationId) { params.push(String(req.query.compilationId)); conds.push(`"compilationId" = $${params.length}`); }
+    if (req.query.status) { params.push(String(req.query.status)); conds.push(`status = $${params.length}`); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const rows = await query(`SELECT * FROM public.working_papers ${where} ORDER BY reference ASC`, params);
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+app.post('/api/working-papers', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const compilationId = b.compilationId;
+    if (!compilationId) return res.status(400).json({ message: 'compilationId is required' });
+    // Derive tenant from the compilation (no auth context in the monorepo API).
+    const comp = await query<any>(`SELECT "tenantId" FROM public.compilations WHERE id::text = $1 LIMIT 1`, [String(compilationId)]);
+    const tenantId = comp[0]?.tenantId;
+    if (!tenantId) return res.status(400).json({ message: 'Compilation not found' });
+    // Auto-generate reference: WP-001, WP-002, … per compilation (matches source service).
+    const cnt = await query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.working_papers WHERE "compilationId" = $1 AND "tenantId" = $2`,
+      [String(compilationId), tenantId]
+    );
+    const reference = b.reference || `WP-${String((cnt[0]?.n || 0) + 1).padStart(3, '0')}`;
+    const rows = await query<any>(
+      `INSERT INTO public.working_papers
+         ("tenantId","compilationId","reference","title","description","sectionId","status")
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *`,
+      [tenantId, String(compilationId), reference, b.title || 'Untitled',
+       b.description ?? null, b.section ?? b.sectionId ?? null, b.status || 'not_started']
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) { next(e); }
+});
 app.get('/api/validation-rules/results', (_req, res) => res.json({ results: [], total: 0 }));
 app.post('/api/validation-rules/run', (_req, res) => res.json({ status: 'ok', runId: 'demo-' + Date.now() }));
 app.get('/api/ems-data/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));

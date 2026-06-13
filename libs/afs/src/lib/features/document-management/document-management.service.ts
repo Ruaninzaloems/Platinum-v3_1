@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, from } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AfsSharePointService, SpAfsDoc } from '../../core/services/afs-sharepoint.service';
 
 export interface DmsDocument {
   id: string;
@@ -122,6 +123,35 @@ export interface UploadMetadata {
 @Injectable({ providedIn: 'root' })
 export class DocumentManagementService {
   private api = inject(ApiService);
+  private afsSp = inject(AfsSharePointService);
+
+  /** The AFS entity id a document is linked to (working paper / compilation / finding / …). */
+  private contextId(m: UploadMetadata): string {
+    return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
+  }
+
+  /** Map a SharePoint doc to the DMS document shape the UI consumes. */
+  private spToDms(d: SpAfsDoc): DmsDocument {
+    return {
+      id: d.id,
+      fileName: d.fileName,
+      originalName: d.fileName,
+      mimeType: d.mimeType,
+      fileSize: d.fileSize,
+      sha256Hash: '',
+      category: d.category || undefined,
+      description: d.description || undefined,
+      tags: d.tags,
+      uploadedBy: '',
+      documentType: 'working_paper',
+      classificationLabel: d.classificationLabel || undefined,
+      accessLevel: undefined,
+      storageProvider: 'sharepoint',
+      externalRef: d.id,
+      createdAt: d.createdAt,
+      __spItem: d.__item,
+    } as unknown as DmsDocument;
+  }
 
   search(params: DmsSearchParams): Observable<DmsSearchResult> {
     const query: Record<string, any> = {};
@@ -154,6 +184,17 @@ export class DocumentManagementService {
   }
 
   upload(file: File, metadata: UploadMetadata): Observable<DmsDocument> {
+    // When AFS SharePoint storage is active (Admin → AFS), upload to the configured
+    // library, tagged with AFSID (link to the entity) + description/Classification/
+    // Category/Tags. Otherwise use the AFS API's local storage.
+    if (this.afsSp.isEnabled()) {
+      return from(this.afsSp.uploadAfsDocument(this.contextId(metadata), file, {
+        description: metadata.description,
+        classification: metadata.classificationLabel || metadata.classificationCode,
+        category: metadata.category,
+        tags: metadata.tags,
+      }).then(d => this.spToDms(d)));
+    }
     return this.api.upload<DmsDocument>('/documents/upload', file, metadata as any);
   }
 
@@ -197,6 +238,11 @@ export class DocumentManagementService {
   }
 
   getByContext(contextType: string, contextId: string): Observable<DmsDocument[]> {
+    // When AFS SharePoint storage is active, list the entity's documents from the
+    // configured library (filtered by AFSID = contextId).
+    if (this.afsSp.isEnabled()) {
+      return from(this.afsSp.listAfsDocuments(contextId).then(docs => docs.map(d => this.spToDms(d))));
+    }
     return this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
   }
 

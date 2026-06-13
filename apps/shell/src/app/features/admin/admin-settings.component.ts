@@ -27,6 +27,10 @@ export interface ModuleApiConfig {
   overtimeSharePointEnabled : boolean;
   overtimeSharePointSiteUrl : string;
   overtimeSharePointLibrary : string;
+  // AFS SharePoint document storage
+  afsSharePointEnabled : boolean;
+  afsSharePointSiteUrl : string;
+  afsSharePointLibrary : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -69,6 +73,10 @@ const DEFAULTS: ModuleApiConfig = {
   overtimeSharePointEnabled : false,
   overtimeSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   overtimeSharePointLibrary : 'UatOvertime',
+  // SharePoint OFF by default → AFS module uses its current (local) file storage
+  afsSharePointEnabled : false,
+  afsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsSharePointLibrary : 'UatAFS',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -362,6 +370,74 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.overtimeSharePointEnabled || !cfg.overtimeSharePointSiteUrl"
                     (click)="testSharePointOvertime()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- SharePoint config — AFS module only -->
+      @if (activeKey() === 'afs') {
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>SharePoint Configuration</span>
+          </div>
+
+          <!-- Toggle -->
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsSharePointEnabled"
+                    (click)="cfg.afsSharePointEnabled = !cfg.afsSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for new uploads</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, new AFS document uploads are stored in SharePoint instead of the AFS module's local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsSharePointEnabled">
+              {{ cfg.afsSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <!-- Fields (disabled when off) -->
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsSharePointSiteUrl"
+                     [disabled]="!cfg.afsSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsSharePointLibrary"
+                     [disabled]="!cfg.afsSharePointEnabled"
+                     placeholder="UatAFS"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFS</strong></div>
+            </div>
+          </div>
+
+          @if (!cfg.afsSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — AFS documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <!-- SP actions -->
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsSharePointEnabled || !cfg.afsSharePointSiteUrl"
+                    (click)="testSharePointAfs()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -717,7 +793,7 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.assetsSharePointSiteUrl = DEFAULTS.assetsSharePointSiteUrl;
       this.cfg.assetsSharePointLibrary = DEFAULTS.assetsSharePointLibrary;
     }
-    // AFS page owns the DB config — reset it too
+    // AFS page owns the DB config + SharePoint config — reset them too
     if (this.activeKey() === 'afs') {
       this.cfg.afsDbHost     = DEFAULTS.afsDbHost;
       this.cfg.afsDbPort     = DEFAULTS.afsDbPort;
@@ -725,6 +801,9 @@ export class AdminSettingsComponent implements OnInit {
       this.cfg.afsDbUser     = DEFAULTS.afsDbUser;
       this.cfg.afsDbPassword = DEFAULTS.afsDbPassword;
       this.cfg.afsDbSslMode  = DEFAULTS.afsDbSslMode;
+      this.cfg.afsSharePointEnabled = DEFAULTS.afsSharePointEnabled;
+      this.cfg.afsSharePointSiteUrl = DEFAULTS.afsSharePointSiteUrl;
+      this.cfg.afsSharePointLibrary = DEFAULTS.afsSharePointLibrary;
     }
     // Overtime page owns the DB config + SharePoint config — reset them too
     if (this.activeKey() === 'overtime') {
@@ -827,6 +906,21 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.assetsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfs() {
+    this.spTesting.set(true);
+    // Basic site-URL well-formedness check (mirrors the assets module's check).
+    const url = this.cfg.afsSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }
