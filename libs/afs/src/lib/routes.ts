@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { Routes, ResolveFn } from '@angular/router';
-import { map, catchError, of } from 'rxjs';
+import { map, catchError, of, timeout } from 'rxjs';
 import { ApiService } from './core/services/api.service';
 import { PeriodFilterService } from './core/services/period-filter.service';
 import { AuthService } from './core/services/auth.service';
@@ -24,6 +24,10 @@ const afsContextResolver: ResolveFn<boolean> = () => {
   if (!auth.isAuthenticated()) auth.setEmbeddedSession();
   if (pf.selectedFyId()) return true;
   return api.get<any[]>('/admin/financial-years').pipe(
+    // Never block AFS navigation: if the AFS backend is slow/down, give up after 6s
+    // and let the route activate (the dashboard then shows its own "service
+    // unavailable" state instead of the whole module appearing to "not work").
+    timeout(6000),
     map((years) => {
       const list = years || [];
       const current = list.find((y: any) => y.isCurrent) || list[0];
