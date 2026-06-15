@@ -3473,13 +3473,15 @@ if (Directory.Exists(spaPath))
     });
 }
 
-// Azure App Service (Linux) forwards inbound HTTP to a specific container port: the value of
-// WEBSITES_PORT when that App Setting is configured, otherwise the platform-assigned PORT env
-// var (default 8080). Hard-binding :3001 made the app listen on a port the platform never
-// forwarded to, so the health probe failed and the site returned 503 "Application Error".
-// Bind to exactly what Azure routes to (WEBSITES_PORT first, then PORT); fall back to :3001
-// for local dev, where the shell proxy (proxy.conf.json) expects the backend on :3001.
-var listenPort = Environment.GetEnvironmentVariable("WEBSITES_PORT")
-                 ?? Environment.GetEnvironmentVariable("PORT")
-                 ?? "3001";
+// Azure App Service (Linux) runs this via the built-in .NET stack (Oryx), which ALWAYS
+// forwards inbound HTTP to port 8080 and IGNORES WEBSITES_PORT (that setting only applies to
+// custom-container apps). The app log confirmed the mismatch: Oryx used "-bindPort 8080" while
+// the app bound :3001 → the health probe hit 8080, found nothing, and the site 503/504'd.
+// Bind the platform PORT (Azure sets it to 8080); if PORT is somehow unset on App Service
+// (detected via WEBSITE_SITE_NAME) still use 8080; fall back to :3001 for local dev, where the
+// shell proxy (proxy.conf.json) expects the backend on :3001. WEBSITES_PORT is intentionally
+// NOT used here.
+var onAppService = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
+var listenPort = Environment.GetEnvironmentVariable("PORT")
+                 ?? (onAppService ? "8080" : "3001");
 app.Run($"http://0.0.0.0:{listenPort}");

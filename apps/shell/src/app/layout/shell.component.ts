@@ -1,4 +1,4 @@
-import { Component, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, signal, computed, OnInit, OnDestroy, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -89,18 +89,22 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <button class="module-chip" [class.active]="activeModule() === 'scm'" (click)="setModule('scm')">
                 <mat-icon class="chip-icon">local_shipping</mat-icon><span>SCM</span>
               </button>
-              <button class="module-chip" [class.active]="activeModule() === 'pos'" (click)="setModule('pos')">
-                <mat-icon class="chip-icon">point_of_sale</mat-icon><span>POS</span>
-              </button>
+              @if (showDevModules()) {
+                <button class="module-chip" [class.active]="activeModule() === 'pos'" (click)="setModule('pos')">
+                  <mat-icon class="chip-icon">point_of_sale</mat-icon><span>POS</span>
+                </button>
+              }
               <button class="module-chip" [class.active]="activeModule() === 'payroll'" (click)="setModule('payroll')">
                 <mat-icon class="chip-icon">payments</mat-icon><span>Payroll</span>
               </button>
               <button class="module-chip" [class.active]="activeModule() === 'idp'" (click)="setModule('idp')">
                 <mat-icon class="chip-icon">assignment</mat-icon><span>IDP</span>
               </button>
-              <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
-                <mat-icon class="chip-icon">insights</mat-icon><span>Performance</span>
-              </button>
+              @if (showDevModules()) {
+                <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
+                  <mat-icon class="chip-icon">insights</mat-icon><span>Performance</span>
+                </button>
+              }
               <button class="module-chip" [class.active]="activeModule() === 'budget'" (click)="setModule('budget')">
                 <mat-icon class="chip-icon">account_balance</mat-icon><span>Budget</span>
               </button>
@@ -110,9 +114,11 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
                 <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
               </button>
-              <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
-                <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
-              </button>
+              @if (showDevModules()) {
+                <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
+                  <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
+                </button>
+              }
               <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
                 <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
               </button>
@@ -592,6 +598,12 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (!u) return 'U';
     return ((u.firstName?.[0] || '') + (u.lastName?.[0] || '')).toUpperCase() || 'U';
   });
+
+  // POS, Performance and SharePoint chips are still in active development, so show
+  // them only when running locally (ng serve → isDevMode() === true) and hide them
+  // on the deployed production build (ng build → isDevMode() === false).
+  private readonly _isDev = isDevMode();
+  showDevModules(): boolean { return this._isDev; }
 
   // Municipality name from the Assets settings API (GET /api/settings →
   // municipality_name). OrgSettingsService is root-provided and auto-loads on
