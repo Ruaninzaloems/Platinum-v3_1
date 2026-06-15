@@ -76,8 +76,18 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// Run schema init + (idempotent) seeding in the BACKGROUND so the HTTP port binds
+// immediately. On Azure App Service the platform health-probes the listening port right after
+// start; doing EnsureCreated + dozens of CREATE TABLE + streaming the 164MB
+// SeedSystemConstants.sql BEFORE app.Run() delayed the bind past the startup window, so the
+// site returned 503 "Application Error". The DB is provisioned idempotently (CREATE TABLE IF
+// NOT EXISTS + per-table seed skips), so deferring this work is safe; any failure is logged
+// and never crashes the API (the original block was un-guarded and would take the boot down).
+_ = Task.Run(async () =>
 {
+  try
+  {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
     await db.Database.EnsureCreatedAsync();
     await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""IsRegistered"" BOOLEAN NOT NULL DEFAULT FALSE;");
@@ -3398,7 +3408,13 @@ using (var scope = app.Services.CreateScope())
     }
 
     await SeedData.SeedAsync(db);
-}
+    Console.WriteLine("[budget] Startup DB init/seed complete.");
+  }
+  catch (Exception ex)
+  {
+    Console.WriteLine($"[budget] Startup DB init/seed failed (non-fatal, API continues): {ex.Message}");
+  }
+});
 
 app.UseSwagger();
 app.UseSwaggerUI();
