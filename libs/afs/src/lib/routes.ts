@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { Routes, ResolveFn } from '@angular/router';
-import { map, catchError, of, timeout } from 'rxjs';
+import { catchError, of, timeout } from 'rxjs';
 import { ApiService } from './core/services/api.service';
 import { PeriodFilterService } from './core/services/period-filter.service';
 import { AuthService } from './core/services/auth.service';
@@ -22,23 +22,24 @@ const afsContextResolver: ResolveFn<boolean> = () => {
   // guard. Establish the embedded session here — mirrors auth.guard's embedded-mode
   // behaviour, but without its login redirect (which would break in the shell).
   if (!auth.isAuthenticated()) auth.setEmbeddedSession();
-  if (pf.selectedFyId()) return true;
-  return api.get<any[]>('/admin/financial-years').pipe(
-    // Never block AFS navigation: if the AFS backend is slow/down, give up after 6s
-    // and let the route activate (the dashboard then shows its own "service
-    // unavailable" state instead of the whole module appearing to "not work").
-    timeout(6000),
-    map((years) => {
+  // Seed the financial year in the BACKGROUND (fire-and-forget) and let the route
+  // activate IMMEDIATELY — AFS navigation must never block on the AFS backend, so
+  // the module loads instantly even when the API is slow or down. When the call
+  // returns, the signals update reactively and gated pages pick up the FY.
+  if (!pf.selectedFyId()) {
+    api.get<any[]>('/admin/financial-years').pipe(
+      timeout(8000),
+      catchError(() => of([] as any[])),
+    ).subscribe((years) => {
       const list = years || [];
       const current = list.find((y: any) => y.isCurrent) || list[0];
       if (current) {
         pf.selectedFyId.set(current.id);
         pf.selectedFyLabel.set(current.label);
       }
-      return true;
-    }),
-    catchError(() => of(true)),
-  );
+    });
+  }
+  return true;   // navigate now; don't wait for the backend
 };
 
 export const AFS_ROUTES: Routes = [

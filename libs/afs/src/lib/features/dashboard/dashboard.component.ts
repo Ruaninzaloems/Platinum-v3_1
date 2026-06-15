@@ -38,7 +38,7 @@ export class DashboardComponent implements OnInit {
   skeletonRows = [1, 2, 3, 4];
 
   retryCount = 0;
-  private maxAutoRetries = 8;
+  private maxAutoRetries = 2;   // fail fast to the empty/unavailable state when the backend is down
 
   selectedPeriod = 'full_year';
   periodOptions = PeriodFilterService.PERIOD_OPTIONS;
@@ -57,7 +57,10 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     this.retryCount = 0;
-    this.api.waitForBackend().subscribe({
+    // Short backend wait: when AFS is healthy /health answers instantly; when it's
+    // down, give up after ~4s and show the empty/unavailable state rather than
+    // polling for 90s (so the dashboard loads fast even with no AFS data).
+    this.api.waitForBackend(4000).subscribe({
       next: (ready) => {
         if (ready) {
           this.initialLoadDone = true;
