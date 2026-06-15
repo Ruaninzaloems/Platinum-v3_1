@@ -11,6 +11,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { DocumentManagementService, DmsClassification, UploadMetadata } from './document-management.service';
+import { AfsSharePointService } from '../../core/services/afs-sharepoint.service';
 
 export interface UploadDialogData {
   contextType?: string;
@@ -42,10 +43,12 @@ export class DocumentUploadDialogComponent implements OnInit {
   dialogRef = inject(MatDialogRef<DocumentUploadDialogComponent>);
   data: UploadDialogData = inject(MAT_DIALOG_DATA, { optional: true }) || {};
   private dms = inject(DocumentManagementService);
+  private afsSp = inject(AfsSharePointService);
 
   selectedFile = signal<File | null>(null);
   isDragOver = signal(false);
   uploading = signal(false);
+  uploadError = signal<string | null>(null);
   classifications = signal<DmsClassification[]>([]);
   selectedClassification = signal<DmsClassification | null>(null);
 
@@ -109,6 +112,7 @@ export class DocumentUploadDialogComponent implements OnInit {
     this.isDragOver.set(false);
     if (event.dataTransfer?.files?.length) {
       this.selectedFile.set(event.dataTransfer.files[0]);
+      this.uploadError.set(null);
     }
   }
 
@@ -116,14 +120,36 @@ export class DocumentUploadDialogComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
       this.selectedFile.set(input.files[0]);
+      this.uploadError.set(null);
       input.value = '';
     }
+  }
+
+  /** Where the file is being stored — used to make upload errors specific. */
+  private destinationLabel(): string {
+    return this.afsSp.isEnabled() ? 'SharePoint' : 'document storage';
+  }
+
+  /** Pull a human-readable message out of an HttpErrorResponse / Error / string. */
+  private extractError(err: any): string {
+    const dest = this.destinationLabel();
+    const detail =
+      err?.error?.error ||
+      err?.error?.message ||
+      (typeof err?.error === 'string' ? err.error : '') ||
+      err?.message ||
+      (typeof err === 'string' ? err : '');
+    const status = err?.status ? ` (HTTP ${err.status})` : '';
+    return detail
+      ? `Upload to ${dest} failed${status}: ${detail}`
+      : `Upload to ${dest} failed${status}. Please try again.`;
   }
 
   upload() {
     const file = this.selectedFile();
     if (!file) return;
 
+    this.uploadError.set(null);
     this.uploading.set(true);
     const metadata: UploadMetadata = {
       documentType: this.documentType || undefined,
@@ -153,7 +179,10 @@ export class DocumentUploadDialogComponent implements OnInit {
         this.uploading.set(false);
         this.dialogRef.close(doc);
       },
-      error: () => this.uploading.set(false),
+      error: (err) => {
+        this.uploading.set(false);
+        this.uploadError.set(this.extractError(err));
+      },
     });
   }
 }
