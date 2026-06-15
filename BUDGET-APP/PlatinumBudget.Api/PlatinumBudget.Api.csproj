@@ -7,8 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The 164MB mSCOA system-constants seed is a ONE-TIME database bootstrap. Keep it copied
+      to the local build output (so `dotnet run` can seed a fresh local DB) but EXCLUDE it from
+      `dotnet publish`, so it is NOT shipped to Azure on every deploy. Shipping 164MB made the
+      deploy artifact huge/slow; the Azure DB is already seeded, and Program.cs skips the seed
+      gracefully when the file is absent (File.Exists check). To re-seed a fresh remote DB, run
+      the SQL manually or deploy once with this exclusion removed.
+    -->
     <Content Include="Data\SeedSystemConstants.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
