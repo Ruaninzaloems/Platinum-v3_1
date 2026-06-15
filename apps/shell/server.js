@@ -61,19 +61,38 @@ const targets = {
   overtime: process.env.OVERTIME_API_URL,
 };
 
+// Azure App Service backends enforce HTTPS: an http:// request is answered with a 301
+// redirect to https. http-proxy-middleware passes that 301 back to the browser, which then
+// follows it to a mangled "https://host:80" URL → net::ERR_SSL_PROTOCOL_ERROR (HTTPS on the
+// plaintext port). Upgrade any http:// Azure target to https:// so the proxy talks HTTPS
+// directly and the backend never issues the redirect in the first place.
+function normalizeTarget(url) {
+  if (!url) return url;
+  let t = url.trim().replace(/\/+$/, '');
+  if (/^http:\/\//i.test(t) && /\.azurewebsites\.net/i.test(t)) {
+    t = t.replace(/^http:\/\//i, 'https://');
+    console.warn(`[shell] Upgraded http→https for Azure target: ${t}`);
+  }
+  return t;
+}
+
 function mountProxy(prefix, targetUrl, rewriteTo) {
   if (!targetUrl) {
     console.warn(`[shell] No target configured for ${prefix} (skipping proxy)`);
     return;
   }
-  console.log(`[shell] Proxy ${prefix}/* -> ${targetUrl}${rewriteTo}`);
+  const target = normalizeTarget(targetUrl);
+  console.log(`[shell] Proxy ${prefix}/* -> ${target}${rewriteTo}`);
   app.use(
     prefix,
     createProxyMiddleware({
-      target: targetUrl,
+      target,
       changeOrigin: true,
       secure: true,
       xfwd: true,
+      // Follow any upstream redirect server-side so a stray http→https 301 can never
+      // leak to the browser as a broken https://host:80 URL.
+      followRedirects: true,
       pathRewrite: (p) => rewriteTo + p,
       proxyTimeout: 600000,
       timeout: 600000,
