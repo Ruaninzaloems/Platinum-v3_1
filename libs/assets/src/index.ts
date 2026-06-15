@@ -1,3 +1,4 @@
 export { ASSETS_ROUTES } from './lib/routes';
 export { DatabaseToggleService, DatabaseBackend } from './lib/core/database-toggle.service';
+export { OrgSettingsService, OrgSettings } from './lib/core/org-settings.service';
 export { SharePointConfigService, AssetsSharePointConfig } from './lib/core/sharepoint-config.service';

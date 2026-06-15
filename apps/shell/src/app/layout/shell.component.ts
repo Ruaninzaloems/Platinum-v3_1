@@ -7,7 +7,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '@platinumv3/shared/auth';
-import { DatabaseToggleService } from '@platinumv3/assets';
+import { DatabaseToggleService, OrgSettingsService } from '@platinumv3/assets';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
@@ -430,7 +430,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             <mat-icon>menu</mat-icon>
           </button>
           <div style="display:flex;align-items:center;gap:12px;margin-left:12px">
-            <span class="municipality-name">Mnquma Local Municipality</span>
+            <span class="municipality-name">{{ municipalityName() }}</span>
             <span class="period-badge">FY {{activeFinYear()}} · P{{activePeriod()}}</span>
           </div>
           <div style="flex:1"></div>
@@ -574,7 +574,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   private expandedGroups = signal<Set<string>>(new Set());
   private routeSub!: Subscription;
 
-  constructor(public authService: AuthService, private router: Router, public dbToggle: DatabaseToggleService) {}
+  constructor(public authService: AuthService, private router: Router, public dbToggle: DatabaseToggleService, public orgSettings: OrgSettingsService) {}
 
   ngOnInit() {
     this.syncModuleFromUrl(this.router.url);
@@ -593,7 +593,18 @@ export class ShellComponent implements OnInit, OnDestroy {
     return ((u.firstName?.[0] || '') + (u.lastName?.[0] || '')).toUpperCase() || 'U';
   });
 
+  // Municipality name from the Assets settings API (GET /api/settings →
+  // municipality_name). OrgSettingsService is root-provided and auto-loads on
+  // construction, so the header reflects the configured municipality instead of a
+  // hardcoded value. Falls back while settings are still loading / unavailable.
+  municipalityName = computed(() => {
+    const s = this.orgSettings.settings();
+    return (s && s.municipality_name) ? s.municipality_name : 'Loading…';
+  });
+
   activeFinYear = computed(() => {
+    const s = this.orgSettings.settings();
+    if (s && s.financial_year) return s.financial_year;
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
@@ -602,6 +613,9 @@ export class ShellComponent implements OnInit, OnDestroy {
   });
 
   activePeriod = computed(() => {
+    const s = this.orgSettings.settings();
+    if (s && s.current_period_month) return s.current_period_month;
+    if (s && s.current_period) return s.current_period;
     const month = new Date().getMonth() + 1;
     return month >= 7 ? month - 6 : month + 6;
   });
