@@ -3457,4 +3457,13 @@ if (Directory.Exists(spaPath))
     });
 }
 
-app.Run("http://0.0.0.0:3001");
+// Azure App Service (Linux) forwards inbound HTTP to a specific container port: the value of
+// WEBSITES_PORT when that App Setting is configured, otherwise the platform-assigned PORT env
+// var (default 8080). Hard-binding :3001 made the app listen on a port the platform never
+// forwarded to, so the health probe failed and the site returned 503 "Application Error".
+// Bind to exactly what Azure routes to (WEBSITES_PORT first, then PORT); fall back to :3001
+// for local dev, where the shell proxy (proxy.conf.json) expects the backend on :3001.
+var listenPort = Environment.GetEnvironmentVariable("WEBSITES_PORT")
+                 ?? Environment.GetEnvironmentVariable("PORT")
+                 ?? "3001";
+app.Run($"http://0.0.0.0:{listenPort}");
