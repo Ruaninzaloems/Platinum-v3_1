@@ -53,6 +53,9 @@ export interface Employee {
   employee_type_name?: string;
   employee_subtype_name?: string;
   salary_type?: string;
+  leave_scheme_id?: number;
+  leave_scheme_name?: string;
+  no_leave_entitlement?: boolean;
 }
 
 export interface Department {

@@ -14,6 +14,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, PaginationComponent, CurrencyZarPipe, DateSaPipe, DateInputComponent],
   templateUrl: './task-grades.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './task-grades.component.css'
 })
 export class TaskGradesComponent implements OnInit {

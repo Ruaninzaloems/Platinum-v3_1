@@ -26,7 +26,7 @@
       <p class="hint">Employees linked to positions with Upper Limit job profiles will appear here.</p>
     </div>
   } @else {
-    <div class="card">
+    <div class="list-card">
       <div class="table-responsive">
         <table class="data-table">
           <thead>
@@ -71,7 +71,7 @@
   <div class="page-header">
     <div>
       <h1>{{ selectedEmployee.first_name }} {{ selectedEmployee.surname }}</h1>
-      <p class="subtitle">{{ selectedEmployee.employee_code }} | {{ selectedEmployee.position_title }}</p>
+      <p class="subtitle">ID: {{ selectedEmployee.id }} | {{ selectedEmployee.employee_code }} | {{ selectedEmployee.position_title }}</p>
     </div>
     <div class="header-actions">
       <button class="btn" (click)="backToList()">
@@ -118,7 +118,7 @@
       </button>
     </div>
 
-    <div class="card section-card">
+    <div class="detail-card">
       <h3 class="section-title">Earnings</h3>
       <div class="table-responsive">
         <table class="data-table">
@@ -184,7 +184,7 @@
       </div>
     </div>
 
-    <div class="card section-card">
+    <div class="detail-card">
       <h3 class="section-title">Deductions</h3>
       <div class="table-responsive">
         <table class="data-table">
@@ -219,7 +219,7 @@
       </div>
     </div>
 
-    <div class="card section-card">
+    <div class="detail-card">
       <h3 class="section-title">Company Contributions</h3>
       <div class="table-responsive">
         <table class="data-table">
@@ -285,7 +285,7 @@
       </div>
     </div>
 
-    <div class="card package-total-card" [class]="getStatusClass(packageStatus)">
+    <div class="detail-card package-total-card" [class]="getStatusClass(packageStatus)">
       <div class="package-total-row">
         <span class="package-total-label">Total Package (Earnings + Company Contributions)</span>
         <span class="package-total-value">{{ formatCurrency(packageTotal) }}</span>

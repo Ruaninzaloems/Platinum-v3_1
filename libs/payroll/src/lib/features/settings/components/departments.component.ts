@@ -13,6 +13,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
     standalone: true,
     imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, DateSaPipe],
     templateUrl: './departments.component.html',
+    host: { 'data-accent': 'settings' },
     styleUrl: './departments.component.css'
   })
   export class DepartmentsComponent implements OnInit {

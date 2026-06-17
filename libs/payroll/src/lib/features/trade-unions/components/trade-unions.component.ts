@@ -10,6 +10,7 @@ import { CurrencyZarPipe } from '../../../shared/pipes/currency-zar.pipe';
 @Component({
   selector: 'app-trade-unions',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe],
   templateUrl: './trade-unions.component.html',
   styleUrl: './trade-unions.component.css'

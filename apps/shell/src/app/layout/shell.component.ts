@@ -191,6 +191,10 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               <mat-icon class="nav-icon">badge</mat-icon>
               <span>Employee Self-Service</span>
             </a>
+            <a class="nav-link" routerLink="/payroll/approvals" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">fact_check</mat-icon>
+              <span>My Approvals</span>
+            </a>
             @for (group of payrollNavGroups; track group.title) {
               <div class="nav-group">
                 <button class="nav-group-header" (click)="toggleGroup(group.title)">
@@ -876,7 +880,7 @@ export class ShellComponent implements OnInit, OnDestroy {
       ]
     },
     {
-      title: 'Payroll', icon: 'payments',
+      title: 'Payroll Management', icon: 'payments',
       items: [
         { label: 'Payslips', icon: 'receipt_long', route: '/payroll/payslip-view' },
         { label: 'Payroll Run', icon: 'play_circle', route: '/payroll/run' }
@@ -886,9 +890,25 @@ export class ShellComponent implements OnInit, OnDestroy {
           label: 'Transactions', icon: 'swap_horiz',
           children: [
             { label: 'Wages', icon: 'monetization_on', route: '/payroll/wages' },
+            { label: 'Overtime', icon: 'more_time', route: '/payroll/overtime' },
+            { label: 'Installments', icon: 'event_repeat', route: '/payroll/installments' },
             { label: 'Claims', icon: 'request_quote', route: '/payroll/claims' }
           ]
         }
+      ]
+    },
+    {
+      title: 'Time Management', icon: 'schedule',
+      items: [
+        { label: 'Attendance', icon: 'co_present', route: '/time/attendance' }
+      ]
+    },
+    {
+      title: 'Leave Management', icon: 'event_note',
+      items: [
+        { label: 'Leave Requests', icon: 'description', route: '/leave/requests' },
+        { label: 'Leave Adjustments', icon: 'tune', route: '/leave/adjustments' },
+        { label: 'Leave Calendar', icon: 'calendar_month', route: '/leave/calendar' }
       ]
     },
     {
@@ -914,7 +934,8 @@ export class ShellComponent implements OnInit, OnDestroy {
             { label: 'Conditions of Service', icon: 'rule', route: '/settings/conditions' },
             { label: 'Task Grades & Notches', icon: 'grade', route: '/settings/task-grades' },
             { label: 'Upper Limits', icon: 'vertical_align_top', route: '/settings/upper-limits' },
-            { label: 'Employment Change Reasons', icon: 'sync_alt', route: '/settings/employment-changes' }
+            { label: 'Employment Change Reasons', icon: 'sync_alt', route: '/settings/employment-changes' },
+            { label: 'Approval Config', icon: 'approval', route: '/settings/approval-config' }
           ]
         },
         {
@@ -923,8 +944,21 @@ export class ShellComponent implements OnInit, OnDestroy {
             { label: 'Tax Tables', icon: 'table_chart', route: '/settings/tax' },
             { label: 'IRP5 Source Codes', icon: 'code', route: '/settings/irp5-source-codes' },
             { label: 'Payroll Cycles', icon: 'loop', route: '/settings/payroll-cycles' },
-            { label: 'Tax Year Setup', icon: 'event', route: '/settings/tax-year-setup' },
-            { label: 'Payroll Periods', icon: 'date_range', route: '/payroll' }
+            { label: 'Tax Year Setup', icon: 'event', route: '/settings/tax-year-setup' }
+          ]
+        },
+        {
+          label: 'Time', icon: 'schedule',
+          children: [
+            { label: 'Work Shifts', icon: 'work_history', route: '/config/work-shifts' },
+            { label: 'Shift Rotations', icon: 'sync', route: '/config/shift-rotations' }
+          ]
+        },
+        {
+          label: 'Leave', icon: 'event_note',
+          children: [
+            { label: 'Leave Configuration', icon: 'rule', route: '/config/leave' },
+            { label: 'Public Holidays', icon: 'flag', route: '/config/leave/public-holidays' }
           ]
         },
         {
@@ -941,27 +975,8 @@ export class ShellComponent implements OnInit, OnDestroy {
             { label: 'Pay Points', icon: 'point_of_sale', route: '/pay-points' },
             { label: 'Salary Transactions', icon: 'payments', route: '/settings/salary-heads' },
             { label: 'Salary Transaction Groups', icon: 'list_alt', route: '/settings/salary-trans-groups' },
-            { label: 'Payroll Constants', icon: 'numbers', route: '/payroll' },
-            { label: 'Claim Rates', icon: 'request_quote', route: '/settings/claim-rates' },
             { label: 'Claim Types', icon: 'category', route: '/settings/claim-configurations' },
             { label: 'GL Integration', icon: 'sync', route: '/settings/gl-integration' }
-          ]
-        },
-        {
-          label: 'Other', icon: 'more_horiz',
-          children: [
-            { label: 'Leave Management', icon: 'event_note', route: '/leave' },
-            { label: 'Time & Attendance', icon: 'schedule', route: '/time' },
-            { label: 'Staff Performance', icon: 'assessment', route: '/performance' },
-            { label: 'Disciplinary', icon: 'gavel', route: '/disciplinary' },
-            { label: 'Skills & Training', icon: 'school', route: '/skills' },
-            { label: 'Recruitment', icon: 'person_search', route: '/recruitment' },
-            { label: 'Leave Types', icon: 'event', route: '/settings/leave-types' },
-            { label: 'Leave Policies', icon: 'policy', route: '/settings/leave-policies' },
-            { label: 'Bank & Payments', icon: 'account_balance', route: '/settings/bank' },
-            { label: 'Security & RBAC', icon: 'security', route: '/settings/security' },
-            { label: 'Workflows', icon: 'linear_scale', route: '/settings/workflows' },
-            { label: 'Data Conversion', icon: 'cloud_upload', route: '/settings/data-conversion' }
           ]
         }
       ]

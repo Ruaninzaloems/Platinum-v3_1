@@ -29,6 +29,29 @@ router.get('/irp5-codes', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/for-claims', authenticate, async (req, res, next) => {
+  try {
+    const { claimType, subtype } = req.query;
+    const irp5Map = {
+      'Travel': ['3702', '3703'],
+      'S & T::Local – Meals and Incidental Costs': ['3704', '3705', '3713', '3714'],
+      'S & T::Local – Incidental Costs': ['3704', '3705', '3713', '3714'],
+      'S & T::Foreign': ['3713', '3714', '3715'],
+    };
+    const key = claimType === 'Travel' ? 'Travel' : `S & T::${subtype || ''}`;
+    const codes = irp5Map[key];
+    if (!codes || codes.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const placeholders = codes.map((_, i) => `$${i + 1}`).join(',');
+    const result = await dbQuery(
+      `SELECT id, code, name, irp5_code FROM salary_heads WHERE enabled = TRUE AND irp5_code IN (${placeholders}) ORDER BY name`,
+      codes
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const result = await dbQuery(`
@@ -66,7 +89,8 @@ router.post('/', authenticate, auditLog('CREATE', 'salary_heads'), async (req, r
       code, name, description, transaction_type, calculation_method,
       irp5_code, sars_code, taxable, affects_uif, affects_sdl, show_on_payslip,
       priority, start_date, end_date, pro_rated, retirement_funding_income,
-      group_on_payslip_by_irp5, enabled, employer_contribution, employee_contribution
+      group_on_payslip_by_irp5, enabled, employer_contribution, employee_contribution,
+      is_overtime, overtime_multiplier_rate
     } = req.body;
 
     if (!code?.trim() || !name?.trim()) {
@@ -76,16 +100,26 @@ router.post('/', authenticate, auditLog('CREATE', 'salary_heads'), async (req, r
       return res.status(400).json({ success: false, error: { message: 'Transaction Type is required' } });
     }
 
+    const isOvertimeEligible = transaction_type === 'EARNING' && irp5_code === '3607';
+    const resolvedIsOvertime = isOvertimeEligible ? (is_overtime === true) : false;
+    const parsedMultiplier = overtime_multiplier_rate != null ? parseFloat(overtime_multiplier_rate) : null;
+    const resolvedMultiplier = isOvertimeEligible && resolvedIsOvertime ? (isNaN(parsedMultiplier) ? null : parsedMultiplier) : null;
+
+    if (resolvedIsOvertime && (resolvedMultiplier == null || resolvedMultiplier <= 0)) {
+      return res.status(400).json({ success: false, error: { message: 'Overtime multiplier rate must be greater than 0 when overtime is enabled' } });
+    }
+
     const result = await dbQuery(`
       INSERT INTO salary_heads (
         code, name, description, transaction_type, calculation_method,
         irp5_code, sars_code, taxable, affects_uif, affects_sdl, show_on_payslip,
         priority, start_date, end_date, pro_rated, retirement_funding_income,
         group_on_payslip_by_irp5, enabled, employer_contribution, employee_contribution,
+        is_overtime, overtime_multiplier_rate,
         created_by
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21
+        $15, $16, $17, $18, $19, $20, $21, $22, $23
       ) RETURNING *
     `, [
       code.trim(), name.trim(), description || null, transaction_type,
@@ -97,6 +131,7 @@ router.post('/', authenticate, auditLog('CREATE', 'salary_heads'), async (req, r
       pro_rated === true, retirement_funding_income === true,
       group_on_payslip_by_irp5 === true, enabled !== false,
       parseFloat(employer_contribution) || 0, parseFloat(employee_contribution) || 0,
+      resolvedIsOvertime, resolvedMultiplier,
       req.user?.id || null
     ]);
 
@@ -127,10 +162,50 @@ router.post('/', authenticate, auditLog('CREATE', 'salary_heads'), async (req, r
 
 router.put('/:id', authenticate, auditLog('UPDATE', 'salary_heads'), async (req, res, next) => {
   try {
-    const existing = await dbQuery('SELECT is_system FROM salary_heads WHERE id = $1', [req.params.id]);
+    const existing = await dbQuery('SELECT * FROM salary_heads WHERE id = $1', [req.params.id]);
     if (!existing.rows.length) return res.status(404).json({ success: false, error: { message: 'Salary transaction not found' } });
-    if (existing.rows[0].is_system) {
-      return res.status(400).json({ success: false, error: { message: 'Cannot edit system salary transactions' } });
+
+    const existingRow = existing.rows[0];
+    const { is_overtime, overtime_multiplier_rate } = req.body;
+
+    if (existingRow.is_system) {
+      const sysOvertimeEligible = existingRow.transaction_type === 'EARNING' && existingRow.irp5_code === '3607';
+      if (!sysOvertimeEligible) {
+        return res.status(400).json({ success: false, error: { message: 'Cannot edit system salary transactions' } });
+      }
+
+      const resolvedIsOvertime = is_overtime === true;
+      const parsedMultiplier = overtime_multiplier_rate != null ? parseFloat(overtime_multiplier_rate) : null;
+      const resolvedMultiplier = resolvedIsOvertime ? (isNaN(parsedMultiplier) ? null : parsedMultiplier) : null;
+
+      if (resolvedIsOvertime && (resolvedMultiplier == null || resolvedMultiplier <= 0)) {
+        return res.status(400).json({ success: false, error: { message: 'Overtime multiplier rate must be greater than 0 when overtime is enabled' } });
+      }
+
+      const result = await dbQuery(`
+        UPDATE salary_heads SET
+          is_overtime = $1, overtime_multiplier_rate = $2,
+          updated_at = NOW(), updated_by = $3
+        WHERE id = $4 RETURNING *
+      `, [resolvedIsOvertime, resolvedMultiplier, req.user?.id || null, req.params.id]);
+
+      const row = result.rows[0];
+      await dbQuery(`
+        INSERT INTO salary_head_history (salary_head_id, change_type, snapshot, changed_by)
+        VALUES ($1, 'UPDATE', $2, $3)
+      `, [row.id, JSON.stringify(row), req.user?.id || null]);
+
+      const full = await dbQuery(`
+        SELECT sh.*,
+          stt.description AS type_description,
+          scm.description AS calc_method_description
+        FROM salary_heads sh
+        LEFT JOIN const_salary_transaction_types stt ON stt.code = sh.transaction_type
+        LEFT JOIN const_salary_calculation_methods scm ON scm.code = sh.calculation_method
+        WHERE sh.id = $1
+      `, [row.id]);
+
+      return res.json({ success: true, data: full.rows[0] });
     }
 
     const {
@@ -147,6 +222,15 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'salary_heads'), async (req,
       return res.status(400).json({ success: false, error: { message: 'Transaction Type is required' } });
     }
 
+    const isOvertimeEligible = transaction_type === 'EARNING' && irp5_code === '3607';
+    const resolvedIsOvertime = isOvertimeEligible ? (is_overtime === true) : false;
+    const parsedMultiplier = overtime_multiplier_rate != null ? parseFloat(overtime_multiplier_rate) : null;
+    const resolvedMultiplier = isOvertimeEligible && resolvedIsOvertime ? (isNaN(parsedMultiplier) ? null : parsedMultiplier) : null;
+
+    if (resolvedIsOvertime && (resolvedMultiplier == null || resolvedMultiplier <= 0)) {
+      return res.status(400).json({ success: false, error: { message: 'Overtime multiplier rate must be greater than 0 when overtime is enabled' } });
+    }
+
     const result = await dbQuery(`
       UPDATE salary_heads SET
         name = $1, description = $2, transaction_type = $3, calculation_method = $4,
@@ -155,8 +239,9 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'salary_heads'), async (req,
         priority = $11, start_date = $12, end_date = $13, pro_rated = $14,
         retirement_funding_income = $15, group_on_payslip_by_irp5 = $16,
         enabled = $17, employer_contribution = $18, employee_contribution = $19,
-        updated_at = NOW(), updated_by = $20
-      WHERE id = $21 RETURNING *
+        is_overtime = $20, overtime_multiplier_rate = $21,
+        updated_at = NOW(), updated_by = $22
+      WHERE id = $23 RETURNING *
     `, [
       name.trim(), description || null, transaction_type,
       calculation_method || 'USER_INPUT',
@@ -167,6 +252,7 @@ router.put('/:id', authenticate, auditLog('UPDATE', 'salary_heads'), async (req,
       pro_rated === true, retirement_funding_income === true,
       group_on_payslip_by_irp5 === true, enabled !== false,
       parseFloat(employer_contribution) || 0, parseFloat(employee_contribution) || 0,
+      resolvedIsOvertime, resolvedMultiplier,
       req.user?.id || null, req.params.id
     ]);
 

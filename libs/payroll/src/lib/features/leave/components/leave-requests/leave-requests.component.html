@@ -1,0 +1,573 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Leave Requests</h1>
+      <p class="page-subtitle">Capture and manage employee leave applications</p>
+    </div>
+    <button class="btn btn-primary" (click)="openAddForm()">
+      <app-icon name="plus" [size]="14"></app-icon> Add Leave Request
+    </button>
+  </div>
+
+  @if (successMsg) {
+    <div class="alert alert-success">{{ successMsg }}</div>
+  }
+
+  <div class="filters-bar">
+    <select class="form-control filter-select" [(ngModel)]="filters.status" (ngModelChange)="onFilterChange()">
+      <option value="">All Statuses</option>
+      <option value="PENDING">Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="RETURNED">Returned</option>
+      <option value="CANCELLED">Cancelled</option>
+    </select>
+    <input class="form-control filter-date" type="date" [(ngModel)]="filters.date_from" (ngModelChange)="onFilterChange()" title="From Date" />
+    <input class="form-control filter-date" type="date" [(ngModel)]="filters.date_to" (ngModelChange)="onFilterChange()" title="To Date" />
+    @if (filters.status || filters.date_from || filters.date_to) {
+      <button class="btn btn-outline btn-sm" (click)="clearFilters()">Clear</button>
+    }
+  </div>
+
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading leave requests...</div>
+  } @else if (transactions.length === 0) {
+    <div class="empty-state">
+      <h3>No leave requests found</h3>
+      <p>Click "Add Leave Request" to submit a new leave application</p>
+    </div>
+  } @else {
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="claims-table">
+          <thead>
+            <tr>
+              <th style="width:36px">
+                @if (canApprove) {
+                  <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()" title="Select all pending" />
+                }
+              </th>
+              <th>Employee</th>
+              <th>Leave Type</th>
+              <th>Start</th>
+              <th>End</th>
+              <th class="text-center">Days</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of transactions; track t.id) {
+              <tr [class.row-selected]="selectedIds.has(t.id)">
+                <td>
+                  @if (t.status === 'PENDING' && canApprove) {
+                    <input type="checkbox" [checked]="selectedIds.has(t.id)" (change)="toggleSelect(t.id)" />
+                  }
+                </td>
+                <td>
+                  <div class="emp-cell">
+                    <span class="emp-cell-name">{{ t.surname }}, {{ t.first_name }}</span>
+                    <span class="emp-cell-code">{{ t.emp_id || t.employee_id }} | {{ t.employee_code }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="leave-type-badge"
+                    [style.background]="t.calendar_color ? t.calendar_color + '22' : '#e8f0fe'"
+                    [style.color]="t.calendar_color || '#3b82f6'">
+                    {{ t.leave_type_name }}
+                  </span>
+                </td>
+                <td>{{ t.start_date | dateSa }}</td>
+                <td>{{ t.end_date | dateSa }}</td>
+                <td class="text-center">{{ t.days }}</td>
+                <td>
+                  <app-status-badge [status]="t.status"></app-status-badge>
+                  @if (t.status === 'PENDING' && t.workflow_level) {
+                    <span class="workflow-level">L{{ t.workflow_level }}/{{ t.workflow_total }}</span>
+                  }
+                </td>
+                <td class="text-muted small">{{ t.created_at | dateSa }}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-sm btn-view" (click)="viewTransaction(t)" title="View Details">
+                      <app-icon name="eye" [size]="12"></app-icon>
+                    </button>
+                    @if (t.status === 'RETURNED') {
+                      <button class="btn btn-sm btn-resubmit" (click)="openEditForm(t)" title="Edit & Resubmit">
+                        <app-icon name="edit" [size]="12"></app-icon>
+                      </button>
+                    }
+                    @if (t.status === 'PENDING' && canApprove) {
+                      <button class="btn btn-sm btn-approve" (click)="approveTransaction(t)" title="Approve">
+                        <app-icon name="check" [size]="12"></app-icon>
+                      </button>
+                      <button class="btn btn-sm btn-return" (click)="returnTransaction(t)" title="Return for Correction">
+                        <app-icon name="chevronLeft" [size]="12"></app-icon>
+                      </button>
+                      <button class="btn btn-sm btn-reject" (click)="rejectTransaction(t)" title="Reject">
+                        <app-icon name="x" [size]="12"></app-icon>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  @if (selectedIds.size > 0 && canApprove) {
+    <div class="bulk-action-bar">
+      <div class="bulk-info"><strong>{{ selectedIds.size }}</strong> request(s) selected</div>
+      <div class="bulk-buttons">
+        <button class="btn-approve-bulk" (click)="bulkApprove()" [disabled]="bulkSaving">
+          <app-icon name="check" [size]="14"></app-icon> Approve All
+        </button>
+        <button class="btn-reject-bulk" (click)="openBulkReject()" [disabled]="bulkSaving">
+          <app-icon name="x" [size]="14"></app-icon> Reject All
+        </button>
+        <button style="background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px" (click)="clearBulkSelection()">Clear</button>
+        @if (bulkSaving) { <span class="bulk-processing">Processing...</span> }
+      </div>
+    </div>
+  }
+}
+
+@if (view === 'form') {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-outline" (click)="backToList()">
+        <app-icon name="chevronLeft" [size]="14"></app-icon> Back
+      </button>
+      <div>
+        @if (editingTransaction) {
+          <h1 class="page-title">Edit Leave Request — {{ editingTransaction.reference_no }}</h1>
+          <p class="page-subtitle">Correct and resubmit the returned leave application</p>
+        } @else {
+          <h1 class="page-title">New Leave Request</h1>
+          <p class="page-subtitle">Submit a new employee leave application</p>
+        }
+      </div>
+    </div>
+    <button class="btn btn-primary" (click)="submitForm()" [disabled]="saving">
+      @if (saving) {
+        @if (editingTransaction) { Resubmitting... } @else { Submitting... }
+      } @else {
+        <app-icon name="check" [size]="14"></app-icon>
+        @if (editingTransaction) { Resubmit Leave Request } @else { Submit Leave Request }
+      }
+    </button>
+  </div>
+
+  @if (formError) { <div class="alert alert-danger">{{ formError }}</div> }
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="user" [size]="15"></app-icon> Employee Details
+        </div>
+
+        <div class="form-group">
+          <label>Employee <span class="required">*</span></label>
+          @if (editingTransaction) {
+            <input class="form-control form-control-readonly" type="text" [value]="employeeSearch" readonly />
+            <span class="field-hint" style="color:#64748b">Employee cannot be changed when resubmitting.</span>
+          } @else {
+            <div class="employee-lookup">
+              <input class="form-control" [(ngModel)]="employeeSearch" placeholder="Search by ID, code or name..."
+                (ngModelChange)="searchEmployees()" />
+              @if (selectedEmployee) {
+                <button class="clear-btn" (click)="clearEmployee()">&times;</button>
+              }
+              @if (employees.length > 0 && !selectedEmployee) {
+                <div class="dropdown-list">
+                  @for (e of employees; track e.id) {
+                    <div class="dropdown-item" (click)="selectEmployee(e)">
+                      {{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}
+                    </div>
+                  }
+                </div>
+              }
+              @if (employeeLoading) {
+                <div class="dropdown-list">
+                  <div class="dropdown-item" style="color:#94a3b8">Searching...</div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        @if (selectedEmployee) {
+          <div class="detail-row">
+            <span class="detail-label">First Name</span>
+            <span class="detail-value">{{ selectedEmployee.first_name }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Surname</span>
+            <span class="detail-value">{{ selectedEmployee.surname }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Employee Code</span>
+            <span class="detail-value">{{ selectedEmployee.employee_code }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Employee ID</span>
+            <span class="detail-value">{{ selectedEmployee.id }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="calendar" [size]="15"></app-icon> Leave Details
+        </div>
+
+        <div class="form-row-two">
+          <div class="form-group">
+            <label>Document Number</label>
+            <input class="form-control form-control-readonly" type="text" value="Auto-generated on submission" readonly />
+          </div>
+          <div class="form-group">
+            <label>Manual Document Number</label>
+            <input class="form-control" type="text" [(ngModel)]="form.manual_doc_number" placeholder="e.g. HR-2026-001" maxlength="100" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Leave Type <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="form.leave_type_id" (change)="onLeaveTypeChange()" [disabled]="!selectedEmployee">
+            <option [ngValue]="null">-- Select leave type --</option>
+            @for (t of leaveTypes; track t.id) {
+              <option [value]="t.id">{{ t.name }}</option>
+            }
+          </select>
+          @if (!selectedEmployee) {
+            <span class="field-hint">Select an employee first.</span>
+          }
+          @if (selectedEmployee && leaveTypes.length === 0) {
+            <span class="field-hint" style="color:#d97706">No leave types available for this employee's scheme.</span>
+          }
+        </div>
+
+        @if (getSelectedBalance(); as bal) {
+          <div class="balance-card">
+            <div class="balance-row"><span class="balance-label">Opening Balance</span><span class="balance-val">{{ bal.opening_balance | number:'1.2-2' }}</span></div>
+            <div class="balance-row"><span class="balance-label">Adjustments</span><span class="balance-val">{{ bal.adjusted_days | number:'1.2-2' }}</span></div>
+            <div class="balance-row"><span class="balance-label">Accrued</span><span class="balance-val" style="color:#0369a1">+{{ bal.accrued_days | number:'1.2-2' }}</span></div>
+            @if ((+bal.pending_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Pending</span><span class="balance-val" style="color:#7c3aed">{{ bal.pending_days | number:'1.2-2' }}</span></div>
+            }
+            <div class="balance-row"><span class="balance-label">Days Taken</span><span class="balance-val text-danger">-{{ bal.taken_days | number:'1.2-2' }}</span></div>
+            @if ((+bal.encashed_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Encashed</span><span class="balance-val" style="color:#64748b">-{{ bal.encashed_days | number:'1.2-2' }}</span></div>
+            }
+            @if ((+bal.forfeited_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Forfeited</span><span class="balance-val" style="color:#d97706">-{{ bal.forfeited_days | number:'1.2-2' }}</span></div>
+            }
+            <div class="balance-row balance-total">
+              <span class="balance-label">Available</span>
+              <span class="balance-val" [class.text-danger]="bal.available_days < 0">{{ bal.available_days | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        }
+
+        <div class="form-group">
+          <label>Start Date <span class="required">*</span></label>
+          <app-date-input [(ngModel)]="form.start_date" (ngModelChange)="computeDays()"></app-date-input>
+        </div>
+
+        <div class="form-group">
+          <label>End Date <span class="required">*</span></label>
+          <app-date-input [(ngModel)]="form.end_date" (ngModelChange)="computeDays()"></app-date-input>
+        </div>
+
+        <div class="form-group">
+          <label>No. of Days</label>
+          <input class="form-control" type="number" [(ngModel)]="form.days" min="0.5" step="0.5" />
+        </div>
+
+        <div class="form-group">
+          <label>Reason for Leave</label>
+          <textarea class="form-control" [(ngModel)]="form.reason" rows="3" placeholder="Enter reason for leave..."></textarea>
+        </div>
+
+        <div class="form-section-title" style="margin-top:8px">
+          <app-icon name="file" [size]="15"></app-icon> Document Upload
+        </div>
+        <div class="form-group">
+          <label>
+            Supporting Document
+            @if (selectedLeaveType?.requires_document && !selectedLeaveType.document_required_after_days) {
+              <span class="required">*</span>
+            } @else if (selectedLeaveType?.requires_document && selectedLeaveType.document_required_after_days) {
+              <span style="color:#dc2626;font-weight:500"> (required after {{ selectedLeaveType.document_required_after_days }} days)</span>
+            } @else {
+              <span style="color:#64748b;font-weight:400"> (optional)</span>
+            }
+          </label>
+          <div class="upload-area">
+            <input type="file" class="upload-input" id="leaveDocUpload" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onFileSelect($event)" />
+            <label for="leaveDocUpload" class="upload-label">
+              <app-icon name="file" [size]="20"></app-icon>
+              <span>Click to browse or drag a file here</span>
+              <span style="font-size:11px;color:#94a3b8">PDF, JPG, PNG, DOC — max 5 MB</span>
+            </label>
+          </div>
+          @if (fileError) {
+            <span class="field-hint" style="color:#dc2626">{{ fileError }}</span>
+          }
+          @if (selectedFile && !fileError) {
+            <div class="file-selected">
+              <app-icon name="check" [size]="13"></app-icon>
+              <span>{{ selectedFile.name }}</span>
+              <button type="button" class="file-remove" (click)="selectedFile=null;fileBase64=''">&times;</button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (view === 'detail' && detailTransaction) {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-outline" (click)="backToList()">
+        <app-icon name="chevronLeft" [size]="14"></app-icon> Back
+      </button>
+      <div>
+        <h1 class="page-title">Leave Request — {{ detailTransaction.reference_no }}</h1>
+        <p class="page-subtitle">{{ detailTransaction.leave_type_name }} · {{ detailTransaction.first_name }} {{ detailTransaction.surname }}</p>
+      </div>
+    </div>
+    <div class="detail-header-actions">
+      <button class="btn btn-outline" (click)="printTransaction()" title="Print Transaction">
+        <app-icon name="printer" [size]="14"></app-icon> Print Transaction
+      </button>
+      <app-status-badge [status]="detailTransaction.status"></app-status-badge>
+      @if (detailTransaction.status === 'PENDING' && detailTransaction.workflow_level) {
+        <span class="workflow-level">L{{ detailTransaction.workflow_level }}/{{ detailTransaction.workflow_total }}</span>
+      }
+      @if (detailTransaction.status === 'RETURNED') {
+        <button class="btn btn-sm btn-resubmit-btn" (click)="openEditForm(detailTransaction)">
+          <app-icon name="edit" [size]="13"></app-icon> Edit &amp; Resubmit
+        </button>
+      }
+      @if (detailTransaction.status === 'PENDING' && canApprove) {
+        <button class="btn btn-sm btn-approve-btn" (click)="approveTransaction(detailTransaction)">
+          <app-icon name="check" [size]="13"></app-icon> Approve
+        </button>
+        <button class="btn btn-sm btn-return-btn" (click)="returnTransaction(detailTransaction)">
+          <app-icon name="chevronLeft" [size]="13"></app-icon> Return
+        </button>
+        <button class="btn btn-sm btn-reject-btn" (click)="rejectTransaction(detailTransaction)">
+          <app-icon name="x" [size]="13"></app-icon> Reject
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="user" [size]="15"></app-icon> Employee Details
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee ID</span>
+          <span class="detail-value">{{ detailTransaction.emp_id || detailTransaction.employee_id }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee</span>
+          <span class="detail-value">{{ detailTransaction.first_name }} {{ detailTransaction.surname }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee Code</span>
+          <span class="detail-value">{{ detailTransaction.employee_code }}</span>
+        </div>
+
+        <div class="form-section-title" style="margin-top:16px">
+          <app-icon name="calendar" [size]="15"></app-icon> Leave Details
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Leave Type</span>
+          <span class="detail-value">
+            <span class="leave-type-badge"
+              [style.background]="detailTransaction.calendar_color ? detailTransaction.calendar_color + '22' : '#e8f0fe'"
+              [style.color]="detailTransaction.calendar_color || '#3b82f6'">
+              {{ detailTransaction.leave_type_name }}
+            </span>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Start Date</span>
+          <span class="detail-value">{{ detailTransaction.start_date | dateSa }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">End Date</span>
+          <span class="detail-value">{{ detailTransaction.end_date | dateSa }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Days</span>
+          <span class="detail-value">{{ detailTransaction.days }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Document Number</span>
+          <span class="detail-value mono">{{ detailTransaction.reference_no }}</span>
+        </div>
+        @if (detailTransaction.manual_doc_number) {
+          <div class="detail-row">
+            <span class="detail-label">Manual Doc Number</span>
+            <span class="detail-value mono">{{ detailTransaction.manual_doc_number }}</span>
+          </div>
+        }
+        <div class="detail-row">
+          <span class="detail-label">Submitted</span>
+          <span class="detail-value">{{ detailTransaction.created_at | dateSa }}</span>
+        </div>
+        @if (detailTransaction.reason) {
+          <div class="detail-row">
+            <span class="detail-label">Reason</span>
+            <span class="detail-value">{{ detailTransaction.reason }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="clock" [size]="15"></app-icon> Leave History
+        </div>
+
+        @if (historyLoading) {
+          <div class="loading" style="padding:20px 0">
+            <div class="spinner"></div> Loading history...
+          </div>
+        } @else if (transactionHistory.length === 0) {
+          <div class="history-empty">No history records found</div>
+        } @else {
+          <div class="history-timeline">
+            @for (entry of transactionHistory; track entry.id) {
+              <div class="timeline-item">
+                <div class="timeline-connector">
+                  <div class="timeline-dot" [style.background]="getActionColor(entry.action)">
+                    <app-icon [name]="getActionIcon(entry.action)" [size]="10"></app-icon>
+                  </div>
+                  <div class="timeline-line"></div>
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="timeline-action" [style.color]="getActionColor(entry.action)">{{ entry.action }}</span>
+                    <span class="timeline-date">{{ entry.performed_at | dateTimeSa }}</span>
+                  </div>
+                  <div class="timeline-actor">by {{ entry.performed_by_name || entry.performed_by }}</div>
+                  @if (entry.comments) {
+                    <div class="timeline-comments">{{ entry.comments }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showApproveModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Approve Leave Request</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Approve <strong>{{ actionTarget?.leave_type_name }}</strong> for <strong>{{ actionTarget?.first_name }} {{ actionTarget?.surname }}</strong> — {{ actionTarget?.days }} day(s)?</p>
+        <div class="form-group">
+          <label>Comments (optional)</label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="3" placeholder="Optional comment..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-success" (click)="confirmApprove()" [disabled]="actionSaving">
+          {{ actionSaving ? 'Approving...' : 'Approve' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRejectModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Reject Leave Request</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This leave request will be rejected. Please provide a reason.</p>
+        <div class="form-group">
+          <label>Reason for Rejection <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="4" placeholder="Provide a reason for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmReject()" [disabled]="actionSaving || !actionComment.trim()">
+          {{ actionSaving ? 'Rejecting...' : 'Reject' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showReturnModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Return Leave Request for Correction</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This request will be returned to the employee for correction. Please provide a reason.</p>
+        <div class="form-group">
+          <label>Reason for Return <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="4" placeholder="Describe what needs to be corrected..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-return-confirm" (click)="confirmReturn()" [disabled]="actionSaving || !actionComment.trim()">
+          {{ actionSaving ? 'Returning...' : 'Return' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showBulkRejectModal) {
+  <div class="modal-overlay visible" (click)="closeBulkReject()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Reject {{ selectedIds.size }} Leave Request(s)</h3>
+        <button class="modal-close" (click)="closeBulkReject()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Reason for Rejection <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="bulkRejectComments" rows="3" placeholder="Reason is required for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeBulkReject()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmBulkReject()" [disabled]="bulkSaving || !bulkRejectComments.trim()">
+          {{ bulkSaving ? 'Processing...' : 'Reject Selected' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

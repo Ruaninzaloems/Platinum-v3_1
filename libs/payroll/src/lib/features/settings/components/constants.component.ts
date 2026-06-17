@@ -9,6 +9,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './constants.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './constants.component.css'
 })
 export class ConstantsComponent implements OnInit {

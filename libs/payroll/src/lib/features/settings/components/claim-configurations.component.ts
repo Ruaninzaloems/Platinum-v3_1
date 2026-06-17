@@ -12,6 +12,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, DateSaPipe, DateInputComponent],
   templateUrl: './claim-configurations.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './claim-configurations.component.css'
 })
 export class ClaimConfigurationsComponent implements OnInit {
@@ -61,11 +62,36 @@ export class ClaimConfigurationsComponent implements OnInit {
     this.api.get<any[]>('/settings/employee-types').subscribe({
       next: (data) => { this.employeeTypes = data || []; this.cdr.detectChanges(); }
     });
-    this.api.get<any[]>('/salary-transactions').subscribe({
-      next: (data) => { this.salaryHeads = data || []; this.cdr.detectChanges(); }
-    });
     this.api.get<any[]>('/settings/sars-prescribed-rates').subscribe({
       next: (data) => { this.sarsRates = data || []; this.cdr.detectChanges(); }
+    });
+  }
+
+  loadFilteredSalaryHeads(claimType: string, subtype: string, preserveSelection = false): void {
+    if (!claimType) {
+      this.salaryHeads = [];
+      if (!preserveSelection) this.editItem.salary_head_id = null;
+      this.cdr.detectChanges();
+      return;
+    }
+    if (claimType === 'S & T' && !subtype) {
+      this.salaryHeads = [];
+      if (!preserveSelection) this.editItem.salary_head_id = null;
+      this.cdr.detectChanges();
+      return;
+    }
+    const params: any = { claimType };
+    if (subtype) params.subtype = subtype;
+    this.api.get<any[]>('/salary-transactions/for-claims', params).subscribe({
+      next: (data) => {
+        this.salaryHeads = data || [];
+        if (!preserveSelection) this.editItem.salary_head_id = null;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.salaryHeads = [];
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -109,6 +135,7 @@ export class ClaimConfigurationsComponent implements OnInit {
       end_date: ''
     };
     this.availableSubtypes = [];
+    this.salaryHeads = [];
     this.view = 'detail';
   }
 
@@ -118,12 +145,15 @@ export class ClaimConfigurationsComponent implements OnInit {
     if (this.editItem.effective_date?.includes('T')) this.editItem.effective_date = this.editItem.effective_date.split('T')[0];
     if (this.editItem.end_date?.includes('T')) this.editItem.end_date = this.editItem.end_date.split('T')[0];
     this.availableSubtypes = this.claimSubtypes[this.editItem.claim_type] || [];
+    this.loadFilteredSalaryHeads(this.editItem.claim_type, this.editItem.claim_subtype, true);
     this.view = 'detail';
   }
 
   backToList(): void {
     this.view = 'list';
     this.editItem = {};
+    this.salaryHeads = [];
+    this.availableSubtypes = [];
     this.load();
   }
 
@@ -131,6 +161,7 @@ export class ClaimConfigurationsComponent implements OnInit {
     this.availableSubtypes = this.claimSubtypes[this.editItem.claim_type] || [];
     this.editItem.claim_subtype = '';
     this.editItem.sars_prescribed_rate_id = null;
+    this.loadFilteredSalaryHeads(this.editItem.claim_type, '');
     this.cdr.detectChanges();
   }
 
@@ -143,9 +174,11 @@ export class ClaimConfigurationsComponent implements OnInit {
   onSubtypeChange(): void {
     if (!this.editItem.claim_subtype) {
       this.editItem.sars_prescribed_rate_id = null;
+      this.loadFilteredSalaryHeads(this.editItem.claim_type, '');
       this.cdr.detectChanges();
       return;
     }
+    this.loadFilteredSalaryHeads(this.editItem.claim_type, this.editItem.claim_subtype);
     const lookupDate = this.editItem.effective_date || new Date().toISOString().split('T')[0];
     this.api.get<any>(`/settings/sars-prescribed-rates/lookup?subtype=${encodeURIComponent(this.editItem.claim_subtype)}&date=${lookupDate}`).subscribe({
       next: (data) => {

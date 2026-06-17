@@ -64,6 +64,42 @@
   font-size: 13px;
 }
 
+.approvals-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.approvals-pill:hover {
+  background: #e2e8f0;
+  color: #0f2b46;
+}
+.approvals-pill.has-items {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+.approvals-count {
+  background: #ef5350;
+  color: #fff;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  font-weight: 700;
+}
+
 .notification-count {
   position: absolute;
   top: 0;

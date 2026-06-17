@@ -1,49 +1,33 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Employee Self-Service</h1>
-    <p class="page-subtitle">View employee profile, payslips, leave balances, and benefits</p>
+    <p class="page-subtitle">View your profile, payslips, leave balances, and benefits</p>
   </div>
 </div>
 
-<div class="ess-selector-bar">
-  <div class="selector-group">
-    <label class="selector-label">Select Employee</label>
-    <select class="selector-input" [(ngModel)]="selectedEmployeeId" (ngModelChange)="selectEmployee()">
-      <option [ngValue]="null">-- Choose an employee --</option>
-      @for (emp of filteredEmployees; track emp.id) {
-        <option [ngValue]="emp.id">{{ emp.id }} — {{ emp.employee_code }} — {{ emp.title ? emp.title + ' ' : '' }}{{ emp.first_name }} {{ emp.surname }}</option>
-      }
-    </select>
+@if (noLinkedEmployee) {
+  <div class="ess-empty">
+    <div class="ess-empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <h3>No Linked Employee Record</h3>
+    <p>No employee record is linked to your account. Please contact your administrator.</p>
   </div>
-  <div class="selector-group selector-search">
-    <label class="selector-label">Search</label>
-    <input class="selector-input" type="text" [(ngModel)]="employeeSearch" placeholder="Filter by ID, code, name or surname..." />
-  </div>
-</div>
+}
 
 @if (loading) {
   <div class="ess-loading">
     <div class="ess-spinner"></div>
-    <p>Loading employee data...</p>
+    <p>Loading your data...</p>
   </div>
 }
 
-@if (!loading && !profile && selectedEmployeeId) {
+@if (!loading && !noLinkedEmployee && !profile && selectedEmployeeId) {
   <div class="ess-empty">
     <div class="ess-empty-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     </div>
     <p>Employee data not found</p>
-  </div>
-}
-
-@if (!loading && !selectedEmployeeId) {
-  <div class="ess-empty">
-    <div class="ess-empty-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    </div>
-    <h3>Employee Self-Service Portal</h3>
-    <p>Select an employee above to view their profile, payslips, leave balances, and benefits.</p>
   </div>
 }
 
@@ -53,6 +37,8 @@
     <button class="ess-tab" [class.active]="activeTab === 'payslips'" (click)="switchTab('payslips')">Payslips</button>
     <button class="ess-tab" [class.active]="activeTab === 'leave'" (click)="switchTab('leave')">Leave</button>
     <button class="ess-tab" [class.active]="activeTab === 'benefits'" (click)="switchTab('benefits')">Benefits</button>
+    <button class="ess-tab" [class.active]="activeTab === 'claims'" (click)="switchTab('claims'); loadEssClaims()">Claims</button>
+    <button class="ess-tab" [class.active]="activeTab === 'myTime'" (click)="switchTab('myTime'); loadMyAttendance()">My Time</button>
     <button class="ess-tab" [class.active]="activeTab === 'personal'" (click)="switchTab('personal')">Personal Details</button>
   </div>
 
@@ -61,12 +47,16 @@
       <!-- Profile Card -->
       <div class="ess-card ess-card-profile">
         <div class="profile-header">
-          <div class="profile-avatar">{{ getInitials() }}</div>
+          @if (profile.photo_url) {
+            <img class="profile-avatar profile-avatar-img" [src]="profile.photo_url" alt="Profile photo">
+          } @else {
+            <div class="profile-avatar">{{ getInitials() }}</div>
+          }
           <div class="profile-info">
             <h2 class="profile-name">{{ profile.title ? profile.title + ' ' : '' }}{{ profile.first_name }} {{ profile.surname }}</h2>
             <p class="profile-position">{{ profile.position_title || 'No position assigned' }}</p>
             <div class="profile-meta">
-              <span class="profile-code">{{ profile.employee_code }}</span>
+              <span class="profile-code">{{ profile.id }} | {{ profile.employee_code }}</span>
               <span class="profile-badge" [class]="getStatusClass(profile.status)">{{ profile.status || 'Unknown' }}</span>
             </div>
           </div>
@@ -190,6 +180,7 @@
                 <div class="leave-item-bottom">
                   <span>Accrued: {{ (lb.accrued || 0) | number:'1.1-1' }}</span>
                   <span>Taken: {{ (lb.taken || 0) | number:'1.1-1' }}</span>
+                  <span>Forfeited: {{ (lb.forfeited || 0) | number:'1.1-1' }}</span>
                 </div>
               </div>
             }
@@ -286,15 +277,23 @@
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Bank</span>
-            <span class="detail-value">{{ profile.bank_name || '-' }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_name || '-' }}</span>
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Account Number</span>
-            <span class="detail-value">{{ maskAccountNumber(profile.bank_account_number) }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_number_masked || '-' }}</span>
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Account Type</span>
-            <span class="detail-value">{{ profile.bank_account_type || '-' }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_type || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Holder</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_holder || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Relationship</span>
+            <span class="detail-value">{{ getRelationshipLabel(bankingDetails?.account_holder_relationship) }}</span>
           </div>
         </div>
       </div>
@@ -345,6 +344,98 @@
   }
 
   @if (activeTab === 'leave') {
+    <!-- Leave Application Form -->
+    @if (leaveView === 'form') {
+      <div class="ess-card ess-form-card" style="margin-bottom:16px">
+        <div class="card-title-bar" style="margin-bottom:16px">
+          <h3 class="card-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;margin-right:6px;vertical-align:-2px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Apply for Leave
+          </h3>
+          <button class="btn-link" (click)="cancelLeaveForm()" style="font-size:13px;color:var(--platinum-muted)">Cancel</button>
+        </div>
+
+        <!-- Balance quick-reference while filling form -->
+        @if (leaveBalances.length > 0) {
+          <div class="leave-balance-hint-row">
+            @for (lb of leaveBalances; track lb.id) {
+              <div class="leave-balance-hint" [class.active]="selectedLeaveType?.id === lb.id">
+                <span class="lbh-type">{{ lb.leave_type }}</span>
+                <span class="lbh-days" [style.color]="getLeaveBarColor(lb)">{{ (lb.balance || 0) | number:'1.1-1' }} days</span>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="ess-form-grid">
+          <div class="form-field form-field-full">
+            <label class="field-label">LEAVE TYPE <span class="required-star">*</span></label>
+            <select class="field-input" [(ngModel)]="leaveForm.leave_type_id" [disabled]="leaveFormLoading">
+              <option value="">-- Select leave type --</option>
+              @for (lt of leaveTypes; track lt.id) {
+                <option [value]="lt.id">{{ lt.name }}</option>
+              }
+            </select>
+            @if (leaveTypes.length === 0) {
+              <div class="field-hint" style="color:var(--platinum-warning)">No leave types found — ensure a leave scheme is assigned to your profile.</div>
+            }
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">START DATE <span class="required-star">*</span></label>
+            <app-date-input [(ngModel)]="leaveForm.start_date" [readonly]="leaveFormLoading"></app-date-input>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">END DATE <span class="required-star">*</span></label>
+            <app-date-input [(ngModel)]="leaveForm.end_date" [readonly]="leaveFormLoading"></app-date-input>
+          </div>
+
+          @if (leaveDayCount > 0) {
+            <div class="form-field form-field-full">
+              <div class="leave-day-count-pill">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ leaveDayCount }} calendar day{{ leaveDayCount !== 1 ? 's' : '' }} selected
+                @if (selectedLeaveType) {
+                  <span style="opacity:.7"> · {{ selectedLeaveType.name }}</span>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="form-field form-field-full">
+            <label class="field-label">REASON / NOTES</label>
+            <textarea class="field-input" rows="3" [(ngModel)]="leaveForm.reason" [disabled]="leaveFormLoading" placeholder="Optional — provide context for your manager"></textarea>
+          </div>
+        </div>
+
+        @if (leaveFormError) {
+          <div class="form-error-banner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {{ leaveFormError }}
+          </div>
+        }
+
+        <div class="form-actions" style="margin-top:16px">
+          <button class="btn-secondary" (click)="cancelLeaveForm()" [disabled]="leaveFormLoading">Cancel</button>
+          <button class="btn-primary" (click)="submitLeaveApplication()" [disabled]="leaveFormLoading">
+            @if (leaveFormLoading) { Submitting… } @else { Submit Application }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Balance cards -->
+    @if (leaveView === 'list') {
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--platinum-muted)">Your leave entitlements</span>
+        <button class="quick-action-btn qa-leave" style="padding:6px 14px;font-size:12px" (click)="openLeaveForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Apply for Leave
+        </button>
+      </div>
+    }
+
     <div class="ess-grid ess-grid-leave">
       @for (lb of leaveBalances; track lb.id) {
         <div class="ess-card leave-card">
@@ -382,6 +473,51 @@
         <div class="ess-card ess-card-full">
           <div class="card-empty">No leave balance records found</div>
         </div>
+      }
+    </div>
+
+    <!-- Leave Request History -->
+    <div class="ess-card" style="margin-top:16px">
+      <div class="card-title-bar">
+        <h3 class="card-heading">My Leave Applications</h3>
+        @if (leaveRequestsLoading) { <span class="loading-spinner-sm"></span> }
+      </div>
+      @if (leaveRequests.length > 0) {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ref No</th>
+                <th>Leave Type</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Days</th>
+                <th>Status</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lr of leaveRequests; track lr.id) {
+                <tr>
+                  <td><code style="font-size:11px">{{ lr.reference_no || '—' }}</code></td>
+                  <td>
+                    @if (lr.calendar_color) {
+                      <span class="leave-type-dot" [style.background]="lr.calendar_color"></span>
+                    }
+                    {{ lr.leave_type }}
+                  </td>
+                  <td>{{ formatDate(lr.start_date) }}</td>
+                  <td>{{ formatDate(lr.end_date) }}</td>
+                  <td>{{ (lr.days_requested || 0) | number:'1.1-1' }}</td>
+                  <td><app-status-badge [status]="lr.status" /></td>
+                  <td style="color:var(--platinum-muted);font-size:12px">{{ formatDate(lr.created_at) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else if (!leaveRequestsLoading) {
+        <div class="card-empty">No leave applications submitted yet</div>
       }
     </div>
   }
@@ -497,6 +633,373 @@
     </div>
   }
 
+  @if (activeTab === 'claims') {
+    @if (essClaimView === 'list') {
+      <div class="ess-card ess-card-full">
+        <div class="card-title-bar">
+          <h3 class="card-heading">My Claims</h3>
+          <button class="btn btn-sm ess-claim-add-btn" (click)="openEssClaimForm()">
+            <app-icon name="plus" [size]="13"></app-icon> Submit Claim
+          </button>
+        </div>
+        @if (essClaimsLoading) {
+          <div class="ess-loading" style="padding:40px"><div class="ess-spinner"></div><p>Loading claims...</p></div>
+        } @else if (essClaims.length === 0) {
+          <div class="card-empty">No claims submitted yet. Click "Submit Claim" to get started.</div>
+        } @else {
+          <div class="table-wrapper">
+            <table class="ess-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Sub-Type</th>
+                  <th>Date</th>
+                  <th style="text-align:right">Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (claim of essClaims; track claim.id) {
+                  <tr>
+                    <td class="td-bold">#{{ claim.id }}</td>
+                    <td>{{ getClaimTypeLabel(claim.claim_type) }}</td>
+                    <td>{{ claim.sub_type || '-' }}</td>
+                    <td>{{ claim.start_date | dateSa }}{{ claim.end_date ? ' - ' + (claim.end_date | dateSa) : '' }}</td>
+                    <td class="td-currency">{{ claim.amount | currencyZar }}</td>
+                    <td><app-status-badge [status]="claim.status"></app-status-badge></td>
+                    <td>
+                      <div style="display:flex;gap:4px;align-items:center">
+                        <button class="btn btn-sm" (click)="essPrintClaimPDF(claim)" title="Print PDF" style="padding:4px 6px">
+                          <app-icon name="printer" [size]="12"></app-icon>
+                        </button>
+                        @if (claim.status === 'RETURNED') {
+                          <button class="btn btn-sm ess-resubmit-btn" (click)="essEditAndResubmit(claim)" title="Edit & Resubmit">
+                            <app-icon name="edit" [size]="12"></app-icon> Resubmit
+                          </button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                  @if (claim.status === 'RETURNED' && claim.return_reason) {
+                    <tr class="ess-return-reason-row">
+                      <td colspan="7">
+                        <div class="ess-return-reason">
+                          <app-icon name="alertTriangle" [size]="14"></app-icon>
+                          <span><strong>Return Reason:</strong> {{ claim.return_reason }}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (essClaimView === 'form') {
+      <div class="ess-card ess-card-full">
+        <div class="card-title-bar">
+          <h3 class="card-heading">{{ essEditingClaimId ? 'Edit & Resubmit Claim #' + essEditingClaimId : 'Submit New Claim' }}</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" (click)="essBackToList()">Cancel</button>
+            <button class="btn btn-sm ess-claim-add-btn" (click)="essSubmitClaim()" [disabled]="essClaimFormLoading">
+              @if (essClaimFormLoading) { Submitting... } @else { <app-icon name="check" [size]="13"></app-icon> {{ essEditingClaimId ? 'Resubmit' : 'Submit' }} }
+            </button>
+          </div>
+        </div>
+
+        <div class="ess-claim-form-grid">
+          <div class="ess-claim-form-col">
+            <div class="form-group">
+              <label>Employee</label>
+              <input class="form-control readonly-field" [value]="profile.id + ' | ' + profile.employee_code + ' - ' + profile.first_name + ' ' + profile.surname" readonly>
+            </div>
+
+            <div class="form-group">
+              <label>Claim Type <span class="required">*</span></label>
+              <select class="form-control" [(ngModel)]="essClaimForm.claim_type" (ngModelChange)="essOnClaimTypeChange()">
+                <option value="">-- Select Claim Type --</option>
+                @for (ct of claimTypes; track ct.value) {
+                  <option [value]="ct.value">{{ ct.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Sub-Type <span class="required">*</span></label>
+              <select class="form-control" [(ngModel)]="essClaimForm.sub_type" (ngModelChange)="essOnSubTypeChange()" [disabled]="!essClaimForm.claim_type || essClaimConfigurations.length === 0">
+                <option value="">-- Select Sub-Type --</option>
+                @for (config of essClaimConfigurations; track config.id) {
+                  <option [value]="config.id">{{ getEssSubTypeLabel(config) }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Reference No</label>
+              <input class="form-control" [(ngModel)]="essClaimForm.reference_no" placeholder="Optional reference number">
+            </div>
+
+            <div class="form-group">
+              <label>Reason</label>
+              <textarea class="form-control" [(ngModel)]="essClaimForm.reason" placeholder="Reason for claim" rows="3"></textarea>
+            </div>
+          </div>
+
+          <div class="ess-claim-form-col">
+            <div class="form-group">
+              <label>Start Date <span class="required">*</span></label>
+              <app-date-input [(ngModel)]="essClaimForm.start_date" (ngModelChange)="essCheckDuplicates()"></app-date-input>
+            </div>
+
+            @if (essClaimForm.claim_type === 'S_AND_T') {
+              <div class="form-group">
+                <label>End Date <span class="required">*</span></label>
+                <app-date-input [(ngModel)]="essClaimForm.end_date" (ngModelChange)="essCheckDuplicates()"></app-date-input>
+                @if (essDayCount > 0) {
+                  <span class="field-hint">{{ essDayCount }} day(s)</span>
+                }
+              </div>
+            }
+
+            @if (essDuplicateWarning) {
+              <div class="ess-duplicate-warning">
+                <app-icon name="alertTriangle" [size]="14"></app-icon>
+                <span>{{ essDuplicateWarning }}</span>
+              </div>
+            }
+            @if (essCheckingDuplicates) {
+              <span class="field-hint">Checking for duplicates...</span>
+            }
+
+            @if (essClaimForm.claim_type === 'TRAVEL') {
+              <div class="form-group">
+                <label>Kilometres <span class="required">*</span></label>
+                <input class="form-control" type="number" [(ngModel)]="essClaimForm.kilometres" step="0.01" min="0" placeholder="Enter kilometres travelled">
+              </div>
+            }
+
+            <div class="form-group">
+              <label>Tariff</label>
+              <input class="form-control readonly-field" [value]="essTariff ? 'R' + essTariff.toFixed(2) : '-'" readonly>
+              @if (essTariff && essClaimForm.claim_type === 'TRAVEL') {
+                <span class="field-hint">Rate per kilometre</span>
+              }
+              @if (essTariff && essClaimForm.claim_type === 'S_AND_T') {
+                <span class="field-hint">Daily rate</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label>Claim Value</label>
+              <input class="form-control readonly-field ess-claim-value" [value]="essClaimValue > 0 ? 'R' + essClaimValue.toFixed(2) : '-'" readonly>
+              @if (essClaimForm.claim_type === 'TRAVEL' && essTariff && essClaimForm.kilometres > 0) {
+                <span class="field-hint">{{ essClaimForm.kilometres }} km &times; R{{ essTariff.toFixed(2) }}</span>
+              }
+              @if (essClaimForm.claim_type === 'S_AND_T' && essTariff && essDayCount > 0) {
+                <span class="field-hint">{{ essDayCount }} days &times; R{{ essTariff.toFixed(2) }}</span>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  @if (activeTab === 'myTime') {
+
+    @if (essTimeView === 'list') {
+      <div class="ess-card ess-card-full">
+        <div class="card-title-bar">
+          <div style="display:flex;align-items:center;gap:12px">
+            <h3 class="card-heading">My Attendance</h3>
+            @if (essTimeLoading) { <span class="loading-spinner-sm"></span> }
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="ess-import-btn" (click)="openTimeImportModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import Excel
+            </button>
+            <button class="ess-claim-add-btn" (click)="openTimeForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Log Time
+            </button>
+          </div>
+        </div>
+
+        <div class="ess-month-nav">
+          <button class="ess-month-nav-btn" (click)="prevEssMonth()" [disabled]="essTimeLoading" title="Previous month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="ess-month-nav-label">{{ essTimeViewMonthLabel() }}</span>
+          <button class="ess-month-nav-btn" (click)="nextEssMonth()" [disabled]="essTimeLoading || essTimeIsCurrentMonth()" title="Next month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        @if (!essTimeLoading && essTimeRecords.length === 0) {
+          <div class="card-empty">
+            No attendance records found for the current period.<br>
+            <span style="font-size:12px;color:var(--platinum-muted)">Click "Log Time" to capture a manual entry.</span>
+          </div>
+        } @else if (essTimeRecords.length > 0) {
+          <div class="table-wrapper">
+            <table class="ess-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Day</th>
+                  <th>Shift</th>
+                  <th>Clock In</th>
+                  <th>Clock Out</th>
+                  <th style="text-align:right">Hours</th>
+                  <th>Exception</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (rec of essTimeRecords; track rec.id) {
+                  <tr [class.ess-time-row-exception]="rec.exception_type && rec.exception_type !== 'COMPLIANT'">
+                    <td class="td-bold">{{ rec.attendance_date | dateSa }}</td>
+                    <td style="color:var(--platinum-muted);font-size:12px">{{ essTimeDayName(rec.attendance_date) }}</td>
+                    <td>
+                      @if (rec.shift_name) {
+                        <span class="ess-shift-chip ess-shift-chip-active">{{ rec.shift_name }}</span>
+                      } @else {
+                        <span class="ess-shift-chip ess-shift-chip-none">—</span>
+                      }
+                    </td>
+                    <td style="font-family:monospace;font-size:12px">{{ rec.clock_in ? (rec.clock_in | slice:11:16) : '—' }}</td>
+                    <td style="font-family:monospace;font-size:12px">{{ rec.clock_out ? (rec.clock_out | slice:11:16) : '—' }}</td>
+                    <td style="text-align:right;font-weight:600">{{ rec.hours_worked != null ? (rec.hours_worked | number:'1.1-2') + 'h' : '—' }}</td>
+                    <td>
+                      <span class="ess-exception-badge" [class]="'ess-ex-' + (rec.exception_type || 'COMPLIANT')">
+                        {{ essTimeExceptionLabel(rec.exception_type || 'COMPLIANT') }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (rec.manual_input) {
+                        <span class="ess-source-badge ess-source-manual">Manual</span>
+                      } @else {
+                        <span class="ess-source-badge ess-source-bio">Biometric</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (essTimeView === 'form') {
+      <div class="ess-card ess-card-full">
+        <div class="card-title-bar">
+          <h3 class="card-heading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Log My Time
+          </h3>
+          <button class="btn-link" (click)="cancelTimeForm()" [disabled]="essTimeFormLoading">Cancel</button>
+        </div>
+
+        <div class="ess-time-info-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          This record will be flagged as manually captured and is subject to supervisor review.
+        </div>
+
+        <div class="ess-form-grid">
+
+          <div class="form-field form-field-full">
+            <label class="field-label">EMPLOYEE</label>
+            <input class="field-input" style="background:var(--platinum-surface);color:var(--platinum-muted)"
+              [value]="profile.id + ' | ' + profile.employee_code + ' — ' + profile.first_name + ' ' + profile.surname" readonly>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">DATE <span class="required-star">*</span></label>
+            <app-date-input [(ngModel)]="essTimeForm.attendance_date"
+              (ngModelChange)="onEssDateChange()"
+              [readonly]="essTimeFormLoading"></app-date-input>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">ASSIGNED SHIFT</label>
+            @if (essTimeShiftLoading) {
+              <div class="ess-shift-resolving">
+                <span class="loading-spinner-sm"></span>
+                <span>Resolving shift…</span>
+              </div>
+            } @else if (essTimeResolvedShift) {
+              <div class="ess-shift-chip-display ess-shift-found">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ essTimeShiftChip() }}
+              </div>
+            } @else if (essTimeShiftIsOffDay) {
+              <div class="ess-shift-chip-display ess-shift-offday">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                Scheduled day off
+              </div>
+            } @else if (essTimeShiftNoRotation) {
+              <div class="ess-shift-chip-display ess-shift-none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                No rotation assigned
+              </div>
+            } @else {
+              <div class="ess-shift-chip-display ess-shift-none">Select a date to resolve shift</div>
+            }
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">CLOCK IN</label>
+            <app-time-input [(ngModel)]="essTimeForm.clock_in" (ngModelChange)="onEssClockChange()"></app-time-input>
+            <span class="field-hint">HH:mm — leave blank if unknown</span>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">CLOCK OUT</label>
+            <app-time-input [(ngModel)]="essTimeForm.clock_out" (ngModelChange)="onEssClockChange()"></app-time-input>
+            <span class="field-hint">HH:mm — leave blank if unknown</span>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">HOURS WORKED</label>
+            <input class="field-input" type="number" [(ngModel)]="essTimeForm.hours_worked"
+              [disabled]="essTimeFormLoading"
+              step="0.25" min="0" max="24" placeholder="Auto-calculated from clock times">
+            <span class="field-hint">Auto-filled when both clock times are entered</span>
+          </div>
+
+          <div class="form-field form-field-full">
+            <label class="field-label">REASON FOR MANUAL CAPTURE <span class="required-star">*</span></label>
+            <textarea class="field-input" rows="3" [(ngModel)]="essTimeForm.comment"
+              [disabled]="essTimeFormLoading"
+              placeholder="e.g. Biometric scanner was offline, worked remotely, forgot to swipe out…"></textarea>
+          </div>
+
+        </div>
+
+        @if (essTimeFormError) {
+          <div class="form-error-banner" style="margin-top:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {{ essTimeFormError }}
+          </div>
+        }
+
+        <div class="form-actions" style="margin-top:16px">
+          <button class="btn-secondary" (click)="cancelTimeForm()" [disabled]="essTimeFormLoading">Cancel</button>
+          <button class="btn-primary" (click)="submitTimeEntry()" [disabled]="essTimeFormLoading">
+            @if (essTimeFormLoading) { Submitting… } @else { Submit Time Entry }
+          </button>
+        </div>
+      </div>
+    }
+  }
+
   @if (activeTab === 'personal') {
     <div class="ess-grid ess-grid-personal">
       <div class="ess-card">
@@ -550,25 +1053,111 @@
       <div class="ess-card">
         <div class="card-title-bar">
           <h3 class="card-heading">Contact Details</h3>
+          @if (!editingContact) {
+            <button type="button" class="btn-link" (click)="startEditContact()">Edit contact details</button>
+          }
         </div>
-        <div class="profile-details">
-          <div class="profile-detail-row">
-            <span class="detail-label">Email</span>
-            <span class="detail-value">{{ profile.email_address || '-' }}</span>
+        @if (!editingContact) {
+          <div class="profile-details">
+            <div class="profile-detail-row">
+              <span class="detail-label">Email</span>
+              <span class="detail-value">{{ profile.email_address || '-' }}</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="detail-label">Cell Number</span>
+              <span class="detail-value">{{ profile.cell_number || '-' }}</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="detail-label">Home Number</span>
+              <span class="detail-value">{{ profile.home_number || '-' }}</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="detail-label">Work Number</span>
+              <span class="detail-value">{{ profile.work_number || '-' }}</span>
+            </div>
           </div>
-          <div class="profile-detail-row">
-            <span class="detail-label">Cell Number</span>
-            <span class="detail-value">{{ profile.cell_number || '-' }}</span>
+        } @else {
+          <div class="profile-details">
+            <div class="form-group">
+              <label>Email</label>
+              <input class="form-control" type="email" [(ngModel)]="contactDraft.email_address" (ngModelChange)="validateContactDraft()" maxlength="200" placeholder="you@example.com">
+              @if (contactErrors.email_address) { <div class="field-error">{{ contactErrors.email_address }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Cell Number</label>
+              <input class="form-control" [(ngModel)]="contactDraft.cell_number" (ngModelChange)="validateContactDraft()" maxlength="20" placeholder="e.g. 082 123 4567">
+              @if (contactErrors.cell_number) { <div class="field-error">{{ contactErrors.cell_number }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Home Number</label>
+              <input class="form-control" [(ngModel)]="contactDraft.home_number" (ngModelChange)="validateContactDraft()" maxlength="20">
+              @if (contactErrors.home_number) { <div class="field-error">{{ contactErrors.home_number }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Work Number</label>
+              <input class="form-control" [(ngModel)]="contactDraft.work_number" (ngModelChange)="validateContactDraft()" maxlength="20">
+              @if (contactErrors.work_number) { <div class="field-error">{{ contactErrors.work_number }}</div> }
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-sm btn-primary" (click)="saveContact()" [disabled]="contactSaving || contactDraftInvalid">
+                {{ contactSaving ? 'Saving...' : 'Save' }}
+              </button>
+              <button class="btn btn-sm" (click)="cancelEditContact()" [disabled]="contactSaving">Cancel</button>
+            </div>
           </div>
-          <div class="profile-detail-row">
-            <span class="detail-label">Home Number</span>
-            <span class="detail-value">{{ profile.home_number || '-' }}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span class="detail-label">Work Number</span>
-            <span class="detail-value">{{ profile.work_number || '-' }}</span>
-          </div>
+        }
+        <p class="card-help-text">You can update your own contact details here. Other personal info (name, ID number, address, etc.) must still be requested from HR.</p>
+        <div class="card-title-bar card-title-bar-sub">
+          <h3 class="card-heading">Emergency Contact</h3>
+          @if (!editingEmergency) {
+            <button type="button" class="btn-link" (click)="startEditEmergency()">Edit emergency contact</button>
+          }
         </div>
+        @if (!editingEmergency) {
+          <div class="profile-details">
+            <div class="profile-detail-row">
+              <span class="detail-label">Name</span>
+              <span class="detail-value">{{ profile.emergency_contact_name || '-' }}</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="detail-label">Phone</span>
+              <span class="detail-value">{{ profile.emergency_contact_phone || '-' }}</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="detail-label">Relationship</span>
+              <span class="detail-value">{{ emergencyRelationshipLabel(profile.emergency_contact_relationship) }}</span>
+            </div>
+          </div>
+        } @else {
+          <div class="profile-details">
+            <div class="form-group">
+              <label>Name</label>
+              <input class="form-control" [(ngModel)]="emergencyDraft.emergency_contact_name" (ngModelChange)="validateEmergencyDraft()" maxlength="200">
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input class="form-control" [(ngModel)]="emergencyDraft.emergency_contact_phone" (ngModelChange)="validateEmergencyDraft()" maxlength="20">
+              @if (emergencyErrors.emergency_contact_phone) { <div class="field-error">{{ emergencyErrors.emergency_contact_phone }}</div> }
+            </div>
+            <div class="form-group">
+              <label>Relationship</label>
+              <select class="form-control" [(ngModel)]="emergencyDraft.emergency_contact_relationship" (ngModelChange)="validateEmergencyDraft()">
+                <option value="">-- Select --</option>
+                @for (opt of relationshipOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+              @if (emergencyErrors.emergency_contact_relationship) { <div class="field-error">{{ emergencyErrors.emergency_contact_relationship }}</div> }
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-sm btn-primary" (click)="saveEmergency()" [disabled]="emergencySaving || emergencyDraftInvalid">
+                {{ emergencySaving ? 'Saving...' : 'Save' }}
+              </button>
+              <button class="btn btn-sm" (click)="cancelEditEmergency()" [disabled]="emergencySaving">Cancel</button>
+            </div>
+          </div>
+        }
+        <p class="card-help-text">Keep your emergency contact details up to date. To change your name, ID number, address or banking details, please contact HR.</p>
         <div class="card-title-bar card-title-bar-sub">
           <h3 class="card-heading">Physical Address</h3>
         </div>
@@ -599,25 +1188,37 @@
       <div class="ess-card">
         <div class="card-title-bar">
           <h3 class="card-heading">Banking Details</h3>
+          <button type="button" class="btn-link" (click)="reportIncorrectBanking()" [disabled]="reportingBanking">
+            {{ reportingBanking ? 'Sending...' : 'Report incorrect details' }}
+          </button>
         </div>
         <div class="profile-details">
           <div class="profile-detail-row">
             <span class="detail-label">Bank</span>
-            <span class="detail-value">{{ profile.bank_name || '-' }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_name || '-' }}</span>
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Branch Code</span>
-            <span class="detail-value">{{ profile.bank_branch_code || '-' }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_branch_code || '-' }}</span>
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Account Number</span>
-            <span class="detail-value">{{ maskAccountNumber(profile.bank_account_number) }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_number_masked || '-' }}</span>
           </div>
           <div class="profile-detail-row">
             <span class="detail-label">Account Type</span>
-            <span class="detail-value">{{ profile.bank_account_type || '-' }}</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_type || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Account Holder</span>
+            <span class="detail-value">{{ bankingDetails?.bank_account_holder || '-' }}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="detail-label">Relationship</span>
+            <span class="detail-value">{{ getRelationshipLabel(bankingDetails?.account_holder_relationship) }}</span>
           </div>
         </div>
+        <p class="card-help-text">For your security, only the last 4 digits of your account number are shown. If anything is incorrect, click "Report incorrect details" to raise a request with HR/Payroll.</p>
         <div class="card-title-bar card-title-bar-sub">
           <h3 class="card-heading">Tax Information</h3>
         </div>
@@ -631,3 +1232,88 @@
     </div>
   }
 }
+
+<div class="ess-import-overlay" [style.display]="showTimeImportModal ? 'flex' : 'none'" (click)="closeTimeImportModal()">
+  <div class="ess-import-modal" (click)="$event.stopPropagation()">
+
+    <div class="card-title-bar" style="margin-bottom:20px">
+      <h3 class="card-heading">Import Attendance from Excel</h3>
+      <button class="btn-link" (click)="closeTimeImportModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="ess-import-step">
+      <div class="ess-import-step-num">1</div>
+      <div class="ess-import-step-body">
+        <div class="ess-import-step-title">Download the template</div>
+        <div class="ess-import-step-desc">Pre-filled with your Employee ID. Add one row per day — delete the example row before uploading.</div>
+        <button class="ess-import-dl-btn" (click)="downloadAttendanceTemplate()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Template
+        </button>
+      </div>
+    </div>
+
+    <div class="ess-import-step">
+      <div class="ess-import-step-num">2</div>
+      <div class="ess-import-step-body">
+        <div class="ess-import-step-title">Upload completed file</div>
+        <div class="ess-import-step-desc">Accepted: .xlsx / .xls. Date format: <strong>dd/MM/yyyy</strong>. Time format: <strong>HH:mm</strong> (24-hour).</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <label class="ess-import-file-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Choose File
+            <input type="file" accept=".xlsx,.xls" style="display:none" (change)="onTimeImportFileSelected($event)">
+          </label>
+          @if (timeImportFileName) {
+            <span class="ess-import-file-name">{{ timeImportFileName }}</span>
+          }
+        </div>
+        @if (timeImportFile && !timeImportResult) {
+          <button class="ess-import-dl-btn" style="margin-top:10px;background:#10b981;border-color:#10b981;color:#fff"
+            [disabled]="timeImportLoading" (click)="submitTimeImport()">
+            @if (timeImportLoading) {
+              <span class="loading-spinner-sm" style="width:13px;height:13px;border-width:1.5px"></span> Importing…
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import Now
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (timeImportResult) {
+      <div class="ess-import-result">
+        <div class="ess-import-result-row">
+          <span class="ess-import-kpi ess-import-kpi-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ timeImportResult.imported }} Imported
+          </span>
+          <span class="ess-import-kpi ess-import-kpi-amber">
+            {{ timeImportResult.skipped }} Skipped (duplicate)
+          </span>
+          @if (timeImportResult.errors.length > 0) {
+            <span class="ess-import-kpi ess-import-kpi-red">
+              {{ timeImportResult.errors.length }} Error(s)
+            </span>
+          }
+        </div>
+        @if (timeImportResult.errors.length > 0) {
+          <div class="ess-import-errors">
+            <div class="ess-import-errors-title">Row Errors</div>
+            @for (e of timeImportResult.errors; track e.row) {
+              <div class="ess-import-error-row">
+                <span class="ess-import-error-row-num">Row {{ e.row }}</span>
+                <span>{{ e.reason }}</span>
+              </div>
+            }
+          </div>
+        }
+        <button class="btn-link" style="margin-top:12px;font-size:13px" (click)="closeTimeImportModal()">Close</button>
+      </div>
+    }
+
+  </div>
+</div>

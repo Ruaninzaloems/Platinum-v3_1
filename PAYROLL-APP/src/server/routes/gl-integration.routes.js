@@ -4,7 +4,7 @@ const { authenticate } = require('../middleware/auth');
 const { auditLog } = require('../middleware/auditLog');
 const { query: dbQuery } = require('../config/database');
 
-const EXTERNAL_API_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+const EXTERNAL_API_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
 
 const projectNameCache = new Map();
 const regionNameCache = new Map();
@@ -99,6 +99,66 @@ router.get('/external/control-scoa-items', authenticate, async (req, res, next) 
       return true;
     });
     res.json({ success: true, data: deduped });
+  } catch (err) { next(err); }
+});
+
+router.get('/external/projects-by-division-function-year', authenticate, async (req, res, next) => {
+  try {
+    const { scoaFunctionId, divisionId, finYear } = req.query;
+    if (!scoaFunctionId || !divisionId || !finYear) {
+      return res.status(400).json({ success: false, error: { message: 'scoaFunctionId, divisionId and finYear are required' } });
+    }
+    const url = `${EXTERNAL_API_BASE}/planning/references/projects/by-division-function-year`
+      + `?scoaFunctionId=${encodeURIComponent(scoaFunctionId)}`
+      + `&divisionId=${encodeURIComponent(divisionId)}`
+      + `&finYear=${encodeURIComponent(finYear)}`;
+    const response = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: { message: 'Failed to fetch projects from external API' } });
+    }
+    const data = await response.json();
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+  } catch (err) { next(err); }
+});
+
+router.get('/external/funds-by-division-function-project-region-year', authenticate, async (req, res, next) => {
+  try {
+    const { scoaFunctionId, divisionId, projectId, scoaRegionId, finYear } = req.query;
+    if (!scoaFunctionId || !divisionId || !projectId || !scoaRegionId || !finYear) {
+      return res.status(400).json({ success: false, error: { message: 'scoaFunctionId, divisionId, projectId, scoaRegionId and finYear are required' } });
+    }
+    const url = `${EXTERNAL_API_BASE}/planning/references/funds/by-division-function-project-region-year`
+      + `?scoaFunctionId=${encodeURIComponent(scoaFunctionId)}`
+      + `&divisionId=${encodeURIComponent(divisionId)}`
+      + `&projectId=${encodeURIComponent(projectId)}`
+      + `&scoaRegionId=${encodeURIComponent(scoaRegionId)}`
+      + `&finYear=${encodeURIComponent(finYear)}`;
+    const response = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: { message: 'Failed to fetch funds from external API' } });
+    }
+    const data = await response.json();
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+  } catch (err) { next(err); }
+});
+
+router.get('/external/regions-by-division-function-project-year', authenticate, async (req, res, next) => {
+  try {
+    const { scoaFunctionId, divisionId, projectId, finYear } = req.query;
+    if (!scoaFunctionId || !divisionId || !projectId || !finYear) {
+      return res.status(400).json({ success: false, error: { message: 'scoaFunctionId, divisionId, projectId and finYear are required' } });
+    }
+    const url = `${EXTERNAL_API_BASE}/planning/references/regions/by-division-function-project-year`
+      + `?scoaFunctionId=${encodeURIComponent(scoaFunctionId)}`
+      + `&divisionId=${encodeURIComponent(divisionId)}`
+      + `&projectId=${encodeURIComponent(projectId)}`
+      + `&finYear=${encodeURIComponent(finYear)}`;
+    const response = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: { message: 'Failed to fetch regions from external API' } });
+    }
+    const data = await response.json();
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (err) { next(err); }
 });
 
@@ -479,6 +539,108 @@ router.put('/salary-heads/:id/gl-mapping', authenticate, auditLog('UPDATE', 'pay
 
     res.json({ success: true, data: row });
   } catch (err) { next(err); }
+});
+
+router.get('/scoa-structure/status', authenticate, async (req, res, next) => {
+  try {
+    const result = await dbQuery(`SELECT COUNT(*) AS total, MAX(synced_at) AS last_synced FROM scoa_structure_sync`);
+    res.json({ success: true, data: { total: parseInt(result.rows[0].total, 10), last_synced: result.rows[0].last_synced } });
+  } catch (err) { next(err); }
+});
+
+router.get('/scoa-structure/items', authenticate, async (req, res, next) => {
+  try {
+    const { search, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    let where = '';
+    const params = [];
+    if (search) {
+      params.push(`%${search}%`);
+      where = `WHERE scoa_code ILIKE $1 OR scoa_short_desc ILIKE $1 OR scoa_desc ILIKE $1 OR CAST(scoa_id AS TEXT) ILIKE $1`;
+    }
+    const countRes = await dbQuery(`SELECT COUNT(*) FROM scoa_structure_sync ${where}`, params);
+    const total = parseInt(countRes.rows[0].count, 10);
+    const dataRes = await dbQuery(
+      `SELECT scoa_id, scoa_code, scoa_desc, scoa_short_desc, scoa_parent_id, level_id, posting_level, enabled, synced_at FROM scoa_structure_sync ${where} ORDER BY scoa_id LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, parseInt(limit, 10), offset]
+    );
+    res.json({ success: true, data: dataRes.rows, meta: { total, page: parseInt(page, 10), limit: parseInt(limit, 10), totalPages: Math.ceil(total / parseInt(limit, 10)) } });
+  } catch (err) { next(err); }
+});
+
+router.post('/scoa-structure/sync', authenticate, async (req, res, next) => {
+  try {
+    console.log('[SCOA Sync] Fetching SCOA structure from external API...');
+    const url = `${EXTERNAL_API_BASE}/scoa-structure`;
+    const resp = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' }, signal: AbortSignal.timeout(180000) });
+    if (!resp.ok) {
+      return res.status(502).json({ success: false, message: `External API returned ${resp.status}` });
+    }
+    console.log('[SCOA Sync] Response received, reading body...');
+    const rawText = await resp.text();
+    console.log(`[SCOA Sync] Body received (${(rawText.length / 1024 / 1024).toFixed(1)} MB), parsing JSON...`);
+    const data = JSON.parse(rawText);
+    const rawRows = Array.isArray(data) ? data : (data.data || data.rows || []);
+    const deduped = new Map();
+    for (const r of rawRows) {
+      const id = r.ScoaID || r.scoaId || r.scoa_id;
+      if (id != null) deduped.set(id, r);
+    }
+    const rows = Array.from(deduped.values());
+    console.log(`[SCOA Sync] Parsed ${rawRows.length} raw rows, ${rows.length} unique by scoa_id, upserting...`);
+    if (rows.length === 0) {
+      return res.json({ success: true, data: { synced: 0 } });
+    }
+    const batchSize = 500;
+    let synced = 0;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const values = [];
+      const placeholders = [];
+      let idx = 1;
+      for (const r of batch) {
+        placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, NOW())`);
+        const parentId = r.ScoaParentId ?? r.scoaParentId ?? r.scoa_parent_id ?? null;
+        const levelId  = r.LevelId      ?? r.levelId      ?? r.level_id      ?? null;
+        const posting  = r.PostingLevel ?? r.postingLevel  ?? r.posting_level ?? false;
+        const enabled  = r.Enabled      ?? r.enabled                          ?? true;
+        values.push(
+          r.ScoaID || r.scoaId || r.scoa_id,
+          r.ScoaCode || r.scoaCode || r.scoa_code,
+          r.ScoaDesc || r.scoaDesc || r.scoa_desc,
+          r.ScoaShortDesc || r.scoaShortDesc || r.scoa_short_desc,
+          parentId, levelId, posting, enabled
+        );
+        idx += 8;
+      }
+      await dbQuery(
+        `INSERT INTO scoa_structure_sync (scoa_id, scoa_code, scoa_desc, scoa_short_desc, scoa_parent_id, level_id, posting_level, enabled, synced_at)
+         VALUES ${placeholders.join(', ')}
+         ON CONFLICT (scoa_id) DO UPDATE SET
+           scoa_code     = EXCLUDED.scoa_code,
+           scoa_desc     = EXCLUDED.scoa_desc,
+           scoa_short_desc = EXCLUDED.scoa_short_desc,
+           scoa_parent_id  = EXCLUDED.scoa_parent_id,
+           level_id        = EXCLUDED.level_id,
+           posting_level   = EXCLUDED.posting_level,
+           enabled         = EXCLUDED.enabled,
+           synced_at       = NOW()`,
+        values
+      );
+      synced += batch.length;
+    }
+    console.log(`[SCOA Sync] Complete — ${synced} rows upserted`);
+    res.json({ success: true, data: { synced } });
+  } catch (err) {
+    console.error('[SCOA Sync] Error:', err.message);
+    if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
+      return res.status(504).json({ success: false, message: 'Sync timed out — the external SCOA API took too long to respond. Please try again.' });
+    }
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.message?.includes('fetch failed')) {
+      return res.status(502).json({ success: false, message: 'Could not reach the external SCOA API. Please check network connectivity and try again.' });
+    }
+    next(err);
+  }
 });
 
 module.exports = router;

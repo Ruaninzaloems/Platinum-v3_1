@@ -27,6 +27,20 @@ export const PAYROLL_ROUTES: Routes = [
   { path: 'skills', loadComponent: () => import('./features/skills/components/skills.component').then(m => m.SkillsComponent) },
   { path: 'recruitment', loadComponent: () => import('./features/recruitment/components/recruitment.component').then(m => m.RecruitmentComponent) },
   { path: 'ess', loadComponent: () => import('./features/ess/components/ess.component').then(m => m.EssComponent) },
+  // ── Synced from Platinum-Payroll-Dev (new features) ──────────────────────────
+  { path: 'approvals', loadComponent: () => import('./features/approvals/approvals.component').then(m => m.ApprovalsComponent) },
+  { path: 'payroll/overtime', loadComponent: () => import('./features/payroll/components/overtime/overtime.component').then(m => m.OvertimeComponent) },
+  { path: 'payroll/installments', loadComponent: () => import('./features/payroll/components/installments/installments.component').then(m => m.InstallmentsComponent) },
+  { path: 'settings/approval-config', loadComponent: () => import('./features/payroll/components/approval-config/approval-config.component').then(m => m.ApprovalConfigComponent) },
+  { path: 'config/leave', loadComponent: () => import('./features/leave/components/leave-config.component').then(m => m.LeaveConfigComponent) },
+  { path: 'config/leave/public-holidays', loadComponent: () => import('./features/leave/components/public-holidays/public-holidays.component').then(m => m.PublicHolidaysComponent) },
+  { path: 'leave/requests', loadComponent: () => import('./features/leave/components/leave-requests/leave-requests.component').then(m => m.LeaveRequestsComponent) },
+  { path: 'leave/adjustments', loadComponent: () => import('./features/leave/components/leave-adjustments/leave-adjustments.component').then(m => m.LeaveAdjustmentsComponent) },
+  { path: 'leave/calendar', loadComponent: () => import('./features/leave/components/leave-calendar/leave-calendar.component').then(m => m.LeaveCalendarComponent) },
+  { path: 'time/attendance', loadComponent: () => import('./features/time/components/attendance/attendance.component').then(m => m.AttendanceComponent) },
+  { path: 'config/work-shifts', loadComponent: () => import('./features/config/work-shifts/work-shifts.component').then(m => m.WorkShiftsComponent) },
+  { path: 'config/shift-rotations', loadComponent: () => import('./features/config/shift-rotations/shift-rotations.component').then(m => m.ShiftRotationsComponent) },
+  { path: 'reports/payroll-totals', loadComponent: () => import('./features/reports/components/payroll-totals/payroll-totals.component').then(m => m.PayrollTotalsComponent) },
   {
     path: 'settings',
     children: [

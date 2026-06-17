@@ -12,12 +12,13 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
 @Component({
   selector: 'app-time',
   standalone: true,
+  host: { 'data-accent': 'time-off' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, PaginationComponent, DateInputComponent],
   templateUrl: './time.component.html',
   styleUrl: './time.component.css'
 })
 export class TimeComponent implements OnInit {
-  activeTab = 'overtime';
+  activeTab = 'attendance';
   shifts: any[] = [];
   employees: any[] = [];
   loading = true;
@@ -71,7 +72,6 @@ export class TimeComponent implements OnInit {
   instForm = { employee_id: '', description: '', total_amount: 0, monthly_instalment: 0, period_months: 12, start_date: '', vendor_name: '', reference_number: '' };
 
   tabs = [
-    { id: 'overtime', label: 'Overtime', icon: 'clock' },
     { id: 'attendance', label: 'Attendance Log', icon: 'check' },
     { id: 'shifts', label: 'Shifts', icon: 'settings' },
     { id: 'rosters', label: 'Shift Rosters', icon: 'calendar' },

@@ -109,6 +109,76 @@
     }
   </div>
 
+  @if (blockersTotal > 0) {
+    <div class="blockers-panel">
+      <div class="blockers-header" (click)="toggleBlockers()">
+        <div class="blockers-title-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <h3 class="blockers-title">Outstanding Approvals — {{ blockersTotal }} item(s)</h3>
+          <span class="blockers-breakdown">
+            @if (blockersCounts.CLAIM)       { <span class="blocker-pill">{{ blockersCounts.CLAIM }} Claim</span> }
+            @if (blockersCounts.WAGE)        { <span class="blocker-pill">{{ blockersCounts.WAGE }} Wage</span> }
+            @if (blockersCounts.OVERTIME)    { <span class="blocker-pill">{{ blockersCounts.OVERTIME }} Overtime</span> }
+            @if (blockersCounts.INSTALLMENT) { <span class="blocker-pill">{{ blockersCounts.INSTALLMENT }} Installment</span> }
+          </span>
+        </div>
+        <div class="blockers-actions">
+          <button class="btn btn-outline btn-sm" (click)="$event.stopPropagation(); loadBlockers()" [disabled]="blockersLoading" title="Refresh">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Refresh
+          </button>
+          <button class="btn btn-primary btn-sm" (click)="$event.stopPropagation(); goToApprovals()">
+            Open My Approvals
+          </button>
+          <span class="blockers-toggle">{{ blockersExpanded ? '▼' : '▶' }}</span>
+        </div>
+      </div>
+      @if (blockersExpanded) {
+        @if (blockersLoading) {
+          <div class="loading-msg">Loading blockers…</div>
+        } @else {
+          <div class="table-wrapper">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Employee</th>
+                  <th>Description</th>
+                  <th class="text-right">Amount</th>
+                  <th>Submitted by</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of blockers; track row.entity_type + ':' + row.entity_id) {
+                  <tr>
+                    <td><span [class]="row.entity_type | entityTypeBadge">{{ formatBlockerType(row.entity_type) }}</span></td>
+                    <td>
+                      <span class="font-mono">{{ row.employee_id }}</span>
+                      @if (row.employee_code) { <span class="font-mono"> | {{ row.employee_code }}</span> }
+                      — {{ row.first_name }} {{ row.surname }}
+                    </td>
+                    <td>{{ row.description || '—' }}</td>
+                    <td class="text-right tabnum">{{ row.amount | currencyZar }}</td>
+                    <td>{{ row.created_by_name || '—' }}</td>
+                    <td><span class="status-badge status-pending">{{ row.status }}</span></td>
+                    <td class="text-right">
+                      <button class="btn btn-outline btn-sm" (click)="goToBlocker(row)" title="Open this transaction">Open</button>
+                    </td>
+                  </tr>
+                }
+                @if (blockers.length === 0) {
+                  <tr><td colspan="7" class="empty-row">No blocking transactions</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  }
+
   @if (errorMessage) {
     <div class="alert alert-error" style="background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:14px;">
       <strong>Error:</strong> {{ errorMessage }}
@@ -172,7 +242,7 @@
               <td>{{ formatDate(fromDate) }}</td>
               <td>{{ formatDate(toDate) }}</td>
               <td>No</td>
-              <td class="text-right tabnum">{{ formatCurrency(currentRun.total_earnings) }}</td>
+              <td class="text-right tabnum">{{ formatCurrency(lockedRunTotal) }}</td>
               <td class="text-right">{{ currentRun.employee_count }}</td>
               <td>{{ formatDate(currentRun.completed_at) }}</td>
             </tr>
@@ -183,7 +253,7 @@
         <p>Payroll Cycle: <strong>{{ getCycleName() }}</strong></p>
         <p>Payroll Period: <strong>{{ formatDate(toDate) }}</strong></p>
         <p>Number of Employees: <strong>{{ currentRun.employee_count }}</strong></p>
-        <p>Total Cost to Company: <strong>{{ formatCurrency(currentRun.total_earnings) }}</strong></p>
+        <p>Total Cost to Company: <strong>{{ formatCurrency(lockedRunTotal) }}</strong></p>
       </div>
     </div>
   }
@@ -275,6 +345,24 @@
                 <tr><td colspan="12" class="empty-row">No results found</td></tr>
               }
             </tbody>
+            @if (results.length > 0) {
+              <tfoot class="results-totals-footer">
+                <tr>
+                  <td colspan="6" class="totals-label">
+                    TOTALS
+                    @if (resultsMeta.totalPages > 1) {
+                      <span class="totals-page-note">(page {{ resultsMeta.page }} of {{ resultsMeta.totalPages }})</span>
+                    }
+                  </td>
+                  <td class="text-right tabnum totals-cell">{{ resultTotals.salary | currencyZar }}</td>
+                  <td class="text-right tabnum totals-cell">{{ resultTotals.earnings | currencyZar }}</td>
+                  <td class="text-right tabnum totals-cell">{{ resultTotals.deductions | currencyZar }}</td>
+                  <td class="text-right tabnum totals-cell">{{ resultTotals.contributions | currencyZar }}</td>
+                  <td class="text-right tabnum totals-cell">{{ resultTotals.fringe | currencyZar }}</td>
+                  <td class="text-right tabnum totals-cell nett-col">{{ resultTotals.nett_salary | currencyZar }}</td>
+                </tr>
+              </tfoot>
+            }
           </table>
         </div>
 
@@ -359,13 +447,13 @@
                   <td><span class="status-badge" [ngClass]="{'status-approved': row.transaction_type === 'EARNING', 'status-rejected': row.transaction_type === 'DEDUCTION', 'status-processing': row.transaction_type === 'COMPANY_CONTRIBUTION'}">{{ row.transaction_type }}</span></td>
                   <td class="text-right tabnum">{{ row.amount | currencyZar }}</td>
                   <td class="font-mono">{{ row.division_id || '-' }}</td>
-                  <td class="font-mono">{{ row.scoa_item_id || '-' }}</td>
+                  <td class="font-mono" [title]="row.debit_scoa_desc || ''">{{ row.debit_scoa_code || row.scoa_item_id || '-' }}</td>
                   <td class="font-mono">{{ row.scoa_project_id || '-' }}</td>
                   <td class="font-mono">{{ row.scoa_function_id || '-' }}</td>
                   <td class="font-mono">{{ row.scoa_region_id || '-' }}</td>
                   <td class="font-mono">{{ row.scoa_fund_id || '-' }}</td>
                   <td class="font-mono">{{ row.contra_division_id || '-' }}</td>
-                  <td class="font-mono">{{ row.contra_scoa_item_id || '-' }}</td>
+                  <td class="font-mono" [title]="row.credit_scoa_desc || ''">{{ row.credit_scoa_code || row.contra_scoa_item_id || '-' }}</td>
                   <td class="font-mono">{{ row.contra_scoa_project_id || '-' }}</td>
                   <td class="font-mono">{{ row.contra_scoa_function_id || '-' }}</td>
                   <td class="font-mono">{{ row.contra_scoa_region_id || '-' }}</td>
@@ -416,26 +504,32 @@
       <div class="modal-body">
         <div class="progress-info-row">
           <span class="progress-label-text">Status</span>
-          <span class="progress-value-text">{{ progressData.status === 'PROCESSING' ? 'Calculating...' : progressData.status }}</span>
+          <span class="progress-value-text">{{ progressStatusLabel }}</span>
         </div>
-        @if (progressData.currentEmployee) {
-          <div class="progress-info-row">
-            <span class="progress-label-text">Current</span>
-            <span class="progress-value-text">{{ progressData.currentEmployee }}</span>
-          </div>
-        }
+        <div class="progress-info-row">
+          <span class="progress-label-text">Current</span>
+          <span class="progress-value-text">{{ progressCurrentLabel }}</span>
+        </div>
         <div class="progress-info-row">
           <span class="progress-label-text">Progress</span>
-          <span class="progress-value-text">{{ progressData.processed || 0 }} / {{ progressData.total || 0 }}</span>
+          <span class="progress-value-text">{{ progressCountLabel }}</span>
         </div>
         <div class="progress-info-row">
           <span class="progress-label-text">Elapsed</span>
           <span class="progress-value-text">{{ elapsedTime }}</span>
         </div>
         <div class="progress-track">
-          <div class="progress-fill" [style.width.%]="progressData.percent || 0"></div>
+          <div class="progress-fill"
+               [class.indeterminate]="isProgressIndeterminate"
+               [style.width.%]="isProgressIndeterminate ? null : (progressData.percent || 0)"></div>
         </div>
-        <div class="progress-pct-text">{{ (progressData.percent || 0).toFixed(1) }}%</div>
+        <div class="progress-pct-text">
+          @if (isProgressIndeterminate) {
+            Working...
+          } @else {
+            {{ (progressData.percent || 0).toFixed(1) }}%
+          }
+        </div>
         @if (progressData.errors > 0) {
           <div class="progress-errors">{{ progressData.errors }} error(s) encountered</div>
         }

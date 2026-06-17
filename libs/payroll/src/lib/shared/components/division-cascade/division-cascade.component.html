@@ -1,0 +1,31 @@
+@if (breadcrumbs.length > 0 || finalizedItem) {
+  <div class="cascade-breadcrumbs">
+    <button type="button" class="crumb crumb-root" (click)="resetToRoot()" title="Clear and start from top level">Root</button>
+    @for (crumb of breadcrumbs; track crumb.id; let i = $index) {
+      <span class="crumb-sep">›</span>
+      <button type="button" class="crumb" (click)="onBreadcrumbClick(i)" [title]="'Back to ' + formatDiv(crumb)">{{ formatDiv(crumb) }}</button>
+    }
+    @if (finalizedItem) {
+      <span class="crumb-sep">›</span>
+      <span class="crumb crumb-leaf" [title]="formatDiv(finalizedItem)">{{ formatDiv(finalizedItem) }}</span>
+    }
+  </div>
+}
+@if (!finalizedItem) {
+  @if (departmentId == null) {
+    <div class="cascade-empty">Select a Department first</div>
+  } @else if (currentOptions.length === 0) {
+    <div class="cascade-empty">No divisions available at this level</div>
+  } @else {
+    <select #cascadeSelect class="form-control" [ngModel]="dropdownValue" (ngModelChange)="onSelect($event)">
+      @if (breadcrumbs.length > 0) {
+        <option value="">-- Select Sub Division --</option>
+      } @else {
+        <option value="">-- Select Division --</option>
+      }
+      @for (d of currentOptions; track d.id) {
+        <option [value]="d.id">{{ formatDiv(d) }}{{ hasChildren(d) ? '  ›' : '' }}</option>
+      }
+    </select>
+  }
+}

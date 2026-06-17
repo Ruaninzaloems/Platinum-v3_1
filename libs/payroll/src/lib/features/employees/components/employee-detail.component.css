@@ -1,6 +1,18 @@
 :host { display: block; }
+
+.btn-payslip-back {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.btn-payslip-back:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0c4a6e;
+}
 .field-value { font-size: 14px; color: var(--platinum-text, #334155); padding: 6px 0; }
 .field-value.derived { color: #64748b; font-style: italic; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px dashed #e2e8f0; }
+.field-hint { margin-top: 6px; font-size: 12px; color: #f59e0b; }
 
 .emp-profile-banner {
   display: flex;
@@ -145,12 +157,22 @@
 }
 
 .emp-detail-main {
+  background: transparent;
+  border: none;
+  box-shadow: none;
   padding: 0;
+  --section-accent: #3b82f6;
 }
+.emp-detail-main[data-group="employee"]   { --section-accent: #3b82f6; }
+.emp-detail-main[data-group="employment"] { --section-accent: #10b981; }
+.emp-detail-main[data-group="payroll"]    { --section-accent: #f59e0b; }
+.emp-detail-main[data-group="benefits"]   { --section-accent: #8b5cf6; }
+
 .main-tabs {
   display: flex;
   gap: 0;
   padding: 0 20px;
+  border: 1px solid #e2e8f0;
   border-bottom: 2px solid #e2e8f0;
   background: #f8fafc;
   border-radius: 12px 12px 0 0;
@@ -172,17 +194,24 @@
 .main-tab:hover:not(.active) { color: #0f2b46; background: #f1f5f9; }
 .main-tab.active {
   color: #0f2b46;
-  border-bottom-color: #3b82f6;
+  border-bottom-color: var(--section-accent);
   background: white;
 }
 
 .emp-detail-main .sub-tabs {
   padding: 0 20px;
-  border-bottom: 1px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
   background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .emp-detail-main .sub-tab-content {
-  padding: 24px;
+  padding: 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: transparent;
 }
 
 .sub-tabs { display: flex; gap: 0; margin-bottom: 0; flex-wrap: wrap; }
@@ -193,7 +222,7 @@
   white-space: nowrap;
 }
 .sub-tab:hover:not(:disabled) { color: #475569; }
-.sub-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+.sub-tab.active { color: var(--section-accent, #3b82f6); border-bottom-color: var(--section-accent, #3b82f6); }
 .sub-tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .sub-tab-content { padding-top: 8px; }
@@ -208,25 +237,6 @@
   font-weight: 600;
 }
 
-.emp-section-group {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f1f5f9;
-}
-.emp-section-group:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-.emp-section-heading {
-  font-size: 12px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 8px;
-  padding-bottom: 4px;
-}
 .form-row-3 {
   display: grid !important;
   grid-template-columns: 1fr 1fr 1fr;
@@ -257,7 +267,7 @@
 .address-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 32px;
+  gap: 24px;
 }
 .address-col .form-group {
   margin-bottom: 4px;
@@ -485,6 +495,12 @@
   background: #f1f5f9;
   padding: 2px 6px;
   border-radius: 3px;
+}
+.st-scoa-code {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 11px;
+  color: #475569;
+  word-break: break-all;
 }
 .st-flag {
   display: inline-block;

@@ -44,7 +44,7 @@
             @for (w of filteredWorkflows; track w.id) {
               <tr>
                 <td style="font-weight:500">{{ w.name || '-' }}</td>
-                <td><span class="badge badge-info">{{ w.module || '-' }}</span></td>
+                <td><span [class]="w.module | entityTypeBadge">{{ w.module || '-' }}</span></td>
                 <td>
                   @if (isStepsCustom(w)) {
                     <span class="badge badge-warning">Custom</span>

@@ -2,54 +2,90 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 
-const EXTERNAL_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+const EXTERNAL_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
 const CACHE_TTL = 5 * 60 * 1000;
+const FAILURE_TTL = 30 * 1000;
 
 let deptCache = { data: null, ts: 0 };
 let divCache = { data: null, ts: 0 };
+let deptInflight = null;
+let divInflight = null;
 
 async function fetchExternal(path) {
-  const res = await fetch(`${EXTERNAL_BASE}${path}`, {
-    headers: { 'ngrok-skip-browser-warning': 'true' }
-  });
-  if (!res.ok) throw new Error(`External API error: ${res.status}`);
-  return res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch(`${EXTERNAL_BASE}${path}`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`External API error: ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function getDepartments() {
   if (deptCache.data && Date.now() - deptCache.ts < CACHE_TTL) return deptCache.data;
-  const raw = await fetchExternal('/departments');
-  const mapped = (Array.isArray(raw) ? raw : []).map(d => ({
-    id: d.departmentId,
-    name: d.name,
-    code: d.code,
-    enabled: d.enabled !== false,
-    start_date: d.startDate || null,
-    end_date: d.endDate || null
-  }));
-  mapped.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  deptCache = { data: mapped, ts: Date.now() };
-  return mapped;
+  if (deptInflight) return deptInflight;
+  deptInflight = fetchExternal('/departments').then(raw => {
+    const mapped = (Array.isArray(raw) ? raw : []).map(d => ({
+      id: d.departmentId,
+      name: d.name,
+      code: d.code,
+      enabled: d.enabled !== false,
+      start_date: d.startDate || null,
+      end_date: d.endDate || null
+    }));
+    mapped.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    deptCache = { data: mapped, ts: Date.now() };
+    deptInflight = null;
+    return mapped;
+  }).catch(err => {
+    deptInflight = null;
+    if (deptCache.data) {
+      console.warn('External departments API unavailable, using cached data');
+      return deptCache.data;
+    }
+    console.warn('External departments API unavailable, retrying in 30s');
+    deptCache = { data: [], ts: Date.now() - (CACHE_TTL - FAILURE_TTL) };
+    return [];
+  });
+  return deptInflight;
 }
 
 async function getDivisions() {
   if (divCache.data && Date.now() - divCache.ts < CACHE_TTL) return divCache.data;
-  const raw = await fetchExternal('/divisions');
-  const mapped = (Array.isArray(raw) ? raw : []).map(d => ({
-    id: d.divisionId,
-    name: d.name,
-    code: d.code,
-    department_id: d.departmentId,
-    parent_id: d.parentDivisionId || null,
-    scoa_function_id: d.scoaFunctionId || null,
-    scoa_region_id: d.scoaRegionId || null,
-    project_id: d.projectId || null,
-    fin_year: d.finYear || null,
-    enabled: true
-  }));
-  mapped.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  divCache = { data: mapped, ts: Date.now() };
-  return mapped;
+  if (divInflight) return divInflight;
+  divInflight = fetchExternal('/divisions').then(raw => {
+    const mapped = (Array.isArray(raw) ? raw : []).map(d => ({
+      id: d.divisionId,
+      name: d.name,
+      code: d.code,
+      department_id: d.departmentId,
+      parent_id: d.parentDivisionId || null,
+      scoa_function_id: d.scoaFunctionId || null,
+      scoa_region_id: d.scoaRegionId || null,
+      project_id: d.projectId || null,
+      fin_year: d.finYear || null,
+      enabled: true
+    }));
+    mapped.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    divCache = { data: mapped, ts: Date.now() };
+    divInflight = null;
+    return mapped;
+  }).catch(err => {
+    divInflight = null;
+    if (divCache.data) {
+      console.warn('External divisions API unavailable, using cached data');
+      return divCache.data;
+    }
+    console.warn('External divisions API unavailable, retrying in 30s');
+    divCache = { data: [], ts: Date.now() - (CACHE_TTL - FAILURE_TTL) };
+    return [];
+  });
+  return divInflight;
 }
 
 async function getDeptName(id) {
@@ -68,21 +104,25 @@ async function getDivName(id) {
 
 async function enrichDeptDiv(rows) {
   if (!rows || rows.length === 0) return rows;
-  const [depts, divs] = await Promise.all([getDepartments(), getDivisions()]);
-  const deptMap = new Map(depts.map(d => [d.id, d.name]));
-  const divMap = new Map(divs.map(d => [d.id, d.name]));
-  const divDeptMap = new Map(divs.map(d => [d.id, d.department_id]));
-  for (const row of rows) {
-    if (row.division_id && !row.division_name) {
-      row.division_name = divMap.get(Number(row.division_id)) || null;
+  try {
+    const [depts, divs] = await Promise.all([getDepartments(), getDivisions()]);
+    const deptMap = new Map(depts.map(d => [d.id, d.name]));
+    const divMap = new Map(divs.map(d => [d.id, d.name]));
+    const divDeptMap = new Map(divs.map(d => [d.id, d.department_id]));
+    for (const row of rows) {
+      if (row.division_id && !row.division_name) {
+        row.division_name = divMap.get(Number(row.division_id)) || null;
+      }
+      if (row.department_id && !row.department_name) {
+        row.department_name = deptMap.get(Number(row.department_id)) || null;
+      }
+      if (!row.department_name && row.division_id) {
+        const deptId = divDeptMap.get(Number(row.division_id));
+        if (deptId) row.department_name = deptMap.get(Number(deptId)) || null;
+      }
     }
-    if (row.department_id && !row.department_name) {
-      row.department_name = deptMap.get(Number(row.department_id)) || null;
-    }
-    if (!row.department_name && row.division_id) {
-      const deptId = divDeptMap.get(Number(row.division_id));
-      if (deptId) row.department_name = deptMap.get(Number(deptId)) || null;
-    }
+  } catch (err) {
+    console.warn('Department enrichment failed (external API unavailable), returning rows without department names');
   }
   return rows;
 }

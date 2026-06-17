@@ -1,0 +1,130 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">My Approvals</h1>
+    <p class="page-subtitle">Items currently waiting on your approval at the present workflow level</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline" (click)="load()" [disabled]="loading">Refresh</button>
+    <button class="btn btn-primary" (click)="bulkApprove()" [disabled]="selectedIds.size === 0 || actionInProgress">
+      Approve Selected ({{ selectedIds.size }})
+    </button>
+  </div>
+</div>
+
+<div class="filter-tabs">
+  <button class="tab-btn" [class.active]="activeFilter === 'ALL'" (click)="setFilter('ALL')">
+    All <span class="count-pill">{{ counts.total }}</span>
+  </button>
+  <button class="tab-btn" [class.active]="activeFilter === 'CLAIM'" (click)="setFilter('CLAIM')">
+    Claims <span class="count-pill">{{ counts.CLAIM }}</span>
+  </button>
+  <button class="tab-btn" [class.active]="activeFilter === 'WAGE'" (click)="setFilter('WAGE')">
+    Wages <span class="count-pill">{{ counts.WAGE }}</span>
+  </button>
+  <button class="tab-btn" [class.active]="activeFilter === 'OVERTIME'" (click)="setFilter('OVERTIME')">
+    Overtime <span class="count-pill">{{ counts.OVERTIME }}</span>
+  </button>
+  <button class="tab-btn" [class.active]="activeFilter === 'INSTALLMENT'" (click)="setFilter('INSTALLMENT')">
+    Installments <span class="count-pill">{{ counts.INSTALLMENT }}</span>
+  </button>
+</div>
+
+<div class="filters-bar">
+  <input class="form-control filter-input" type="text" placeholder="Search employee, description, reference..." [(ngModel)]="search" />
+  <div class="date-range">
+    <label class="filter-label">From</label>
+    <input class="form-control filter-date" type="date" [(ngModel)]="dateFrom" />
+    <label class="filter-label">To</label>
+    <input class="form-control filter-date" type="date" [(ngModel)]="dateTo" />
+    @if (dateFrom || dateTo) {
+      <button class="btn btn-sm btn-outline" (click)="clearDateFilter()">Clear dates</button>
+    }
+  </div>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading approvals...</div>
+} @else if (filteredItems.length === 0) {
+  <div class="empty-state">
+    <h3>Inbox zero</h3>
+    <p>You have no transactions waiting for your approval at this time.</p>
+  </div>
+} @else {
+  <div class="table-card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:36px">
+              <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
+            </th>
+            <th>Type</th>
+            <th>Employee</th>
+            <th>Description</th>
+            <th>Date</th>
+            <th class="text-right">Amount</th>
+            <th>Reference</th>
+            <th class="text-center">Status</th>
+            <th class="text-center">Level</th>
+            <th class="text-right" style="width:300px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of filteredItems; track rowKey(item)) {
+            <tr (click)="openRow(item)" class="clickable-row" [class.overdue-row]="isOverdue(item)" title="Open transaction detail">
+              <td (click)="$event.stopPropagation()">
+                <input type="checkbox" [checked]="isSelected(item)" (change)="toggleSelect(item)">
+              </td>
+              <td><span [class]="item.entity_type | entityTypeBadge">{{ item.entity_type }}</span></td>
+              <td>
+                <div class="emp-name">{{ item.first_name }} {{ item.surname }}</div>
+                <div class="emp-code">{{ item.employee_code }}</div>
+              </td>
+              <td>{{ item.description }}</td>
+              <td>{{ item.transaction_date | dateSa }}</td>
+              <td class="text-right amount-cell">{{ item.amount | currencyZar }}</td>
+              <td class="ref-cell">{{ item.reference_no || '—' }}</td>
+              <td class="text-center"><span [class]="statusClass(item)">{{ statusLabel(item) }}</span></td>
+              <td class="text-center">
+                <span class="level-pill">L{{ item.current_step }} of {{ item.total_steps }}</span>
+              </td>
+              <td class="text-right" (click)="$event.stopPropagation()">
+                <button class="btn btn-sm btn-success" (click)="approve(item, $event)" [disabled]="actionInProgress">Approve</button>
+                <button class="btn btn-sm btn-warning" (click)="promptReturn(item, $event)" [disabled]="actionInProgress">Return</button>
+                <button class="btn btn-sm btn-danger" (click)="promptReject(item, $event)" [disabled]="actionInProgress">Reject</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showCommentDialog && pendingAction) {
+  <div class="modal-backdrop" (click)="closeCommentDialog()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ pendingAction.action === 'reject' ? 'Reject' : 'Return' }} {{ approvals.labelFor(pendingAction.item.entity_type) }}</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-context">
+          {{ pendingAction.item.first_name }} {{ pendingAction.item.surname }} — {{ pendingAction.item.description }}
+        </p>
+        <label class="form-label">Reason / Comment <span class="required">*</span></label>
+        <textarea class="form-control" rows="4" [(ngModel)]="pendingComment" placeholder="Please provide a reason..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeCommentDialog()" [disabled]="actionInProgress">Cancel</button>
+        <button
+          class="btn"
+          [class.btn-danger]="pendingAction.action === 'reject'"
+          [class.btn-warning]="pendingAction.action === 'return'"
+          (click)="submitCommentDialog()"
+          [disabled]="actionInProgress || !pendingComment.trim()">
+          Confirm {{ pendingAction.action === 'reject' ? 'Reject' : 'Return' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

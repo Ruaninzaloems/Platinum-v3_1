@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './employee-types.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './employee-types.component.css'
 })
 export class EmployeeTypesComponent implements OnInit {

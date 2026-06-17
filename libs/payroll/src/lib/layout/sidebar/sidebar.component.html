@@ -44,6 +44,14 @@
                 </div>
               </div>
             }
+            @if (item.childrenAfter) {
+              @for (child of item.childrenAfter; track child.label) {
+                <a class="nav-child" [routerLink]="child.route" routerLinkActive="active">
+                  <span class="nav-icon" [innerHTML]="svgHtml(child.svgIcon)"></span>
+                  {{ child.label }}
+                </a>
+              }
+            }
           </div>
         } @else if (item.children && item.toggleKey) {
           <div class="nav-item" [class.expanded]="expandedGroups[item.toggleKey]" (click)="toggleGroup(item.toggleKey)">

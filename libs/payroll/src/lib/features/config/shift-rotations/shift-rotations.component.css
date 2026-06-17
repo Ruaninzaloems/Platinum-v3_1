@@ -1,0 +1,32 @@
+.rotation-layout { display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:flex-start }
+
+.rotation-list-panel { background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:12px;min-height:400px }
+
+.rotation-card { border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:background .15s,border-color .15s }
+.rotation-card:hover { background:var(--bg-hover,#f8fafc) }
+.rotation-card.active { border-color:#3B82F6;background:#EFF6FF }
+
+.rotation-detail-panel { background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:16px;min-height:400px }
+
+.detail-row { background:var(--bg-surface,#f8f9fb);border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:12px;margin-bottom:10px }
+.detail-row.row-disabled { opacity:.55 }
+
+.day-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:6px }
+.day-cell { display:flex;flex-direction:column;align-items:center;gap:4px }
+.day-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted) }
+.day-shift { font-size:10px;font-weight:600;color:#fff;border-radius:4px;padding:3px 6px;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.day-empty { font-size:12px;color:var(--text-muted) }
+
+.day-assign-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:12px }
+
+.toggle-switch { position:relative;display:inline-flex;align-items:center;cursor:pointer }
+.toggle-switch input { position:absolute;opacity:0;width:0;height:0 }
+.toggle-track { width:34px;height:18px;background:#CBD5E1;border-radius:9px;transition:background .2s;position:relative }
+.toggle-track .toggle-thumb { position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25) }
+.toggle-switch input:checked + .toggle-track { background:#3B82F6 }
+.toggle-switch input:checked + .toggle-track .toggle-thumb { transform:translateX(16px) }
+
+@media (max-width:900px) {
+  .rotation-layout { grid-template-columns:1fr }
+  .day-assign-grid { grid-template-columns:repeat(2,1fr) }
+}

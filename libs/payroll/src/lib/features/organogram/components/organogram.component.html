@@ -55,7 +55,6 @@
   </div>
 </div>
 
-<!-- Charts Row -->
 @if (!loading && flatList.length > 0) {
 <div class="charts-row">
   <div class="chart-card">
@@ -107,7 +106,6 @@
   </div>
 </div>
 
-<!-- Department Cards -->
 <div class="dept-cards-section">
   <h3 class="section-title">Departments Overview</h3>
   <div class="dept-cards-grid">
@@ -137,7 +135,6 @@
 </div>
 }
 
-<!-- Tabs -->
 <div class="tabs">
   <button class="tab" [class.active]="activeTab === 'chart'" (click)="activeTab = 'chart'">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="14"/><line x1="12" y1="12" x2="19" y2="14"/></svg>
@@ -155,12 +152,17 @@
   <div class="card">
     <div class="chart-toolbar">
       <div class="chart-toolbar-left">
-        <select class="filter-select" [(ngModel)]="chartDeptFilter">
-          <option value="">All Departments</option>
+        <select class="filter-select" [(ngModel)]="chartDeptFilter" (ngModelChange)="buildChartTree()">
+          <option value="">Select Department...</option>
           @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
         </select>
       </div>
       <div class="chart-toolbar-right">
+        @if (chartTreeNodes.length > 0) {
+        <label class="depth-label">Depth:</label>
+        <select class="filter-select filter-select-sm" [(ngModel)]="maxVisibleDepth" (ngModelChange)="onDepthChange()">
+          @for (d of depthOptions; track d) { <option [ngValue]="d">{{ d }}</option> }
+        </select>
         <button class="btn-subtle" (click)="expandAll()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
           Expand All
@@ -169,15 +171,35 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
           Collapse All
         </button>
+        }
       </div>
     </div>
-    @if (chartTree.length === 0) {
-      <div class="empty-state"><h3>No Positions</h3><p>No positions found in the organisational structure</p></div>
+
+    @if (!chartDeptFilter) {
+      <div class="chart-dept-prompt">
+        <div class="prompt-icon-wrap">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.5">
+            <circle cx="12" cy="5" r="3"/><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="14"/><line x1="12" y1="12" x2="19" y2="14"/>
+          </svg>
+        </div>
+        <h3 class="prompt-title">Select a Department</h3>
+        <p class="prompt-desc">Choose a department below to view its organisational hierarchy</p>
+        <div class="dept-chips">
+          @for (d of departments; track d) {
+            <button class="dept-chip" (click)="selectChartDept(d)">{{ d }}</button>
+          }
+        </div>
+      </div>
+    } @else if (chartTreeNodes.length === 0) {
+      <div class="empty-state"><h3>No Positions</h3><p>No positions found for this department</p></div>
     } @else {
-      <div class="org-visual-tree">
-        @for (node of chartTree; track node.id) {
-          <ng-container *ngTemplateOutlet="orgCard; context: { $implicit: node, level: 0 }"></ng-container>
-        }
+      <div class="tree-scroll-container">
+        <ul class="org-tree">
+          @for (node of chartTreeNodes; track node.id) {
+            <ng-container *ngTemplateOutlet="treeNodeTpl; context: { $implicit: node }"></ng-container>
+          }
+        </ul>
       </div>
     }
   </div>
@@ -235,7 +257,7 @@
                     <div class="emp-avatar-sm" [style.background]="p.status === 'FILLED' ? '#dcfce7' : '#f1f5f9'" [style.color]="p.status === 'FILLED' ? '#16a34a' : '#94a3b8'">
                       {{ getInitials(p.employee_name) }}
                     </div>
-                    <span>{{ p.employee_name }}</span>
+                    <span>{{ p.employee_id ? p.employee_id + ' | ' : '' }}{{ p.employee_name }}</span>
                   </div>
                 } @else {
                   <span class="text-muted">-</span>
@@ -259,51 +281,45 @@
   </div>
 }
 
-<!-- Org Chart Card Template -->
-<ng-template #orgCard let-node let-level="level">
-  <div class="org-node-wrapper" [class.org-root]="level === 0">
-    <div class="org-node-card" [class.org-hod]="node.is_hod"
-         [class.org-filled]="node.status === 'FILLED'"
-         [class.org-vacant]="node.status === 'VACANT'"
-         [class.org-frozen]="node.status === 'FROZEN'">
-      <div class="org-card-top">
-        <div class="org-card-avatar" [style.background]="getStatusBg(node.status)" [style.color]="getStatusColor(node.status)">
-          @if (node.employee_name) {
-            {{ getInitials(node.employee_name) }}
-          } @else {
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          }
-        </div>
-        <div class="org-card-info">
-          <div class="org-card-title">{{ node.title }}</div>
-          <div class="org-card-name">{{ node.employee_name || 'Vacant' }}</div>
-        </div>
-        <span class="status-dot" [style.background]="getStatusColor(node.status)"></span>
-      </div>
-      <div class="org-card-meta">
-        <span class="org-meta-item"><span class="code-badge-sm">{{ node.position_code }}</span></span>
-        @if (node.grade_code) { <span class="org-meta-item"><span class="grade-badge-sm">{{ node.grade_code }}</span></span> }
-        @if (node.department_name) { <span class="org-meta-dept">{{ node.department_name }}</span> }
-        @if (node.is_hod) { <span class="hod-badge">HOD</span> }
-      </div>
-    </div>
-
-    @if (node.children && node.children.length > 0) {
-      <button class="org-toggle-children" (click)="toggleNode(node)">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-          [style.transform]="node.expanded ? 'rotate(90deg)' : 'rotate(0)'" style="transition: transform 0.2s;">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-        {{ node.children.length }} report{{ node.children.length > 1 ? 's' : '' }}
-      </button>
-    }
-
-    @if (node.expanded && node.children && node.children.length > 0) {
-      <div class="org-children" [class.org-children-connected]="true">
-        @for (child of node.children; track child.id) {
-          <ng-container *ngTemplateOutlet="orgCard; context: { $implicit: child, level: level + 1 }"></ng-container>
+<ng-template #treeNodeTpl let-node>
+  <li>
+    <div class="tree-node"
+         [class.has-children]="node.children?.length > 0"
+         [class.node-ancestor]="node._isAncestor"
+         (click)="toggleNode(node)">
+      <div class="node-circle"
+           [class.node-filled]="node.status === 'FILLED' && !node._isAncestor"
+           [class.node-vacant]="node.status === 'VACANT' && !node._isAncestor"
+           [class.node-frozen]="node.status === 'FROZEN' && !node._isAncestor"
+           [class.node-abolished]="node.status === 'ABOLISHED' || node._isAncestor"
+           [class.node-hod]="node.is_hod && !node._isAncestor">
+        @if (node.status === 'FILLED' && node.employee_name && !node._isAncestor) {
+          <span class="node-initials">{{ getInitials(node.employee_name) }}</span>
+        } @else {
+          <svg class="node-person-svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
         }
       </div>
+      <div class="node-title" [title]="node.title">{{ node.title }}</div>
+      @if (node.employee_name) {
+        <div class="node-emp">{{ node.employee_id ? node.employee_id + ' | ' : '' }}{{ node.employee_name }}</div>
+      } @else if (node.status === 'VACANT') {
+        <div class="node-emp node-emp-vacant">Vacant</div>
+      }
+      @if (node.is_hod && !node._isAncestor) {
+        <div class="node-hod-label">HOD</div>
+      }
+      @if (!node.expanded && node.children && node.children.length > 0) {
+        <div class="node-expand-badge">+{{ node.children.length }}</div>
+      }
+    </div>
+    @if (node.expanded && node.children && node.children.length > 0) {
+      <ul>
+        @for (child of node.children; track child.id) {
+          <ng-container *ngTemplateOutlet="treeNodeTpl; context: { $implicit: child }"></ng-container>
+        }
+      </ul>
     }
-  </div>
+  </li>
 </ng-template>

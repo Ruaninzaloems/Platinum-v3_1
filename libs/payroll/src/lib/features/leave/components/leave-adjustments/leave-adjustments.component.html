@@ -1,0 +1,570 @@
+@if (view === 'list') {
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Leave Adjustments</h1>
+      <p class="page-subtitle">Capture opening balances, manual adjustments and leave encashments</p>
+    </div>
+    <button class="btn btn-primary" (click)="openAddForm()">
+      <app-icon name="plus" [size]="14"></app-icon> Add Adjustment
+    </button>
+  </div>
+
+  @if (successMsg) {
+    <div class="alert alert-success">{{ successMsg }}</div>
+  }
+
+  <div class="filters-bar">
+    <select class="form-control filter-select" [(ngModel)]="filters.adjustment_type" (ngModelChange)="onFilterChange()">
+      <option value="">All Types</option>
+      <option value="OPENING_BALANCE">Opening Balance</option>
+      <option value="ADJUSTED">Adjusted</option>
+      <option value="ACCRUED">Accrued</option>
+      <option value="FORFEITED">Forfeited</option>
+      <option value="ENCASHED">Encashed</option>
+    </select>
+    <select class="form-control filter-select" [(ngModel)]="filters.status" (ngModelChange)="onFilterChange()">
+      <option value="">All Statuses</option>
+      <option value="PENDING">Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="RETURNED">Returned</option>
+    </select>
+    @if (filters.status || filters.adjustment_type) {
+      <button class="btn btn-outline btn-sm" (click)="clearFilters()">Clear</button>
+    }
+  </div>
+
+  @if (loading) {
+    <div class="loading"><div class="spinner"></div>Loading leave adjustments...</div>
+  } @else if (adjustments.length === 0) {
+    <div class="empty-state">
+      <h3>No leave adjustments found</h3>
+      <p>Click "Add Adjustment" to capture an opening balance, manual adjustment or encashment</p>
+    </div>
+  } @else {
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="claims-table">
+          <thead>
+            <tr>
+              <th style="width:36px">
+                @if (canApprove) {
+                  <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()" title="Select all pending" />
+                }
+              </th>
+              <th>Ref No</th>
+              <th>Employee</th>
+              <th>Leave Type</th>
+              <th>Adj. Type</th>
+              <th class="text-center">Days</th>
+              <th>Effective Date</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of adjustments; track a.id) {
+              <tr [class.row-selected]="selectedIds.has(a.id)">
+                <td>
+                  @if (a.status === 'PENDING' && canApprove && canApproveRecord(a)) {
+                    <input type="checkbox" [checked]="selectedIds.has(a.id)" (change)="toggleSelect(a.id)" />
+                  }
+                </td>
+                <td class="mono">{{ a.reference_no }}</td>
+                <td>
+                  <div class="emp-cell">
+                    <span class="emp-cell-name">{{ a.surname }}, {{ a.first_name }}</span>
+                    <span class="emp-cell-code">{{ a.emp_id || a.employee_id }} | {{ a.employee_code }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="leave-type-badge"
+                    [style.background]="a.calendar_color ? a.calendar_color + '22' : '#e8f0fe'"
+                    [style.color]="a.calendar_color || '#3b82f6'">
+                    {{ a.leave_type_name }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="adjTypeClass(a.adjustment_type)">{{ adjTypeLabel(a.adjustment_type) }}</span>
+                </td>
+                <td class="text-center"
+                  [class.text-danger]="a.adjustment_days < 0"
+                  [class.text-success]="a.adjustment_days > 0">
+                  {{ a.adjustment_days > 0 ? '+' : '' }}{{ a.adjustment_days | number:'1.2-2' }}
+                </td>
+                <td>{{ a.effective_date | dateSa }}</td>
+                <td>
+                  <app-status-badge [status]="a.status"></app-status-badge>
+                  @if (a.status === 'PENDING' && a.workflow_level) {
+                    <span class="workflow-level">L{{ a.workflow_level }}/{{ a.workflow_total }}</span>
+                  }
+                </td>
+                <td class="text-muted small">{{ a.created_at | dateSa }}</td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="btn btn-sm btn-view" (click)="viewAdjustment(a)" title="View Details">
+                      <app-icon name="eye" [size]="12"></app-icon>
+                    </button>
+                    @if (a.status === 'PENDING' && canApprove && canApproveRecord(a)) {
+                      <button class="btn btn-sm btn-approve" (click)="approveAdjustment(a)" title="Approve">
+                        <app-icon name="check" [size]="12"></app-icon>
+                      </button>
+                      <button class="btn btn-sm btn-return" (click)="returnAdjustment(a)" title="Return for Correction">
+                        <app-icon name="chevronLeft" [size]="12"></app-icon>
+                      </button>
+                      <button class="btn btn-sm btn-reject" (click)="rejectAdjustment(a)" title="Reject">
+                        <app-icon name="x" [size]="12"></app-icon>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  @if (selectedIds.size > 0 && canApprove) {
+    <div class="bulk-action-bar">
+      <div class="bulk-info"><strong>{{ selectedIds.size }}</strong> adjustment(s) selected</div>
+      <div class="bulk-buttons">
+        <button class="btn-approve-bulk" (click)="bulkApprove()" [disabled]="bulkSaving">
+          <app-icon name="check" [size]="14"></app-icon> Approve All
+        </button>
+        <button class="btn-reject-bulk" (click)="openBulkReject()" [disabled]="bulkSaving">
+          <app-icon name="x" [size]="14"></app-icon> Reject All
+        </button>
+        <button style="background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px" (click)="clearBulkSelection()">Clear</button>
+        @if (bulkSaving) { <span class="bulk-processing">Processing...</span> }
+      </div>
+    </div>
+  }
+}
+
+@if (view === 'form') {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-outline" (click)="backToList()">
+        <app-icon name="chevronLeft" [size]="14"></app-icon> Back
+      </button>
+      <div>
+        <h1 class="page-title">New Leave Adjustment</h1>
+        <p class="page-subtitle">Capture an opening balance, manual adjustment or leave encashment</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" (click)="submitForm()" [disabled]="saving">
+      @if (saving) { Submitting... } @else {
+        <app-icon name="check" [size]="14"></app-icon> Submit Adjustment
+      }
+    </button>
+  </div>
+
+  @if (formError) { <div class="alert alert-danger">{{ formError }}</div> }
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="edit" [size]="15"></app-icon> Adjustment Type
+        </div>
+
+        <div class="form-group">
+          <label>Leave Adjustment Type <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="form.adjustment_type">
+            @for (t of adjustmentTypes; track t.value) {
+              <option [value]="t.value">{{ t.label }}</option>
+            }
+          </select>
+        </div>
+
+        @switch (form.adjustment_type) {
+          @case ('OPENING_BALANCE') {
+            <div class="desc-card desc-blue">
+              <strong>Opening Balance</strong> — Sets the initial leave entitlement balance for a new period or employee joining.
+            </div>
+          }
+          @case ('ADJUSTED') {
+            <div class="desc-card desc-green">
+              <strong>Adjusted</strong> — Manual adjustment (positive to add days, negative to deduct days) to an existing balance.
+            </div>
+          }
+          @case ('ACCRUED') {
+            <div class="desc-card desc-blue">
+              <strong>Accrued</strong> — Records leave days accrued (earned) by the employee, increasing the available balance.
+            </div>
+          }
+          @case ('FORFEITED') {
+            <div class="desc-card desc-amber">
+              <strong>Forfeited</strong> — Records leave days forfeited (lapsed/expired) by the employee, reducing the available balance.
+            </div>
+          }
+          @case ('ENCASHED') {
+            <div class="desc-card desc-amber">
+              <strong>Encashed</strong> — Records days encashed (paid out) to the employee, reducing the leave balance.
+            </div>
+          }
+        }
+
+        <div class="form-section-title" style="margin-top:8px">
+          <app-icon name="user" [size]="15"></app-icon> Employee Details
+        </div>
+
+        <div class="form-group">
+          <label>Employee <span class="required">*</span></label>
+          <div class="employee-lookup">
+            <input class="form-control" [(ngModel)]="employeeSearch" placeholder="Search by ID, code or name..."
+              (ngModelChange)="searchEmployees()" />
+            @if (selectedEmployee) {
+              <button class="clear-btn" (click)="clearEmployee()">&times;</button>
+            }
+            @if (employees.length > 0 && !selectedEmployee) {
+              <div class="dropdown-list">
+                @for (e of employees; track e.id) {
+                  <div class="dropdown-item" (click)="selectEmployee(e)">
+                    {{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}
+                  </div>
+                }
+              </div>
+            }
+            @if (employeeLoading) {
+              <div class="dropdown-list">
+                <div class="dropdown-item" style="color:#94a3b8">Searching...</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (selectedEmployee) {
+          <div class="form-group">
+            <label>First Name</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.first_name" readonly />
+          </div>
+          <div class="form-group">
+            <label>Surname</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.surname" readonly />
+          </div>
+          <div class="form-group">
+            <label>Employee Code</label>
+            <input class="form-control readonly-field" [value]="selectedEmployee.employee_code" readonly />
+          </div>
+        }
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="calendar" [size]="15"></app-icon> Adjustment Details
+        </div>
+
+        <div class="form-group">
+          <label>Leave Type <span class="required">*</span></label>
+          <select class="form-control" [(ngModel)]="form.leave_type_id" [disabled]="!selectedEmployee" (change)="onLeaveTypeChange()">
+            <option [ngValue]="null">-- Select leave type --</option>
+            @for (t of leaveTypes; track t.id) {
+              <option [value]="t.id">{{ t.name }}</option>
+            }
+          </select>
+          @if (!selectedEmployee) {
+            <span class="field-hint">Select an employee first.</span>
+          }
+          @if (selectedEmployee && leaveTypes.length === 0) {
+            <span class="field-hint" style="color:#d97706">No leave types available for this employee's scheme.</span>
+          }
+        </div>
+
+        @if (getSelectedBalance(); as bal) {
+          <div class="balance-card">
+            <div class="balance-row"><span class="balance-label">Opening Balance</span><span class="balance-val">{{ bal.opening_balance | number:'1.2-2' }}</span></div>
+            <div class="balance-row"><span class="balance-label">Adjustments</span><span class="balance-val">{{ bal.adjusted_days | number:'1.2-2' }}</span></div>
+            @if ((+bal.accrued_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Accrued</span><span class="balance-val" style="color:#0369a1">+{{ bal.accrued_days | number:'1.2-2' }}</span></div>
+            }
+            <div class="balance-row"><span class="balance-label">Days Taken</span><span class="balance-val text-danger">-{{ bal.taken_days | number:'1.2-2' }}</span></div>
+            @if ((+bal.encashed_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Encashed</span><span class="balance-val" style="color:#64748b">-{{ bal.encashed_days | number:'1.2-2' }}</span></div>
+            }
+            @if ((+bal.forfeited_days) > 0) {
+              <div class="balance-row"><span class="balance-label">Forfeited</span><span class="balance-val" style="color:#d97706">-{{ bal.forfeited_days | number:'1.2-2' }}</span></div>
+            }
+            <div class="balance-row balance-total">
+              <span class="balance-label">Current Balance</span>
+              <span class="balance-val" [class.text-danger]="bal.available_days < 0">{{ bal.available_days | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        }
+
+        <div class="form-group">
+          <label>
+            {{ form.adjustment_type === 'ADJUSTED' ? 'Adjustment Days (+/-)' : 'Days' }} <span class="required">*</span>
+          </label>
+          <input class="form-control" type="number" [(ngModel)]="form.adjustment_days" [step]="0.5"
+            [placeholder]="form.adjustment_type === 'ADJUSTED' ? 'e.g. 5 or -3' : 'e.g. 15'" />
+          @if (form.adjustment_type === 'ADJUSTED') {
+            <span class="field-hint">Enter a positive number to add days or a negative number to deduct days.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Effective Date <span class="required">*</span></label>
+          <app-date-input [(ngModel)]="form.effective_date"></app-date-input>
+        </div>
+
+        <div class="form-group">
+          <label>Reason for Adjustment</label>
+          <textarea class="form-control" [(ngModel)]="form.reason" rows="3"
+            [placeholder]="form.adjustment_type === 'OPENING_BALANCE' ? 'e.g. Initial balance setup for 2026/2027 leave cycle' : form.adjustment_type === 'ENCASHED' ? 'e.g. Leave encashment on exit' : 'Reason for adjustment...'"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>
+            Supporting Document
+            @if (selectedLeaveType?.requires_document && !selectedLeaveType.document_required_after_days) {
+              <span class="required">*</span>
+            } @else {
+              <span style="color:#64748b;font-weight:400"> (optional)</span>
+            }
+          </label>
+          <input type="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" (change)="onFileSelect($event)" />
+          @if (fileError) { <span class="field-hint" style="color:#dc2626">{{ fileError }}</span> }
+          @if (selectedFile && !fileError) {
+            <span class="field-hint" style="color:#16a34a">
+              <app-icon name="check" [size]="12"></app-icon> {{ selectedFile.name }} ({{ (selectedFile.size / 1024).toFixed(1) }} KB)
+            </span>
+          }
+          <span class="field-hint">Accepted: PDF, JPG, PNG, DOC, DOCX — max 5 MB</span>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (view === 'detail' && detailAdjustment) {
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-outline" (click)="backToList()">
+        <app-icon name="chevronLeft" [size]="14"></app-icon> Back
+      </button>
+      <div>
+        <h1 class="page-title">Leave Adjustment — {{ detailAdjustment.reference_no }}</h1>
+        <p class="page-subtitle">{{ adjTypeLabel(detailAdjustment.adjustment_type) }} · {{ detailAdjustment.first_name }} {{ detailAdjustment.surname }}</p>
+      </div>
+    </div>
+    <div class="detail-header-actions">
+      <app-status-badge [status]="detailAdjustment.status"></app-status-badge>
+      @if (detailAdjustment.status === 'PENDING' && detailAdjustment.workflow_level) {
+        <span class="workflow-level">L{{ detailAdjustment.workflow_level }}/{{ detailAdjustment.workflow_total }}</span>
+      }
+      @if (detailAdjustment.status === 'PENDING' && canApprove && canApproveRecord(detailAdjustment)) {
+        <button class="btn btn-sm btn-approve-btn" (click)="approveAdjustment(detailAdjustment)">
+          <app-icon name="check" [size]="13"></app-icon> Approve
+        </button>
+        <button class="btn btn-sm btn-return-btn" (click)="returnAdjustment(detailAdjustment)">
+          <app-icon name="chevronLeft" [size]="13"></app-icon> Return
+        </button>
+        <button class="btn btn-sm btn-reject-btn" (click)="rejectAdjustment(detailAdjustment)">
+          <app-icon name="x" [size]="13"></app-icon> Reject
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="detail-form">
+    <div class="form-two-col">
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="user" [size]="15"></app-icon> Employee Details
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee ID</span>
+          <span class="detail-value">{{ detailAdjustment.emp_id || detailAdjustment.employee_id }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee</span>
+          <span class="detail-value">{{ detailAdjustment.first_name }} {{ detailAdjustment.surname }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Employee Code</span>
+          <span class="detail-value">{{ detailAdjustment.employee_code }}</span>
+        </div>
+
+        <div class="form-section-title" style="margin-top:16px">
+          <app-icon name="calendar" [size]="15"></app-icon> Adjustment Details
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Leave Type</span>
+          <span class="detail-value">
+            <span class="leave-type-badge"
+              [style.background]="detailAdjustment.calendar_color ? detailAdjustment.calendar_color + '22' : '#e8f0fe'"
+              [style.color]="detailAdjustment.calendar_color || '#3b82f6'">
+              {{ detailAdjustment.leave_type_name }}
+            </span>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Adjustment Type</span>
+          <span class="detail-value">
+            <span class="badge" [ngClass]="adjTypeClass(detailAdjustment.adjustment_type)">{{ adjTypeLabel(detailAdjustment.adjustment_type) }}</span>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Days Adjusted</span>
+          <span class="detail-value" [class.text-success]="detailAdjustment.adjustment_days > 0" [class.text-danger]="detailAdjustment.adjustment_days < 0">
+            {{ detailAdjustment.adjustment_days > 0 ? '+' : '' }}{{ detailAdjustment.adjustment_days | number:'1.2-2' }}
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Effective Date</span>
+          <span class="detail-value">{{ detailAdjustment.effective_date | dateSa }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Reference No</span>
+          <span class="detail-value mono">{{ detailAdjustment.reference_no }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Submitted</span>
+          <span class="detail-value">{{ detailAdjustment.created_at | dateSa }}</span>
+        </div>
+        @if (detailAdjustment.reason) {
+          <div class="detail-row">
+            <span class="detail-label">Reason</span>
+            <span class="detail-value">{{ detailAdjustment.reason }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="form-column">
+        <div class="form-section-title">
+          <app-icon name="clock" [size]="15"></app-icon> Adjustment History
+        </div>
+
+        @if (historyLoading) {
+          <div class="loading" style="padding:20px 0">
+            <div class="spinner"></div> Loading history...
+          </div>
+        } @else if (adjustmentHistory.length === 0) {
+          <div class="history-empty">No history records found</div>
+        } @else {
+          <div class="history-timeline">
+            @for (entry of adjustmentHistory; track entry.id) {
+              <div class="timeline-item">
+                <div class="timeline-connector">
+                  <div class="timeline-dot" [style.background]="getActionColor(entry.action)">
+                    <app-icon [name]="getActionIcon(entry.action)" [size]="10"></app-icon>
+                  </div>
+                  <div class="timeline-line"></div>
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="timeline-action" [style.color]="getActionColor(entry.action)">{{ entry.action }}</span>
+                    <span class="timeline-date">{{ entry.performed_at | dateTimeSa }}</span>
+                  </div>
+                  <div class="timeline-actor">by {{ entry.performed_by_name || entry.performed_by }}</div>
+                  @if (entry.comments) {
+                    <div class="timeline-comments">{{ entry.comments }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showApproveModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Approve Adjustment</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Approve <strong>{{ adjTypeLabel(actionTarget?.adjustment_type) }}</strong> of <strong>{{ actionTarget?.adjustment_days > 0 ? '+' : '' }}{{ actionTarget?.adjustment_days }}</strong> days for <strong>{{ actionTarget?.first_name }} {{ actionTarget?.surname }}</strong>?</p>
+        <div class="form-group">
+          <label>Comments (optional)</label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="3" placeholder="Optional comment..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-success" (click)="confirmApprove()" [disabled]="actionSaving">
+          {{ actionSaving ? 'Approving...' : 'Approve' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRejectModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Reject Adjustment</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This adjustment will be rejected. Please provide a reason.</p>
+        <div class="form-group">
+          <label>Reason for Rejection <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="4" placeholder="Provide a reason for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmReject()" [disabled]="actionSaving || !actionComment.trim()">
+          {{ actionSaving ? 'Rejecting...' : 'Reject' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showReturnModal) {
+  <div class="modal-overlay visible" (click)="cancelAction()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Return Adjustment for Correction</h3>
+        <button class="modal-close" (click)="cancelAction()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This adjustment will be returned for correction. Please provide a reason.</p>
+        <div class="form-group">
+          <label>Reason for Return <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="actionComment" rows="4" placeholder="Describe what needs to be corrected..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="cancelAction()">Cancel</button>
+        <button class="btn btn-return-confirm" (click)="confirmReturn()" [disabled]="actionSaving || !actionComment.trim()">
+          {{ actionSaving ? 'Returning...' : 'Return' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showBulkRejectModal) {
+  <div class="modal-overlay visible" (click)="closeBulkReject()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Reject {{ selectedIds.size }} Adjustment(s)</h3>
+        <button class="modal-close" (click)="closeBulkReject()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Reason for Rejection <span class="required">*</span></label>
+          <textarea class="form-control" [(ngModel)]="bulkRejectComments" rows="3" placeholder="Reason is required for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeBulkReject()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmBulkReject()" [disabled]="bulkSaving || !bulkRejectComments.trim()">
+          {{ bulkSaving ? 'Processing...' : 'Reject Selected' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

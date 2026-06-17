@@ -1,0 +1,445 @@
+<div class="page-header">
+  <h2>Leave Configuration</h2>
+  <p class="muted">Configure global leave settings, leave types, and leave schemes.</p>
+</div>
+
+<div class="tabs">
+  <button class="tab" [class.active]="activeTab === 'setup'" (click)="switchTab('setup')">Setup</button>
+  <button class="tab" [class.active]="activeTab === 'types'" (click)="switchTab('types')">Leave Types</button>
+  <button class="tab" [class.active]="activeTab === 'schemes'" (click)="switchTab('schemes')">Leave Schemes</button>
+</div>
+
+<!-- ===== SETUP TAB ===== -->
+@if (activeTab === 'setup') {
+  <div class="list-card setup-card">
+    @if (loading) {
+      <div class="loading">Loading setup...</div>
+    } @else {
+      <div class="form-grid">
+        <div class="form-row" style="align-items:center;gap:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+            <span class="toggle-switch">
+              <input type="checkbox" [(ngModel)]="setup.enable_leave" (ngModelChange)="setupDirty = true" style="display:none;">
+              <span class="toggle-track" [class.on]="setup.enable_leave" (click)="setup.enable_leave = !setup.enable_leave; setupDirty = true">
+                <span class="toggle-thumb"></span>
+              </span>
+            </span>
+            <span style="font-weight:600;font-size:13px;">Enable Leave Module</span>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Leave Start Date</label>
+          <app-date-input [(ngModel)]="setup.leave_start_date" (ngModelChange)="setupDirty = true"></app-date-input>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" (click)="saveSetup()" [disabled]="!setupDirty">Save</button>
+        <button class="btn" (click)="loadSetup()" [disabled]="!setupDirty">Discard</button>
+      </div>
+    }
+  </div>
+}
+
+<!-- ===== TYPES TAB ===== -->
+@if (activeTab === 'types') {
+  @if (typesView === 'list') {
+    <div class="list-toolbar">
+      <div class="search-box">
+        <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+        <input class="search-input" placeholder="Search by name or code..." [(ngModel)]="typeSearch" (ngModelChange)="filterTypes()">
+        <span class="result-count">{{ filteredTypes.length }} results</span>
+      </div>
+      <button class="btn btn-primary" (click)="newType()"><app-icon name="plus" [size]="16"></app-icon> Add Leave Type</button>
+    </div>
+
+    @if (loading) {
+      <div class="loading">Loading leave types...</div>
+    } @else {
+      <div class="list-card">
+        @if (filteredTypes.length === 0) {
+          <div class="empty-state"><h3>No leave types defined</h3><p>Click "Add Leave Type" to create one.</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th>Abbrev</th>
+                  <th>Description</th>
+                  <th>Classification</th>
+                  <th>Base Type</th>
+                  <th>Paid</th>
+                  <th>Carry Fwd</th>
+                  <th>Status</th>
+                  <th style="width: 100px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of filteredTypes; track t.id) {
+                  <tr (click)="openType(t)">
+                    <td>
+                      <span style="display:inline-flex;align-items:center;gap:6px;">
+                        @if (t.calendar_color) {
+                          <span style="width:12px;height:12px;border-radius:50%;display:inline-block;flex-shrink:0;" [style.background]="t.calendar_color"></span>
+                        }
+                        <span class="id-badge">{{ t.calendar_abbreviation || t.code }}</span>
+                      </span>
+                    </td>
+                    <td><span class="title-text">{{ t.name }}</span></td>
+                    <td>{{ classificationName(t.classification_id) }}</td>
+                    <td>{{ t.base_type }}</td>
+                    <td>{{ t.paid ? 'Yes' : 'No' }}</td>
+                    <td>{{ t.carry_forward_allowed ? 'Yes' : 'No' }}</td>
+                    <td><app-status-badge [status]="t.enabled ? 'ACTIVE' : 'INACTIVE'"></app-status-badge></td>
+                    <td>
+                      <div style="display:flex;gap:4px;">
+                        <button class="btn btn-sm" (click)="openType(t); $event.stopPropagation()" title="View"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteType(t, $event)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  } @else {
+    <div class="detail-card">
+      <div class="detail-header">
+        <h3>{{ typesMode === 'create' ? 'New Leave Type' : type.name }}</h3>
+        <div>
+          @if (typesMode === 'view') {
+            <button class="btn" (click)="typesView = 'list'">Back</button>
+            <button class="btn btn-primary" (click)="editType()">Edit</button>
+          } @else {
+            <button class="btn" (click)="cancelType()">Cancel</button>
+            <button class="btn btn-primary" (click)="saveType()">Save</button>
+          }
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <!-- ROW: Dates -->
+        <div class="form-row">
+          <label>Start Date *</label>
+          <app-date-input [(ngModel)]="type.start_date" [readonly]="typesMode === 'view'"></app-date-input>
+        </div>
+        <div class="form-row">
+          <label>End Date</label>
+          <app-date-input [(ngModel)]="type.end_date" [readonly]="typesMode === 'view'"></app-date-input>
+        </div>
+
+        <!-- ROW: Description + Abbreviation -->
+        <div class="form-row">
+          <label>Description *</label>
+          <input [(ngModel)]="type.name" [readOnly]="typesMode === 'view'">
+        </div>
+        <div class="form-row">
+          <label>Calendar Abbreviation</label>
+          <input [(ngModel)]="type.calendar_abbreviation" [readOnly]="typesMode === 'view'" maxlength="10" placeholder="e.g. AL, SL, ML" style="text-transform:uppercase;">
+        </div>
+
+        <!-- ROW: Colour + Classification -->
+        <div class="form-row">
+          <label>Calendar Colour</label>
+          @if (typesMode === 'view') {
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <span style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;display:inline-block;" [style.background]="type.calendar_color || '#cccccc'"></span>
+              <span style="font-size:12px;color:#64748b;">{{ type.calendar_color || '-' }}</span>
+            </span>
+          } @else {
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <input type="color" [(ngModel)]="type.calendar_color" style="width:40px;height:32px;padding:2px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;">
+              <input [(ngModel)]="type.calendar_color" maxlength="20" style="width:100px;font-size:12px;" placeholder="#3b82f6">
+            </span>
+          }
+        </div>
+        <div class="form-row">
+          <label>Classification</label>
+          <select [(ngModel)]="type.classification_id" [disabled]="typesMode === 'view'">
+            <option [ngValue]="null">--</option>
+            @for (c of classifications; track c.id) {
+              <option [ngValue]="c.id">{{ c.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- ROW: Base Type + Paid Leave -->
+        <div class="form-row">
+          <label>Base Type *</label>
+          <select [(ngModel)]="type.base_type" [disabled]="typesMode === 'view'">
+            <option value="CALENDAR_DAYS">Calendar Days</option>
+            <option value="WORKING_DAYS">Working Days</option>
+            <option value="HOURS">Hours</option>
+          </select>
+        </div>
+        <div class="form-row" style="align-self:flex-end;padding-bottom:6px;">
+          <label><input type="checkbox" [(ngModel)]="type.paid" [disabled]="typesMode === 'view'"> Paid Leave</label>
+        </div>
+        @if (type.base_type === 'CALENDAR_DAYS') {
+          <div class="form-row">
+            <label><input type="checkbox" [(ngModel)]="type.include_public_holidays" [disabled]="typesMode === 'view'"> Include Public Holidays</label>
+          </div>
+          <div class="form-row"></div>
+        }
+
+        <!-- ROW: Requires Document -->
+        <div class="form-row">
+          <label><input type="checkbox" [(ngModel)]="type.requires_document" [disabled]="typesMode === 'view'"> Requires Supporting Document</label>
+        </div>
+        <div class="form-row"></div>
+        @if (type.requires_document) {
+          <div class="form-row">
+            <label>Document Required After (days)</label>
+            <input type="number" [(ngModel)]="type.document_required_after_days" [readOnly]="typesMode === 'view'">
+          </div>
+          <div class="form-row"></div>
+        }
+
+        <!-- ROW: Gender Restriction -->
+        <div class="form-row">
+          <label>Gender Restriction</label>
+          <select [(ngModel)]="type.gender_restriction" [disabled]="typesMode === 'view'">
+            <option [ngValue]="null">None</option>
+            <option value="M">Male only</option>
+            <option value="F">Female only</option>
+          </select>
+        </div>
+        <div class="form-row"></div>
+
+        <!-- ROW: Carry Forward — checkbox + max days + forfeit excess all in one row -->
+        <div class="form-row" style="flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap;">
+          <label style="white-space:nowrap;margin:0;display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" [(ngModel)]="type.carry_forward_allowed" [disabled]="typesMode === 'view'">
+            Carry Forward Allowed
+          </label>
+          @if (type.carry_forward_allowed) {
+            <span style="display:flex;align-items:center;gap:6px;margin-left:8px;">
+              <label style="margin:0;font-size:12px;color:#64748b;white-space:nowrap;">Max Days</label>
+              <input type="number" step="0.01" [(ngModel)]="type.carry_forward_max_days" [readOnly]="typesMode === 'view'" style="width:80px;">
+            </span>
+          }
+        </div>
+        <div class="form-row" style="align-self:center;">
+          @if (type.carry_forward_allowed) {
+            <label style="display:flex;align-items:center;gap:6px;margin:0;">
+              <input type="checkbox" [(ngModel)]="type.forfeit_excess" [disabled]="typesMode === 'view'">
+              Forfeit Excess
+            </label>
+          }
+        </div>
+
+        <!-- ROW: Pro-rata -->
+        <div class="form-row">
+          <label><input type="checkbox" [(ngModel)]="type.pro_rata_on_join" [disabled]="typesMode === 'view'"> Pro-rata on Join</label>
+        </div>
+        <div class="form-row">
+          <label><input type="checkbox" [(ngModel)]="type.pro_rata_on_terminate" [disabled]="typesMode === 'view'"> Pro-rata on Terminate</label>
+        </div>
+
+        <!-- ROW: Limits -->
+        <div class="form-row">
+          <label>Max Accumulation</label>
+          <input type="number" step="0.01" [(ngModel)]="type.max_accumulation" [readOnly]="typesMode === 'view'">
+        </div>
+        <div class="form-row">
+          <label>Max Negative Balance</label>
+          <input type="number" step="0.01" [(ngModel)]="type.max_negative_balance" [readOnly]="typesMode === 'view'">
+        </div>
+
+      </div>
+
+      <div class="form-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h4>Entitlement Rules (priority order)</h4>
+          @if (typesMode !== 'view') {
+            <button class="btn btn-sm" (click)="addRule()"><app-icon name="plus" [size]="12"></app-icon> Add Rule</button>
+          }
+        </div>
+        <div class="table-wrap">
+          <table class="jp-table">
+            <thead>
+              <tr>
+                <th>Priority</th>
+                <th>Rule Name</th>
+                <th>Service Months From</th>
+                <th>Service Months To</th>
+                <th>Entitlement Days</th>
+                <th>Frequency</th>
+                <th>Cycle Months</th>
+                @if (typesMode !== 'view') { <th></th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of (type.rules || []); track $index; let i = $index) {
+                <tr>
+                  <td style="width:60px;text-align:center;">{{ r.deduction_priority }}</td>
+                  <td><input class="rule-input" [(ngModel)]="r.rule_name" [readOnly]="typesMode === 'view'"></td>
+                  <td><input class="rule-input rule-input-sm" type="number" [(ngModel)]="r.service_months_from" [readOnly]="typesMode === 'view'"></td>
+                  <td><input class="rule-input rule-input-sm" type="number" [(ngModel)]="r.service_months_to" [readOnly]="typesMode === 'view'"></td>
+                  <td><input class="rule-input rule-input-sm" type="number" step="0.01" [(ngModel)]="r.entitlement_days" [readOnly]="typesMode === 'view'"></td>
+                  <td>
+                    <select class="rule-input" [(ngModel)]="r.accrual_frequency" [disabled]="typesMode === 'view'">
+                      <option value="MONTHLY">Monthly</option>
+                      <option value="ANNUAL">Annual</option>
+                      <option value="ONCE_OFF">Once-off</option>
+                      <option value="PAYROLL">Payroll</option>
+                    </select>
+                  </td>
+                  <td><input class="rule-input rule-input-sm" type="number" [(ngModel)]="r.cycle_months" [readOnly]="typesMode === 'view'"></td>
+                  @if (typesMode !== 'view') {
+                    <td><button class="btn btn-sm" (click)="removeRule(i)"><app-icon name="trash" [size]="12"></app-icon></button></td>
+                  }
+                </tr>
+              }
+              @if ((type.rules || []).length === 0) {
+                <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px;">No rules defined</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+<!-- ===== SCHEMES TAB ===== -->
+@if (activeTab === 'schemes') {
+  @if (schemesView === 'list') {
+    <div class="list-toolbar">
+      <div class="search-box">
+        <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+        <input class="search-input" placeholder="Search by name or code..." [(ngModel)]="schemeSearch" (ngModelChange)="filterSchemes()">
+        <span class="result-count">{{ filteredSchemes.length }} results</span>
+      </div>
+      <button class="btn btn-primary" (click)="newScheme()"><app-icon name="plus" [size]="16"></app-icon> Add Leave Scheme</button>
+    </div>
+
+    @if (loading) {
+      <div class="loading">Loading leave schemes...</div>
+    } @else {
+      <div class="list-card">
+        @if (filteredSchemes.length === 0) {
+          <div class="empty-state"><h3>No leave schemes defined</h3><p>Click "Add Leave Scheme" to create one.</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="jp-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Employee Type</th>
+                  <th>Sub Type</th>
+                  <th>Condition of Service</th>
+                  <th># Leave Types</th>
+                  <th># Employees</th>
+                  <th>Status</th>
+                  <th style="width:100px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of filteredSchemes; track s.id) {
+                  <tr (click)="openScheme(s)">
+                    <td><span class="id-badge">{{ s.code }}</span></td>
+                    <td><span class="title-text">{{ s.name }}</span></td>
+                    <td>{{ s.employee_type_name || '-' }}</td>
+                    <td>{{ s.employee_subtype_name || '-' }}</td>
+                    <td>{{ s.condition_of_service_name || '-' }}</td>
+                    <td style="text-align:center">{{ s.leave_type_count }}</td>
+                    <td style="text-align:center">{{ s.employee_count }}</td>
+                    <td><app-status-badge [status]="s.enabled ? 'ACTIVE' : 'INACTIVE'"></app-status-badge></td>
+                    <td>
+                      <div style="display:flex;gap:4px;">
+                        <button class="btn btn-sm" (click)="openScheme(s); $event.stopPropagation()"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteScheme(s, $event)"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  } @else {
+    <div class="detail-card">
+      <div class="detail-header">
+        <h3>{{ schemesMode === 'create' ? 'New Leave Scheme' : scheme.name }}</h3>
+        <div>
+          @if (schemesMode === 'view') {
+            <button class="btn" (click)="schemesView = 'list'">Back</button>
+            <button class="btn btn-primary" (click)="editScheme()">Edit</button>
+          } @else {
+            <button class="btn" (click)="cancelScheme()">Cancel</button>
+            <button class="btn btn-primary" (click)="saveScheme()">Save</button>
+          }
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Start Date</label>
+          <app-date-input [(ngModel)]="scheme.start_date" [readonly]="schemesMode === 'view'"></app-date-input>
+        </div>
+        <div class="form-row">
+          <label>End Date</label>
+          <app-date-input [(ngModel)]="scheme.end_date" [readonly]="schemesMode === 'view'"></app-date-input>
+        </div>
+        <div class="form-row">
+          <label>Code *</label>
+          <input [(ngModel)]="scheme.code" [readOnly]="schemesMode === 'view' || schemesMode === 'edit'">
+        </div>
+        <div class="form-row">
+          <label>Name *</label>
+          <input [(ngModel)]="scheme.name" [readOnly]="schemesMode === 'view'">
+        </div>
+        <div class="form-row">
+          <label>Employee Type</label>
+          <select [(ngModel)]="scheme.employee_type_id" [disabled]="schemesMode === 'view'">
+            <option [ngValue]="null">Any</option>
+            @for (et of employeeTypes; track et.id) { <option [ngValue]="et.id">{{ et.name }}</option> }
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Employee Sub Type</label>
+          <select [(ngModel)]="scheme.employee_subtype_id" [disabled]="schemesMode === 'view'">
+            <option [ngValue]="null">Any</option>
+            @for (es of employeeSubtypes; track es.id) { <option [ngValue]="es.id">{{ es.name }}</option> }
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Condition of Service</label>
+          <select [(ngModel)]="scheme.condition_of_service_id" [disabled]="schemesMode === 'view'">
+            <option [ngValue]="null">Any</option>
+            @for (c of conditions; track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Leave Types in this Scheme</h4>
+        @if (types.length === 0) {
+          <p class="muted">No leave types defined yet. Create some on the Leave Types tab first.</p>
+        } @else {
+          <div class="checkbox-grid">
+            @for (t of types; track t.id) {
+              <label class="checkbox-item">
+                <input type="checkbox"
+                       [checked]="isSchemeTypeSelected(t.id)"
+                       (change)="toggleSchemeType(t.id)"
+                       [disabled]="schemesMode === 'view'">
+                <span class="leave-type-chip" [style.borderLeftColor]="t.calendar_color || '#94a3b8'">
+                  <span class="leave-type-dot" [style.background]="t.calendar_color || '#94a3b8'"></span>
+                  <strong>{{ t.code }}</strong> — {{ t.name }}
+                </span>
+              </label>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+}

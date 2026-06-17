@@ -17,10 +17,13 @@ interface OrgNode {
   funded: boolean;
   grade_code: string;
   grade_name: string;
+  employee_id?: number;
   employee_name?: string;
   employee_number?: string;
   children?: OrgNode[];
   expanded?: boolean;
+  depth?: number;
+  _isAncestor?: boolean;
 }
 
 interface DeptStat {
@@ -35,6 +38,7 @@ interface DeptStat {
 @Component({
   selector: 'app-organogram',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent],
   templateUrl: './organogram.component.html',
   styleUrl: './organogram.component.css'
@@ -51,7 +55,9 @@ export class OrganogramComponent implements OnInit, AfterViewChecked {
   deptStats: DeptStat[] = [];
   stats = { total: 0, filled: 0, vacant: 0, funded: 0, frozen: 0, abolished: 0, fillRate: 0, fundedRate: 0 };
   chartDeptFilter = '';
-  maxChartDepth = 4;
+  chartTreeNodes: OrgNode[] = [];
+  maxVisibleDepth = 3;
+  depthOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9];
   private needsCanvasRedraw = false;
 
   @ViewChild('donutCanvas') donutCanvasRef!: ElementRef<HTMLCanvasElement>;
@@ -75,7 +81,10 @@ export class OrganogramComponent implements OnInit, AfterViewChecked {
     this.loading = true;
     this.api.get<any[]>('/positions/organogram').subscribe({
       next: (data) => {
-        this.flatList = data || [];
+        this.flatList = (data || []).map((n: any) => ({
+          ...n,
+          employee_name: n.employee_name || (n.first_name ? `${n.first_name} ${n.surname}`.trim() : null)
+        }));
         this.tree = this.buildTree(this.flatList);
         this.departments = [...new Set(this.flatList.map(n => n.department_name).filter(Boolean))].sort();
         const filled = this.flatList.filter(n => n.status === 'FILLED').length;
@@ -116,7 +125,7 @@ export class OrganogramComponent implements OnInit, AfterViewChecked {
   buildTree(nodes: OrgNode[]): OrgNode[] {
     const map = new Map<number, OrgNode>();
     const roots: OrgNode[] = [];
-    nodes.forEach(n => map.set(n.id, { ...n, children: [], expanded: true }));
+    nodes.forEach(n => map.set(n.id, { ...n, children: [], expanded: true, depth: 0 }));
     map.forEach(node => {
       if (node.parent_position_id && map.has(node.parent_position_id)) {
         map.get(node.parent_position_id)!.children!.push(node);
@@ -124,46 +133,84 @@ export class OrganogramComponent implements OnInit, AfterViewChecked {
         roots.push(node);
       }
     });
+    const setDepth = (list: OrgNode[], d: number) => {
+      list.forEach(n => {
+        n.depth = d;
+        if (n.children && n.children.length > 0) setDepth(n.children, d + 1);
+      });
+    };
+    setDepth(roots, 0);
     return roots;
   }
 
-  get chartTree(): OrgNode[] {
-    if (!this.chartDeptFilter) return this.tree;
+  buildChartTree(): void {
+    if (!this.chartDeptFilter) {
+      this.chartTreeNodes = [];
+      this.cdr.detectChanges();
+      return;
+    }
+    const dept = this.chartDeptFilter;
     const filterNodes = (nodes: OrgNode[]): OrgNode[] => {
       return nodes.reduce((acc: OrgNode[], n) => {
-        if (n.department_name === this.chartDeptFilter) {
-          acc.push({ ...n, children: n.children ? filterNodes(n.children) : [] });
-        } else if (n.children && n.children.length > 0) {
-          const filteredChildren = filterNodes(n.children);
-          if (filteredChildren.length > 0) {
-            acc.push({ ...n, children: filteredChildren });
-          }
+        const matches = n.department_name === dept;
+        const filteredChildren = n.children ? filterNodes(n.children) : [];
+        if (matches || filteredChildren.length > 0) {
+          const childSet = matches ? this.deepCopyExpanded(n.children || [], dept) : filteredChildren;
+          acc.push({ ...n, children: childSet, expanded: true, _isAncestor: !matches });
         }
         return acc;
       }, []);
     };
-    return filterNodes(this.tree);
-  }
-
-  toggleNode(node: OrgNode): void {
-    node.expanded = !node.expanded;
+    this.chartTreeNodes = filterNodes(this.tree);
+    this.applyDepthLimit(this.chartTreeNodes, 0);
     this.cdr.detectChanges();
   }
 
+  onDepthChange(): void {
+    this.applyDepthLimit(this.chartTreeNodes, 0);
+    this.cdr.detectChanges();
+  }
+
+  private applyDepthLimit(nodes: OrgNode[], currentDepth: number): void {
+    nodes.forEach(n => {
+      n.expanded = currentDepth < this.maxVisibleDepth;
+      if (n.children) this.applyDepthLimit(n.children, currentDepth + 1);
+    });
+  }
+
+  private deepCopyExpanded(nodes: OrgNode[], dept: string, depth: number = 0): OrgNode[] {
+    return nodes.map(n => ({
+      ...n,
+      expanded: depth < this.maxVisibleDepth,
+      _isAncestor: n.department_name !== dept,
+      children: n.children ? this.deepCopyExpanded(n.children, dept, depth + 1) : []
+    }));
+  }
+
+  selectChartDept(dept: string): void {
+    this.chartDeptFilter = dept;
+    this.buildChartTree();
+  }
+
+  toggleNode(node: OrgNode): void {
+    if (node.children && node.children.length > 0) {
+      node.expanded = !node.expanded;
+      this.cdr.detectChanges();
+    }
+  }
+
   expandAll(): void {
-    const setExpanded = (nodes: OrgNode[], val: boolean) => {
-      nodes.forEach(n => { n.expanded = val; if (n.children) setExpanded(n.children, val); });
-    };
-    setExpanded(this.tree, true);
+    this.setAllExpanded(this.chartTreeNodes, true);
     this.cdr.detectChanges();
   }
 
   collapseAll(): void {
-    const setExpanded = (nodes: OrgNode[], val: boolean) => {
-      nodes.forEach(n => { n.expanded = val; if (n.children) setExpanded(n.children, val); });
-    };
-    setExpanded(this.tree, false);
+    this.setAllExpanded(this.chartTreeNodes, false);
     this.cdr.detectChanges();
+  }
+
+  private setAllExpanded(nodes: OrgNode[], val: boolean): void {
+    nodes.forEach(n => { n.expanded = val; if (n.children) this.setAllExpanded(n.children, val); });
   }
 
   get filteredList(): OrgNode[] {
@@ -196,18 +243,6 @@ export class OrganogramComponent implements OnInit, AfterViewChecked {
       case 'ABOLISHED': return '#f3f4f6';
       default: return '#dbeafe';
     }
-  }
-
-  getNodeDepth(node: OrgNode): number {
-    let depth = 0;
-    let current = node;
-    while (current.parent_position_id) {
-      const parent = this.flatList.find(n => n.id === current.parent_position_id);
-      if (!parent) break;
-      current = parent;
-      depth++;
-    }
-    return depth;
   }
 
   drawDonut(): void {

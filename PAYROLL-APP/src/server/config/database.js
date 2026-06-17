@@ -1,15 +1,12 @@
 const { Pool } = require('pg');
 
-const connectionString = process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL;
-// Azure PostgreSQL requires SSL; relax cert validation (DigiCert chain not bundled locally).
-const isAzure = (connectionString || '').includes('.postgres.database.azure.com');
-
 const pool = new Pool({
-  connectionString,
-  ssl: isAzure ? { rejectUnauthorized: false } : undefined,
+  // Monorepo adaptation: the Payroll DB connection is provided as AZURE_DATABASE_URL
+  // (root .env / Azure App Settings); fall back to DATABASE_URL for standalone source dev.
+  connectionString: process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 15000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on('error', (err) => {

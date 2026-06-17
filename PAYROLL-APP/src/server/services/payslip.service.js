@@ -150,8 +150,9 @@ function renderPayslipPage(doc, employee, payRun, lines, ytd, municipality) {
   doc.fontSize(7).text(`Tel: ${municipality.tel}`, { align: 'center', width: textWidth });
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   doc.moveDown(0.2);
-  const periodLabel = `Period ${payRun.period_number} (${months[(payRun.period_number - 1) % 12]}) - Tax Year ${payRun.tax_year}`;
-  doc.fontSize(8).font('Helvetica-Bold').text(periodLabel, lm, doc.y, { align: 'center', width: pageW });
+  const periodMonthName = payRun.period_start ? months[new Date(payRun.period_start).getUTCMonth()] : months[(payRun.period_number - 1) % 12];
+  const periodLabel = `Period ${payRun.period_number} (${periodMonthName}) - Tax Year ${payRun.tax_year}`;
+  doc.fontSize(8).font('Helvetica-Bold').text(periodLabel, lm, doc.y, { align: 'left', width: pageW });
   doc.moveDown(0.1);
   doc.fontSize(7).font('Helvetica').text(`Generated: ${new Date().toLocaleDateString('en-ZA')}`, lm, doc.y, { align: 'right', width: pageW });
 

@@ -1,0 +1,237 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Approval Configuration</h1>
+    <p class="page-subtitle">Configure level-based approval workflows for claims and wages</p>
+  </div>
+  <button class="btn btn-primary" (click)="openAddModal()">
+    <app-icon name="plus" [size]="16"></app-icon> New Workflow
+  </button>
+</div>
+
+<div class="list-summary">
+  <div class="summary-stat">
+    <span class="summary-number">{{ workflows.length }}</span>
+    <span class="summary-label">Total Workflows</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ claimCount }}</span>
+    <span class="summary-label">Claims</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number" style="color:var(--color-info)">{{ wageCount }}</span>
+    <span class="summary-label">Wages</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number" style="color:var(--color-warning, #f59e0b)">{{ overtimeCount }}</span>
+    <span class="summary-label">Overtime</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number" style="color:#8b5cf6">{{ installmentCount }}</span>
+    <span class="summary-label">Installments</span>
+  </div>
+  <div class="summary-stat">
+    <span class="summary-number summary-active">{{ activeCount }}</span>
+    <span class="summary-label">Active</span>
+  </div>
+</div>
+
+<div class="list-toolbar">
+  <div class="search-box">
+    <app-icon name="search" [size]="16" color="#94a3b8"></app-icon>
+    <input class="search-input" placeholder="Search workflows..." [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()">
+    <span class="result-count">{{ filteredWorkflows.length }} results</span>
+  </div>
+  <select class="form-control filter-select" [(ngModel)]="entityTypeFilter" (change)="applyFilter()">
+    <option value="">All Types</option>
+    <option value="CLAIM">Claims</option>
+    <option value="WAGE">Wages</option>
+    <option value="OVERTIME">Overtime</option>
+    <option value="INSTALLMENT">Installments</option>
+    <option value="LEAVE_REQUEST">Leave Requests</option>
+    <option value="LEAVE_ADJUSTMENT">Leave Adjustments</option>
+  </select>
+  <select class="form-control filter-select" [(ngModel)]="departmentFilter" (change)="applyFilter()">
+    <option value="">All Departments</option>
+    @for (dept of departments; track dept.id) {
+      <option [value]="dept.id">{{ dept.name }}</option>
+    }
+  </select>
+</div>
+
+@if (loading) {
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+} @else {
+  <div class="list-card">
+    <div class="table-wrap">
+      <table class="jp-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Scope</th>
+            <th>Approval Levels</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (filteredWorkflows.length === 0) {
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">No approval workflows configured yet. Click "New Workflow" to create one.</td></tr>
+          } @else {
+            @for (w of filteredWorkflows; track w.id) {
+              <tr>
+                <td style="font-weight:500">{{ w.name }}</td>
+                <td>
+                  <span [class]="(w.entity_type || w.module) | entityTypeBadge">{{ w.entity_type || w.module }}</span>
+                </td>
+                <td>
+                  <span class="scope-label">{{ getScopeLabel(w) }}</span>
+                </td>
+                <td>
+                  @for (level of getLevels(w); track $index) {
+                    <div class="level-badge">
+                      <span class="level-num">L{{ $index + 1 }}</span>
+                      <span class="level-users">{{ getLevelUserNames(level) }}</span>
+                    </div>
+                  }
+                </td>
+                <td>
+                  @if (w.enabled !== false) {
+                    <span class="badge badge-success">Active</span>
+                  } @else {
+                    <span class="badge badge-danger">Inactive</span>
+                  }
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="action-btn" (click)="openEditModal(w)" title="Edit"><app-icon name="edit" [size]="14"></app-icon></button>
+                    <button class="action-btn action-btn-danger" (click)="deleteWorkflow(w)" title="Delete"><app-icon name="trash" [size]="14"></app-icon></button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (showModal) {
+  <div class="modal-overlay visible" (click)="showModal = false">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ isNew ? 'Create' : 'Edit' }} Approval Workflow</h3>
+        <button class="modal-close" (click)="showModal = false">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Workflow Name <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="editItem.name" placeholder="e.g. Claims - Finance Department">
+          </div>
+          <div class="form-group">
+            <label>Entity Type <span class="required">*</span></label>
+            <select class="form-control" [(ngModel)]="editItem.entity_type" (change)="onEntityTypeChange()">
+              <option value="CLAIM">Claim</option>
+              <option value="WAGE">Wage</option>
+              <option value="OVERTIME">Overtime</option>
+              <option value="INSTALLMENT">Installment</option>
+              <option value="LEAVE_REQUEST">Leave Request</option>
+              <option value="LEAVE_ADJUSTMENT">Leave Adjustment</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" [(ngModel)]="editItem.enabled">
+              <option [ngValue]="true">Active</option>
+              <option [ngValue]="false">Inactive</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Department Scope</label>
+            <select class="form-control" [(ngModel)]="editItem.department_id" (change)="onDepartmentChange()">
+              <option [ngValue]="null">Default (All Departments)</option>
+              @for (dept of departments; track dept.id) {
+                <option [ngValue]="dept.id">{{ dept.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division Scope</label>
+            <select class="form-control" [(ngModel)]="editItem.division_id" [disabled]="!editItem.department_id">
+              <option [ngValue]="null">Default (All Divisions)</option>
+              @for (div of filteredDivisions; track div.id) {
+                <option [ngValue]="div.id">{{ div.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="levels-section">
+          <div class="levels-header">
+            <h4><app-icon name="list" [size]="16"></app-icon> Approval Levels</h4>
+            <button class="btn btn-sm" (click)="addLevel()"><app-icon name="plus" [size]="14"></app-icon> Add Level</button>
+          </div>
+          <p class="levels-description">Define approval levels. Each level can have multiple approvers — any one of them can approve to advance to the next level.</p>
+
+          @for (level of editLevels; track $index; let i = $index) {
+            <div class="level-card">
+              <div class="level-number">Level {{ i + 1 }}</div>
+              <div class="level-fields">
+                <div class="form-group level-approvers">
+                  <label>Approvers <span class="required">*</span></label>
+                  <div class="user-chips-wrap">
+                    @for (uid of level.assigned_users; track uid) {
+                      <span class="user-chip">
+                        {{ getUserName(uid) }}
+                        <button class="chip-remove" (click)="removeUserFromLevel(i, uid)">&times;</button>
+                      </span>
+                    }
+                    <div class="user-search-inline">
+                      <input class="user-search-input"
+                        placeholder="Search users..."
+                        [value]="showUserPicker === i ? userSearchTerm : ''"
+                        (focus)="openUserPicker(i)"
+                        (ngModelChange)="onUserSearch($event)"
+                        [ngModel]="showUserPicker === i ? userSearchTerm : ''">
+                    </div>
+                  </div>
+                  @if (showUserPicker === i && filteredUsers.length > 0) {
+                    <div class="user-picker-dropdown">
+                      @for (user of filteredUsers; track user.id) {
+                        <div class="user-picker-option" [class.selected]="isUserInLevel(i, user.id)" (click)="toggleUserInLevel(i, user.id)">
+                          <span class="user-check">{{ isUserInLevel(i, user.id) ? '&#10003;' : '' }}</span>
+                          <span class="user-info">
+                            <span class="user-display-name">{{ user.first_name }} {{ user.surname }}</span>
+                            <span class="user-username">{{ user.username }}</span>
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @if (showUserPicker === i && userSearchTerm && filteredUsers.length === 0) {
+                    <div class="user-picker-dropdown">
+                      <div class="user-picker-empty">No users matching "{{ userSearchTerm }}"</div>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="level-actions">
+                <button class="icon-btn" (click)="moveLevel(i, -1)" [disabled]="i === 0" title="Move Up"><app-icon name="chevronUp" [size]="14"></app-icon></button>
+                <button class="icon-btn" (click)="moveLevel(i, 1)" [disabled]="i === editLevels.length - 1" title="Move Down"><app-icon name="chevronDown" [size]="14"></app-icon></button>
+                <button class="icon-btn icon-btn-danger" (click)="removeLevel(i)" title="Remove Level"><app-icon name="trash" [size]="14"></app-icon></button>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="showModal = false" [disabled]="saving">Cancel</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Saving...' : (isNew ? 'Create Workflow' : 'Update Workflow') }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

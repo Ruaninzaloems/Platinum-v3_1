@@ -97,9 +97,13 @@ router.get('/summary', authenticate, async (req, res, next) => {
        ORDER BY pp.start_date ASC LIMIT 1`),
 
       (async () => {
-        const { getDepartments } = require('./department.routes');
-        const depts = await getDepartments();
-        return { rows: [{ total_departments: depts.filter(d => d.enabled !== false).length }] };
+        try {
+          const { getDepartments } = require('./department.routes');
+          const depts = await getDepartments();
+          return { rows: [{ total_departments: depts.filter(d => d.enabled !== false).length }] };
+        } catch (e) {
+          return { rows: [{ total_departments: 0 }] };
+        }
       })()
     ]);
 
@@ -149,8 +153,9 @@ router.get('/leave-summary', authenticate, async (req, res, next) => {
               COUNT(ltr.id) FILTER (WHERE ltr.status = 'APPROVED') AS approved,
               COUNT(ltr.id) FILTER (WHERE ltr.status = 'REJECTED') AS rejected,
               COALESCE(SUM(ltr.days) FILTER (WHERE ltr.status = 'APPROVED'), 0) AS total_days_taken
-       FROM leave_types lt
+       FROM leave_type lt
        LEFT JOIN leave_transactions ltr ON ltr.leave_type_id = lt.id
+       WHERE lt.deleted_at IS NULL
        GROUP BY lt.id, lt.name, lt.code
        ORDER BY lt.name`
     );
@@ -173,13 +178,18 @@ router.get('/department-headcount', authenticate, async (req, res, next) => {
        WHERE p.department_id IS NOT NULL
        GROUP BY p.department_id`
     );
-    const { getDepartments } = require('./department.routes');
-    const depts = await getDepartments();
-    const deptMap = new Map(depts.map(d => [d.id, d]));
-    const data = result.rows.map(r => {
-      const dept = deptMap.get(Number(r.department_id)) || {};
-      return { id: Number(r.department_id), code: dept.code || null, name: dept.name || null, ...r, department_id: undefined };
-    }).filter(r => r.name).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    let data = [];
+    try {
+      const { getDepartments } = require('./department.routes');
+      const depts = await getDepartments();
+      const deptMap = new Map(depts.map(d => [d.id, d]));
+      data = result.rows.map(r => {
+        const dept = deptMap.get(Number(r.department_id)) || {};
+        return { id: Number(r.department_id), code: dept.code || null, name: dept.name || null, ...r, department_id: undefined };
+      }).filter(r => r.name).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } catch (e) {
+      data = result.rows.map(r => ({ id: Number(r.department_id), name: `Department ${r.department_id}`, ...r }));
+    }
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -247,9 +257,11 @@ router.get('/current-cycles', authenticate, async (req, res, next) => {
           periodLabel = `Fortnight ${row.period_number}`;
         }
       }
+      const freqMap = { MONTHLY: 'Monthly', WEEKLY: 'Weekly', FORTNIGHTLY: 'Fortnightly', 'BI-WEEKLY': 'Fortnightly' };
       return {
         payroll: row.payroll,
         cycle_type: row.cycle_type === 'MONTHLY' ? 'Normal' : 'Special',
+        pay_frequency: freqMap[row.cycle_type] || row.cycle_type,
         period: periodLabel,
         status: row.status || 'No Period',
         period_number: row.period_number,
@@ -324,10 +336,12 @@ router.get('/demographics', authenticate, async (req, res, next) => {
          WHERE e.status = 'ACTIVE' AND e.enabled = TRUE
          GROUP BY p.department_id, e.gender
          ORDER BY p.department_id, e.gender`);
-        const { getDepartments } = require('./department.routes');
-        const depts = await getDepartments();
-        const deptMap = new Map(depts.map(d => [d.id, d.name]));
-        for (const row of r.rows) { row.department_name = deptMap.get(Number(row.department_id)) || null; }
+        try {
+          const { getDepartments } = require('./department.routes');
+          const depts = await getDepartments();
+          const deptMap = new Map(depts.map(d => [d.id, d.name]));
+          for (const row of r.rows) { row.department_name = deptMap.get(Number(row.department_id)) || null; }
+        } catch (e) { /* dept API unavailable */ }
         return r;
       })(),
       dbQuery(`SELECT tg.grade_code, tg.grade_name, e.race, e.gender, COUNT(*) AS count

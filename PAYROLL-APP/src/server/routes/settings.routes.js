@@ -5,7 +5,9 @@ const fs = require('fs');
 const multer = require('multer');
 const { authenticate } = require('../middleware/auth');
 const { auditLog } = require('../middleware/auditLog');
-const { query: dbQuery } = require('../config/database');
+const { query: dbQuery, getClient } = require('../config/database');
+const SARS_TAX_DEFAULTS = require('../data/sars-tax-defaults');
+const { checkPayrollLockdown } = require('../utils/payroll-lockdown');
 
 const logoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -46,6 +48,13 @@ router.get('/active-tax-year', authenticate, async (req, res, next) => {
     }
     const taxYear = result.rows.length > 0 ? result.rows[0].tax_year : null;
     res.json({ success: true, data: { tax_year: taxYear } });
+  } catch (err) { next(err); }
+});
+
+router.get('/tax-tables/available-defaults', authenticate, async (req, res, next) => {
+  try {
+    const years = Object.keys(SARS_TAX_DEFAULTS).map(Number).sort((a, b) => b - a);
+    res.json({ success: true, data: years });
   } catch (err) { next(err); }
 });
 
@@ -219,63 +228,94 @@ router.post('/tax-tables/copy', authenticate, auditLog('CREATE', 'tax_tables_cop
   } catch (err) { next(err); }
 });
 
-router.get('/leave-types', authenticate, async (req, res, next) => {
+router.post('/tax-tables/load-defaults', authenticate, auditLog('CREATE', 'tax_tables_load_defaults'), async (req, res, next) => {
   try {
-    const { scheme_id } = req.query;
-    let q = `SELECT lt.*, ls.name AS scheme_name FROM leave_types lt
-             LEFT JOIN leave_schemes ls ON lt.leave_scheme_id = ls.id
-             WHERE lt.enabled = TRUE`;
-    const params = [];
-    if (scheme_id) { q += ' AND lt.leave_scheme_id = $1'; params.push(scheme_id); }
-    q += ' ORDER BY lt.code';
-    const result = await dbQuery(q, params);
-    res.json({ success: true, data: result.rows });
-  } catch (err) { next(err); }
-});
+    const { tax_year } = req.body;
+    const parsedYear = parseInt(tax_year);
+    if (!parsedYear || isNaN(parsedYear)) return res.status(400).json({ success: false, error: { message: 'tax_year is required and must be a valid number' } });
 
-router.get('/leave-schemes', authenticate, async (req, res, next) => {
-  try {
-    const result = await dbQuery('SELECT * FROM leave_schemes WHERE enabled = TRUE ORDER BY name');
-    res.json({ success: true, data: result.rows });
-  } catch (err) { next(err); }
-});
+    const defaults = SARS_TAX_DEFAULTS[parsedYear];
+    if (!defaults) return res.status(400).json({ success: false, error: { message: `No SARS default data available for tax year ${parsedYear}` } });
 
-router.post('/leave-types', authenticate, auditLog('CREATE', 'leave_types'), async (req, res, next) => {
-  try {
-    const { code, name, leave_scheme_id, accrual_days, max_accumulation, accrual_frequency, requires_document, paid, carry_over_days, negative_balance_allowed } = req.body;
-    if (!code || !name) return res.status(400).json({ success: false, error: { message: 'Code and name are required' } });
-    const result = await dbQuery(
-      `INSERT INTO leave_types (code, name, leave_scheme_id, accrual_days, max_accumulation, accrual_frequency, requires_document, paid, carry_over_days, negative_balance_allowed)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [code.toUpperCase(), name, leave_scheme_id || null, accrual_days || 0, max_accumulation || 0, accrual_frequency || 'ANNUAL', requires_document || false, paid !== false, carry_over_days || 0, negative_balance_allowed || false]
-    );
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) { next(err); }
-});
+    const startDate = `${parsedYear - 1}-03-01`;
+    const endDate = `${parsedYear}-02-28`;
 
-router.put('/leave-types/:id', authenticate, auditLog('UPDATE', 'leave_types'), async (req, res, next) => {
-  try {
-    const { name, leave_scheme_id, accrual_days, max_accumulation, accrual_frequency, requires_document, paid, carry_over_days, negative_balance_allowed } = req.body;
-    const result = await dbQuery(
-      `UPDATE leave_types SET name = $1, leave_scheme_id = $2, accrual_days = $3, max_accumulation = $4,
-       accrual_frequency = $5, requires_document = $6, paid = $7, carry_over_days = $8, negative_balance_allowed = $9
-       WHERE id = $10 RETURNING *`,
-      [name, leave_scheme_id, accrual_days, max_accumulation, accrual_frequency, requires_document, paid, carry_over_days, negative_balance_allowed, req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ success: false, error: { message: 'Leave type not found' } });
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) { next(err); }
-});
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
 
-router.delete('/leave-types/:id', authenticate, auditLog('DELETE', 'leave_types'), async (req, res, next) => {
-  try {
-    const inUse = await dbQuery('SELECT COUNT(*) AS cnt FROM leave_transactions WHERE leave_type_id = $1', [req.params.id]);
-    if (parseInt(inUse.rows[0].cnt) > 0) {
-      await dbQuery('UPDATE leave_types SET enabled = FALSE WHERE id = $1', [req.params.id]);
-      return res.json({ success: true, message: 'Leave type disabled (has historical data)' });
+      await client.query('DELETE FROM tax_brackets WHERE tax_year = $1', [parsedYear]);
+      await client.query('DELETE FROM tax_rebates WHERE tax_year = $1', [parsedYear]);
+      await client.query('DELETE FROM tax_thresholds WHERE tax_year = $1', [parsedYear]);
+      await client.query('DELETE FROM medical_tax_credits WHERE tax_year = $1', [parsedYear]);
+      await client.query('DELETE FROM uif_settings WHERE tax_year = $1', [parsedYear]);
+      await client.query('DELETE FROM sdl_settings WHERE tax_year = $1', [parsedYear]);
+
+      for (const b of defaults.brackets) {
+        await client.query(
+          `INSERT INTO tax_brackets (tax_year, bracket_number, min_income, max_income, base_tax, rate, start_date, end_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::date)`,
+          [parsedYear, b.bracket_number, b.min_income, b.max_income, b.base_tax, b.rate, startDate, endDate]
+        );
+      }
+
+      for (const r of defaults.rebates) {
+        await client.query(
+          `INSERT INTO tax_rebates (tax_year, rebate_type, amount, age_threshold, start_date, end_date)
+           VALUES ($1, $2, $3, $4, $5::date, $6::date)`,
+          [parsedYear, r.rebate_type, r.amount, r.age_threshold, startDate, endDate]
+        );
+      }
+
+      for (const t of defaults.thresholds) {
+        await client.query(
+          `INSERT INTO tax_thresholds (tax_year, threshold_type, age_group, amount, start_date, end_date)
+           VALUES ($1, $2, $3, $4, $5::date, $6::date)`,
+          [parsedYear, t.threshold_type, t.age_group, t.amount, startDate, endDate]
+        );
+      }
+
+      const mc = defaults.medical_tax_credits;
+      await client.query(
+        `INSERT INTO medical_tax_credits (tax_year, main_member, first_dependant, additional_dependant, start_date, end_date)
+         VALUES ($1, $2, $3, $4, $5::date, $6::date)`,
+        [parsedYear, mc.main_member, mc.first_dependant, mc.additional_dependant, startDate, endDate]
+      );
+
+      const u = defaults.uif;
+      await client.query(
+        `INSERT INTO uif_settings (tax_year, employee_rate, employer_rate, ceiling, start_date, end_date)
+         VALUES ($1, $2, $3, $4, $5::date, $6::date)`,
+        [parsedYear, u.employee_rate, u.employer_rate, u.ceiling, startDate, endDate]
+      );
+
+      const s = defaults.sdl;
+      await client.query(
+        `INSERT INTO sdl_settings (tax_year, rate, threshold, start_date, end_date)
+         VALUES ($1, $2, $3, $4::date, $5::date)`,
+        [parsedYear, s.rate, s.threshold, startDate, endDate]
+      );
+
+      if (defaults.prescribed_rates && defaults.prescribed_rates.length > 0) {
+        await client.query('DELETE FROM sars_prescribed_rates WHERE tax_year = $1', [parsedYear]);
+        for (const pr of defaults.prescribed_rates) {
+          await client.query(
+            `INSERT INTO sars_prescribed_rates (tax_year, description, subtype_index, irp5_code, rate, effective_date, end_date)
+             VALUES ($1, $2, $3, $4, $5, $6::date, $7::date)`,
+            [parsedYear, pr.description, pr.subtype_index, pr.irp5_code, pr.rate, startDate, endDate]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
-    await dbQuery('DELETE FROM leave_types WHERE id = $1', [req.params.id]);
-    res.json({ success: true, message: 'Leave type deleted' });
+
+    res.json({ success: true, message: `SARS default tax tables loaded for tax year ${parsedYear}.` });
   } catch (err) { next(err); }
 });
 
@@ -441,6 +481,8 @@ router.get('/employee-types', authenticate, async (req, res, next) => {
 
 router.put('/employee-types/:id', authenticate, auditLog('UPDATE', 'employee_types'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { working_hours_per_month, working_days_per_month } = req.body;
     if (working_hours_per_month != null && (isNaN(working_hours_per_month) || Number(working_hours_per_month) <= 0)) {
       return res.status(400).json({ success: false, error: { message: 'Working Hours Per Month must be a positive number' } });
@@ -534,6 +576,8 @@ router.post('/salary-transaction-groups', authenticate, auditLog('CREATE', 'sala
 
 router.put('/salary-transaction-groups/:id', authenticate, auditLog('UPDATE', 'salary_transaction_groups'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { code, name, description } = req.body;
     if (!code || !name) return res.status(400).json({ success: false, error: { message: 'Code and name are required' } });
     const result = await dbQuery(
@@ -661,6 +705,8 @@ router.post('/upper-limits', authenticate, auditLog('CREATE', 'salary_upper_limi
 
 router.put('/upper-limits/:id', authenticate, auditLog('UPDATE', 'salary_upper_limits'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { employee_type_id, employee_subtype_id,
             start_date, end_date, minimum_value, midpoint_value, maximum_value } = req.body;
     if (!start_date) return res.status(400).json({ success: false, error: { message: 'Start date is required' } });
@@ -726,6 +772,8 @@ router.post('/conditions-of-service', authenticate, auditLog('CREATE', 'conditio
 
 router.put('/conditions-of-service/:id', authenticate, auditLog('UPDATE', 'conditions_of_service'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { code, name, description, working_hours_per_day, working_days_per_week, enabled, start_date, end_date } = req.body;
     const result = await dbQuery(
       `UPDATE conditions_of_service SET code=$1, name=$2, description=$3, working_hours_per_day=$4, working_days_per_week=$5, enabled=$6, start_date=$7, end_date=$8, updated_at=NOW()
@@ -818,6 +866,8 @@ router.post('/task-grades', authenticate, auditLog('CREATE', 'task_grades'), asy
 
 router.put('/task-grades/:id', authenticate, auditLog('UPDATE', 'task_grades'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { grade_code, grade_name, min_salary, max_salary, notch_count, enabled, start_date, end_date,
             is_legacy, to_phase_out, task_skill_level_id, yearly_notch_level_increase,
             use_employment_date, use_specific_notch_increase_date, notch_increase_month, exclude_from_yearly_increase } = req.body;
@@ -928,6 +978,8 @@ router.post('/task-grades/:gradeId/notches', authenticate, auditLog('CREATE', 't
 
 router.put('/task-grade-notches/:id', authenticate, auditLog('UPDATE', 'task_grade_notches'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { notch_number, min_salary, max_salary, start_date, end_date } = req.body;
     if (parseFloat(max_salary) < parseFloat(min_salary)) return res.status(400).json({ success: false, error: { message: 'Max salary must be greater than or equal to min salary' } });
     const result = await dbQuery(
@@ -975,6 +1027,10 @@ router.put('/municipality', authenticate, auditLog('UPDATE', 'system_settings'),
     const { settings } = req.body;
     if (!settings || typeof settings !== 'object') return res.status(400).json({ success: false, error: { message: 'Settings object required' } });
     const validKeys = [
+      'municipality_name', 'municipality_code',
+      'municipality_address_line1', 'municipality_address_line2',
+      'municipality_city', 'municipality_province', 'municipality_postal_code',
+      'municipality_telephone', 'municipality_email', 'municipality_website',
       'paye_reference', 'sdl_reference', 'uif_reference',
       'sars_contact_first_name', 'sars_contact_surname',
       'sars_contact_position_id', 'sars_contact_phone', 'sars_contact_email',
@@ -1104,37 +1160,6 @@ router.put('/system', authenticate, auditLog('UPDATE', 'system_settings'), async
       );
     }
     res.json({ success: true, message: 'Settings updated' });
-  } catch (err) { next(err); }
-});
-
-// === CLAIM RATES ===
-router.get('/claim-rates', authenticate, async (req, res, next) => {
-  try {
-    const result = await dbQuery('SELECT * FROM claim_rates ORDER BY claim_type, effective_date DESC');
-    res.json({ success: true, data: result.rows });
-  } catch (err) { next(err); }
-});
-
-router.post('/claim-rates', authenticate, auditLog('CREATE', 'claim_rates'), async (req, res, next) => {
-  try {
-    const { claim_type, description, rate, rate_unit, effective_date, end_date } = req.body;
-    const result = await dbQuery(
-      `INSERT INTO claim_rates (claim_type, description, rate, rate_unit, effective_date, end_date) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [claim_type, description, rate, rate_unit, effective_date, end_date]
-    );
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) { next(err); }
-});
-
-router.put('/claim-rates/:id', authenticate, auditLog('UPDATE', 'claim_rates'), async (req, res, next) => {
-  try {
-    const { claim_type, description, rate, rate_unit, effective_date, end_date } = req.body;
-    const result = await dbQuery(
-      `UPDATE claim_rates SET claim_type=$1, description=$2, rate=$3, rate_unit=$4, effective_date=$5, end_date=$6 WHERE id=$7 RETURNING *`,
-      [claim_type, description, rate, rate_unit, effective_date, end_date, req.params.id]
-    );
-    if (!result.rows.length) return res.status(404).json({ success: false, error: { message: 'Claim rate not found' } });
-    res.json({ success: true, data: result.rows[0] });
   } catch (err) { next(err); }
 });
 

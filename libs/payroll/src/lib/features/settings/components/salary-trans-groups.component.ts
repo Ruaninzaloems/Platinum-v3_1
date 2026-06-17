@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './salary-trans-groups.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './salary-trans-groups.component.css'
 })
 export class SalaryTransGroupsComponent implements OnInit {

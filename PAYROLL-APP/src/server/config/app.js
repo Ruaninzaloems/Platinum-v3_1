@@ -18,7 +18,7 @@ const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'x-user-id', 'x-user-name', 'x-user-display-name', 'x-user-roles', 'x-employee-id'],
   },
 };
 

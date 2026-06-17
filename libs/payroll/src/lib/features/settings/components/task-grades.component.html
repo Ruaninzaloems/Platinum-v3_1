@@ -295,17 +295,19 @@
                 <tr><td colspan="8" class="empty-state">No notches defined. Click "Add Notch" to create notch salary ranges.</td></tr>
               } @else {
                 @for (n of notches; track n.id) {
-                  <tr>
-                    <td style="text-align:center;font-weight:600">{{ n.notch_number }}</td>
-                    <td style="text-align:right">{{ n.min_salary | currencyZar }}</td>
-                    <td style="text-align:right">{{ n.max_salary | currencyZar }}</td>
-                    <td style="text-align:right">{{ monthlyAmount(n.min_salary) | currencyZar }}</td>
-                    <td style="text-align:right">{{ monthlyAmount(n.max_salary) | currencyZar }}</td>
-                    <td>{{ n.start_date | dateSa }}</td>
-                    <td>{{ formatEndDate(n.end_date) }}</td>
-                    <td>
-                      <button class="btn btn-sm" (click)="openNotchModal(n)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
-                      <button class="btn btn-sm" (click)="deleteNotch(n)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                  <tr style="line-height:1">
+                    <td style="text-align:center;font-weight:600;padding:5px 8px">{{ n.notch_number }}</td>
+                    <td style="text-align:right;padding:5px 8px">{{ n.min_salary | currencyZar }}</td>
+                    <td style="text-align:right;padding:5px 8px">{{ n.max_salary | currencyZar }}</td>
+                    <td style="text-align:right;padding:5px 8px">{{ monthlyAmount(n.min_salary) | currencyZar }}</td>
+                    <td style="text-align:right;padding:5px 8px">{{ monthlyAmount(n.max_salary) | currencyZar }}</td>
+                    <td style="padding:5px 8px">{{ n.start_date | dateSa }}</td>
+                    <td style="padding:5px 8px">{{ formatEndDate(n.end_date) }}</td>
+                    <td style="padding:5px 8px">
+                      <div style="display:flex;gap:4px;align-items:center">
+                        <button class="btn btn-sm" (click)="openNotchModal(n)" title="Edit"><app-icon name="edit" [size]="12"></app-icon></button>
+                        <button class="btn btn-sm" (click)="deleteNotch(n)" title="Delete"><app-icon name="trash" [size]="12"></app-icon></button>
+                      </div>
                     </td>
                   </tr>
                 }

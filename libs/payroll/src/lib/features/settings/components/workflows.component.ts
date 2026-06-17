@@ -4,12 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { UiService } from '../../../core/services/ui.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
+import { EntityTypeBadgePipe } from '../../../shared/pipes/entity-type-badge.pipe';
 
 @Component({
   selector: 'app-workflows',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent, EntityTypeBadgePipe],
   templateUrl: './workflows.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './workflows.component.css'
 })
 export class WorkflowsComponent implements OnInit {

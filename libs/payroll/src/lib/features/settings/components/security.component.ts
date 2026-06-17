@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './security.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './security.component.css'
 })
 export class SecurityComponent implements OnInit {

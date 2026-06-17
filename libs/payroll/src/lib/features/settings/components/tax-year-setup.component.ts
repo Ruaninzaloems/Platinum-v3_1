@@ -13,6 +13,7 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, DateInputComponent, DateSaPipe, StatusBadgeComponent],
   templateUrl: './tax-year-setup.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './tax-year-setup.component.css'
 })
 export class TaxYearSetupComponent implements OnInit {

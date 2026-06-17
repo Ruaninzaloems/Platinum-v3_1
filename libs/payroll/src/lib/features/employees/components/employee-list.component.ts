@@ -16,6 +16,7 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-employee-list',
   standalone: true,
+  host: { 'data-accent': 'employees' },
   imports: [CommonModule, RouterModule, FormsModule, IconComponent, StatusBadgeComponent, PaginationComponent, CurrencyZarPipe, DateInputComponent],
   templateUrl: './employee-list.component.html',
   styleUrl: './employee-list.component.css'
@@ -188,7 +189,7 @@ export class EmployeeListComponent implements OnInit, OnDestroy {
     if (this.cycleFilter) params.push(`cycle_id=${this.cycleFilter}`);
     if (this.statusFilter) params.push(`status=${this.statusFilter}`);
     const qs = params.length > 0 ? '?' + params.join('&') : '';
-    window.open(`/api/v1/employees/export${qs}`, '_blank');
+    window.open(`/payroll-app/api/employees/export${qs}`, '_blank');
   }
 
   onPageChange(p: number): void {
@@ -197,7 +198,7 @@ export class EmployeeListComponent implements OnInit, OnDestroy {
   }
 
   viewEmployee(id: number): void {
-    this.router.navigate(['/employees', id]);
+    this.router.navigate(['/payroll/employees', id]);
   }
 
   get stats() {
@@ -439,7 +440,7 @@ export class EmployeeListComponent implements OnInit, OnDestroy {
     this.importing = true;
     const formData = new FormData();
     formData.append('file', this.importFile);
-    fetch('/api/v1/employees/import', { method: 'POST', body: formData })
+    fetch('/payroll-app/api/employees/import', { method: 'POST', body: formData })
       .then(r => r.json())
       .then(result => {
         const imported = result.data?.imported || result.imported || 0;

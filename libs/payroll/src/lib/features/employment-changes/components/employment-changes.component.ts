@@ -9,6 +9,7 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
 @Component({
   selector: 'app-employment-changes',
   standalone: true,
+  host: { 'data-accent': 'talent' },
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent],
   templateUrl: './employment-changes.component.html',
   styleUrl: './employment-changes.component.css'

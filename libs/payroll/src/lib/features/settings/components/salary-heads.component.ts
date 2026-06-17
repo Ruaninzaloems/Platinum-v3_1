@@ -13,6 +13,7 @@ import { DateSaPipe } from '../../../shared/pipes/date-sa.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, DateInputComponent, DateSaPipe],
   templateUrl: './salary-heads.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './salary-heads.component.css'
 })
 export class SalaryHeadsComponent implements OnInit {
@@ -242,7 +243,9 @@ export class SalaryHeadsComponent implements OnInit {
       group_on_payslip_by_irp5: false,
       enabled: true,
       employer_contribution: 0,
-      employee_contribution: 0
+      employee_contribution: 0,
+      is_overtime: false,
+      overtime_multiplier_rate: null
     };
     this.mode = 'create';
     this.activeTab = 'details';
@@ -304,6 +307,25 @@ export class SalaryHeadsComponent implements OnInit {
 
   get showMocTab(): boolean {
     return this.item.id && this.item.calculation_method === 'SYSTEM_CALCULATE';
+  }
+
+  get isOvertimeEligible(): boolean {
+    return this.item.transaction_type === 'EARNING' && this.item.irp5_code === '3607';
+  }
+
+  get isSystemOvertimeEdit(): boolean {
+    return this.item.is_system && this.isOvertimeEligible && this.mode === 'edit';
+  }
+
+  onTransactionTypeOrIrp5Change(): void {
+    if (!this.isOvertimeEligible) {
+      this.item.is_overtime = false;
+      this.item.overtime_multiplier_rate = null;
+    } else if (this.mode === 'create' && !this.item.is_overtime) {
+      this.item.is_overtime = true;
+      this.item.overtime_multiplier_rate = 1.0;
+    }
+    this.cdr.detectChanges();
   }
 
   navigatePrev(): void {
@@ -515,6 +537,11 @@ export class SalaryHeadsComponent implements OnInit {
   }
 
   save(): void {
+    if (this.isSystemOvertimeEdit) {
+      this.saveSystemOvertime();
+      return;
+    }
+
     if (!this.item.transaction_type) {
       this.ui.toast('error', 'Validation', 'Transaction Type is required');
       return;
@@ -525,6 +552,13 @@ export class SalaryHeadsComponent implements OnInit {
     }
     if (!this.item.name?.trim()) {
       this.ui.toast('error', 'Validation', 'Title is required');
+      return;
+    }
+
+    const isOT = this.isOvertimeEligible && this.item.is_overtime === true;
+    const otRate = parseFloat(this.item.overtime_multiplier_rate);
+    if (isOT && (!otRate || otRate <= 0)) {
+      this.ui.toast('error', 'Validation', 'Overtime multiplier rate must be greater than 0 when overtime is enabled');
       return;
     }
 
@@ -548,7 +582,9 @@ export class SalaryHeadsComponent implements OnInit {
       group_on_payslip_by_irp5: this.item.group_on_payslip_by_irp5 === true,
       enabled: this.item.enabled !== false,
       employer_contribution: parseFloat(this.item.employer_contribution) || 0,
-      employee_contribution: parseFloat(this.item.employee_contribution) || 0
+      employee_contribution: parseFloat(this.item.employee_contribution) || 0,
+      is_overtime: this.isOvertimeEligible ? (this.item.is_overtime === true) : false,
+      overtime_multiplier_rate: this.isOvertimeEligible && this.item.is_overtime ? (parseFloat(this.item.overtime_multiplier_rate) || null) : null
     };
 
     const obs = this.item.id
@@ -567,6 +603,34 @@ export class SalaryHeadsComponent implements OnInit {
         } else {
           this.goBack();
         }
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.ui.toast('error', 'Error', err?.error?.error?.message || err?.error?.error || 'Failed to save');
+      }
+    });
+  }
+
+  saveSystemOvertime(): void {
+    const isOT = this.item.is_overtime === true;
+    const otRate = parseFloat(this.item.overtime_multiplier_rate);
+    if (isOT && (!otRate || otRate <= 0)) {
+      this.ui.toast('error', 'Validation', 'Overtime multiplier rate must be greater than 0 when overtime is enabled');
+      return;
+    }
+
+    const payload = {
+      is_overtime: isOT,
+      overtime_multiplier_rate: isOT ? (otRate || null) : null
+    };
+
+    this.api.put(`/salary-transactions/${this.item.id}`, payload).subscribe({
+      next: (d: any) => {
+        this.ui.toast('success', 'Saved', 'Overtime settings updated');
+        this.item = d;
+        this.normalizeItemDates();
+        this.loadItems();
+        this.mode = 'view';
         this.cdr.detectChanges();
       },
       error: (err: any) => {

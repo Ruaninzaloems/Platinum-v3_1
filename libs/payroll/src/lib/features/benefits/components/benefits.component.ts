@@ -13,6 +13,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, StatusBadgeComponent, CurrencyZarPipe, DateInputComponent],
   templateUrl: './benefits.component.html',
+  host: { 'data-accent': 'benefits' },
   styleUrl: './benefits.component.css'
 })
 export class BenefitsComponent implements OnInit {
@@ -155,7 +156,7 @@ export class BenefitsComponent implements OnInit {
 
   getEmployeeName(): string {
     const emp = this.employees.find(e => e.id == this.selectedEmployee);
-    return emp ? `${emp.first_name} ${emp.surname}` : '';
+    return emp ? `${emp.id} | ${emp.employee_code} - ${emp.first_name} ${emp.surname}` : '';
   }
 
   viewDependants(membershipId: number): void {

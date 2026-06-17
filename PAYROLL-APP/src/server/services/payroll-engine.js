@@ -217,6 +217,555 @@ async function getEmployeeRetirementFundInfo(employeeId) {
   return rfResult.rows;
 }
 
+function _computePayslipCore({
+  employeeId, emp, period, cycle, periodsPerYear, taxYear,
+  taxTables, salaryStructure,
+  medInfo, retFunds, unionMemberships,
+  empTransRows, payslipTxRows, wageTransRows, overtimeRows,
+  claimsRows, instalmentRows,
+  prevBasicSalary: prevBasicSalaryParam, unionHeadId, mocRulesMap,
+}) {
+  const { annualSalary, salarySource, groupItems, upperLimitStructureRows, upperLimitTargetPackage } = salaryStructure;
+
+  const isUpperLimit = salarySource === 'UPPER_LIMIT';
+
+  if (isUpperLimit) {
+    let includedSum = 0;
+    for (const sr of upperLimitStructureRows) {
+      if (sr.included_in_package) includedSum += parseFloat(sr.amount) || 0;
+    }
+    const balanceVariance = Math.abs(upperLimitTargetPackage - includedSum);
+    if (balanceVariance > 5.00) {
+      throw new Error(
+        `Upper Limit salary structure for employee ${emp.employee_code || employeeId} is not balanced. ` +
+        `Target package: R${upperLimitTargetPackage.toFixed(2)}, structure total: R${includedSum.toFixed(2)}, ` +
+        `variance: R${balanceVariance.toFixed(2)} (exceeds R5.00 tolerance). ` +
+        `Please balance the salary structure before running payroll.`
+      );
+    }
+  }
+
+  const ulAmountsByHeadId = {};
+  if (isUpperLimit) {
+    for (const sr of upperLimitStructureRows) {
+      ulAmountsByHeadId[sr.salary_head_id] = {
+        annualAmount: parseFloat(sr.amount) || 0,
+        monthlyAmount: parseFloat(((parseFloat(sr.amount) || 0) / 12).toFixed(2)),
+        code: sr.code, name: sr.name, transaction_type: sr.transaction_type,
+        calculation_method: sr.calculation_method, irp5_code: sr.irp5_code,
+        taxable: sr.taxable, affects_uif: sr.affects_uif, affects_sdl: sr.affects_sdl,
+        priority: sr.priority, scoa_debit_item: sr.scoa_debit_item, scoa_credit_item: sr.scoa_credit_item,
+      };
+    }
+  }
+
+  const payslipTxByHead = {};
+  for (const pt of payslipTxRows) {
+    if (!payslipTxByHead[pt.salary_head_id]) payslipTxByHead[pt.salary_head_id] = [];
+    payslipTxByHead[pt.salary_head_id].push(pt);
+  }
+
+  const transactions = [];
+  for (const est of empTransRows) {
+    if (isUpperLimit) {
+      if (ulAmountsByHeadId[est.salary_head_id]) {
+        const ulRow = ulAmountsByHeadId[est.salary_head_id];
+        if (ulRow.calculation_method !== 'SYSTEM_CALCULATE' && ulRow.calculation_method !== 'FORMULA') {
+          transactions.push({
+            est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+            amount: ulRow.monthlyAmount, start_date: est.start_date, end_date: est.end_date,
+            head_code: ulRow.code, head_name: ulRow.name, transaction_type: ulRow.transaction_type,
+            irp5_code: ulRow.irp5_code, taxable: ulRow.taxable, affects_uif: ulRow.affects_uif,
+            affects_sdl: ulRow.affects_sdl, calculation_method: null, priority: ulRow.priority,
+            scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
+            is_upper_limit_structure: true
+          });
+          continue;
+        }
+      }
+      const isFormula = est.calculation_method === 'SYSTEM_CALCULATE' || est.calculation_method === 'FORMULA';
+      if (isFormula) {
+        const headPtsULFormula = payslipTxByHead[est.salary_head_id] || [];
+        if (headPtsULFormula.length > 0) {
+          for (const pt of headPtsULFormula) {
+            transactions.push({
+              est_id: est.est_id, ept_id: pt.ept_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+              amount: parseFloat(pt.captured_amount) || 0, reference_no: pt.reference_no || '',
+              start_date: est.start_date, end_date: est.end_date,
+              head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+              irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+              affects_sdl: est.affects_sdl, calculation_method: null, priority: est.priority,
+              scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item,
+              is_payslip_transaction: true
+            });
+          }
+        } else {
+          transactions.push({
+            est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+            amount: 0, start_date: est.start_date, end_date: est.end_date,
+            head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+            irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+            affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
+            scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
+          });
+        }
+      } else {
+        const headPtsUL = payslipTxByHead[est.salary_head_id] || [];
+        if (headPtsUL.length > 0) {
+          for (const pt of headPtsUL) {
+            transactions.push({
+              est_id: est.est_id, ept_id: pt.ept_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+              amount: parseFloat(pt.captured_amount) || 0, reference_no: pt.reference_no || '',
+              start_date: est.start_date, end_date: est.end_date,
+              head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+              irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+              affects_sdl: est.affects_sdl, calculation_method: null, priority: est.priority,
+              scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item,
+              is_payslip_transaction: true
+            });
+          }
+        } else {
+          transactions.push({
+            est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+            amount: 0, start_date: est.start_date, end_date: est.end_date,
+            head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+            irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+            affects_sdl: est.affects_sdl, calculation_method: null, priority: est.priority,
+            scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
+          });
+        }
+      }
+      continue;
+    }
+
+    const headPts = payslipTxByHead[est.salary_head_id] || [];
+    if (headPts.length > 0) {
+      for (const pt of headPts) {
+        transactions.push({
+          est_id: est.est_id, ept_id: pt.ept_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+          amount: parseFloat(pt.captured_amount) || 0, reference_no: pt.reference_no || '',
+          start_date: est.start_date, end_date: est.end_date,
+          head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+          irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+          affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
+          scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item,
+          is_payslip_transaction: true
+        });
+      }
+    } else {
+      transactions.push({
+        est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
+        amount: 0, start_date: est.start_date, end_date: est.end_date,
+        head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
+        irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
+        affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
+        scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
+      });
+    }
+  }
+
+  if (isUpperLimit) {
+    const estHeadIds = new Set(empTransRows.map(r => r.salary_head_id));
+    for (const sr of upperLimitStructureRows) {
+      if (!estHeadIds.has(sr.salary_head_id) && sr.calculation_method !== 'SYSTEM_CALCULATE' && sr.calculation_method !== 'FORMULA') {
+        const ulRow = ulAmountsByHeadId[sr.salary_head_id];
+        transactions.push({
+          est_id: null, employee_id: employeeId, salary_head_id: sr.salary_head_id,
+          amount: ulRow.monthlyAmount, head_code: ulRow.code, head_name: ulRow.name,
+          transaction_type: ulRow.transaction_type, irp5_code: ulRow.irp5_code,
+          taxable: ulRow.taxable, affects_uif: ulRow.affects_uif, affects_sdl: ulRow.affects_sdl,
+          calculation_method: null, priority: ulRow.priority,
+          scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
+          is_upper_limit_structure: true
+        });
+      }
+    }
+  }
+
+  for (const wt of wageTransRows) {
+    transactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: wt.salary_head_id,
+      amount: parseFloat(wt.amount) || 0, start_date: period.start_date, end_date: period.end_date,
+      head_code: wt.head_code, head_name: wt.head_name, transaction_type: wt.transaction_type,
+      irp5_code: wt.irp5_code, taxable: wt.taxable, affects_uif: wt.affects_uif,
+      affects_sdl: wt.affects_sdl, calculation_method: 'FIXED', priority: wt.priority,
+      scoa_debit_item: wt.scoa_debit_item, scoa_credit_item: wt.scoa_credit_item,
+      is_wage_transaction: true
+    });
+  }
+
+  for (const ot of overtimeRows) {
+    transactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: ot.salary_head_id,
+      amount: parseFloat(ot.amount) || 0, start_date: period.start_date, end_date: period.end_date,
+      head_code: ot.head_code, head_name: ot.head_name, transaction_type: ot.transaction_type,
+      irp5_code: ot.irp5_code, taxable: ot.taxable, affects_uif: ot.affects_uif,
+      affects_sdl: ot.affects_sdl, calculation_method: 'FIXED', priority: ot.priority,
+      scoa_debit_item: ot.scoa_debit_item, scoa_credit_item: ot.scoa_credit_item,
+      is_overtime_transaction: true
+    });
+  }
+
+  for (const cl of claimsRows) {
+    if (!cl.salary_head_id || !cl.head_code) continue;
+    transactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: cl.salary_head_id,
+      amount: parseFloat(cl.amount) || 0, reference_no: cl.reference_no || '',
+      start_date: period.start_date, end_date: period.end_date,
+      head_code: cl.head_code, head_name: cl.head_name,
+      transaction_type: cl.transaction_type || 'EARNING',
+      irp5_code: cl.irp5_code, taxable: cl.taxable, affects_uif: cl.affects_uif,
+      affects_sdl: cl.affects_sdl, calculation_method: null, priority: cl.priority,
+      scoa_debit_item: cl.scoa_debit_item, scoa_credit_item: cl.scoa_credit_item,
+      is_claim_transaction: true, claim_id: cl.claim_id
+    });
+  }
+
+  for (const inst of instalmentRows) {
+    const monthly = parseFloat(inst.monthly_instalment) || 0;
+    const balance = parseFloat(inst.balance) || 0;
+    const deduct = parseFloat(Math.min(monthly, balance).toFixed(2));
+    if (deduct <= 0) continue;
+    transactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: inst.salary_head_id,
+      amount: deduct, head_code: inst.head_code, head_name: inst.head_name || inst.description,
+      transaction_type: 'DEDUCTION',
+      irp5_code: inst.irp5_code, taxable: false, affects_uif: false, affects_sdl: false,
+      calculation_method: 'FIXED', priority: 60,
+      scoa_debit_item: inst.scoa_debit_item, scoa_credit_item: inst.scoa_credit_item,
+      is_instalment_transaction: true, instalment_id: inst.id,
+      instalment_description: inst.description || null,
+      instalment_total_amount: parseFloat(inst.total_amount) || 0,
+      instalment_monthly: monthly,
+      instalment_balance_before: balance,
+      instalment_balance_after: parseFloat(Math.max(0, balance - deduct).toFixed(2))
+    });
+  }
+
+  const systemCalcCodes = new Set(['MED_EE', 'MED_ER', 'MED_FRINGE', 'PEN_EE', 'PEN_ER', 'PEN_FRINGE',
+    'MED_AID_EE', 'MED_AID_ER', 'PENSION_EE', 'PENSION_ER', 'PENSION_FRINGE',
+    'UIF_EE', 'UIF_ER', 'SDL', 'PAYE', 'UNION_FEES',
+    'PAYASYOUEARN_PAYE', 'UNEMPLOYMENT_INSURANCE_FUND_UIF_EMPLOYEE', 'UNEMPLOYMENT_INSURANCE_FUND_UIF_EMPLOYER',
+    'SKILLS_DEVELOPMENT_LEVY_SDL']);
+
+  let monthlyBasic, basicAnnual;
+
+  if (isUpperLimit) {
+    const basicStructRow = upperLimitStructureRows.find(sr => BASIC_CODES.has(sr.code));
+    if (!basicStructRow) {
+      throw new Error(`Upper Limit employee ${emp.employee_code || employeeId} has no BASIC salary in the salary structure table. Please add a BASIC salary component before running payroll.`);
+    }
+    const basicAnnualFromStruct = parseFloat(basicStructRow.amount) || 0;
+    if (basicAnnualFromStruct <= 0) {
+      throw new Error(`Upper Limit employee ${emp.employee_code || employeeId} has R0.00 BASIC in salary structure. Please set the BASIC amount in the salary structure.`);
+    }
+    monthlyBasic = parseFloat((basicAnnualFromStruct / 12).toFixed(2));
+    basicAnnual = basicAnnualFromStruct;
+  } else {
+    monthlyBasic = resolveMonthlyBasic(emp, periodsPerYear);
+    basicAnnual = monthlyBasic * periodsPerYear;
+  }
+
+  const isRateBasedZeroBasic = !isUpperLimit && !(emp.task_grade_id || emp.jp_task_grade_id) &&
+    (emp.salary_based_on === 'RATE_PER_HOUR' || emp.salary_based_on === 'RATE_PER_DAY' || emp.salary_based_on === 'CAPTURED_VALUE');
+  const basicTx = transactions.find(t => isBasicCode(t.head_code));
+  if (basicTx) {
+    if (!isRateBasedZeroBasic) {
+      basicTx.amount = monthlyBasic;
+      basicTx.calculation_method = null;
+    }
+  } else {
+    transactions.unshift({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: monthlyBasic, head_code: 'BASIC', head_name: 'Basic Salary', transaction_type: 'EARNING',
+      irp5_code: '3601', taxable: true, calculation_method: null, priority: 0,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+
+  let medEeAmount = 0, medErAmount = 0, medFringeAmount = 0;
+  if (medInfo.hasMedicalAid && medInfo.scheme) {
+    const s = medInfo.scheme;
+    const memberVal = parseFloat(s.main_member_contribution) || 0;
+    const adultVal = parseFloat(s.adult_dependant_contribution) || 0;
+    const childVal = parseFloat(s.child_dependant_contribution) || 0;
+    const eePct = parseFloat(s.employee_percent) || 0;
+    const erPct = parseFloat(s.employer_percent) || 0;
+    const maxErVal = parseFloat(s.max_employer_contribution) || 0;
+    const maxDeps = parseInt(s.max_dependants) || 999;
+    const maxChildOnly = s.max_child_dependants_only === true;
+
+    let { adults, children } = medInfo.dependants;
+
+    if (maxChildOnly) {
+      if (children > maxDeps) children = maxDeps;
+    } else {
+      const totalDeps = adults + children;
+      if (totalDeps > maxDeps) {
+        const cappedAdults = Math.min(adults, maxDeps);
+        const remainingSlots = Math.max(0, maxDeps - cappedAdults);
+        adults = cappedAdults;
+        children = Math.min(children, remainingSlots);
+      }
+    }
+
+    const totalMedCost = parseFloat((memberVal + (adultVal * adults) + (childVal * children)).toFixed(2));
+    medErAmount = parseFloat((totalMedCost * (erPct / 100)).toFixed(2));
+    medEeAmount = parseFloat((totalMedCost * (eePct / 100)).toFixed(2));
+
+    if (maxErVal > 0 && medErAmount > maxErVal) {
+      medEeAmount = parseFloat((medEeAmount + (medErAmount - maxErVal)).toFixed(2));
+      medErAmount = maxErVal;
+    }
+    medFringeAmount = medErAmount;
+  }
+
+  let retEeAmount = 0, retErAmount = 0, retFringeAmount = 0;
+  for (const rf of retFunds) {
+    let ee = 0, er = 0;
+    const eeOverride = parseFloat(rf.employee_amount) || 0;
+    const erOverride = parseFloat(rf.employer_amount) || 0;
+    const contribType = (rf.employer_contribution_type || '').toUpperCase();
+
+    if (eeOverride > 0) {
+      ee = eeOverride;
+    } else if (contribType === 'PERCENTAGE') {
+      const eeVal = parseFloat(rf.employee_contribution_value) || parseFloat(rf.employee_contribution_rate) || 0;
+      ee = parseFloat((monthlyBasic * eeVal / 100).toFixed(2));
+    } else {
+      ee = parseFloat(rf.employee_contribution_value) || 0;
+      if (ee === 0 && parseFloat(rf.employee_contribution_rate) > 0) {
+        ee = parseFloat((monthlyBasic * parseFloat(rf.employee_contribution_rate) / 100).toFixed(2));
+      }
+    }
+
+    if (erOverride > 0) {
+      er = erOverride;
+    } else if (contribType === 'PERCENTAGE') {
+      const erVal = parseFloat(rf.employer_contribution_value) || parseFloat(rf.employer_contribution_rate) || 0;
+      er = parseFloat((monthlyBasic * erVal / 100).toFixed(2));
+    } else {
+      er = parseFloat(rf.employer_contribution_value) || 0;
+      if (er === 0 && parseFloat(rf.employer_contribution_rate) > 0) {
+        er = parseFloat((monthlyBasic * parseFloat(rf.employer_contribution_rate) / 100).toFixed(2));
+      }
+    }
+
+    const erMax = parseFloat(rf.employer_max_value) || 0;
+    if (erMax > 0 && er > erMax) er = erMax;
+    const eeMax = parseFloat(rf.employee_max_value) || 0;
+    if (eeMax > 0 && ee > eeMax) ee = eeMax;
+    retEeAmount += ee;
+    retErAmount += er;
+    retFringeAmount += er;
+  }
+
+  const employeeData = {
+    id: emp.id, employee_code: emp.employee_code,
+    date_of_birth: emp.date_of_birth, date_engaged: emp.date_engaged,
+    termination_date: emp.termination_date || null,
+    dependants: medInfo.hasMedicalAid ? medInfo.dependantCount : (emp.dependants || 0),
+    annual_salary: basicAnnual, monthly_salary: emp.monthly_salary,
+    salary_based_on: emp.salary_based_on, wage_rate: emp.wage_rate,
+    task_grade_id: emp.task_grade_id, exclude_uif: emp.exclude_uif, exclude_sdl: emp.exclude_sdl,
+    employee_type_id: emp.employee_type_id || null,
+    employee_subtype_id: emp.employee_subtype_id || null,
+    condition_of_service_id: emp.condition_of_service_id || null,
+    hours_worked: emp.working_hours_per_month || null, days_worked: emp.working_days_per_month || null,
+    working_hours_per_month: emp.working_hours_per_month, working_days_per_month: emp.working_days_per_month,
+    working_hours_per_day: emp.working_hours_per_day,
+    prev_basic_salary: prevBasicSalaryParam,
+    prev_annual_salary: prevBasicSalaryParam ? prevBasicSalaryParam * periodsPerYear : null,
+  };
+
+  const filteredTransactions = transactions.filter(tx => !systemCalcCodes.has(tx.head_code) || isBasicCode(tx.head_code));
+
+  if (medInfo.hasMedicalAid && medEeAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: medEeAmount, percentage: null, head_code: 'MED_EE', head_name: 'Medical Aid Employee',
+      transaction_type: 'DEDUCTION', irp5_code: '4005', taxable: false, calculation_method: null, priority: 50,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+  if (medInfo.hasMedicalAid && medErAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: medErAmount, percentage: null, head_code: 'MED_ER', head_name: 'Medical Aid (Employer)',
+      transaction_type: 'COMPANY_CONTRIBUTION', irp5_code: null, taxable: false, calculation_method: null, priority: 50,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+  if (medInfo.hasMedicalAid && medFringeAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: medFringeAmount, percentage: null, head_code: 'MED_FRINGE', head_name: 'Medical Aid (Fringe)',
+      transaction_type: 'FRINGE_BENEFIT', irp5_code: '3810', taxable: true, calculation_method: null, priority: 50,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+  if (retFunds.length > 0 && retEeAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: retEeAmount, percentage: null, head_code: 'PEN_EE', head_name: 'Pension Fund (Employee)',
+      transaction_type: 'DEDUCTION', irp5_code: '4001', taxable: false, calculation_method: null, priority: 51,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+  if (retFunds.length > 0 && retErAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: retErAmount, percentage: null, head_code: 'PEN_ER', head_name: 'Pension Fund (Employer)',
+      transaction_type: 'COMPANY_CONTRIBUTION', irp5_code: null, taxable: false, calculation_method: null, priority: 51,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+  if (retFunds.length > 0 && retFringeAmount > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: null,
+      amount: retFringeAmount, percentage: null, head_code: 'PEN_FRINGE', head_name: 'Pension Fund (Fringe)',
+      transaction_type: 'FRINGE_BENEFIT', irp5_code: '3825', taxable: true, calculation_method: null, priority: 51,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  }
+
+  let unionFeeTotal = 0;
+  for (const um of unionMemberships) {
+    const contribType = (um.contribution_type || '').trim();
+    const contribValue = parseFloat(um.contribution_value) || 0;
+    const maxValue = parseFloat(um.maximum_value) || 0;
+    let fee = 0;
+    if (contribType === '%') {
+      fee = parseFloat((monthlyBasic * contribValue / 100).toFixed(2));
+      if (maxValue > 0 && fee > maxValue) fee = maxValue;
+    } else {
+      fee = contribValue;
+      if (maxValue > 0 && fee > maxValue) fee = maxValue;
+    }
+    unionFeeTotal += fee;
+  }
+  if (unionMemberships.length > 0 && unionFeeTotal > 0) {
+    filteredTransactions.push({
+      est_id: null, employee_id: employeeId, salary_head_id: unionHeadId,
+      amount: parseFloat(unionFeeTotal.toFixed(2)), percentage: null,
+      head_code: 'UNION_FEES', head_name: 'Union Fees', transaction_type: 'DEDUCTION',
+      irp5_code: null, taxable: false, calculation_method: null, priority: 52,
+      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
+    });
+  } else if (unionHeadId) {
+    const unionPayslipTxs = payslipTxByHead[unionHeadId] || [];
+    for (const pt of unionPayslipTxs) {
+      const amt = parseFloat(pt.captured_amount) || 0;
+      if (amt > 0) {
+        filteredTransactions.push({
+          est_id: null, ept_id: pt.ept_id, employee_id: employeeId, salary_head_id: unionHeadId,
+          amount: amt, percentage: null, reference_no: pt.reference_no || '',
+          head_code: 'UNION_FEES', head_name: 'Union Fees', transaction_type: 'DEDUCTION',
+          irp5_code: null, taxable: false, calculation_method: null, priority: 52,
+          scoa_debit_item: null, scoa_credit_item: null, formula: null, is_payslip_transaction: true,
+        });
+      }
+    }
+  }
+
+  const existingHeadIds = new Set(filteredTransactions.filter(t => t.salary_head_id).map(t => t.salary_head_id));
+
+  const calcResult = calculateForEmployee(employeeData, filteredTransactions, taxTables, period, cycle, mocRulesMap);
+
+  const age = getAge(emp.date_of_birth, period.end_date);
+  const annualGrossTaxable = calcResult.summary.taxable_income * periodsPerYear;
+  const pensionDeductionAnnual = calculatePensionDeduction(calcResult.results, annualGrossTaxable, periodsPerYear);
+  const annualTaxableIncome = annualGrossTaxable - pensionDeductionAnnual;
+  const annualPAYE = calculatePAYE(annualTaxableIncome, age, taxTables);
+  const monthlyPAYE = parseFloat((annualPAYE / periodsPerYear).toFixed(2));
+  const hasMedAidTx = calcResult.results.some(r =>
+    (r.head_code || '').includes('MED') && (r.transaction_type === 'DEDUCTION' || r.transaction_type === 'FRINGE_BENEFIT')
+  );
+  const medCredits = (medInfo.hasMedicalAid || hasMedAidTx)
+    ? calculateMedicalCredits(medInfo.dependantCount || emp.dependants || 0, taxTables, periodsPerYear)
+    : 0;
+  const finalPAYE = Math.max(0, parseFloat((monthlyPAYE - medCredits).toFixed(2)));
+
+  const payeItem = calcResult.results.find(r => r.head_code === 'PAYE');
+  if (payeItem) {
+    const payeDiff = payeItem.amount - finalPAYE;
+    payeItem.amount = finalPAYE;
+    payeItem.calculation_detail = {
+      ...payeItem.calculation_detail,
+      annual_gross_taxable: annualGrossTaxable,
+      annual_pension_deduction: pensionDeductionAnnual,
+      annual_taxable: annualTaxableIncome,
+      medical_credits: medCredits,
+      monthly_tax: monthlyPAYE,
+      annual_tax: annualPAYE,
+    };
+    calcResult.summary.paye = finalPAYE;
+    calcResult.summary.total_deductions = parseFloat((calcResult.summary.total_deductions - payeDiff).toFixed(2));
+    calcResult.summary.nett_pay = parseFloat((calcResult.summary.nett_pay + payeDiff).toFixed(2));
+    calcResult.summary.medical_credits = medCredits;
+  }
+
+  let appliedBracket = null;
+  for (const bracket of taxTables.brackets) {
+    const min = parseFloat(bracket.min_income) || 0;
+    const max = parseFloat(bracket.max_income) || Infinity;
+    if (annualTaxableIncome > min && annualTaxableIncome <= max) { appliedBracket = bracket; break; }
+    if (annualTaxableIncome > min) appliedBracket = bracket;
+  }
+
+  let totalRebates = 0;
+  const rebatesApplied = [];
+  for (const rebate of taxTables.rebates) {
+    const rebateAmount = parseFloat(rebate.amount) || 0;
+    const rebateType = (rebate.rebate_type || '').toUpperCase();
+    if (rebateType === 'PRIMARY') {
+      totalRebates += rebateAmount;
+      rebatesApplied.push({ type: 'PRIMARY', amount: rebateAmount });
+    } else if (rebateType === 'SECONDARY' && age >= 65) {
+      totalRebates += rebateAmount;
+      rebatesApplied.push({ type: 'SECONDARY', amount: rebateAmount });
+    } else if (rebateType === 'TERTIARY' && age >= 75) {
+      totalRebates += rebateAmount;
+      rebatesApplied.push({ type: 'TERTIARY', amount: rebateAmount });
+    }
+  }
+
+  const payeBreakdown = {
+    tax_year: taxYear, age, periods_per_year: periodsPerYear,
+    monthly_taxable_income: calcResult.summary.taxable_income,
+    annual_gross_taxable: annualGrossTaxable,
+    annual_pension_deduction: pensionDeductionAnnual,
+    annual_taxable_income: annualTaxableIncome,
+    applied_bracket: appliedBracket ? {
+      bracket_number: appliedBracket.bracket_number,
+      min_income: parseFloat(appliedBracket.min_income),
+      max_income: parseFloat(appliedBracket.max_income),
+      base_tax: parseFloat(appliedBracket.base_tax),
+      rate: parseFloat(appliedBracket.rate),
+    } : null,
+    annual_tax_before_rebates: annualPAYE + totalRebates,
+    rebates: rebatesApplied, total_rebates: totalRebates,
+    annual_tax_after_rebates: annualPAYE,
+    monthly_paye_before_credits: monthlyPAYE,
+    medical_tax_credits: medCredits,
+    dependant_count: medInfo.hasMedicalAid ? medInfo.dependantCount : (emp.dependants || 0),
+    final_monthly_paye: finalPAYE, salary_source: salarySource,
+    total_package: annualSalary, basic_annual: basicAnnual,
+  };
+
+  return {
+    ...calcResult,
+    employee_id: employeeId,
+    period,
+    salaryStructure: { source: salarySource, annualSalary, basicAnnual, monthlyBasic, groupItems },
+    medicalAid: medInfo,
+    retirementFunds: retFunds,
+    unionMemberships,
+    payeBreakdown,
+    transactions: empTransRows,
+  };
+}
+
 async function calculatePayslipForEmployee(employeeId, periodId, cycleId) {
   const periodResult = await dbQuery(
     `SELECT pp.*, pc.name AS cycle_name, pc.cycle_type, pc.periods_per_year
@@ -242,9 +791,11 @@ async function calculatePayslipForEmployee(employeeId, periodId, cycleId) {
     taxTables = await loadTaxTables(taxYear - 1);
   }
 
-  const medInfo = await getEmployeeMedicalAidInfo(employeeId, period.start_date, period.end_date);
-  const retFunds = await getEmployeeRetirementFundInfo(employeeId);
-  const unionMemberships = await getEmployeeUnionInfo(employeeId, period.start_date, period.end_date);
+  const [medInfo, retFunds, unionMemberships] = await Promise.all([
+    getEmployeeMedicalAidInfo(employeeId, period.start_date, period.end_date),
+    getEmployeeRetirementFundInfo(employeeId),
+    getEmployeeUnionInfo(employeeId, period.start_date, period.end_date),
+  ]);
 
   const empTransResult = await dbQuery(
     `SELECT est.id AS est_id, est.employee_id, est.salary_head_id,
@@ -293,278 +844,68 @@ async function calculatePayslipForEmployee(employeeId, periodId, cycleId) {
     [employeeId, period.id]
   );
 
-  const { annualSalary, salarySource, groupItems, upperLimitStructureRows, upperLimitTargetPackage } = salaryStructure;
-  const emp = salaryStructure.employee;
+  let claimsRows = [];
+  try {
+    const claimsResult = await dbQuery(
+      `SELECT DISTINCT ON (c.id) c.id AS claim_id, c.claim_type, c.sub_type, c.amount, c.reference_no,
+              COALESCE(cc.salary_head_id,
+                CASE WHEN c.claim_type = 'TRAVEL' THEN 26
+                     WHEN c.claim_type = 'S_AND_T' THEN 89
+                     ELSE NULL END
+              ) AS salary_head_id,
+              sh.code AS head_code, sh.name AS head_name, sh.transaction_type,
+              sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM claims c
+       LEFT JOIN claim_configurations cc ON (
+         CASE WHEN c.claim_type = 'TRAVEL' THEN 'Travel'
+              WHEN c.claim_type = 'S_AND_T' THEN 'S & T'
+              ELSE c.claim_type END
+       ) = cc.claim_type
+       AND cc.effective_date <= $2 AND (cc.end_date IS NULL OR cc.end_date >= $2)
+       LEFT JOIN salary_heads sh ON sh.id = COALESCE(cc.salary_head_id,
+         CASE WHEN c.claim_type = 'TRAVEL' THEN 26
+              WHEN c.claim_type = 'S_AND_T' THEN 89
+              ELSE NULL END)
+       WHERE c.employee_id = $1 AND c.status = 'APPROVED'
+       AND (c.period_id IS NULL OR c.period_id = $3)
+       ORDER BY c.id, cc.id`,
+      [employeeId, period.end_date, periodId]
+    );
+    claimsRows = claimsResult.rows;
+  } catch (e) { /* claims table may not have data */ }
 
-  const isUpperLimit = salarySource === 'UPPER_LIMIT';
+  let instalmentRows = [];
+  try {
+    const instalmentResult = await dbQuery(
+      `SELECT i.id, i.salary_head_id, i.description, i.total_amount, i.monthly_instalment, i.balance,
+              sh.code AS head_code, sh.name AS head_name, sh.irp5_code,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM instalments i
+       LEFT JOIN salary_heads sh ON i.salary_head_id = sh.id
+       WHERE i.employee_id = $1 AND i.status = 'ACTIVE' AND i.balance > 0
+         AND i.start_date <= $2
+         AND (i.end_date IS NULL OR i.end_date >= $2)`,
+      [employeeId, period.end_date]
+    );
+    instalmentRows = instalmentResult.rows;
+  } catch (e) { /* instalments table may not exist */ }
 
-  if (isUpperLimit) {
-    let includedSum = 0;
-    for (const sr of upperLimitStructureRows) {
-      if (sr.included_in_package) includedSum += parseFloat(sr.amount) || 0;
-    }
-    const balanceVariance = Math.abs(upperLimitTargetPackage - includedSum);
-    if (balanceVariance > 5.00) {
-      throw new Error(
-        `Upper Limit salary structure for employee ${emp.employee_code || employeeId} is not balanced. ` +
-        `Target package: R${upperLimitTargetPackage.toFixed(2)}, structure total: R${includedSum.toFixed(2)}, ` +
-        `variance: R${balanceVariance.toFixed(2)} (exceeds R5.00 tolerance). ` +
-        `Please balance the salary structure before running payroll.`
-      );
-    }
-  }
-
-  const ulAmountsByHeadId = {};
-  if (isUpperLimit) {
-    for (const sr of upperLimitStructureRows) {
-      ulAmountsByHeadId[sr.salary_head_id] = {
-        annualAmount: parseFloat(sr.amount) || 0,
-        monthlyAmount: parseFloat(((parseFloat(sr.amount) || 0) / 12).toFixed(2)),
-        code: sr.code,
-        name: sr.name,
-        transaction_type: sr.transaction_type,
-        calculation_method: sr.calculation_method,
-        irp5_code: sr.irp5_code,
-        taxable: sr.taxable,
-        affects_uif: sr.affects_uif,
-        affects_sdl: sr.affects_sdl,
-        priority: sr.priority,
-        scoa_debit_item: sr.scoa_debit_item,
-        scoa_credit_item: sr.scoa_credit_item,
-      };
-    }
-  }
-
-  const payslipTxByHead = {};
-  for (const pt of payslipTxResult.rows) {
-    if (!payslipTxByHead[pt.salary_head_id]) payslipTxByHead[pt.salary_head_id] = [];
-    payslipTxByHead[pt.salary_head_id].push(pt);
-  }
-
-  const transactions = [];
-  for (const est of empTransResult.rows) {
-    if (isUpperLimit) {
-      if (ulAmountsByHeadId[est.salary_head_id]) {
-        const ulRow = ulAmountsByHeadId[est.salary_head_id];
-        if (ulRow.calculation_method !== 'SYSTEM_CALCULATE' && ulRow.calculation_method !== 'FORMULA') {
-          transactions.push({
-            est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
-            amount: ulRow.monthlyAmount,
-            start_date: est.start_date, end_date: est.end_date,
-            head_code: ulRow.code, head_name: ulRow.name, transaction_type: ulRow.transaction_type,
-            irp5_code: ulRow.irp5_code, taxable: ulRow.taxable, affects_uif: ulRow.affects_uif,
-            affects_sdl: ulRow.affects_sdl, calculation_method: null, priority: ulRow.priority,
-            scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
-            is_upper_limit_structure: true
-          });
-          continue;
-        }
-      }
-      const isFormula = est.calculation_method === 'SYSTEM_CALCULATE' || est.calculation_method === 'FORMULA';
-      if (isFormula) {
-        transactions.push({
-          est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
-          amount: 0,
-          start_date: est.start_date, end_date: est.end_date,
-          head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-          irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-          affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
-          scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
-        });
-      } else {
-        transactions.push({
-          est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
-          amount: 0,
-          start_date: est.start_date, end_date: est.end_date,
-          head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-          irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-          affects_sdl: est.affects_sdl, calculation_method: null, priority: est.priority,
-          scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
-        });
-      }
-      continue;
-    }
-
-    const headPts = payslipTxByHead[est.salary_head_id] || [];
-    if (headPts.length > 0) {
-      for (const pt of headPts) {
-        transactions.push({
-          est_id: est.est_id, ept_id: pt.ept_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
-          amount: parseFloat(pt.captured_amount) || 0,
-          reference_no: pt.reference_no || '',
-          start_date: est.start_date, end_date: est.end_date,
-          head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-          irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-          affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
-          scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item,
-          is_payslip_transaction: true
-        });
-      }
-    } else {
-      transactions.push({
-        est_id: est.est_id, employee_id: employeeId, salary_head_id: est.salary_head_id,
-        amount: 0,
-        start_date: est.start_date, end_date: est.end_date,
-        head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-        irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-        affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
-        scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
-      });
-    }
-  }
-
-  if (isUpperLimit) {
-    const estHeadIds = new Set(empTransResult.rows.map(r => r.salary_head_id));
-    for (const sr of upperLimitStructureRows) {
-      if (!estHeadIds.has(sr.salary_head_id) && sr.calculation_method !== 'SYSTEM_CALCULATE' && sr.calculation_method !== 'FORMULA') {
-        const ulRow = ulAmountsByHeadId[sr.salary_head_id];
-        transactions.push({
-          est_id: null, employee_id: employeeId, salary_head_id: sr.salary_head_id,
-          amount: ulRow.monthlyAmount,
-          head_code: ulRow.code, head_name: ulRow.name, transaction_type: ulRow.transaction_type,
-          irp5_code: ulRow.irp5_code, taxable: ulRow.taxable, affects_uif: ulRow.affects_uif,
-          affects_sdl: ulRow.affects_sdl, calculation_method: null, priority: ulRow.priority,
-          scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
-          is_upper_limit_structure: true
-        });
-      }
-    }
-  }
-
-  for (const wt of wageTransResult.rows) {
-    transactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: wt.salary_head_id,
-      amount: parseFloat(wt.amount) || 0,
-      start_date: period.start_date, end_date: period.end_date,
-      head_code: wt.head_code, head_name: wt.head_name, transaction_type: wt.transaction_type,
-      irp5_code: wt.irp5_code, taxable: wt.taxable, affects_uif: wt.affects_uif,
-      affects_sdl: wt.affects_sdl, calculation_method: 'FIXED', priority: wt.priority,
-      scoa_debit_item: wt.scoa_debit_item, scoa_credit_item: wt.scoa_credit_item,
-      is_wage_transaction: true
-    });
-  }
-
-  const systemCalcCodes = new Set(['MED_EE', 'MED_ER', 'MED_FRINGE', 'PEN_EE', 'PEN_ER', 'PEN_FRINGE',
-    'MED_AID_EE', 'MED_AID_ER', 'PENSION_EE', 'PENSION_ER', 'PENSION_FRINGE',
-    'UIF_EE', 'UIF_ER', 'SDL', 'PAYE', 'UNION_FEES',
-    'PAYASYOUEARN_PAYE', 'UNEMPLOYMENT_INSURANCE_FUND_UIF_EMPLOYEE', 'UNEMPLOYMENT_INSURANCE_FUND_UIF_EMPLOYER',
-    'SKILLS_DEVELOPMENT_LEVY_SDL']);
-
-  let monthlyBasic, basicAnnual;
-
-  if (isUpperLimit) {
-    const basicStructRow = upperLimitStructureRows.find(sr => BASIC_CODES.has(sr.code));
-    if (!basicStructRow) {
-      throw new Error(`Upper Limit employee ${emp.employee_code || employeeId} has no BASIC salary in the salary structure table. Please add a BASIC salary component before running payroll.`);
-    }
-    const basicAnnualFromStruct = parseFloat(basicStructRow.amount) || 0;
-    if (basicAnnualFromStruct <= 0) {
-      throw new Error(`Upper Limit employee ${emp.employee_code || employeeId} has R0.00 BASIC in salary structure. Please set the BASIC amount in the salary structure.`);
-    }
-    monthlyBasic = parseFloat((basicAnnualFromStruct / 12).toFixed(2));
-    basicAnnual = basicAnnualFromStruct;
-  } else {
-    monthlyBasic = resolveMonthlyBasic(emp, periodsPerYear);
-    basicAnnual = monthlyBasic * periodsPerYear;
-  }
-
-  const isRateBasedZeroBasic = !isUpperLimit && !(emp.task_grade_id || emp.jp_task_grade_id) && (emp.salary_based_on === 'RATE_PER_HOUR' || emp.salary_based_on === 'RATE_PER_DAY' || emp.salary_based_on === 'CAPTURED_VALUE');
-  const basicTx = transactions.find(t => isBasicCode(t.head_code));
-  if (basicTx) {
-    if (!isRateBasedZeroBasic) {
-      basicTx.amount = monthlyBasic;
-      basicTx.calculation_method = null;
-    }
-  } else {
-    transactions.unshift({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: monthlyBasic,
-      head_code: 'BASIC', head_name: 'Basic Salary', transaction_type: 'EARNING',
-      irp5_code: '3601', taxable: true, calculation_method: null, priority: 0,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  let medEeAmount = 0, medErAmount = 0, medFringeAmount = 0;
-  if (medInfo.hasMedicalAid && medInfo.scheme) {
-    const s = medInfo.scheme;
-    const memberVal = parseFloat(s.main_member_contribution) || 0;
-    const adultVal = parseFloat(s.adult_dependant_contribution) || 0;
-    const childVal = parseFloat(s.child_dependant_contribution) || 0;
-    const eePct = parseFloat(s.employee_percent) || 0;
-    const erPct = parseFloat(s.employer_percent) || 0;
-    const maxErVal = parseFloat(s.max_employer_contribution) || 0;
-    const maxDeps = parseInt(s.max_dependants) || 999;
-    const maxChildOnly = s.max_child_dependants_only === true;
-
-    let { adults, children } = medInfo.dependants;
-
-    if (maxChildOnly) {
-      if (children > maxDeps) children = maxDeps;
-    } else {
-      const totalDeps = adults + children;
-      if (totalDeps > maxDeps) {
-        const cappedAdults = Math.min(adults, maxDeps);
-        const remainingSlots = Math.max(0, maxDeps - cappedAdults);
-        adults = cappedAdults;
-        children = Math.min(children, remainingSlots);
-      }
-    }
-
-    const totalMedCost = parseFloat((
-      memberVal + (adultVal * adults) + (childVal * children)
-    ).toFixed(2));
-
-    medErAmount = parseFloat((totalMedCost * (erPct / 100)).toFixed(2));
-    medEeAmount = parseFloat((totalMedCost * (eePct / 100)).toFixed(2));
-
-    if (maxErVal > 0 && medErAmount > maxErVal) {
-      medEeAmount = parseFloat((medEeAmount + (medErAmount - maxErVal)).toFixed(2));
-      medErAmount = maxErVal;
-    }
-
-    medFringeAmount = medErAmount;
-  }
-
-  let retEeAmount = 0, retErAmount = 0, retFringeAmount = 0;
-  for (const rf of retFunds) {
-    let ee = 0, er = 0;
-    const eeOverride = parseFloat(rf.employee_amount) || 0;
-    const erOverride = parseFloat(rf.employer_amount) || 0;
-    const contribType = (rf.employer_contribution_type || '').toUpperCase();
-
-    if (eeOverride > 0) {
-      ee = eeOverride;
-    } else if (contribType === 'PERCENTAGE') {
-      const eeVal = parseFloat(rf.employee_contribution_value) || parseFloat(rf.employee_contribution_rate) || 0;
-      ee = parseFloat((monthlyBasic * eeVal / 100).toFixed(2));
-    } else {
-      ee = parseFloat(rf.employee_contribution_value) || 0;
-      if (ee === 0 && parseFloat(rf.employee_contribution_rate) > 0) {
-        ee = parseFloat((monthlyBasic * parseFloat(rf.employee_contribution_rate) / 100).toFixed(2));
-      }
-    }
-
-    if (erOverride > 0) {
-      er = erOverride;
-    } else if (contribType === 'PERCENTAGE') {
-      const erVal = parseFloat(rf.employer_contribution_value) || parseFloat(rf.employer_contribution_rate) || 0;
-      er = parseFloat((monthlyBasic * erVal / 100).toFixed(2));
-    } else {
-      er = parseFloat(rf.employer_contribution_value) || 0;
-      if (er === 0 && parseFloat(rf.employer_contribution_rate) > 0) {
-        er = parseFloat((monthlyBasic * parseFloat(rf.employer_contribution_rate) / 100).toFixed(2));
-      }
-    }
-
-    const erMax = parseFloat(rf.employer_max_value) || 0;
-    if (erMax > 0 && er > erMax) er = erMax;
-    const eeMax = parseFloat(rf.employee_max_value) || 0;
-    if (eeMax > 0 && ee > eeMax) ee = eeMax;
-    retEeAmount += ee;
-    retErAmount += er;
-    retFringeAmount += er;
-  }
+  let overtimeRows = [];
+  try {
+    const overtimeResult = await dbQuery(
+      `SELECT ot.salary_head_id, ot.amount,
+              sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
+              sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM overtime_transactions ot
+       JOIN salary_heads sh ON ot.salary_head_id = sh.id
+       WHERE ot.employee_id = $1 AND ot.period_id = $2 AND ot.status = 'APPROVED'
+       ORDER BY sh.priority`,
+      [employeeId, period.id]
+    );
+    overtimeRows = overtimeResult.rows;
+  } catch (e) { console.warn('Failed to load overtime transactions:', e.message); }
 
   let prevBasicSalary = null;
   try {
@@ -577,260 +918,563 @@ async function calculatePayslipForEmployee(employeeId, periodId, cycleId) {
        ORDER BY pp.end_date DESC LIMIT 1`,
       [employeeId, period.start_date]
     );
-    if (prevResult.rows.length > 0) {
-      prevBasicSalary = parseFloat(prevResult.rows[0].amount) || null;
-    }
+    if (prevResult.rows.length > 0) prevBasicSalary = parseFloat(prevResult.rows[0].amount) || null;
   } catch (e) { /* optional */ }
 
-  const employeeData = {
-    id: emp.id,
-    employee_code: emp.employee_code,
-    date_of_birth: emp.date_of_birth,
-    date_engaged: emp.date_engaged,
-    termination_date: emp.termination_date || null,
-    dependants: medInfo.hasMedicalAid ? medInfo.dependantCount : (emp.dependants || 0),
-    annual_salary: basicAnnual,
-    monthly_salary: emp.monthly_salary,
-    salary_based_on: emp.salary_based_on,
-    wage_rate: emp.wage_rate,
-    task_grade_id: emp.task_grade_id,
-    exclude_uif: emp.exclude_uif,
-    exclude_sdl: emp.exclude_sdl,
-    employee_type_id: emp.employee_type_id || null,
-    employee_subtype_id: emp.employee_subtype_id || null,
-    condition_of_service_id: emp.condition_of_service_id || null,
-    hours_worked: emp.working_hours_per_month || null,
-    days_worked: emp.working_days_per_month || null,
-    working_hours_per_month: emp.working_hours_per_month,
-    working_days_per_month: emp.working_days_per_month,
-    working_hours_per_day: emp.working_hours_per_day,
-    prev_basic_salary: prevBasicSalary,
-    prev_annual_salary: prevBasicSalary ? prevBasicSalary * periodsPerYear : null,
-  };
-
-  const filteredTransactions = transactions.filter(tx => !systemCalcCodes.has(tx.head_code) || isBasicCode(tx.head_code));
-
-  if (medInfo.hasMedicalAid && medEeAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: medEeAmount, percentage: null,
-      head_code: 'MED_EE', head_name: 'Medical Aid Employee', transaction_type: 'DEDUCTION',
-      irp5_code: '4005', taxable: false, calculation_method: null, priority: 50,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  if (medInfo.hasMedicalAid && medErAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: medErAmount, percentage: null,
-      head_code: 'MED_ER', head_name: 'Medical Aid (Employer)', transaction_type: 'COMPANY_CONTRIBUTION',
-      irp5_code: null, taxable: false, calculation_method: null, priority: 50,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  if (medInfo.hasMedicalAid && medFringeAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: medFringeAmount, percentage: null,
-      head_code: 'MED_FRINGE', head_name: 'Medical Aid (Fringe)', transaction_type: 'FRINGE_BENEFIT',
-      irp5_code: '3810', taxable: true, calculation_method: null, priority: 50,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  if (retFunds.length > 0 && retEeAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: retEeAmount, percentage: null,
-      head_code: 'PEN_EE', head_name: 'Pension Fund (Employee)', transaction_type: 'DEDUCTION',
-      irp5_code: '4001', taxable: false, calculation_method: null, priority: 51,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  if (retFunds.length > 0 && retErAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: retErAmount, percentage: null,
-      head_code: 'PEN_ER', head_name: 'Pension Fund (Employer)', transaction_type: 'COMPANY_CONTRIBUTION',
-      irp5_code: null, taxable: false, calculation_method: null, priority: 51,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  if (retFunds.length > 0 && retFringeAmount > 0) {
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: null,
-      amount: retFringeAmount, percentage: null,
-      head_code: 'PEN_FRINGE', head_name: 'Pension Fund (Fringe)', transaction_type: 'FRINGE_BENEFIT',
-      irp5_code: '3825', taxable: true, calculation_method: null, priority: 51,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  let unionFeeTotal = 0;
-  for (const um of unionMemberships) {
-    const contribType = (um.contribution_type || '').trim();
-    const contribValue = parseFloat(um.contribution_value) || 0;
-    const maxValue = parseFloat(um.maximum_value) || 0;
-    let fee = 0;
-    if (contribType === '%') {
-      fee = parseFloat((monthlyBasic * contribValue / 100).toFixed(2));
-      if (maxValue > 0 && fee > maxValue) fee = maxValue;
-    } else {
-      fee = contribValue;
-      if (maxValue > 0 && fee > maxValue) fee = maxValue;
-    }
-    unionFeeTotal += fee;
-  }
-  if (unionMemberships.length > 0 && unionFeeTotal > 0) {
-    const unionHead = await dbQuery(`SELECT id FROM salary_heads WHERE code = 'UNION_FEES' LIMIT 1`);
-    const unionHeadId = unionHead.rows.length > 0 ? unionHead.rows[0].id : null;
-    filteredTransactions.push({
-      est_id: null, employee_id: employeeId, salary_head_id: unionHeadId,
-      amount: parseFloat(unionFeeTotal.toFixed(2)), percentage: null,
-      head_code: 'UNION_FEES', head_name: 'Union Fees', transaction_type: 'DEDUCTION',
-      irp5_code: null, taxable: false, calculation_method: null, priority: 52,
-      scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true,
-    });
-  }
-
-  const existingHeadIds = new Set(filteredTransactions.filter(t => t.salary_head_id).map(t => t.salary_head_id));
-
-  const allMocResult = await dbQuery(
-    `SELECT shf.*, sh.id AS sh_id, sh.code, sh.name AS head_name, sh.transaction_type,
-            sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority AS head_priority,
-            sh.scoa_debit_item, sh.scoa_credit_item
-     FROM salary_head_formulas shf
-     JOIN salary_heads sh ON shf.salary_head_id = sh.id
-     WHERE shf.enabled = TRUE AND sh.calculation_method IN ('SYSTEM_CALCULATE', 'FORMULA')
-     AND (shf.start_date IS NULL OR shf.start_date <= $1)
-     AND (shf.end_date IS NULL OR shf.end_date >= $1)
-     ORDER BY shf.priority DESC`,
-    [period.end_date]
-  );
+  const unionHeadRow = await dbQuery(`SELECT id FROM salary_heads WHERE code = 'UNION_FEES' LIMIT 1`);
+  const unionHeadId = unionHeadRow.rows.length > 0 ? unionHeadRow.rows[0].id : null;
 
   let mocRulesMap = null;
-  if (allMocResult.rows.length > 0) {
+  try {
+    const allMocResult = await dbQuery(
+      `SELECT shf.*, sh.id AS sh_id, sh.code, sh.name AS head_name, sh.transaction_type,
+              sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority AS head_priority,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM salary_head_formulas shf
+       JOIN salary_heads sh ON shf.salary_head_id = sh.id
+       WHERE shf.enabled = TRUE AND sh.calculation_method IN ('SYSTEM_CALCULATE', 'FORMULA')
+       AND (shf.start_date IS NULL OR shf.start_date <= $1)
+       AND (shf.end_date IS NULL OR shf.end_date >= $1)
+       ORDER BY shf.priority DESC`,
+      [period.end_date]
+    );
+    if (allMocResult.rows.length > 0) {
+      mocRulesMap = {};
+      for (const rule of allMocResult.rows) {
+        if (!mocRulesMap[rule.salary_head_id]) mocRulesMap[rule.salary_head_id] = [];
+        mocRulesMap[rule.salary_head_id].push(rule);
+      }
+    }
+  } catch (e) { /* table may not exist */ }
+
+  return _computePayslipCore({
+    employeeId, emp: salaryStructure.employee, period, cycle, periodsPerYear, taxYear,
+    taxTables, salaryStructure, medInfo, retFunds, unionMemberships,
+    empTransRows: empTransResult.rows, payslipTxRows: payslipTxResult.rows,
+    wageTransRows: wageTransResult.rows, overtimeRows,
+    claimsRows, instalmentRows,
+    prevBasicSalary, unionHeadId, mocRulesMap,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Batch preload: load ALL employee data in ~15 parallel bulk queries.
+// Reduces trial-run DB round-trips from ~13 per employee to ~15 total.
+// ---------------------------------------------------------------------------
+async function preloadBatchData(employees, period) {
+  if (employees.length === 0) {
+    return {
+      period, taxTables: null, mocRulesMap: null, unionHeadId: null,
+      empTransByEmpId: new Map(), payslipTxByEmpId: new Map(),
+      wageTxByEmpId: new Map(), overtimeTxByEmpId: new Map(),
+      claimsByEmpId: new Map(), instalmentsByEmpId: new Map(),
+      medAidByEmpId: new Map(), unionsByEmpId: new Map(),
+      retFundsByEmpId: new Map(), salaryStructureByEmpId: new Map(),
+      prevBasicByEmpId: new Map(),
+    };
+  }
+
+  const employeeIds = employees.map(e => e.id);
+  const stgIds = [...new Set(employees.map(e => e.pos_stg_id || e.jp_stg_id).filter(Boolean))];
+  const upperLimitIds = [...new Set(employees.map(e => e.jp_upper_limit_id).filter(Boolean))];
+  const taxYear = resolveTaxYear(period.end_date);
+
+  const [
+    taxTablesRaw,
+    empSalaryTxResult,
+    payslipTxResult,
+    wageTxResult,
+    overtimeTxResult,
+    claimsResult,
+    instalmentsResult,
+    medAidResult,
+    unionResult,
+    retFundResult,
+    stgItemsResult,
+    upperLimitsResult,
+    ulStructureResult,
+    prevBasicResult,
+    unionHeadResult,
+    mocResult,
+  ] = await Promise.all([
+    // 1. Tax tables
+    (async () => {
+      let tt = await loadTaxTables(taxYear);
+      if (tt.brackets.length === 0) tt = await loadTaxTables(taxYear - 1);
+      return tt;
+    })(),
+    // 2. Employee salary transactions
+    dbQuery(
+      `SELECT est.id AS est_id, est.employee_id, est.salary_head_id,
+              est.start_date, est.end_date,
+              sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
+              sh.taxable, sh.affects_uif, sh.affects_sdl, sh.calculation_method, sh.priority,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM employee_salary_transactions est
+       JOIN salary_heads sh ON est.salary_head_id = sh.id
+       WHERE est.employee_id = ANY($1) AND est.enabled = TRUE
+       AND est.start_date <= $2 AND est.end_date >= $2
+       ORDER BY est.employee_id, sh.priority, est.id`,
+      [employeeIds, period.end_date]
+    ),
+    // 3. Payslip transactions
+    dbQuery(
+      `SELECT ept.id AS ept_id, ept.employee_salary_transaction_id, ept.employee_id,
+              ept.salary_head_id, ept.captured_amount, ept.period_id, ept.every_month,
+              ept.reference_no,
+              sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
+              sh.taxable, sh.affects_uif, sh.affects_sdl, sh.calculation_method, sh.priority,
+              sh.scoa_debit_item, sh.scoa_credit_item
+       FROM employee_payslip_transactions ept
+       JOIN salary_heads sh ON ept.salary_head_id = sh.id
+       WHERE ept.employee_id = ANY($1) AND ept.enabled = TRUE
+       AND (ept.every_month = TRUE OR ept.period_id = $2)
+       ORDER BY ept.employee_id, sh.priority`,
+      [employeeIds, period.id]
+    ),
+    // 4. Wage transactions
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT wt.employee_id, wt.salary_head_id, wt.hours, wt.days, wt.rate, wt.amount,
+                  sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
+                  sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM wage_transactions wt
+           JOIN salary_heads sh ON wt.salary_head_id = sh.id
+           WHERE wt.employee_id = ANY($1) AND wt.period_id = $2 AND wt.status = 'APPROVED'
+           ORDER BY wt.employee_id, sh.priority`,
+          [employeeIds, period.id]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 5. Overtime transactions
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT ot.employee_id, ot.salary_head_id, ot.amount,
+                  sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
+                  sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM overtime_transactions ot
+           JOIN salary_heads sh ON ot.salary_head_id = sh.id
+           WHERE ot.employee_id = ANY($1) AND ot.period_id = $2 AND ot.status = 'APPROVED'
+           ORDER BY ot.employee_id, sh.priority`,
+          [employeeIds, period.id]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 6. Claims (pre-joined with salary head info)
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT DISTINCT ON (c.id, c.employee_id) c.id AS claim_id, c.employee_id,
+                  c.claim_type, c.sub_type, c.amount, c.reference_no,
+                  COALESCE(cc.salary_head_id,
+                    CASE WHEN c.claim_type = 'TRAVEL' THEN 26
+                         WHEN c.claim_type = 'S_AND_T' THEN 89 ELSE NULL END) AS salary_head_id,
+                  sh.code AS head_code, sh.name AS head_name, sh.transaction_type,
+                  sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM claims c
+           LEFT JOIN claim_configurations cc ON (
+             CASE WHEN c.claim_type = 'TRAVEL' THEN 'Travel'
+                  WHEN c.claim_type = 'S_AND_T' THEN 'S & T'
+                  ELSE c.claim_type END) = cc.claim_type
+             AND cc.effective_date <= $2 AND (cc.end_date IS NULL OR cc.end_date >= $2)
+           LEFT JOIN salary_heads sh ON sh.id = COALESCE(cc.salary_head_id,
+             CASE WHEN c.claim_type = 'TRAVEL' THEN 26
+                  WHEN c.claim_type = 'S_AND_T' THEN 89 ELSE NULL END)
+           WHERE c.employee_id = ANY($1) AND c.status = 'APPROVED'
+           AND (c.period_id IS NULL OR c.period_id = $3)
+           ORDER BY c.id, c.employee_id, cc.id`,
+          [employeeIds, period.end_date, period.id]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 7. Instalments
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT i.id, i.employee_id, i.salary_head_id, i.description, i.total_amount, i.monthly_instalment, i.balance,
+                  sh.code AS head_code, sh.name AS head_name, sh.irp5_code,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM instalments i
+           LEFT JOIN salary_heads sh ON i.salary_head_id = sh.id
+           WHERE i.employee_id = ANY($1) AND i.status = 'ACTIVE' AND i.balance > 0
+             AND i.start_date <= $2 AND (i.end_date IS NULL OR i.end_date >= $2)`,
+          [employeeIds, period.end_date]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 8. Medical aid (main member + scheme)
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT ema.id, ema.employee_id, ema.scheme_id,
+                  mas.main_member_contribution, mas.adult_dependant_contribution, mas.child_dependant_contribution,
+                  mas.employer_contribution AS employee_percent,
+                  mas.employer_contribution_percentage AS employer_percent,
+                  mas.max_employer_contribution, mas.max_dependants, mas.max_child_dependants_only
+           FROM employee_medical_aid ema
+           JOIN medical_aid_schemes mas ON ema.scheme_id = mas.id
+           WHERE ema.employee_id = ANY($1) AND ema.is_current = TRUE
+             AND ema.join_date <= $2 AND (ema.termination_date IS NULL OR ema.termination_date >= $3)`,
+          [employeeIds, period.end_date, period.start_date]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 9. Union memberships
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT eu.employee_id, eu.id, eu.trade_union_id,
+                  tu.representative AS union_name, tu.contribution_type, tu.contribution_value, tu.maximum_value
+           FROM employee_unions eu
+           JOIN trade_unions tu ON eu.trade_union_id = tu.id
+           WHERE eu.employee_id = ANY($1) AND eu.enabled = TRUE AND tu.enabled = TRUE
+             AND eu.join_date <= $2 AND (eu.termination_date IS NULL OR eu.termination_date >= $3)`,
+          [employeeIds, period.end_date, period.start_date]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 10. Retirement funds
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT erf.employee_id, erf.id, erf.fund_type_id, erf.employee_amount, erf.employer_amount,
+                  rft.employer_contribution_type, rft.employer_contribution_value,
+                  rft.employee_contribution_value, rft.employer_max_value, rft.employee_max_value,
+                  rft.employee_contribution_rate, rft.employer_contribution_rate
+           FROM employee_retirement_funds erf
+           JOIN retirement_fund_types rft ON erf.fund_type_id = rft.id
+           WHERE erf.employee_id = ANY($1) AND erf.is_current = TRUE
+             AND (erf.status IS NULL OR erf.status = 'ACTIVE')`,
+          [employeeIds]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 11. Salary transaction group items
+    stgIds.length > 0 ? dbQuery(
+      `SELECT stgi.id, stgi.group_id, stgi.salary_head_id, stgi.sort_order, stgi.included_in_package,
+              sh.code, sh.name, sh.transaction_type, sh.irp5_code, sh.taxable,
+              sh.calculation_method, sh.priority,
+              sh.scoa_debit_item, sh.scoa_credit_item, sh.affects_uif, sh.affects_sdl
+       FROM salary_transaction_group_items stgi
+       JOIN salary_heads sh ON stgi.salary_head_id = sh.id
+       WHERE stgi.group_id = ANY($1)
+       ORDER BY stgi.sort_order, sh.priority`,
+      [stgIds]
+    ) : Promise.resolve({ rows: [] }),
+    // 12. Upper limit definitions
+    upperLimitIds.length > 0 ? dbQuery(
+      `SELECT * FROM salary_upper_limits WHERE id = ANY($1) AND enabled = TRUE
+         AND start_date <= $2 AND end_date >= $2`,
+      [upperLimitIds, period.end_date]
+    ) : Promise.resolve({ rows: [] }),
+    // 13. Upper limit employee structures
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT uls.employee_id, uls.salary_head_id, uls.amount, uls.included_in_package,
+                  sh.code, sh.name, sh.transaction_type, sh.calculation_method,
+                  sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM employee_upper_limit_structure uls
+           JOIN salary_heads sh ON uls.salary_head_id = sh.id
+           WHERE uls.employee_id = ANY($1)
+           ORDER BY uls.employee_id, sh.priority`,
+          [employeeIds]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 14. Previous basic salaries (DISTINCT ON per employee)
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT DISTINCT ON (pr.employee_id) pr.employee_id, pr.amount
+           FROM payroll_results pr
+           JOIN payroll_runs prr ON pr.run_id = prr.id
+           JOIN payroll_periods pp ON prr.period_id = pp.id
+           JOIN salary_heads sh ON pr.salary_head_id = sh.id
+           WHERE pr.employee_id = ANY($1) AND sh.code IN ('BASIC','BASIC_SALARY')
+             AND pp.end_date < $2
+           ORDER BY pr.employee_id, pp.end_date DESC`,
+          [employeeIds, period.start_date]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+    // 15. Union fees salary head ID (shared)
+    dbQuery(`SELECT id FROM salary_heads WHERE code = 'UNION_FEES' LIMIT 1`),
+    // 16. MOC formula rules (shared across all employees)
+    (async () => {
+      try {
+        return await dbQuery(
+          `SELECT shf.*, sh.id AS sh_id, sh.code, sh.name AS head_name, sh.transaction_type,
+                  sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority AS head_priority,
+                  sh.scoa_debit_item, sh.scoa_credit_item
+           FROM salary_head_formulas shf
+           JOIN salary_heads sh ON shf.salary_head_id = sh.id
+           WHERE shf.enabled = TRUE AND sh.calculation_method IN ('SYSTEM_CALCULATE', 'FORMULA')
+           AND (shf.start_date IS NULL OR shf.start_date <= $1)
+           AND (shf.end_date IS NULL OR shf.end_date >= $1)
+           ORDER BY shf.priority DESC`,
+          [period.end_date]
+        );
+      } catch (e) { return { rows: [] }; }
+    })(),
+  ]);
+
+  // ---- Build employee→data maps ----
+
+  // empTransByEmpId: employee_id → array of rows (deduped by salary_head_id)
+  const empTransByEmpId = new Map();
+  const _empTransSeen = new Map();
+  for (const row of empSalaryTxResult.rows) {
+    if (!empTransByEmpId.has(row.employee_id)) {
+      empTransByEmpId.set(row.employee_id, []);
+      _empTransSeen.set(row.employee_id, new Set());
+    }
+    const seen = _empTransSeen.get(row.employee_id);
+    if (!seen.has(row.salary_head_id)) {
+      seen.add(row.salary_head_id);
+      empTransByEmpId.get(row.employee_id).push(row);
+    }
+  }
+
+  const payslipTxByEmpId = new Map();
+  for (const row of payslipTxResult.rows) {
+    if (!payslipTxByEmpId.has(row.employee_id)) payslipTxByEmpId.set(row.employee_id, []);
+    payslipTxByEmpId.get(row.employee_id).push(row);
+  }
+
+  const wageTxByEmpId = new Map();
+  for (const row of wageTxResult.rows) {
+    if (!wageTxByEmpId.has(row.employee_id)) wageTxByEmpId.set(row.employee_id, []);
+    wageTxByEmpId.get(row.employee_id).push(row);
+  }
+
+  const overtimeTxByEmpId = new Map();
+  for (const row of overtimeTxResult.rows) {
+    if (!overtimeTxByEmpId.has(row.employee_id)) overtimeTxByEmpId.set(row.employee_id, []);
+    overtimeTxByEmpId.get(row.employee_id).push(row);
+  }
+
+  const claimsByEmpId = new Map();
+  for (const row of claimsResult.rows) {
+    if (!claimsByEmpId.has(row.employee_id)) claimsByEmpId.set(row.employee_id, []);
+    claimsByEmpId.get(row.employee_id).push(row);
+  }
+
+  const instalmentsByEmpId = new Map();
+  for (const row of instalmentsResult.rows) {
+    if (!instalmentsByEmpId.has(row.employee_id)) instalmentsByEmpId.set(row.employee_id, []);
+    instalmentsByEmpId.get(row.employee_id).push(row);
+  }
+
+  // Medical aid: resolve dependants separately (one more query but small)
+  const medAidById = new Map();
+  const empIdToMedAidId = new Map();
+  for (const row of medAidResult.rows) {
+    medAidById.set(row.id, row);
+    empIdToMedAidId.set(row.employee_id, row.id);
+  }
+  const depsByMedAidId = new Map();
+  if (medAidResult.rows.length > 0) {
+    const medAidIds = medAidResult.rows.map(r => r.id);
+    try {
+      const depResult = await dbQuery(
+        `SELECT employee_medical_aid_id, dependant_type, employer_contributes
+         FROM employee_medical_aid_dependants
+         WHERE employee_medical_aid_id = ANY($1)
+           AND (end_date IS NULL OR end_date >= $2) AND start_date <= $3`,
+        [medAidIds, period.start_date, period.end_date]
+      );
+      for (const dep of depResult.rows) {
+        if (!depsByMedAidId.has(dep.employee_medical_aid_id)) depsByMedAidId.set(dep.employee_medical_aid_id, []);
+        depsByMedAidId.get(dep.employee_medical_aid_id).push(dep);
+      }
+    } catch (e) { /* optional */ }
+  }
+
+  const medAidByEmpId = new Map();
+  const _noMed = { hasMedicalAid: false, dependantCount: 0, scheme: null, dependants: { adults: 0, children: 0 } };
+  for (const emp of employees) {
+    const medAidId = empIdToMedAidId.get(emp.id);
+    if (!medAidId) { medAidByEmpId.set(emp.id, _noMed); continue; }
+    const ma = medAidById.get(medAidId);
+    const deps = depsByMedAidId.get(medAidId) || [];
+    let adults = 0, children = 0;
+    for (const dep of deps) {
+      const dt = (dep.dependant_type || '').toUpperCase();
+      if (dt === 'ADULT' || dt === 'SPOUSE') adults++; else children++;
+    }
+    medAidByEmpId.set(emp.id, {
+      hasMedicalAid: true, dependantCount: adults + children,
+      scheme: ma, dependants: { adults, children },
+    });
+  }
+
+  const unionsByEmpId = new Map();
+  for (const row of unionResult.rows) {
+    if (!unionsByEmpId.has(row.employee_id)) unionsByEmpId.set(row.employee_id, []);
+    unionsByEmpId.get(row.employee_id).push(row);
+  }
+
+  const retFundsByEmpId = new Map();
+  for (const row of retFundResult.rows) {
+    if (!retFundsByEmpId.has(row.employee_id)) retFundsByEmpId.set(row.employee_id, []);
+    retFundsByEmpId.get(row.employee_id).push(row);
+  }
+
+  // STG items by group_id
+  const stgItemsByGroupId = new Map();
+  for (const row of stgItemsResult.rows) {
+    if (!stgItemsByGroupId.has(row.group_id)) stgItemsByGroupId.set(row.group_id, []);
+    stgItemsByGroupId.get(row.group_id).push(row);
+  }
+
+  // Upper limits by id
+  const upperLimitsById = new Map();
+  for (const row of upperLimitsResult.rows) upperLimitsById.set(row.id, row);
+
+  // Upper limit structures by employee_id
+  const ulStructureByEmpId = new Map();
+  for (const row of ulStructureResult.rows) {
+    if (!ulStructureByEmpId.has(row.employee_id)) ulStructureByEmpId.set(row.employee_id, []);
+    ulStructureByEmpId.get(row.employee_id).push(row);
+  }
+
+  // Build salary structure per employee (mirrors resolveEmployeeSalaryStructure logic)
+  const salaryStructureByEmpId = new Map();
+  for (const emp of employees) {
+    const stgId = emp.pos_stg_id || emp.jp_stg_id || null;
+    const upperLimitId = emp.jp_upper_limit_id || null;
+    const upperLimitValueType = (emp.upper_limit_value_type || emp.pos_upper_limit_value_type || 'MIDPOINT').toUpperCase();
+
+    const groupItems = stgId ? (stgItemsByGroupId.get(stgId) || []) : [];
+    const upperLimitStructureRows = ulStructureByEmpId.get(emp.id) || [];
+
+    let resolvedSalary = null, salarySource = 'FIXED', upperLimitTargetPackage = 0;
+
+    if (upperLimitId) {
+      const ul = upperLimitsById.get(upperLimitId);
+      if (ul) {
+        if (upperLimitValueType === 'MINIMUM') resolvedSalary = parseFloat(ul.minimum_value) || 0;
+        else if (upperLimitValueType === 'MAXIMUM') resolvedSalary = parseFloat(ul.maximum_value) || 0;
+        else resolvedSalary = parseFloat(ul.midpoint_value) || 0;
+        upperLimitTargetPackage = resolvedSalary;
+        salarySource = 'UPPER_LIMIT';
+      }
+    }
+
+    const effectiveTaskGradeId = emp.task_grade_id || emp.jp_task_grade_id || null;
+    if (resolvedSalary === null && effectiveTaskGradeId && emp.current_notch) {
+      const monthlySal = parseFloat(emp.monthly_salary) || 0;
+      if (monthlySal <= 0) {
+        salaryStructureByEmpId.set(emp.id, {
+          _error: `Task Grade employee ${emp.employee_code || emp.id} has no monthly salary set.`,
+        });
+        continue;
+      }
+      resolvedSalary = parseFloat((monthlySal * 12).toFixed(2));
+      salarySource = 'TASK_GRADE';
+    }
+
+    if (resolvedSalary === null) {
+      resolvedSalary = parseFloat(emp.annual_salary) || 0;
+      salarySource = 'FIXED';
+    }
+
+    const empObj = {
+      id: emp.id, employee_code: emp.employee_code,
+      annual_salary: emp.annual_salary, monthly_salary: emp.monthly_salary,
+      position_id: emp.position_id, task_grade_id: emp.task_grade_id,
+      current_notch: emp.current_notch,
+      upper_limit_value_type: upperLimitValueType,
+      date_of_birth: emp.date_of_birth, dependants: emp.dependants,
+      exclude_uif: emp.exclude_uif, exclude_sdl: emp.exclude_sdl,
+      date_engaged: emp.date_engaged || emp.joining_date,
+      termination_date: emp.termination_date || emp.end_date,
+      employee_type_id: emp.employee_type_id, employee_subtype_id: emp.employee_subtype_id,
+      condition_of_service_id: emp.condition_of_service_id,
+      working_hours_per_month: emp.hours_worked || emp.working_hours_per_month,
+      working_days_per_month: emp.days_worked || emp.working_days_per_month,
+      working_hours_per_day: emp.working_hours_per_day,
+      salary_based_on: emp.salary_based_on, wage_rate: emp.wage_rate,
+      jp_task_grade_id: emp.jp_task_grade_id, jp_upper_limit_id: emp.jp_upper_limit_id,
+    };
+
+    salaryStructureByEmpId.set(emp.id, {
+      employee: empObj, annualSalary: resolvedSalary, salarySource,
+      salaryTransGroupId: stgId, groupItems,
+      upperLimitValueType, upperLimitStructureRows, upperLimitTargetPackage,
+    });
+  }
+
+  // Previous basic salary by employee_id
+  const prevBasicByEmpId = new Map();
+  for (const row of prevBasicResult.rows) {
+    prevBasicByEmpId.set(row.employee_id, parseFloat(row.amount) || null);
+  }
+
+  // Union fees head ID
+  const unionHeadId = unionHeadResult.rows.length > 0 ? unionHeadResult.rows[0].id : null;
+
+  // MOC rules map
+  let mocRulesMap = null;
+  if (mocResult.rows.length > 0) {
     mocRulesMap = {};
-    for (const rule of allMocResult.rows) {
+    for (const rule of mocResult.rows) {
       if (!mocRulesMap[rule.salary_head_id]) mocRulesMap[rule.salary_head_id] = [];
       mocRulesMap[rule.salary_head_id].push(rule);
     }
   }
 
-  const calcResult = calculateForEmployee(employeeData, filteredTransactions, taxTables, period, cycle, mocRulesMap);
-
-  const age = getAge(emp.date_of_birth, period.end_date);
-
-  const annualGrossTaxable = calcResult.summary.taxable_income * periodsPerYear;
-  const pensionDeductionAnnual = calculatePensionDeduction(calcResult.results, annualGrossTaxable, periodsPerYear);
-  const annualTaxableIncome = annualGrossTaxable - pensionDeductionAnnual;
-  const annualPAYE = calculatePAYE(annualTaxableIncome, age, taxTables);
-  const monthlyPAYE = parseFloat((annualPAYE / periodsPerYear).toFixed(2));
-  const hasMedAidTx = calcResult.results.some(r =>
-    (r.head_code || '').includes('MED') && (r.transaction_type === 'DEDUCTION' || r.transaction_type === 'FRINGE_BENEFIT')
-  );
-  const medCredits = (medInfo.hasMedicalAid || hasMedAidTx)
-    ? calculateMedicalCredits(medInfo.dependantCount || emp.dependants || 0, taxTables, periodsPerYear)
-    : 0;
-  const finalPAYE = Math.max(0, parseFloat((monthlyPAYE - medCredits).toFixed(2)));
-
-  const payeItem = calcResult.results.find(r => r.head_code === 'PAYE');
-  if (payeItem) {
-    const payeDiff = payeItem.amount - finalPAYE;
-    payeItem.amount = finalPAYE;
-    payeItem.calculation_detail = {
-      ...payeItem.calculation_detail,
-      annual_gross_taxable: annualGrossTaxable,
-      annual_pension_deduction: pensionDeductionAnnual,
-      annual_taxable: annualTaxableIncome,
-      medical_credits: medCredits,
-      monthly_tax: monthlyPAYE,
-      annual_tax: annualPAYE,
-    };
-    calcResult.summary.paye = finalPAYE;
-    calcResult.summary.total_deductions = parseFloat((calcResult.summary.total_deductions - payeDiff).toFixed(2));
-    calcResult.summary.nett_pay = parseFloat((calcResult.summary.nett_pay + payeDiff).toFixed(2));
-    calcResult.summary.medical_credits = medCredits;
-  }
-
-  let appliedBracket = null;
-  for (const bracket of taxTables.brackets) {
-    const min = parseFloat(bracket.min_income) || 0;
-    const max = parseFloat(bracket.max_income) || Infinity;
-    if (annualTaxableIncome > min && annualTaxableIncome <= max) {
-      appliedBracket = bracket;
-      break;
-    }
-    if (annualTaxableIncome > min) appliedBracket = bracket;
-  }
-
-  let totalRebates = 0;
-  const rebatesApplied = [];
-  for (const rebate of taxTables.rebates) {
-    const rebateAmount = parseFloat(rebate.amount) || 0;
-    const rebateType = (rebate.rebate_type || '').toUpperCase();
-    if (rebateType === 'PRIMARY') {
-      totalRebates += rebateAmount;
-      rebatesApplied.push({ type: 'PRIMARY', amount: rebateAmount });
-    } else if (rebateType === 'SECONDARY' && age >= 65) {
-      totalRebates += rebateAmount;
-      rebatesApplied.push({ type: 'SECONDARY', amount: rebateAmount });
-    } else if (rebateType === 'TERTIARY' && age >= 75) {
-      totalRebates += rebateAmount;
-      rebatesApplied.push({ type: 'TERTIARY', amount: rebateAmount });
-    }
-  }
-
-  const payeBreakdown = {
-    tax_year: taxYear,
-    age,
-    periods_per_year: periodsPerYear,
-    monthly_taxable_income: calcResult.summary.taxable_income,
-    annual_gross_taxable: annualGrossTaxable,
-    annual_pension_deduction: pensionDeductionAnnual,
-    annual_taxable_income: annualTaxableIncome,
-    applied_bracket: appliedBracket ? {
-      bracket_number: appliedBracket.bracket_number,
-      min_income: parseFloat(appliedBracket.min_income),
-      max_income: parseFloat(appliedBracket.max_income),
-      base_tax: parseFloat(appliedBracket.base_tax),
-      rate: parseFloat(appliedBracket.rate),
-    } : null,
-    annual_tax_before_rebates: annualPAYE + totalRebates,
-    rebates: rebatesApplied,
-    total_rebates: totalRebates,
-    annual_tax_after_rebates: annualPAYE,
-    monthly_paye_before_credits: monthlyPAYE,
-    medical_tax_credits: medCredits,
-    dependant_count: medInfo.hasMedicalAid ? medInfo.dependantCount : (emp.dependants || 0),
-    final_monthly_paye: finalPAYE,
-    salary_source: salarySource,
-    total_package: annualSalary,
-    basic_annual: basicAnnual,
-  };
-
   return {
-    ...calcResult,
-    employee_id: employeeId,
-    period,
-    salaryStructure: {
-      source: salarySource,
-      annualSalary,
-      basicAnnual,
-      monthlyBasic,
-      groupItems: groupItems,
-    },
-    medicalAid: medInfo,
-    retirementFunds: retFunds,
-    unionMemberships,
-    payeBreakdown,
-    transactions: empTransResult.rows,
+    period, taxTables: taxTablesRaw, mocRulesMap, unionHeadId,
+    empTransByEmpId, payslipTxByEmpId, wageTxByEmpId, overtimeTxByEmpId,
+    claimsByEmpId, instalmentsByEmpId, medAidByEmpId, unionsByEmpId,
+    retFundsByEmpId, salaryStructureByEmpId, prevBasicByEmpId,
   };
 }
+
+// Uses preloaded batch data to compute a single employee payslip without extra DB calls.
+function calculatePayslipForEmployeeFromPreload(employeeId, preloadedData) {
+  const {
+    period, taxTables, mocRulesMap, unionHeadId,
+    empTransByEmpId, payslipTxByEmpId, wageTxByEmpId, overtimeTxByEmpId,
+    claimsByEmpId, instalmentsByEmpId, medAidByEmpId, unionsByEmpId,
+    retFundsByEmpId, salaryStructureByEmpId, prevBasicByEmpId,
+  } = preloadedData;
+
+  const salaryStructure = salaryStructureByEmpId.get(employeeId);
+  if (!salaryStructure) throw new Error(`Employee ${employeeId} not found in preloaded data`);
+  if (salaryStructure._error) throw new Error(salaryStructure._error);
+
+  const cycle = { periods_per_year: period.periods_per_year || 12 };
+  const periodsPerYear = cycle.periods_per_year;
+  const taxYear = resolveTaxYear(period.end_date);
+
+  const _noMed = { hasMedicalAid: false, dependantCount: 0, scheme: null, dependants: { adults: 0, children: 0 } };
+
+  return _computePayslipCore({
+    employeeId, emp: salaryStructure.employee,
+    period, cycle, periodsPerYear, taxYear, taxTables, salaryStructure,
+    medInfo: medAidByEmpId.get(employeeId) || _noMed,
+    retFunds: retFundsByEmpId.get(employeeId) || [],
+    unionMemberships: unionsByEmpId.get(employeeId) || [],
+    empTransRows: empTransByEmpId.get(employeeId) || [],
+    payslipTxRows: payslipTxByEmpId.get(employeeId) || [],
+    wageTransRows: wageTxByEmpId.get(employeeId) || [],
+    overtimeRows: overtimeTxByEmpId.get(employeeId) || [],
+    claimsRows: claimsByEmpId.get(employeeId) || [],
+    instalmentRows: instalmentsByEmpId.get(employeeId) || [],
+    prevBasicSalary: prevBasicByEmpId.get(employeeId) || null,
+    unionHeadId, mocRulesMap,
+  });
+}
+
 
 function tokenizeFormula(input) {
   const tokens = [];
@@ -1664,6 +2308,13 @@ function calculateForEmployee(employee, transactions, taxTables, period, cycle, 
     results.push({
       est_id: ded.est_id || null,
       ept_id: ded.ept_id || null,
+      instalment_id: ded.instalment_id || null,
+      is_instalment_transaction: !!ded.is_instalment_transaction,
+      instalment_description: ded.instalment_description != null ? ded.instalment_description : null,
+      instalment_total_amount: ded.instalment_total_amount != null ? ded.instalment_total_amount : null,
+      instalment_monthly: ded.instalment_monthly != null ? ded.instalment_monthly : null,
+      instalment_balance_before: ded.instalment_balance_before != null ? ded.instalment_balance_before : null,
+      instalment_balance_after: ded.instalment_balance_after != null ? ded.instalment_balance_after : null,
       salary_head_id: ded.salary_head_id,
       head_code: ded.head_code || ded.code,
       head_name: ded.head_name || ded.name,
@@ -1893,11 +2544,17 @@ function normalizeTransactionsToMonthly(transactions, periodsPerYear, employee) 
     'MED_AID_EE', 'MED_AID_ER', 'PENSION_EE', 'PENSION_ER', 'PENSION_FRINGE',
     'UIF_EE', 'UIF_ER', 'SDL', 'PAYE', 'UNION_FEES']);
 
-  const basicTx = transactions.find(t => isBasicCode(t.head_code || t.code));
+  const basicTx = transactions.find(t => isBasicCode(t.head_code || t.code) && !t.is_wage_transaction);
   if (basicTx) {
-    const monthlySal = employee ? (parseFloat(employee.monthly_salary) || 0) : 0;
-    const annualSal = employee ? (parseFloat(employee.annual_salary) || 0) : 0;
-    basicTx.amount = monthlySal > 0 ? monthlySal : parseFloat((annualSal / periodsPerYear).toFixed(2));
+    const salaryBasedOn = employee ? (employee.salary_based_on || '') : '';
+    const isRateBasedZero = salaryBasedOn === 'RATE_PER_HOUR' || salaryBasedOn === 'RATE_PER_DAY' || salaryBasedOn === 'CAPTURED_VALUE';
+    if (isRateBasedZero) {
+      basicTx.amount = 0;
+    } else {
+      const monthlySal = employee ? (parseFloat(employee.monthly_salary) || 0) : 0;
+      const annualSal = employee ? (parseFloat(employee.annual_salary) || 0) : 0;
+      basicTx.amount = monthlySal > 0 ? monthlySal : parseFloat((annualSal / periodsPerYear).toFixed(2));
+    }
     basicTx.calculation_method = null;
   }
 
@@ -1913,4 +2570,4 @@ function normalizeTransactionsToMonthly(transactions, periodsPerYear, employee) 
   return transactions;
 }
 
-module.exports = { calculateForEmployee, calculateMock, loadTaxTables, calculatePAYE, calculateUIF, calculateSDL, calculateMedicalCredits, getAge, calculateETI, resolveTaxYear, resolveMonthlyBasic, resolveEmployeeSalaryStructure, getEmployeeMedicalAidInfo, getEmployeeRetirementFundInfo, getEmployeeUnionInfo, calculatePayslipForEmployee, normalizeTransactionsToMonthly, evaluateFormulaV2, buildFormulaVariables, resolveMOCRule, loadMOCRules, applyMOCRounding };
+module.exports = { calculateForEmployee, calculateMock, loadTaxTables, calculatePAYE, calculateUIF, calculateSDL, calculateMedicalCredits, getAge, calculateETI, resolveTaxYear, resolveMonthlyBasic, resolveEmployeeSalaryStructure, getEmployeeMedicalAidInfo, getEmployeeRetirementFundInfo, getEmployeeUnionInfo, calculatePayslipForEmployee, preloadBatchData, calculatePayslipForEmployeeFromPreload, normalizeTransactionsToMonthly, evaluateFormulaV2, buildFormulaVariables, resolveMOCRule, loadMOCRules, applyMOCRounding };

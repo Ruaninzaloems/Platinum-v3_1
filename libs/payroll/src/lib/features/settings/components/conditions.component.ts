@@ -11,6 +11,7 @@ import { DateInputComponent } from '../../../shared/components/date-input/date-i
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, DateInputComponent],
   templateUrl: './conditions.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './conditions.component.css'
 })
 export class ConditionsComponent implements OnInit {

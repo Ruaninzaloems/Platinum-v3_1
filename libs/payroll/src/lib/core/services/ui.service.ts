@@ -19,6 +19,7 @@ export interface ConfirmConfig {
   title: string;
   message: string;
   danger?: boolean;
+  confirmText?: string;
 }
 
 @Injectable({ providedIn: 'root' })

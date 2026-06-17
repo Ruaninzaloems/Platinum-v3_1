@@ -9,6 +9,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   templateUrl: './irp5-source-codes.component.html',
+  host: { 'data-accent': 'settings' },
   styleUrl: './irp5-source-codes.component.css'
 })
 export class Irp5SourceCodesComponent implements OnInit {

@@ -4,7 +4,39 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { paginationMiddleware } = require('../middleware/validation');
 const { auditLog } = require('../middleware/auditLog');
 const { query: dbQuery, getClient } = require('../config/database');
-const { calculateForEmployee, calculateMock, loadTaxTables, calculateETI, getAge, resolveTaxYear, resolveMonthlyBasic, calculatePayslipForEmployee, normalizeTransactionsToMonthly, evaluateFormulaV2, buildFormulaVariables } = require('../services/payroll-engine');
+const { checkPayrollLockdown } = require('../utils/payroll-lockdown');
+const { calculateForEmployee, calculateMock, loadTaxTables, calculateETI, getAge, resolveTaxYear, resolveMonthlyBasic, calculatePayslipForEmployee, preloadBatchData, calculatePayslipForEmployeeFromPreload, normalizeTransactionsToMonthly, evaluateFormulaV2, buildFormulaVariables } = require('../services/payroll-engine');
+const { getInPeriodUnapprovedTransactions } = require('../services/transaction-approval.service');
+
+// ---------------------------------------------------------------------------
+// Payroll-run pre-flight gate (Task #180)
+// ---------------------------------------------------------------------------
+// Stops trial AND final payroll runs from starting while any in-period
+// CLAIM / WAGE / OVERTIME / INSTALLMENT row is still awaiting approval.
+// Returns null when the run may proceed; otherwise returns a structured
+// error payload that the caller writes back as 400.
+async function preflightApprovalCheck(runId) {
+  const r = await dbQuery('SELECT cycle_id, period_id FROM payroll_runs WHERE id = $1', [runId]);
+  if (r.rows.length === 0) {
+    return { status: 404, body: { success: false, error: { code: 'NOT_FOUND', message: 'Payroll run not found' } } };
+  }
+  const { cycle_id, period_id } = r.rows[0];
+  const check = await getInPeriodUnapprovedTransactions(cycle_id, period_id);
+  if (!check.blocking) return null;
+  return {
+    status: 400,
+    body: {
+      success: false,
+      error: {
+        code: 'OUTSTANDING_APPROVALS',
+        message: 'Outstanding transactions awaiting approval. Please complete all approvals before running payroll.',
+        counts: check.counts,
+        ids: check.ids,
+        total: check.total
+      }
+    }
+  };
+}
 
 /**
  * @swagger
@@ -235,6 +267,38 @@ const { calculateForEmployee, calculateMock, loadTaxTables, calculateETI, getAge
  *         description: Third party payments
  */
 
+router.get('/lock-status', authenticate, async (req, res, next) => {
+  try {
+    const { cycle_id } = req.query;
+    if (!cycle_id) return res.json({ success: true, data: { locked: false } });
+    const cid = parseInt(cycle_id, 10);
+    if (!cid || isNaN(cid)) return res.json({ success: true, data: { locked: false } });
+    // Check whether ANY period in this cycle is currently in Trial Lockdown
+    const result = await dbQuery(
+      `SELECT pp.id, pp.status, pp.period_number, pp.start_date, pp.end_date, pc.name AS cycle_name
+       FROM payroll_periods pp
+       JOIN payroll_cycles pc ON pp.cycle_id = pc.id
+       WHERE pp.cycle_id = $1 AND pp.status = 'LOCKED'
+       LIMIT 1`,
+      [cid]
+    );
+    if (result.rows.length === 0) return res.json({ success: true, data: { locked: false } });
+    const p = result.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        locked: true,
+        period_id: p.id,
+        period_status: p.status,
+        period_number: p.period_number,
+        cycle_name: p.cycle_name
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/cycles', authenticate, async (req, res, next) => {
   try {
     const { all } = req.query;
@@ -349,7 +413,7 @@ router.get('/periods/open', authenticate, async (req, res, next) => {
        JOIN payroll_cycles pc ON pp.cycle_id = pc.id
        WHERE pp.cycle_id = $1 AND pp.status IN ('OPEN', 'TRIAL', 'LOCKED')
          AND COALESCE(pp.cycle_mode_id, 1) = 1
-       ORDER BY CASE pp.status WHEN 'OPEN' THEN 0 WHEN 'TRIAL' THEN 1 WHEN 'LOCKED' THEN 2 END, pp.tax_year ASC, pp.period_number ASC
+       ORDER BY CASE pp.status WHEN 'LOCKED' THEN 0 WHEN 'TRIAL' THEN 1 WHEN 'OPEN' THEN 2 END, pp.tax_year ASC, pp.period_number ASC
        LIMIT 1`,
       [parseInt(cycle_id, 10)]
     );
@@ -541,10 +605,14 @@ router.get('/runs/:id/gl-ledger', authenticate, async (req, res, next) => {
               pr.division_id, pr.scoa_item_id, pr.scoa_project_id, pr.scoa_function_id, pr.scoa_region_id, pr.scoa_fund_id,
               pr.contra_division_id, pr.contra_scoa_item_id, pr.contra_scoa_project_id, pr.contra_scoa_function_id, pr.contra_scoa_region_id, pr.contra_scoa_fund_id,
               pr.debit_plan_project_item_id, pr.credit_plan_project_item_id,
+              dss.scoa_code AS debit_scoa_code, dss.scoa_short_desc AS debit_scoa_desc,
+              css.scoa_code AS credit_scoa_code, css.scoa_short_desc AS credit_scoa_desc,
               COALESCE(pgl.journal_entry_only, false) AS journal_entry_only
        FROM payroll_results pr
        JOIN employees e ON pr.employee_id = e.id
        LEFT JOIN salary_heads sh ON pr.salary_head_id = sh.id
+       LEFT JOIN scoa_structure_sync dss ON dss.scoa_id::text = pr.scoa_item_id
+       LEFT JOIN scoa_structure_sync css ON css.scoa_id::text = pr.contra_scoa_item_id
        LEFT JOIN LATERAL (
          SELECT journal_entry_only FROM payroll_gl_items
          WHERE salary_head_id = pr.salary_head_id
@@ -702,10 +770,14 @@ router.get('/runs/:id/gl-ledger/export', authenticate, async (req, res, next) =>
               pr.division_id, pr.scoa_item_id, pr.scoa_project_id, pr.scoa_function_id, pr.scoa_region_id, pr.scoa_fund_id,
               pr.contra_division_id, pr.contra_scoa_item_id, pr.contra_scoa_project_id, pr.contra_scoa_function_id, pr.contra_scoa_region_id, pr.contra_scoa_fund_id,
               pr.debit_plan_project_item_id, pr.credit_plan_project_item_id,
+              dss.scoa_code AS debit_scoa_code, dss.scoa_short_desc AS debit_scoa_desc,
+              css.scoa_code AS credit_scoa_code, css.scoa_short_desc AS credit_scoa_desc,
               COALESCE(pgl.journal_entry_only, false) AS journal_entry_only
        FROM payroll_results pr
        JOIN employees e ON pr.employee_id = e.id
        LEFT JOIN salary_heads sh ON pr.salary_head_id = sh.id
+       LEFT JOIN scoa_structure_sync dss ON dss.scoa_id::text = pr.scoa_item_id
+       LEFT JOIN scoa_structure_sync css ON css.scoa_id::text = pr.contra_scoa_item_id
        LEFT JOIN LATERAL (
          SELECT journal_entry_only FROM payroll_gl_items
          WHERE salary_head_id = pr.salary_head_id
@@ -772,13 +844,13 @@ router.get('/runs/:id/gl-ledger/export', authenticate, async (req, res, next) =>
         transaction_type: sanitize(row.transaction_type),
         amount: parseFloat(row.amount) || 0,
         division_id: row.division_id || '',
-        scoa_item_id: row.scoa_item_id || '',
+        scoa_item_id: row.debit_scoa_code || (row.scoa_item_id ? String(row.scoa_item_id) : ''),
         scoa_project_id: row.scoa_project_id || '',
         scoa_function_id: row.scoa_function_id || '',
         scoa_region_id: row.scoa_region_id || '',
         scoa_fund_id: row.scoa_fund_id || '',
         contra_division_id: row.contra_division_id || '',
-        contra_scoa_item_id: row.contra_scoa_item_id || '',
+        contra_scoa_item_id: row.credit_scoa_code || (row.contra_scoa_item_id ? String(row.contra_scoa_item_id) : ''),
         contra_scoa_project_id: row.contra_scoa_project_id || '',
         contra_scoa_function_id: row.contra_scoa_function_id || '',
         contra_scoa_region_id: row.contra_scoa_region_id || '',
@@ -859,7 +931,7 @@ router.post('/runs/:id/post-to-ledger', authenticate, async (req, res, next) => 
       lines
     };
 
-    const EXTERNAL_API_BASE = process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
+    const EXTERNAL_API_BASE = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev';
     const extRes = await globalThis.fetch(`${EXTERNAL_API_BASE}/gl-outbox`, {
       method: 'POST',
       headers: {
@@ -953,7 +1025,7 @@ router.post('/periods/generate', authenticate, async (req, res, next) => {
         current.setDate(current.getDate() + 1);
         if (current > endDt) break;
       }
-    } else if (cycle.cycle_type === 'BI-WEEKLY') {
+    } else if (cycle.cycle_type === 'FORTNIGHTLY' || cycle.cycle_type === 'BI-WEEKLY') {
       let current = new Date(startDt);
       for (let i = 1; i <= periodsCount; i++) {
         const periodStart = new Date(current);
@@ -1092,6 +1164,27 @@ router.post('/runs', authenticate, auditLog('CREATE', 'payroll_run'), async (req
       [cycle_id, period_id, run_type, payment_date || period.rows[0].payment_date, req.user?.id || 1]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Approval blockers — read-only inline panel for the payroll-run page (Task #183)
+// ---------------------------------------------------------------------------
+// Returns the hydrated set of in-period CLAIM/WAGE/OVERTIME/INSTALLMENT rows
+// that are still preventing this run from executing, with employee name,
+// amount and submitter so the payroll officer can chase the right approver
+// without leaving the screen.
+router.get('/runs/:id/approval-blockers', authenticate, async (req, res, next) => {
+  try {
+    const r = await dbQuery('SELECT cycle_id, period_id FROM payroll_runs WHERE id = $1', [req.params.id]);
+    if (r.rows.length === 0) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Payroll run not found' } });
+    }
+    const { cycle_id, period_id } = r.rows[0];
+    const data = await getInPeriodUnapprovedTransactions(cycle_id, period_id, { hydrate: true });
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -1251,7 +1344,7 @@ function allocateCreditScoa(txType, gl, pos, amount, debitFundId) {
   return { division, projectId, scoaItemId, functionId, regionId, fundId, planProjectItemId };
 }
 
-const PLAN_PROJECT_ITEMS_BY_YEAR_API = (process.env.EMS_API_BASE_URL || 'https://nicki-unrecuperated-counteractively.ngrok-free.dev') + '/planning/references/project-items-by-year';
+const PLAN_PROJECT_ITEMS_BY_YEAR_API = 'https://nicki-unrecuperated-counteractively.ngrok-free.dev/planning/references/project-items-by-year';
 
 async function loadPlanProjectItems(finYear) {
   try {
@@ -1314,27 +1407,13 @@ async function executeForEmployees(runId, employeeFilter, userId) {
   ]);
   const period = periodRes.rows[0];
   const cycle = cycleRes.rows[0];
-  const taxTablesData = await loadTaxTables(period.tax_year);
-  const finYear = period.financial_year || `${period.tax_year - 1}/${period.tax_year}`;
+  const [taxTablesData, finYearMeta] = await Promise.all([
+    loadTaxTables(period.tax_year),
+    Promise.resolve(period.financial_year || `${period.tax_year - 1}/${period.tax_year}`),
+  ]);
+  const finYear = finYearMeta;
   const ppidLookup = await loadPlanProjectItems(finYear);
   const resolvePlanProjectItemId = createPlanProjectItemResolver(ppidLookup);
-
-  let mocRulesMap = null;
-  try {
-    const mocResult = await dbQuery(
-      `SELECT * FROM salary_head_formulas WHERE enabled = TRUE
-       AND (start_date IS NULL OR start_date <= $1)
-       AND (end_date IS NULL OR end_date >= $1)`,
-      [period.end_date]
-    );
-    if (mocResult.rows.length > 0) {
-      mocRulesMap = {};
-      for (const rule of mocResult.rows) {
-        if (!mocRulesMap[rule.salary_head_id]) mocRulesMap[rule.salary_head_id] = [];
-        mocRulesMap[rule.salary_head_id].push(rule);
-      }
-    }
-  } catch (e) { /* table may not exist yet */ }
 
   const runData = run.rows[0];
   const runType = runData.run_type || 'NORMAL';
@@ -1346,10 +1425,14 @@ async function executeForEmployees(runId, employeeFilter, userId) {
       e.working_hours_per_month AS hours_worked, e.working_days_per_month AS days_worked,
       e.working_hours_per_day, e.salary_based_on, e.wage_rate,
       e.task_grade_id, e.current_notch,
+      e.upper_limit_value_type,
       p.department_id, p.division_id,
       p.scoa_project_id AS pos_scoa_project_id, p.scoa_function_id AS pos_scoa_function_id,
       p.scoa_region_id AS pos_scoa_region_id, p.scoa_fund_id AS pos_scoa_fund_id,
-      jp.task_grade_id AS jp_task_grade_id, jp.upper_limit_id AS jp_upper_limit_id
+      p.salary_transaction_group_id AS pos_stg_id,
+      p.upper_limit_value_type AS pos_upper_limit_value_type,
+      jp.task_grade_id AS jp_task_grade_id, jp.upper_limit_id AS jp_upper_limit_id,
+      jp.salary_transaction_group_id AS jp_stg_id
     FROM employees e
     LEFT JOIN positions p ON e.position_id = p.id
     LEFT JOIN job_profiles jp ON p.job_profile_id = jp.id
@@ -1371,10 +1454,21 @@ async function executeForEmployees(runId, employeeFilter, userId) {
 
   employeeQuery += ' ORDER BY e.id';
 
+  if (!employeeFilter && runProgress[runId]) {
+    runProgress[runId].stage = 'LOADING_EMPLOYEES';
+    runProgress[runId].stageMessage = 'Loading employees...';
+  }
+
   const employees = await dbQuery(employeeQuery, empParams);
 
   if (employeeFilter && employees.rows.length === 0) {
     throw Object.assign(new Error('Employee not found or not active'), { statusCode: 404, code: 'NOT_FOUND' });
+  }
+
+  if (!employeeFilter && runProgress[runId]) {
+    runProgress[runId].total = employees.rows.length;
+    runProgress[runId].stage = 'PREPARING_CALCULATIONS';
+    runProgress[runId].stageMessage = 'Preparing calculations...';
   }
 
   const client = await getClient();
@@ -1386,7 +1480,8 @@ async function executeForEmployees(runId, employeeFilter, userId) {
       await client.query(`UPDATE payroll_runs SET status = 'PROCESSING', started_at = NOW() WHERE id = $1`, [runId]);
       await client.query('DELETE FROM payroll_results WHERE run_id = $1', [runId]);
       await client.query('DELETE FROM payroll_run_errors WHERE run_id = $1', [runId]);
-      runProgress[runId] = { total: employees.rows.length, processed: 0, errors: 0, currentEmployee: '', status: 'PROCESSING', startedAt: Date.now() };
+      const prev = runProgress[runId] || { startedAt: Date.now() };
+      runProgress[runId] = { total: employees.rows.length, processed: 0, errors: 0, currentEmployee: '', stage: 'PROCESSING', stageMessage: '', status: 'PROCESSING', startedAt: prev.startedAt };
     } else {
       await client.query('DELETE FROM payroll_results WHERE run_id = $1 AND employee_id = $2', [runId, parseInt(employeeFilter, 10)]);
       await client.query('DELETE FROM payroll_run_errors WHERE run_id = $1 AND employee_id = $2', [runId, parseInt(employeeFilter, 10)]);
@@ -1394,308 +1489,44 @@ async function executeForEmployees(runId, employeeFilter, userId) {
 
     await client.query('COMMIT');
 
-    const employeeIds = employees.rows.map(e => e.id);
-
-    let allTransactions;
-    if (!employeeFilter && employeeIds.length > 0) {
-      allTransactions = await dbQuery(
-        `SELECT est.id AS est_id, est.employee_id, est.salary_head_id,
-                sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
-                sh.taxable, sh.affects_uif, sh.affects_sdl, sh.calculation_method, sh.priority,
-                sh.scoa_debit_item, sh.scoa_credit_item
-         FROM employee_salary_transactions est
-         JOIN salary_heads sh ON est.salary_head_id = sh.id
-         WHERE est.enabled = TRUE
-         AND est.start_date <= $1 AND est.end_date >= $1
-         ORDER BY est.employee_id, sh.priority, est.id`,
-        [period.end_date]
-      );
-    } else if (employeeFilter) {
-      allTransactions = await dbQuery(
-        `SELECT est.id AS est_id, est.employee_id, est.salary_head_id,
-                sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
-                sh.taxable, sh.affects_uif, sh.affects_sdl, sh.calculation_method, sh.priority,
-                sh.scoa_debit_item, sh.scoa_credit_item
-         FROM employee_salary_transactions est
-         JOIN salary_heads sh ON est.salary_head_id = sh.id
-         WHERE est.employee_id = $1 AND est.enabled = TRUE
-         AND est.start_date <= $2 AND est.end_date >= $2
-         ORDER BY sh.priority, est.id`,
-        [parseInt(employeeFilter, 10), period.end_date]
-      );
-    } else {
-      allTransactions = { rows: [] };
+    // Batch preload: fetch ALL per-employee data in ~16 parallel bulk queries.
+    // Reduces trial-run DB round-trips from ~13 per employee to ~16 total.
+    if (!employeeFilter && runProgress[runId]) {
+      runProgress[runId].stage = 'PRELOADING_DATA';
+      runProgress[runId].stageMessage = 'Preloading payroll data...';
+    }
+    let preloadedData = null;
+    try {
+      preloadedData = await preloadBatchData(employees.rows, period);
+    } catch (e) {
+      console.warn('[payroll-run] preloadBatchData failed, falling back to per-employee mode:', e.message);
     }
 
-    const txByEmployee = {};
-    for (const tx of allTransactions.rows) {
-      tx.amount = 0;
-      if (!txByEmployee[tx.employee_id]) txByEmployee[tx.employee_id] = [];
-      txByEmployee[tx.employee_id].push(tx);
-    }
-    for (const empId of Object.keys(txByEmployee)) {
-      const seen = new Set();
-      txByEmployee[empId] = txByEmployee[empId].filter(tx => {
-        if (seen.has(tx.salary_head_id)) return false;
-        seen.add(tx.salary_head_id);
-        return true;
-      });
-    }
+    const isFinalRunForActivation = ['FINAL', 'ADHOC_FINAL'].includes(runType);
 
-    let allPayslipTransactions = { rows: [] };
-    if (employeeIds.length > 0) {
+    // Auto-activate APPROVED instalments whose start_date has been reached — FINAL runs only.
+    if (isFinalRunForActivation) {
       try {
-        allPayslipTransactions = await dbQuery(
-          `SELECT ept.id AS ept_id, ept.employee_salary_transaction_id, ept.employee_id,
-                  ept.salary_head_id, ept.captured_amount, ept.period_id, ept.every_month,
-                  ept.reference_no,
-                  sh.code AS head_code, sh.name AS head_name, sh.transaction_type, sh.irp5_code,
-                  sh.taxable, sh.affects_uif, sh.affects_sdl, sh.calculation_method, sh.priority,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM employee_payslip_transactions ept
-           JOIN salary_heads sh ON ept.salary_head_id = sh.id
-           WHERE ept.enabled = TRUE
-           AND (ept.every_month = TRUE OR ept.period_id = $1)
-           ORDER BY ept.employee_id, sh.priority`,
-          [period.id]
-        );
-      } catch (e) { console.warn('Could not load payslip transactions for trial run:', e.message); }
-    }
-    const payslipTxByEmployee = {};
-    for (const pt of allPayslipTransactions.rows) {
-      if (!payslipTxByEmployee[pt.employee_id]) payslipTxByEmployee[pt.employee_id] = [];
-      payslipTxByEmployee[pt.employee_id].push(pt);
-    }
-
-    let allApprovedOT = { rows: [] };
-    if (employeeIds.length > 0) {
-      try {
-        allApprovedOT = await dbQuery(
-          `SELECT ot.employee_id, ot.salary_head_id, ot.hours, ot.rate_multiplier, ot.amount,
-                  sh.code AS head_code, sh.name AS head_name, sh.irp5_code, sh.taxable,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM overtime_transactions ot
-           LEFT JOIN salary_heads sh ON ot.salary_head_id = sh.id
-           WHERE ot.status = 'APPROVED' AND ot.period_id = $1`,
-          [period.id]
-        );
-      } catch (e) { /* overtime table may not have matching data */ }
-    }
-    const otByEmployee = {};
-    for (const ot of allApprovedOT.rows) {
-      if (!otByEmployee[ot.employee_id]) otByEmployee[ot.employee_id] = [];
-      otByEmployee[ot.employee_id].push(ot);
-    }
-
-    let allActiveInstalments = { rows: [] };
-    if (employeeIds.length > 0) {
-      try {
-        allActiveInstalments = await dbQuery(
-          `SELECT i.id, i.employee_id, i.salary_head_id, i.description, i.monthly_instalment, i.balance,
-                  sh.code AS head_code, sh.name AS head_name, sh.irp5_code,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM instalments i
-           LEFT JOIN salary_heads sh ON i.salary_head_id = sh.id
-           WHERE i.status = 'ACTIVE' AND i.balance > 0
-             AND i.start_date <= $1
-             AND (i.end_date IS NULL OR i.end_date >= $1)`,
+        const toActivate = await dbQuery(
+          `SELECT id FROM instalments WHERE status = 'APPROVED' AND balance > 0 AND start_date <= $1`,
           [period.end_date]
         );
-      } catch (e) { /* instalments table may not have matching data */ }
-    }
-    const instByEmployee = {};
-    for (const inst of allActiveInstalments.rows) {
-      if (!instByEmployee[inst.employee_id]) instByEmployee[inst.employee_id] = [];
-      instByEmployee[inst.employee_id].push(inst);
-    }
-
-    let allOutstandingArrears = { rows: [] };
-    if (employeeIds.length > 0) {
-      try {
-        allOutstandingArrears = await dbQuery(
-          `SELECT a.id, a.employee_id, a.salary_head_id, a.amount, a.reason,
-                  sh.code AS head_code, sh.name AS head_name, sh.irp5_code,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM arrears a
-           LEFT JOIN salary_heads sh ON a.salary_head_id = sh.id
-           WHERE a.recovered = FALSE`,
-          []
-        );
-      } catch (e) { /* arrears table may not have data */ }
-    }
-    const arrearsByEmployee = {};
-    for (const arr of allOutstandingArrears.rows) {
-      if (!arrearsByEmployee[arr.employee_id]) arrearsByEmployee[arr.employee_id] = [];
-      arrearsByEmployee[arr.employee_id].push(arr);
-    }
-
-    let allApprovedWages = { rows: [] };
-    if (employeeIds.length > 0) {
-      try {
-        allApprovedWages = await dbQuery(
-          `SELECT wt.employee_id, wt.id AS wt_id, wt.salary_head_id, wt.hours, wt.days, wt.rate, wt.amount,
-                  sh.code AS head_code, sh.name AS head_name, sh.irp5_code, sh.taxable,
-                  sh.affects_uif, sh.affects_sdl, sh.transaction_type,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM wage_transactions wt
-           LEFT JOIN salary_heads sh ON wt.salary_head_id = sh.id
-           WHERE wt.status = 'APPROVED' AND wt.period_id = $1`,
-          [period.id]
-        );
-      } catch (e) { /* wage_transactions table may not exist yet */ }
-    }
-    const wagesByEmployee = {};
-    for (const wt of allApprovedWages.rows) {
-      if (!wagesByEmployee[wt.employee_id]) wagesByEmployee[wt.employee_id] = [];
-      wagesByEmployee[wt.employee_id].push(wt);
-    }
-
-    let allMedicalAids = { rows: [] };
-    try {
-      allMedicalAids = await dbQuery(
-        `SELECT ema.employee_id, ema.id AS membership_id,
-                ms.main_member_contribution, ms.adult_dependant_contribution, ms.child_dependant_contribution,
-                ms.employer_contribution AS employee_percent, ms.employer_contribution_percentage AS employer_percent,
-                ms.max_employer_contribution, ms.max_dependants, ms.max_child_dependants_only
-         FROM employee_medical_aid ema
-         JOIN medical_aid_schemes ms ON ema.scheme_id = ms.id
-         WHERE ema.is_current = TRUE AND ema.join_date <= $1
-           AND (ema.termination_date IS NULL OR ema.termination_date >= $2)`,
-        [period.end_date, period.start_date]
-      );
-    } catch (e) { console.warn('Could not load medical aids for trial run:', e.message); }
-    const medByEmployee = {};
-    for (const m of allMedicalAids.rows) {
-      medByEmployee[m.employee_id] = m;
-    }
-
-    let allMedDependants = { rows: [] };
-    if (allMedicalAids.rows.length > 0) {
-      const medMemberIds = allMedicalAids.rows.map(m => m.membership_id);
-      try {
-        allMedDependants = await dbQuery(
-          `SELECT emd.employee_medical_aid_id, emd.dependant_type, emd.employer_contributes,
-                  ema.employee_id
-           FROM employee_medical_aid_dependants emd
-           JOIN employee_medical_aid ema ON emd.employee_medical_aid_id = ema.id
-           WHERE emd.employee_medical_aid_id = ANY($1)
-             AND (emd.end_date IS NULL OR emd.end_date >= $2)
-             AND emd.start_date <= $3`,
-          [medMemberIds, period.start_date, period.end_date]
-        );
-      } catch (e) { console.warn('Could not load medical dependants for trial run:', e.message); }
-    }
-    const medDepsByEmployee = {};
-    for (const d of allMedDependants.rows) {
-      if (!medDepsByEmployee[d.employee_id]) medDepsByEmployee[d.employee_id] = [];
-      medDepsByEmployee[d.employee_id].push(d);
-    }
-
-    let allRetirementFunds = { rows: [] };
-    try {
-      allRetirementFunds = await dbQuery(
-        `SELECT erf.employee_id, erf.id, erf.fund_type_id, erf.employee_amount, erf.employer_amount,
-                rft.code AS fund_code, rft.name AS fund_name, rft.fund_type,
-                rft.employee_contribution_rate, rft.employer_contribution_rate,
-                rft.employer_contribution_type, rft.employer_contribution_value,
-                rft.employee_contribution_value, rft.employer_max_value, rft.employee_max_value
-         FROM employee_retirement_funds erf
-         JOIN retirement_fund_types rft ON erf.fund_type_id = rft.id
-         WHERE erf.is_current = TRUE AND (erf.status IS NULL OR erf.status = 'ACTIVE')`,
-        []
-      );
-    } catch (e) { console.warn('Could not load retirement funds for trial run:', e.message); }
-    const retByEmployee = {};
-    for (const rf of allRetirementFunds.rows) {
-      if (!retByEmployee[rf.employee_id]) retByEmployee[rf.employee_id] = [];
-      retByEmployee[rf.employee_id].push(rf);
-    }
-
-    let allUnionMemberships = { rows: [] };
-    try {
-      allUnionMemberships = await dbQuery(
-        `SELECT eu.employee_id, eu.id, eu.trade_union_id, eu.join_date, eu.termination_date,
-                tu.representative AS union_name, tu.contribution_type, tu.contribution_value, tu.maximum_value
-         FROM employee_unions eu
-         JOIN trade_unions tu ON eu.trade_union_id = tu.id
-         WHERE eu.enabled = TRUE AND tu.enabled = TRUE
-           AND eu.join_date <= $1 AND (eu.termination_date IS NULL OR eu.termination_date >= $2)`,
-        [period.end_date, period.start_date]
-      );
-    } catch (e) { console.warn('Could not load union memberships for trial run:', e.message); }
-    const unionByEmployee = {};
-    for (const u of allUnionMemberships.rows) {
-      if (!unionByEmployee[u.employee_id]) unionByEmployee[u.employee_id] = [];
-      unionByEmployee[u.employee_id].push(u);
-    }
-
-    let allUpperLimitStructure = { rows: [] };
-    if (employeeIds.length > 0) {
-      try {
-        allUpperLimitStructure = await dbQuery(
-          `SELECT uls.employee_id, uls.salary_head_id, uls.amount, uls.included_in_package,
-                  sh.code, sh.name, sh.transaction_type, sh.calculation_method,
-                  sh.irp5_code, sh.taxable, sh.affects_uif, sh.affects_sdl, sh.priority,
-                  sh.scoa_debit_item, sh.scoa_credit_item
-           FROM employee_upper_limit_structure uls
-           JOIN salary_heads sh ON uls.salary_head_id = sh.id
-           WHERE uls.employee_id = ANY($1)
-           ORDER BY uls.employee_id, sh.priority`,
-          [employeeIds]
-        );
-      } catch (e) { /* table may not have data */ }
-    }
-    const ulStructByEmployee = {};
-    for (const row of allUpperLimitStructure.rows) {
-      if (!ulStructByEmployee[row.employee_id]) ulStructByEmployee[row.employee_id] = [];
-      ulStructByEmployee[row.employee_id].push(row);
-    }
-
-    let allUpperLimitTargets = {};
-    const upperLimitEmployeeIds = new Set();
-    if (employeeIds.length > 0) {
-      try {
-        const ulTargetResult = await dbQuery(
-          `SELECT e.id AS employee_id, e.upper_limit_value_type,
-                  p.upper_limit_value_type AS pos_upper_limit_value_type,
-                  sul.minimum_value, sul.midpoint_value, sul.maximum_value
-           FROM employees e
-           JOIN positions p ON e.position_id = p.id
-           JOIN job_profiles jp ON p.job_profile_id = jp.id
-           JOIN salary_upper_limits sul ON jp.upper_limit_id = sul.id
-           WHERE jp.upper_limit_id IS NOT NULL
-             AND sul.enabled = TRUE AND sul.start_date <= $1 AND sul.end_date >= $1`,
-          [period.end_date]
-        );
-        for (const row of ulTargetResult.rows) {
-          upperLimitEmployeeIds.add(row.employee_id);
-          const vt = (row.upper_limit_value_type || row.pos_upper_limit_value_type || 'MIDPOINT').toUpperCase();
-          let target = 0;
-          if (vt === 'MINIMUM') target = parseFloat(row.minimum_value) || 0;
-          else if (vt === 'MAXIMUM') target = parseFloat(row.maximum_value) || 0;
-          else target = parseFloat(row.midpoint_value) || 0;
-          allUpperLimitTargets[row.employee_id] = target;
+        if (toActivate.rows.length > 0) {
+          const ids = toActivate.rows.map(r => r.id);
+          const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+          await dbQuery(`UPDATE instalments SET status = 'ACTIVE', updated_at = NOW() WHERE id IN (${placeholders})`, ids);
+          for (const id of ids) {
+            try {
+              await dbQuery(
+                `INSERT INTO instalment_history (instalment_id, action, performed_by, comments, status_after)
+                 VALUES ($1, 'ACTIVATED', NULL, 'Start date reached — auto-activated by payroll run', 'ACTIVE')`,
+                [id]
+              );
+            } catch (e) { /* history insert best-effort */ }
+          }
         }
-      } catch (e) { /* optional */ }
+      } catch (e) { /* instalments table may not exist */ }
     }
-
-    const prevPeriodBasics = {};
-    try {
-      const prevResults = await dbQuery(
-        `SELECT DISTINCT ON (pr.employee_id) pr.employee_id, pr.amount
-         FROM payroll_results pr
-         JOIN payroll_runs prr ON pr.run_id = prr.id
-         JOIN payroll_periods pp ON prr.period_id = pp.id
-         LEFT JOIN salary_heads sh ON pr.salary_head_id = sh.id
-         WHERE COALESCE(sh.code, pr.head_code, '') IN ('BASIC','BASIC_SALARY') AND pp.end_date < $1
-         AND pp.cycle_id = $2
-         ORDER BY pr.employee_id, pp.end_date DESC`,
-        [period.start_date, cycle.id]
-      );
-      for (const row of prevResults.rows) {
-        prevPeriodBasics[row.employee_id] = parseFloat(row.amount) || 0;
-      }
-    } catch (e) { /* prev period data optional */ }
 
     const glConfigByHeadId = {};
     try {
@@ -1773,264 +1604,9 @@ async function executeForEmployees(runId, employeeFilter, userId) {
         }
       }
       try {
-        if (prevPeriodBasics[emp.id]) {
-          emp.prev_basic_salary = prevPeriodBasics[emp.id];
-          emp.prev_annual_salary = prevPeriodBasics[emp.id] * (cycle.periods_per_year || 12);
-        }
-
-        const empUlStruct = ulStructByEmployee[emp.id] || [];
-        const empUlTarget = allUpperLimitTargets[emp.id] || 0;
-        const isUpperLimitEmp = upperLimitEmployeeIds.has(emp.id);
-
-        if (isUpperLimitEmp) {
-          let includedSum = 0;
-          for (const sr of empUlStruct) {
-            if (sr.included_in_package) includedSum += parseFloat(sr.amount) || 0;
-          }
-          const balanceVariance = Math.abs(empUlTarget - includedSum);
-          if (balanceVariance > 5.00) {
-            throw new Error(
-              `Upper Limit salary structure for employee ${emp.employee_code || emp.id} is not balanced. ` +
-              `Target: R${empUlTarget.toFixed(2)}, structure: R${includedSum.toFixed(2)}, ` +
-              `variance: R${balanceVariance.toFixed(2)} (exceeds R5.00 tolerance).`
-            );
-          }
-        }
-
-        const ulAmountsByHeadId = {};
-        if (isUpperLimitEmp) {
-          for (const sr of empUlStruct) {
-            ulAmountsByHeadId[sr.salary_head_id] = {
-              annualAmount: parseFloat(sr.amount) || 0,
-              monthlyAmount: parseFloat(((parseFloat(sr.amount) || 0) / 12).toFixed(2)),
-              code: sr.code,
-              name: sr.name,
-              transaction_type: sr.transaction_type,
-              calculation_method: sr.calculation_method,
-              irp5_code: sr.irp5_code,
-              taxable: sr.taxable,
-              affects_uif: sr.affects_uif,
-              affects_sdl: sr.affects_sdl,
-              priority: sr.priority,
-              scoa_debit_item: sr.scoa_debit_item,
-              scoa_credit_item: sr.scoa_credit_item,
-            };
-          }
-        }
-
-        const estLinks = txByEmployee[emp.id] || [];
-        const empPayslipTxs = payslipTxByEmployee[emp.id] || [];
-        const payslipTxByHead = {};
-        for (const pt of empPayslipTxs) {
-          if (!payslipTxByHead[pt.salary_head_id]) payslipTxByHead[pt.salary_head_id] = [];
-          payslipTxByHead[pt.salary_head_id].push(pt);
-        }
-        const empTransactions = [];
-        if (isUpperLimitEmp) {
-          for (const est of estLinks) {
-            if (ulAmountsByHeadId[est.salary_head_id]) {
-              const ulRow = ulAmountsByHeadId[est.salary_head_id];
-              if (ulRow.calculation_method !== 'SYSTEM_CALCULATE' && ulRow.calculation_method !== 'FORMULA') {
-                empTransactions.push({
-                  est_id: est.est_id, employee_id: emp.id, salary_head_id: est.salary_head_id,
-                  amount: ulRow.monthlyAmount,
-                  head_code: ulRow.code, head_name: ulRow.name, transaction_type: ulRow.transaction_type,
-                  irp5_code: ulRow.irp5_code, taxable: ulRow.taxable, affects_uif: ulRow.affects_uif,
-                  affects_sdl: ulRow.affects_sdl, calculation_method: null, priority: ulRow.priority,
-                  scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
-                  is_upper_limit_structure: true
-                });
-                continue;
-              }
-            }
-            const isFormula = est.calculation_method === 'SYSTEM_CALCULATE' || est.calculation_method === 'FORMULA';
-            empTransactions.push({
-              est_id: est.est_id, employee_id: emp.id, salary_head_id: est.salary_head_id,
-              amount: 0,
-              head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-              irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-              affects_sdl: est.affects_sdl, calculation_method: isFormula ? est.calculation_method : null, priority: est.priority,
-              scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
-            });
-          }
-          const estHeadIds = new Set(estLinks.map(r => r.salary_head_id));
-          for (const sr of empUlStruct) {
-            if (!estHeadIds.has(sr.salary_head_id) && sr.calculation_method !== 'SYSTEM_CALCULATE' && sr.calculation_method !== 'FORMULA') {
-              const ulRow = ulAmountsByHeadId[sr.salary_head_id];
-              empTransactions.push({
-                est_id: null, employee_id: emp.id, salary_head_id: sr.salary_head_id,
-                amount: ulRow.monthlyAmount,
-                head_code: ulRow.code, head_name: ulRow.name, transaction_type: ulRow.transaction_type,
-                irp5_code: ulRow.irp5_code, taxable: ulRow.taxable, affects_uif: ulRow.affects_uif,
-                affects_sdl: ulRow.affects_sdl, calculation_method: null, priority: ulRow.priority,
-                scoa_debit_item: ulRow.scoa_debit_item, scoa_credit_item: ulRow.scoa_credit_item,
-                is_upper_limit_structure: true
-              });
-            }
-          }
-        } else {
-          for (const est of estLinks) {
-            const headPts = payslipTxByHead[est.salary_head_id] || [];
-            if (headPts.length > 0) {
-              for (const pt of headPts) {
-                empTransactions.push({
-                  est_id: est.est_id, ept_id: pt.ept_id, employee_id: emp.id, salary_head_id: est.salary_head_id,
-                  amount: parseFloat(pt.captured_amount) || 0,
-                  reference_no: pt.reference_no || '',
-                  head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-                  irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-                  affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
-                  scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item,
-                  is_payslip_transaction: true
-                });
-              }
-            } else {
-              empTransactions.push({
-                est_id: est.est_id, employee_id: emp.id, salary_head_id: est.salary_head_id,
-                amount: 0,
-                head_code: est.head_code, head_name: est.head_name, transaction_type: est.transaction_type,
-                irp5_code: est.irp5_code, taxable: est.taxable, affects_uif: est.affects_uif,
-                affects_sdl: est.affects_sdl, calculation_method: est.calculation_method, priority: est.priority,
-                scoa_debit_item: est.scoa_debit_item, scoa_credit_item: est.scoa_credit_item
-              });
-            }
-          }
-        }
-
-        const empWages = wagesByEmployee[emp.id] || [];
-        for (const wt of empWages) {
-          empTransactions.push({
-            employee_id: emp.id, salary_head_id: wt.salary_head_id,
-            amount: parseFloat(wt.amount) || 0,
-            head_code: wt.head_code, head_name: wt.head_name, transaction_type: wt.transaction_type,
-            irp5_code: wt.irp5_code, taxable: wt.taxable, affects_uif: wt.affects_uif,
-            affects_sdl: wt.affects_sdl, calculation_method: 'FIXED',
-            scoa_debit_item: wt.scoa_debit_item, scoa_credit_item: wt.scoa_credit_item,
-            formula: null, is_wage_transaction: true
-          });
-        }
-        normalizeTransactionsToMonthly(empTransactions, cycle.periods_per_year || 12, emp);
-
-        const ppy = cycle.periods_per_year || 12;
-        const BASIC_CODES_SET = new Set(['BASIC', 'BASIC_SALARY']);
-        let empMonthlyBasic;
-        if (isUpperLimitEmp) {
-          const basicStructRow = empUlStruct.find(sr => BASIC_CODES_SET.has(sr.code));
-          if (!basicStructRow) {
-            throw new Error(`Upper Limit employee ${emp.employee_code || emp.id} has no BASIC salary in the salary structure table. Please add a BASIC salary component before running payroll.`);
-          }
-          const basicAnnual = parseFloat(basicStructRow.amount) || 0;
-          if (basicAnnual <= 0) {
-            throw new Error(`Upper Limit employee ${emp.employee_code || emp.id} has R0.00 BASIC in salary structure.`);
-          }
-          empMonthlyBasic = parseFloat((basicAnnual / 12).toFixed(2));
-          emp.monthly_salary = empMonthlyBasic;
-          emp.annual_salary = basicAnnual;
-        } else {
-          empMonthlyBasic = resolveMonthlyBasic(emp, ppy);
-        }
-
-        const empMedDeps = medDepsByEmployee[emp.id] || [];
-        if (empMedDeps.length > 0 || medByEmployee[emp.id]) {
-          emp.dependants = empMedDeps.length;
-        }
-
-        const empMed = medByEmployee[emp.id];
-        if (empMed) {
-          const s = empMed;
-          const memberVal = parseFloat(s.main_member_contribution) || 0;
-          const adultVal = parseFloat(s.adult_dependant_contribution) || 0;
-          const childVal = parseFloat(s.child_dependant_contribution) || 0;
-          const eePct = parseFloat(s.employee_percent) || 0;
-          const erPct = parseFloat(s.employer_percent) || 0;
-          const maxErVal = parseFloat(s.max_employer_contribution) || 0;
-          const maxDeps = parseInt(s.max_dependants) || 999;
-          const maxChildOnly = s.max_child_dependants_only === true;
-          const deps = medDepsByEmployee[emp.id] || [];
-          let adults = 0, children = 0;
-          for (const d of deps) {
-            const rt = (d.dependant_type || '').toUpperCase();
-            if (['CHILD','MINOR','DEPENDANT_CHILD'].includes(rt)) children++;
-            else adults++;
-          }
-          if (maxChildOnly) {
-            if (children > maxDeps) children = maxDeps;
-          } else {
-            const totalDeps = adults + children;
-            if (totalDeps > maxDeps) {
-              const cappedAdults = Math.min(adults, maxDeps);
-              adults = cappedAdults;
-              children = Math.min(children, Math.max(0, maxDeps - cappedAdults));
-            }
-          }
-          const totalMedCost = parseFloat((memberVal + (adultVal * adults) + (childVal * children)).toFixed(2));
-          let medErAmount = parseFloat((totalMedCost * (erPct / 100)).toFixed(2));
-          let medEeAmount = parseFloat((totalMedCost * (eePct / 100)).toFixed(2));
-          if (maxErVal > 0 && medErAmount > maxErVal) {
-            medEeAmount = parseFloat((medEeAmount + (medErAmount - maxErVal)).toFixed(2));
-            medErAmount = maxErVal;
-          }
-          if (medEeAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: medEeAmount, percentage: null, head_code: 'MED_EE', head_name: 'Medical Aid Employee', transaction_type: 'DEDUCTION', irp5_code: '4005', taxable: false, calculation_method: null, priority: 50, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-          if (medErAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: medErAmount, percentage: null, head_code: 'MED_ER', head_name: 'Medical Aid Employer', transaction_type: 'COMPANY_CONTRIBUTION', irp5_code: null, taxable: false, calculation_method: null, priority: 50, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-          if (medErAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: medErAmount, percentage: null, head_code: 'MED_FRINGE', head_name: 'Medical Aid Fringe', transaction_type: 'FRINGE_BENEFIT', irp5_code: '3810', taxable: true, calculation_method: null, priority: 50, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-        }
-
-        const empRetFunds = retByEmployee[emp.id] || [];
-        if (empRetFunds.length > 0) {
-          let retEeAmount = 0, retErAmount = 0;
-          for (const rf of empRetFunds) {
-            let ee = 0, er = 0;
-            const eeOverride = parseFloat(rf.employee_amount) || 0;
-            const erOverride = parseFloat(rf.employer_amount) || 0;
-            const contribType = (rf.employer_contribution_type || '').toUpperCase();
-            if (eeOverride > 0) { ee = eeOverride; }
-            else if (contribType === 'PERCENTAGE') { const eeVal = parseFloat(rf.employee_contribution_value) || parseFloat(rf.employee_contribution_rate) || 0; ee = parseFloat((empMonthlyBasic * eeVal / 100).toFixed(2)); }
-            else { ee = parseFloat(rf.employee_contribution_value) || 0; if (ee === 0 && parseFloat(rf.employee_contribution_rate) > 0) ee = parseFloat((empMonthlyBasic * parseFloat(rf.employee_contribution_rate) / 100).toFixed(2)); }
-            if (erOverride > 0) { er = erOverride; }
-            else if (contribType === 'PERCENTAGE') { const erVal = parseFloat(rf.employer_contribution_value) || parseFloat(rf.employer_contribution_rate) || 0; er = parseFloat((empMonthlyBasic * erVal / 100).toFixed(2)); }
-            else { er = parseFloat(rf.employer_contribution_value) || 0; if (er === 0 && parseFloat(rf.employer_contribution_rate) > 0) er = parseFloat((empMonthlyBasic * parseFloat(rf.employer_contribution_rate) / 100).toFixed(2)); }
-            const erMax = parseFloat(rf.employer_max_value) || 0;
-            if (erMax > 0 && er > erMax) er = erMax;
-            const eeMax = parseFloat(rf.employee_max_value) || 0;
-            if (eeMax > 0 && ee > eeMax) ee = eeMax;
-            retEeAmount += ee;
-            retErAmount += er;
-          }
-          if (retEeAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: retEeAmount, percentage: null, head_code: 'PEN_EE', head_name: 'Pension Fund (Employee)', transaction_type: 'DEDUCTION', irp5_code: '4001', taxable: false, calculation_method: null, priority: 51, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-          if (retErAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: retErAmount, percentage: null, head_code: 'PEN_ER', head_name: 'Pension Fund (Employer)', transaction_type: 'COMPANY_CONTRIBUTION', irp5_code: null, taxable: false, calculation_method: null, priority: 51, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-          if (retErAmount > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: retErAmount, percentage: null, head_code: 'PEN_FRINGE', head_name: 'Pension Fund (Fringe)', transaction_type: 'FRINGE_BENEFIT', irp5_code: '3825', taxable: true, calculation_method: null, priority: 51, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-        }
-
-        const empUnions = unionByEmployee[emp.id] || [];
-        if (empUnions.length > 0) {
-          let unionFeeTotal = 0;
-          for (const um of empUnions) {
-            const contribType = (um.contribution_type || '').trim();
-            const contribValue = parseFloat(um.contribution_value) || 0;
-            const maxValue = parseFloat(um.maximum_value) || 0;
-            let fee = 0;
-            if (contribType === '%') { fee = parseFloat((empMonthlyBasic * contribValue / 100).toFixed(2)); if (maxValue > 0 && fee > maxValue) fee = maxValue; }
-            else { fee = contribValue; if (maxValue > 0 && fee > maxValue) fee = maxValue; }
-            unionFeeTotal += fee;
-          }
-          if (unionFeeTotal > 0) {
-            empTransactions.push({ est_id: null, employee_id: emp.id, salary_head_id: null, amount: parseFloat(unionFeeTotal.toFixed(2)), percentage: null, head_code: 'UNION_FEES', head_name: 'Union Fees', transaction_type: 'DEDUCTION', irp5_code: null, taxable: false, calculation_method: null, priority: 52, scoa_debit_item: null, scoa_credit_item: null, formula: null, is_system_generated: true });
-          }
-        }
-
-        const calcResult = calculateForEmployee(emp, empTransactions, taxTablesData, period, cycle, mocRulesMap);
+        const payslipResult = preloadedData
+          ? calculatePayslipForEmployeeFromPreload(emp.id, preloadedData)
+          : await calculatePayslipForEmployee(emp.id, period.id, cycle.id);
 
         const posScoa = {
           division_id: emp.division_id,
@@ -2041,7 +1617,7 @@ async function executeForEmployees(runId, employeeFilter, userId) {
         };
         const empTypeId = emp.employee_type_id || null;
 
-        for (const row of calcResult.results) {
+        for (const row of payslipResult.results) {
           let resolvedHeadId = row.salary_head_id;
           if (!resolvedHeadId && row.head_code && taxTablesData.systemHeads) {
             const sysHead = taxTablesData.systemHeads[row.head_code];
@@ -2057,16 +1633,11 @@ async function executeForEmployees(runId, employeeFilter, userId) {
           if (!isFringe) {
             debit = allocateDebitScoa(row.transaction_type, empTypeId, gl, posScoa, row.amount);
             credit = allocateCreditScoa(row.transaction_type, gl, posScoa, row.amount, debit.fundId);
-
             if (!debit.planProjectItemId && debit.scoaItemId && debit.projectId) {
-              debit.planProjectItemId = resolvePlanProjectItemId(
-                finYear, debit.scoaItemId, debit.projectId, debit.functionId, debit.regionId, debit.division, debit.fundId
-              );
+              debit.planProjectItemId = resolvePlanProjectItemId(finYear, debit.scoaItemId, debit.projectId, debit.functionId, debit.regionId, debit.division, debit.fundId);
             }
             if (!credit.planProjectItemId && credit.scoaItemId && credit.projectId) {
-              credit.planProjectItemId = resolvePlanProjectItemId(
-                finYear, credit.scoaItemId, credit.projectId, credit.functionId, credit.regionId, credit.division, credit.fundId
-              );
+              credit.planProjectItemId = resolvePlanProjectItemId(finYear, credit.scoaItemId, credit.projectId, credit.functionId, credit.regionId, credit.division, credit.fundId);
             }
           }
 
@@ -2099,13 +1670,22 @@ async function executeForEmployees(runId, employeeFilter, userId) {
           await flushResults();
         }
 
-        totalEarnings += calcResult.summary.gross_earnings;
-        totalDeductions += calcResult.summary.total_deductions;
-        totalCompany += calcResult.summary.company_contributions;
-        totalNett += calcResult.summary.nett_pay;
-        totalPaye += calcResult.summary.paye;
-        totalUif += calcResult.summary.uif_employee;
-        totalSdl += calcResult.summary.sdl;
+        if (isFinalRunForActivation) {
+          for (const row of payslipResult.results) {
+            if (row.instalment_id && row.transaction_type === 'DEDUCTION') {
+              instalmentUpdates.push({ instalment_id: row.instalment_id, amount: row.amount });
+            }
+          }
+        }
+
+        totalEarnings += payslipResult.summary.gross_earnings;
+        totalDeductions += payslipResult.summary.total_deductions;
+        totalCompany += payslipResult.summary.company_contributions;
+        totalNett += payslipResult.summary.nett_pay;
+        totalPaye += payslipResult.summary.paye;
+        totalUif += payslipResult.summary.uif_employee;
+        totalSdl += payslipResult.summary.sdl;
+
       } catch (empErr) {
         errorCount++;
         if (!employeeFilter && runProgress[runId]) runProgress[runId].errors++;
@@ -2121,6 +1701,49 @@ async function executeForEmployees(runId, employeeFilter, userId) {
 
     await flushResults();
     await flushErrors();
+
+    // Apply instalment balance reductions; mark COMPLETED when balance reaches zero.
+    // Only on FINAL/ADHOC_FINAL runs — TRIAL/NORMAL re-runs must not mutate balances.
+    const isFinalRun = ['FINAL', 'ADHOC_FINAL'].includes(runType);
+    if (isFinalRun && instalmentUpdates.length > 0) {
+      const totalsByInstalment = {};
+      for (const u of instalmentUpdates) {
+        totalsByInstalment[u.instalment_id] = (totalsByInstalment[u.instalment_id] || 0) + u.amount;
+      }
+      for (const idStr of Object.keys(totalsByInstalment)) {
+        const id = parseInt(idStr, 10);
+        const amt = parseFloat(totalsByInstalment[idStr].toFixed(2));
+        try {
+          const upd = await dbQuery(
+            `UPDATE instalments
+             SET balance = GREATEST(balance - $1, 0),
+                 status = CASE WHEN balance - $1 <= 0 THEN 'COMPLETED' ELSE status END,
+                 end_date = CASE WHEN balance - $1 <= 0 AND end_date IS NULL THEN CURRENT_DATE ELSE end_date END,
+                 updated_at = NOW()
+             WHERE id = $2 AND status = 'ACTIVE'
+             RETURNING status`,
+            [amt, id]
+          );
+          // Per-period DEDUCTION audit entry
+          try {
+            await dbQuery(
+              `INSERT INTO instalment_history (instalment_id, action, performed_by, comments, status_after, period_id, amount)
+               VALUES ($1, 'DEDUCTION', NULL, $2, $3, $4, $5)`,
+              [id, `Payroll deduction for period ${period.id}`, upd.rows[0]?.status || 'ACTIVE', period.id, amt]
+            );
+          } catch (e) { /* history best-effort */ }
+          if (upd.rows[0] && upd.rows[0].status === 'COMPLETED') {
+            try {
+              await dbQuery(
+                `INSERT INTO instalment_history (instalment_id, action, performed_by, comments, status_after, period_id)
+                 VALUES ($1, 'COMPLETED', NULL, 'Instalment fully repaid — balance reached zero', 'COMPLETED', $2)`,
+                [id, period.id]
+              );
+            } catch (e) { /* history best-effort */ }
+          }
+        } catch (e) { /* per-instalment update best-effort */ }
+      }
+    }
 
     let updatedRun;
     if (employeeFilter) {
@@ -2214,6 +1837,8 @@ router.get('/runs/:id/progress', authenticate, async (req, res) => {
         errors: progress.errors,
         percent: progress.total > 0 ? Math.round((progress.processed / progress.total) * 100) : 0,
         currentEmployee: progress.currentEmployee,
+        stage: progress.stage || 'PROCESSING',
+        stageMessage: progress.stageMessage || '',
         status: progress.status,
         error_message: progress.error_message || null,
         eta_seconds: eta,
@@ -2244,6 +1869,17 @@ router.post('/runs/:id/execute', authenticate, auditLog('CREATE', 'payroll_execu
   const { employee_id } = req.query;
   const { async: runAsync } = req.body || {};
 
+  // Pre-flight: block the run if any in-period transactions are still
+  // awaiting approval. This applies to TRIAL and FINAL runs alike, AND to
+  // single-employee re-execution, since the engine is the same payment
+  // path. Skip is intentionally NOT offered (no override per task spec).
+  try {
+    const blocked = await preflightApprovalCheck(runId);
+    if (blocked) return res.status(blocked.status).json(blocked.body);
+  } catch (preErr) {
+    return next(preErr);
+  }
+
   if (runAsync && !employee_id) {
     try {
       const run = await dbQuery('SELECT status FROM payroll_runs WHERE id = $1', [runId]);
@@ -2251,11 +1887,14 @@ router.post('/runs/:id/execute', authenticate, auditLog('CREATE', 'payroll_execu
       if (!['PENDING', 'COMPLETED', 'PROCESSING', 'FAILED'].includes(run.rows[0].status)) {
         return res.status(400).json({ success: false, error: { message: `Cannot execute from status ${run.rows[0].status}` } });
       }
+      const numericRunId = parseInt(runId, 10);
+      runProgress[numericRunId] = { total: 0, processed: 0, errors: 0, currentEmployee: '', stage: 'PREPARING', stageMessage: 'Preparing run...', status: 'PROCESSING', startedAt: Date.now() };
+      await dbQuery(`UPDATE payroll_runs SET status = 'PROCESSING', started_at = NOW() WHERE id = $1`, [numericRunId]);
       res.json({ success: true, message: 'Payroll execution started', async: true });
       executeForEmployees(runId, null, req.user?.id || 1).catch(async (err) => {
         console.error(`Async payroll run ${runId} failed:`, err.message);
-        if (runProgress[runId]) { runProgress[runId].status = 'FAILED'; setTimeout(() => delete runProgress[runId], 60000); }
-        await dbQuery(`UPDATE payroll_runs SET status = 'FAILED', completed_at = NOW() WHERE id = $1`, [runId]);
+        if (runProgress[numericRunId]) { runProgress[numericRunId].status = 'FAILED'; runProgress[numericRunId].error_message = err.message; setTimeout(() => delete runProgress[numericRunId], 60000); }
+        await dbQuery(`UPDATE payroll_runs SET status = 'FAILED', completed_at = NOW() WHERE id = $1`, [numericRunId]);
       });
       return;
     } catch (err) {
@@ -2288,6 +1927,12 @@ router.post('/runs/:id/execute-single', authenticate, auditLog('CREATE', 'payrol
     if (!employee_id) {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'employee_id is required' } });
     }
+
+    // Pre-flight: same approval gate as full-run execution. A single-employee
+    // recompute writes to the same payroll_results table, so it must respect
+    // the same period-level approval lock.
+    const blocked = await preflightApprovalCheck(req.params.id);
+    if (blocked) return res.status(blocked.status).json(blocked.body);
 
     const result = await executeForEmployees(req.params.id, employee_id, req.user?.id || 1);
 
@@ -2372,6 +2017,67 @@ router.post('/runs/:id/approve', authenticate, auditLog('APPROVE', 'payroll_run'
       catch (e) { postApproval.payment_batches = { error: e.message }; }
     }
 
+    try {
+      const run = result.rows[0];
+      if (['FINAL', 'ADHOC_FINAL'].includes(run.run_type)) {
+        const processedEmpIds = await dbQuery(
+          'SELECT DISTINCT employee_id FROM payroll_results WHERE run_id = $1', [runId]
+        );
+        const empIds = processedEmpIds.rows.map(r => r.employee_id);
+        if (empIds.length > 0) {
+          const claimClient = await getClient();
+          try {
+            await claimClient.query('BEGIN');
+            const paidClaims = await claimClient.query(
+              `UPDATE claims SET status = 'PAID', period_id = $1, payroll_run_id = $2, updated_at = NOW()
+               WHERE status = 'APPROVED' AND employee_id = ANY($3)
+               RETURNING id`,
+              [run.period_id, runId, empIds]
+            );
+            if (paidClaims.rows.length > 0) {
+              const historyValues = paidClaims.rows.map((_, i) =>
+                `($${i * 3 + 1}, 'PAID', $${i * 3 + 2}, $${i * 3 + 3})`
+              ).join(', ');
+              const historyParams = paidClaims.rows.flatMap(pc => [
+                pc.id, userId, `Processed in payroll run #${runId}`
+              ]);
+              await claimClient.query(
+                `INSERT INTO claim_history (claim_id, action, performed_by, comments) VALUES ${historyValues}`,
+                historyParams
+              );
+            }
+            await claimClient.query('COMMIT');
+            postApproval.claims_processed = paidClaims.rows.length;
+          } catch (txErr) {
+            await claimClient.query('ROLLBACK');
+            throw txErr;
+          } finally {
+            claimClient.release();
+          }
+        } else {
+          postApproval.claims_processed = 0;
+        }
+        // -----------------------------------------------------------------------
+        // CRITICAL: Close the current period after Final Run approval.
+        // The period only advances to the next one when the Final Run is approved —
+        // NOT when the Trial is locked, NOT when the Final Run is created.
+        // After closing, /periods/open will return the next OPEN period automatically.
+        // -----------------------------------------------------------------------
+        try {
+          await dbQuery(
+            `UPDATE payroll_periods SET status = 'CLOSED' WHERE id = $1`,
+            [run.period_id]
+          );
+          postApproval.period_closed = run.period_id;
+        } catch (periodErr) {
+          console.warn('Failed to close period after final run approval:', periodErr.message);
+        }
+      }
+    } catch (claimErr) {
+      console.warn('Failed to process claims during payroll approval:', claimErr.message);
+      postApproval.claims_processed = { error: claimErr.message };
+    }
+
     res.json({ success: true, data: result.rows[0], post_approval: postApproval, message: 'Payroll run approved' });
   } catch (err) {
     next(err);
@@ -2392,6 +2098,10 @@ router.post('/runs/:id/promote', authenticate, auditLog('UPDATE', 'payroll_run')
     if (!['COMPLETED', 'LOCKED'].includes(r.status)) {
       return res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Run must be COMPLETED or LOCKED before promoting to final.' } });
     }
+    // Pre-flight: a FINAL run can never be created while in-period
+    // approvals are outstanding (stricter rule per task spec).
+    const blocked = await preflightApprovalCheck(req.params.id);
+    if (blocked) return res.status(blocked.status).json(blocked.body);
     const newType = r.run_type === 'ADHOC_TRIAL' ? 'ADHOC_FINAL' : 'FINAL';
     const newStatus = re_execute ? 'COMPLETED' : 'LOCKED';
     const result = await dbQuery(
@@ -2410,6 +2120,13 @@ router.post('/runs/:id/promote', authenticate, auditLog('UPDATE', 'payroll_run')
            WHERE period_id = $1 AND status = 'APPROVED' AND employee_id = ANY($2)`,
           [runDetails.period_id, empIds]
         );
+        try {
+          await dbQuery(
+            `UPDATE overtime_transactions SET status = 'PROCESSED', payroll_run_id = $2, updated_at = NOW()
+             WHERE period_id = $1 AND status = 'APPROVED' AND employee_id = ANY($3)`,
+            [runDetails.period_id, req.params.id, empIds]
+          );
+        } catch (otErr) { /* overtime_transactions may not exist yet */ }
       }
     } catch (e) { /* wage_transactions may not exist yet */ }
     res.json({ success: true, data: result.rows[0], message: `Run promoted to ${newType} and locked` });
@@ -2531,6 +2248,8 @@ router.get('/salary-heads', authenticate, async (req, res, next) => {
 
 router.post('/salary-heads', authenticate, auditLog('CREATE', 'salary_head'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { code, name, transaction_type, calculation_method, irp5_code, sars_code, taxable, affects_uif, affects_sdl, show_on_payslip, priority, scoa_debit_item, scoa_credit_item, start_date, employee_contribution, employer_contribution, condition_of_service_id, employee_type_filter, employee_subtype_filter, pro_rated, round_calculation, round_digits } = req.body;
     const result = await dbQuery(
       `INSERT INTO salary_heads (code, name, transaction_type, calculation_method, irp5_code, sars_code, taxable, affects_uif, affects_sdl, show_on_payslip, priority, scoa_debit_item, scoa_credit_item, start_date, employee_contribution, employer_contribution, condition_of_service_id, employee_type_filter, employee_subtype_filter, pro_rated, round_calculation, round_digits, created_by, updated_by)
@@ -2545,6 +2264,8 @@ router.post('/salary-heads', authenticate, auditLog('CREATE', 'salary_head'), as
 
 router.put('/salary-heads/:id', authenticate, auditLog('UPDATE', 'salary_head'), async (req, res, next) => {
   try {
+    const lockdown = await checkPayrollLockdown();
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { name, transaction_type, calculation_method, irp5_code, sars_code, taxable, affects_uif, affects_sdl, show_on_payslip, priority, scoa_debit_item, scoa_credit_item, employee_contribution, employer_contribution, condition_of_service_id, employee_type_filter, employee_subtype_filter, pro_rated, round_calculation, round_digits } = req.body;
     const result = await dbQuery(
       `UPDATE salary_heads SET name = COALESCE($1, name), transaction_type = COALESCE($2, transaction_type),
@@ -4382,6 +4103,7 @@ router.get('/payslip-view/employee/:employeeId/calculate', authenticate, authori
       const msg = calcErr.message || 'Calculation failed';
       if (msg.includes('not found')) return res.status(404).json({ success: false, message: msg });
       if (msg.includes('does not belong')) return res.status(400).json({ success: false, message: msg });
+      if (msg.includes('not balanced')) return res.status(422).json({ success: false, error: { code: 'SALARY_STRUCTURE_UNBALANCED', message: msg } });
       throw calcErr;
     }
 
@@ -4392,7 +4114,10 @@ router.get('/payslip-view/employee/:employeeId/calculate', authenticate, authori
       const grouped = {};
       for (const item of items) {
         const ref = (item.reference_no || '').trim();
-        const key = `${item.salary_head_id}::${ref}`;
+        const instalmentSuffix = item.is_instalment_transaction && item.instalment_id
+          ? `::inst_${item.instalment_id}`
+          : '';
+        const key = `${item.salary_head_id || item.head_code}::${ref}${instalmentSuffix}`;
         if (!grouped[key]) {
           grouped[key] = { ...item };
           if (ref) {
@@ -4454,6 +4179,7 @@ router.get('/payslip-view/employee/:employeeId/paye-breakdown', authenticate, au
       const msg = calcErr.message || 'Calculation failed';
       if (msg.includes('not found')) return res.status(404).json({ success: false, message: msg });
       if (msg.includes('does not belong')) return res.status(400).json({ success: false, message: msg });
+      if (msg.includes('not balanced')) return res.status(422).json({ success: false, error: { code: 'SALARY_STRUCTURE_UNBALANCED', message: msg } });
       throw calcErr;
     }
 
@@ -4467,6 +4193,9 @@ router.get('/payslip-view/employee/:employeeId/paye-breakdown', authenticate, au
 router.post('/payslip-view/employee/:employeeId/transactions', authenticate, authorize('admin', 'payroll_admin'), async (req, res, next) => {
   try {
     const { employeeId } = req.params;
+    const empCycle = await dbQuery('SELECT payroll_cycle_id FROM employees WHERE id = $1', [employeeId]);
+    const lockdown = await checkPayrollLockdown(empCycle.rows[0]?.payroll_cycle_id ?? null);
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { salary_head_id, amount, entry_date, reference_no, every_month, period_end_date, cycle_id } = req.body;
     if (!salary_head_id || amount === undefined) return res.status(400).json({ success: false, message: 'salary_head_id and amount are required' });
 
@@ -4571,6 +4300,9 @@ router.get('/payslip-view/employee/:employeeId/transactions-by-head/:salaryHeadI
 router.put('/payslip-view/employee/:employeeId/transactions/:transactionId', authenticate, authorize('admin', 'payroll_admin'), async (req, res, next) => {
   try {
     const { employeeId, transactionId } = req.params;
+    const empCycle = await dbQuery('SELECT payroll_cycle_id FROM employees WHERE id = $1', [employeeId]);
+    const lockdown = await checkPayrollLockdown(empCycle.rows[0]?.payroll_cycle_id ?? null);
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
     const { amount, entry_date, reference_no, every_month, period_end_date } = req.body;
     if (amount === undefined) return res.status(400).json({ success: false, message: 'amount is required' });
 
@@ -4608,6 +4340,9 @@ router.put('/payslip-view/employee/:employeeId/transactions/:transactionId', aut
 router.delete('/payslip-view/employee/:employeeId/transactions/:transactionId', authenticate, authorize('admin', 'payroll_admin'), async (req, res, next) => {
   try {
     const { employeeId, transactionId } = req.params;
+    const empCycle = await dbQuery('SELECT payroll_cycle_id FROM employees WHERE id = $1', [employeeId]);
+    const lockdown = await checkPayrollLockdown(empCycle.rows[0]?.payroll_cycle_id ?? null);
+    if (lockdown) return res.status(lockdown.status).json(lockdown.body);
 
     const result = await dbQuery(
       `UPDATE employee_payslip_transactions SET enabled = FALSE, updated_at = NOW(), updated_by = $3
@@ -4753,14 +4488,59 @@ router.get('/wages/employees', authenticate, async (req, res, next) => {
 
 router.get('/wages/transactions', authenticate, async (req, res, next) => {
   try {
-    const { period_id, cycle_id, employee_id, status } = req.query;
-    if (!period_id || !cycle_id) return res.status(400).json({ success: false, message: 'period_id and cycle_id required' });
+    const { period_id, cycle_id, employee_id, status, tab, page, limit } = req.query;
+    const isProcessed = tab === 'processed';
 
-    let where = 'WHERE wt.period_id = $1 AND wt.cycle_id = $2';
-    const params = [period_id, cycle_id];
-    let pi = 3;
+    let where = 'WHERE 1=1';
+    const params = [];
+    let pi = 1;
+
+    if (isProcessed) {
+      where += ` AND wt.status = 'PROCESSED'`;
+    } else {
+      where += ` AND wt.status != 'PROCESSED'`;
+      if (period_id && cycle_id) {
+        where += ` AND wt.period_id = $${pi} AND wt.cycle_id = $${pi + 1}`;
+        params.push(period_id, cycle_id);
+        pi += 2;
+      } else if (cycle_id) {
+        where += ` AND wt.cycle_id = $${pi}`;
+        params.push(cycle_id);
+        pi++;
+      }
+      if (status) { where += ` AND wt.status = $${pi}`; params.push(status.toUpperCase()); pi++; }
+    }
+
     if (employee_id) { where += ` AND wt.employee_id = $${pi}`; params.push(employee_id); pi++; }
-    if (status) { where += ` AND wt.status = $${pi}`; params.push(status.toUpperCase()); pi++; }
+
+    if (isProcessed) {
+      const pg = Math.max(1, parseInt(page) || 1);
+      const lim = Math.max(1, Math.min(parseInt(limit) || 25, 100));
+      const offset = (pg - 1) * lim;
+
+      const countResult = await dbQuery(
+        `SELECT COUNT(*) AS total FROM wage_transactions wt ${where}`, params
+      );
+      const total = parseInt(countResult.rows[0].total) || 0;
+
+      const dataResult = await dbQuery(
+        `SELECT wt.*, e.employee_code, e.first_name, e.surname,
+                sh.code AS head_code, sh.name AS head_name, sh.transaction_type,
+                pp.start_date AS period_start_date, pp.end_date AS period_end_date, pp.period_number,
+                pc.name AS cycle_name
+         FROM wage_transactions wt
+         JOIN employees e ON wt.employee_id = e.id
+         JOIN salary_heads sh ON wt.salary_head_id = sh.id
+         LEFT JOIN payroll_periods pp ON wt.period_id = pp.id
+         LEFT JOIN payroll_cycles pc ON wt.cycle_id = pc.id
+         ${where}
+         ORDER BY wt.updated_at DESC
+         LIMIT $${pi} OFFSET $${pi + 1}`,
+        [...params, lim, offset]
+      );
+
+      return res.json({ success: true, data: dataResult.rows, meta: { total, page: pg, limit: lim } });
+    }
 
     const result = await dbQuery(
       `SELECT wt.*, e.employee_code, e.first_name, e.surname,
@@ -4771,6 +4551,19 @@ router.get('/wages/transactions', authenticate, async (req, res, next) => {
        ${where}
        ORDER BY e.surname, e.first_name, sh.code`, params
     );
+
+    const pendingIds = result.rows.filter(r => r.status === 'PENDING').map(r => r.id);
+    if (pendingIds.length > 0) {
+      const { getWorkflowStatusBatch } = require('../services/transaction-approval.service');
+      const wfMap = await getWorkflowStatusBatch('WAGE', pendingIds);
+      for (const row of result.rows) {
+        const wf = wfMap[row.id];
+        if (wf) {
+          row.workflow_level = wf.currentStep;
+          row.workflow_total = wf.totalSteps;
+        }
+      }
+    }
 
     res.json({ success: true, data: result.rows });
   } catch (err) { next(err); }
@@ -4799,6 +4592,13 @@ router.post('/wages/transactions', authenticate, async (req, res, next) => {
     if (salaryBasedOn !== 'RATE_PER_HOUR' && salaryBasedOn !== 'RATE_PER_DAY') {
       return res.status(400).json({ success: false, message: 'Wages can only be captured for employees with salary based on Rate Per Hour or Rate Per Day.' });
     }
+    const periodCheck = await dbQuery(
+      `SELECT id FROM payroll_periods WHERE id = $1 AND cycle_id = $2`, [period_id, cycle_id]
+    );
+    if (!periodCheck.rows.length) {
+      return res.status(400).json({ success: false, message: 'Invalid period for the selected cycle. Please re-select the payroll cycle and try again.' });
+    }
+
     const configuredRate = parseFloat(emp?.wage_rate) || 0;
     let effectiveRate = configuredRate > 0 ? configuredRate : (parseFloat(rate) || 0);
     const h = parseFloat(hours || 0);
@@ -4817,11 +4617,27 @@ router.post('/wages/transactions', authenticate, async (req, res, next) => {
     } else {
       finalAmount = parseFloat(amount) || 0;
     }
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
     const result = await dbQuery(
       `INSERT INTO wage_transactions (employee_id, salary_head_id, period_id, cycle_id, hours, days, rate, amount, reference_no, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [employee_id, salary_head_id, period_id, cycle_id, h, d, effectiveRate, finalAmount, reference_no || null, notes || null, req.user?.id || 1]
+      [employee_id, salary_head_id, period_id, cycle_id, h, d, effectiveRate, finalAmount, reference_no || null, notes || null, userId]
     );
+
+    const { checkAutoApprove, writeHistory } = require('../services/transaction-approval.service');
+    await writeHistory('WAGE', result.rows[0].id, 'SUBMITTED', userId, notes || null, null, 'PENDING');
+    try {
+      const autoApproved = await checkAutoApprove('WAGE', result.rows[0].id, userId, parseInt(employee_id));
+      if (autoApproved) {
+        const updated = await dbQuery('SELECT * FROM wage_transactions WHERE id = $1', [result.rows[0].id]);
+        return res.status(201).json({ success: true, data: updated.rows[0], message: 'Wage auto-approved (no workflow configured).' });
+      }
+    } catch (wfErr) {
+      console.warn('Workflow init warning for WAGE tx', result.rows[0].id, ':', wfErr.message);
+    }
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) { next(err); }
 });
@@ -4883,28 +4699,236 @@ router.delete('/wages/transactions/:id', authenticate, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-router.post('/wages/transactions/approve', authenticate, authorize('admin', 'payroll_admin'), async (req, res, next) => {
+router.post('/wages/transactions/approve', authenticate, async (req, res, next) => {
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, message: 'ids array required' });
-    const result = await dbQuery(
-      `UPDATE wage_transactions SET status='APPROVED', approved_by=$1, approved_at=NOW(), updated_at=NOW()
-       WHERE id = ANY($2) AND status='PENDING' RETURNING id`,
-      [req.user?.id || 1, ids]
-    );
-    res.json({ success: true, data: { count: result.rowCount }, message: `${result.rowCount} transactions approved` });
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+    const { handleApproval } = require('../services/transaction-approval.service');
+
+    if (ids.length === 1) {
+      const result = await handleApproval('WAGE', ids[0], userId, req.user?.roles || [], null);
+      if (!result.success) {
+        return res.status(result.status || 400).json({ success: false, message: result.error || 'Approval failed' });
+      }
+      return res.json({
+        success: true,
+        data: result.data,
+        message: result.message,
+        finalApproval: result.finalApproval,
+        level: result.level,
+        totalLevels: result.totalLevels
+      });
+    }
+
+    let approvedCount = 0, steppedCount = 0, failedCount = 0;
+    const failedIds = [];
+    const skipReasons = {};
+    for (const txId of ids) {
+      try {
+        const result = await handleApproval('WAGE', txId, userId, req.user?.roles || [], null);
+        if (result.success) {
+          if (result.finalApproval) { approvedCount++; } else { steppedCount++; }
+        } else {
+          failedCount++;
+          failedIds.push(txId);
+          const reason = result.error || 'Unknown error';
+          skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+        }
+      } catch (err) {
+        console.warn('Wage approve error for tx', txId, err.message);
+        failedCount++;
+        failedIds.push(txId);
+        const reason = err.message || 'Unknown error';
+        skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+      }
+    }
+
+    res.json({
+      success: failedCount === 0,
+      data: { count: approvedCount + steppedCount, approved: approvedCount, stepped: steppedCount, failed: failedCount, failedIds, total: ids.length, skipReasons },
+      message: `${approvedCount} fully approved, ${steppedCount} step(s) advanced${failedCount ? ', ' + failedCount + ' failed' : ''}`,
+      finalApproval: approvedCount > 0,
+      level: null,
+      totalLevels: null
+    });
   } catch (err) { next(err); }
 });
 
-router.post('/wages/transactions/reject', authenticate, authorize('admin', 'payroll_admin'), async (req, res, next) => {
+router.post('/wages/transactions/reject', authenticate, async (req, res, next) => {
   try {
-    const { ids } = req.body;
+    const { ids, comments } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, message: 'ids array required' });
-    const result = await dbQuery(
-      `UPDATE wage_transactions SET status='REJECTED', updated_at=NOW()
-       WHERE id = ANY($1) AND status='PENDING' RETURNING id`, [ids]
+    if (!comments || !comments.trim()) return res.status(400).json({ success: false, message: 'A reason/comment is required when rejecting transactions' });
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+    const { handleRejection } = require('../services/transaction-approval.service');
+
+    if (ids.length === 1) {
+      const result = await handleRejection('WAGE', ids[0], userId, req.user?.roles || [], comments.trim());
+      if (!result.success) {
+        return res.status(result.status || 400).json({ success: false, message: result.error || 'Rejection failed' });
+      }
+      return res.json({
+        success: true,
+        data: result.data,
+        message: result.message,
+        finalApproval: false,
+        level: result.level,
+        totalLevels: result.totalLevels
+      });
+    }
+
+    let rejectedCount = 0, failedCount = 0;
+    const failedIds = [];
+    for (const txId of ids) {
+      try {
+        const result = await handleRejection('WAGE', txId, userId, req.user?.roles || [], comments.trim());
+        if (result.success) { rejectedCount++; } else { failedCount++; failedIds.push(txId); }
+      } catch (err) {
+        console.warn('Wage reject error for tx', txId, err.message);
+        failedCount++;
+        failedIds.push(txId);
+      }
+    }
+
+    res.json({
+      success: failedCount === 0,
+      data: { count: rejectedCount, rejected: rejectedCount, failed: failedCount, failedIds, total: ids.length },
+      message: `${rejectedCount} transaction(s) rejected${failedCount ? ', ' + failedCount + ' failed' : ''}.`,
+      finalApproval: false,
+      level: null,
+      totalLevels: null
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/wages/transactions/return', authenticate, async (req, res, next) => {
+  try {
+    const { ids, comments } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, message: 'ids array required' });
+    if (!comments || !comments.trim()) return res.status(400).json({ success: false, message: 'A reason/comment is required when returning transactions' });
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+    const { handleReturn } = require('../services/transaction-approval.service');
+
+    if (ids.length === 1) {
+      const result = await handleReturn('WAGE', ids[0], userId, req.user?.roles || [], comments.trim());
+      if (!result.success) {
+        return res.status(result.status || 400).json({ success: false, message: result.error || 'Return failed' });
+      }
+      return res.json({
+        success: true,
+        data: result.data,
+        message: result.message,
+        finalApproval: false,
+        level: result.level,
+        totalLevels: result.totalLevels
+      });
+    }
+
+    let returnedCount = 0, failedCount = 0;
+    const failedIds = [];
+    for (const txId of ids) {
+      try {
+        const result = await handleReturn('WAGE', txId, userId, req.user?.roles || [], comments.trim());
+        if (result.success) { returnedCount++; } else { failedCount++; failedIds.push(txId); }
+      } catch (err) {
+        console.warn('Wage return error for tx', txId, err.message);
+        failedCount++;
+        failedIds.push(txId);
+      }
+    }
+
+    res.json({
+      success: failedCount === 0,
+      data: { count: returnedCount, returned: returnedCount, failed: failedCount, failedIds, total: ids.length },
+      message: `${returnedCount} transaction(s) returned for correction${failedCount ? ', ' + failedCount + ' failed' : ''}.`,
+      finalApproval: false,
+      level: null,
+      totalLevels: null
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/wages/can-approve', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user?.id || 0;
+    const userRoles = req.user?.roles || [];
+
+    const wageDefinitions = await dbQuery(
+      `SELECT steps FROM workflow_definitions WHERE entity_type = 'WAGE' AND enabled = TRUE`
     );
-    res.json({ success: true, data: { count: result.rowCount }, message: `${result.rowCount} transactions rejected` });
+
+    if (wageDefinitions.rows.length === 0) {
+      return res.json({ success: true, data: { canApprove: true, mode: 'direct' } });
+    }
+
+    for (const def of wageDefinitions.rows) {
+      const steps = def.steps || [];
+      for (const step of steps) {
+        const assignedUsers = step.assigned_users || [];
+        if (assignedUsers.includes(userId)) {
+          return res.json({ success: true, data: { canApprove: true, mode: 'workflow' } });
+        }
+        if (step.assigned_role) {
+          const normalizedStepRole = step.assigned_role.toLowerCase().replace(/[\s_-]+/g, '_');
+          const hasRole = userRoles.some(r => {
+            const normalizedUserRole = String(r).toLowerCase().replace(/[\s_-]+/g, '_');
+            return normalizedUserRole === normalizedStepRole;
+          });
+          if (hasRole) {
+            return res.json({ success: true, data: { canApprove: true, mode: 'workflow' } });
+          }
+        }
+      }
+    }
+
+    const delegations = await dbQuery(
+      `SELECT from_user FROM delegations WHERE to_user = $1 AND active = TRUE
+       AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+       AND (module = 'WAGE' OR module IS NULL)`,
+      [userId]
+    );
+    if (delegations.rows.length > 0) {
+      for (const def of wageDefinitions.rows) {
+        const steps = def.steps || [];
+        for (const step of steps) {
+          const assignedUsers = step.assigned_users || [];
+          for (const del of delegations.rows) {
+            if (assignedUsers.includes(del.from_user)) {
+              return res.json({ success: true, data: { canApprove: true, mode: 'workflow' } });
+            }
+          }
+        }
+      }
+    }
+
+    return res.json({ success: true, data: { canApprove: false, mode: 'workflow' } });
+  } catch (err) { next(err); }
+});
+
+router.get('/wages/transactions/:id/history', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const txCheck = await dbQuery('SELECT id FROM wage_transactions WHERE id = $1', [id]);
+    if (txCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Wage transaction not found' });
+    }
+    const result = await dbQuery(
+      `SELECT wth.*,
+              COALESCE(u.username, 'System') AS performed_by_name
+       FROM wage_transaction_history wth
+       LEFT JOIN users u ON wth.performed_by = u.id
+       WHERE wth.wage_transaction_id = $1
+       ORDER BY wth.performed_at ASC`,
+      [id]
+    );
+    res.json({ success: true, data: result.rows });
   } catch (err) { next(err); }
 });
 

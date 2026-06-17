@@ -8,7 +8,7 @@ async function calculateWorkingDays(startDate, endDate, excludeHolidays = true, 
 
   if (excludeHolidays) {
     const hResult = await dbQuery(
-      `SELECT holiday_date FROM holidays WHERE holiday_date BETWEEN $1 AND $2`,
+      `SELECT holiday_date FROM holidays WHERE holiday_date IS NOT NULL AND enabled = TRUE AND holiday_date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
     for (const h of hResult.rows) {
@@ -45,11 +45,11 @@ async function checkSickLeaveCycle(employeeId, requestDate) {
   cycleEnd.setMonth(cycleEnd.getMonth() + 36);
   cycleEnd.setDate(cycleEnd.getDate() - 1);
 
-  const sickType = await dbQuery(`SELECT id FROM leave_types WHERE name ILIKE '%sick%' LIMIT 1`);
+  const sickType = await dbQuery(`SELECT id FROM leave_types_legacy WHERE name ILIKE '%sick%' LIMIT 1`);
   if (!sickType.rows.length) return { error: 'Sick leave type not found' };
 
   const used = await dbQuery(
-    `SELECT COALESCE(SUM(days_taken), 0) AS used FROM leave_transactions
+    `SELECT COALESCE(SUM(days_taken), 0) AS used FROM leave_transactions_legacy
      WHERE employee_id = $1 AND leave_type_id = $2 AND status = 'APPROVED'
      AND start_date >= $3 AND start_date <= $4`,
     [employeeId, sickType.rows[0].id, cycleStart.toISOString(), cycleEnd.toISOString()]
@@ -71,7 +71,7 @@ async function checkSickLeaveCycle(employeeId, requestDate) {
 
 async function accrueLeave(employeeId, leaveTypeId, periodEndDate) {
   const policy = await dbQuery(
-    `SELECT * FROM leave_policies WHERE leave_type_id = $1 LIMIT 1`,
+    `SELECT * FROM leave_policies_legacy WHERE leave_type_id = $1 LIMIT 1`,
     [leaveTypeId]
   );
   if (!policy.rows.length) return { accrued: 0, message: 'No policy found' };
@@ -87,7 +87,7 @@ async function accrueLeave(employeeId, leaveTypeId, periodEndDate) {
   }
 
   const currentBalance = await dbQuery(
-    `SELECT balance FROM employee_leave_balances WHERE employee_id = $1 AND leave_type_id = $2`,
+    `SELECT balance FROM employee_leave_balances_legacy WHERE employee_id = $1 AND leave_type_id = $2`,
     [employeeId, leaveTypeId]
   );
 
@@ -98,12 +98,12 @@ async function accrueLeave(employeeId, leaveTypeId, periodEndDate) {
 
   if (currentBalance.rows.length) {
     await dbQuery(
-      `UPDATE employee_leave_balances SET balance = $3, last_accrual_date = $4 WHERE employee_id = $1 AND leave_type_id = $2`,
+      `UPDATE employee_leave_balances_legacy SET balance = $3, last_accrual_date = $4 WHERE employee_id = $1 AND leave_type_id = $2`,
       [employeeId, leaveTypeId, newBalance, periodEndDate]
     );
   } else {
     await dbQuery(
-      `INSERT INTO employee_leave_balances (employee_id, leave_type_id, balance, last_accrual_date) VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO employee_leave_balances_legacy (employee_id, leave_type_id, balance, last_accrual_date) VALUES ($1, $2, $3, $4)`,
       [employeeId, leaveTypeId, newBalance, periodEndDate]
     );
   }
@@ -113,7 +113,7 @@ async function accrueLeave(employeeId, leaveTypeId, periodEndDate) {
 
 async function calculateLeaveBalance(employeeId, leaveTypeId) {
   const bal = await dbQuery(
-    `SELECT balance FROM employee_leave_balances WHERE employee_id = $1 AND leave_type_id = $2`,
+    `SELECT balance FROM employee_leave_balances_legacy WHERE employee_id = $1 AND leave_type_id = $2`,
     [employeeId, leaveTypeId]
   );
   return bal.rows.length ? parseFloat(bal.rows[0].balance) : 0;
@@ -121,8 +121,8 @@ async function calculateLeaveBalance(employeeId, leaveTypeId) {
 
 async function validateLeaveRequest(employeeId, leaveTypeId, startDate, endDate) {
   const errors = [];
-  const policy = await dbQuery(`SELECT * FROM leave_policies WHERE leave_type_id = $1 LIMIT 1`, [leaveTypeId]);
-  const leaveType = await dbQuery(`SELECT * FROM leave_types WHERE id = $1`, [leaveTypeId]);
+  const policy = await dbQuery(`SELECT * FROM leave_policies_legacy WHERE leave_type_id = $1 LIMIT 1`, [leaveTypeId]);
+  const leaveType = await dbQuery(`SELECT * FROM leave_types_legacy WHERE id = $1`, [leaveTypeId]);
   const emp = await dbQuery(`SELECT * FROM employees WHERE id = $1`, [employeeId]);
 
   if (!emp.rows.length) return { valid: false, errors: ['Employee not found'] };
@@ -181,7 +181,7 @@ async function calculateLeaveLiability(asAtDate) {
     `SELECT e.id, e.employee_code, e.first_name, e.surname, e.annual_salary,
             COALESCE(SUM(lb.balance), 0) AS total_leave_days
      FROM employees e
-     LEFT JOIN employee_leave_balances lb ON lb.employee_id = e.id
+     LEFT JOIN employee_leave_balances_legacy lb ON lb.employee_id = e.id
      WHERE e.status = 'ACTIVE' AND e.enabled = TRUE
      GROUP BY e.id, e.employee_code, e.first_name, e.surname, e.annual_salary
      HAVING COALESCE(SUM(lb.balance), 0) > 0`

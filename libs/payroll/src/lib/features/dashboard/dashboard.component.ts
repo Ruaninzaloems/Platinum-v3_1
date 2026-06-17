@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ApiService } from '../../core/services/api.service';
+import { ApprovalsService, ApprovalCounts } from '../../core/services/approvals.service';
 import { IconComponent } from '../../shared/components/icon/icon.component';
 import { CurrencyShortPipe } from '../../shared/pipes/currency-short.pipe';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
@@ -35,6 +36,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   workflowCount = 0;
   probationCount = 0;
   ghostCount = 0;
+  myApprovalCounts: ApprovalCounts = { total: 0, CLAIM: 0, WAGE: 0, OVERTIME: 0, INSTALLMENT: 0, LEAVE_REQUEST: 0, LEAVE_ADJUSTMENT: 0 };
 
   empListState = {
     page: 1,
@@ -104,7 +106,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   deptChartColors = ['#6C7AE0','#68D391','#F6AD55','#FC8181','#B794F4','#F687B3','#81E6D9','#FBD38D'];
 
-  constructor(private api: ApiService, private router: Router, private cdr: ChangeDetectorRef) {}
+  constructor(private api: ApiService, private router: Router, private cdr: ChangeDetectorRef, private approvalsSvc: ApprovalsService) {}
 
   ngOnInit(): void {
     this.loadDashboard();
@@ -147,6 +149,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.workflowCount = Array.isArray(res.data) ? res.data.length : (parseInt(res.data.count) || 0);
          this.cdr.detectChanges(); }
       }
+    });
+    this.approvalsSvc.refreshCounts();
+    this.approvalsSvc.counts$.subscribe(counts => {
+      this.myApprovalCounts = counts;
+      this.cdr.detectChanges();
     });
     this.api.getRaw<any>('/employees/probation-alerts').pipe(catchError(() => of(null))).subscribe({
       next: (res) => {
@@ -225,7 +232,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       'settings-workflows': '/settings/workflows',
       'employees': '/employees',
       'time': '/time',
-      'payroll': '/payroll',
+      'payroll': '/payroll/run',
+      'approvals': '/approvals',
     };
     const route = routeMap[module];
     if (route) this.router.navigate([route]);

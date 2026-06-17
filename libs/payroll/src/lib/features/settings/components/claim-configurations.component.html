@@ -158,8 +158,8 @@
 
         <div class="form-group">
           <label>Salary Transaction</label>
-          <select class="form-control" [(ngModel)]="editItem.salary_head_id">
-            <option [ngValue]="null">-- Select Salary Transaction --</option>
+          <select class="form-control" [(ngModel)]="editItem.salary_head_id" [disabled]="!editItem.claim_type || (editItem.claim_type === 'S & T' && !editItem.claim_subtype) || salaryHeads.length === 0">
+            <option [ngValue]="null">{{ !editItem.claim_type || (editItem.claim_type === 'S & T' && !editItem.claim_subtype) ? '-- Select claim type/subtype first --' : '-- Select Salary Transaction --' }}</option>
             @for (sh of salaryHeads; track sh.id) {
               <option [ngValue]="sh.id">{{ sh.name }}</option>
             }

@@ -121,7 +121,7 @@
         <select class="form-control" style="width:100%" [(ngModel)]="selectedEmployee" (ngModelChange)="onEmployeeSelect()">
           <option value="">-- Select Employee --</option>
           @for (emp of employees; track emp.id) {
-            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+            <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
           }
         </select>
       </div>
@@ -320,7 +320,7 @@
         <select class="form-control" style="width:100%" [(ngModel)]="selectedLifeEventEmployee" (ngModelChange)="onLifeEventEmployeeChange()">
           <option value="">-- Select Employee --</option>
           @for (emp of employees; track emp.id) {
-            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+            <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
           }
         </select>
       </div>
@@ -361,7 +361,7 @@
         <select class="form-control" style="width:100%" [(ngModel)]="projectionEmployee">
           <option value="">-- Select Employee --</option>
           @for (emp of employees; track emp.id) {
-            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+            <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
           }
         </select>
       </div>
@@ -414,7 +414,7 @@
         <select class="form-control" style="width:100%" [(ngModel)]="selectedReportEmployee">
           <option value="">-- Select Employee --</option>
           @for (emp of employees; track emp.id) {
-            <option [value]="emp.id">{{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
+            <option [value]="emp.id">{{ emp.id }} | {{ emp.employee_code }} - {{ emp.first_name }} {{ emp.surname }}</option>
           }
         </select>
       </div>

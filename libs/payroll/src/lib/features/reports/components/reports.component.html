@@ -5,6 +5,18 @@
   </div>
 </div>
 
+<div class="section-header" style="margin-top:4px"><app-icon name="barChart" [size]="16"></app-icon> Operational Reports</div>
+<div class="summary-row" style="margin-bottom:24px">
+  <div class="summary-card sc-blue" style="cursor:pointer" [routerLink]="['/reports/payroll-totals']">
+    <div class="summary-icon" style="background:var(--info-bg)"><app-icon name="barChart" [size]="18"></app-icon></div>
+    <div>
+      <div class="summary-label">Payroll Totals</div>
+      <div class="summary-value">Period Summary</div>
+      <div class="summary-sub">By salary head, with PDF / Excel / CSV</div>
+    </div>
+  </div>
+</div>
+
 <div class="module-tabs">
   <div class="detail-tab" [class.active]="activeTab === 'statutory'" (click)="switchTab('statutory')"><app-icon name="file" [size]="14"></app-icon> Statutory Reports</div>
   <div class="detail-tab" [class.active]="activeTab === 'payslips'" (click)="switchTab('payslips')"><app-icon name="creditCard" [size]="14"></app-icon> Payslips</div>
@@ -197,6 +209,7 @@
             <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px;margin:0"
                    [style.background]="isEmployeeSelected(emp.id) ? '#f0f7ff' : '#fff'">
               <input type="checkbox" [checked]="isEmployeeSelected(emp.id)" (change)="toggleEmployee(emp.id)" style="margin:0">
+              <span style="font-weight:600;min-width:40px">{{ emp.id }}</span>
               <span style="font-weight:600;min-width:70px">{{ emp.employee_code }}</span>
               <span style="flex:1">{{ emp.surname }}, {{ emp.first_name }}</span>
               @if (emp.pay_point_name) {
@@ -240,7 +253,7 @@
       <select class="form-control" [(ngModel)]="letterEmployeeId">
         <option value="">-- Select --</option>
         @for (e of employees; track e.id) {
-          <option [value]="e.id">{{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
+          <option [value]="e.id">{{ e.id }} | {{ e.employee_code }} - {{ e.first_name }} {{ e.surname }}</option>
         }
       </select>
     </div>
