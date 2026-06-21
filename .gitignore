@@ -152,3 +152,8 @@ BUDGET-APP/PlatinumBudget.Api/Data/SeedSystemConstants.sql
 
 .nx/cache
 .nx/workspace-data
+/apps/shell/.angular/cache
+/SCM-API/obj
+/OVERTIME-API/obj
+/IDP-UI/PlatinumIDP/obj
+/BUDGET-APP/PlatinumBudget.Api/obj

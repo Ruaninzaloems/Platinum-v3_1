@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthService, MsAuthService, SiteInfo } from '@platinumv3/shared/auth';
 
 @Component({
@@ -305,13 +306,27 @@ export class LoginComponent implements OnInit {
     this.errorMessage.set('');
     try {
       await this.msAuth.signIn();
-      // Mirror the MS user into the Platinum local session so the rest of
-      // the shell (nav, role guards, etc.) sees an authenticated user.
       const ms = this.msAuth.msUser();
-      if (ms) {
-        this.auth.setLocalSession(ms.username);
+      if (!ms) {
+        this.errorMessage.set('Microsoft sign-in did not return an account.');
+        return;
       }
-      this.router.navigate(['/dashboard']);
+      // Resolve / create the matching EMS user on the server and start a real
+      // session (azureUid = Azure object id, email = preferred_username).
+      const resp = await firstValueFrom(
+        this.auth.loginAzure(
+          { azureUid: ms.accountId, email: ms.email, username: ms.name },
+          this.selectedSite
+        )
+      );
+      if (resp.success) {
+        this.router.navigate(['/dashboard']);
+      } else {
+        // Don't leave a dangling Microsoft session that would bounce the user
+        // straight back past the login page on reload.
+        await this.msAuth.clearLocalSession();
+        this.errorMessage.set(resp.error || 'Could not sign you in to Platinum.');
+      }
     } catch (e: any) {
       if (e?.errorCode !== 'user_cancelled') {
         this.errorMessage.set(

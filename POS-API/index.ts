@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import compression from "compression";
 import pgSessionStore from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -55,16 +56,30 @@ app.use(compression({
   },
 }));
 
-const PgStore = pgSessionStore(session);
+// Session store: Postgres whenever a connection string is present (always the
+// case in production / Replit). The in-memory store is ONLY a local-testing
+// fallback for when no Postgres is configured — it never overrides an existing
+// Postgres DB.
+const pgConnString = process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL;
+
+let sessionStore: session.Store;
+if (pgConnString) {
+  const PgStore = pgSessionStore(session);
+  sessionStore = new PgStore({
+    conString: pgConnString,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+    pruneSessionInterval: 300,
+  });
+} else {
+  const MemoryStore = createMemoryStore(session);
+  sessionStore = new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 });
+  console.warn('[Session] No DATABASE_URL — using in-memory session store (local testing only).');
+}
 
 app.use(
   session({
-    store: new PgStore({
-      conString: process.env.AZURE_DATABASE_URL || process.env.DATABASE_URL,
-      tableName: 'user_sessions',
-      createTableIfMissing: true,
-      pruneSessionInterval: 300,
-    }),
+    store: sessionStore,
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,

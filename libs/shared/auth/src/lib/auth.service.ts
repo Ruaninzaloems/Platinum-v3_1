@@ -143,6 +143,36 @@ export class AuthService {
     });
   }
 
+  /**
+   * Azure-AD (MSAL) login. After the front end completes the Microsoft popup,
+   * the resulting claims are posted to POS-API, which looks up / creates the
+   * matching EMS user and starts a cookie session.
+   */
+  loginAzure(
+    claims: { azureUid: string; email: string; username: string },
+    siteId: string = 'george'
+  ): Observable<LoginResponse> {
+    return new Observable<LoginResponse>(sub => {
+      this.http.post<LoginResponse>(
+        `${POS_AUTH_BASE}/auth/createTokenAzure`,
+        { ...claims, siteId },
+        { withCredentials: true }
+      ).subscribe({
+        next: (resp) => {
+          if (resp?.success && resp.user) {
+            this.applySession(resp.user, resp.site, resp.token);
+          }
+          sub.next(resp);
+          sub.complete();
+        },
+        error: (err: HttpErrorResponse) => {
+          sub.next({ success: false, error: err.error?.error || err.message || 'Microsoft sign-in failed' });
+          sub.complete();
+        }
+      });
+    });
+  }
+
   /** Convenience used by login.component when the API returns the legacy shape. */
   handleLoginSuccess(response: { token?: string; user: AuthUser; site?: SiteInfo }) {
     this.applySession(response.user, response.site, response.token);
