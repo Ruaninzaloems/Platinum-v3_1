@@ -21,8 +21,8 @@ import sql from "mssql";
 const config: sql.config = {
   server: process.env.EMS_V3_SERVER || "emsfunctions.database.windows.net",
   database: process.env.EMS_V3_NAME || "ems_v3",
-  user: process.env.EMS_V3_USER || "",
-  password: process.env.EMS_V3_PASSWORD || "",
+  user: process.env.EMS_V3_USER || "PlatinumV3User",
+  password: process.env.EMS_V3_PASSWORD || "e21Lpi5xctIU",
   port: process.env.EMS_V3_PORT ? parseInt(process.env.EMS_V3_PORT, 10) : 1433,
   options: {
     encrypt: process.env.EMS_V3_ENCRYPT !== "false",

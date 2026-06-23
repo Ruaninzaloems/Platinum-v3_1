@@ -86,6 +86,29 @@ async function logSchemaOnce(pool: sql.ConnectionPool): Promise<void> {
   }
 }
 
+// The User_UserDetail primary-key column differs between EMS tenant schemas:
+// some use "UserId", others "User_ID". Hard-coding the wrong one throws
+// "Invalid column name 'UserId'". Resolve the real column name from the live
+// schema once per pool (cached) and use it in all hand-written SQL.
+const userIdColCache = new WeakMap<sql.ConnectionPool, string>();
+async function userIdColumn(pool: sql.ConnectionPool): Promise<string> {
+  const cached = userIdColCache.get(pool);
+  if (cached) return cached;
+  let col = "UserId";
+  try {
+    const res = await pool.request().query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_NAME = '${T_USER}'
+         AND COLUMN_NAME IN ('User_ID','UserId','UserID','user_id')
+       ORDER BY CASE COLUMN_NAME
+         WHEN 'User_ID' THEN 0 WHEN 'UserId' THEN 1 WHEN 'UserID' THEN 2 ELSE 3 END`,
+    );
+    if (res.recordset[0]?.COLUMN_NAME) col = res.recordset[0].COLUMN_NAME;
+  } catch { /* keep default */ }
+  userIdColCache.set(pool, col);
+  return col;
+}
+
 async function getAzureLinkUserId(
   pool: sql.ConnectionPool,
   azureUid: string,
@@ -106,10 +129,11 @@ async function getUserById(
   pool: sql.ConnectionPool,
   userId: number,
 ): Promise<EmsUser | null> {
+  const idCol = await userIdColumn(pool);
   const res = await pool
     .request()
     .input("id", sql.Int, userId)
-    .query(`SELECT * FROM ${T_USER} WHERE UserId = @id`);
+    .query(`SELECT * FROM ${T_USER} WHERE [${idCol}] = @id`);
   return res.recordset[0] ? mapUser(res.recordset[0]) : null;
 }
 
@@ -171,6 +195,7 @@ async function createAzureUser(
   const endDate = new Date(now);
   endDate.setFullYear(endDate.getFullYear() + 2);
 
+  const idCol = await userIdColumn(pool);
   const res = await pool
     .request()
     .input("userName", sql.NVarChar, userName)
@@ -185,7 +210,7 @@ async function createAzureUser(
          (UserName, [Password], FirstName, LastName, eMail, Enabled, DateCaptured,
           SuperUser, PasswordNeverExpire, CapturerID, PasswordLastChangedDate,
           TemporaryPassword, EndDate, CashFloat)
-       OUTPUT INSERTED.UserId
+       OUTPUT INSERTED.[${idCol}] AS UserId
        VALUES
          (@userName, @password, @firstName, @lastName, @email, 1, @now,
           0, 1, 777, @now,
