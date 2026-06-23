@@ -175,12 +175,11 @@ stages:
     displayName: 'POS → Platinum-V3-POS-API'
     pool: { vmImage: $(vmImage) }
     steps:
-      - task: NodeTool@0
-        inputs: { versionSpec: '22.x' }
-      - script: |
-          cd POS-API
-          npm ci --legacy-peer-deps    # installs tsx (runtime) + mssql + express
-        displayName: 'Install POS API deps'
+      # Deploy SOURCE ONLY — do NOT bundle node_modules (POS-API's is ~200MB and the
+      # zip-deploy fails). Let Oryx run `npm install` on the App Service instead
+      # (SCM_DO_BUILD_DURING_DEPLOYMENT=true, enforced below). The package.json "build"
+      # script is a no-op, so Oryx's post-install build succeeds; the app then starts via
+      # `npm start` (= NODE_ENV=production tsx index.ts), binding Azure's PORT.
       - task: AzureWebApp@1
         displayName: 'Deploy to Platinum-V3-POS-API'
         inputs:
@@ -189,4 +188,5 @@ stages:
           appName: 'Platinum-V3-POS-API'
           runtimeStack: 'NODE|22-lts'
           package: 'POS-API'
-          startUpCommand: 'npm start'   # = NODE_ENV=production tsx index.ts (binds Azure's PORT)
+          startUpCommand: 'npm start'
+          appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT true'
