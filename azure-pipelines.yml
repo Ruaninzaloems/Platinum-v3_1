@@ -167,3 +167,26 @@ stages:
           runtimeStack: 'NODE|22-lts'
           package: 'PAYROLL-APP'
           startUpCommand: 'node src/server/index.js'   # adjust to PAYROLL-APP's real entry
+
+  # POS auth + receipting API (Node/TypeScript via tsx; reads EMS_V3_* + EMS_TENANT_*
+  # from this app's App Settings — see runbook). The shell proxies /pos-app/api here
+  # via its POS_API_URL setting.
+  - job: POS_API
+    displayName: 'POS → Platinum-V3-POS-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          cd POS-API
+          npm ci --legacy-peer-deps    # installs tsx (runtime) + mssql + express
+        displayName: 'Install POS API deps'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-POS-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-POS-API'
+          runtimeStack: 'NODE|22-lts'
+          package: 'POS-API'
+          startUpCommand: 'npm start'   # = NODE_ENV=production tsx index.ts (binds Azure's PORT)
