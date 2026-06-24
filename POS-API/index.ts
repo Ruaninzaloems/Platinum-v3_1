@@ -5,6 +5,7 @@ import pgSessionStore from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { setupSwagger } from "./swagger";
 import { createServer } from "http";
 import path from "path";
 import { existsSync } from "fs";
@@ -155,6 +156,10 @@ app.use((req, res, next) => {
   });
 
   await registerRoutes(httpServer, app);
+
+  // Swagger UI — mounted after routes (so the spec sees them) and before
+  // serveStatic (so /swagger isn't swallowed by the SPA/dev-proxy catch-all).
+  setupSwagger(app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
