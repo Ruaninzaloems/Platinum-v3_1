@@ -54,6 +54,7 @@ export const routes: Routes = [
       { path: 'sharepoint/uat-assets', loadComponent: () => import('./features/sharepoint/uat-assets.component').then(m => m.UatAssetsComponent) },
       { path: 'sharepoint/uat-overtime', loadComponent: () => import('./features/sharepoint/uat-overtime.component').then(m => m.UatOvertimeComponent) },
       { path: 'admin-settings', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
+      { path: 'admin-settings/access-management', loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
       { path: 'admin-settings/:module', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }

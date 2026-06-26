@@ -387,34 +387,56 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             </a>
             <div style="padding:2px 16px 0 44px;font-size:11px;color:#94a3b8">Sebata2</div>
           } @else if (activeModule() === 'admin') {
-            <div style="padding:6px 16px 4px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">API Config</div>
-            <a class="nav-link sub-item" routerLink="/admin-settings/assets" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">inventory_2</mat-icon><span>Assets</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/scm" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">local_shipping</mat-icon><span>SCM</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/pos" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">point_of_sale</mat-icon><span>POS</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/payroll" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">payments</mat-icon><span>Payroll</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/idp" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">assignment</mat-icon><span>IDP</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/budget" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">account_balance</mat-icon><span>Budget</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/afs" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">summarize</mat-icon><span>AFS</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/insights" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">insights</mat-icon><span>Performance</span>
-            </a>
-            <a class="nav-link sub-item" routerLink="/admin-settings/overtime" routerLinkActive="active-link">
-              <mat-icon class="nav-icon">more_time</mat-icon><span>Overtime</span>
-            </a>
+            <!-- API Config (collapsible) -->
+            <button class="nav-group-header" (click)="toggleGroup('API Config')">
+              <mat-icon class="nav-icon">api</mat-icon>
+              <span class="nav-group-title">API Config</span>
+              <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded('API Config')">chevron_right</mat-icon>
+            </button>
+            @if (isGroupExpanded('API Config')) {
+              <div class="nav-group-items">
+                <a class="nav-link sub-item" routerLink="/admin-settings/assets" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">inventory_2</mat-icon><span>Assets</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/scm" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">local_shipping</mat-icon><span>SCM</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/pos" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">point_of_sale</mat-icon><span>POS</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/payroll" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">payments</mat-icon><span>Payroll</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/idp" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">assignment</mat-icon><span>IDP</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/budget" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">account_balance</mat-icon><span>Budget</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/afs" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">summarize</mat-icon><span>AFS</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/insights" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">insights</mat-icon><span>Performance</span>
+                </a>
+                <a class="nav-link sub-item" routerLink="/admin-settings/overtime" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">more_time</mat-icon><span>Overtime</span>
+                </a>
+              </div>
+            }
+            <!-- Settings (collapsible) -->
+            <button class="nav-group-header" (click)="toggleGroup('Admin Settings')">
+              <mat-icon class="nav-icon">settings</mat-icon>
+              <span class="nav-group-title">Settings</span>
+              <mat-icon class="nav-chevron" [class.expanded]="isGroupExpanded('Admin Settings')">chevron_right</mat-icon>
+            </button>
+            @if (isGroupExpanded('Admin Settings')) {
+              <div class="nav-group-items">
+                <a class="nav-link sub-item" routerLink="/admin-settings/access-management" routerLinkActive="active-link">
+                  <mat-icon class="nav-icon">admin_panel_settings</mat-icon><span>Access Management</span>
+                </a>
+              </div>
+            }
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -581,7 +603,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
 export class ShellComponent implements OnInit, OnDestroy {
   sidenavCollapsed = signal(false);
   activeModule = signal<AppModule>('home');
-  private expandedGroups = signal<Set<string>>(new Set());
+  private expandedGroups = signal<Set<string>>(new Set(['API Config']));
   private routeSub!: Subscription;
 
   constructor(public authService: AuthService, private router: Router, public dbToggle: DatabaseToggleService, public orgSettings: OrgSettingsService) {}

@@ -597,6 +597,107 @@ app.post('/api/working-papers', async (req, res, next) => {
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
 });
+// Adjustments — real CRUD against the AFS DB (ports server adjustments.service.ts).
+// SCOA/PPID lookups are autocompletes; return [] here (codes can be typed manually).
+app.get('/api/adjustments/lookup/scoa', (_req, res) => res.json([]));
+app.get('/api/adjustments/lookup/ppid', (_req, res) => res.json([]));
+
+app.get('/api/adjustments', async (req, res, next) => {
+  try {
+    const compilationId = req.query.compilationId as string | undefined;
+    const rows = compilationId
+      ? await query<any>(`SELECT * FROM public.adjustments WHERE "compilationId" = $1 ORDER BY "createdAt" DESC`, [String(compilationId)])
+      : await query<any>(`SELECT * FROM public.adjustments ORDER BY "createdAt" DESC`);
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+app.post('/api/adjustments', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const compilationId = b.compilationId;
+    if (!compilationId) return res.status(400).json({ message: 'compilationId is required' });
+    // Derive tenant from the compilation (no auth context in the monorepo API).
+    const comp = await query<any>(`SELECT "tenantId" FROM public.compilations WHERE id::text = $1 LIMIT 1`, [String(compilationId)]);
+    const tenantId = comp[0]?.tenantId;
+    if (!tenantId) return res.status(400).json({ message: 'Compilation not found' });
+
+    const lines = Array.isArray(b.lines) ? b.lines.filter((l: any) => l && l.glAccountCode) : [];
+    let totalDebit = 0, totalCredit = 0;
+    for (const l of lines) { totalDebit += Number(l.debitAmount || 0); totalCredit += Number(l.creditAmount || 0); }
+    const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    const cnt = await query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.adjustments WHERE "compilationId" = $1 AND "tenantId" = $2`,
+      [String(compilationId), tenantId]
+    );
+    const reference = b.reference || `ADJ-${String((cnt[0]?.n || 0) + 1).padStart(4, '0')}`;
+
+    const adjRows = await query<any>(
+      `INSERT INTO public.adjustments
+         (id,"tenantId","compilationId","reference","description","adjustmentType","impactType","status",
+          "effectiveDate","reason","totalDebit","totalCredit","isBalanced","preparedBy","createdAt","updatedAt")
+       VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,NOW(),NOW())
+       RETURNING *`,
+      [tenantId, String(compilationId), reference, b.description || '', b.adjustmentType || 'audit',
+       b.impactType || 'presentation_only', b.effectiveDate ? new Date(b.effectiveDate) : new Date(),
+       b.reason ?? null, totalDebit, totalCredit, isBalanced, b.preparedBy || 'system']
+    );
+    const adj = adjRows[0];
+
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      await query(
+        `INSERT INTO public.adjustment_lines
+           (id,"adjustmentId","glAccountCode","glAccountName","lineItemId","debitAmount","creditAmount","description",
+            "mscoaSegment","scoaItemCode","scoaFunctionCode","scoaFundCode","scoaProjectCode","scoaRegionCode","scoaCostingCode","ppid","sortOrder","createdAt")
+         VALUES (gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())`,
+        [adj.id, l.glAccountCode, l.glAccountName ?? null, l.lineItemId ?? null,
+         Number(l.debitAmount || 0), Number(l.creditAmount || 0), l.description ?? null,
+         l.mscoaSegment ?? l.scoaSegment ?? null, l.scoaItemCode ?? null, l.scoaFunctionCode ?? null,
+         l.scoaFundCode ?? null, l.scoaProjectCode ?? null, l.scoaRegionCode ?? null, l.scoaCostingCode ?? null,
+         l.ppid ?? null, i]
+      );
+    }
+    res.status(201).json(adj);
+  } catch (e) { next(e); }
+});
+
+app.get('/api/adjustments/:id', async (req, res, next) => {
+  try {
+    const rows = await query<any>(`SELECT * FROM public.adjustments WHERE id::text = $1 LIMIT 1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'Adjustment not found' });
+    const lines = await query<any>(`SELECT * FROM public.adjustment_lines WHERE "adjustmentId"::text = $1 ORDER BY "sortOrder"`, [req.params.id]);
+    res.json({ ...rows[0], lines });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/adjustments/:id/impact', (_req, res) =>
+  res.json({ available: false, message: 'Impact preview is not computed in this environment.', lines: [] }));
+
+// Workflow transitions
+async function setAdjStatus(id: string, sets: Record<string, any>): Promise<any> {
+  const cols = Object.keys(sets);
+  const setSql = cols.map((c, i) => `"${c}" = $${i + 2}`).join(', ');
+  const rows = await query<any>(
+    `UPDATE public.adjustments SET ${setSql}, "updatedAt" = NOW() WHERE id::text = $1 RETURNING *`,
+    [id, ...cols.map(c => sets[c])]
+  );
+  return rows[0];
+}
+app.post('/api/adjustments/:id/submit', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'pending_review' })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/approve', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'approved', approvedAt: new Date() })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/reject', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'rejected', rejectedAt: new Date(), rejectionReason: req.body?.reason ?? null })); } catch (e) { next(e); }
+});
+app.post('/api/adjustments/:id/post', async (req, res, next) => {
+  try { res.json(await setAdjStatus(req.params.id, { status: 'posted', postedAt: new Date() })); } catch (e) { next(e); }
+});
+
 app.get('/api/validation-rules/results', (_req, res) => res.json({ results: [], total: 0 }));
 app.post('/api/validation-rules/run', (_req, res) => res.json({ status: 'ok', runId: 'demo-' + Date.now() }));
 app.get('/api/ems-data/status', (_req, res) => res.json({ status: 'idle', lastSync: null }));

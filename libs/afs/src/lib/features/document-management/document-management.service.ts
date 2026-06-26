@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
-import { AfsSharePointService, SpAfsDoc } from '../../core/services/afs-sharepoint.service';
+import { AfsSharePointService, SpAfsDoc, AfsSpVariant } from '../../core/services/afs-sharepoint.service';
 
 export interface DmsDocument {
   id: string;
@@ -130,6 +130,32 @@ export class DocumentManagementService {
     return (m.workingPaperId || m.compilationId || m.findingId || m.rfiId || m.adjustmentId || '') as string;
   }
 
+  /** Adjustment documents go to the separate Adjustments library; everything else to the AFS library. */
+  private variantForUpload(m: UploadMetadata): AfsSpVariant {
+    return m.adjustmentId ? 'adjustments' : 'afs';
+  }
+  private variantForContext(contextType: string): AfsSpVariant {
+    return contextType === 'adjustment' ? 'adjustments' : 'afs';
+  }
+
+  /**
+   * Should this document use SharePoint storage? True when the variant's own toggle is on, OR
+   * (for adjustment documents) when the working-paper SharePoint toggle is on — adjustment docs
+   * always belong in the Adjustments library, so any active AFS SharePoint routes them there
+   * (using the Adjustments library's defaults) rather than the local AFS API.
+   */
+  private useSharePoint(variant: AfsSpVariant): boolean {
+    if (this.afsSp.isEnabled(variant)) return true;
+    return variant === 'adjustments' && this.afsSp.isEnabled('afs');
+  }
+
+  /** Turn a code like "adjustment_support" / "internal" into a readable label
+   *  ("Adjustment Support" / "Internal") for the SharePoint DocumentType/AccessLevel columns. */
+  private prettify(s?: string): string | undefined {
+    if (!s) return undefined;
+    return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
   /** Map a SharePoint doc to the DMS document shape the UI consumes. */
   private spToDms(d: SpAfsDoc): DmsDocument {
     return {
@@ -150,6 +176,7 @@ export class DocumentManagementService {
       externalRef: d.id,
       createdAt: d.createdAt,
       __spItem: d.__item,
+      __spVariant: d.__variant,
     } as unknown as DmsDocument;
   }
 
@@ -186,16 +213,42 @@ export class DocumentManagementService {
   upload(file: File, metadata: UploadMetadata): Observable<DmsDocument> {
     // When AFS SharePoint storage is active (Admin → AFS), upload to the configured
     // library, tagged with AFSID (link to the entity) + description/Classification/
-    // Category/Tags. Otherwise use the AFS API's local storage.
-    if (this.afsSp.isEnabled()) {
+    // Category/Tags. Adjustment documents use the separate Adjustments library
+    // (UatAFSAdjustments) when that toggle is on. Otherwise use the AFS API's local storage.
+    const variant = this.variantForUpload(metadata);
+    if (this.useSharePoint(variant)) {
       return from(this.afsSp.uploadAfsDocument(this.contextId(metadata), file, {
         description: metadata.description,
         classification: metadata.classificationLabel || metadata.classificationCode,
         category: metadata.category,
         tags: metadata.tags,
-      }).then(d => this.spToDms(d)));
+        documentType: this.prettify(metadata.documentType),
+        accessLevel: this.prettify(metadata.accessLevel),
+      }, variant).then(d => this.spToDms(d)));
     }
     return this.api.upload<DmsDocument>('/documents/upload', file, metadata as any);
+  }
+
+  /** True when AFS SharePoint storage is active for the given library variant. */
+  isSharePointActive(variant: AfsSpVariant = 'afs'): boolean {
+    return this.afsSp.isEnabled(variant);
+  }
+
+  /** List every document in a SharePoint library (e.g. all UatAFS working papers). */
+  listAllSpDocuments(variant: AfsSpVariant = 'afs'): Observable<DmsDocument[]> {
+    return from(this.afsSp.listAllAfsDocuments(variant).then(docs => docs.map(d => this.spToDms(d))));
+  }
+
+  /** Copy a SharePoint document into the Adjustments library, linked to the adjustment (ADJID). */
+  copySpToAdjustment(doc: DmsDocument, adjustmentId: string): Observable<DmsDocument> {
+    const item = (doc as any).__spItem;
+    const sourceVariant: AfsSpVariant = (doc as any).__spVariant || 'afs';
+    return from(this.afsSp.copyDocument(item, sourceVariant, 'adjustments', adjustmentId, {
+      description: doc.description,
+      classification: doc.classificationLabel,
+      category: doc.category,
+      tags: (doc.tags || []).join(', '),
+    }).then(d => this.spToDms(d)));
   }
 
   download(id: string): Observable<Blob> {
@@ -239,9 +292,11 @@ export class DocumentManagementService {
 
   getByContext(contextType: string, contextId: string): Observable<DmsDocument[]> {
     // When AFS SharePoint storage is active, list the entity's documents from the
-    // configured library (filtered by AFSID = contextId).
-    if (this.afsSp.isEnabled()) {
-      return from(this.afsSp.listAfsDocuments(contextId).then(docs => docs.map(d => this.spToDms(d))));
+    // configured library (filtered by AFSID = contextId). Adjustments read from the
+    // separate Adjustments library when that toggle is on.
+    const variant = this.variantForContext(contextType);
+    if (this.useSharePoint(variant)) {
+      return from(this.afsSp.listAfsDocuments(contextId, variant).then(docs => docs.map(d => this.spToDms(d))));
     }
     return this.api.get<DmsDocument[]>(`/documents/by-context/${contextType}/${contextId}`);
   }

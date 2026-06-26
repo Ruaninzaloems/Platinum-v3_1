@@ -172,6 +172,11 @@
         </div>
       </div>
 
+      @if (createError()) {
+        <div style="margin-top: 12px; padding: 10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:13px;">
+          {{ createError() }}
+        </div>
+      }
       <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
         <button mat-stroked-button (click)="showCreateForm.set(false)" matTooltip="Discard this adjustment and close the form">Cancel</button>
         <button mat-flat-button class="btn-primary" (click)="createAdjustment()" [disabled]="!isNewBalanced() || !newAdjustment.description" matTooltip="Save this balanced adjustment entry">
@@ -248,10 +253,10 @@
             Supporting Documents ({{ adjDocuments().length }})
           </h4>
           <div style="display: flex; gap: 8px;">
-            <button mat-stroked-button (click)="uploadDocForAdj(selectedAdjustment()!.id)" matTooltip="Upload supporting documentation">
+            <button mat-stroked-button (click)="uploadDocForAdj(selectedAdjustment()!)" matTooltip="Upload supporting documentation">
               <mat-icon>cloud_upload</mat-icon> Upload
             </button>
-            <button mat-stroked-button (click)="linkDocToAdj(selectedAdjustment()!.id)" matTooltip="Link existing document">
+            <button mat-stroked-button (click)="linkDocToAdj(selectedAdjustment()!)" matTooltip="Link existing document">
               <mat-icon>link</mat-icon> Link Existing
             </button>
           </div>

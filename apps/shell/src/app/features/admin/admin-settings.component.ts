@@ -31,6 +31,11 @@ export interface ModuleApiConfig {
   afsSharePointEnabled : boolean;
   afsSharePointSiteUrl : string;
   afsSharePointLibrary : string;
+  // AFS Adjustments SharePoint document storage (separate library)
+  afsAdjustmentsSharePointEnabled : boolean;
+  afsAdjustmentsSharePointSiteUrl : string;
+  afsAdjustmentsSharePointLibrary : string;
+  afsAdjustmentsSharePointLinkColumn : string;
   // AFS PostgreSQL database (maps to AZURE_POSTGRES_URL read by AFS-UI/api)
   afsDbHost     : string;
   afsDbPort     : string;
@@ -77,6 +82,11 @@ const DEFAULTS: ModuleApiConfig = {
   afsSharePointEnabled : false,
   afsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
   afsSharePointLibrary : 'UatAFS',
+  // AFS Adjustments → separate SharePoint library (URL segment "UatAFSAdjustments1")
+  afsAdjustmentsSharePointEnabled : false,
+  afsAdjustmentsSharePointSiteUrl : 'https://zamicromega.sharepoint.com/sites/Sebata2',
+  afsAdjustmentsSharePointLibrary : 'UatAFSAdjustments1',
+  afsAdjustmentsSharePointLinkColumn : 'ADJID',
   // AFS database — separate "AFS" PostgreSQL on Azure
   afsDbHost     : 'platinum-postgre-sql.postgres.database.azure.com',
   afsDbPort     : '5432',
@@ -438,6 +448,77 @@ const MODULES: ModuleDef[] = [
           <div class="actions" style="margin-top:0">
             <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsSharePointEnabled || !cfg.afsSharePointSiteUrl"
                     (click)="testSharePointAfs()">
+              <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
+              {{ spTesting() ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <button class="btn-primary" [disabled]="!dirty()" (click)="save()">
+              <mat-icon>save</mat-icon> Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Adjustments SharePoint library (separate from working-paper docs) -->
+        <div class="config-card">
+          <div class="sp-header">
+            <mat-icon style="color:#0078d4">cloud</mat-icon>
+            <span>Adjustments SharePoint Configuration</span>
+          </div>
+
+          <div class="sp-toggle-row">
+            <button class="sp-switch" [class.on]="cfg.afsAdjustmentsSharePointEnabled"
+                    (click)="cfg.afsAdjustmentsSharePointEnabled = !cfg.afsAdjustmentsSharePointEnabled; markDirty()"
+                    role="switch" [attr.aria-checked]="cfg.afsAdjustmentsSharePointEnabled">
+              <span class="sp-knob"></span>
+            </button>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:#1e293b">Use SharePoint for adjustment documents</div>
+              <div style="font-size:12px;color:#64748b">
+                When enabled, adjustment supporting documents are stored in the dedicated Adjustments SharePoint library (linked by AFSID, with metadata) instead of local file storage.
+              </div>
+            </div>
+            <span class="sp-status" [class.active]="cfg.afsAdjustmentsSharePointEnabled">
+              {{ cfg.afsAdjustmentsSharePointEnabled ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+          </div>
+
+          <div class="field-grid" [class.sp-disabled]="!cfg.afsAdjustmentsSharePointEnabled">
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0078d4">link</mat-icon> SharePoint Site URL</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjustmentsSharePointSiteUrl"
+                     [disabled]="!cfg.afsAdjustmentsSharePointEnabled"
+                     placeholder="https://yourtenant.sharepoint.com/sites/Sebata2"
+                     (ngModelChange)="markDirty()">
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#d97706">folder</mat-icon> Document Library Name</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjustmentsSharePointLibrary"
+                     [disabled]="!cfg.afsAdjustmentsSharePointEnabled"
+                     placeholder="UatAFSAdjustments1"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">Default library: <strong>UatAFSAdjustments1</strong> (use the library's URL segment, e.g. the "UatAFSAdjustments1" in its address)</div>
+            </div>
+            <div class="field-block">
+              <label class="field-label"><mat-icon class="field-icon" style="color:#0891b2">vpn_key</mat-icon> Link Column (internal name)</label>
+              <input class="field-input" [(ngModel)]="cfg.afsAdjustmentsSharePointLinkColumn"
+                     [disabled]="!cfg.afsAdjustmentsSharePointEnabled"
+                     placeholder="ADJID"
+                     (ngModelChange)="markDirty()">
+              <div class="field-hint">The column that stores the adjustment id. Use the SharePoint <strong>internal</strong> name (Library settings → click the column → the URL's <code>Field=</code> value, e.g. <strong>ADJID0</strong> if it was recreated).</div>
+            </div>
+          </div>
+
+          @if (!cfg.afsAdjustmentsSharePointEnabled) {
+            <div class="conn-box">
+              <mat-icon style="font-size:14px;color:#94a3b8;flex-shrink:0">info</mat-icon>
+              <div style="font-size:12px;color:#64748b">
+                SharePoint is <strong>off</strong> — adjustment documents use the module's current local file storage.
+              </div>
+            </div>
+          }
+
+          <div class="actions" style="margin-top:0">
+            <button class="btn-secondary" [disabled]="spTesting() || !cfg.afsAdjustmentsSharePointEnabled || !cfg.afsAdjustmentsSharePointSiteUrl"
+                    (click)="testSharePointAfsAdjustments()">
               <mat-icon>{{ spTesting() ? 'hourglass_empty' : 'wifi_tethering' }}</mat-icon>
               {{ spTesting() ? 'Testing…' : 'Test Connection' }}
             </button>
@@ -921,6 +1002,20 @@ export class AdminSettingsComponent implements OnInit {
       this.spTesting.set(false);
       if (ok) {
         this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsSharePointLibrary}`, 'OK', { duration: 4000 });
+      } else {
+        this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
+      }
+    }, 600);
+  }
+
+  testSharePointAfsAdjustments() {
+    this.spTesting.set(true);
+    const url = this.cfg.afsAdjustmentsSharePointSiteUrl?.trim();
+    const ok = !!url && /^https:\/\/.+\.sharepoint\.com\/sites\/.+/.test(url);
+    setTimeout(() => {
+      this.spTesting.set(false);
+      if (ok) {
+        this.snack.open(`SharePoint site URL looks valid. Library: ${this.cfg.afsAdjustmentsSharePointLibrary}`, 'OK', { duration: 4000 });
       } else {
         this.snack.open('Invalid SharePoint site URL. Expected https://<tenant>.sharepoint.com/sites/<site>', 'Close', { duration: 5000 });
       }

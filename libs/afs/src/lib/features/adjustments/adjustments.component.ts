@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, effect, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,7 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { Subject } from 'rxjs';
+import { Subject, firstValueFrom } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { ApiService } from '../../core/services/api.service';
 import { PeriodFilterService } from '../../core/services/period-filter.service';
@@ -61,6 +61,8 @@ export class AdjustmentsComponent implements OnInit {
 
   hasCompilationContext = signal(false);
   compilationContextLoading = signal(true);
+  activeCompilationId = signal<string | null>(null);
+  createError = signal<string | null>(null);
 
   private scoaSearch$ = new Subject<{ term: string; index: number }>();
   private ppidSearch$ = new Subject<{ term: string; index: number }>();
@@ -73,24 +75,36 @@ export class AdjustmentsComponent implements OnInit {
     { glAccountCode: '', description: '', debitAmount: 0, creditAmount: 0 },
   ];
 
+  constructor() {
+    // The financial year is seeded asynchronously by the non-blocking afsContextResolver
+    // (background fetch), so selectedFyId() may be empty when this component first inits —
+    // which would wrongly show "No Active Compilation". Re-run the compilation check
+    // reactively whenever the FY becomes available (or changes).
+    effect(() => {
+      const fyId = this.periodFilter.selectedFyId();
+      if (fyId) this.checkCompilationContext(fyId);
+    });
+  }
+
   ngOnInit() {
-    this.checkCompilationContext();
     this.loadAdjustments();
     this.initScoaSearch();
     this.initPpidSearch();
   }
 
-  private checkCompilationContext(): void {
+  private checkCompilationContext(fyId: string): void {
     this.compilationContextLoading.set(true);
-    const fyId = this.periodFilter.selectedFyId();
     this.api.get<any[]>('/compilations').subscribe({
       next: (compilations) => {
-        this.hasCompilationContext.set(Array.isArray(compilations) && compilations.some(c =>
+        const match = (Array.isArray(compilations) ? compilations : []).find(c =>
           (c.financialYearId === fyId || c.financialYear?.id === fyId) && c.status !== 'inactive'
-        ));
+        );
+        this.activeCompilationId.set(match?.id ?? null);
+        this.hasCompilationContext.set(!!match);
         this.compilationContextLoading.set(false);
       },
       error: () => {
+        this.activeCompilationId.set(null);
         this.hasCompilationContext.set(false);
         this.compilationContextLoading.set(false);
       }
@@ -98,7 +112,7 @@ export class AdjustmentsComponent implements OnInit {
   }
 
   goToCompilations(): void {
-    this.router.navigate(['/compilations']);
+    this.router.navigate(['/afs/compilations']);
   }
 
   private initScoaSearch() {
@@ -198,7 +212,15 @@ export class AdjustmentsComponent implements OnInit {
   }
 
   createAdjustment() {
+    // The backend ties an adjustment to a compilation (compilationId is required).
+    // Use the active compilation resolved for the selected FY in checkCompilationContext().
+    const compilationId = this.activeCompilationId();
+    if (!compilationId) {
+      this.createError.set('No active compilation for the selected financial year — select or create one first.');
+      return;
+    }
     const body = {
+      compilationId,
       description: this.newAdjustment.description,
       adjustmentType: this.newAdjustment.adjustmentType,
       effectiveDate: this.newAdjustment.effectiveDate,
@@ -208,13 +230,18 @@ export class AdjustmentsComponent implements OnInit {
         debitAmount: l.debitAmount,
         creditAmount: l.creditAmount,
         ppid: l.ppid || undefined,
+        scoaSegment: l.scoaSegment || undefined,
       })),
     };
+    this.createError.set(null);
     this.api.post('/adjustments', body).subscribe({
       next: () => {
         this.showCreateForm.set(false);
         this.resetForm();
         this.loadAdjustments();
+      },
+      error: (err) => {
+        this.createError.set(err?.error?.message || err?.message || 'Failed to create adjustment.');
       },
     });
   }
@@ -232,7 +259,7 @@ export class AdjustmentsComponent implements OnInit {
       next: (data) => {
         this.selectedAdjustment.set(data);
         this.loadImpact(data.id);
-        this.loadAdjDocuments(data.id);
+        this.loadAdjDocuments(data);
       },
     });
   }
@@ -244,30 +271,48 @@ export class AdjustmentsComponent implements OnInit {
     });
   }
 
-  loadAdjDocuments(adjId: string) {
-    this.dms.getByContext('adjustment', adjId).subscribe({
+  /** The value stored in (and matched against) the SharePoint ADJID column — the adjustment's
+   *  human-readable title, e.g. "ADJ-0001 — test". Used for upload, link and listing so they stay
+   *  consistent. */
+  private adjLinkValue(adj: Adjustment): string {
+    return [adj.reference, adj.description].filter(Boolean).join(' — ') || adj.id;
+  }
+
+  loadAdjDocuments(adj: Adjustment) {
+    this.dms.getByContext('adjustment', this.adjLinkValue(adj)).subscribe({
       next: (docs) => this.adjDocuments.set(docs),
       error: () => this.adjDocuments.set([]),
     });
   }
 
-  uploadDocForAdj(adjId: string) {
+  uploadDocForAdj(adj: Adjustment) {
     const ref = this.dialog.open(DocumentUploadDialogComponent, {
       width: '600px',
-      data: { contextType: 'adjustment', contextId: adjId, preselectedType: 'adjustment_support' },
+      data: { contextType: 'adjustment', contextId: this.adjLinkValue(adj), preselectedType: 'adjustment_support' },
     });
     ref.afterClosed().subscribe((result) => {
-      if (result) this.loadAdjDocuments(adjId);
+      if (result) this.loadAdjDocuments(adj);
     });
   }
 
-  linkDocToAdj(adjId: string) {
+  linkDocToAdj(adj: Adjustment) {
+    const adjId = this.adjLinkValue(adj);
     const ref = this.dialog.open(DocumentPickerComponent, {
       width: '640px',
-      data: { multiple: true, documentType: 'adjustment_support' },
+      data: { multiple: true, documentType: 'working_paper', contextType: 'adjustment', contextId: adjId },
     });
     ref.afterClosed().subscribe((result) => {
-      if (result) this.loadAdjDocuments(adjId);
+      if (!result) return;
+      const docs = Array.isArray(result) ? result : [result];
+      // When AFS SharePoint is active, the picker returns UatAFS working papers — copy
+      // each selected one into the UatAFSAdjustments library, linked to this adjustment (ADJID).
+      const spDocs = docs.filter((d: any) => d?.storageProvider === 'sharepoint' && d?.__spItem);
+      if (spDocs.length) {
+        Promise.allSettled(spDocs.map((d: any) => firstValueFrom(this.dms.copySpToAdjustment(d, adjId))))
+          .then(() => this.loadAdjDocuments(adj));
+      } else {
+        this.loadAdjDocuments(adj);
+      }
     });
   }
 

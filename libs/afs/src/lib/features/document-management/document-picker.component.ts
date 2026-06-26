@@ -43,6 +43,7 @@ export class DocumentPickerComponent implements OnInit {
   documents = signal<DmsDocument[]>([]);
   selectedDocs = signal<DmsDocument[]>([]);
   loading = signal(false);
+  loadError = signal<string>('');
   searchQuery = '';
   typeFilter = '';
 
@@ -53,6 +54,30 @@ export class DocumentPickerComponent implements OnInit {
 
   doSearch() {
     this.loading.set(true);
+    this.loadError.set('');
+    // When AFS SharePoint storage is active (either the working-paper or the adjustments
+    // toggle), "Working Paper" documents live in the UatAFS library — list them from there
+    // (filtered client-side by the search box).
+    const spActive = this.dms.isSharePointActive('afs') || this.dms.isSharePointActive('adjustments');
+    console.log('[DocumentPicker] doSearch — SharePoint active?', spActive);
+    if (spActive) {
+      this.dms.listAllSpDocuments('afs').subscribe({
+        next: (docs) => {
+          const q = (this.searchQuery || '').toLowerCase().trim();
+          this.documents.set(
+            q ? docs.filter(d => (d.originalName || d.fileName || '').toLowerCase().includes(q)) : docs
+          );
+          this.loading.set(false);
+        },
+        error: (err) => {
+          console.error('[DocumentPicker] SharePoint listing failed:', err);
+          this.loadError.set(err?.message || 'Could not load documents from SharePoint. Make sure you are signed in to Microsoft.');
+          this.documents.set([]);
+          this.loading.set(false);
+        },
+      });
+      return;
+    }
     this.dms.search({
       search: this.searchQuery || undefined,
       documentType: this.typeFilter || undefined,

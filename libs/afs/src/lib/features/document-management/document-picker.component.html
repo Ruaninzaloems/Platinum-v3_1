@@ -27,7 +27,15 @@
     <div style="text-align: center; padding: 32px; color: var(--platinum-text-muted);">Loading...</div>
   }
 
-  @if (!loading() && documents().length === 0) {
+  @if (!loading() && loadError()) {
+    <div class="empty-state" style="padding: 32px; color: #b91c1c;">
+      <mat-icon style="color: #b91c1c;">error_outline</mat-icon>
+      <h3>Could not load documents</h3>
+      <p>{{ loadError() }}</p>
+    </div>
+  }
+
+  @if (!loading() && !loadError() && documents().length === 0) {
     <div class="empty-state" style="padding: 32px;">
       <mat-icon>search_off</mat-icon>
       <h3>No documents found</h3>

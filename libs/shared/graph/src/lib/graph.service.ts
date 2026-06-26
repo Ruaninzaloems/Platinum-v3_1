@@ -189,14 +189,18 @@ export class GraphService {
    * an <a download> element or direct programmatic download.
    */
   async downloadFile(driveId: string, itemId: string): Promise<string> {
+    return URL.createObjectURL(await this.getFileBlob(driveId, itemId));
+  }
+
+  /** Fetch a drive item's raw content as a Blob (for re-upload/copy between libraries). */
+  async getFileBlob(driveId: string, itemId: string): Promise<Blob> {
     const headers = await this.headers();
-    const blob = await firstValueFrom(
+    return firstValueFrom(
       this.http.get(`${GRAPH}/drives/${driveId}/items/${itemId}/content`, {
         headers,
         responseType: 'blob',
       })
     );
-    return URL.createObjectURL(blob);
   }
 
   /**
@@ -242,10 +246,21 @@ export class GraphService {
 
   // ── Metadata (SharePoint list columns) ───────────────────────────────────
 
-  /** List the columns defined on a drive's underlying SharePoint list. */
+  /**
+   * List the columns defined on a drive's underlying SharePoint list.
+   * Follows @odata.nextLink — a doc library can have 40+ system columns, so custom
+   * columns added last would otherwise be dropped on the first page.
+   */
   async getDriveColumns(driveId: string): Promise<ListColumn[]> {
-    const resp = await this.get<{ value: ListColumn[] }>(`/drives/${driveId}/list/columns`);
-    return resp.value;
+    const all: ListColumn[] = [];
+    let path: string | null = `/drives/${driveId}/list/columns?$top=200`;
+    while (path) {
+      const resp: { value: ListColumn[]; '@odata.nextLink'?: string } = await this.get(path);
+      all.push(...(resp.value || []));
+      const next = resp['@odata.nextLink'];
+      path = next ? next.replace(GRAPH, '') : null;
+    }
+    return all;
   }
 
   /** Read the SharePoint metadata (list item fields) for a drive item. */
