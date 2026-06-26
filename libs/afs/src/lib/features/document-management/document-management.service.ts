@@ -248,6 +248,8 @@ export class DocumentManagementService {
       classification: doc.classificationLabel,
       category: doc.category,
       tags: (doc.tags || []).join(', '),
+      documentType: this.prettify(doc.documentType),
+      accessLevel: this.prettify(doc.accessLevel),
     }).then(d => this.spToDms(d)));
   }
 
