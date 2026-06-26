@@ -116,20 +116,32 @@ export class MsAuthService {
    * Tries silent first; falls back to interactive if needed.
    */
   async getGraphToken(): Promise<string> {
+    return this.getTokenForScopes(GRAPH_SCOPES);
+  }
+
+  /**
+   * Returns an access token for the signed-in ("Windows"/Entra) user, scoped to a
+   * custom protected API — e.g. the George Platinum API: getApiToken(['api://<client-id>/.default']).
+   * Use this for SSO to a downstream API that trusts Azure AD tokens from this tenant.
+   * (A Graph token will NOT be accepted by such an API — the audience must match the API's scope.)
+   */
+  async getApiToken(scopes: string[]): Promise<string> {
+    return this.getTokenForScopes(scopes);
+  }
+
+  /** Silent token acquisition for the given scopes, falling back to an interactive popup. */
+  private async getTokenForScopes(scopes: string[]): Promise<string> {
     const account = this.msal.instance.getActiveAccount();
     if (!account) throw new Error('No signed-in Microsoft account.');
 
     try {
-      const result = await this.msal.instance.acquireTokenSilent({
-        scopes  : GRAPH_SCOPES,
-        account,
-      });
+      const result = await this.msal.instance.acquireTokenSilent({ scopes, account });
       return result.accessToken;
     } catch (e) {
       if (e instanceof InteractionRequiredAuthError) {
         this.clearStaleLock();
         const result = await this.msal.instance.acquireTokenPopup({
-          scopes      : GRAPH_SCOPES,
+          scopes,
           redirectUri : POPUP_REDIRECT_URI,
         });
         return result.accessToken;

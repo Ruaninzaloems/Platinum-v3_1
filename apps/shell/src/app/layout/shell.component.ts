@@ -39,7 +39,7 @@ interface BudgetNavGroup {
   items?: { label: string; icon: string; route: string }[];
 }
 
-type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint' | 'admin';
+type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insights' | 'budget' | 'afs' | 'overtime' | 'sharepoint' | 'admin' | 'settings';
 
 @Component({
   selector: 'app-shell',
@@ -76,6 +76,8 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                     <span class="brand-module">SharePoint</span>
                   } @else if (activeModule() === 'admin') {
                     <span class="brand-module">Admin</span>
+                  } @else if (activeModule() === 'settings') {
+                    <span class="brand-module">Settings</span>
                   }
                 </div>
               </div>
@@ -121,6 +123,9 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               }
               <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
                 <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
+              </button>
+              <button class="module-chip" [class.active]="activeModule() === 'settings'" (click)="setModule('settings')">
+                <mat-icon class="chip-icon">settings</mat-icon><span>Settings</span>
               </button>
             </div>
           }
@@ -437,6 +442,11 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                 </a>
               </div>
             }
+          } @else if (activeModule() === 'settings') {
+            <a class="nav-link" routerLink="/settings/access-management" routerLinkActive="active-link">
+              <mat-icon class="nav-icon">admin_panel_settings</mat-icon>
+              @if (!sidenavCollapsed()) { <span>Access Management</span> }
+            </a>
           }
         </nav>
         <div style="padding:12px 16px;border-top:1px solid #e8ecf1;font-size:11px;color:#94a3b8">
@@ -451,6 +461,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
             @else if (activeModule() === 'overtime') { v1.0 · Overtime Mgmt }
             @else if (activeModule() === 'sharepoint') { Microsoft 365 · SharePoint }
             @else if (activeModule() === 'admin') { System Administration }
+            @else if (activeModule() === 'settings') { System Settings }
             @else { v1.0 · GRAP Compliant }
           }
         </div>
@@ -670,6 +681,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     else if (url.startsWith('/afs')) mod = 'afs';
     else if (url.startsWith('/overtime')) mod = 'overtime';
     else if (url.startsWith('/sharepoint')) mod = 'sharepoint'; // covers /sharepoint and /sharepoint/uat-assets
+    else if (url.startsWith('/settings')) mod = 'settings'; // covers /settings and /settings/:page
     else if (url.startsWith('/admin-settings')) mod = 'admin'; // covers /admin-settings and /admin-settings/:module
     this.activeModule.set(mod);
   }
@@ -687,7 +699,8 @@ export class ShellComponent implements OnInit, OnDestroy {
       afs: '/afs',
       overtime: '/overtime',
       sharepoint: '/sharepoint',
-      admin: '/admin-settings/assets'
+      admin: '/admin-settings/assets',
+      settings: '/settings/access-management'
     };
     this.router.navigate([routeMap[mod]]);
   }

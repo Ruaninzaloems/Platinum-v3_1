@@ -60,6 +60,12 @@
     "changeOrigin": true,
     "pathRewrite": { "^/overtime-app/api": "/api" }
   },
+  "^/george-app/api/(.*)$": {
+    "target": "https://georgeplatinumuatapi.azurewebsites.net",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/george-app/api": "/api" }
+  },
   "/perf-app": {
     "target": "http://localhost:18156",
     "secure": false,

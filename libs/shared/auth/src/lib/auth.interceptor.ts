@@ -19,6 +19,11 @@ const FIRST_PARTY_API_PREFIXES = [
 /** Hosts that explicitly accept the SCM Azure JWT bearer token. */
 const SCM_BEARER_HOSTS = ['rep-scm-api.azurewebsites.net'];
 
+/** The George Platinum API (Access Management) — its own .NET backend, Bearer-authenticated.
+ *  Reached via the shell proxy (/george-app/api → georgeplatinumuatapi) to avoid CORS. */
+const GEORGE_PREFIXES = ['/george-app/api/'];
+const GEORGE_HOSTS = ['georgeplatinumuatapi.azurewebsites.net'];
+
 function isFirstPartyApi(url: string): boolean {
   // Same-origin relative URLs starting with one of the proxied prefixes.
   if (url.startsWith('/')) {
@@ -29,6 +34,19 @@ function isFirstPartyApi(url: string): boolean {
 
 function isScmBearerTarget(url: string): boolean {
   return SCM_BEARER_HOSTS.some(h => url.includes(h));
+}
+
+function isGeorgeTarget(url: string): boolean {
+  return GEORGE_PREFIXES.some(p => url.startsWith(p)) || GEORGE_HOSTS.some(h => url.includes(h));
+}
+
+/** Token for the George API: a dedicated george_token if configured, else the session token. */
+function georgeToken(fallback: string | null): string | null {
+  try {
+    const t = localStorage.getItem('george_token');
+    if (t) return t;
+  } catch { /* ignore */ }
+  return fallback;
 }
 
 /**
@@ -50,6 +68,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const token = auth.getToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
+  const george = isGeorgeTarget(req.url);
+  if (george) {
+    const token = georgeToken(auth.getToken());
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const cloned = req.clone({
     withCredentials: isFirstPartyApi(req.url),
@@ -58,7 +81,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && !req.url.includes('/auth/')) {
+      // A 401 from the George API just means its token is missing/invalid — it must NOT tear
+      // down the app session (that's POS-API's domain).
+      if (err.status === 401 && !req.url.includes('/auth/') && !george) {
         // Soft teardown: don't persist the logged-out flag, so an expected
         // upstream 401 (e.g. the SCM Azure API without a real JWT) doesn't
         // permanently suppress the auto-admin session on the next reload.

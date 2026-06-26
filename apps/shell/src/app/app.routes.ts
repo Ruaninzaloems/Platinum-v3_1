@@ -56,6 +56,8 @@ export const routes: Routes = [
       { path: 'admin-settings', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: 'admin-settings/access-management', loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
       { path: 'admin-settings/:module', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
+      { path: 'settings', redirectTo: 'settings/access-management', pathMatch: 'full' },
+      { path: 'settings/access-management', loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]
