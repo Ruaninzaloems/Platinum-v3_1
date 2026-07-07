@@ -3,93 +3,76 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 
 /**
- * Access Management data source — the George Platinum API.
+ * Access Management data source — POS-API (the identity provider).
  *
- * Reached through the shell proxy at /george-app/api (→ georgeplatinumuatapi.azurewebsites.net/api)
- * so browser CORS isn't an issue. The auth interceptor attaches the Bearer token
- * (a dedicated `george_token` in localStorage if present, otherwise the session token).
+ * Reached through the shell proxy at /pos-app/api (→ localhost:3003 in dev). The
+ * module-access tables live in the shared ems_v3 DB; the tenant is resolved
+ * server-side from the session's site config.
  *
- * The upstream JSON shapes aren't published, so mapping is defensive: each field tries
- * several common property names.
+ *   GET  /api/users            tenant users + their assigned roleIds
+ *   GET  /api/roles            role catalogue (id, name, isAdmin/isBase, moduleCodes)
+ *   PUT  /api/user-roles/:id   replace a user's role assignment ({ roleIds })
  */
-const GEORGE_API = '/george-app/api';
+const POS_API = '/pos-app/api';
 
 export interface AmUser {
   userId: string;
   name: string;
   email: string;
   enabled: boolean;
-  roles: string[];
-  raw: any;            // original record (for the edit dialog / save)
-}
-
-export interface AmRole {
-  id: string;
-  name: string;
+  roleIds: number[];      // assigned role IDs
+  roles: string[];        // assigned role names (resolved via the catalogue)
   raw: any;
 }
 
-const pick = (o: any, ...keys: string[]): any => {
-  for (const k of keys) {
-    if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k];
-  }
-  return undefined;
-};
-
-/** Normalise a roles value that may be string[], {name}[], or a comma string. */
-const toRoleNames = (v: any): string[] => {
-  if (!v) return [];
-  if (typeof v === 'string') return v.split(',').map(s => s.trim()).filter(Boolean);
-  if (Array.isArray(v)) {
-    return v
-      .map(r => (typeof r === 'string' ? r : pick(r, 'name', 'roleName', 'role', 'description', 'code', 'moduleName')))
-      .filter(Boolean)
-      .map((s: any) => String(s).trim());
-  }
-  return [];
-};
+export interface AmRole {
+  id: number;
+  name: string;
+  isAdmin: boolean;
+  isBase: boolean;
+  moduleCodes: string[];
+  raw: any;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AccessManagementService {
   private http = inject(HttpClient);
 
-  /** All users. */
-  getUsers(): Observable<AmUser[]> {
-    return this.http.get<any>(`${GEORGE_API}/User`).pipe(map(res => this.toUsers(res)));
-  }
-
   /** All assignable roles. */
   getRoles(): Observable<AmRole[]> {
-    return this.http.get<any>(`${GEORGE_API}/usermodules/roles`).pipe(map(res => this.toRoles(res)));
+    return this.http.get<any[]>(`${POS_API}/roles`).pipe(
+      map((res) => (res || []).map((r) => ({
+        id: Number(r.roleId ?? r.id),
+        name: String(r.roleName ?? r.name ?? ''),
+        isAdmin: !!r.isAdmin,
+        isBase: !!r.isBase,
+        moduleCodes: Array.isArray(r.moduleCodes) ? r.moduleCodes : [],
+        raw: r,
+      })).filter((r) => r.name)),
+    );
   }
 
-  /** Persist a user's role assignment. Endpoint shape is unconfirmed — adjust once known. */
-  saveUserRoles(user: AmUser, roleNames: string[]): Observable<any> {
-    return this.http.put(`${GEORGE_API}/User/${user.userId}`, { ...user.raw, roles: roleNames });
+  /** All tenant users with their assigned role IDs, resolved to names via the catalogue. */
+  getUsers(roles: AmRole[]): Observable<AmUser[]> {
+    const nameById = new Map(roles.map((r) => [r.id, r.name]));
+    return this.http.get<any[]>(`${POS_API}/users`).pipe(
+      map((res) => (res || []).map((u) => {
+        const roleIds: number[] = Array.isArray(u.roleIds) ? u.roleIds.map((n: any) => Number(n)) : [];
+        return {
+          userId: String(u.userId ?? ''),
+          name: String(u.name ?? u.userName ?? '').trim(),
+          email: String(u.email ?? ''),
+          enabled: !!u.enabled,
+          roleIds,
+          roles: roleIds.map((id) => nameById.get(id)).filter(Boolean) as string[],
+          raw: u,
+        };
+      })),
+    );
   }
 
-  // ── mapping ──────────────────────────────────────────────────────────────
-  private toUsers(res: any): AmUser[] {
-    const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? res?.users ?? res?.value ?? []);
-    return list.map(u => ({
-      userId: String(pick(u, 'userID', 'userId', 'id', 'user_ID', 'userId') ?? ''),
-      name: String(
-        pick(u, 'name', 'displayName', 'fullName', 'userName', 'username') ??
-        [pick(u, 'firstName', 'firstname'), pick(u, 'lastName', 'lastname', 'surname')].filter(Boolean).join(' ') ??
-        ''
-      ).trim(),
-      email: String(pick(u, 'email', 'eMail', 'emailAddress', 'mail') ?? ''),
-      enabled: Boolean(pick(u, 'enabled', 'isEnabled', 'active', 'isActive') ?? false),
-      roles: toRoleNames(pick(u, 'roles', 'assignedRoles', 'userRoles', 'modules', 'userModules')),
-      raw: u,
-    }));
-  }
-
-  private toRoles(res: any): AmRole[] {
-    const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? res?.roles ?? res?.value ?? []);
-    return list.map(r => {
-      const name = typeof r === 'string' ? r : String(pick(r, 'name', 'roleName', 'role', 'description', 'code', 'moduleName') ?? '');
-      return { id: String(typeof r === 'string' ? r : (pick(r, 'id', 'roleId', 'roleID', 'code') ?? name)), name, raw: r };
-    }).filter(r => r.name);
+  /** Persist a user's role assignment. */
+  saveUserRoles(user: AmUser, roleIds: number[]): Observable<any> {
+    return this.http.put(`${POS_API}/user-roles/${user.userId}`, { roleIds });
   }
 }

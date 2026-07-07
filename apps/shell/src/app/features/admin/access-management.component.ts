@@ -156,13 +156,17 @@ export class AccessManagementComponent implements OnInit {
   reload() {
     this.loading.set(true);
     this.error.set('');
-    this.svc.getRoles().subscribe({ next: (r) => this.roles.set(r), error: () => { /* roles are best-effort */ } });
-    this.svc.getUsers().subscribe({
+    // Roles first so user rows can resolve their assigned role IDs to names.
+    this.svc.getRoles().subscribe({
+      next: (r) => { this.roles.set(r); this.loadUsers(r); },
+      error: () => { this.roles.set([]); this.loadUsers([]); },
+    });
+  }
+
+  private loadUsers(roles: AmRole[]) {
+    this.svc.getUsers(roles).subscribe({
       next: (u) => { this.users.set(u); this.loading.set(false); },
-      error: (err) => {
-        this.loading.set(false);
-        this.error.set(this.msg(err));
-      },
+      error: (err) => { this.loading.set(false); this.error.set(this.msg(err)); },
     });
   }
 
@@ -174,7 +178,7 @@ export class AccessManagementComponent implements OnInit {
       width: '520px',
       data: { user, roles: this.roles() },
     });
-    ref.afterClosed().subscribe((selected: string[] | undefined) => {
+    ref.afterClosed().subscribe((selected: number[] | undefined) => {
       if (!selected) return;
       this.svc.saveUserRoles(user, selected).subscribe({
         next: () => this.reload(),
@@ -184,7 +188,8 @@ export class AccessManagementComponent implements OnInit {
   }
 
   private msg(err: any): string {
-    if (err?.status === 401) return 'Not authorised (401). The George API needs its own Bearer token — see notes.';
+    if (err?.status === 401) return 'Not authorised (401). Sign in again to manage access.';
+    if (err?.status === 503) return 'Access-control database is not configured on the server.';
     return err?.error?.message || err?.message || `Request failed (HTTP ${err?.status ?? '?'}).`;
   }
 }
@@ -207,7 +212,7 @@ export class AccessManagementComponent implements OnInit {
       }
       <div class="role-grid">
         @for (r of data.roles; track r.id) {
-          <mat-checkbox [checked]="isOn(r.name)" (change)="toggle(r.name, $event.checked)">{{ r.name }}</mat-checkbox>
+          <mat-checkbox [checked]="isOn(r.id)" (change)="toggle(r.id, $event.checked)">{{ r.name }}</mat-checkbox>
         }
       </div>
     </mat-dialog-content>
@@ -225,12 +230,12 @@ export class AccessManagementComponent implements OnInit {
 export class EditAccessDialogComponent {
   ref = inject(MatDialogRef<EditAccessDialogComponent>);
   data = inject<{ user: AmUser; roles: AmRole[] }>(MAT_DIALOG_DATA);
-  private selected = signal<Set<string>>(new Set(this.data.user.roles));
+  private selected = signal<Set<number>>(new Set(this.data.user.roleIds));
 
-  isOn(name: string) { return this.selected().has(name); }
-  toggle(name: string, on: boolean) {
+  isOn(id: number) { return this.selected().has(id); }
+  toggle(id: number, on: boolean) {
     const next = new Set(this.selected());
-    if (on) next.add(name); else next.delete(name);
+    if (on) next.add(id); else next.delete(id);
     this.selected.set(next);
   }
   current() { return Array.from(this.selected()); }

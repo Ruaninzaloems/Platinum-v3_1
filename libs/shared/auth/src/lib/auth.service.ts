@@ -20,6 +20,12 @@ export interface AuthUser {
   finYear: string;
   /** Convenience aliases used by some legacy components */
   role?: string;
+  /**
+   * Effective side-nav module codes the user may access (e.g. ['dashboard',
+   * 'assets']). Delivered by POS-API in the login/session payload. superUsers
+   * ignore this list and see everything (see canAccessModule).
+   */
+  modules?: string[];
 }
 
 export interface SiteInfo {
@@ -75,6 +81,25 @@ export class AuthService {
     return u.superUser ? ['admin', 'super'] : ['user'];
   });
 
+  /**
+   * Effective side-nav module codes for the current user. superUsers implicitly
+   * have every module (empty vs full distinction lives in canAccessModule).
+   */
+  allowedModules = computed<string[]>(() => this._user()?.modules ?? []);
+
+  /**
+   * True if the user may access the given side-nav module code. superUsers see
+   * everything; everyone else is gated by their granted module list. Dashboard
+   * is always open so a base user with no grants still has a landing page.
+   */
+  canAccessModule(code: string): boolean {
+    const u = this._user();
+    if (!u) return false;
+    if (u.superUser) return true;
+    if (code === 'dashboard') return true;
+    return (u.modules ?? []).includes(code);
+  }
+
   constructor() {
     // Login screen is disabled — every visitor gets an instant local admin
     // session so the shell + all modules are immediately reachable.
@@ -92,6 +117,33 @@ export class AuthService {
       this.setLocalSession('admin');
     }
     this._checked.set(true);
+    // Self-heal module access for a restored (non-super) session whose cached
+    // payload predates this feature.
+    const restored = this._user();
+    if (restored && !restored.superUser && restored.modules === undefined) {
+      this.loadMyModules();
+    }
+  }
+
+  /**
+   * Refreshes the effective module list from POS-API and merges it into the
+   * current user. No-op for superUsers (they already see everything); errors
+   * are swallowed so a transient failure never blocks the shell.
+   */
+  loadMyModules(): void {
+    const u = this._user();
+    if (!u || u.superUser) return;
+    this.http.get<{ modules: string[] }>(`${POS_AUTH_BASE}/auth/my-modules`, { withCredentials: true })
+      .subscribe({
+        next: (resp) => {
+          if (resp && Array.isArray(resp.modules)) {
+            const next = { ...this._user()!, modules: resp.modules };
+            this._user.set(next);
+            try { localStorage.setItem(STORAGE_USER, JSON.stringify(next)); } catch {}
+          }
+        },
+        error: () => { /* non-fatal */ },
+      });
   }
 
   /** Read-only token (used by SCM Azure backend bearer requests). */

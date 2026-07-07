@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { NotFoundComponent } from './features/not-found/not-found.component';
+import { moduleGuard } from './core/module.guard';
 
 export const routes: Routes = [
   // Login is disabled — every visitor lands directly inside the shell with
@@ -41,23 +42,23 @@ export const routes: Routes = [
       { path: 'overtime-app', redirectTo: 'overtime', pathMatch: 'full' },
       { path: 'overtime-app/**', redirectTo: 'overtime' },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
-      { path: 'assets', loadChildren: () => import('@platinumv3/assets').then(m => m.ASSETS_ROUTES) },
-      { path: 'scm', loadChildren: () => import('@platinumv3/scm').then(m => m.SCM_ROUTES) },
-      { path: 'pos', loadChildren: () => import('@platinumv3/pos').then(m => m.POS_ROUTES) },
-      { path: 'payroll', loadChildren: () => import('@platinumv3/payroll').then(m => m.PAYROLL_ROUTES) },
-      { path: 'idp', loadChildren: () => import('@platinumv3/idp').then(m => m.IDP_ROUTES) },
-      { path: 'budget', loadChildren: () => import('@platinumv3/budget').then(m => m.BUDGET_ROUTES) },
-      { path: 'afs', loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
-      { path: 'ins', loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
-      { path: 'overtime', loadChildren: () => import('@platinumv3/overtime').then(m => m.OVERTIME_ROUTES) },
-      { path: 'sharepoint', loadComponent: () => import('./features/sharepoint/sharepoint.component').then(m => m.SharepointComponent) },
-      { path: 'sharepoint/uat-assets', loadComponent: () => import('./features/sharepoint/uat-assets.component').then(m => m.UatAssetsComponent) },
-      { path: 'sharepoint/uat-overtime', loadComponent: () => import('./features/sharepoint/uat-overtime.component').then(m => m.UatOvertimeComponent) },
-      { path: 'admin-settings', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
-      { path: 'admin-settings/access-management', loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
-      { path: 'admin-settings/:module', loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
+      { path: 'assets', canMatch: [moduleGuard('assets')], loadChildren: () => import('@platinumv3/assets').then(m => m.ASSETS_ROUTES) },
+      { path: 'scm', canMatch: [moduleGuard('scm')], loadChildren: () => import('@platinumv3/scm').then(m => m.SCM_ROUTES) },
+      { path: 'pos', canMatch: [moduleGuard('pos')], loadChildren: () => import('@platinumv3/pos').then(m => m.POS_ROUTES) },
+      { path: 'payroll', canMatch: [moduleGuard('payroll')], loadChildren: () => import('@platinumv3/payroll').then(m => m.PAYROLL_ROUTES) },
+      { path: 'idp', canMatch: [moduleGuard('idp')], loadChildren: () => import('@platinumv3/idp').then(m => m.IDP_ROUTES) },
+      { path: 'budget', canMatch: [moduleGuard('budget')], loadChildren: () => import('@platinumv3/budget').then(m => m.BUDGET_ROUTES) },
+      { path: 'afs', canMatch: [moduleGuard('afs')], loadChildren: () => import('@platinumv3/afs').then(m => m.AFS_ROUTES) },
+      { path: 'ins', canMatch: [moduleGuard('insights')], loadChildren: () => import('@platinumv3/ins').then(m => m.INS_ROUTES) },
+      { path: 'overtime', canMatch: [moduleGuard('overtime')], loadChildren: () => import('@platinumv3/overtime').then(m => m.OVERTIME_ROUTES) },
+      { path: 'sharepoint', canMatch: [moduleGuard('sharepoint')], loadComponent: () => import('./features/sharepoint/sharepoint.component').then(m => m.SharepointComponent) },
+      { path: 'sharepoint/uat-assets', canMatch: [moduleGuard('sharepoint')], loadComponent: () => import('./features/sharepoint/uat-assets.component').then(m => m.UatAssetsComponent) },
+      { path: 'sharepoint/uat-overtime', canMatch: [moduleGuard('sharepoint')], loadComponent: () => import('./features/sharepoint/uat-overtime.component').then(m => m.UatOvertimeComponent) },
+      { path: 'admin-settings', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
+      { path: 'admin-settings/access-management', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
+      { path: 'admin-settings/:module', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/admin-settings.component').then(m => m.AdminSettingsComponent) },
       { path: 'settings', redirectTo: 'settings/access-management', pathMatch: 'full' },
-      { path: 'settings/access-management', loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
+      { path: 'settings/access-management', canMatch: [moduleGuard('admin')], loadComponent: () => import('./features/admin/access-management.component').then(m => m.AccessManagementComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: '**', component: NotFoundComponent }
     ]

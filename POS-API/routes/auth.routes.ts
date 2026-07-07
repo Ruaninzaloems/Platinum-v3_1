@@ -4,6 +4,25 @@ import { getSession, requireAuth, handlePlatinumResult } from "./middleware";
 import { platinumGet, platinumPost, loginWithCredentials, logoutSession, isSessionAuthenticated, refreshSessionToken, getPlatinumApiUrl, getPlatinumDbName, clearLockoutCache, SITE_CONFIGS, getSiteConfig } from "../platinum-auth";
 import { isEmsConfigured } from "../ems-db";
 import { resolveAzureUser, computeFinYear } from "../ems-azure-auth";
+import { getEffectiveModuleCodes } from "../ems-modules";
+
+/**
+ * Resolve the user's effective side-nav module codes and attach them to the
+ * session userData payload (consumed by apps/shell). Non-fatal: on any failure
+ * fall back to the limited base set so login never breaks.
+ */
+async function attachModuleAccess(userData: any, dbName: string): Promise<void> {
+  try {
+    userData.modules = await getEffectiveModuleCodes(
+      Number(userData.user_ID),
+      dbName,
+      !!userData.superUser,
+    );
+  } catch (e: any) {
+    console.warn('[Auth] Module-access lookup failed, defaulting to base set:', e.message);
+    userData.modules = ['dashboard'];
+  }
+}
 
 export function registerAuthRoutes(app: Express, httpServer: Server): void {
   app.get("/api/sites", (_req, res) => {
@@ -90,6 +109,11 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         return res.status(401).json({ success: false, error: result.error || 'Invalid username or password' });
       }
       req.session.platinumAuth = result.session;
+      // EMS-backed users get their side-nav module access; demo/superusers are
+      // handled client-side (superUser === true → all modules).
+      if (isEmsConfigured() && result.session.userData) {
+        await attachModuleAccess(result.session.userData, dbName || site.dbName);
+      }
       console.log(`[Auth] Live session created for ${username} (user_ID: ${result.session.userData?.user_ID})`);
       res.json({
         success: true,
@@ -157,7 +181,10 @@ export function registerAuthRoutes(app: Express, httpServer: Server): void {
         superUser: user.superUser,
         cashFloat: user.cashFloat,
         finYear: computeFinYear(),
+        modules: [] as string[],
       };
+      // Attach the user's effective side-nav module access (non-fatal).
+      await attachModuleAccess(userData, userDb);
 
       // EMS-direct users have no upstream Platinum bearer token; use a synthetic
       // marker (same pattern as the demo fast-path) so the session is valid.

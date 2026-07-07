@@ -85,48 +85,66 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
           </a>
           @if (!sidenavCollapsed() || activeModule() !== 'assets') {
             <div class="module-grid">
-              <button class="module-chip" [class.active]="activeModule() === 'assets'" (click)="setModule('assets')">
-                <mat-icon class="chip-icon">inventory_2</mat-icon><span>Assets</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'scm'" (click)="setModule('scm')">
-                <mat-icon class="chip-icon">local_shipping</mat-icon><span>SCM</span>
-              </button>
-              @if (showDevModules()) {
+              @if (canShowModule('assets')) {
+                <button class="module-chip" [class.active]="activeModule() === 'assets'" (click)="setModule('assets')">
+                  <mat-icon class="chip-icon">inventory_2</mat-icon><span>Assets</span>
+                </button>
+              }
+              @if (canShowModule('scm')) {
+                <button class="module-chip" [class.active]="activeModule() === 'scm'" (click)="setModule('scm')">
+                  <mat-icon class="chip-icon">local_shipping</mat-icon><span>SCM</span>
+                </button>
+              }
+              @if (canShowModule('pos')) {
                 <button class="module-chip" [class.active]="activeModule() === 'pos'" (click)="setModule('pos')">
                   <mat-icon class="chip-icon">point_of_sale</mat-icon><span>POS</span>
                 </button>
               }
-              <button class="module-chip" [class.active]="activeModule() === 'payroll'" (click)="setModule('payroll')">
-                <mat-icon class="chip-icon">payments</mat-icon><span>Payroll</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'idp'" (click)="setModule('idp')">
-                <mat-icon class="chip-icon">assignment</mat-icon><span>IDP</span>
-              </button>
-              @if (showDevModules()) {
+              @if (canShowModule('payroll')) {
+                <button class="module-chip" [class.active]="activeModule() === 'payroll'" (click)="setModule('payroll')">
+                  <mat-icon class="chip-icon">payments</mat-icon><span>Payroll</span>
+                </button>
+              }
+              @if (canShowModule('idp')) {
+                <button class="module-chip" [class.active]="activeModule() === 'idp'" (click)="setModule('idp')">
+                  <mat-icon class="chip-icon">assignment</mat-icon><span>IDP</span>
+                </button>
+              }
+              @if (canShowModule('insights')) {
                 <button class="module-chip" [class.active]="activeModule() === 'insights'" (click)="setModule('insights')">
                   <mat-icon class="chip-icon">insights</mat-icon><span>Performance</span>
                 </button>
               }
-              <button class="module-chip" [class.active]="activeModule() === 'budget'" (click)="setModule('budget')">
-                <mat-icon class="chip-icon">account_balance</mat-icon><span>Budget</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'afs'" (click)="setModule('afs')">
-                <mat-icon class="chip-icon">description</mat-icon><span>AFS</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
-                <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
-              </button>
-              @if (showDevModules()) {
+              @if (canShowModule('budget')) {
+                <button class="module-chip" [class.active]="activeModule() === 'budget'" (click)="setModule('budget')">
+                  <mat-icon class="chip-icon">account_balance</mat-icon><span>Budget</span>
+                </button>
+              }
+              @if (canShowModule('afs')) {
+                <button class="module-chip" [class.active]="activeModule() === 'afs'" (click)="setModule('afs')">
+                  <mat-icon class="chip-icon">description</mat-icon><span>AFS</span>
+                </button>
+              }
+              @if (canShowModule('overtime')) {
+                <button class="module-chip" [class.active]="activeModule() === 'overtime'" (click)="setModule('overtime')">
+                  <mat-icon class="chip-icon">more_time</mat-icon><span>Overtime</span>
+                </button>
+              }
+              @if (canShowModule('sharepoint')) {
                 <button class="module-chip" [class.active]="activeModule() === 'sharepoint'" (click)="setModule('sharepoint')">
                   <mat-icon class="chip-icon">folder_open</mat-icon><span>SharePoint</span>
                 </button>
               }
-              <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
-                <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
-              </button>
-              <button class="module-chip" [class.active]="activeModule() === 'settings'" (click)="setModule('settings')">
-                <mat-icon class="chip-icon">settings</mat-icon><span>Settings</span>
-              </button>
+              @if (canShowModule('admin')) {
+                <button class="module-chip" [class.active]="activeModule() === 'admin'" (click)="setModule('admin')">
+                  <mat-icon class="chip-icon">admin_panel_settings</mat-icon><span>Admin</span>
+                </button>
+              }
+              @if (canShowModule('settings')) {
+                <button class="module-chip" [class.active]="activeModule() === 'settings'" (click)="setModule('settings')">
+                  <mat-icon class="chip-icon">settings</mat-icon><span>Settings</span>
+                </button>
+              }
             </div>
           }
         </div>
@@ -641,6 +659,20 @@ export class ShellComponent implements OnInit, OnDestroy {
   // on the deployed production build (ng build → isDevMode() === false).
   private readonly _isDev = isDevMode();
   showDevModules(): boolean { return this._isDev; }
+
+  // POS, Performance and SharePoint are still in active development — hidden on
+  // production builds regardless of access grants.
+  private readonly _devOnlyModules = new Set<string>(['pos', 'insights', 'sharepoint']);
+
+  /**
+   * Whether a module chip should render: the user must have access to the
+   * module AND (for in-development modules) be running a dev build. superUsers
+   * pass the access check for everything (see AuthService.canAccessModule).
+   */
+  canShowModule(code: string): boolean {
+    if (this._devOnlyModules.has(code) && !this._isDev) return false;
+    return this.authService.canAccessModule(code);
+  }
 
   // Municipality name from the Assets settings API (GET /api/settings →
   // municipality_name). OrgSettingsService is root-provided and auto-loads on

@@ -13,6 +13,7 @@ import { registerDebtRoutes } from "./debt.routes";
 import { registerLegalRoutes } from "./legal.routes";
 import { registerCommunicationsRoutes } from "./communications.routes";
 import { registerAnalyticsRoutes } from "./analytics.routes";
+import { registerModulesRoutes } from "./modules.routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -31,6 +32,7 @@ export async function registerRoutes(
   registerLegalRoutes(app, httpServer);
   registerCommunicationsRoutes(app, httpServer);
   registerAnalyticsRoutes(app, httpServer);
+  registerModulesRoutes(app, httpServer);
 
   return httpServer;
 }

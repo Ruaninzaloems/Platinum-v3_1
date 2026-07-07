@@ -1,9 +1,18 @@
-import { Component } from '@angular/core';
+import { Component, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '@platinumv3/shared/auth';
+
+interface DashboardModule {
+  name: string;
+  path: string;
+  module: string;   // side-nav module code — gates visibility via AuthService.canAccessModule
+  icon: string;
+  color: string;
+  description: string;
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -14,7 +23,7 @@ import { AuthService } from '@platinumv3/shared/auth';
       <h2>Welcome, {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}</h2>
       <p class="subtitle">Platinum ERP — Municipal Management System</p>
       <div class="module-grid">
-        @for (mod of modules; track mod.path) {
+        @for (mod of visibleModules(); track mod.path) {
           <a [routerLink]="mod.path" class="module-card">
             <mat-icon class="module-icon" [style.color]="mod.color">{{ mod.icon }}</mat-icon>
             <h3>{{ mod.name }}</h3>
@@ -43,14 +52,32 @@ import { AuthService } from '@platinumv3/shared/auth';
 export class DashboardComponent {
   constructor(public authService: AuthService) {}
 
-  modules = [
-    { name: 'Asset Management', path: '/assets', icon: 'inventory_2', color: '#1a237e', description: 'GRAP-compliant asset register, verification, depreciation and disposal management.' },
-    { name: 'Supply Chain', path: '/scm', icon: 'local_shipping', color: '#0d47a1', description: 'SCM procurement workflows, supplier management, and bid processes.' },
-    { name: 'Point of Sale', path: '/pos', icon: 'point_of_sale', color: '#1b5e20', description: 'Revenue collection, payment processing, debt management and billing.' },
-    { name: 'Payroll', path: '/payroll', icon: 'payments', color: '#e65100', description: 'Employee management, salary processing, tax calculations and reporting.' },
-    { name: 'IDP', path: '/idp', icon: 'account_tree', color: '#4a148c', description: 'Integrated Development Plan cycles, projects and performance tracking.' },
-    { name: 'Budget', path: '/budget', icon: 'account_balance', color: '#006064', description: 'MFMA budget preparation, virements, scenarios and expenditure tracking.' },
-    { name: 'AFS', path: '/afs', icon: 'description', color: '#bf360c', description: 'Annual Financial Statements builder, mappings, compilations and audit management.' },
-    { name: 'Performance', path: '/ins', icon: 'insights', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' }
+  // POS and Performance are still in active development — hidden on production
+  // builds, mirroring the side nav (shell.component.ts canShowModule).
+  private readonly _isDev = isDevMode();
+  private readonly _devOnlyModules = new Set<string>(['pos', 'insights', 'sharepoint']);
+
+  modules: DashboardModule[] = [
+    { name: 'Asset Management', path: '/assets', module: 'assets', icon: 'inventory_2', color: '#1a237e', description: 'GRAP-compliant asset register, verification, depreciation and disposal management.' },
+    { name: 'Supply Chain', path: '/scm', module: 'scm', icon: 'local_shipping', color: '#0d47a1', description: 'SCM procurement workflows, supplier management, and bid processes.' },
+    { name: 'Point of Sale', path: '/pos', module: 'pos', icon: 'point_of_sale', color: '#1b5e20', description: 'Revenue collection, payment processing, debt management and billing.' },
+    { name: 'Payroll', path: '/payroll', module: 'payroll', icon: 'payments', color: '#e65100', description: 'Employee management, salary processing, tax calculations and reporting.' },
+    { name: 'IDP', path: '/idp', module: 'idp', icon: 'account_tree', color: '#4a148c', description: 'Integrated Development Plan cycles, projects and performance tracking.' },
+    { name: 'Budget', path: '/budget', module: 'budget', icon: 'account_balance', color: '#006064', description: 'MFMA budget preparation, virements, scenarios and expenditure tracking.' },
+    { name: 'AFS', path: '/afs', module: 'afs', icon: 'description', color: '#bf360c', description: 'Annual Financial Statements builder, mappings, compilations and audit management.' },
+    { name: 'Performance', path: '/ins', module: 'insights', icon: 'insights', color: '#311b92', description: 'KPI tracking, SDBIP monitoring, and municipal performance analytics.' }
   ];
+
+  /**
+   * Tiles the current user may see — the same rule as the side-nav chips:
+   * the user must have access to the module (AuthService.canAccessModule) AND,
+   * for in-development modules, be on a dev build. superUsers pass the access
+   * check for everything.
+   */
+  visibleModules(): DashboardModule[] {
+    return this.modules.filter(m => {
+      if (this._devOnlyModules.has(m.module) && !this._isDev) return false;
+      return this.authService.canAccessModule(m.module);
+    });
+  }
 }
