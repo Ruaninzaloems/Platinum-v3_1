@@ -8,8 +8,11 @@ import { getEffectiveModuleCodes } from "../ems-modules";
 
 /**
  * Resolve the user's effective side-nav module codes and attach them to the
- * session userData payload (consumed by apps/shell). Non-fatal: on any failure
- * fall back to the limited base set so login never breaks.
+ * session userData payload (consumed by apps/shell). Non-fatal: on failure we
+ * leave `modules` unresolved (undefined) rather than a restrictive set — the
+ * shell fails OPEN when the list is absent, so a transient lookup failure (or an
+ * EMS-less deployment) never locks a real user out of every module. An explicit
+ * array — even empty — is what actually enforces access.
  */
 async function attachModuleAccess(userData: any, dbName: string): Promise<void> {
   try {
@@ -19,8 +22,8 @@ async function attachModuleAccess(userData: any, dbName: string): Promise<void> 
       !!userData.superUser,
     );
   } catch (e: any) {
-    console.warn('[Auth] Module-access lookup failed, defaulting to base set:', e.message);
-    userData.modules = ['dashboard'];
+    console.warn('[Auth] Module-access lookup failed, leaving access unresolved (fail-open):', e.message);
+    delete userData.modules;
   }
 }
 

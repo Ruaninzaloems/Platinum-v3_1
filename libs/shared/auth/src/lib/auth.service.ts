@@ -91,13 +91,21 @@ export class AuthService {
    * True if the user may access the given side-nav module code. superUsers see
    * everything; everyone else is gated by their granted module list. Dashboard
    * is always open so a base user with no grants still has a landing page.
+   *
+   * Access is only enforced once the server has resolved an explicit module
+   * list (an array — possibly empty). When it is unresolved (module access is
+   * unavailable: the feature/EMS is not configured, the lookup failed, or a
+   * cached session predates this feature) we fail OPEN, matching the pre-feature
+   * behaviour, so a real user is never locked out of everything. loadMyModules()
+   * hydrates the authoritative list shortly after.
    */
   canAccessModule(code: string): boolean {
     const u = this._user();
     if (!u) return false;
     if (u.superUser) return true;
     if (code === 'dashboard') return true;
-    return (u.modules ?? []).includes(code);
+    if (!Array.isArray(u.modules)) return true; // unresolved → fail open
+    return u.modules.includes(code);
   }
 
   constructor() {
