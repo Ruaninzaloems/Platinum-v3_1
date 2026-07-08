@@ -22,15 +22,21 @@ interface DashboardModule {
     <div class="dashboard">
       <h2>Welcome, {{ authService.user()?.firstName }} {{ authService.user()?.lastName }}</h2>
       <p class="subtitle">Platinum ERP — Municipal Management System</p>
-      <div class="module-grid">
-        @for (mod of visibleModules(); track mod.path) {
-          <a [routerLink]="mod.path" class="module-card">
-            <mat-icon class="module-icon" [style.color]="mod.color">{{ mod.icon }}</mat-icon>
-            <h3>{{ mod.name }}</h3>
-            <p>{{ mod.description }}</p>
-          </a>
-        }
-      </div>
+      @if (visibleModules().length === 0) {
+        <div class="no-access">
+          No access granted. Please contact your administrator.
+        </div>
+      } @else {
+        <div class="module-grid">
+          @for (mod of visibleModules(); track mod.path) {
+            <a [routerLink]="mod.path" class="module-card">
+              <mat-icon class="module-icon" [style.color]="mod.color">{{ mod.icon }}</mat-icon>
+              <h3>{{ mod.name }}</h3>
+              <p>{{ mod.description }}</p>
+            </a>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -47,6 +53,12 @@ interface DashboardModule {
     .module-icon { font-size: 48px; width: 48px; height: 48px; margin-bottom: 1rem; }
     h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
     p { font-size: 0.85rem; color: #64748b; line-height: 1.4; }
+    .no-access {
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      width: 220px; min-height: 200px; padding: 2rem; box-sizing: border-box;
+      background: #5f7fa6; color: #fff; font-weight: 700; font-size: 1.05rem; line-height: 1.4;
+      border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
   `]
 })
 export class DashboardComponent {
