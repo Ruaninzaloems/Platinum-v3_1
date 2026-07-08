@@ -16,8 +16,18 @@ const FIRST_PARTY_API_PREFIXES = [
   '/perf-app/api/',
 ];
 
-/** Hosts that explicitly accept the SCM Azure JWT bearer token. */
-const SCM_BEARER_HOSTS = ['rep-scm-api.azurewebsites.net'];
+/** Default SCM Azure backend host. Overridable via the SCM_API_URL App Setting, which
+ *  server.js injects as window.__PLATINUM_ENV__.SCM_API_URL (so the host can be changed
+ *  on the web app without a code change). */
+const SCM_DEFAULT_URL = 'https://rep-scm-api.azurewebsites.net';
+
+/** The configured SCM backend host (from the injected runtime env, else the default). */
+function scmHost(): string {
+  const url =
+    (typeof globalThis !== 'undefined' && (globalThis as any).__PLATINUM_ENV__?.SCM_API_URL) ||
+    SCM_DEFAULT_URL;
+  try { return new URL(url).host; } catch { return 'rep-scm-api.azurewebsites.net'; }
+}
 
 /** The George Platinum API (Access Management) — its own .NET backend, Bearer-authenticated.
  *  Reached via the shell proxy (/george-app/api → georgeplatinumuatapi) to avoid CORS. */
@@ -33,7 +43,7 @@ function isFirstPartyApi(url: string): boolean {
 }
 
 function isScmBearerTarget(url: string): boolean {
-  return SCM_BEARER_HOSTS.some(h => url.includes(h));
+  return url.includes(scmHost());
 }
 
 function isGeorgeTarget(url: string): boolean {
@@ -57,14 +67,17 @@ function georgeToken(fallback: string | null): string | null {
  *  - Authorization: Bearer ONLY when calling the SCM Azure backend that
  *    actually accepts the token. Prevents leaking the SCM JWT to other hosts.
  *  - On 401 from a non-auth endpoint, tears down the local session and
- *    redirects to /login.
+ *    redirects to /login — EXCEPT for the SCM and George backends, whose 401
+ *    just means their own token is missing/invalid (not that the app session
+ *    expired), so they must not bounce the user to /login.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   const headers: Record<string, string> = {};
-  if (isScmBearerTarget(req.url)) {
+  const scm = isScmBearerTarget(req.url);
+  if (scm) {
     const token = auth.getToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
@@ -81,11 +94,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(cloned).pipe(
     catchError((err: HttpErrorResponse) => {
-      // A 401 from the George API just means its token is missing/invalid — it must NOT tear
-      // down the app session (that's POS-API's domain).
-      if (err.status === 401 && !req.url.includes('/auth/') && !george) {
-        // Soft teardown: don't persist the logged-out flag, so an expected
-        // upstream 401 (e.g. the SCM Azure API without a real JWT) doesn't
+      // A 401 from the SCM or George backend just means THEIR token is missing/invalid — it must
+      // NOT tear down the app session (that's POS-API's domain) or bounce the user to /login.
+      if (err.status === 401 && !req.url.includes('/auth/') && !george && !scm) {
+        // Soft teardown: don't persist the logged-out flag, so an expected upstream 401 doesn't
         // permanently suppress the auto-admin session on the next reload.
         auth.logout(false).catch(() => router.navigate(['/login']));
       }

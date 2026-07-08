@@ -44,6 +44,27 @@ function findBrowserDir() {
 const browserDir = findBrowserDir();
 console.log(`[shell] Serving Angular SPA from: ${browserDir}`);
 
+// Runtime config exposed to the browser SPA as window.__PLATINUM_ENV__ (injected into index.html
+// below). Lets App Settings drive front-end config that isn't served through the shell proxy —
+// notably the SCM module, which calls its Azure backend host directly.
+//   SCM_API_URL   e.g. https://rep-scm-api.azurewebsites.net   (overridable per environment)
+const RUNTIME_ENV = {
+  SCM_API_URL: (process.env.SCM_API_URL || 'https://rep-scm-api.azurewebsites.net').trim().replace(/\/+$/, ''),
+};
+console.log(`[shell] Runtime env → SCM_API_URL=${RUNTIME_ENV.SCM_API_URL}`);
+
+// index.html with the runtime-env snippet injected into <head> (before the app bundle runs).
+let indexHtmlCache = null;
+function getIndexHtml() {
+  if (indexHtmlCache) return indexHtmlCache;
+  let html = fs.readFileSync(path.join(browserDir, 'index.html'), 'utf8');
+  const snippet = `<script>window.__PLATINUM_ENV__=${JSON.stringify(RUNTIME_ENV)};</script>`;
+  indexHtmlCache = html.includes('</head>')
+    ? html.replace('</head>', `${snippet}</head>`)
+    : `${snippet}${html}`;
+  return indexHtmlCache;
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -135,7 +156,7 @@ app.use(
 
 app.get('*', (_req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(browserDir, 'index.html'));
+  res.type('html').send(getIndexHtml());
 });
 
 app.listen(PORT, '0.0.0.0', () => {
