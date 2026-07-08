@@ -1,3 +1,4 @@
+import "./load-profile"; // MUST be first: applies the EMS_PROFILE config before other modules read process.env
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import compression from "compression";

@@ -16,8 +16,10 @@ export const SITE_CONFIGS: SiteConfig[] = [
   {
     id: 'george',
     name: 'George Municipality',
-    apiUrl: 'https://georgeplatinumuatapi.azurewebsites.net',
-    dbName: 'George',
+    // Overridable via the PLATINUM_API_URL / PLATINUM_API_DBNAME env vars (App Settings on the
+    // web app) so the George Platinum API endpoint can be changed without a code change.
+    apiUrl: PLATINUM_API_URL,
+    dbName: PLATINUM_DBNAME,
     logo: '/images/platinum-logo.png',
     themeClass: '',
   },
