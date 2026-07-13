@@ -174,6 +174,16 @@ local file storage, controlled from **Admin → <module> → SharePoint**.
   **`OvertimeID`** + **`Employee`** (`"Full Name (#empNo)"`) columns. Wired into the
   Capture/Edit Overtime form: when enabled, the supporting PDF uploads to the
   configured library; the edit form lists/views/removes the SharePoint doc.
+- **AFS:** `libs/afs/.../core/services/afs-sharepoint.service.ts` supports **two** libraries
+  (Admin → AFS → SharePoint Config), each with its own toggle:
+  - **UatAFS** — working papers / general AFS docs, entity-link column **`AFSID`**.
+  - **UatAFSAdjustments1** — adjustment documents, entity-link column **`ADJID`** (note the URL
+    segment `…Adjustments1`; the drive is matched by URL segment, not display title).
+  Columns written: link column + `Description`, `Classification`, `Category`, `Tags`,
+  `DocumentType`, `AccessLevel`. Metadata is written resiliently (bulk PATCH, then field-by-field
+  fallback). **Adjustments → Link Existing** copies a UatAFS working paper into the Adjustments
+  library, re-tagged with the adjustment title in `ADJID`. Internal column names can differ from the
+  display name (e.g. `Adj-id` → `Adj_x002d_id`); the uploader tries several candidate names.
 - **SharePoint module** (`/sharepoint`): a Document Browser with pinned site
   (Sebata2) and dedicated **pinned library** pages in the sidebar:
   **UatAssets** (`/sharepoint/uat-assets`) and **UatOvertime** (`/sharepoint/uat-overtime`).
@@ -243,8 +253,172 @@ curl http://localhost:5000/afs-app/api/reports/dashboard      # proxy path → d
 
 ---
 
-## 9. Change log (recent integrations)
+## 9. Deployed Azure web apps & App Settings
 
+The monorepo deploys to a set of Azure App Services. Frontend is one web app; each module API is its own.
+
+| Role | Azure App Service | Deployed by pipeline | Public URL (referenced in code) |
+|---|---|---|---|
+| **Shell / frontend** | `Platinum-V3-UI` | ✅ | — (the site itself) |
+| POS / identity | `Platinum-V3-POS-API` | ✅ | `platinum-pos-api.azurewebsites.net` |
+| AFS | `Platinum-V3-AFS-Postgres-API` | ✅ | `platinum-afs-api.azurewebsites.net` |
+| IDP | `Platinum-V3-IDP-Postgres-API` | ✅ | `platinum-idp-api.azurewebsites.net` |
+| Budget | `Platinum-V3-Budget-Postgres-API` | ✅ | `platinum-budget-api.azurewebsites.net` |
+| Overtime | `Platinum-V3-Overtime-Postgres-API` | ✅ | `platinum-overtime-api.azurewebsites.net` |
+| Payroll | `Platinum-V3-Payroll-Postgres-API` | ✅ | `platinum-payroll-api.azurewebsites.net` |
+| Assets | _(referenced / deployed separately)_ | — | `platinum-assets-api.azurewebsites.net` |
+| SCM | _(external backend, own JWT)_ | — | `rep-scm-api.azurewebsites.net` |
+| Insights | _(referenced / deployed separately)_ | — | `platinum-insights-api.azurewebsites.net` |
+
+### App Settings by web app
+
+**`Platinum-V3-UI` (shell / `server.js`)** — reverse-proxy targets + browser runtime config:
+
+| Setting | Purpose |
+|---|---|
+| `ASSETS_API_URL`, `POS_API_URL`, `AFS_API_URL`, `PAYROLL_API_URL`, `IDP_API_URL`, `BUDGET_API_URL`, `SCM_API_URL`, `INSIGHTS_API_URL`, `OVERTIME_API_URL` | Per-module proxy targets |
+| `SCM_API_URL` | **Also injected to the browser** as `window.__PLATINUM_ENV__.SCM_API_URL`; the SCM module + auth interceptor read it (default `https://rep-scm-api.azurewebsites.net`). Lets the SCM host be changed without a redeploy. |
+
+**`Platinum-V3-POS-API`** — reads `process.env` directly (no dotenv); see §11 for profiles:
+
+| Setting | Purpose |
+|---|---|
+| `EMS_PROFILE` | Selects the EMS/tenant config set (`grguat` / `localtest`), loaded by `load-profile.ts` |
+| `PLATINUM_API_URL` | George Platinum API (login/user-details); also drives the `george` site's `apiUrl` |
+| `PLATINUM_API_USERNAME` / `PLATINUM_API_PASSWORD` / `PLATINUM_API_DBNAME` | George API service creds / default DB |
+| `EMS_V3_*` (`SERVER`/`NAME`/`USER`/`PASSWORD`/`PORT`/`ENCRYPT`/`TRUST_CERT`) | `ems_v3` catalogue DB |
+| `EMS_TENANT_*` (`SERVER`/`PORT`/`USER`/`PASSWORD`/`NAME`/`ENCRYPT`/`TRUST_CERT`/`DB_MAP`) | Tenant `User_UserDetail` DB |
+| `PORT`, `DATABASE_URL`, `SESSION_SECRET` | Port, optional Postgres session store, session secret |
+
+> A real App Setting always wins over a profile-file value — pick a profile and still override single keys.
+
+---
+
+## 10. Deployment pipeline (`azure-pipelines.yml`)
+
+| Job | App Service | Build |
+|---|---|---|
+| `Shell_UI` | `Platinum-V3-UI` | Angular prod build → served by `server.js` |
+| `POS_API` | `Platinum-V3-POS-API` | Source-only + Oryx `npm install`, `npm start` |
+| `AFS_API` | `Platinum-V3-AFS-Postgres-API` | Source-only + Oryx |
+| `IDP_API` / `Budget_API` / `Overtime_API` / `Payroll_API` | `Platinum-V3-*-Postgres-API` | `dotnet publish` |
+
+**Azure Linux/Oryx notes:** the built-in .NET stack listens on `:8080` (ignores `WEBSITES_PORT`); large
+Node apps deploy source-only and let Oryx install. Set `SCM_DO_BUILD_DURING_DEPLOYMENT=true` where Oryx builds.
+
+---
+
+## 11. POS-API identity, EMS databases & profiles
+
+POS-API is the **identity provider** and the Access-Management backend. It uses **MS SQL (EMS)**, not Postgres.
+
+### Login flow
+1. `POST /pos-app/api/auth/login` → POS-API authenticates against the **George Platinum API**
+   (`{PLATINUM_API_URL}/auth/createToken`, or `/auth/createTokenAzure` for Microsoft sign-in) and fetches the
+   profile from `{PLATINUM_API_URL}/api/User`.
+2. Returns `{ user, site, token }`; `AuthService` stores it. Dashboard shows `firstName lastName`; header shows the site.
+3. Sites (`SITE_CONFIGS` in `platinum-auth.ts`): `george` (apiUrl/dbName from `PLATINUM_API_URL`/`PLATINUM_API_DBNAME`), `site02`.
+
+### EMS databases
+- **`ems_v3` catalogue** (`emsfunctions.database.windows.net`) — `dbo.roles`, `dbo.modules`, `dbo.role_modules`,
+  `dbo.user_roles`. Accessed via `getEmsPool()`.
+- **Tenant DB** (`User_UserDetail`) — per municipality, on the on-prem / UAT SQL box. Accessed via
+  `getTenantPool(dbName)`; `dbName` resolves from the session's site config (or pinned by `EMS_TENANT_NAME`).
+
+### EMS profiles (`POS-API/env/<profile>.env`, selected by `EMS_PROFILE`)
+`load-profile.ts` (imported first in `index.ts`) applies the file at startup; `run.sh <profile>` is a local launcher.
+
+| Profile | ems_v3 | Tenant DB (`User_UserDetail`) |
+|---|---|---|
+| **grguat** (default) | `PlatinumV3User` @ `emsfunctions…/ems_v3` | `emsv2User` @ `159.138.171.219:3342` / `EMS_GeorgeUAT` (encrypt off) |
+| **localtest** | same | `emsv2User` @ `110.238.76.98:3342` / `EMS_Training` (encrypt off) |
+
+> Credentials live in the profile files / `ems-db.ts` defaults _(secret)_ — not duplicated here.
+> `EMS SQL 18456 "Login failed"` = wrong credentials/permissions or wrong server, **not** a firewall timeout.
+
+---
+
+## 12. Access Management (Settings → Access Management)
+
+`/settings/access-management` (top-level **Settings** module) and `/admin-settings/access-management`.
+Backed by POS-API:
+
+| Endpoint | Source |
+|---|---|
+| `GET /pos-app/api/roles` | `ems_v3` role catalogue (no auth) |
+| `GET /pos-app/api/users` | tenant `User_UserDetail` + `ems_v3.user_roles` (needs a valid POS session) |
+| `PUT /pos-app/api/user-roles/:userId` | writes `ems_v3.dbo.user_roles` |
+
+Routes: `POS-API/routes/modules.routes.ts`; data access: `POS-API/ems-modules.ts`. UI:
+`apps/shell/.../admin/access-management.component.ts` (+ `.service.ts`).
+
+---
+
+## 13. Shared auth — the single source of identity & token
+
+**Package `@platinumv3/shared/auth` (`libs/shared/auth`) is the one auth authority.** Every module reads
+the signed-in user and the token from its `AuthService`; no module defines its own login or hardcodes a user.
+
+> A standalone integration contract for this (for Replit / out-of-repo module work, so auth merges back
+> without conflicts) is kept as **`Platinum-Auth-Config.docx`** at the repo root. Update it alongside this
+> section when the auth surface changes.
+
+### 13.1 `AuthService` public surface
+- **Signals:** `user()` (`AuthUser`: `user_ID`, `userName`, `firstName`, `lastName`, `eMail`, `superUser`,
+  `modules?`), `site()`, `isAuthenticated()`/`authenticated()`, `checked()`, `userRoles()`, `allowedModules()`.
+- **Methods:** `getToken()` (the POS `platinum_token` — the single token source), `canAccessModule(code)`,
+  `loadMyModules()`, `checkAuth()`, `login(username,password,siteId='george')`, `loginAzure(claims,siteId)`,
+  `loadSites()`, `handleLoginSuccess()`, `setLocalSession()`, `logout(persist=true)`, `hasRole()`.
+- **Storage keys:** `platinum_user`, `platinum_site`, `platinum_token`, `platinum_logged_out`.
+- **Backend:** `POS_AUTH_BASE = '/pos-app/api'` → POS-API (`/auth/login`, `/auth/createTokenAzure`,
+  `/auth/status`, `/auth/my-modules`, `/sites`, `/auth/logout`). See §11 for the login → George API flow.
+- **Also exported:** `authInterceptor`, `authGuard`, `MsAuthService` (`getGraphToken()`, `getApiToken(scopes)`).
+
+### 13.2 Interceptor (`auth.interceptor.ts`)
+- `withCredentials` **only** for first-party `/<module>-app/api/` calls (POS-API session cookie).
+- `Authorization: Bearer getToken()` **only** for the **SCM** host (`SCM_API_URL`) and the **George** API.
+- A `401` tears down the session and redirects to `/login` — **except** for SCM, George, and `/auth/`
+  calls (their 401 means their own token is invalid, not that the app session expired). This is why the
+  SCM nav no longer bounces the user to login.
+
+### 13.3 Module identity unification
+Modules keep their own role/permission logic but source the **displayed user** and the **token** from the
+shared `AuthService` (overlay the shell user's name/email; token from `getToken()`). Done for **overtime,
+afs, payroll, scm** (was: "Karools", hardcoded "System Admin", `DEV_USERS`, `rep-scm-api` user). **assets,
+budget, idp, ins** don't render a user name; **pos** is the identity provider itself.
+
+Pattern:
+```ts
+import { AuthService as ShellAuthService } from '@platinumv3/shared/auth';
+private shell = inject(ShellAuthService);
+readonly displayName = computed(() => {
+  const u = this.shell.user();
+  return u ? (`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.userName) : (fallback);
+});
+getToken() { return this.shell.getToken(); }
+```
+
+> **SCM caveat:** SCM uses `rep-scm-api` with its own JWT; the app session token is not valid there, so SCM
+> *data* still needs a valid SCM token/bootstrap even though the nav no longer logs you out.
+> **Boundary:** this unifies the **frontend** identity/token; each module **backend** still validates its own
+> auth (full backend token-trust / SSO is a separate, not-yet-done change).
+
+---
+
+## 14. Change log (recent integrations)
+
+- **Unified module auth:** overtime/afs/payroll/scm now source the displayed user + token from the shared
+  `@platinumv3/shared/auth` `AuthService` instead of hardcoded/module-local identities (see §13.3). Added
+  `Platinum-Auth-Config.docx` (standalone integration contract).
+- **AFS Adjustments SharePoint:** second AFS library (**UatAFSAdjustments1**, `ADJID`); Upload + Link-Existing
+  copy into it with full metadata (`DocumentType`/`AccessLevel` added); resilient field-by-field metadata write.
+- **Access Management:** Settings → Access Management wired to POS-API (`/users`, `/roles`, `/user-roles/:id`)
+  over `ems_v3` + tenant `User_UserDetail`; new top-level **Settings** module chip.
+- **POS-API config:** `EMS_PROFILE` profile loader (`env/*.env`, `load-profile.ts`, `run.sh`); `PLATINUM_API_URL`
+  now drives the `george` site config; profiles **grguat** / **localtest**.
+- **SCM fix:** `SCM_API_URL` is a `Platinum-V3-UI` App Setting injected to the browser (`window.__PLATINUM_ENV__`);
+  auth interceptor no longer logs the user out on SCM/George `401`s (stops the SCM→login bounce).
+- **Dashboard:** added the **Overtime** tile and a "No access granted" state when the user has no modules.
 - **AFS sync:** UI synced from source; added **ART proxy** (`art.ts`), **Platinum
   proxy** (`platinum.ts`), and **Ratios** endpoint (`ratios.ts`) to `AFS-UI/api`;
   wired `ART_API_URL/USER/PASS`, `PLATINUM_API_URL`, `AZURE_POSTGRES_URL` in `.env`.

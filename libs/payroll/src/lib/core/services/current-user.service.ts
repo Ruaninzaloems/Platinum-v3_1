@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { AuthService as ShellAuthService } from '@platinumv3/shared/auth';
 
 export interface DevUser {
   userId: number;
@@ -20,7 +21,23 @@ const STORAGE_KEY = 'mscoa_dev_user';
 
 @Injectable({ providedIn: 'root' })
 export class CurrentUserService {
-  readonly currentUser = signal<DevUser>(this.loadUser());
+  private shell = inject(ShellAuthService);
+
+  /** The selected dev persona — supplies roles / employeeId (in-module authorization). */
+  private _selected = signal<DevUser>(this.loadUser());
+
+  /**
+   * The current user: role/employee data from the selected persona, but the DISPLAYED name and
+   * username come from the shell's POS-authenticated user (single source of truth across modules),
+   * so the UI shows the real signed-in user instead of a hardcoded dev name.
+   */
+  readonly currentUser = computed<DevUser>(() => {
+    const base = this._selected();
+    const su = this.shell.user();
+    if (!su) return base;
+    const name = `${su.firstName ?? ''} ${su.lastName ?? ''}`.trim() || su.userName || base.displayName;
+    return { ...base, displayName: name, userName: su.userName || base.userName };
+  });
 
   private loadUser(): DevUser {
     try {
@@ -40,7 +57,7 @@ export class CurrentUserService {
 
   setCurrentUser(user: DevUser): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    this.currentUser.set(user);
+    this._selected.set(user);
   }
 
   getInitials(): string {

@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { tap, map, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { AuthService as ShellAuthService } from '@platinumv3/shared/auth';
 import { environment } from '../../environment';
 
 export interface UserPermissions {
@@ -114,10 +115,36 @@ function mergePermissions(roleKeys: string[]): string[] {
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private shell = inject(ShellAuthService);
 
   private _currentUser = signal<User | null>(null);
-  readonly currentUser = this._currentUser.asReadonly();
-  readonly isLoggedIn = computed(() => !!this._currentUser());
+
+  /**
+   * The current user. Role/permission data comes from the SCM backend user; the DISPLAYED
+   * name/email is overlaid from the shell's POS-authenticated user (single source of truth across
+   * modules), so the UI shows the real signed-in user. When there is no SCM user yet, a minimal
+   * user is synthesized from the shell session (superUser → admin permissions).
+   */
+  readonly currentUser = computed<User | null>(() => {
+    const base = this._currentUser();
+    const su = this.shell.user();
+    if (!su) return base;
+    const firstName = su.firstName || base?.firstName || '';
+    const lastName = su.lastName || base?.lastName || '';
+    if (base) {
+      return { ...base, firstName, lastName, username: su.userName || base.username, email: su.eMail || base.email };
+    }
+    const admin = !!su.superUser;
+    const perms = admin ? ['all', 'admin'] : ['dashboard'];
+    return {
+      id: String(su.user_ID), username: su.userName, firstName, lastName, email: su.eMail,
+      role: admin ? 'system_admin' : 'requestor', roleLabel: admin ? 'System Administrator' : 'User',
+      roles: admin ? ['system_admin'] : [], superUser: admin, temporaryPassword: false,
+      department: 'General', costCentre: '', delegationLimit: 0, active: true,
+      permissions: { canCreate: perms, canView: perms, canApprove: perms, description: '' },
+    } as User;
+  });
+  readonly isLoggedIn = computed(() => !!this.currentUser());
 
   constructor() {
     this.loadStoredUser();
@@ -197,12 +224,13 @@ export class AuthService {
     this.router.navigate(['/dashboard']);
   }
 
+  /** Token from the shared POS session (single source), falling back to the stored token. */
   getToken(): string | null {
-    return localStorage.getItem('platinum_token');
+    return this.shell.getToken() ?? localStorage.getItem('platinum_token');
   }
 
   hasPermission(area: string): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     if (!user) return false;
     if (user.superUser) return true;
     const storedPerms = user.permissions?.canView || [];
@@ -212,7 +240,7 @@ export class AuthService {
   }
 
   hasRole(...roles: string[]): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     if (!user) return false;
     if (user.superUser || user.role === 'system_admin') return true;
     if (roles.includes(user.role)) return true;
@@ -221,12 +249,12 @@ export class AuthService {
   }
 
   isAuditor(): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     return user?.role === 'internal_auditor';
   }
 
   isTemporaryPassword(): boolean {
-    const user = this._currentUser();
+    const user = this.currentUser();
     return user?.temporaryPassword || false;
   }
 

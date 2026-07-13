@@ -1,9 +1,16 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '@platinumv3/shared/auth';
 import { environment } from '../../environment';
 import { ApiResponse } from '../models/api-response.model';
 import { MeDto } from '../models/overtime-workflow.model';
+
+/** Full display name of the signed-in shell (POS) user, or '' if not available. */
+function shellUserName(u: { firstName?: string; lastName?: string; userName?: string } | null): string {
+  if (!u) return '';
+  return `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || (u.userName ?? '');
+}
 
 /** Retry delays in ms for the startup race: 1 s, 2 s, 4 s. */
 const RETRY_DELAYS = [1000, 2000, 4000];
@@ -19,11 +26,16 @@ const RETRY_DELAYS = [1000, 2000, 4000];
 @Injectable({ providedIn: 'root' })
 export class UserContextService {
   private http = inject(HttpClient);
+  private auth = inject(AuthService);
   private base = environment.apiBaseUrl;
 
   readonly me = signal<MeDto | null>(null);
 
-  readonly displayName = computed(() => this.me()?.displayName ?? 'Loading...');
+  // The displayed identity is the shell's signed-in (POS-authenticated) user — the single source
+  // of truth across every module — falling back to the module's own /auth/me only if the shell
+  // session isn't populated yet.
+  readonly displayName = computed(() =>
+    shellUserName(this.auth.user()) || this.me()?.displayName || 'Loading...');
   readonly roleLabel   = computed(() => positionLabel(this.me()));
 
   constructor() { this.refreshWithRetry(); }

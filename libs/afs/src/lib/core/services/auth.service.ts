@@ -1,17 +1,35 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { AuthService as ShellAuthService } from '@platinumv3/shared/auth';
 import { ApiService } from './api.service';
 import { User, LoginResponse } from '../models/interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private shell = inject(ShellAuthService);
   private currentUser = signal<User | null>(null);
   private token = signal<string | null>(null);
 
-  user = this.currentUser.asReadonly();
-  isAuthenticated = computed(() => !!this.token());
-  userRoles = computed(() => this.currentUser()?.roles || []);
-  userPermissions = computed(() => this.currentUser()?.permissions || []);
+  // The signed-in identity is the shell's POS-authenticated user (single source of truth across
+  // modules), mapped into the AFS User shape; falls back to any AFS-local session.
+  user = computed<User | null>(() => {
+    const su = this.shell.user();
+    if (su) {
+      return {
+        id: String(su.user_ID),
+        email: su.eMail,
+        firstName: su.firstName,
+        lastName: su.lastName,
+        tenantId: 'default',
+        roles: su.superUser ? ['admin'] : ['user'],
+        permissions: su.superUser ? ['*'] : [],
+      } as User;
+    }
+    return this.currentUser();
+  });
+  isAuthenticated = computed(() => !!this.shell.user() || !!this.token());
+  userRoles = computed(() => this.user()?.roles || []);
+  userPermissions = computed(() => this.user()?.permissions || []);
 
   constructor(private api: ApiService, private router: Router) {
     const savedToken = localStorage.getItem('token');
@@ -22,8 +40,9 @@ export class AuthService {
     }
   }
 
+  /** Token from the shared POS session (single source), falling back to any AFS-local token. */
   getToken(): string | null {
-    return this.token();
+    return this.shell.getToken() ?? this.token();
   }
 
   setEmbeddedSession() {
