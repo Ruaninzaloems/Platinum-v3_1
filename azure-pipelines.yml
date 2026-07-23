@@ -175,11 +175,17 @@ stages:
     displayName: 'POS → Platinum-V3-POS-API'
     pool: { vmImage: $(vmImage) }
     steps:
-      # Deploy SOURCE ONLY — do NOT bundle node_modules (POS-API's is ~200MB and the
-      # zip-deploy fails). Let Oryx run `npm install` on the App Service instead
-      # (SCM_DO_BUILD_DURING_DEPLOYMENT=true, enforced below). The package.json "build"
-      # script is a no-op, so Oryx's post-install build succeeds; the app then starts via
-      # `npm start` (= NODE_ENV=production tsx index.ts), binding Azure's PORT.
+      # Deploy SOURCE ONLY — do NOT bundle node_modules (the installed tree is large and the
+      # zip-deploy fails/times out). Oryx runs `npm install` on the App Service instead
+      # (SCM_DO_BUILD_DURING_DEPLOYMENT=true). The package.json "build" script is a no-op, so
+      # Oryx's post-install build succeeds; the app then starts via `npm start`
+      # (= NODE_ENV=production tsx index.ts), binding Azure's PORT.
+      #
+      # NODE_ENV=production forces Oryx's install to skip devDependencies — POS-API's front-end /
+      # build packages (React, Radix, Tailwind, Vite, esbuild, …) live there and pull heavy
+      # NATIVE binaries (tailwind-oxide, lightningcss, rollup) that the server-side install chokes
+      # on. The backend (tsx index.ts) never imports them, so skipping them makes the deploy
+      # reliable. Keep NODE_ENV=production BEFORE SCM_DO_BUILD so the install is production-only.
       - task: AzureWebApp@1
         displayName: 'Deploy to Platinum-V3-POS-API'
         inputs:
@@ -189,4 +195,4 @@ stages:
           runtimeStack: 'NODE|22-lts'
           package: 'POS-API'
           startUpCommand: 'npm start'
-          appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT true'
+          appSettings: '-NODE_ENV production -SCM_DO_BUILD_DURING_DEPLOYMENT true'
