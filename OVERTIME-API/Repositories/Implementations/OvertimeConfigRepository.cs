@@ -31,6 +31,8 @@ public class OvertimeConfigRepository : IOvertimeConfigRepository
         existing.CountingPeriodEndDay = incoming.CountingPeriodEndDay;
         existing.MaximumMonthlyOvertimeHours = incoming.MaximumMonthlyOvertimeHours;
         existing.ExceptionalMaximumOvertimeHours = incoming.ExceptionalMaximumOvertimeHours;
+        existing.OverridePositionId          = incoming.OverridePositionId;
+        existing.OverridePositionDescription = incoming.OverridePositionDescription;
         existing.UpdatedBy = incoming.UpdatedBy;
         existing.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);

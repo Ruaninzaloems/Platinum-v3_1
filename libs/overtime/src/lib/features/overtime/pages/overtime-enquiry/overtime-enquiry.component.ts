@@ -13,6 +13,8 @@ import { toObservable, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { OvertimeTransactionsService } from '../../../../core/services/overtime-transactions.service';
 import { UserContextService } from '../../../../core/services/user-context.service';
+import { LookupService } from '../../../../core/services/lookup.service';
+import { ConstDivisionLookup } from '../../../../core/models/payroll-lookup.model';
 import {
   OvertimeTransactionDto,
   WorkflowStatus
@@ -25,7 +27,32 @@ interface ChainStep {
   tooltip: string;
 }
 
-// ── Module-level pure helpers (called only from computed signals, not from templates) ──
+type AugmentedRow = OvertimeTransactionDto & { _sc: string; _steps: ChainStep[] };
+
+interface EmployeeMonthGroup {
+  key: string;
+  employeeId: string;
+  employeeName: string;
+  departmentName: string;
+  monthKey: string;
+  monthLabel: string;
+  totalHours: number;
+  totalAmount: number;
+  rows: AugmentedRow[];
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function toMonthLabel(monthKey: string): string {
+  if (!monthKey || monthKey.length < 7) return '—';
+  const [y, m] = monthKey.split('-');
+  return `${MONTH_NAMES[+m - 1] ?? '?'} ${y}`;
+}
+
+// ── Module-level pure helpers ──
 function enquiryStatusClass(status: number): string {
   switch (status) {
     case WorkflowStatus.Processed: return 'status-approved';
@@ -135,7 +162,7 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
         </button>
       </div>
 
-      <!-- Filter bar — hide status dropdown on Processed tab (always filtered) -->
+      <!-- Filter bar -->
       <div class="filter-bar">
         @if (activeTab() === 'current') {
           <select class="filter-select" (change)="setFilterStatus($event)">
@@ -157,6 +184,13 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
           <option value="">All Departments</option>
           @for (d of departmentOptions(); track d.id) {
             <option [value]="d.id">{{ d.name }}</option>
+          }
+        </select>
+
+        <select class="filter-select" (change)="setFilterDivision($event)">
+          <option value="">All Divisions</option>
+          @for (d of divisionOptions(); track d.divisionId) {
+            <option [value]="d.divisionDesc">{{ d.divisionDesc }}</option>
           }
         </select>
 
@@ -184,12 +218,11 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
       </div>
 
       <!-- Summary bar -->
-      @if (!loading() && totalCount()) {
+      @if (!loading() && txCount()) {
         <div class="summary-bar">
-          <span class="summary-count">{{ displayedCount() }} transaction{{ displayedCount() !== 1 ? 's' : '' }} total</span>
+          <span class="summary-count">{{ txCount() }} transaction{{ txCount() !== 1 ? 's' : '' }} total</span>
           @if (statusSummary().length) {
             <span class="summary-sep">·</span>
-            <span class="summary-page-label">This page:</span>
             @for (s of statusSummary(); track s.label) {
               <span class="summary-chip" [ngClass]="s.cls">{{ s.label }}: {{ s.count }}</span>
             }
@@ -203,7 +236,7 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
             <mat-spinner diameter="32"></mat-spinner>
             <span class="empty-title">Loading transactions…</span>
           </div>
-        } @else if (!pagedRows().length) {
+        } @else if (!groupedRows().length) {
           <div class="empty-state">
             <mat-icon>search_off</mat-icon>
             <span class="empty-title">No transactions found.</span>
@@ -217,80 +250,133 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
           </div>
         } @else {
           <div class="grid-scroll">
-            <table class="grid-table">
+            <table class="grid-table group-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th class="chain-col">Approval Chain</th>
-                  <th>OT Type</th>
-                  <th class="num-col">Hours</th>
-                  <th class="num-col">Amount</th>
-                  <th>Date</th>
-                  @if (activeTab() === 'current') {
-                    <th>Status</th>
+                  <th class="emp-col">Employee</th>
+                  <th>Department</th>
+                  <th class="num-col">Total Hours</th>
+                  @if (showAmount()) {
+                    <th class="num-col">Total Amount</th>
                   }
-                  <th>Actions</th>
+                  <th>Month</th>
                 </tr>
               </thead>
               <tbody>
-                @for (r of pagedRows(); track r.id) {
-                  <tr (click)="view(r)">
+                @for (g of pagedGroups(); track g.key) {
+                  <!-- Group summary row -->
+                  <tr class="group-row" (click)="toggleGroup(g.key)">
                     <td>
-                      <div class="cell-strong">{{ r.employeeName }}</div>
-                      <div class="cell-sub">{{ r.employeeId }}</div>
-                      <div class="cell-sub">{{ r.departmentName }}</div>
-                    </td>
-                    <td class="chain-col">
-                      <div class="chain-strip">
-                        @for (step of r._steps; track step.label; let last = $last) {
-                          <div class="chain-step"
-                               [ngClass]="'step-' + step.state"
-                               [matTooltip]="step.tooltip"
-                               matTooltipPosition="above">
-                            <div class="step-bubble">
-                              <mat-icon class="step-icon">{{ step.icon }}</mat-icon>
-                            </div>
-                            <span class="step-label">{{ step.label }}</span>
-                          </div>
-                          @if (!last) {
-                            <div class="chain-connector" [class.connector-done]="step.state === 'done'"></div>
-                          }
-                        }
+                      <div class="group-employee-cell">
+                        <mat-icon class="expand-icon" [class.expanded]="isExpanded(g.key)">
+                          chevron_right
+                        </mat-icon>
+                        <div>
+                          <div class="cell-strong">{{ g.employeeName }}</div>
+                          <div class="cell-sub">{{ g.employeeId }}</div>
+                        </div>
                       </div>
                     </td>
-                    <td>
-                      <div class="cell-strong">{{ r.salaryHeadName || '—' }}</div>
-                    </td>
-                    <td class="num-col">{{ r.hours | number:'1.2-2' }}</td>
-                    <td class="num-col">R&nbsp;{{ r.amount | number:'1.2-2' }}</td>
-                    <td class="date-col">{{ r.overtimeDate | date:'dd/MM/yyyy' }}</td>
-                    @if (activeTab() === 'current') {
-                      <td>
-                        <span class="status-badge" [ngClass]="r._sc">
-                          {{ r.statusLabel }}
-                        </span>
-                      </td>
+                    <td><div class="cell-muted">{{ g.departmentName }}</div></td>
+                    <td class="num-col cell-strong">{{ g.totalHours | number:'1.2-2' }}</td>
+                    @if (showAmount()) {
+                      <td class="num-col cell-strong">R&nbsp;{{ g.totalAmount | number:'1.2-2' }}</td>
                     }
-                    <td class="actions-col" (click)="$event.stopPropagation()">
-                      <button class="action-btn info"
-                              type="button"
-                              aria-label="View overtime"
-                              matTooltip="View details"
-                              (click)="view(r)">
-                        <mat-icon>visibility</mat-icon>
-                      </button>
-                    </td>
+                    <td><div class="cell-month">{{ g.monthLabel }}</div></td>
                   </tr>
+
+                  <!-- Expanded detail rows -->
+                  @if (isExpanded(g.key)) {
+                    <tr class="detail-container-row">
+                      <td [attr.colspan]="showAmount() ? 5 : 4" class="detail-container-cell">
+                        <table class="detail-table">
+                          <thead>
+                            <tr class="detail-header-row">
+                              <th class="emp-col">Employee</th>
+                              <th class="chain-col">Approval Chain</th>
+                              <th>OT Type</th>
+                              <th class="num-col">Hours</th>
+                              @if (showAmount()) {
+                                <th class="num-col">Amount</th>
+                              }
+                              <th class="date-col">Date</th>
+                              @if (activeTab() === 'current') {
+                                <th>Status</th>
+                              }
+                              <th class="actions-col">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (r of g.rows; track r.id) {
+                              <tr class="detail-row" (click)="view(r)">
+                                <td>
+                                  <div class="detail-emp-inline">
+                                    <span class="cell-strong">{{ r.employeeName }}</span>
+                                    <span class="emp-sep">·</span>
+                                    <span class="cell-sub">{{ r.employeeId }}</span>
+                                    <span class="emp-sep">·</span>
+                                    <span class="cell-sub">{{ r.departmentName }}</span>
+                                  </div>
+                                </td>
+                                <td class="chain-col">
+                                  <div class="chain-strip">
+                                    @for (step of r._steps; track step.label; let last = $last) {
+                                      <div class="chain-step"
+                                           [ngClass]="'step-' + step.state"
+                                           [matTooltip]="step.tooltip"
+                                           matTooltipPosition="above">
+                                        <div class="step-bubble">
+                                          <mat-icon class="step-icon">{{ step.icon }}</mat-icon>
+                                        </div>
+                                        <span class="step-label">{{ step.label }}</span>
+                                      </div>
+                                      @if (!last) {
+                                        <div class="chain-connector" [class.connector-done]="step.state === 'done'"></div>
+                                      }
+                                    }
+                                  </div>
+                                </td>
+                                <td>
+                                  <div class="cell-strong">{{ r.salaryHeadName || '—' }}</div>
+                                </td>
+                                <td class="num-col">{{ r.hours | number:'1.2-2' }}</td>
+                                @if (showAmount()) {
+                                  <td class="num-col">R&nbsp;{{ r.amount | number:'1.2-2' }}</td>
+                                }
+                                <td class="date-col">{{ r.overtimeDate | date:'dd/MM/yyyy' }}</td>
+                                @if (activeTab() === 'current') {
+                                  <td>
+                                    <span class="status-badge" [ngClass]="r._sc">
+                                      {{ r.statusLabel }}
+                                    </span>
+                                  </td>
+                                }
+                                <td class="actions-col" (click)="$event.stopPropagation()">
+                                  <button class="action-btn info"
+                                          type="button"
+                                          aria-label="View overtime"
+                                          matTooltip="View details"
+                                          (click)="view(r)">
+                                    <mat-icon>visibility</mat-icon>
+                                  </button>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
           </div>
 
           <mat-paginator
-            [length]="displayedCount()"
+            [length]="groupedRows().length"
             [pageIndex]="pageIndex()"
             [pageSize]="pageSize()"
-            [pageSizeOptions]="[25, 50, 100]"
+            [pageSizeOptions]="[10, 25, 50]"
             (page)="onPage($event)">
           </mat-paginator>
         }
@@ -369,7 +455,6 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
     }
     .summary-count      { font-weight: 600; color: #374151; }
     .summary-sep        { color: #94a3b8; }
-    .summary-page-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
     .summary-chip {
       padding: 2px 8px;
       border-radius: 10px;
@@ -381,13 +466,85 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
     .chip-rejected { background: #fee2e2; color: #b91c1c; }
     .chip-returned { background: #fef3c7; color: #b45309; }
 
-    /* ── Table ── */
+    /* ── Outer group table ── */
     .grid-scroll { overflow-x: auto; }
-    .grid-table tbody tr { cursor: pointer; }
-    .num-col    { text-align: right; white-space: nowrap; }
+    .emp-col { min-width: 160px; }
+
+    .group-table .group-row {
+      cursor: pointer;
+      background: #f8fafc;
+      border-top: 2px solid #e2e8f0;
+    }
+    .group-table .group-row:hover { background: #f1f5f9; }
+    .group-table .group-row td {
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+
+    .group-employee-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .expand-icon {
+      font-size: 20px !important;
+      width: 20px !important;
+      height: 20px !important;
+      color: #64748b;
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    .expand-icon.expanded { transform: rotate(90deg); }
+
+    .detail-emp-inline {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .emp-sep { color: #cbd5e1; font-size: 11px; }
+    .cell-muted { color: #64748b; font-size: 13px; }
+    .cell-month { color: #374151; font-size: 13px; white-space: nowrap; }
+    .num-col { text-align: right; white-space: nowrap; }
+
+    /* ── Detail container (expanded row) ── */
+    .detail-container-row { background: #fff; }
+    .detail-container-cell {
+      padding: 0 !important;
+      border-top: none !important;
+    }
+
+    /* ── Inner detail table ── */
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .detail-table thead .detail-header-row th {
+      padding: 6px 12px 6px 16px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    .detail-table tbody .detail-row {
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .detail-table tbody .detail-row:hover { background: #f8fafc; }
+    .detail-table tbody .detail-row:last-child { border-bottom: 2px solid #e2e8f0; }
+    .detail-table tbody .detail-row td {
+      padding: 8px 12px 8px 16px;
+      vertical-align: middle;
+    }
+    .chain-col  { min-width: 280px; }
     .date-col   { white-space: nowrap; }
     .actions-col { width: 48px; text-align: center; }
-    .chain-col  { min-width: 280px; }
 
     /* ── Chain strip ── */
     .chain-strip {
@@ -459,56 +616,105 @@ function buildChainSteps(r: OvertimeTransactionDto): ChainStep[] {
   `]
 })
 export class OvertimeEnquiryComponent {
-  private txService = inject(OvertimeTransactionsService);
-  private user      = inject(UserContextService);
-  private router    = inject(Router);
+  private txService     = inject(OvertimeTransactionsService);
+  private user          = inject(UserContextService);
+  private router        = inject(Router);
+  private lookupService = inject(LookupService);
 
-  activeTab  = signal<'current' | 'processed'>('current');
+  /**
+   * Controls visibility of the Total Amount / Amount columns on the Enquiry list.
+   *
+   * Only approvers and payroll-side roles may see salary-derived figures.
+   * Recommenders are excluded — they assess requests on hours and justification,
+   * not on cost. Plain capturers (who only submit their own overtime) are also excluded.
+   *
+   * Roles that retain visibility:
+   *   - isApprover          — direct overtime approver
+   *   - isExcessApprover    — approves over-limit claims (must assess cost)
+   *   - isPayrollCapturer   — needs amounts to reconcile payroll
+   *   - isPayrollApprover   — signs off payroll release
+   */
+  showAmount = computed(() => {
+    const me = this.user.me();
+    return !!(me?.isApprover || me?.isExcessApprover);
+  });
+
+  activeTab = signal<'current' | 'processed'>('current');
 
   allRows    = signal<OvertimeTransactionDto[]>([]);
-  totalCount = signal(0);
   loading    = signal(false);
   pageIndex  = signal(0);
-  pageSize   = signal(25);
+  pageSize   = signal(10);
 
   filterStatus     = signal<number | ''>('');
   filterSalaryHead = signal('');
   filterDepartment = signal('');
+  filterDivision   = signal('');
   filterSearch     = signal('');
   filterFromDate   = signal('');
   filterToDate     = signal('');
 
+  expandedGroups = signal(new Set<string>());
+
   private optionRows = signal<OvertimeTransactionDto[]>([]);
 
-  // Pre-compute expensive per-row values once when data arrives
   private augmentedRows = computed(() =>
     this.allRows().map(r => ({
       ...r,
       _sc:    enquiryStatusClass(r.status),
       _steps: buildChainSteps(r),
-    }))
+    })) as AugmentedRow[]
   );
 
-  // Memoised date-picker bridges (avoid new Date() on every CD tick)
-  private _fromCache: { iso: string; date: Date | null } = { iso: '', date: null };
-  private _toCache:   { iso: string; date: Date | null } = { iso: '', date: null };
-
-  // On Current tab: client-side exclude Processed rows so the grid is clean.
-  // On Processed tab: the API already returns only Processed rows.
-  pagedRows = computed(() => {
-    const rows = this.augmentedRows();
-    if (this.activeTab() === 'current') {
-      return rows.filter(r => r.status !== WorkflowStatus.Processed);
-    }
+  private filteredRows = computed(() => {
+    let rows = this.augmentedRows();
+    if (this.activeTab() === 'current')
+      rows = rows.filter(r => r.status !== WorkflowStatus.Processed);
+    const division = this.filterDivision();
+    if (division)
+      rows = rows.filter(r => (r.legacyDivisionName ?? '') === division);
     return rows;
   });
 
-  // The count shown in the summary bar and paginator
-  displayedCount = computed(() =>
-    this.activeTab() === 'current'
-      ? this.pagedRows().length   // client-filtered
-      : this.totalCount()          // server total (all Processed)
-  );
+  groupedRows = computed((): EmployeeMonthGroup[] => {
+    const rows = this.filteredRows();
+    const map = new Map<string, EmployeeMonthGroup>();
+
+    for (const r of rows) {
+      const monthKey = (r.overtimeDate ?? '').substring(0, 7);
+      const key = `${r.employeeId}|${monthKey}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          employeeId:     r.employeeId ?? '',
+          employeeName:   r.employeeName ?? '',
+          departmentName: r.departmentName ?? '',
+          monthKey,
+          monthLabel:     toMonthLabel(monthKey),
+          totalHours:  0,
+          totalAmount: 0,
+          rows: [],
+        });
+      }
+      const g = map.get(key)!;
+      g.totalHours  += r.hours  ?? 0;
+      g.totalAmount += r.amount ?? 0;
+      g.rows.push(r);
+    }
+
+    return [...map.values()].sort((a, b) => {
+      if (b.monthKey !== a.monthKey) return b.monthKey.localeCompare(a.monthKey);
+      return a.employeeName.localeCompare(b.employeeName);
+    });
+  });
+
+  pagedGroups = computed(() => {
+    const groups = this.groupedRows();
+    const start  = this.pageIndex() * this.pageSize();
+    return groups.slice(start, start + this.pageSize());
+  });
+
+  txCount = computed(() => this.filteredRows().length);
 
   statusOptions = computed(() => {
     const seen = new Map<number, string>();
@@ -533,8 +739,10 @@ export class OvertimeEnquiryComponent {
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  divisionOptions = signal<ConstDivisionLookup[]>([]);
+
   statusSummary = computed(() => {
-    const rows = this.pagedRows();
+    const rows = this.filteredRows();
     if (this.activeTab() === 'processed') return [];
     const counts = {
       pending:  rows.filter(r => r.status !== WorkflowStatus.Rejected && r.status !== WorkflowStatus.Returned).length,
@@ -547,6 +755,10 @@ export class OvertimeEnquiryComponent {
       { label: 'Returned',    count: counts.returned, cls: 'summary-chip chip-returned' },
     ].filter(s => s.count > 0);
   });
+
+  // Memoised date-picker bridges
+  private _fromCache: { iso: string; date: Date | null } = { iso: '', date: null };
+  private _toCache:   { iso: string; date: Date | null } = { iso: '', date: null };
 
   constructor() {
     toObservable(this.user.me)
@@ -566,17 +778,24 @@ export class OvertimeEnquiryComponent {
     this.txService.listEnquiry({ page: 1, pageSize: 500 }).subscribe({
       next: result => this.optionRows.set(result?.items ?? []),
     });
+    this.lookupService.payrollDivisions().subscribe({
+      next: divisions => this.divisionOptions.set(divisions),
+    });
   }
 
   switchTab(tab: 'current' | 'processed'): void {
     this.activeTab.set(tab);
     this.filterStatus.set('');
     this.pageIndex.set(0);
+    this.expandedGroups.set(new Set());
     this.load();
   }
 
   load(): void {
     this.loading.set(true);
+    this.pageIndex.set(0);
+    this.expandedGroups.set(new Set());
+
     const tab        = this.activeTab();
     const dept       = this.filterDepartment();
     const search     = this.filterSearch().trim();
@@ -584,15 +803,14 @@ export class OvertimeEnquiryComponent {
     const from       = this.filterFromDate();
     const to         = this.filterToDate();
 
-    // For Processed tab always filter to Processed; for Current tab use the dropdown filter.
     const effectiveStatus: number | undefined =
       tab === 'processed'
         ? WorkflowStatus.Processed
         : (this.filterStatus() !== '' ? (this.filterStatus() as number) : undefined);
 
     this.txService.listEnquiry({
-      page:           this.pageIndex() + 1,
-      pageSize:       this.pageSize(),
+      page:           1,
+      pageSize:       500,
       status:         effectiveStatus,
       departmentId:   dept       || undefined,
       employeeSearch: search     || undefined,
@@ -602,7 +820,6 @@ export class OvertimeEnquiryComponent {
     }).subscribe({
       next: result => {
         this.allRows.set(result?.items ?? []);
-        this.totalCount.set(result?.total ?? 0);
         this.loading.set(false);
       },
       error: () => {
@@ -611,28 +828,33 @@ export class OvertimeEnquiryComponent {
     });
   }
 
-  private resetPageAndLoad(): void {
-    this.pageIndex.set(0);
+  private resetAndLoad(): void {
     this.load();
   }
 
   setFilterStatus(e: Event): void {
     const v = (e.target as HTMLSelectElement).value;
     this.filterStatus.set(v === '' ? '' : +v as WorkflowStatus);
-    this.resetPageAndLoad();
+    this.resetAndLoad();
   }
   setFilterSalaryHead(e: Event): void {
     this.filterSalaryHead.set((e.target as HTMLSelectElement).value);
-    this.resetPageAndLoad();
+    this.resetAndLoad();
   }
   setFilterDepartment(e: Event): void {
     this.filterDepartment.set((e.target as HTMLSelectElement).value);
-    this.resetPageAndLoad();
+    this.resetAndLoad();
+  }
+  setFilterDivision(e: Event): void {
+    this.filterDivision.set((e.target as HTMLSelectElement).value);
+    this.pageIndex.set(0);
+    this.expandedGroups.set(new Set());
   }
   setFilterSearch(e: Event): void {
     this.filterSearch.set((e.target as HTMLInputElement).value);
-    this.resetPageAndLoad();
+    this.resetAndLoad();
   }
+
   get fromDateValue(): Date | null {
     const iso = this.filterFromDate();
     if (!iso) return null;
@@ -644,7 +866,7 @@ export class OvertimeEnquiryComponent {
   }
   set fromDateValue(val: Date | null) {
     this.filterFromDate.set(val ? dateToIso(val) : '');
-    this.resetPageAndLoad();
+    this.resetAndLoad();
   }
 
   get toDateValue(): Date | null {
@@ -658,24 +880,35 @@ export class OvertimeEnquiryComponent {
   }
   set toDateValue(val: Date | null) {
     this.filterToDate.set(val ? dateToIso(val) : '');
-    this.resetPageAndLoad();
+    this.resetAndLoad();
   }
 
   onPage(e: PageEvent): void {
     this.pageIndex.set(e.pageIndex);
     this.pageSize.set(e.pageSize);
-    this.load();
+    this.expandedGroups.set(new Set());
+  }
+
+  toggleGroup(key: string): void {
+    this.expandedGroups.update(s => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  isExpanded(key: string): boolean {
+    return this.expandedGroups().has(key);
   }
 
   view(r: OvertimeTransactionDto): void {
     this.router.navigate(['/overtime/capture', r.id]);
   }
-
 }
 
 function dateToIso(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }

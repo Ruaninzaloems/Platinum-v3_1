@@ -15,4 +15,12 @@ public class OvertimeWorkflowState
     public string? ActionedBy { get; set; }
     public string? Comments { get; set; }
     public DateTime ActionedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Snapshotted label for the chain position role at the time of action.
+    /// Set to "Override Approver" when the action was taken by the master-approver
+    /// override user (who has no chain-assigned position on the transaction).
+    /// Null for normal workflow participants.
+    /// </summary>
+    public string? ChainPositionNote { get; set; }
 }

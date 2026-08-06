@@ -71,15 +71,27 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         // Guard: a Bottom position can only be linked to one Top (approver) position
+        // at any given time. Only flag a conflict when the two periods temporally overlap.
+        // Treat a null or year-9999 EndDate as open-ended (DateTime.MaxValue).
         if (request.ReportingRelationships.Count > 0)
         {
             var allConfigs = await _repo.GetAllAsync(ct);
             foreach (var rr in request.ReportingRelationships)
             {
+                var newEnd = (rr.EndDate.HasValue && rr.EndDate.Value.Year < 9999)
+                    ? rr.EndDate.Value
+                    : DateTime.MaxValue;
+
                 var conflict = allConfigs.FirstOrDefault(c =>
                     !c.PositionId.Equals(positionId, StringComparison.OrdinalIgnoreCase) &&
                     c.ReportingRelationships.Any(r =>
-                        r.ReportsToPositionId.Equals(rr.ReportsToPositionId, StringComparison.OrdinalIgnoreCase)));
+                        r.ReportsToPositionId.Equals(rr.ReportsToPositionId, StringComparison.OrdinalIgnoreCase) &&
+                        // Two intervals [A.Start, A.End) and [B.Start, B.End) overlap when:
+                        // A.Start < B.End  AND  B.Start < A.End
+                        r.StartDate < newEnd &&
+                        rr.StartDate < (r.EndDate.HasValue && r.EndDate.Value.Year < 9999
+                            ? r.EndDate.Value
+                            : DateTime.MaxValue)));
                 if (conflict is not null)
                     throw new ArgumentException(
                         $"Position '{rr.ReportsToPositionId}' is already configured under approver '{conflict.PositionDescription ?? conflict.PositionId}'. " +
@@ -111,8 +123,13 @@ public class PositionApprovalService : IPositionApprovalService
                 {
                     ActingEmployeeId = a.ActingEmployeeId,
                     ActingEmployeeName = a.ActingEmployeeName,
-                    ActingInPositionId = a.ActingInPositionId,
-                    ActingInPositionDescription = a.ActingInPositionDescription,
+                    // ActingInPositionId must always equal the config's own PositionId.
+                    // The UI sends the acting employee's home position here (used as a
+                    // search aid to find the employee), so we always override it with
+                    // the authoritative config position to satisfy the FK constraint and
+                    // OvertimeTransactionsService's position-keyed lookup.
+                    ActingInPositionId = pos.Id,
+                    ActingInPositionDescription = pos.Description,
                     StartDate = a.StartDate,
                     EndDate = a.EndDate
                 }).ToList()
@@ -133,7 +150,16 @@ public class PositionApprovalService : IPositionApprovalService
     {
         var positions = await _platinum.GetPositionsAsync(null, ct);
         var configs   = await _repo.GetAllAsync(ct);
+        var employees = await _platinum.GetEmployeesAsync(null, ct);
         var configByPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
+
+        // Maps acting employee ID → their home position ID.
+        // The UI-save path overrides ActingInPositionId to the configured position, so
+        // we cannot rely on ActingInPositionId for export — we must re-derive the home
+        // position from the stored ActingEmployeeId.
+        var homePosByEmpId = employees
+            .Where(e => !string.IsNullOrWhiteSpace(e.Id) && !string.IsNullOrWhiteSpace(e.PositionId))
+            .ToDictionary(e => e.Id, e => e.PositionId, StringComparer.OrdinalIgnoreCase);
 
         using var wb = new XLWorkbook();
 
@@ -149,7 +175,7 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         // Row 2: guidance note (not imported — parser starts at row 3).
-        wsConfig.Cell(2, 1).Value = "↑ Do not edit column headers or this note row. Valid flags: Y = Yes  |  N or blank = No  |  Green-highlighted rows already have saved configuration.";
+        wsConfig.Cell(2, 1).Value = "↑ Do not edit column headers or this note row. These are your currently configured positions. Edit flags, add new rows for unconfigured positions, or remove rows to clear a position's config. Valid flags: Y = Yes  |  N or blank = No. Re-importing this file will become the new saved config.";
         wsConfig.Cell(2, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
         wsConfig.Cell(2, 1).Style.Font.Italic = true;
         wsConfig.Row(2).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
@@ -163,16 +189,17 @@ public class PositionApprovalService : IPositionApprovalService
             var isApp  = (cfg?.IsOvertimeApprover                 == true) ? "Y" : "N";
             var isDept = (cfg?.IsDepartmentExcessOvertimeApprover == true) ? "Y" : "N";
 
+            // Only include positions that have at least one flag configured.
+            // Unconfigured positions (all N) are excluded so the file reflects
+            // the live config — users add new rows manually for new positions.
+            if (isRec == "N" && isApp == "N" && isDept == "N") continue;
+
             wsConfig.Cell(row, 1).Value = pos.Id;
             wsConfig.Cell(row, 2).Value = pos.Description;
             wsConfig.Cell(row, 2).Style.Protection.Locked = true;
             wsConfig.Cell(row, 3).Value = isRec;
             wsConfig.Cell(row, 4).Value = isApp;
             wsConfig.Cell(row, 5).Value = isDept;
-
-            // Highlight rows that already have saved configuration in light green.
-            if (isRec == "Y" || isApp == "Y" || isDept == "Y")
-                wsConfig.Row(row).Style.Fill.BackgroundColor = XLColor.FromHtml("#E2EFDA");
 
             row++;
         }
@@ -223,7 +250,7 @@ public class PositionApprovalService : IPositionApprovalService
 
         // ── Sheet 3: Acting Appointments ────────────────────────────────────
         var wsActing = wb.Worksheets.Add("Acting Appointments");
-        var actingHeaders = new[] { "ActingEmployeeId", "ActingInPositionId", "StartDate (dd/MM/yyyy)", "EndDate (dd/MM/yyyy)" };
+        var actingHeaders = new[] { "PositionId", "ActingPositionId", "StartDate (dd/MM/yyyy)", "EndDate (dd/MM/yyyy)" };
         for (var i = 0; i < actingHeaders.Length; i++)
         {
             var cell = wsActing.Cell(1, i + 1);
@@ -233,7 +260,7 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         // Row 2: guidance note for acting appointments.
-        wsActing.Cell(2, 1).Value = "↑ Note: ActingEmployeeId must be a valid employee. ActingInPositionId must be a valid position. Both dates required in dd/MM/yyyy format. EndDate must be ≥ StartDate.";
+        wsActing.Cell(2, 1).Value = "↑ Note: PositionId is the config/approver position. ActingPositionId is the home position of the person temporarily acting in that role. Both must be valid positions. Both dates required in dd/MM/yyyy format. EndDate must be ≥ StartDate.";
         wsActing.Row(2).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF3CD");
         wsActing.Row(2).Style.Font.Italic = true;
 
@@ -242,8 +269,12 @@ public class PositionApprovalService : IPositionApprovalService
         {
             foreach (var aa in cfg.ActingAppointments)
             {
-                wsActing.Cell(actingRow, 1).Value = aa.ActingEmployeeId;
-                wsActing.Cell(actingRow, 2).Value = aa.ActingInPositionId;
+                // Derive the acting employee's home position from ActingEmployeeId.
+                // ActingInPositionId cannot be used here because the UI-save path always
+                // overrides it to the configured position — only ActingEmployeeId is reliable.
+                homePosByEmpId.TryGetValue(aa.ActingEmployeeId, out var actingHomePosId);
+                wsActing.Cell(actingRow, 1).Value = cfg.PositionId;
+                wsActing.Cell(actingRow, 2).Value = actingHomePosId ?? aa.ActingInPositionId;
                 wsActing.Cell(actingRow, 3).Value = aa.StartDate == default ? "" : aa.StartDate.ToString("dd/MM/yyyy");
                 wsActing.Cell(actingRow, 4).Value = aa.EndDate == default   ? "" : aa.EndDate.ToString("dd/MM/yyyy");
                 actingRow++;
@@ -270,7 +301,6 @@ public class PositionApprovalService : IPositionApprovalService
         // ── Data loading ─────────────────────────────────────────────────────
         var configs   = await _repo.GetAllAsync(ct);
         var positions = await _platinum.GetPositionsAsync(null, ct);
-        var employees = await _platinum.GetEmployeesAsync(null, ct);
 
         // O(1) enrichment maps
         var posById = positions.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
@@ -278,12 +308,6 @@ public class PositionApprovalService : IPositionApprovalService
         // Config keyed by position ID — used to look up flags/relationships for
         // each position when iterating over the full positions list.
         var configByPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
-
-        // Employee keyed by the position they occupy → gives us full name / division.
-        var empByPosId = employees
-            .Where(e => !string.IsNullOrWhiteSpace(e.PositionId))
-            .GroupBy(e => e.PositionId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         // Set of all position IDs that have at least one acting appointment.
         var actingPositionIds = new HashSet<string>(
@@ -298,7 +322,7 @@ public class PositionApprovalService : IPositionApprovalService
         var headers = new[]
         {
             "Position ID",
-            "Position Description",
+            "Top Position Description",
             "Occupying Employee",
             "Department",
             "Division",
@@ -306,11 +330,11 @@ public class PositionApprovalService : IPositionApprovalService
             "Overtime Recommender (Y/N)",
             "Overtime Approver (Y/N)",
             "Dept Excess Approver (Y/N)",
-            "Applies-To Position ID",
-            "Applies-To Position Description",
-            "Applies-To Employee",
-            "Applies-To Department",
-            "Applies-To Division",
+            "Bottom Position ID",
+            "Bottom Position Description",
+            "Bottom Position Employee",
+            "Bottom Position Department",
+            "Bottom Position Division",
             "Start Date",
             "End Date",
             "Temporary Acting Appointment (Y/N)"
@@ -334,12 +358,12 @@ public class PositionApprovalService : IPositionApprovalService
         // Sort all positions by department → description for easy scanning.
         foreach (var pos in positions.OrderBy(p => p.DepartmentName).ThenBy(p => p.Description))
         {
-            empByPosId.TryGetValue(pos.Id, out var posEmp);
-            var employee = posEmp is not null
-                ? $"{posEmp.FullName} ({posEmp.EmployeeNumber})"
+            var hasEmployee = !string.IsNullOrWhiteSpace(pos.EmployeeCode);
+            var employee = hasEmployee
+                ? ($"{pos.EmployeeFirstName} {pos.EmployeeSurname}".Trim() + $" ({pos.EmployeeCode})")
                 : string.Empty;
             var dept = pos.DepartmentName;
-            var div  = posEmp?.DivisionName ?? string.Empty;
+            var div  = pos.DivisionName;
 
             if (!configByPosId.TryGetValue(pos.Id, out var cfg))
             {
@@ -369,13 +393,13 @@ public class PositionApprovalService : IPositionApprovalService
                 foreach (var rel in cfg.ReportingRelationships.OrderBy(r => r.StartDate))
                 {
                     posById.TryGetValue(rel.ReportsToPositionId, out var appPos);
-                    empByPosId.TryGetValue(rel.ReportsToPositionId, out var appEmp);
 
-                    var appEmployee = appEmp is not null
-                        ? $"{appEmp.FullName} ({appEmp.EmployeeNumber})"
+                    var appHasEmployee = appPos is not null && !string.IsNullOrWhiteSpace(appPos.EmployeeCode);
+                    var appEmployee = appHasEmployee
+                        ? ($"{appPos!.EmployeeFirstName} {appPos.EmployeeSurname}".Trim() + $" ({appPos.EmployeeCode})")
                         : string.Empty;
                     var appDept = appPos?.DepartmentName ?? string.Empty;
-                    var appDiv  = appEmp?.DivisionName   ?? string.Empty;
+                    var appDiv  = appPos?.DivisionName   ?? string.Empty;
 
                     var startStr = rel.StartDate == default ? "" : rel.StartDate.ToString("dd/MM/yyyy");
                     var endStr   = rel.EndDate.HasValue
@@ -549,7 +573,7 @@ public class PositionApprovalService : IPositionApprovalService
             // Tracks (Top|Bottom|StartDate) to catch exact duplicates within this file.
             var seenRelatKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             // Tracks Bottom → Top to catch a Bottom position linked to more than one Top.
-            var bottomToTopImport = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var bottomToTopImport = new Dictionary<string, (string TopId, DateTime? EndDate)>(StringComparer.OrdinalIgnoreCase);
             for (var rowNum = 3; rowNum <= lastRow; rowNum++)
             {
                 var posId = wsRelat.Cell(rowNum, 1).GetString().Trim();
@@ -608,14 +632,20 @@ public class PositionApprovalService : IPositionApprovalService
                 }
 
                 // Cross-top check: same Bottom position linked to a different Top in this file.
-                if (bottomToTopImport.TryGetValue(reportsTo, out var existingTop) &&
-                    !existingTop.Equals(posId, StringComparison.OrdinalIgnoreCase))
+                // A dated transition is allowed: if the existing row has an EndDate and the new
+                // row's StartDate is on or after that EndDate the periods don't overlap.
+                if (bottomToTopImport.TryGetValue(reportsTo, out var existingEntry) &&
+                    !existingEntry.TopId.Equals(posId, StringComparison.OrdinalIgnoreCase))
                 {
-                    result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = rowNum, Error = $"Position '{reportsTo}' is already linked to Top PositionId '{existingTop}' elsewhere in this file. A position can only be linked to one approver." });
-                    result.ErrorRows++;
-                    continue;
+                    var isNonOverlapping = existingEntry.EndDate.HasValue && startDate >= existingEntry.EndDate.Value;
+                    if (!isNonOverlapping)
+                    {
+                        result.Errors.Add(new ImportRowErrorDto { Sheet = "Reporting Relationships", Row = rowNum, Error = $"Position '{reportsTo}' is already linked to Top PositionId '{existingEntry.TopId}' elsewhere in this file with an overlapping or open-ended period. A position can only be linked to one approver at a time." });
+                        result.ErrorRows++;
+                        continue;
+                    }
                 }
-                bottomToTopImport[reportsTo] = posId;
+                bottomToTopImport[reportsTo] = (posId, endDate);
 
                 result.ReportingRelationshipChanges.Add(new ReportingRelationshipChangeDto
                 {
@@ -637,14 +667,14 @@ public class PositionApprovalService : IPositionApprovalService
         {
             var h3Col1 = wsActing.Cell(1, 1).GetString().Trim();
             var h3Col2 = wsActing.Cell(1, 2).GetString().Trim();
-            if (!h3Col1.Contains("ActingEmployee", StringComparison.OrdinalIgnoreCase))
+            if (!h3Col1.Contains("PositionId", StringComparison.OrdinalIgnoreCase))
             {
-                result.Errors.Add(new ImportRowErrorDto { Sheet = "Acting Appointments", Row = 1, Error = $"Column A header should contain 'ActingEmployee' but found '{h3Col1}'. Ensure you are using the correct import template." });
+                result.Errors.Add(new ImportRowErrorDto { Sheet = "Acting Appointments", Row = 1, Error = $"Column A header should be 'PositionId' but found '{h3Col1}'. Ensure you are using the correct import template." });
                 result.ErrorRows++;
             }
-            if (!h3Col2.Contains("ActingIn", StringComparison.OrdinalIgnoreCase))
+            if (!h3Col2.Contains("ActingPosition", StringComparison.OrdinalIgnoreCase))
             {
-                result.Errors.Add(new ImportRowErrorDto { Sheet = "Acting Appointments", Row = 1, Error = $"Column B header should contain 'ActingIn' but found '{h3Col2}'. Ensure you are using the correct import template." });
+                result.Errors.Add(new ImportRowErrorDto { Sheet = "Acting Appointments", Row = 1, Error = $"Column B header should be 'ActingPositionId' but found '{h3Col2}'. Ensure you are using the correct import template." });
                 result.ErrorRows++;
             }
 
@@ -652,24 +682,24 @@ public class PositionApprovalService : IPositionApprovalService
             var lastRow = wsActing.LastRowUsed()?.RowNumber() ?? 2;
             for (var rowNum = 3; rowNum <= lastRow; rowNum++)
             {
-                var empId = wsActing.Cell(rowNum, 1).GetString().Trim();
-                var posId = wsActing.Cell(rowNum, 2).GetString().Trim();
-                var startRaw = wsActing.Cell(rowNum, 3).GetString().Trim();
-                var endRaw = wsActing.Cell(rowNum, 4).GetString().Trim();
+                var configPosId  = wsActing.Cell(rowNum, 1).GetString().Trim();
+                var actingPosId  = wsActing.Cell(rowNum, 2).GetString().Trim();
+                var startRaw     = wsActing.Cell(rowNum, 3).GetString().Trim();
+                var endRaw       = wsActing.Cell(rowNum, 4).GetString().Trim();
 
-                if (string.IsNullOrWhiteSpace(empId) && string.IsNullOrWhiteSpace(posId)) continue;
+                if (string.IsNullOrWhiteSpace(configPosId) && string.IsNullOrWhiteSpace(actingPosId)) continue;
 
                 var rowErrors = new List<string>();
 
-                if (string.IsNullOrWhiteSpace(empId))
-                    rowErrors.Add("ActingEmployeeId is required.");
-                else if (!employeeIds.Contains(empId))
-                    rowErrors.Add($"ActingEmployeeId '{empId}' not found.");
+                if (string.IsNullOrWhiteSpace(configPosId))
+                    rowErrors.Add("PositionId is required.");
+                else if (!positionIds.Contains(configPosId))
+                    rowErrors.Add($"PositionId '{configPosId}' not found.");
 
-                if (string.IsNullOrWhiteSpace(posId))
-                    rowErrors.Add("ActingInPositionId is required.");
-                else if (!positionIds.Contains(posId))
-                    rowErrors.Add($"ActingInPositionId '{posId}' not found.");
+                if (string.IsNullOrWhiteSpace(actingPosId))
+                    rowErrors.Add("ActingPositionId is required.");
+                else if (!positionIds.Contains(actingPosId))
+                    rowErrors.Add($"ActingPositionId '{actingPosId}' not found.");
 
                 DateTime startDate = default;
                 if (!TryParseDate(startRaw, out startDate))
@@ -697,10 +727,10 @@ public class PositionApprovalService : IPositionApprovalService
 
                 result.ActingAppointmentChanges.Add(new ActingAppointmentChangeDto
                 {
-                    ActingEmployeeId = empId,
-                    ActingInPositionId = posId,
-                    StartDate = startDate,
-                    EndDate = endDate
+                    PositionId      = configPosId,
+                    ActingPositionId = actingPosId,
+                    StartDate       = startDate,
+                    EndDate         = endDate
                 });
                 result.AcceptedRows++;
             }
@@ -728,6 +758,11 @@ public class PositionApprovalService : IPositionApprovalService
 
         var allEmployees = await _platinum.GetEmployeesAsync(null, ct);
         var employeeIds = new HashSet<string>(allEmployees.Select(e => e.Id), StringComparer.OrdinalIgnoreCase);
+        // Map from PositionId → first employee occupying that position (used to resolve acting appointments).
+        var employeeByPositionId = allEmployees
+            .Where(e => !string.IsNullOrEmpty(e.PositionId))
+            .GroupBy(e => e.PositionId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         var validationErrors = new List<string>();
 
@@ -738,7 +773,7 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         var confirmRelatKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var confirmBottomToTop = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var confirmBottomToTop = new Dictionary<string, (string TopId, DateTime? EndDate)>(StringComparer.OrdinalIgnoreCase);
         foreach (var r in request.ReportingRelationshipChanges)
         {
             if (!positionIds.Contains(r.PositionId))
@@ -754,11 +789,19 @@ public class PositionApprovalService : IPositionApprovalService
                 validationErrors.Add($"Reporting Relationships: duplicate entry — Top='{r.PositionId}', Bottom='{r.ReportsToPositionId}', start={r.StartDate:dd/MM/yyyy}.");
 
             // Cross-top check within the import batch.
-            if (confirmBottomToTop.TryGetValue(r.ReportsToPositionId, out var existingTopInBatch) &&
-                !existingTopInBatch.Equals(r.PositionId, StringComparison.OrdinalIgnoreCase))
-                validationErrors.Add($"Reporting Relationships: position '{r.ReportsToPositionId}' cannot be linked to both '{existingTopInBatch}' and '{r.PositionId}'. A position can only have one approver.");
+            // A dated transition is allowed: if the existing row has an EndDate and the new
+            // row's StartDate is on or after that EndDate the periods don't overlap.
+            if (confirmBottomToTop.TryGetValue(r.ReportsToPositionId, out var existingBatch) &&
+                !existingBatch.TopId.Equals(r.PositionId, StringComparison.OrdinalIgnoreCase))
+            {
+                var isNonOverlapping = existingBatch.EndDate.HasValue && r.StartDate >= existingBatch.EndDate.Value;
+                if (!isNonOverlapping)
+                    validationErrors.Add($"Reporting Relationships: position '{r.ReportsToPositionId}' cannot be linked to both '{existingBatch.TopId}' and '{r.PositionId}' with overlapping or open-ended periods. A position can only have one approver at a time.");
+                else
+                    confirmBottomToTop[r.ReportsToPositionId] = (r.PositionId, r.EndDate);
+            }
             else
-                confirmBottomToTop[r.ReportsToPositionId] = r.PositionId;
+                confirmBottomToTop[r.ReportsToPositionId] = (r.PositionId, r.EndDate);
         }
 
         // Relationship-change detection: bottom positions moving to a new top.
@@ -781,12 +824,12 @@ public class PositionApprovalService : IPositionApprovalService
 
         foreach (var a in request.ActingAppointmentChanges)
         {
-            if (!employeeIds.Contains(a.ActingEmployeeId))
-                validationErrors.Add($"Acting Appointments: ActingEmployeeId '{a.ActingEmployeeId}' is not a valid employee.");
-            if (!positionIds.Contains(a.ActingInPositionId))
-                validationErrors.Add($"Acting Appointments: ActingInPositionId '{a.ActingInPositionId}' is not a valid position.");
+            if (!positionIds.Contains(a.PositionId))
+                validationErrors.Add($"Acting Appointments: PositionId '{a.PositionId}' is not a valid position.");
+            if (!positionIds.Contains(a.ActingPositionId))
+                validationErrors.Add($"Acting Appointments: ActingPositionId '{a.ActingPositionId}' is not a valid position.");
             if (a.EndDate < a.StartDate)
-                validationErrors.Add($"Acting Appointments: EndDate before StartDate for employee '{a.ActingEmployeeId}'.");
+                validationErrors.Add($"Acting Appointments: EndDate before StartDate for PositionId '{a.PositionId}'.");
         }
 
         if (validationErrors.Count > 0)
@@ -801,14 +844,14 @@ public class PositionApprovalService : IPositionApprovalService
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         var actingByPosition = request.ActingAppointmentChanges
-            .GroupBy(a => a.ActingInPositionId, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(a => a.PositionId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         // All position IDs touched by this import across all three sheets.
         var allAffectedPositionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var c in request.PositionConfigChanges) allAffectedPositionIds.Add(c.PositionId);
         foreach (var r in request.ReportingRelationshipChanges) allAffectedPositionIds.Add(r.PositionId);
-        foreach (var a in request.ActingAppointmentChanges) allAffectedPositionIds.Add(a.ActingInPositionId);
+        foreach (var a in request.ActingAppointmentChanges) allAffectedPositionIds.Add(a.PositionId);
 
         // For positions where at least one of the three data categories is NOT
         // provided by the import, we must read the existing DB row to preserve it.
@@ -859,18 +902,28 @@ public class PositionApprovalService : IPositionApprovalService
                 reporting = existingDb?.ReportingRelationships.ToList() ?? new List<PositionReportingRelationship>();
             }
 
-            // Acting: from Sheet 3 if ActingInPositionId matches, else preserve DB, else empty.
+            // Acting: from Sheet 3 if PositionId (col A) matches, else preserve DB, else empty.
             List<TemporaryActingAppointment> acting;
             if (actingByPosition.TryGetValue(posId, out var importActs))
             {
-                acting = importActs.Select(a => new TemporaryActingAppointment
+                acting = importActs.Select(a =>
                 {
-                    ActingEmployeeId = a.ActingEmployeeId,
-                    ActingEmployeeName = string.Empty,
-                    ActingInPositionId = posId,
-                    ActingInPositionDescription = desc,
-                    StartDate = a.StartDate,
-                    EndDate = a.EndDate
+                    // ActingPositionId (col B) is the acting employee's HOME position — used
+                    // only as a search key to find the employee. It is NOT stored as
+                    // ActingInPositionId: the repo guard requires ActingInPositionId == posId
+                    // (the configured position from col A), and AssigneeResolverService keys
+                    // its acting-badge lookup by this same field.
+                    employeeByPositionId.TryGetValue(a.ActingPositionId, out var actingEmp);
+                    var configPosDesc = positionDescs.TryGetValue(posId, out var cpd) ? cpd : string.Empty;
+                    return new TemporaryActingAppointment
+                    {
+                        ActingEmployeeId            = actingEmp?.Id ?? string.Empty,
+                        ActingEmployeeName          = actingEmp?.FullName ?? string.Empty,
+                        ActingInPositionId          = posId,
+                        ActingInPositionDescription = configPosDesc,
+                        StartDate = a.StartDate,
+                        EndDate   = a.EndDate
+                    };
                 }).ToList();
             }
             else
@@ -972,5 +1025,155 @@ public class PositionApprovalService : IPositionApprovalService
         }
 
         return false;
+    }
+
+    // ── Organogram ────────────────────────────────────────────────────────────
+
+    public async Task<OrgChartDto> GetOrgChartAsync(bool gapsOnly = false, CancellationToken ct = default)
+    {
+        var allPacs      = await _repo.GetAllAsync(ct);
+        // GetPositionsAsync performs the Payroll_Position → Payroll_Employee DB join
+        // and returns EmployeeFirstName/Surname/EmployeeId on each PositionDto.
+        // GetEmployeesAsync must NOT be used here — the DB-backed integration service
+        // delegates that method to the mock, which carries fake "POS-001" position IDs
+        // that never match the real numeric position IDs used by the PAC system.
+        var allPositions = await _platinum.GetPositionsAsync(null, ct);
+        var today        = DateTime.UtcNow.Date;
+
+        // Position DTO keyed by position ID → gives us the incumbent employee for each node.
+        var posDtoById = allPositions
+            .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+            .ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+
+        // Active relationships only (within StartDate–EndDate window).
+        static bool IsActive(PositionReportingRelationship r, DateTime d) =>
+            r.StartDate.Date <= d && (r.EndDate == null || r.EndDate.Value.Date >= d);
+
+        // parentPacOf[X] = the PAC whose reporting-relationship row lists X as
+        // a subordinate, i.e. position X reports UP to that PAC.
+        var parentPacOf = new Dictionary<string, PositionApprovalConfig>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pac in allPacs)
+            foreach (var rel in pac.ReportingRelationships.Where(r => IsActive(r, today)))
+                parentPacOf[rel.ReportsToPositionId] = pac; // last-writer wins on duplicates
+
+        var pacIds = allPacs
+            .Select(p => p.PositionId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // PACs that appear in parentPacOf as a VALUE own at least one active subordinate.
+        // PACs that appear as a KEY are themselves a subordinate of another PAC.
+        // Either condition makes a PAC "connected"; the rest are islands with no active
+        // relationships and are excluded from the tree entirely.
+        var pacsWithSubordinates = parentPacOf.Values
+            .Select(p => p.PositionId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var pacsWithParents = parentPacOf.Keys
+            .Where(k => pacIds.Contains(k))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        bool IsPacConnected(string posId) =>
+            pacsWithSubordinates.Contains(posId) || pacsWithParents.Contains(posId);
+
+        // Walk the ancestor PAC chain from startPositionId; return true when a
+        // recommender is found before the chain terminates or loops.
+        bool HasRecommenderInChain(string startPositionId)
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var current = startPositionId;
+            while (parentPacOf.TryGetValue(current, out var pac))
+            {
+                if (!visited.Add(pac.PositionId)) break; // cycle guard
+                if (pac.IsOvertimeRecommender) return true;
+                current = pac.PositionId;
+            }
+            return false;
+        }
+
+        var nodes = new List<OrgChartNodeDto>(allPacs.Count * 2);
+
+        // ── PAC nodes — connected only (skip islands with no active relationships) ──
+        foreach (var pac in allPacs)
+        {
+            if (!IsPacConnected(pac.PositionId)) continue;
+
+            var parentPac = parentPacOf.TryGetValue(pac.PositionId, out var p) ? p : null;
+            posDtoById.TryGetValue(pac.PositionId, out var pacPos);
+            var pacEmpName = $"{pacPos?.EmployeeFirstName} {pacPos?.EmployeeSurname}".Trim();
+            nodes.Add(new OrgChartNodeDto
+            {
+                PositionId          = pac.PositionId,
+                PositionDescription = pac.PositionDescription ?? pac.PositionId,
+                IsRecommender       = pac.IsOvertimeRecommender,
+                IsApprover          = pac.IsOvertimeApprover,
+                IsExcessApprover    = pac.IsDepartmentExcessOvertimeApprover,
+                ParentPositionId    = parentPac?.PositionId,
+                IsPacNode           = true,
+                HasRecommenderGap   = !HasRecommenderInChain(pac.PositionId),
+                EmployeeId          = string.IsNullOrWhiteSpace(pacPos?.EmployeeId)   ? null : pacPos!.EmployeeId,
+                EmployeeName        = string.IsNullOrWhiteSpace(pacEmpName)           ? null : pacEmpName,
+            });
+        }
+
+        // ── Leaf positions (in relationships but not PAC nodes themselves) ────
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pac in allPacs)
+        {
+            foreach (var rel in pac.ReportingRelationships.Where(r => IsActive(r, today)))
+            {
+                var leafId = rel.ReportsToPositionId;
+                if (pacIds.Contains(leafId)) continue; // already emitted as a PAC node
+                if (!seen.Add(leafId))        continue; // deduplicate
+
+                posDtoById.TryGetValue(leafId, out var leafPos);
+                var leafEmpName = $"{leafPos?.EmployeeFirstName} {leafPos?.EmployeeSurname}".Trim();
+                nodes.Add(new OrgChartNodeDto
+                {
+                    PositionId          = leafId,
+                    PositionDescription = rel.ReportsToPositionDescription ?? leafId,
+                    IsPacNode           = false,
+                    ParentPositionId    = pac.PositionId,
+                    HasRecommenderGap   = !HasRecommenderInChain(leafId),
+                    EmployeeId          = string.IsNullOrWhiteSpace(leafPos?.EmployeeId)  ? null : leafPos!.EmployeeId,
+                    EmployeeName        = string.IsNullOrWhiteSpace(leafEmpName)          ? null : leafEmpName,
+                });
+            }
+        }
+
+        // ── Compute summary totals BEFORE any gapsOnly pruning ───────────────
+        var totalPac  = nodes.Count(n => n.IsPacNode);
+        var totalLeaf = nodes.Count(n => !n.IsPacNode);
+        var totalGap  = nodes.Count(n => n.HasRecommenderGap);
+
+        // ── gapsOnly: prune to just the chains that contain a gap ────────────
+        if (gapsOnly)
+        {
+            // Collect the ancestor PAC IDs for every gap node (leaf or PAC).
+            var keepPacIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var node in nodes.Where(n => n.HasRecommenderGap))
+            {
+                keepPacIds.Add(node.PositionId); // the node itself (may be a PAC)
+
+                // Walk upward through the parent PAC chain.
+                var current = node.PositionId;
+                while (parentPacOf.TryGetValue(current, out var ancestor))
+                {
+                    if (!keepPacIds.Add(ancestor.PositionId)) break; // already processed
+                    current = ancestor.PositionId;
+                }
+            }
+
+            nodes = nodes
+                .Where(n => n.HasRecommenderGap || (n.IsPacNode && keepPacIds.Contains(n.PositionId)))
+                .ToList();
+        }
+
+        return new OrgChartDto
+        {
+            Nodes         = nodes,
+            TotalPacCount = totalPac,
+            TotalLeafCount = totalLeaf,
+            TotalGapCount  = totalGap,
+        };
     }
 }

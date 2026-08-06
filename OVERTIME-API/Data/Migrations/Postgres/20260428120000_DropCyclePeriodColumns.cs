@@ -10,21 +10,13 @@ namespace PlatinumOvertime_API.Data.Migrations.Postgres
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "CycleId",
-                table: "OvertimeTransaction");
-
-            migrationBuilder.DropColumn(
-                name: "CycleName",
-                table: "OvertimeTransaction");
-
-            migrationBuilder.DropColumn(
-                name: "PeriodId",
-                table: "OvertimeTransaction");
-
-            migrationBuilder.DropColumn(
-                name: "PeriodName",
-                table: "OvertimeTransaction");
+            // Use IF EXISTS so this migration is safe whether the columns were ever
+            // added (legacy DBs where they existed before this migration was created)
+            // or were never present (fresh DBs replaying all migrations from scratch).
+            migrationBuilder.Sql(@"ALTER TABLE ""OvertimeTransaction"" DROP COLUMN IF EXISTS ""CycleId"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""OvertimeTransaction"" DROP COLUMN IF EXISTS ""CycleName"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""OvertimeTransaction"" DROP COLUMN IF EXISTS ""PeriodId"";");
+            migrationBuilder.Sql(@"ALTER TABLE ""OvertimeTransaction"" DROP COLUMN IF EXISTS ""PeriodName"";");
         }
 
         /// <inheritdoc />

@@ -23,6 +23,13 @@ public class OvertimeTransaction
     public string DepartmentId { get; set; } = string.Empty;
     public string DepartmentName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Division of the employee's position at capture time, resolved from
+    /// Payroll_Position.DivisionId → Const_Division.DivisionDesc.
+    /// Null for rows captured before this column was added.
+    /// </summary>
+    public string? DivisionName { get; set; }
+
     public string PositionId { get; set; } = string.Empty;
 
     // ---------- Legacy payroll classification (Const_*/Payroll_CyclePeriodDetails) ----------
@@ -51,6 +58,13 @@ public class OvertimeTransaction
     public int SalaryHeadId { get; set; }
     public string SalaryHeadName { get; set; } = string.Empty;
     public string FormulaSnapshot { get; set; } = string.Empty;
+    /// <summary>
+    /// The formula with variable names replaced by their actual values at capture time,
+    /// e.g. "4 * ((45 650,00 / 160,00) * 1.5)".  Null for rows captured before this
+    /// column was added.  Used by recommenders/approvers to inspect the calculation
+    /// without triggering a fresh preview API call.
+    /// </summary>
+    public string? FormulaWithValuesSnapshot { get; set; }
     public decimal Amount { get; set; }
 
     /// <summary>Hours already captured for this employee in the same counting
@@ -80,8 +94,16 @@ public class OvertimeTransaction
     // act next" without re-querying the position-approval graph.
     public string? RecommenderEmployeeId { get; set; }
     public string? RecommenderEmployeeName { get; set; }
+    /// <summary>The PositionApprovalConfig position the recommender was resolved from.
+    /// Distinct from the employee's home position when an acting appointment is in effect.</summary>
+    public string? RecommenderChainPositionId { get; set; }
+    public string? RecommenderChainPositionName { get; set; }
     public string? ApproverEmployeeId { get; set; }
     public string? ApproverEmployeeName { get; set; }
+    /// <summary>The PositionApprovalConfig position the approver was resolved from.
+    /// Distinct from the employee's home position when an acting appointment is in effect.</summary>
+    public string? ApproverChainPositionId { get; set; }
+    public string? ApproverChainPositionName { get; set; }
     public string? ExcessApproverEmployeeId { get; set; }
     public string? ExcessApproverEmployeeName { get; set; }
     public string? PayrollCapturerEmployeeId { get; set; }

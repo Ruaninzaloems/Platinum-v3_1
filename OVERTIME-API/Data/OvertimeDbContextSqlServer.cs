@@ -17,5 +17,19 @@ public class OvertimeDbContextSqlServer : OvertimeDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Explicitly pin every DateTime column to datetime2 on SQL Server.
+        // Without this, schema tools and some drivers default to datetimeoffset,
+        // which causes InvalidCastException when EF reads into DateTime properties.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                {
+                    property.SetColumnType("datetime2");
+                }
+            }
+        }
     }
 }

@@ -53,6 +53,7 @@ export interface EmployeeLookup {
   divisionName: string;
   positionId: string;
   positionDescription: string;
+  allowOverTime: boolean;
 }
 
 export interface DepartmentLookup {
@@ -142,4 +143,31 @@ export interface ConfirmImportRequest {
   positionConfigChanges: PositionConfigChange[];
   reportingRelationshipChanges: ReportingRelationshipChange[];
   actingAppointmentChanges: ActingAppointmentChange[];
+}
+
+// ── Organogram ────────────────────────────────────────────────────────────────
+
+export interface OrgChartNode {
+  positionId: string;
+  positionDescription: string;
+  isRecommender: boolean;
+  isApprover: boolean;
+  isExcessApprover: boolean;
+  /** null for root PAC nodes; populated for sub-PAC nodes and leaf positions. */
+  parentPositionId: string | null;
+  /** true = has a PositionApprovalConfig entry; false = leaf subordinate position. */
+  isPacNode: boolean;
+  /** true when no recommender exists anywhere in this position's ancestor chain. */
+  hasRecommenderGap: boolean;
+  /** Employee currently occupying this position (null = vacant or not resolved). */
+  employeeId:   string | null;
+  employeeName: string | null;
+}
+
+export interface OrgChartData {
+  nodes: OrgChartNode[];
+  /** Full-dataset totals, unaffected by gapsOnly filtering. */
+  totalPacCount:  number;
+  totalLeafCount: number;
+  totalGapCount:  number;
 }

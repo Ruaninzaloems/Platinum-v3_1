@@ -8,4 +8,6 @@ public class UpdateOvertimeConfigRequest
     public int CountingPeriodEndDay { get; set; }
     public decimal MaximumMonthlyOvertimeHours { get; set; }
     public decimal ExceptionalMaximumOvertimeHours { get; set; }
+    public string? OverridePositionId { get; set; }
+    public string? OverridePositionDescription { get; set; }
 }

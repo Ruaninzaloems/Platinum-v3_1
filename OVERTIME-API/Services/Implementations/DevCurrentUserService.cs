@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using PlatinumOvertime_API.Data;
 using PlatinumOvertime_API.Models.Domain;
 using PlatinumOvertime_API.Services.Interfaces;
@@ -66,7 +67,37 @@ public class DevUserDirectory
     private Dictionary<string, DevUser>? _byUserId;
     private Dictionary<string, DevUser>? _byEmployeeId;
 
-    public DevUserDirectory(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
+    // When true, any overtime permission that has zero rows in Sys_RolePermission
+    // is granted to all users (useful for local dev environments without seed data).
+    // Set "OvertimePermissions:FailOpen": true in appsettings.Development.json to
+    // enable. Defaults to false so production always enforces permissions strictly.
+    private readonly bool _failOpen;
+
+    // Cache TTL. When _neverExpires is true the cache lives until Invalidate() or
+    // process restart (legacy behaviour). Otherwise the cache is automatically
+    // discarded and rebuilt from the DB after _cacheTtl, so Sys_RolePermission
+    // changes take effect without restarting the API.
+    // Configured via "OvertimePermissions:CacheTtlMinutes" (default 5, 0 = never expire).
+    private readonly bool _neverExpires;
+    private readonly TimeSpan _cacheTtl;
+    private long _cacheExpiryTicks; // Volatile. 0 = not yet loaded or invalidated.
+
+    public DevUserDirectory(IServiceScopeFactory scopeFactory, IConfiguration configuration)
+    {
+        _scopeFactory = scopeFactory;
+        _failOpen = configuration.GetValue<bool>("OvertimePermissions:FailOpen");
+        var ttlMinutes = configuration.GetValue<double>("OvertimePermissions:CacheTtlMinutes", 5.0);
+        if (ttlMinutes <= 0)
+        {
+            _neverExpires = true;
+            _cacheTtl = TimeSpan.Zero;
+        }
+        else
+        {
+            _neverExpires = false;
+            _cacheTtl = TimeSpan.FromMinutes(ttlMinutes);
+        }
+    }
 
     /// <summary>
     /// Test-only constructor: skips the database load and serves the supplied
@@ -76,6 +107,8 @@ public class DevUserDirectory
     internal DevUserDirectory(IReadOnlyList<DevUser> testUsers)
     {
         _scopeFactory = null!;
+        _failOpen = false;
+        _neverExpires = true; // Test data never expires — it's fixed at construction.
         var list = testUsers.ToList();
         _byUserId = list.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
         _byEmployeeId = list
@@ -110,8 +143,14 @@ public class DevUserDirectory
     /// <summary>Drop the cached snapshot so the next read re-queries the DB.</summary>
     public void Invalidate()
     {
+        // No-op for test-mode instances (test-only constructor passes _scopeFactory = null).
+        // Test directories are pre-populated and immutable; clearing them would cause a
+        // NullReferenceException when Load() tries to open a DB scope.
+        if (_scopeFactory is null) return;
+
         lock (_lock)
         {
+            Volatile.Write(ref _cacheExpiryTicks, 0L); // force expiry on fast path
             _cache = null;
             _byUserId = null;
             _byEmployeeId = null;
@@ -123,33 +162,21 @@ public class DevUserDirectory
     private const int PermissionPayroll = 3202;
     private const int PermissionEnquiry = 3203;
 
+    private bool CacheIsValid() =>
+        _cache != null &&
+        (_neverExpires || DateTime.UtcNow.Ticks < Volatile.Read(ref _cacheExpiryTicks));
+
     private List<DevUser> Load()
     {
-        if (_cache != null) return _cache;
+        if (CacheIsValid()) return _cache!;
         lock (_lock)
         {
-            if (_cache != null) return _cache;
+            if (CacheIsValid()) return _cache!;
+            // Expired or first load — clear stale data before rebuilding.
+            _cache = null;
+            _byUserId = null;
+            _byEmployeeId = null;
 
-            try
-            {
-                return LoadFromDb();
-            }
-            catch (Exception)
-            {
-                // DB tables are missing (e.g. dev seeders were skipped) — fall
-                // back to a single hard-coded admin so /api/me and the
-                // SessionAuthFilter still work without login.
-                var fallback = new List<DevUser> { FallbackUser };
-                _byUserId = fallback.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
-                _byEmployeeId = new Dictionary<string, DevUser>(StringComparer.OrdinalIgnoreCase);
-                Volatile.Write(ref _cache, fallback);
-                return fallback;
-            }
-        }
-    }
-
-    private List<DevUser> LoadFromDb()
-    {
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
 
@@ -257,31 +284,33 @@ public class DevUserDirectory
                     IsApprover = cfg?.IsOvertimeApprover ?? false,
                     IsExcessApprover = cfg?.IsDepartmentExcessOvertimeApprover ?? false,
 
-                    // Payroll roles aren't modelled in PositionApprovalConfig
-                    // yet, so leave them on for every dev user. This keeps
-                    // the full Capture → Recommend → Approve → Payroll chain
-                    // testable from any seeded persona without forcing the
-                    // tester to remember which row owns payroll today.
-                    IsPayrollCapturer = true,
-                    IsPayrollApprover = true,
+                    // Payroll-side visibility (salary amounts, formula values) is
+                    // gated by PermissionPayroll (3202). This flag controls whether the
+                    // user sees salary figures — it must NEVER fall back to _failOpen,
+                    // because salary data is sensitive even in development. An unseeded
+                    // dev DB is not a reason to expose real salary figures to everyone.
+                    IsPayrollCapturer = perms?.Contains(PermissionPayroll) ?? false,
+                    IsPayrollApprover = perms?.Contains(PermissionPayroll) ?? false,
 
                     // Page-access: derived from User_UserRoles → Sys_RolePermission.
-                    // For each permission: if any row exists in the seed we enforce
-                    // it strictly per-user; if the permission is absent from the seed
-                    // entirely we grant it unconditionally so the page stays testable
-                    // without requiring complete seed data.
+                    // For each permission: if any row exists in the DB we enforce
+                    // it strictly per-user. If no rows exist at all we fall back to
+                    // _failOpen (true only in Development via appsettings.Development.json
+                    // "OvertimePermissions:FailOpen": true) so local dev environments
+                    // without seed data stay usable. In production _failOpen is false,
+                    // meaning an unconfigured permission denies access to everyone.
                     CanAccessConfig = hasConfigInSeed
                         ? (perms?.Contains(PermissionConfig) ?? false)
-                        : true,
+                        : _failOpen,
                     CanAccessCapture = hasCaptureInSeed
                         ? (perms?.Contains(PermissionCapture) ?? false)
-                        : true,
+                        : _failOpen,
                     CanAccessPayroll = hasPayrollInSeed
                         ? (perms?.Contains(PermissionPayroll) ?? false)
-                        : true,
+                        : _failOpen,
                     CanAccessEnquiry = hasEnquiryInSeed
                         ? (perms?.Contains(PermissionEnquiry) ?? false)
-                        : true
+                        : _failOpen
                 };
             }).ToList();
 
@@ -327,32 +356,34 @@ public class DevUserDirectory
                     IsPayrollApprover = isSu,
                     CanAccessConfig = hasConfigInSeed
                         ? (perms?.Contains(PermissionConfig) ?? isSu)
-                        : true,
+                        : _failOpen || isSu,
                     CanAccessCapture = hasCaptureInSeed
                         ? (perms?.Contains(PermissionCapture) ?? isSu)
-                        : true,
+                        : _failOpen || isSu,
                     CanAccessPayroll = hasPayrollInSeed
                         ? (perms?.Contains(PermissionPayroll) ?? isSu)
-                        : true,
+                        : _failOpen || isSu,
                     CanAccessEnquiry = hasEnquiryInSeed
                         ? (perms?.Contains(PermissionEnquiry) ?? isSu)
-                        : true,
+                        : _failOpen || isSu,
                 };
             }).ToList();
 
             var users = employeeUsers.Concat(nonEmpUsers).ToList();
 
             // Publish dictionaries BEFORE _cache so the lock-free fast path
-            // (`if (_cache != null) return _cache;`) never observes a non-null
-            // _cache while _byUserId / _byEmployeeId are still null. Without
-            // this ordering a concurrent first-load FindByUserId() could NRE
-            // dereferencing the lookup tables.
+            // (CacheIsValid()) never observes a non-null _cache while _byUserId /
+            // _byEmployeeId are still null. Set the expiry ticks before publishing
+            // _cache for the same reason — the fast path reads expiry first.
             _byUserId = users.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
             _byEmployeeId = users
                 .GroupBy(u => u.EmployeeId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            var expiryTicks = _neverExpires ? long.MaxValue : DateTime.UtcNow.Add(_cacheTtl).Ticks;
+            Volatile.Write(ref _cacheExpiryTicks, expiryTicks);
             Volatile.Write(ref _cache, users);
             return users;
+        }
     }
 
     private static string JoinNonEmpty(params string?[] parts) =>

@@ -69,14 +69,21 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
         var positionIds = positions.Select(p => p.PositionId).ToHashSet();
 
         // One query for all incumbent employees in this result set.
-        var empsByPositionId = await db.PayrollEmployees
-            .AsNoTracking()
-            .Where(e => e.PositionId.HasValue && positionIds.Contains(e.PositionId!.Value))
-            .Select(e => new { e.PositionId, e.EmployeeId, e.EmpCode, e.FirstName, e.Surname })
-            .ToListAsync(ct);
-        var empMap = empsByPositionId
-            .GroupBy(e => e.PositionId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
+        // Incumbent employees — key on the EmployeeId stored directly on each position row.
+        // Positions with EmployeeId == null are vacant; skip them to avoid stale records.
+        var occupiedEmpIds = positions
+            .Where(p => p.EmployeeId.HasValue)
+            .Select(p => p.EmployeeId!.Value)
+            .Distinct()
+            .ToList();
+        var empsByEmpId = occupiedEmpIds.Count > 0
+            ? (await db.PayrollEmployees
+                .AsNoTracking()
+                .Where(e => occupiedEmpIds.Contains(e.EmployeeId))
+                .Select(e => new { e.EmployeeId, e.EmpCode, e.FirstName, e.Surname })
+                .ToListAsync(ct))
+              .ToDictionary(e => e.EmployeeId)
+            : [];
 
         // One query for all departments referenced by this result set.
         var deptIds = positions
@@ -91,10 +98,24 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
                 .ToDictionaryAsync(d => d.DepartmentId, d => d.DepartmentDesc ?? string.Empty, ct)
             : new Dictionary<int, string>();
 
+        // One query for all divisions referenced by this result set.
+        var divIds = positions
+            .Where(p => p.DivisionId.HasValue)
+            .Select(p => p.DivisionId!.Value)
+            .Distinct()
+            .ToList();
+        var divMap = divIds.Count > 0
+            ? await db.ConstDivisions
+                .AsNoTracking()
+                .Where(d => divIds.Contains(d.DivisionId))
+                .ToDictionaryAsync(d => d.DivisionId, d => d.DivisionDesc ?? string.Empty, ct)
+            : new Dictionary<int, string>();
+
         var result = positions.Select(p =>
         {
-            empMap.TryGetValue(p.PositionId, out var emp);
+            var emp = p.EmployeeId.HasValue && empsByEmpId.TryGetValue(p.EmployeeId.Value, out var e) ? e : null;
             var deptName = p.DepartmentId.HasValue && deptMap.TryGetValue(p.DepartmentId.Value, out var dn) ? dn : string.Empty;
+            var divName  = p.DivisionId.HasValue  && divMap.TryGetValue(p.DivisionId.Value,  out var dv) ? dv  : string.Empty;
             return new PositionDto
             {
                 Id = p.PositionId.ToString(),
@@ -102,6 +123,7 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
                 Description = p.PositionDesc ?? string.Empty,
                 DepartmentId = p.DepartmentId.HasValue ? p.DepartmentId.Value.ToString() : string.Empty,
                 DepartmentName = deptName,
+                DivisionName = divName,
                 EmployeeId = emp != null ? emp.EmployeeId.ToString() : string.Empty,
                 EmployeeCode = emp?.EmpCode ?? string.Empty,
                 EmployeeFirstName = emp?.FirstName ?? string.Empty,
@@ -287,13 +309,22 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
         var divCodeMap = divRows.ToDictionary(d => d.DivisionId, d => d.DivisionCode ?? string.Empty);
         var divNameMap = divRows.ToDictionary(d => d.DivisionId, d => d.DivisionDesc ?? string.Empty);
 
-        // Incumbent employees (one per position)
-        var empList = await db.PayrollEmployees.AsNoTracking()
-            .Where(e => e.PositionId.HasValue && pageIds2.Contains(e.PositionId!.Value))
-            .ToListAsync(ct);
-        var empByPos = empList
-            .GroupBy(e => e.PositionId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
+        // Incumbent employees — only look up positions that have an EmployeeId set on the
+        // position row itself. A null EmployeeId means the position is vacant; we avoid
+        // pulling in any stale employee records by keying on the stored EmployeeId rather
+        // than matching by PositionId (which can return multiple/terminated employees).
+        var occupiedEmployeeIds = pagePositions
+            .Where(p => p.EmployeeId.HasValue)
+            .Select(p => p.EmployeeId!.Value)
+            .Distinct()
+            .ToList();
+        var empList = occupiedEmployeeIds.Count > 0
+            ? await db.PayrollEmployees.AsNoTracking()
+                .Where(e => occupiedEmployeeIds.Contains(e.EmployeeId))
+                .ToListAsync(ct)
+            : [];
+        // Key by EmployeeId so we can look up by the position's stored EmployeeId directly.
+        var empById = empList.ToDictionary(e => e.EmployeeId);
 
         // ReportsTo descriptions — flat join, no correlated subquery
         var reportsToEntries = await (
@@ -311,7 +342,7 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
 
         var items = pagePositions.Select(p =>
         {
-            empByPos.TryGetValue(p.PositionId, out var emp);
+            var emp = p.EmployeeId.HasValue && empById.TryGetValue(p.EmployeeId.Value, out var e) ? e : null;
             var deptName = p.DepartmentId.HasValue && deptMap.TryGetValue(p.DepartmentId.Value, out var dn) ? dn : string.Empty;
             var divCode = p.DivisionId.HasValue && divCodeMap.TryGetValue(p.DivisionId.Value, out var dc) ? dc : string.Empty;
             var divName = p.DivisionId.HasValue && divNameMap.TryGetValue(p.DivisionId.Value, out var dv) ? dv : string.Empty;
@@ -390,12 +421,14 @@ public class DbPositionsPlatinumIntegrationService : IPlatinumIntegrationService
             (p.PositionDesc != null && p.PositionDesc.ToLower().Contains(lower)) ||
             (p.PositionCode != null && p.PositionCode.ToLower().Contains(lower)) ||
             (idTerm != 0 && p.PositionId == idTerm) ||
-            db.PayrollEmployees.Any(e =>
-                e.PositionId == p.PositionId &&
+            // Only match the incumbent stored on the position row (p.EmployeeId);
+            // vacant positions (EmployeeId == null) are never returned by a name search.
+            (p.EmployeeId != null && db.PayrollEmployees.Any(e =>
+                e.EmployeeId == p.EmployeeId &&
                 (
                     (e.FirstName != null && e.FirstName.ToLower().Contains(lower)) ||
                     (e.Surname != null && e.Surname.ToLower().Contains(lower)) ||
                     (e.EmpCode != null && e.EmpCode.ToLower().Contains(lower))
-                )));
+                ))));
     }
 }

@@ -43,6 +43,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LookupService } from '../../../../core/services/lookup.service';
 import { PositionApprovalService } from '../../../../core/services/position-approval.service';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
+import { UserContextService } from '../../../../core/services/user-context.service';
 import {
   ActingAppointment, EmployeeLookup, ImportRowError, ImportValidationResult,
   PositionApprovalConfig, PositionListItem, PositionLookup, PositionStatusFilter,
@@ -101,6 +102,7 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
   private snack = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private userCtx = inject(UserContextService);
 
   // Module-level gating flag (Business Rule #1).
   multipleApprovalEnabled = signal<boolean>(false);
@@ -159,7 +161,17 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
     for (const p of this.allPositions()) m.set(p.id, p);
     return m;
   });
-  actingDisplayedColumns = ['position', 'empId', 'empCode', 'empFirstName', 'empSurname', 'startDate', 'endDate', 'actions'];
+
+  // O(1) lookup: employeeId → EmployeeLookup.
+  // Used to display the correct acting employee info regardless of actingInPositionId,
+  // which the backend always overrides to the configured position.
+  employeeMapById = computed(() => {
+    const m = new Map<string, EmployeeLookup>();
+    for (const e of this.allEmployees()) m.set(e.id, e);
+    return m;
+  });
+
+  actingDisplayedColumns = ['position', 'empId', 'empCode', 'empName', 'startDate', 'endDate', 'actions'];
 
   form: FormGroup<PositionApprovalForm> = this.fb.group<PositionApprovalForm>({
     isOvertimeRecommender: this.fb.nonNullable.control(false),
@@ -606,8 +618,12 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
       actingAppointments: v.actingAppointments.map((a): ActingAppointment => ({
         actingEmployeeId: a.actingEmployeeId,
         actingEmployeeName: a.actingEmployeeName,
-        actingInPositionId: a.actingInPositionId,
-        actingInPositionDescription: a.actingInPositionDescription,
+        // ActingInPositionId must always equal the config position — the backend
+        // enforces this FK constraint, and OvertimeTransactionsService keys its
+        // acting-lookup by this field. Always force it to the selected position
+        // regardless of what the employee picker may have stored.
+        actingInPositionId: pos.id,
+        actingInPositionDescription: this.selectedPositionDescription(),
         startDate: a.startDate ? a.startDate.toISOString() : new Date().toISOString(),
         // Acting endDate is required on the API. The open-ended sentinel
         // is sent as the sentinel ISO so it round-trips unchanged.
@@ -626,6 +642,10 @@ export class PositionApprovalSetupComponent implements OnInit, AfterViewInit {
         this.refreshSummary();
         this.loadList();
         this.backToList();
+        // Re-fetch the current user's profile so that role-dependent UI (amount
+        // visibility, approval buttons, etc.) reflects the new flags immediately
+        // without requiring a page reload or re-login.
+        void this.userCtx.refresh();
       },
       error: err => {
         this.saving.set(false);

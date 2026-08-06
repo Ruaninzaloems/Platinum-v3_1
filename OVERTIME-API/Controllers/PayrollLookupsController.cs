@@ -114,7 +114,9 @@ public class PayrollLookupsController : ControllerBase
                 p.FinancialYear,
                 p.TaxYear,
                 p.CycleId,
-                p.CycleModeId
+                p.CycleModeId,
+                p.PeriodStartDate,
+                p.PeriodEndDate
             })
             .ToListAsync(ct);
 
@@ -127,6 +129,8 @@ public class PayrollLookupsController : ControllerBase
             TaxYear         = p.TaxYear,
             CycleId         = p.CycleId,
             CycleModeId     = p.CycleModeId,
+            PeriodStartDate = p.PeriodStartDate,
+            PeriodEndDate   = p.PeriodEndDate,
             DisplayName     = BuildPeriodDisplay(p.ProcessingMonth, p.TaxYear ?? p.FinancialYear, p.CycleModeId)
         }).ToList();
 
@@ -191,6 +195,8 @@ public class PayrollLookupsController : ControllerBase
                 TaxYear         = p.TaxYear,
                 CycleId         = p.CycleId,
                 CycleModeId     = p.CycleModeId,
+                PeriodStartDate = p.PeriodStartDate,
+                PeriodEndDate   = p.PeriodEndDate,
                 DisplayName     = BuildPeriodDisplay(p.ProcessingMonth, p.TaxYear ?? p.FinancialYear, p.CycleModeId)
             })
             .ToList();

@@ -147,9 +147,13 @@ builder.Services.AddScoped<UserUserDetailSeeder>();
 builder.Services.AddScoped<UserUserRoleSeeder>();
 builder.Services.AddScoped<SysRolePermissionSeeder>();
 builder.Services.AddScoped<PayrollEmployeeOvertimeSeeder>();
+builder.Services.AddScoped<ConstPayrollCycleModeSeeder>();
 
 // ---------- Schema upgrader for OvertimeTransaction (idempotent ALTERs) ----------
 builder.Services.AddScoped<OvertimeCaptureSchemaUpgrader>();
+// Idempotent back-fills for pre-existing transactions (new chain-position + division-name columns).
+builder.Services.AddScoped<OvertimeChainPositionBackfillService>();
+builder.Services.AddScoped<OvertimeDivisionNameBackfillService>();
 
 // ---------- Current-user shim (X-User-Id header → DevUserDirectory) ----------
 builder.Services.AddHttpContextAccessor();
@@ -251,6 +255,8 @@ using (var scope = app.Services.CreateScope())
     {
         logger.LogInformation("Seeding:SkipOnStartup=true — skipping all dev data seeders.");
         await RunSeeder("OvertimeCaptureSchema", () => scope.ServiceProvider.GetRequiredService<OvertimeCaptureSchemaUpgrader>().UpgradeAsync());
+        await RunSeeder("ChainPositionBackfill", () => scope.ServiceProvider.GetRequiredService<OvertimeChainPositionBackfillService>().BackfillAsync());
+        await RunSeeder("DivisionNameBackfill", () => scope.ServiceProvider.GetRequiredService<OvertimeDivisionNameBackfillService>().BackfillAsync());
     }
     else
     {
@@ -259,6 +265,7 @@ using (var scope = app.Services.CreateScope())
         await RunSeeder("SalaryHead", () => scope.ServiceProvider.GetRequiredService<SalaryHeadDataSeeder>().SeedIfNeededAsync());
         await RunSeeder("AAAAConfigSettings", () => scope.ServiceProvider.GetRequiredService<AAAAConfigSettingsSeeder>().SeedIfNeededAsync());
         await RunSeeder("ConstCycle", () => scope.ServiceProvider.GetRequiredService<ConstCycleSeeder>().SeedIfNeededAsync());
+        await RunSeeder("ConstPayrollCycleMode", () => scope.ServiceProvider.GetRequiredService<ConstPayrollCycleModeSeeder>().SeedIfNeededAsync());
         await RunSeeder("ConstDepartment", () => scope.ServiceProvider.GetRequiredService<ConstDepartmentSeeder>().SeedIfNeededAsync());
         await RunSeeder("ConstDivision", () => scope.ServiceProvider.GetRequiredService<ConstDivisionSeeder>().SeedIfNeededAsync());
         await RunSeeder("PayrollCyclePeriodDetails", () => scope.ServiceProvider.GetRequiredService<PayrollCyclePeriodDetailsSeeder>().SeedIfNeededAsync());
@@ -267,6 +274,8 @@ using (var scope = app.Services.CreateScope())
         await RunSeeder("SysRolePermission", () => scope.ServiceProvider.GetRequiredService<SysRolePermissionSeeder>().SeedIfNeededAsync());
         await RunSeeder("PayrollEmployeeOvertime", () => scope.ServiceProvider.GetRequiredService<PayrollEmployeeOvertimeSeeder>().SeedIfNeededAsync());
         await RunSeeder("OvertimeCaptureSchema", () => scope.ServiceProvider.GetRequiredService<OvertimeCaptureSchemaUpgrader>().UpgradeAsync());
+        await RunSeeder("ChainPositionBackfill", () => scope.ServiceProvider.GetRequiredService<OvertimeChainPositionBackfillService>().BackfillAsync());
+        await RunSeeder("DivisionNameBackfill", () => scope.ServiceProvider.GetRequiredService<OvertimeDivisionNameBackfillService>().BackfillAsync());
     }
 }
 

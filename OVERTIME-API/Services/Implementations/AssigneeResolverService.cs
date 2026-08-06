@@ -35,7 +35,9 @@ namespace PlatinumOvertime_API.Services.Implementations;
 ///   Employee in 1911  →  Recommender = 1561,  Approver = 681
 ///   Employee in 1561  →  Recommender = 681,   Approver = 541
 ///
-/// Acting appointments and dev-user fallbacks are honoured as before.
+/// When the chain walk cannot find a recommender or approver the bundle's
+/// ChainError property is set with a human-readable explanation and the
+/// submission must be rejected.  No fallback user is substituted.
 /// </summary>
 public class AssigneeResolverService : IAssigneeResolverService
 {
@@ -45,7 +47,7 @@ public class AssigneeResolverService : IAssigneeResolverService
     public AssigneeResolverService(OvertimeDbContext db, DevUserDirectory users)
     { _db = db; _users = users; }
 
-    public async Task<AssigneeBundle> ResolveAsync(string capturedForPositionId, CancellationToken ct = default)
+    public async Task<AssigneeBundle> ResolveAsync(string capturedForPositionId, DateTime? asOf = null, CancellationToken ct = default)
     {
         var configs = await _db.PositionApprovalConfigs
             .Include(c => c.ReportingRelationships)
@@ -54,7 +56,7 @@ public class AssigneeResolverService : IAssigneeResolverService
             .ToListAsync(ct);
 
         var byPosId = configs.ToDictionary(c => c.PositionId, StringComparer.OrdinalIgnoreCase);
-        var now = DateTime.UtcNow;
+        var now = asOf ?? DateTime.UtcNow;
 
         // Returns the parent position ID of the given child position by REVERSE
         // lookup: scan all configs and find the one that lists childPositionId in
@@ -72,41 +74,47 @@ public class AssigneeResolverService : IAssigneeResolverService
 
         // Resolves the DevUser for a winning position, honouring any active
         // TemporaryActingAppointment that covers the winning position.
-        DevUser? ResolveUser(Models.Domain.PositionApprovalConfig winningCfg)
+        // Returns (user, isActing) where isActing is true when an acting appointment filled the seat.
+        (DevUser? User, bool IsActing) ResolveUser(Models.Domain.PositionApprovalConfig winningCfg)
         {
             var posId = winningCfg.PositionId;
+            // The appointment is already scoped to this config via PositionApprovalConfigId,
+            // so we only need to check the date range — no ActingInPositionId filter needed.
             var acting = winningCfg.ActingAppointments
-                .FirstOrDefault(a => a.ActingInPositionId == posId
-                                     && a.StartDate <= now && a.EndDate >= now);
+                .FirstOrDefault(a => a.StartDate <= now && a.EndDate >= now);
             if (acting != null)
             {
                 var actingUser = _users.All.FirstOrDefault(u =>
                     string.Equals(u.EmployeeId, acting.ActingEmployeeId, StringComparison.OrdinalIgnoreCase));
-                if (actingUser != null) return actingUser;
+                if (actingUser != null) return (actingUser, true);
             }
-            return _users.All.FirstOrDefault(u =>
-                string.Equals(u.PositionId, posId, StringComparison.OrdinalIgnoreCase));
+            return (_users.All.FirstOrDefault(u =>
+                string.Equals(u.PositionId, posId, StringComparison.OrdinalIgnoreCase)), false);
         }
 
         // Walk upward starting AT startPositionId (inclusive) until a position
-        // matching the predicate is found. Returns (user, resolvedPositionId).
+        // matching the predicate is found. Returns (user, resolvedPositionId, isActing).
         // "Upward" is found via GetParentId's reverse lookup at each hop.
         // Callers pass GetParentId(x) to skip position x itself and begin at
         // x's immediate superior.
-        (DevUser? User, string? PositionId) WalkFrom(string? startPositionId, Func<Models.Domain.PositionApprovalConfig, bool> match)
+        (DevUser? User, string? PositionId, bool IsActing) WalkFrom(string? startPositionId, Func<Models.Domain.PositionApprovalConfig, bool> match)
         {
             var current = startPositionId;
             for (var hop = 0; hop < 16; hop++)
             {
-                if (string.IsNullOrWhiteSpace(current)) return (null, null);
-                if (!byPosId.TryGetValue(current, out var cfg)) return (null, null);
-                if (match(cfg)) return (ResolveUser(cfg), cfg.PositionId);
+                if (string.IsNullOrWhiteSpace(current)) return (null, null, false);
+                if (!byPosId.TryGetValue(current, out var cfg)) return (null, null, false);
+                if (match(cfg))
+                {
+                    var (user, isActing) = ResolveUser(cfg);
+                    return (user, cfg.PositionId, isActing);
+                }
 
                 // Move upward via reverse lookup (find which config lists 'current'
                 // in its relationships — that config is 'current's superior).
                 current = GetParentId(current);
             }
-            return (null, null);
+            return (null, null, false);
         }
 
         // --- Chained resolution --------------------------------------------------
@@ -116,26 +124,52 @@ public class AssigneeResolverService : IAssigneeResolverService
         // higher candidate exists.
 
         // Step 1: Recommender — start from the parent of the employee's position.
-        var (recommender, recommenderPosId) =
+        var (recommender, recommenderPosId, recommenderIsActing) =
             WalkFrom(GetParentId(capturedForPositionId), c => c.IsOvertimeRecommender);
 
         // Step 2: Approver — start from the parent of the recommender's position.
-        var (approver, approverPosId) =
+        var (approver, approverPosId, approverIsActing) =
             WalkFrom(GetParentId(recommenderPosId), c => c.IsOvertimeApprover);
 
         // Step 3: ExcessApprover — start from the parent of the approver's position.
-        var (excessApprover, _) =
+        var (excessApprover, _, _) =
             WalkFrom(GetParentId(approverPosId), c => c.IsDepartmentExcessOvertimeApprover);
 
-        // Fall back to the first dev-user with the matching role flag when the
-        // position graph yields nothing (e.g. chain not yet fully configured).
+        // Build a human-readable error when the chain is incomplete.
+        // No fallback user is substituted — a random assignment is worse than a clear error.
+        string? chainError = null;
+        if (recommender is null && approver is null)
+            chainError = $"No recommender or approver is configured for position {capturedForPositionId}. " +
+                         "Please contact your system administrator to set up the approval chain in Position Approval Setup.";
+        else if (recommender is null)
+            chainError = $"No recommender is configured for position {capturedForPositionId}. " +
+                         "Please contact your system administrator to set up the approval chain in Position Approval Setup.";
+        else if (approver is null)
+            chainError = $"No approver is configured for position {capturedForPositionId} " +
+                         "(recommender was resolved but the chain ends there). " +
+                         "Please contact your system administrator to set up the approval chain in Position Approval Setup.";
+
+        // Surface the chain position (PositionApprovalConfig) that each role was
+        // resolved from so callers can snapshot it and display the correct role
+        // label — even when an acting employee fills the seat and their home
+        // position differs from the approval-chain position.
+        byPosId.TryGetValue(recommenderPosId ?? string.Empty, out var recommenderCfg);
+        byPosId.TryGetValue(approverPosId    ?? string.Empty, out var approverCfg);
+
         return new AssigneeBundle
         {
-            Recommender    = recommender   ?? _users.All.FirstOrDefault(u => u.IsRecommender),
-            Approver       = approver      ?? _users.All.FirstOrDefault(u => u.IsApprover),
-            ExcessApprover = excessApprover ?? _users.All.FirstOrDefault(u => u.IsExcessApprover),
+            Recommender                    = recommender,
+            RecommenderIsActing            = recommenderIsActing,
+            RecommenderPositionId          = recommenderCfg?.PositionId,
+            RecommenderPositionDescription = recommenderCfg?.PositionDescription,
+            Approver                       = approver,
+            ApproverIsActing               = approverIsActing,
+            ApproverPositionId             = approverCfg?.PositionId,
+            ApproverPositionDescription    = approverCfg?.PositionDescription,
+            ExcessApprover  = excessApprover ?? _users.All.FirstOrDefault(u => u.IsExcessApprover),
             PayrollCapturer = _users.All.FirstOrDefault(u => u.IsPayrollCapturer),
             PayrollApprover = _users.All.FirstOrDefault(u => u.IsPayrollApprover),
+            ChainError      = chainError,
         };
     }
 }

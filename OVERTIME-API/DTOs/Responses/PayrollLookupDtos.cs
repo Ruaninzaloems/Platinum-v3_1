@@ -52,5 +52,7 @@ public class PayrollCyclePeriodDto
     public string? TaxYear { get; set; }
     public int? CycleId { get; set; }
     public int? CycleModeId { get; set; }
+    public DateTime? PeriodStartDate { get; set; }
+    public DateTime? PeriodEndDate { get; set; }
     public string DisplayName { get; set; } = string.Empty;
 }

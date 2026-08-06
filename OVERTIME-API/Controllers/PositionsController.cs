@@ -68,6 +68,18 @@ public class PositionsController : ControllerBase
             : Ok(ApiResponse<object>.Success(p));
     }
 
+    /// <summary>
+    /// Returns a flat list of all configured positions and their leaf
+    /// subordinate positions, with role flags and a HasRecommenderGap flag so
+    /// the client can render an interactive organogram that highlights broken
+    /// approval chains.
+    /// </summary>
+    [HttpGet("organogram")]
+    public async Task<IActionResult> GetOrgChart(
+        [FromQuery] bool gapsOnly = false,
+        CancellationToken ct = default)
+        => Ok(ApiResponse<object>.Success(await _approval.GetOrgChartAsync(gapsOnly, ct)));
+
     [HttpGet("{id}/approval-config")]
     public async Task<IActionResult> GetApprovalConfig(string id, CancellationToken ct)
         => Ok(ApiResponse<object>.Success(await _approval.GetByPositionIdAsync(id, ct)));
@@ -95,7 +107,7 @@ public class PositionsController : ControllerBase
     public async Task<IActionResult> DownloadImportTemplate(CancellationToken ct)
     {
         var bytes = await _approval.GenerateImportTemplateAsync(ct);
-        var fileName = $"PositionApprovalConfig_Template_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+        var fileName = "position-config.xlsx";
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 

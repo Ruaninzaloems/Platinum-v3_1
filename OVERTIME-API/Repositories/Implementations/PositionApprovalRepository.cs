@@ -47,12 +47,15 @@ public class PositionApprovalRepository : IPositionApprovalRepository
 
                 if (existing is null)
                 {
+                    ValidateActingAppointments(config.ActingAppointments, config.PositionId);
                     config.CreatedAt = DateTime.UtcNow;
                     config.UpdatedAt = DateTime.UtcNow;
                     _db.PositionApprovalConfigs.Add(config);
                 }
                 else
                 {
+                    ValidateActingAppointments(config.ActingAppointments, existing.PositionId);
+
                     existing.PositionDescription = config.PositionDescription;
                     existing.IsOvertimeRecommender = config.IsOvertimeRecommender;
                     existing.IsOvertimeApprover = config.IsOvertimeApprover;
@@ -103,12 +106,15 @@ public class PositionApprovalRepository : IPositionApprovalRepository
 
         if (existing is null)
         {
+            ValidateActingAppointments(config.ActingAppointments, config.PositionId);
             config.CreatedAt = DateTime.UtcNow;
             config.UpdatedAt = DateTime.UtcNow;
             _db.PositionApprovalConfigs.Add(config);
             await _db.SaveChangesAsync(ct);
             return config;
         }
+
+        ValidateActingAppointments(config.ActingAppointments, existing.PositionId);
 
         existing.PositionDescription = config.PositionDescription;
         existing.IsOvertimeRecommender = config.IsOvertimeRecommender;
@@ -138,5 +144,26 @@ public class PositionApprovalRepository : IPositionApprovalRepository
 
         await _db.SaveChangesAsync(ct);
         return existing;
+    }
+
+    /// <summary>
+    /// Enforces the invariant: every TemporaryActingAppointment stored under a
+    /// PositionApprovalConfig must have ActingInPositionId equal to that
+    /// config's PositionId.  The PositionApprovalConfigId FK is derived from
+    /// this relationship; if the two diverge, the acting badge resolution in
+    /// AssigneeResolverService will silently fail.
+    /// </summary>
+    private static void ValidateActingAppointments(
+        IEnumerable<TemporaryActingAppointment> appointments,
+        string configPositionId)
+    {
+        foreach (var a in appointments)
+        {
+            if (!string.Equals(a.ActingInPositionId, configPositionId, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException(
+                    $"Acting appointment has ActingInPositionId '{a.ActingInPositionId}' but is being saved " +
+                    $"under config for position '{configPositionId}'. These must match: the appointment must " +
+                    $"belong to the PositionApprovalConfig for the position being acted into.");
+        }
     }
 }

@@ -33,9 +33,15 @@ public class ExceptionHandlingMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");
-            // Internal exception details are logged server-side only. Clients
-            // receive a generic message to avoid information disclosure.
-            await Write(ctx, HttpStatusCode.InternalServerError, "An unexpected error occurred.", null);
+            // TEMP DIAGNOSTIC: expose exception type + message in errors[] so it
+            // is visible in the browser Network → Response tab without needing
+            // Azure Log Stream access. Revert once root cause is identified.
+            var detail = new[]
+            {
+                $"[{ex.GetType().Name}] {ex.Message}",
+                ex.InnerException != null ? $"Inner: [{ex.InnerException.GetType().Name}] {ex.InnerException.Message}" : null
+            }.Where(s => s != null).Cast<string>().ToArray();
+            await Write(ctx, HttpStatusCode.InternalServerError, "An unexpected error occurred.", detail);
         }
     }
 

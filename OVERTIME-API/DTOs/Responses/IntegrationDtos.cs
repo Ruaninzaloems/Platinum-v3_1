@@ -13,6 +13,7 @@ public class EmployeeDto
     public string DivisionName { get; set; } = string.Empty;
     public string PositionId { get; set; } = string.Empty;
     public string PositionDescription { get; set; } = string.Empty;
+    public bool AllowOverTime { get; set; } = true;
 }
 
 public class PositionDto
@@ -22,6 +23,12 @@ public class PositionDto
     public string Description { get; set; } = string.Empty;
     public string DepartmentId { get; set; } = string.Empty;
     public string DepartmentName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Division that owns this position, resolved from Const_Division via the
+    /// position's DivisionId. Empty when no division is configured.
+    /// </summary>
+    public string DivisionName { get; set; } = string.Empty;
 
     /// <summary>
     /// Incumbent employee for this position. All four fields are empty

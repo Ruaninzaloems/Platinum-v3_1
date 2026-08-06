@@ -19,8 +19,8 @@ public class ReportingRelationshipChangeDto
 
 public class ActingAppointmentChangeDto
 {
-    public string ActingEmployeeId { get; set; } = string.Empty;
-    public string ActingInPositionId { get; set; } = string.Empty;
+    public string PositionId { get; set; } = string.Empty;
+    public string ActingPositionId { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
 }

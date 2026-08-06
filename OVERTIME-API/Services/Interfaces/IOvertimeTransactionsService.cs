@@ -18,4 +18,5 @@ public interface IOvertimeTransactionsService
     Task<ApiResponse<List<OvertimeTypeOption>>> GetOvertimeTypesForEmployeeAsync(string employeeId, CancellationToken ct = default);
     Task<ApiResponse<OvertimeDocumentDto>> UploadDocumentAsync(Guid transactionId, IFormFile file, CancellationToken ct = default);
     Task<(byte[] Bytes, string ContentType, string FileName)?> DownloadDocumentAsync(Guid transactionId, Guid documentId, CancellationToken ct = default);
+    Task<ApiResponse<bool>> DeleteDocumentAsync(Guid transactionId, Guid documentId, CancellationToken ct = default);
 }

@@ -23,6 +23,17 @@ public class OvertimeConfig
 
     public decimal ExceptionalMaximumOvertimeHours { get; set; } = 60m;
 
+    /// <summary>
+    /// Optional. When set, the employee currently holding this position acts as a
+    /// system-wide master approver: they can recommend, approve, return, or reject
+    /// any overtime transaction regardless of the normal approval chain.
+    /// Stored as the string form of the Payroll_Position.Position_ID integer.
+    /// </summary>
+    public string? OverridePositionId { get; set; }
+
+    /// <summary>Snapshot of the position description at the time it was saved.</summary>
+    public string? OverridePositionDescription { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string? UpdatedBy { get; set; }

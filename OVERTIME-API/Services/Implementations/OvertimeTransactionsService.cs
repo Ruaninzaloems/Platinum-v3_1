@@ -22,7 +22,22 @@ namespace PlatinumOvertime_API.Services.Implementations;
 public class OvertimeTransactionsService : IOvertimeTransactionsService
 {
     private const long MaxDocumentBytes = 5 * 1024 * 1024;
-    private const string PdfContentType = "application/pdf";
+
+    private static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",   // .xlsx
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+        "application/vnd.ms-outlook",   // .msg
+        "application/octet-stream",     // .msg fallback (some mail clients use this)
+    };
+
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".jpg", ".jpeg", ".png", ".xlsx", ".docx", ".msg"
+    };
 
     private readonly OvertimeDbContext _db;
     private readonly IPlatinumIntegrationService _platinum;
@@ -53,17 +68,53 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
     {
         // "Current" = anything still in flight assigned to me OR captured by me
         // and not yet terminal. Lets capturers see what they've submitted.
-        var me = _user.Current.UserId;
+        var me = _user.Current;
+        var meId = me.UserId;
+
+        // Extend the assignee match to cover positions the current user is
+        // actively deputising for via a TemporaryActingAppointment.
+        var actingForUserIds = new List<string>();
+        if (!string.IsNullOrWhiteSpace(me.EmployeeId))
+        {
+            var nowUtc = DateTime.UtcNow;
+            var actingConfigs = await _db.PositionApprovalConfigs
+                .Include(c => c.ActingAppointments)
+                .Where(c => c.ActingAppointments.Any(a =>
+                    a.ActingEmployeeId == me.EmployeeId
+                    && a.StartDate <= nowUtc && a.EndDate >= nowUtc))
+                .AsNoTracking()
+                .ToListAsync(ct);
+
+            actingForUserIds = actingConfigs
+                .Select(cfg => _user.AllUsers.FirstOrDefault(u =>
+                    string.Equals(u.PositionId, cfg.PositionId, StringComparison.OrdinalIgnoreCase))?.UserId)
+                .Where(uid => !string.IsNullOrWhiteSpace(uid))
+                .Select(uid => uid!)
+                .ToList();
+        }
+
+        var myUserIds = new[] { meId }.Concat(actingForUserIds).ToList();
+
+        // Determine whether the current user holds the configured override position.
+        // Override users see every in-flight transaction, not just their own queue.
+        var cfg = await _db.OvertimeConfig.AsNoTracking().FirstOrDefaultAsync(ct);
+        var isOverrideUser = !string.IsNullOrWhiteSpace(cfg?.OverridePositionId)
+            && !string.IsNullOrWhiteSpace(me.PositionId)
+            && string.Equals(me.PositionId, cfg.OverridePositionId, StringComparison.OrdinalIgnoreCase);
+
         var rows = await _db.OvertimeTransactions
             .Include(t => t.Documents)
             .Include(t => t.WorkflowHistory)
             .AsSplitQuery()
             .Where(t => t.Status != WorkflowStatus.Processed
                         && t.Status != WorkflowStatus.Rejected
-                        && (t.CurrentAssigneeUserId == me || t.CapturedBy == me))
+                        && (isOverrideUser
+                            || myUserIds.Contains(t.CurrentAssigneeUserId)
+                            || t.CapturedBy == meId))
             .OrderByDescending(t => t.UpdatedAt)
             .ToListAsync(ct);
-        var dto = rows.Select(ToDto).ToList();
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
         return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
             PaginatedResponse<OvertimeTransactionDto>.Create(dto, page, pageSize));
     }
@@ -79,7 +130,8 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                         || t.Status == WorkflowStatus.Rejected)
             .OrderByDescending(t => t.UpdatedAt)
             .ToListAsync(ct);
-        var dto = rows.Select(ToDto).ToList();
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
         return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
             PaginatedResponse<OvertimeTransactionDto>.Create(dto, page, pageSize));
     }
@@ -119,7 +171,8 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
-        var dto = rows.Select(ToDto).ToList();
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        var dto = rows.Select(r => ToDto(r, actingLookup)).ToList();
         return ApiResponse<PaginatedResponse<OvertimeTransactionDto>>.Success(
             new PaginatedResponse<OvertimeTransactionDto>
             {
@@ -139,15 +192,16 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             .Where(t => t.EmployeeId == employeeId)
             .OrderByDescending(t => t.OvertimeDate)
             .ToListAsync(ct);
-        return ApiResponse<List<OvertimeTransactionDto>>.Success(rows.Select(ToDto).ToList());
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<List<OvertimeTransactionDto>>.Success(rows.Select(r => ToDto(r, actingLookup)).ToList());
     }
 
     public async Task<ApiResponse<OvertimeTransactionDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         var row = await LoadAsync(id, ct);
-        return row is null
-            ? ApiResponse<OvertimeTransactionDto>.Failure("Overtime transaction not found.")
-            : ApiResponse<OvertimeTransactionDto>.Success(ToDto(row));
+        if (row is null) return ApiResponse<OvertimeTransactionDto>.Failure("Overtime transaction not found.");
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<OvertimeTransactionDto>.Success(ToDto(row, actingLookup));
     }
 
     // ---------- Create ----------
@@ -169,12 +223,43 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         if (emp is null)
             return ApiResponse<OvertimeTransactionDto>.Failure($"Employee {request.EmployeeId} not found.");
 
+        if (!emp.AllowOverTime)
+            return ApiResponse<OvertimeTransactionDto>.Failure(
+                $"{emp.FullName} is not authorised to claim overtime (AllowOverTime = false).");
+
         if (!int.TryParse(request.EmployeeId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var empNum))
             return ApiResponse<OvertimeTransactionDto>.Failure("EmployeeId is not numeric.");
 
         // Duplicate guard: warn (not hard-block) when a non-rejected transaction
         // already exists for the same employee + salary head + date.
         var requestedDate = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc);
+
+        // Hard-block: overlapping (or identical) time range on the same date.
+        // Not bypassable by SkipDuplicateDateCheck.
+        var reqStart = ParseTime(request.StartTime);
+        var reqEnd   = ParseTime(request.EndTime);
+        if (reqStart.HasValue && reqEnd.HasValue)
+        {
+            var candidates = await _db.OvertimeTransactions
+                .Where(t => t.EmployeeId == request.EmployeeId
+                         && t.SalaryHeadId == request.SalaryHeadId
+                         && t.OvertimeDate == requestedDate
+                         && t.Status != WorkflowStatus.Rejected)
+                .Select(t => new { t.StartTime, t.EndTime })
+                .ToListAsync(ct);
+
+            bool overlaps = candidates.Any(c =>
+                c.StartTime.HasValue && c.EndTime.HasValue &&
+                reqStart.Value < c.EndTime.Value &&
+                reqEnd.Value   > c.StartTime.Value);
+
+            if (overlaps)
+                return ApiResponse<OvertimeTransactionDto>.Failure(
+                    "DUPLICATE_DATETIME_ERROR: An overtime claim for this employee and type " +
+                    "already exists on this date with an overlapping time range. " +
+                    "Overlapping claims cannot be submitted.");
+        }
+
         if (!request.SkipDuplicateDateCheck)
         {
             var duplicate = await _db.OvertimeTransactions
@@ -200,6 +285,15 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         // Determine excess by counting hours captured for the same employee
         // in the active counting window from OvertimeConfig.
         var cfg = await _config.GetAsync(ct);
+
+        // Oldest-date guard: reject captures older than 2 months before the current period open.
+        var cutoff = ComputeOldestAllowedDate(cfg, DateTime.UtcNow.Date);
+        if (requestedDate < cutoff)
+            return ApiResponse<OvertimeTransactionDto>.Failure(
+                $"Overtime date {requestedDate:dd/MM/yyyy} is too old to capture. " +
+                $"The earliest allowed date is {cutoff:dd/MM/yyyy} " +
+                $"(2 months before the current period opening).");
+
         var (windowStart, windowEnd) = ComputeCountingWindow(cfg, request.OvertimeDate.Date);
         var hoursAlready = await _db.OvertimeTransactions
             .Where(t => t.EmployeeId == request.EmployeeId
@@ -223,7 +317,12 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                 $"Adding {request.Hours:0.##} hour{(request.Hours == 1m ? "" : "s")} would exceed the maximum allowed of {exceptionalMax:0.##} hours.");
 
         // Resolve the workflow chain for snapshotting.
-        var bundle = await _resolver.ResolveAsync(emp.PositionId, ct);
+        // Reject immediately when the chain is incomplete — no transaction should be
+        // created with a missing recommender or approver.
+        var bundle = await _resolver.ResolveAsync(emp.PositionId,
+            asOf: DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc), ct);
+        if (bundle.ChainError is not null)
+            return ApiResponse<OvertimeTransactionDto>.Failure(bundle.ChainError);
 
         // Resolve the optional payroll classification dropdowns. Bad IDs are
         // rejected up-front so a bogus client payload doesn't get persisted
@@ -239,6 +338,12 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             EmployeeName = emp.FullName,
             DepartmentId = emp.DepartmentId,
             DepartmentName = emp.DepartmentName,
+            DivisionName = int.TryParse(emp.PositionId, out var _empPosId)
+                ? await (from pos in _db.PayrollPositions
+                         join div in _db.ConstDivisions on pos.DivisionId equals div.DivisionId
+                         where pos.PositionId == _empPosId
+                         select div.DivisionDesc).FirstOrDefaultAsync(ct)
+                : null,
             PositionId = emp.PositionId,
             OvertimeDate = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc),
             StartTime = ParseTime(request.StartTime),
@@ -248,14 +353,19 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             SalaryHeadId = request.SalaryHeadId,
             SalaryHeadName = calc.SalaryHeadName,
             FormulaSnapshot = calc.Formula,
+            FormulaWithValuesSnapshot = BuildFormulaWithValues(calc.Formula, calc.Inputs),
             Amount = calc.Amount,
             HoursAlreadyCapturedThisMonth = hoursAlready,
             IsExcess = isExcess,
             Status = WorkflowStatus.Requested,
-            RecommenderEmployeeId = bundle.Recommender?.EmployeeId,
-            RecommenderEmployeeName = bundle.Recommender?.EmployeeName,
-            ApproverEmployeeId = bundle.Approver?.EmployeeId,
-            ApproverEmployeeName = bundle.Approver?.EmployeeName,
+            RecommenderEmployeeId        = bundle.Recommender?.EmployeeId,
+            RecommenderEmployeeName      = bundle.Recommender?.EmployeeName,
+            RecommenderChainPositionId   = bundle.RecommenderPositionId,
+            RecommenderChainPositionName = bundle.RecommenderPositionDescription,
+            ApproverEmployeeId           = bundle.Approver?.EmployeeId,
+            ApproverEmployeeName         = bundle.Approver?.EmployeeName,
+            ApproverChainPositionId      = bundle.ApproverPositionId,
+            ApproverChainPositionName    = bundle.ApproverPositionDescription,
             ExcessApproverEmployeeId = isExcess ? bundle.ExcessApprover?.EmployeeId : null,
             ExcessApproverEmployeeName = isExcess ? bundle.ExcessApprover?.EmployeeName : null,
             PayrollCapturerEmployeeId = bundle.PayrollCapturer?.EmployeeId,
@@ -285,7 +395,8 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         await _db.SaveChangesAsync(ct);
 
         var loaded = await LoadAsync(tx.Id, ct);
-        return ApiResponse<OvertimeTransactionDto>.Success(ToDto(loaded!));
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<OvertimeTransactionDto>.Success(ToDto(loaded!, actingLookup));
     }
 
     // ---------- Update ----------
@@ -339,6 +450,34 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         // is already occupied by another non-rejected transaction.
         var newDate = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc);
         var newHead = request.SalaryHeadId;
+
+        // Hard-block: overlapping (or identical) time range on the same date.
+        // Not bypassable by SkipDuplicateDateCheck.
+        var updReqStart = ParseTime(request.StartTime);
+        var updReqEnd   = ParseTime(request.EndTime);
+        if (updReqStart.HasValue && updReqEnd.HasValue)
+        {
+            var candidates = await _db.OvertimeTransactions
+                .Where(t => t.Id != id
+                         && t.EmployeeId == tx.EmployeeId
+                         && t.SalaryHeadId == newHead
+                         && t.OvertimeDate == newDate
+                         && t.Status != WorkflowStatus.Rejected)
+                .Select(t => new { t.StartTime, t.EndTime })
+                .ToListAsync(ct);
+
+            bool overlaps = candidates.Any(c =>
+                c.StartTime.HasValue && c.EndTime.HasValue &&
+                updReqStart.Value < c.EndTime.Value &&
+                updReqEnd.Value   > c.StartTime.Value);
+
+            if (overlaps)
+                return ApiResponse<OvertimeTransactionDto>.Failure(
+                    "DUPLICATE_DATETIME_ERROR: An overtime claim for this employee and type " +
+                    "already exists on this date with an overlapping time range. " +
+                    "Overlapping claims cannot be submitted.");
+        }
+
         if (!request.SkipDuplicateDateCheck && (newDate != tx.OvertimeDate.Date || newHead != tx.SalaryHeadId))
         {
             var duplicate = await _db.OvertimeTransactions
@@ -352,6 +491,16 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                     "DUPLICATE_DATE_WARNING: A claim for this employee, overtime type, and date already exists. " +
                     "Are you sure you want to submit another claim for the same date?");
         }
+
+        // Oldest-date guard: always reject when the effective overtime date is
+        // older than the cutoff, regardless of which fields changed.
+        var updCfg    = await _config.GetAsync(ct);
+        var updCutoff = ComputeOldestAllowedDate(updCfg, DateTime.UtcNow.Date);
+        if (newDate < updCutoff)
+            return ApiResponse<OvertimeTransactionDto>.Failure(
+                $"Overtime date {newDate:dd/MM/yyyy} is too old to capture. " +
+                $"The earliest allowed date is {updCutoff:dd/MM/yyyy} " +
+                $"(2 months before the current period opening).");
 
         // Recalculate amount + isExcess only if the inputs changed (cheap to
         // recalc unconditionally, but skipping a roundtrip when nothing
@@ -372,7 +521,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
                 return ApiResponse<OvertimeTransactionDto>.Failure(ex.Message);
             }
 
-            var cfg = await _config.GetAsync(ct);
+            var cfg = updCfg;
             var (windowStart, windowEnd) = ComputeCountingWindow(cfg, request.OvertimeDate.Date);
             var hoursAlready = await _db.OvertimeTransactions
                 .Where(t => t.EmployeeId == tx.EmployeeId
@@ -396,6 +545,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             tx.SalaryHeadId   = request.SalaryHeadId;
             tx.SalaryHeadName = calc.SalaryHeadName;
             tx.FormulaSnapshot = calc.Formula;
+            tx.FormulaWithValuesSnapshot = BuildFormulaWithValues(calc.Formula, calc.Inputs);
             tx.Amount         = calc.Amount;
             tx.HoursAlreadyCapturedThisMonth = hoursAlready;
             tx.IsExcess       = (hoursAlready + request.Hours) > monthlyMax;
@@ -405,9 +555,56 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             // resolver call used at create-time.
             if (tx.IsExcess != wasExcess)
             {
-                var bundle = await _resolver.ResolveAsync(tx.PositionId, ct);
+                var bundle = await _resolver.ResolveAsync(tx.PositionId,
+                    asOf: DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc), ct);
                 tx.ExcessApproverEmployeeId   = tx.IsExcess ? bundle.ExcessApprover?.EmployeeId   : null;
                 tx.ExcessApproverEmployeeName = tx.IsExcess ? bundle.ExcessApprover?.EmployeeName : null;
+            }
+        }
+
+        // Re-resolve the primary approval chain using the (potentially updated) overtime
+        // date so any reporting-config changes backdated to before the claim date are
+        // picked up on Save Changes without requiring a full reject-and-recapture cycle.
+        // When the newly resolved chain is incomplete (ChainError set) we intentionally
+        // skip the update — preserving existing assignees is safer than writing nulls.
+        // The submit guard in WorkflowService will still block submission if the
+        // snapshotted recommender/approver is absent when the user tries to submit.
+        {
+            var chainAsOf  = DateTime.SpecifyKind(request.OvertimeDate.Date, DateTimeKind.Utc);
+            var chainBundle = await _resolver.ResolveAsync(tx.PositionId, chainAsOf, ct);
+            var chainChanged = chainBundle.ChainError is null && (
+                tx.RecommenderEmployeeId      != chainBundle.Recommender?.EmployeeId      ||
+                tx.RecommenderChainPositionId != chainBundle.RecommenderPositionId        ||
+                tx.ApproverEmployeeId         != chainBundle.Approver?.EmployeeId         ||
+                tx.ApproverChainPositionId    != chainBundle.ApproverPositionId);
+
+            if (chainChanged)
+            {
+                tx.RecommenderEmployeeId        = chainBundle.Recommender?.EmployeeId;
+                tx.RecommenderEmployeeName      = chainBundle.Recommender?.EmployeeName;
+                tx.RecommenderChainPositionId   = chainBundle.RecommenderPositionId;
+                tx.RecommenderChainPositionName = chainBundle.RecommenderPositionDescription;
+                tx.ApproverEmployeeId           = chainBundle.Approver?.EmployeeId;
+                tx.ApproverEmployeeName         = chainBundle.Approver?.EmployeeName;
+                tx.ApproverChainPositionId      = chainBundle.ApproverPositionId;
+                tx.ApproverChainPositionName    = chainBundle.ApproverPositionDescription;
+
+                // Always re-point the current assignee to the newly-resolved recommender.
+                // For Recommended transactions the recall block below will set Status→Requested,
+                // so the effective outcome is always: Status=Requested, Assignee=newRecommender.
+                tx.CurrentAssigneeUserId = chainBundle.Recommender?.UserId;
+
+                var chainEntry = new OvertimeWorkflowState
+                {
+                    OvertimeTransactionId = tx.Id,
+                    FromStatus  = tx.Status,
+                    ToStatus    = tx.Status,
+                    ActionedBy  = me,
+                    Comments    = "Approval chain updated due to reporting configuration change.",
+                    ActionedAt  = DateTime.UtcNow
+                };
+                _db.OvertimeWorkflowStates.Add(chainEntry);
+                tx.WorkflowHistory.Add(chainEntry);
             }
         }
 
@@ -460,7 +657,8 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         await _db.SaveChangesAsync(ct);
 
         var loaded = await LoadAsync(tx.Id, ct);
-        return ApiResponse<OvertimeTransactionDto>.Success(ToDto(loaded!));
+        var actingLookup = await LoadActiveActingLookupAsync(ct);
+        return ApiResponse<OvertimeTransactionDto>.Success(ToDto(loaded!, actingLookup));
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -504,12 +702,21 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         try
         {
             var calc = await _amount.CalculateAsync(empNum, request.SalaryHeadId, request.Hours, ct);
+
+            // Strip all salary-derived data for capture-only users.
+            // Recommenders and any approver/payroll role retain the full response.
+            // Both Amount and Inputs are zeroed/nulled: the UI gates display on the
+            // same flags, but zeroing here ensures no salary data leaks via the wire.
+            var u = _user.Current;
+            // Gate on position-level approval flags only — same rule as ToDto.
+            var canSeeFinancials = u.IsApprover || u.IsExcessApprover;
+
             return ApiResponse<AmountPreviewDto>.Success(new AmountPreviewDto
             {
-                Amount = calc.Amount,
+                Amount = canSeeFinancials ? calc.Amount : 0m,
                 Formula = calc.Formula,
                 SalaryHeadName = calc.SalaryHeadName,
-                Inputs = calc.Inputs
+                Inputs = canSeeFinancials ? calc.Inputs : null
             });
         }
         catch (Exception ex)
@@ -534,9 +741,10 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             return ApiResponse<OvertimeDocumentDto>.Failure("No file uploaded.");
         if (file.Length > MaxDocumentBytes)
             return ApiResponse<OvertimeDocumentDto>.Failure("Document must be 5 MB or smaller.");
-        if (!string.Equals(file.ContentType, PdfContentType, StringComparison.OrdinalIgnoreCase)
-            && !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            return ApiResponse<OvertimeDocumentDto>.Failure("Only PDF documents are supported.");
+        var ext = Path.GetExtension(file.FileName);
+        if (!AllowedMimeTypes.Contains(file.ContentType) && !AllowedExtensions.Contains(ext))
+            return ApiResponse<OvertimeDocumentDto>.Failure(
+                "Only PDF, JPG, PNG, XLSX, DOCX and MSG files are supported.");
 
         var tx = await _db.OvertimeTransactions
             .Include(t => t.Documents)
@@ -559,7 +767,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         {
             OvertimeTransactionId = transactionId,
             FileName = safeName,
-            ContentType = PdfContentType,
+            ContentType = file.ContentType,
             SizeBytes = file.Length,
             StoragePath = path,
             UploadedBy = _user.Current.UserId,
@@ -586,6 +794,23 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         if (doc is null || !File.Exists(doc.StoragePath)) return null;
         var bytes = await File.ReadAllBytesAsync(doc.StoragePath, ct);
         return (bytes, doc.ContentType, doc.FileName);
+    }
+
+    public async Task<ApiResponse<bool>> DeleteDocumentAsync(Guid transactionId, Guid documentId, CancellationToken ct = default)
+    {
+        var doc = await _db.OvertimeTransactionDocuments
+            .FirstOrDefaultAsync(d => d.Id == documentId && d.OvertimeTransactionId == transactionId, ct);
+        if (doc is null)
+            return ApiResponse<bool>.Failure("Document not found.");
+
+        _db.OvertimeTransactionDocuments.Remove(doc);
+        await _db.SaveChangesAsync(ct);
+
+        // Best-effort file cleanup — don't fail the request if the file is already gone.
+        try { if (File.Exists(doc.StoragePath)) File.Delete(doc.StoragePath); }
+        catch (Exception ex) { _log.LogWarning(ex, "Could not delete document file {Path}.", doc.StoragePath); }
+
+        return ApiResponse<bool>.Success(true);
     }
 
     // ---------- Helpers ----------
@@ -655,6 +880,50 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             legacyDivisionId, divName));
     }
 
+    /// <summary>
+    /// Pre-loads all active TemporaryActingAppointments for today and returns a
+    /// lookup keyed by the ActingInPositionId. When multiple appointments share
+    /// a position only the first encountered is kept (edge case).
+    /// The dictionary is empty — never null — when there are no active appointments.
+    /// </summary>
+    private async Task<Dictionary<string, (string Id, string Name)>> LoadActiveActingLookupAsync(CancellationToken ct)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var result = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
+
+        var configs = await _db.PositionApprovalConfigs
+            .Include(c => c.ActingAppointments)
+            .Where(c => c.ActingAppointments.Any(a => a.StartDate <= nowUtc && a.EndDate >= nowUtc))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        foreach (var cfg in configs)
+        {
+            var appt = cfg.ActingAppointments
+                .FirstOrDefault(a => a.StartDate <= nowUtc && a.EndDate >= nowUtc);
+            if (appt == null) continue;
+
+            // ActingInPositionId is the authoritative chain position being covered and is
+            // stored directly on the appointment row.  Using it as the key means the lookup
+            // is correct even when PositionApprovalConfigId points to the wrong config record.
+            // Fall back to cfg.PositionId for older rows where ActingInPositionId may be empty.
+            var primaryKey = !string.IsNullOrEmpty(appt.ActingInPositionId)
+                ? appt.ActingInPositionId
+                : cfg.PositionId;
+
+            if (!result.ContainsKey(primaryKey))
+                result[primaryKey] = (appt.ActingEmployeeId, appt.ActingEmployeeName);
+
+            // Also index by cfg.PositionId so that appointments whose FK is correct
+            // (primaryKey == cfg.PositionId) continue to work without a second pass,
+            // and so that any direct cfg.PositionId lookups elsewhere still resolve.
+            if (!string.Equals(primaryKey, cfg.PositionId, StringComparison.OrdinalIgnoreCase)
+                && !result.ContainsKey(cfg.PositionId))
+                result[cfg.PositionId] = (appt.ActingEmployeeId, appt.ActingEmployeeName);
+        }
+        return result;
+    }
+
     private async Task<OvertimeTransaction?> LoadAsync(Guid id, CancellationToken ct) =>
         await _db.OvertimeTransactions
             .Include(t => t.Documents)
@@ -674,6 +943,23 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
     /// containing <paramref name="anchor"/> per OvertimeConfig.
     /// Defaults to a calendar month when no config exists.
     /// </summary>
+    /// <summary>
+    /// Returns the earliest OvertimeDate that may be captured.
+    /// Cutoff = first day of the current open period minus 2 full months.
+    /// Example: today = 18 Jun, startDay = 1 → period opens 1 Jun → cutoff = 1 Apr.
+    /// </summary>
+    private static DateTime ComputeOldestAllowedDate(
+        Models.Domain.OvertimeConfig? cfg, DateTime today)
+    {
+        var startDay = Math.Clamp(cfg?.CountingPeriodStartDay ?? 1, 1, 28);
+        var periodAnchor = today.Day >= startDay ? today : today.AddMonths(-1);
+        var dim = DateTime.DaysInMonth(periodAnchor.Year, periodAnchor.Month);
+        var periodOpen = new DateTime(
+            periodAnchor.Year, periodAnchor.Month,
+            Math.Min(startDay, dim), 0, 0, 0, DateTimeKind.Utc);
+        return periodOpen.AddMonths(-2);
+    }
+
     private static (DateTime Start, DateTime End) ComputeCountingWindow(
         Models.Domain.OvertimeConfig? cfg, DateTime anchor)
     {
@@ -696,11 +982,26 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         return (winStart, winEnd);
     }
 
-    private OvertimeTransactionDto ToDto(OvertimeTransaction t)
-        => ToDto(t, _user);
+    private OvertimeTransactionDto ToDto(OvertimeTransaction t,
+        Dictionary<string, (string Id, string Name)>? actingByPositionId = null)
+        => ToDto(t, _user, actingByPositionId);
 
-    public static OvertimeTransactionDto ToDto(OvertimeTransaction t, ICurrentUserService? userSvc)
+    public static OvertimeTransactionDto ToDto(OvertimeTransaction t, ICurrentUserService? userSvc,
+        Dictionary<string, (string Id, string Name)>? actingByPositionId = null)
     {
+        // Financial fields (Amount, formula strings) are salary-derived and must only be
+        // visible to roles that need them for approval/processing decisions.
+        // Recommenders are explicitly excluded — they assess requests on hours/justification,
+        // not on cost. Approvers (direct, excess, and payroll-side) retain visibility.
+        // When userSvc is null (no request context) we default to hidden.
+        // Only position-level approvers may see salary-derived fields.
+        // IsPayrollCapturer / IsPayrollApprover gate Payroll Processing page access,
+        // not financial data visibility — those users may have permission 3202 without
+        // being overtime approvers, so including them here would leak salary figures.
+        var canSeeFinancials = userSvc is not null
+            && (userSvc.Current.IsApprover
+             || userSvc.Current.IsExcessApprover);
+
         // For rows captured before CapturedByName was persisted, fall back to
         // the in-memory directory lookup (dev only; returns null in production).
         var capturer = string.IsNullOrWhiteSpace(t.CapturedByName)
@@ -709,6 +1010,84 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             ? userSvc.FindByUserId(t.CapturedBy)
             : null;
 
+        // Resolve current acting employees for the recommender and approver positions.
+        // Two distinct scenarios are handled:
+        //
+        //   A) The snapshotted assignee IS an acting appointee: they were assigned
+        //      because they hold an active TemporaryActingAppointment in the chain
+        //      position.  Their home position differs from the chain position, so we
+        //      must use the snapshotted RecommenderChainPositionName / ApproverChainPositionName
+        //      for the role label and flag them as acting (RecommenderIsActing / ApproverIsActing).
+        //
+        //   B) The snapshotted assignee is the primary holder and someone ELSE is
+        //      currently standing in for them via a TemporaryActingAppointment.  In
+        //      that case we surface the covering person via RecommenderActingEmployee*.
+        //
+        // The actingByPositionId lookup (keyed by chain PositionId → (actingEmpId, actingEmpName))
+        // covers both: if the acting employee's ID matches the snapshotted assignee this is
+        // scenario A; otherwise it is scenario B.
+
+        string? recommenderActingId = null, recommenderActingName = null;
+        bool recommenderIsActing = false;
+        string? recommenderPrimaryHolderName = null;
+
+        string? approverActingId = null, approverActingName = null;
+        bool approverIsActing = false;
+        string? approverPrimaryHolderName = null;
+
+        if (actingByPositionId != null)
+        {
+            // --- Recommender ---
+            // Prefer the snapshotted chain position; fall back to the employee's home position
+            // for legacy rows that pre-date the chain-position snapshot.
+            var recChainPosId = t.RecommenderChainPositionId
+                             ?? userSvc?.FindByUserId(t.RecommenderEmployeeId ?? string.Empty)?.PositionId;
+            if (!string.IsNullOrEmpty(recChainPosId)
+                && actingByPositionId.TryGetValue(recChainPosId, out var recActing))
+            {
+                if (string.Equals(recActing.Id, t.RecommenderEmployeeId, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Scenario A: the snapshotted recommender IS the acting appointee.
+                    recommenderIsActing = true;
+                    // The primary holder is whoever normally occupies the chain position
+                    // (any user whose home PositionId matches the chain position, excluding the acting person).
+                    recommenderPrimaryHolderName = userSvc?.AllUsers
+                        .FirstOrDefault(u => string.Equals(u.PositionId, recChainPosId, StringComparison.OrdinalIgnoreCase)
+                                          && !string.Equals(u.EmployeeId, t.RecommenderEmployeeId, StringComparison.OrdinalIgnoreCase))
+                        ?.EmployeeName;
+                }
+                else
+                {
+                    // Scenario B: primary holder is assigned; someone else is covering them.
+                    recommenderActingId   = recActing.Id;
+                    recommenderActingName = recActing.Name;
+                }
+            }
+
+            // --- Approver ---
+            var appChainPosId = t.ApproverChainPositionId
+                             ?? userSvc?.FindByUserId(t.ApproverEmployeeId ?? string.Empty)?.PositionId;
+            if (!string.IsNullOrEmpty(appChainPosId)
+                && actingByPositionId.TryGetValue(appChainPosId, out var appActing))
+            {
+                if (string.Equals(appActing.Id, t.ApproverEmployeeId, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Scenario A: the snapshotted approver IS the acting appointee.
+                    approverIsActing = true;
+                    approverPrimaryHolderName = userSvc?.AllUsers
+                        .FirstOrDefault(u => string.Equals(u.PositionId, appChainPosId, StringComparison.OrdinalIgnoreCase)
+                                          && !string.Equals(u.EmployeeId, t.ApproverEmployeeId, StringComparison.OrdinalIgnoreCase))
+                        ?.EmployeeName;
+                }
+                else
+                {
+                    // Scenario B: primary holder is assigned; someone else is covering them.
+                    approverActingId   = appActing.Id;
+                    approverActingName = appActing.Name;
+                }
+            }
+        }
+
         return new OvertimeTransactionDto
         {
         Id = t.Id,
@@ -716,6 +1095,7 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         EmployeeName = t.EmployeeName,
         DepartmentId = t.DepartmentId,
         DepartmentName = t.DepartmentName,
+        DivisionName = t.DivisionName,
         PositionId = t.PositionId,
         OvertimeDate = t.OvertimeDate,
         StartTime = t.StartTime?.ToString(@"hh\:mm"),
@@ -725,17 +1105,34 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
         IsExcess = t.IsExcess,
         SalaryHeadId = t.SalaryHeadId,
         SalaryHeadName = t.SalaryHeadName,
-        FormulaSnapshot = t.FormulaSnapshot,
-        Amount = t.Amount,
+        FormulaSnapshot = canSeeFinancials ? t.FormulaSnapshot : string.Empty,
+        FormulaWithValuesSnapshot = canSeeFinancials ? t.FormulaWithValuesSnapshot : null,
+        Amount = canSeeFinancials ? t.Amount : 0m,
         Reason = t.Reason,
         Status = t.Status,
         StatusLabel = t.Status.ToLabel(),
         RecommenderEmployeeName = t.RecommenderEmployeeName,
-        RecommenderPositionDescription = string.IsNullOrWhiteSpace(t.RecommenderEmployeeId) ? null
-            : userSvc?.FindByUserId(t.RecommenderEmployeeId)?.PositionDescription,
+        // Use the snapshotted chain position name (which equals the PositionApprovalConfig
+        // position, not the employee's home position).  Fall back to the employee's home
+        // position description for legacy rows that pre-date the chain-position snapshot.
+        RecommenderPositionDescription = !string.IsNullOrWhiteSpace(t.RecommenderChainPositionName)
+            ? t.RecommenderChainPositionName
+            : (string.IsNullOrWhiteSpace(t.RecommenderEmployeeId) ? null
+                : userSvc?.FindByUserId(t.RecommenderEmployeeId)?.PositionDescription),
+        RecommenderIsActing           = recommenderIsActing,
+        RecommenderPrimaryHolderName  = recommenderPrimaryHolderName,
+        RecommenderActingEmployeeId   = recommenderActingId,
+        RecommenderActingEmployeeName = recommenderActingName,
         ApproverEmployeeName = t.ApproverEmployeeName,
-        ApproverPositionDescription = string.IsNullOrWhiteSpace(t.ApproverEmployeeId) ? null
-            : userSvc?.FindByUserId(t.ApproverEmployeeId)?.PositionDescription,
+        // Same as above for the approver.
+        ApproverPositionDescription = !string.IsNullOrWhiteSpace(t.ApproverChainPositionName)
+            ? t.ApproverChainPositionName
+            : (string.IsNullOrWhiteSpace(t.ApproverEmployeeId) ? null
+                : userSvc?.FindByUserId(t.ApproverEmployeeId)?.PositionDescription),
+        ApproverIsActing           = approverIsActing,
+        ApproverPrimaryHolderName  = approverPrimaryHolderName,
+        ApproverActingEmployeeId   = approverActingId,
+        ApproverActingEmployeeName = approverActingName,
         ExcessApproverEmployeeId = t.ExcessApproverEmployeeId,
         ExcessApproverEmployeeName = t.ExcessApproverEmployeeName,
         ExcessApproverPositionDescription = string.IsNullOrWhiteSpace(t.ExcessApproverEmployeeId) ? null
@@ -763,8 +1160,49 @@ public class OvertimeTransactionsService : IOvertimeTransactionsService
             .Select(w => new WorkflowEventDto
             {
                 Id = w.Id, FromStatus = w.FromStatus, ToStatus = w.ToStatus,
-                ActionedBy = w.ActionedBy, Comments = w.Comments, ActionedAt = w.ActionedAt
+                ActionedBy = w.ActionedBy,
+                ActionedByEmployeeName = string.IsNullOrEmpty(w.ActionedBy) ? null
+                    : userSvc?.FindByUserId(w.ActionedBy)?.EmployeeName,
+                Comments = w.Comments, ActionedAt = w.ActionedAt
             }).ToList()
     };
+    }
+
+    /// <summary>
+    /// Substitutes variable names in <paramref name="formula"/> with their formatted
+    /// numeric values, producing a string like "4 * ((45 650,00 / 160,00) * 1.5)".
+    /// Keys are replaced longest-first to avoid partial substitution (e.g. WHPM
+    /// being substituted inside WHPM_Monthly).
+    /// </summary>
+    private static string? BuildFormulaWithValues(string? formula, Dictionary<string, decimal> inputs)
+    {
+        if (string.IsNullOrWhiteSpace(formula) || inputs.Count == 0) return null;
+
+        var enZa = new System.Globalization.CultureInfo("en-ZA");
+        var expr  = formula;
+
+        foreach (var (key, val) in inputs.OrderByDescending(kv => kv.Key.Length))
+        {
+            string fmt;
+            if (val >= 1000m)
+                fmt = val.ToString("N2", enZa);
+            else if (val == Math.Floor(val))
+                fmt = ((long)val).ToString();
+            else
+                fmt = val.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+            // Escape only the search key (it is a regex pattern); the replacement
+            // string is treated as a literal by Regex.Replace only when no special
+            // characters appear, so use a MatchEvaluator to return the raw fmt value.
+            var pattern = System.Text.RegularExpressions.Regex.Escape(key);
+            var replacement = fmt; // captured for the lambda
+            expr = System.Text.RegularExpressions.Regex.Replace(
+                expr,
+                pattern,
+                _ => replacement,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        return expr;
     }
 }

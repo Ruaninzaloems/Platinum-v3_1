@@ -12,13 +12,16 @@ public class OvertimeTransactionsController : ControllerBase
 {
     private readonly IOvertimeTransactionsService _service;
     private readonly ICurrentUserService _currentUser;
+    private readonly IAssigneeResolverService _resolver;
 
     public OvertimeTransactionsController(
         IOvertimeTransactionsService service,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IAssigneeResolverService resolver)
     {
         _service     = service;
         _currentUser = currentUser;
+        _resolver    = resolver;
     }
 
     [HttpGet("current")]
@@ -88,6 +91,18 @@ public class OvertimeTransactionsController : ControllerBase
     public async Task<ActionResult<ApiResponse<AmountPreviewDto>>> PreviewAmount(
         [FromBody] AmountPreviewRequest req, CancellationToken ct = default)
     {
+        // Only users with an overtime workflow role may call this endpoint.
+        // Salary-derived inputs are further redacted inside the service for
+        // capture-only callers; recommenders and approver-side roles receive
+        // the full inputs map.
+        var u = _currentUser.Current;
+        var hasOvertimeRole = u.IsCapturer || u.IsRecommender
+            || u.IsApprover || u.IsExcessApprover
+            || u.IsPayrollCapturer || u.IsPayrollApprover;
+        if (!hasOvertimeRole)
+            return StatusCode(403, ApiResponse<AmountPreviewDto>.Failure(
+                "You do not have permission to access the amount preview."));
+
         var resp = await _service.PreviewAmountAsync(req, ct);
         return resp.IsSuccess ? Ok(resp) : BadRequest(resp);
     }
@@ -96,6 +111,45 @@ public class OvertimeTransactionsController : ControllerBase
     public async Task<ActionResult<ApiResponse<List<OvertimeTypeOption>>>> GetOvertimeTypesForEmployee(
         string employeeId, CancellationToken ct = default)
         => Ok(await _service.GetOvertimeTypesForEmployeeAsync(employeeId, ct));
+
+    /// <summary>
+    /// Preview the approval chain (recommender + approver) that would be assigned to a
+    /// transaction for the given position and overtime date, without creating anything.
+    /// Always returns 200 — null slots indicate the chain is not configured for that position.
+    /// Exposed under both /api/overtime-transactions/chain-preview and /api/overtime/chain-preview.
+    /// </summary>
+    [HttpGet("chain-preview")]
+    [HttpGet("/api/overtime/chain-preview")]
+    public async Task<ActionResult<ApiResponse<ChainPreviewDto>>> ChainPreview(
+        [FromQuery] string? positionId,
+        [FromQuery] string? overtimeDate,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(positionId) || !DateOnly.TryParse(overtimeDate, out var date))
+            return Ok(ApiResponse<ChainPreviewDto>.Success(new ChainPreviewDto(null, null, false)));
+
+        var asOf   = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var bundle = await _resolver.ResolveAsync(positionId, asOf, ct);
+
+        var dto = new ChainPreviewDto(
+            Recommender: bundle.Recommender is null ? null : new ChainPreviewPersonDto(
+                bundle.Recommender.EmployeeId,
+                bundle.Recommender.EmployeeName,
+                bundle.RecommenderPositionId,
+                bundle.RecommenderPositionDescription,
+                bundle.RecommenderIsActing),
+            Approver: bundle.Approver is null ? null : new ChainPreviewPersonDto(
+                bundle.Approver.EmployeeId,
+                bundle.Approver.EmployeeName,
+                bundle.ApproverPositionId,
+                bundle.ApproverPositionDescription,
+                bundle.ApproverIsActing),
+            ExcessApproverConfigured: bundle.ExcessApprover is not null,
+            ChainError: bundle.ChainError
+        );
+
+        return Ok(ApiResponse<ChainPreviewDto>.Success(dto));
+    }
 
     [HttpPost("{id:guid}/documents")]
     [RequestSizeLimit(10 * 1024 * 1024)]
@@ -113,5 +167,12 @@ public class OvertimeTransactionsController : ControllerBase
         var doc = await _service.DownloadDocumentAsync(id, documentId, ct);
         if (doc is null) return NotFound();
         return File(doc.Value.Bytes, doc.Value.ContentType, doc.Value.FileName);
+    }
+
+    [HttpDelete("{id:guid}/documents/{documentId:guid}")]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteDocument(Guid id, Guid documentId, CancellationToken ct = default)
+    {
+        var resp = await _service.DeleteDocumentAsync(id, documentId, ct);
+        return resp.IsSuccess ? Ok(resp) : NotFound(resp);
     }
 }

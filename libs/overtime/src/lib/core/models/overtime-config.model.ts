@@ -8,4 +8,6 @@ export interface OvertimeConfig {
   exceptionalMaximumOvertimeHours: number;
   updatedAt?: string;
   updatedBy?: string | null;
+  overridePositionId?: string | null;
+  overridePositionDescription?: string | null;
 }

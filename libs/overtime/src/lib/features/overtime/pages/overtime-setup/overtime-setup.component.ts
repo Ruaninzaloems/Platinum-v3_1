@@ -7,7 +7,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { HttpClient } from '@angular/common/http';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
+import { environment } from '../../../../environment';
+
+interface PositionItem { id: string; description: string; }
 
 @Component({
   selector: 'app-overtime-setup',
@@ -79,6 +83,90 @@ import { OvertimeConfigService } from '../../../../core/services/overtime-config
         }
       </div>
 
+      <!-- ── Override Position ─────────────────────────────────────────── -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <mat-icon>admin_panel_settings</mat-icon>
+          <span>Master Approver Override</span>
+        </div>
+        <p class="form-section-sub">
+          When set, the employee currently holding this position can recommend, approve,
+          return, or reject <em>any</em> overtime transaction regardless of the normal
+          approval chain. Leave blank to disable.
+        </p>
+
+        <div class="form-group override-group">
+          <label>Override Position</label>
+
+          @if (overridePositionId()) {
+            <!-- Selected state: show name + clear button -->
+            <div class="pos-selected">
+              <mat-icon class="pos-icon">work_outline</mat-icon>
+              <span class="pos-selected-name">{{ overridePositionDesc() || overridePositionId() }}</span>
+              <button type="button" class="btn-icon pos-clear" title="Remove override position"
+                      (click)="clearOverride()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          } @else {
+            <!-- Search state: input + results dropdown -->
+            <div class="pos-search-wrap">
+              <input class="form-control" type="text"
+                     placeholder="Search by position name or code…"
+                     [value]="posSearch()"
+                     (input)="onPosSearch($event)"
+                     autocomplete="off" />
+              @if (posSearching()) {
+                <div class="pos-status">Searching…</div>
+              } @else if (posSearch() && posResults().length === 0) {
+                <div class="pos-status pos-none">No positions found</div>
+              }
+              @if (posResults().length > 0) {
+                <ul class="pos-results">
+                  @for (p of posResults(); track p.id) {
+                    <li (click)="selectPos(p)">
+                      <span class="pos-result-name">{{ p.description }}</span>
+                      <span class="pos-result-id">{{ p.id }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- ── User Permissions Cache ───────────────────────────────────────── -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <mat-icon>manage_accounts</mat-icon>
+          <span>User Permissions Cache</span>
+        </div>
+        <p class="form-section-sub">
+          Role and permission assignments are cached for performance. Use this to apply
+          changes (new users, role updates, access removals) immediately without
+          restarting the server.
+        </p>
+
+        <div class="flush-row">
+          <button type="button" class="btn btn-secondary flush-btn"
+                  [disabled]="flushing()"
+                  (click)="flushPermissions()">
+            <mat-icon>refresh</mat-icon>
+            {{ flushing() ? 'Refreshing…' : 'Refresh Now' }}
+          </button>
+
+          @if (flushResult()) {
+            <span class="flush-result">
+              <mat-icon class="flush-ok-icon">check_circle</mat-icon>
+              {{ flushResult()!.usersLoaded }} users loaded
+              &nbsp;·&nbsp;
+              refreshed at {{ flushResult()!.refreshedAt | date:'HH:mm:ss' }}
+            </span>
+          }
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="button" class="btn">
           <mat-icon>arrow_back</mat-icon>
@@ -113,16 +201,112 @@ import { OvertimeConfigService } from '../../../../core/services/overtime-config
     .date-field { padding-right: 34px !important; cursor: pointer; }
     .date-toggle { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); }
     .date-toggle button { width: 30px !important; height: 30px !important; padding: 0 !important; }
+
+    /* Override position picker */
+    .override-group { max-width: 480px; }
+
+    .pos-selected {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #15803d;
+    }
+    .pos-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+    .pos-selected-name { flex: 1; }
+    .btn-icon {
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer;
+      width: 28px; height: 28px; border-radius: 50%;
+      color: #15803d; padding: 0;
+    }
+    .btn-icon:hover { background: #dcfce7; }
+    .btn-icon mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    .pos-search-wrap { position: relative; }
+    .pos-status {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 2px;
+    }
+    .pos-none { font-style: italic; }
+    .pos-results {
+      list-style: none;
+      margin: 4px 0 0;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .pos-results li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pos-results li:last-child { border-bottom: none; }
+    .pos-results li:hover { background: #f0f9ff; }
+    .pos-result-name { color: var(--text-main, #111); font-weight: 500; }
+    .pos-result-id   { color: var(--text-muted); font-size: 11px; margin-left: 8px; flex-shrink: 0; }
+
+    /* Permissions cache flush */
+    .flush-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .flush-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .flush-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    .flush-result {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #15803d;
+      font-weight: 500;
+    }
+    .flush-ok-icon { font-size: 16px; width: 16px; height: 16px; color: #16a34a; }
   `]
 })
 export class OvertimeSetupComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private svc = inject(OvertimeConfigService);
+  private fb    = inject(FormBuilder);
+  private svc   = inject(OvertimeConfigService);
   private snack = inject(MatSnackBar);
+  private http  = inject(HttpClient);
 
-  saving = signal(false);
+  saving      = signal(false);
   lastUpdated = signal<string | null>(null);
-  enabled = signal(false);
+  enabled     = signal(false);
+
+  flushing    = signal(false);
+  flushResult = signal<{ usersLoaded: number; refreshedAt: Date } | null>(null);
+
+  /** Override-position state — managed outside the reactive form */
+  overridePositionId   = signal<string | null>(null);
+  overridePositionDesc = signal<string | null>(null);
+
+  /** Position search state */
+  posSearch    = signal('');
+  posResults   = signal<PositionItem[]>([]);
+  posSearching = signal(false);
+  private _posTimer: ReturnType<typeof setTimeout> | null = null;
 
   private destroyRef = inject(DestroyRef);
 
@@ -210,10 +394,78 @@ export class OvertimeSetupComponent implements OnInit {
           exceptionalMaximumOvertimeHours: cfg.exceptionalMaximumOvertimeHours
         });
         this.lastUpdated.set(cfg.updatedAt ?? null);
+        // Load override position from saved config
+        this.overridePositionId.set(cfg.overridePositionId ?? null);
+        this.overridePositionDesc.set(cfg.overridePositionDescription ?? null);
       },
       error: () => this.snack.open('Failed to load configuration', 'Dismiss', { duration: 3000 })
     });
   }
+
+  // ── Position search ────────────────────────────────────────────────────
+
+  onPosSearch(e: Event): void {
+    const v = (e.target as HTMLInputElement).value;
+    this.posSearch.set(v);
+    this.posResults.set([]);
+    if (this._posTimer) clearTimeout(this._posTimer);
+    if (!v.trim()) { this.posSearching.set(false); return; }
+    this.posSearching.set(true);
+    this._posTimer = setTimeout(() => {
+      this.http.get<{ data: { items: PositionItem[] } }>(
+        `${environment.apiBaseUrl}/positions/list?search=${encodeURIComponent(v.trim())}&pageSize=20`
+      ).subscribe({
+        next: r => {
+          this.posResults.set(r.data?.items ?? []);
+          this.posSearching.set(false);
+        },
+        error: () => {
+          this.posSearching.set(false);
+          this.posResults.set([]);
+        }
+      });
+    }, 300);
+  }
+
+  selectPos(p: PositionItem): void {
+    this.overridePositionId.set(p.id);
+    this.overridePositionDesc.set(p.description);
+    this.posSearch.set('');
+    this.posResults.set([]);
+    this.posSearching.set(false);
+  }
+
+  clearOverride(): void {
+    this.overridePositionId.set(null);
+    this.overridePositionDesc.set(null);
+    this.posSearch.set('');
+    this.posResults.set([]);
+  }
+
+  // ── Permissions cache flush ────────────────────────────────────────────
+
+  flushPermissions(): void {
+    this.flushing.set(true);
+    this.flushResult.set(null);
+    this.http.post<{ data: { usersLoaded: number; refreshedAt: string } }>(
+      `${environment.apiBaseUrl}/admin/refresh-users`, {}
+    ).subscribe({
+      next: r => {
+        this.flushing.set(false);
+        this.flushResult.set({
+          usersLoaded: r.data.usersLoaded,
+          refreshedAt: new Date(r.data.refreshedAt),
+        });
+        this.snack.open(`Permissions refreshed — ${r.data.usersLoaded} users loaded`, 'Dismiss', { duration: 3000 });
+      },
+      error: () => {
+        this.flushing.set(false);
+        this.snack.open('Failed to refresh permissions cache', 'Dismiss', { duration: 4000 });
+      }
+    });
+  }
+
+  // ── Save ───────────────────────────────────────────────────────────────
 
   save(): void {
     if (this.form.invalid) return;
@@ -225,7 +477,9 @@ export class OvertimeSetupComponent implements OnInit {
       countingPeriodStartDay: Number(v.countingPeriodStartDay),
       countingPeriodEndDay: Number(v.countingPeriodEndDay),
       maximumMonthlyOvertimeHours: Number(v.maximumMonthlyOvertimeHours),
-      exceptionalMaximumOvertimeHours: Number(v.exceptionalMaximumOvertimeHours)
+      exceptionalMaximumOvertimeHours: Number(v.exceptionalMaximumOvertimeHours),
+      overridePositionId: this.overridePositionId() || null,
+      overridePositionDescription: this.overridePositionDesc() || null
     }).subscribe({
       next: cfg => {
         this.saving.set(false);

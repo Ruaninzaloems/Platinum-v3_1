@@ -1,7 +1,23 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, catchError, of } from 'rxjs';
 import { environment } from '../../environment';
+
+export interface ChainPreviewPersonDto {
+  employeeId: string | null;
+  employeeName: string | null;
+  positionId: string | null;
+  positionName: string | null;
+  isActing: boolean;
+}
+
+export interface ChainPreviewDto {
+  recommender: ChainPreviewPersonDto | null;
+  approver: ChainPreviewPersonDto | null;
+  excessApproverConfigured: boolean;
+  /** Non-null when the chain could not be resolved for the position. Display to user; block submission. */
+  chainError: string | null;
+}
 import { ApiResponse } from '../models/api-response.model';
 import { PaginatedResponse } from '../models/position-approval.model';
 
@@ -124,5 +140,17 @@ export class OvertimeTransactionsService {
 
   documentDownloadUrl(transactionId: string, documentId: string): string {
     return `${this.base}/overtime-transactions/${transactionId}/documents/${documentId}`;
+  }
+
+  chainPreview(positionId: string, overtimeDate: string): Observable<ChainPreviewDto | null> {
+    const params = new HttpParams()
+      .set('positionId', positionId)
+      .set('overtimeDate', overtimeDate);
+    return this.http.get<{ isSuccess: boolean; data: ChainPreviewDto }>(
+      `${this.base}/overtime-transactions/chain-preview`, { params }
+    ).pipe(
+      map(r => r.isSuccess ? r.data : null),
+      catchError(() => of(null))
+    );
   }
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,16 +15,15 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
-import { debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { Subject } from 'rxjs';
 
 import { LookupService } from '../../../../core/services/lookup.service';
-import { OvertimeTransactionsService } from '../../../../core/services/overtime-transactions.service';
+import { OvertimeTransactionsService, ChainPreviewDto } from '../../../../core/services/overtime-transactions.service';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
 import { WorkflowService } from '../../../../core/services/workflow.service';
 import { UserContextService } from '../../../../core/services/user-context.service';
-import { OvertimeSharePointService, SpOvertimeDoc } from '../../../../core/services/overtime-sharepoint.service';
 import {
   OvertimeTransactionDto,
   OvertimeTypeOption,
@@ -116,27 +115,24 @@ export class DuplicateDateConfirmDialog {
           </div>
 
           @if (!editId()) {
-            <div class="form-group emp-search-wrap" style="max-width: 520px;">
+            <div class="form-group" style="max-width: 520px;">
               <label>EMPLOYEE <span class="required">*</span></label>
               <input class="form-control"
                      type="text"
-                     autocomplete="off"
                      [(ngModel)]="searchTerm"
                      (ngModelChange)="onSearch($event)"
-                     (focus)="onSearch(searchTerm)"
-                     (blur)="onSearchBlur()"
+                     [matAutocomplete]="auto"
                      placeholder="Search by employee ID, position ID, first name or surname">
-              @if (suggestions().length > 0) {
-                <div class="emp-dropdown">
-                  @for (e of suggestions(); track e.id) {
-                    <button type="button" class="emp-option" (mousedown)="onEmployeePicked(e)">
-                      <span class="emp-opt-id">{{ e.employeeNumber }}</span>
-                      <span class="emp-opt-name">{{ e.fullName }}</span>
-                    </button>
-                  }
-                </div>
-              }
             </div>
+            <mat-autocomplete #auto="matAutocomplete"
+                              panelClass="picker-panel"
+                              (optionSelected)="onEmployeePicked($event.option.value)">
+              @for (e of suggestions(); track e.id) {
+                <mat-option [value]="e">
+                  <span class="opt-line">{{ e.employeeNumber }} - {{ e.fullName }}</span>
+                </mat-option>
+              }
+            </mat-autocomplete>
           }
 
           @if (employee()) {
@@ -192,6 +188,7 @@ export class DuplicateDateConfirmDialog {
                   <input class="form-control date-field" readonly
                          [matDatepicker]="overtimePicker"
                          [value]="overtimeDateValue"
+                         [min]="minOvertimeDate()"
                          (dateChange)="onOvertimeDateChange($event.value)"
                          placeholder="dd/mm/yyyy"
                          [disabled]="viewOnly()" />
@@ -202,6 +199,11 @@ export class DuplicateDateConfirmDialog {
                   <div class="special-day-badge">
                     <mat-icon>info</mat-icon>
                     <span>{{ specialDayLabel() }}</span>
+                  </div>
+                }
+                @if (minOvertimeDate() && !viewOnly()) {
+                  <div class="form-hint" style="margin-top:4px;font-size:0.78rem;color:#6c757d;">
+                    Captures allowed from {{ minOvertimeDate()! | date:'dd/MM/yyyy' }}
                   </div>
                 }
               </div>
@@ -271,12 +273,14 @@ export class DuplicateDateConfirmDialog {
             <div class="amount-tile">
               <div class="amount-left">
                 <div class="amt-label">Calculated amount</div>
-                <div class="amt-value">R {{ amountPreview()?.amount ?? 0 | number:'1.2-2' }}</div>
+                @if (canSeeFinancialDetails()) {
+                  <div class="amt-value">R {{ amountPreview()?.amount ?? 0 | number:'1.2-2' }}</div>
+                }
                 <div class="amt-formula" *ngIf="amountPreview()?.formula">
                   <span class="amt-formula-label">Formula:</span>
                   <code>{{ amountPreview()!.formula }}</code>
                 </div>
-                <div class="amt-formula amt-formula-values" *ngIf="formulaWithValues()">
+                <div class="amt-formula amt-formula-values" *ngIf="formulaWithValues() && canSeeFinancialDetails()">
                   <span class="amt-formula-label">Values:</span>
                   <code>{{ formulaWithValues() }}</code>
                 </div>
@@ -308,34 +312,7 @@ export class DuplicateDateConfirmDialog {
             }
 
             @if (!viewOnly()) {
-              @if (usingSharePoint() && spDoc()) {
-                <!-- Existing SharePoint document (stored in the library configured in Admin → Overtime) -->
-                <div class="existing-doc-card">
-                  <mat-icon class="existing-doc-icon">cloud_done</mat-icon>
-                  <div class="existing-doc-info">
-                    <span class="existing-doc-name">{{ spDoc()!.fileName }}</span>
-                    <span class="existing-doc-meta">
-                      {{ (spDoc()!.sizeBytes / 1024).toFixed(1) }} KB
-                      · Uploaded {{ spDoc()!.uploadedAt | date:'dd/MM/yyyy' }} · SharePoint
-                    </span>
-                  </div>
-                  <div class="existing-doc-actions">
-                    <button class="btn" type="button"
-                            matTooltip="Open the SharePoint document"
-                            (click)="viewSpDoc()">
-                      <mat-icon>open_in_new</mat-icon><span>View</span>
-                    </button>
-                    <button class="btn existing-doc-remove"
-                            type="button"
-                            [disabled]="removingDoc()"
-                            matTooltip="Remove document so a replacement can be attached"
-                            (click)="removeSpDoc()">
-                      <mat-icon>delete_outline</mat-icon>
-                      <span>{{ removingDoc() ? 'Removing…' : 'Remove' }}</span>
-                    </button>
-                  </div>
-                </div>
-              } @else if (!usingSharePoint() && existingDoc()) {
+              @if (existingDoc()) {
                 <!-- Existing document — show when editing a transaction that already has one -->
                 <div class="existing-doc-card">
                   <mat-icon class="existing-doc-icon">description</mat-icon>
@@ -367,7 +344,7 @@ export class DuplicateDateConfirmDialog {
                 <!-- No existing doc — show the upload drop-zone -->
                 <div class="upload-area" [class.has-file]="!!pendingFile()"
                      role="button"
-                     [attr.aria-label]="pendingFile() ? 'Replace attached document' : 'Attach supporting PDF document'"
+                     [attr.aria-label]="pendingFile() ? 'Replace attached document' : 'Attach supporting document'"
                      (click)="fileInput.click()" tabindex="0"
                      (keydown.enter)="fileInput.click(); $event.preventDefault()"
                      (keydown.space)="fileInput.click(); $event.preventDefault()">
@@ -375,7 +352,7 @@ export class DuplicateDateConfirmDialog {
                   <div>
                     <strong>{{ pendingFile() ? pendingFile()!.name : 'Attach supporting document' }}</strong>
                   </div>
-                  <div class="upload-hint">PDF only · max 5 MB</div>
+                  <div class="upload-hint">PDF, JPG, PNG, XLSX, DOCX, MSG · max 5 MB</div>
                   @if (pendingFile()) {
                     <button class="btn" type="button" style="margin-top:8px;"
                             (click)="$event.stopPropagation(); pendingFile.set(null)">
@@ -383,8 +360,9 @@ export class DuplicateDateConfirmDialog {
                     </button>
                   }
                 </div>
-                <input #fileInput type="file" accept="application/pdf" hidden
-                       (change)="onFile($event)">
+                <input #fileInput type="file"
+                       accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-outlook,.pdf,.jpg,.jpeg,.png,.xlsx,.docx,.msg"
+                       hidden (change)="onFile($event)">
               }
             } @else if (loadedTx()?.documents?.length) {
               <!-- View-only: still let the approver open the document -->
@@ -424,7 +402,7 @@ export class DuplicateDateConfirmDialog {
               @if (canSubmit()) {
                 <button class="btn btn-primary"
                         type="button"
-                        [disabled]="!canSave() || saving()"
+                        [disabled]="!canSave() || saving() || chainIncomplete()"
                         (click)="save(true)">
                   <mat-icon>send</mat-icon>
                   <span>Save &amp; submit</span>
@@ -432,7 +410,83 @@ export class DuplicateDateConfirmDialog {
               }
             }
           </div>
+          @if (chainIncomplete()) {
+            <div class="chain-incomplete-notice">
+              <mat-icon class="chain-incomplete-icon">warning</mat-icon>
+              <span>
+                @if (!chainPreview()?.recommender && !chainPreview()?.approver) {
+                  No recommender or approver found for this position — submission is disabled until the approval chain is configured.
+                } @else if (!chainPreview()?.recommender) {
+                  No recommender found for this position — submission is disabled until a recommender is configured.
+                } @else {
+                  No approver found for this position — submission is disabled until an approver is configured.
+                }
+              </span>
+            </div>
+          }
         </section>
+
+        <!-- Chain-change warning banner (edit path only) ---------------- -->
+        @if (showChainChangeBanner()) {
+          <div class="chain-change-banner">
+            <mat-icon>warning_amber</mat-icon>
+            <span>{{ chainChangeBannerText() }}</span>
+            <button class="chain-change-dismiss" type="button"
+                    (click)="dismissChainBanner()"
+                    matTooltip="Dismiss">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
+
+        <!-- Approval chain preview — new-capture path only -------------- -->
+        @if (!editId() && (chainPreviewLoading() || chainPreview())) {
+          <section class="form-card">
+            <div class="form-section">
+              <div class="form-section-title">
+                <mat-icon>verified_user</mat-icon><span>Approval Chain</span>
+              </div>
+              @if (chainPreviewLoading()) {
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+                  <mat-spinner diameter="20"></mat-spinner>
+                  <span style="font-size:13px;color:#64748b;">Resolving approval chain…</span>
+                </div>
+              } @else if (chainPreview()) {
+                <div class="approvals-grid">
+                  <div class="approval-field">
+                    <div class="approval-label">Recommender</div>
+                    @if (chainPreview()!.recommender) {
+                      <div class="approval-value">{{ chainPreview()!.recommender!.employeeName }}</div>
+                      <div class="approval-sub">{{ chainPreview()!.recommender!.positionName }}</div>
+                      @if (chainPreview()!.recommender!.isActing) {
+                        <div class="approval-acting">Acting appointment</div>
+                      }
+                    } @else {
+                      <div class="approval-value muted">Not configured</div>
+                      <div class="approval-sub" style="color:#dc2626;font-size:11px;">No recommender found for this position</div>
+                    }
+                  </div>
+                  <div class="approval-field">
+                    <div class="approval-label">Approver</div>
+                    @if (chainPreview()!.approver) {
+                      <div class="approval-value">{{ chainPreview()!.approver!.employeeName }}</div>
+                      <div class="approval-sub">{{ chainPreview()!.approver!.positionName }}</div>
+                      @if (chainPreview()!.approver!.isActing) {
+                        <div class="approval-acting">Acting appointment</div>
+                      }
+                    } @else {
+                      <div class="approval-value muted">Not configured</div>
+                      <div class="approval-sub" style="color:#dc2626;font-size:11px;">No approver found for this position</div>
+                    }
+                  </div>
+                </div>
+                <div style="margin-top:8px;font-size:11px;color:#94a3b8;">
+                  Preview based on reporting configuration as at {{ overtimeDate() | date:'dd/MM/yyyy' }}
+                </div>
+              }
+            </div>
+          </section>
+        }
 
         <!-- Approvals -------------------------------------------------- -->
         @if (editId() && loadedTx()) {
@@ -451,6 +505,9 @@ export class DuplicateDateConfirmDialog {
                     </div>
                     @if (f.subDisplay) {
                       <div class="approval-sub">{{ f.subDisplay }}</div>
+                    }
+                    @if (f.actingDisplay) {
+                      <div class="approval-acting">{{ f.actingDisplay }}</div>
                     }
                     @if (f.timestamp) {
                       <div class="approval-timestamp">
@@ -540,8 +597,8 @@ export class DuplicateDateConfirmDialog {
                       </span>
                     </td>
                   </ng-container>
-                  <tr mat-header-row *matHeaderRowDef="histCols"></tr>
-                  <tr mat-row *matRowDef="let r; columns: histCols;"></tr>
+                  <tr mat-header-row *matHeaderRowDef="histCols()"></tr>
+                  <tr mat-row *matRowDef="let r; columns: histCols();"></tr>
                 </table>
               </div>
             }
@@ -552,29 +609,6 @@ export class DuplicateDateConfirmDialog {
   `,
   styles: [`
     .capture-page { display: flex; flex-direction: column; gap: 0; max-width: 1100px; }
-
-    /* Employee search dropdown (custom, signal-driven) */
-    .emp-search-wrap { position: relative; }
-    .emp-dropdown {
-      position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;
-      margin-top: 4px; max-height: 320px; overflow-y: auto;
-      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
-      box-shadow: 0 10px 28px rgba(15,23,42,0.12), 0 2px 6px rgba(15,23,42,0.06);
-      padding: 4px;
-    }
-    .emp-option {
-      display: flex; align-items: center; gap: 10px; width: 100%;
-      padding: 8px 10px; border: 0; background: transparent; cursor: pointer;
-      border-radius: 6px; text-align: left; font-size: 13px; color: #1e293b;
-    }
-    .emp-option:hover { background: #eef2ff; }
-    .emp-opt-id {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-width: 48px; padding: 1px 8px; border-radius: 999px;
-      background: #eef2ff; color: #4338ca; font-size: 11px; font-weight: 600;
-      font-variant-numeric: tabular-nums; flex-shrink: 0;
-    }
-    .emp-opt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .date-field-wrap { position: relative; display: flex; align-items: center; }
     .special-day-badge {
       display: inline-flex; align-items: center; gap: 5px;
@@ -749,6 +783,27 @@ export class DuplicateDateConfirmDialog {
       margin-bottom: 8px;
     }
 
+    /* Chain-change warning banner --------------------------------- */
+    .chain-change-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px;
+      background: #fffbeb; border: 1px solid #f59e0b;
+      border-radius: 8px; color: #92400e;
+      font-size: 13px; line-height: 1.5;
+    }
+    .chain-change-banner > mat-icon {
+      color: #f59e0b; flex-shrink: 0;
+      font-size: 18px; width: 18px; height: 18px; margin-top: 1px;
+    }
+    .chain-change-banner > span { flex: 1; }
+    .chain-change-dismiss {
+      background: none; border: none; cursor: pointer; padding: 2px;
+      color: #92400e; display: flex; align-items: center; flex-shrink: 0;
+      border-radius: 4px; line-height: 1;
+    }
+    .chain-change-dismiss:hover { background: #fde68a; }
+    .chain-change-dismiss mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
     /* Approvals panel --------------------------------------------- */
     /* auto-fit + minmax keeps the grid responsive at desktop / tablet /
        mobile widths without a hand-counted spacer or hard breakpoints. */
@@ -787,11 +842,42 @@ export class DuplicateDateConfirmDialog {
       color: #64748b;
       font-weight: 400;
     }
+    .approval-acting {
+      font-size: 11px;
+      color: #0369a1;
+      font-weight: 500;
+      background: #e0f2fe;
+      border-radius: 4px;
+      padding: 2px 6px;
+      display: inline-block;
+      margin-top: 2px;
+    }
     .approval-timestamp {
       font-size: 11px;
       color: #94a3b8;
       font-weight: 400;
       margin-top: 2px;
+    }
+    .chain-incomplete-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #9a3412;
+      line-height: 1.45;
+    }
+    .chain-incomplete-icon {
+      font-size: 18px !important;
+      height: 18px !important;
+      width: 18px !important;
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: #ea580c;
     }
     .approval-comment {
       font-size: 12px;
@@ -885,7 +971,6 @@ export class DuplicateDateConfirmDialog {
 export class OvertimeCaptureFormComponent implements OnInit {
   private lookups = inject(LookupService);
   private txService = inject(OvertimeTransactionsService);
-  private spOvertime = inject(OvertimeSharePointService);
   private configSvc = inject(OvertimeConfigService);
   private wf = inject(WorkflowService);
   private user = inject(UserContextService);
@@ -893,8 +978,42 @@ export class OvertimeCaptureFormComponent implements OnInit {
   private dialog = inject(MatDialog);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
-  histCols = ['date','hours','amount','type','status'];
+  private _chainPreviewTrigger$ = new Subject<{ positionId: string; date: string } | null>();
+  chainPreviewLoading = signal(false);
+  chainPreview = signal<ChainPreviewDto | null>(null);
+  chainBannerDismissed = signal(false);
+
+  chainChanged = computed(() => {
+    if (!this.editId()) return false;
+    const tx      = this.loadedTx();
+    const preview = this.chainPreview();
+    if (!tx || !preview) return false;
+    const origRecommender = tx.recommenderEmployeeName ?? null;
+    const origApprover    = tx.approverEmployeeName    ?? null;
+    const newRecommender  = preview.recommender?.employeeName ?? null;
+    const newApprover     = preview.approver?.employeeName    ?? null;
+    return origRecommender !== newRecommender || origApprover !== newApprover;
+  });
+
+  showChainChangeBanner = computed(() =>
+    !this.viewOnly() && this.chainChanged() && !this.chainBannerDismissed()
+  );
+
+  chainChangeBannerText = computed(() => {
+    const preview = this.chainPreview();
+    if (!preview) return '';
+    const recommenderName = preview.recommender?.employeeName ?? 'None';
+    const approverName    = preview.approver?.employeeName    ?? 'None';
+    return `Saving will update the approval chain — new recommender: ${recommenderName}, new approver: ${approverName}`;
+  });
+
+  histCols = computed(() =>
+    this.canSeeFinancialDetails()
+      ? ['date', 'hours', 'amount', 'type', 'status']
+      : ['date', 'hours', 'type', 'status']
+  );
 
   editId = signal<string | null>(null);
   currentStatus = signal<WorkflowStatus | null>(null);
@@ -945,6 +1064,17 @@ export class OvertimeCaptureFormComponent implements OnInit {
         || this.currentStatus() === WorkflowStatus.Returned;
   });
 
+  // True only on the new-capture path when the chain preview has loaded but is
+  // missing a recommender or approver, or when the API returned an explicit
+  // chain error.  The edit/recall path is excluded because the chain was
+  // already resolved at create-time.
+  chainIncomplete = computed(() => {
+    if (this.editId()) return false;
+    const preview = this.chainPreview();
+    if (!preview) return false;
+    return !!preview.chainError || !preview.recommender || !preview.approver;
+  });
+
   // Approval fields rendered in the Approvals panel. Defined as data so the
   // grid layout never depends on a hand-counted number of <div>s.
   // `timestamp` carries the per-role action time (Created for the capturer,
@@ -956,6 +1086,7 @@ export class OvertimeCaptureFormComponent implements OnInit {
     label: string;
     display: string;
     subDisplay: string | null;
+    actingDisplay: string | null;
     muted: boolean;
     timestamp: string | null;
     timestampPrefix: string;
@@ -972,11 +1103,11 @@ export class OvertimeCaptureFormComponent implements OnInit {
       .filter(Boolean).join(' · ') || null;
 
     return [
-      { label: 'Capturer',        display: capturerName,                                                          subDisplay: capturerSub,  muted: !tx.capturedBy,               timestamp: tx.createdAt ?? null,              timestampPrefix: 'Created', comment: null },
-      { label: 'Approval Status', display: tx.statusLabel || '—',                                                 subDisplay: null,          muted: !tx.statusLabel,              timestamp: null,                              timestampPrefix: '',        comment: null },
-      { label: 'Recommender',     display: tx.recommenderEmployeeName || '—',                                       subDisplay: tx.recommenderPositionDescription || null,    muted: !tx.recommenderEmployeeName,    timestamp: recommenderEv?.actionedAt ?? null,    timestampPrefix: 'Signed', comment: recommenderEv?.comments ?? null },
-      { label: 'Approver',        display: tx.approverEmployeeName || '—',                                         subDisplay: tx.approverPositionDescription || null,       muted: !tx.approverEmployeeName,       timestamp: approverEv?.actionedAt ?? null,      timestampPrefix: 'Signed', comment: approverEv?.comments ?? null },
-      { label: 'Excess Approver', display: tx.excessApproverEmployeeName || (tx.isExcess ? '—' : 'Not applicable'), subDisplay: tx.excessApproverPositionDescription || null, muted: !tx.excessApproverEmployeeName, timestamp: excessApproverEv?.actionedAt ?? null, timestampPrefix: 'Signed', comment: excessApproverEv?.comments ?? null },
+      { label: 'Capturer',        display: capturerName,                                                          subDisplay: capturerSub,                                  actingDisplay: null,                                                                                   muted: !tx.capturedBy,               timestamp: tx.createdAt ?? null,                timestampPrefix: 'Created', comment: null },
+      { label: 'Approval Status', display: tx.statusLabel || '—',                                                 subDisplay: null,                                         actingDisplay: null,                                                                                   muted: !tx.statusLabel,              timestamp: null,                                timestampPrefix: '',        comment: null },
+      { label: 'Recommender',     display: tx.recommenderEmployeeName || '—',                                     subDisplay: tx.recommenderPositionDescription || null,     actingDisplay: tx.recommenderIsActing ? `Acting for ${tx.recommenderPrimaryHolderName || 'primary holder'}` : (tx.recommenderActingEmployeeName ? `Acting: ${tx.recommenderActingEmployeeName}` : null), muted: !tx.recommenderEmployeeName,  timestamp: recommenderEv?.actionedAt ?? null,   timestampPrefix: 'Signed',  comment: recommenderEv?.comments ?? null },
+      { label: 'Approver',        display: tx.approverEmployeeName || '—',                                        subDisplay: tx.approverPositionDescription || null,        actingDisplay: tx.approverIsActing ? `Acting for ${tx.approverPrimaryHolderName || 'primary holder'}` : (tx.approverActingEmployeeName ? `Acting: ${tx.approverActingEmployeeName}` : null),     muted: !tx.approverEmployeeName,     timestamp: approverEv?.actionedAt ?? null,      timestampPrefix: 'Signed',  comment: approverEv?.comments ?? null },
+      { label: 'Excess Approver', display: tx.excessApproverEmployeeName || (tx.isExcess ? '—' : 'Not applicable'), subDisplay: tx.excessApproverPositionDescription || null, actingDisplay: null,                                                                                muted: !tx.excessApproverEmployeeName, timestamp: excessApproverEv?.actionedAt ?? null, timestampPrefix: 'Signed', comment: excessApproverEv?.comments ?? null },
     ];
   });
 
@@ -1024,21 +1155,34 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   private historyEventActor(ev: WorkflowEventDto, tx: OvertimeTransactionDto, isExcess: boolean): string {
     const { fromStatus: from, toStatus: to } = ev;
-    let resolved: string | null | undefined;
+
+    // Determine the expected primary actor (snapshotted on the transaction).
+    let primary: string | null | undefined;
     if (to === WorkflowStatus.Recommended
         && (from === WorkflowStatus.Requested || from === WorkflowStatus.Returned))
-      resolved = tx.capturedByName || tx.capturedBy;
+      primary = tx.capturedByName || tx.capturedBy;
     else if (from === WorkflowStatus.Recommended && to === WorkflowStatus.ApprovedForPayment)
-      resolved = tx.recommenderEmployeeName;
+      primary = tx.recommenderEmployeeName;
     else if (from === WorkflowStatus.ApprovedForPayment && to === WorkflowStatus.ApprovedForPayment)
-      resolved = tx.approverEmployeeName;
+      primary = tx.approverEmployeeName;
     else if (from === WorkflowStatus.ApprovedForPayment && to === WorkflowStatus.AwaitingPayrollApproval)
-      resolved = isExcess ? tx.excessApproverEmployeeName : tx.approverEmployeeName;
+      primary = isExcess ? tx.excessApproverEmployeeName : tx.approverEmployeeName;
     else if (from === WorkflowStatus.AwaitingPayrollApproval && to === WorkflowStatus.AwaitingPayrollApproval)
-      resolved = tx.payrollCapturerEmployeeName;
+      primary = tx.payrollCapturerEmployeeName;
     else if (from === WorkflowStatus.AwaitingPayrollApproval && to === WorkflowStatus.Processed)
-      resolved = tx.payrollApproverEmployeeName;
-    return resolved || ev.actionedBy || '—';
+      primary = tx.payrollApproverEmployeeName;
+
+    // When the server resolved the actual actioner's employee name, use it.
+    // If it differs from the primary (acting appointment), annotate accordingly.
+    const actual = ev.actionedByEmployeeName;
+    if (actual) {
+      if (primary && actual !== primary) {
+        return `${actual} (acting for ${primary})`;
+      }
+      return actual;
+    }
+
+    return primary || ev.actionedBy || '—';
   }
 
   private historyEventStatusClass(status: WorkflowStatus): string {
@@ -1056,20 +1200,15 @@ export class OvertimeCaptureFormComponent implements OnInit {
   searchTerm = '';
   private search$ = new Subject<string>();
   private _hideSuggestions = signal(false);
-  suggestions = signal<EmployeeLookup[]>([]);
-
-  // Custom signal-driven dropdown (replaces mat-autocomplete, which doesn't
-  // reliably open with async options under zoneless change detection).
-  // When results land, suggestions() updates and the @if/@for in the template
-  // renders the dropdown directly in the component view — no overlay timing.
-  private _searchSub = this.search$.pipe(
-    debounceTime(250),
-    distinctUntilChanged(),
-    switchMap(t => t && t.length >= 2 ? this.lookups.employees(t) : of([] as EmployeeLookup[])),
-    takeUntilDestroyed(),
-  ).subscribe(results => {
-    this.suggestions.set(this._hideSuggestions() ? [] : (results || []));
-  });
+  private _rawSuggestions = toSignal(
+    this.search$.pipe(
+      debounceTime(250),
+      distinctUntilChanged(),
+      switchMap(t => t && t.length >= 2 ? this.lookups.employees(t) : of([] as EmployeeLookup[]))
+    ),
+    { initialValue: [] as EmployeeLookup[] }
+  );
+  suggestions = computed(() => this._hideSuggestions() ? [] as EmployeeLookup[] : (this._rawSuggestions() ?? []));
 
   employee = signal<EmployeeLookup | null>(null);
   overtimeDate = signal(todayIso());
@@ -1122,20 +1261,31 @@ export class OvertimeCaptureFormComponent implements OnInit {
    * Only available when the amount was computed live (not from a stored snapshot).
    */
   formulaWithValues = computed(() => {
+    // Prefer the live preview (available while the user is actively editing).
     const preview = this.amountPreview();
-    if (!preview?.inputs || !preview.formula) return null;
-    // Sort keys longest-first to avoid partial substitution (e.g. WHPM before WHPM_Monthly)
-    const entries = Object.entries(preview.inputs)
-      .sort((a, b) => b[0].length - a[0].length);
-    let expr = preview.formula;
-    for (const [key, val] of entries) {
-      const fmt = val >= 1000
-        ? val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : Number.isInteger(val) ? val.toString() : val.toFixed(2);
-      expr = expr.replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), fmt);
+    if (preview?.inputs && preview.formula) {
+      // Sort keys longest-first to avoid partial substitution (e.g. WHPM before WHPM_Monthly)
+      const entries = Object.entries(preview.inputs)
+        .sort((a, b) => b[0].length - a[0].length);
+      let expr = preview.formula;
+      for (const [key, val] of entries) {
+        const fmt = val >= 1000
+          ? val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        expr = expr.replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), fmt);
+      }
+      return expr;
     }
-    return expr;
+    // Fall back to the snapshotted string stored on the transaction (available in view mode).
+    return this.loadedTx()?.formulaWithValuesSnapshot ?? null;
   });
+
+  /** True when the current user is an approver (or excess/payroll approver) — only they may see the calculated amount and substituted salary values. Recommenders are excluded. */
+  canSeeFinancialDetails = computed(() => {
+    const me = this.user.me();
+    return !!(me?.isApprover || me?.isExcessApprover);
+  });
+
   previewing = signal(false);
 
   pendingFile  = signal<File | null>(null);
@@ -1144,18 +1294,27 @@ export class OvertimeCaptureFormComponent implements OnInit {
 
   existingDoc = computed(() => this.loadedTx()?.documents?.[0] ?? null);
 
-  // SharePoint document storage (Admin → Overtime → SharePoint config). When
-  // enabled, supporting PDFs are uploaded to / listed from SharePoint instead of
-  // the overtime API's local file storage.
-  usingSharePoint = signal(this.spOvertime.isEnabled());
-  spDoc = signal<SpOvertimeDoc | null>(null);
-  spBusy = signal(false);
-
   exceptionalMax = signal(60);
+  overtimeConfig = signal<import('../../../../core/models/overtime-config.model').OvertimeConfig | null>(null);
+
+  minOvertimeDate = computed((): Date | null => {
+    const cfg = this.overtimeConfig();
+    if (!cfg) return null;
+    const startDay = Math.min(Math.max(cfg.countingPeriodStartDay ?? 1, 1), 28);
+    const today = new Date();
+    const periodAnchor = today.getDate() >= startDay
+      ? today
+      : new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const periodOpen = new Date(periodAnchor.getFullYear(), periodAnchor.getMonth(), startDay);
+    return new Date(periodOpen.getFullYear(), periodOpen.getMonth() - 2, periodOpen.getDate());
+  });
 
   ngOnInit(): void {
     this.configSvc.get().subscribe({
-      next: cfg => { if (cfg?.exceptionalMaximumOvertimeHours) this.exceptionalMax.set(cfg.exceptionalMaximumOvertimeHours); },
+      next: cfg => {
+        this.overtimeConfig.set(cfg ?? null);
+        if (cfg?.exceptionalMaximumOvertimeHours) this.exceptionalMax.set(cfg.exceptionalMaximumOvertimeHours);
+      },
       error: () => {}
     });
     const id = this.route.snapshot.paramMap.get('id');
@@ -1163,6 +1322,31 @@ export class OvertimeCaptureFormComponent implements OnInit {
       this.editId.set(id);
       this.loadForEdit(id);
     }
+
+    // Pre-populate employee when navigated from the capture list "add" button.
+    const presetEmployeeId = this.route.snapshot.queryParamMap.get('employeeId');
+    if (!id && presetEmployeeId) {
+      this.lookups.employee(presetEmployeeId).subscribe({
+        next: emp => { if (emp) this.onEmployeePicked(emp); },
+        error: () => {}
+      });
+    }
+
+    this._chainPreviewTrigger$.pipe(
+      debounceTime(400),
+      distinctUntilChanged((a, b) => a?.positionId === b?.positionId && a?.date === b?.date),
+      switchMap(trigger => {
+        if (!trigger) { this.chainPreviewLoading.set(false); return of(null); }
+        this.chainPreviewLoading.set(true);
+        return this.txService.chainPreview(trigger.positionId, trigger.date).pipe(
+          catchError(() => of(null))
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(result => {
+      this.chainPreview.set(result);
+      this.chainPreviewLoading.set(false);
+    });
   }
 
   wouldExceedLimit(): boolean {
@@ -1291,10 +1475,6 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.currentStatus.set(tx.status);
     this.currentStatusLabel.set(tx.statusLabel);
 
-    // When SharePoint storage is active, the supporting document lives in
-    // SharePoint (not the overtime API) — load it by OvertimeID metadata.
-    if (this.usingSharePoint()) this.loadSpDoc(tx.id);
-
     // Seed the card immediately with what the transaction already carries so
     // the UI isn't blank while the employee fetch is in flight.
     const partial: EmployeeLookup = {
@@ -1308,7 +1488,8 @@ export class OvertimeCaptureFormComponent implements OnInit {
       divisionId: '',
       divisionName: '',
       positionId: tx.positionId,
-      positionDescription: ''
+      positionDescription: '',
+      allowOverTime: true
     };
     this.employee.set(partial);
 
@@ -1337,6 +1518,30 @@ export class OvertimeCaptureFormComponent implements OnInit {
       salaryHeadName: tx.salaryHeadName
     });
 
+    // For legacy rows that pre-date the FormulaWithValuesSnapshot column, the
+    // formulaWithValues() computed signal would return null (no snapshot, no
+    // live inputs). Trigger a background preview to obtain the inputs map so
+    // the substituted-values line can render for recommenders/approvers.
+    // We preserve the original stored amount to avoid showing a recalculated
+    // figure for a transaction that may already be in an approval workflow.
+    if (!tx.formulaWithValuesSnapshot && tx.salaryHeadId && tx.hours > 0) {
+      this.txService.previewAmount({
+        employeeId: tx.employeeId,
+        salaryHeadId: tx.salaryHeadId,
+        hours: tx.hours,
+      }).subscribe({
+        next: preview => {
+          this.amountPreview.set({
+            amount:         tx.amount,           // keep original stored amount
+            formula:        tx.formulaSnapshot,  // keep original formula template
+            salaryHeadName: tx.salaryHeadName,
+            inputs:         preview.inputs,      // inject live inputs for substitution
+          });
+        },
+        error: () => { /* non-fatal — values line stays hidden for legacy rows */ }
+      });
+    }
+
     this.loadTypes(tx.employeeId);
     this.loadHistory(tx.employeeId);
   }
@@ -1346,22 +1551,17 @@ export class OvertimeCaptureFormComponent implements OnInit {
     this.search$.next(t);
   }
 
-  /** Hide the dropdown shortly after blur (delay lets an option mousedown register). */
-  onSearchBlur(): void {
-    setTimeout(() => { this._hideSuggestions.set(true); this.suggestions.set([]); }, 150);
-  }
-
   onEmployeePicked(e: EmployeeLookup | string): void {
     if (typeof e === 'string') return;
-    // Hide the dropdown and lock in the selection.
+    // Synchronously hide all options so the panel cannot re-open via _handleFocus
     this._hideSuggestions.set(true);
-    this.suggestions.set([]);
     this.employee.set(e);
     this.searchTerm = `${e.employeeNumber} - ${e.fullName}`;
     this.salaryHeadId = null;
     this.amountPreview.set(null);
     this.loadTypes(e.id);
     this.loadHistory(e.id);
+    this.triggerChainPreview();
   }
 
   private loadTypes(empId: string): void {
@@ -1399,6 +1599,23 @@ export class OvertimeCaptureFormComponent implements OnInit {
     const m = String(val.getMonth() + 1).padStart(2, '0');
     const d = String(val.getDate()).padStart(2, '0');
     this.overtimeDate.set(`${y}-${m}-${d}`);
+    this.chainBannerDismissed.set(false);
+    this.triggerChainPreview();
+  }
+
+  dismissChainBanner(): void {
+    this.chainBannerDismissed.set(true);
+  }
+
+  private triggerChainPreview(): void {
+    const emp  = this.employee();
+    const date = this.overtimeDate();
+    if (!emp?.positionId || !date) {
+      this._chainPreviewTrigger$.next(null);
+      this.chainPreview.set(null);
+      return;
+    }
+    this._chainPreviewTrigger$.next({ positionId: emp.positionId, date });
   }
 
   get hoursLabel(): string {
@@ -1482,12 +1699,24 @@ export class OvertimeCaptureFormComponent implements OnInit {
     });
   }
 
+  private static readonly ALLOWED_MIME = new Set([
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-outlook',
+    'application/octet-stream', // .msg fallback
+  ]);
+  private static readonly ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.docx', '.msg']);
+
   onFile(ev: Event): void {
     const input = ev.target as HTMLInputElement;
     const f = input.files?.[0];
     if (!f) return;
-    if (f.type !== 'application/pdf') {
-      this.snack.open('Only PDF files are accepted.', 'OK', { duration: 3000 });
+    const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
+    if (!OvertimeCaptureFormComponent.ALLOWED_MIME.has(f.type) && !OvertimeCaptureFormComponent.ALLOWED_EXT.has(ext)) {
+      this.snack.open('Only PDF, JPG, PNG, XLSX, DOCX and MSG files are accepted.', 'OK', { duration: 4000 });
       input.value = ''; return;
     }
     if (f.size > 5 * 1024 * 1024) {
@@ -1596,56 +1825,13 @@ export class OvertimeCaptureFormComponent implements OnInit {
       }
     };
     if (file) {
-      if (this.usingSharePoint()) {
-        // Upload to the SharePoint library configured in Admin → Overtime,
-        // tagged with the OvertimeID + Employee metadata so it can be listed
-        // back on edit and identified in the library.
-        const emp = this.employee();
-        const employeeLabel = emp ? `${emp.fullName} (#${emp.employeeNumber})` : (tx.employeeName || undefined);
-        this.spOvertime.uploadOvertimeDocument(tx.id, file, { description: this.reason || file.name, employee: employeeLabel })
-          .then(() => { this.pendingFile.set(null); finish(); })
-          .catch(e => { this.saving.set(false); this.snack.open(`SharePoint upload failed: ${e?.message ?? e}`, 'OK', { duration: 5000 }); });
-      } else {
-        this.txService.uploadDocument(tx.id, file).subscribe({
-          next: () => finish(),
-          error: e => { this.saving.set(false); this.snack.open(`Upload failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 }); }
-        });
-      }
+      this.txService.uploadDocument(tx.id, file).subscribe({
+        next: () => finish(),
+        error: e => { this.saving.set(false); this.snack.open(`Upload failed: ${e?.error?.message ?? e?.message}`, 'OK', { duration: 4000 }); }
+      });
     } else {
       finish();
     }
-  }
-
-  /** Load the SharePoint document (if any) for an overtime transaction. */
-  private loadSpDoc(id: string): void {
-    this.spOvertime.listOvertimeDocuments(id)
-      .then(docs => this.spDoc.set(docs[0] ?? null))
-      .catch(() => this.spDoc.set(null));
-  }
-
-  /** Open the SharePoint document in a new tab / download it. */
-  viewSpDoc(): void {
-    const doc = this.spDoc();
-    if (!doc) return;
-    this.spOvertime.downloadOvertimeDocument(doc.__item)
-      .catch(e => this.snack.open(`Open failed: ${e?.message ?? e}`, 'OK', { duration: 4000 }));
-  }
-
-  /** Remove the SharePoint document so a replacement can be attached. */
-  removeSpDoc(): void {
-    const doc = this.spDoc();
-    if (!doc) return;
-    this.removingDoc.set(true);
-    this.spOvertime.deleteOvertimeDocument(doc.__item)
-      .then(() => {
-        this.removingDoc.set(false);
-        this.spDoc.set(null);
-        this.snack.open('Document removed.', 'OK', { duration: 2500 });
-      })
-      .catch(e => {
-        this.removingDoc.set(false);
-        this.snack.open(`Remove failed: ${e?.message ?? e}`, 'OK', { duration: 4000 });
-      });
   }
 
   private done(msg: string): void {

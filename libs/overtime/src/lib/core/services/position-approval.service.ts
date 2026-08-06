@@ -5,6 +5,7 @@ import { environment } from '../../environment';
 import { ApiResponse } from '../models/api-response.model';
 import {
   ConfirmImportRequest, ImportConfirmResult, ImportValidationResult,
+  OrgChartData,
   PaginatedResponse, PositionApprovalConfig, PositionListItem,
   PositionsSummary, PositionStatusFilter
 } from '../models/position-approval.model';
@@ -76,5 +77,15 @@ export class PositionApprovalService {
     return this.http.post<ApiResponse<ImportConfirmResult>>(
       `${this.base}/approval-config/import/confirm`, payload
     ).pipe(map(r => r.data));
+  }
+
+  /** Flat node list for the approval-chain organogram.
+   *  @param gapsOnly When true, only nodes on chains that contain a recommender
+   *                  gap are returned. Summary totals always reflect the full dataset.
+   */
+  organogram(gapsOnly = false): Observable<OrgChartData> {
+    const params = new HttpParams().set('gapsOnly', String(gapsOnly));
+    return this.http.get<ApiResponse<OrgChartData>>(`${this.base}/organogram`, { params })
+      .pipe(map(r => r.data));
   }
 }

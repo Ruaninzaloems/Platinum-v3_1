@@ -1,14 +1,19 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using PlatinumOvertime_API.Models.Domain;
 
 namespace PlatinumOvertime_API.Data;
 
-public class OvertimeDbContext : DbContext
+public class OvertimeDbContext : DbContext, IDataProtectionKeyContext
 {
     // Non-generic options accepted so derived per-provider contexts
     // (OvertimeDbContextPostgres / OvertimeDbContextSqlServer) can pass their
     // own DbContextOptions<TSelf> here without type juggling.
     protected OvertimeDbContext(DbContextOptions options) : base(options) { }
+
+    // IDataProtectionKeyContext — keys persisted here survive redeployments.
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
     public DbSet<OvertimeConfig> OvertimeConfig => Set<OvertimeConfig>();
     public DbSet<PositionApprovalConfig> PositionApprovalConfigs => Set<PositionApprovalConfig>();
@@ -54,6 +59,8 @@ public class OvertimeDbContext : DbContext
 
     /// <summary>Read-only projection of legacy Const_Cycle.</summary>
     public DbSet<ConstCycle> ConstCycles => Set<ConstCycle>();
+
+    /// <summary>Read-only projection of legacy Const_Payroll_CycleMode_sys.</summary>
     public DbSet<ConstPayrollCycleMode> ConstPayrollCycleModes => Set<ConstPayrollCycleMode>();
 
     /// <summary>Read-only projection of legacy Const_Department.</summary>
@@ -155,8 +162,12 @@ public class OvertimeDbContext : DbContext
             e.Property(x => x.HoursAlreadyCapturedThisMonth).HasColumnType("decimal(8,2)");
             e.Property(x => x.RecommenderEmployeeId).HasMaxLength(64);
             e.Property(x => x.RecommenderEmployeeName).HasMaxLength(300);
+            e.Property(x => x.RecommenderChainPositionId).HasMaxLength(64);
+            e.Property(x => x.RecommenderChainPositionName).HasMaxLength(500);
             e.Property(x => x.ApproverEmployeeId).HasMaxLength(64);
             e.Property(x => x.ApproverEmployeeName).HasMaxLength(300);
+            e.Property(x => x.ApproverChainPositionId).HasMaxLength(64);
+            e.Property(x => x.ApproverChainPositionName).HasMaxLength(500);
             e.Property(x => x.ExcessApproverEmployeeId).HasMaxLength(64);
             e.Property(x => x.ExcessApproverEmployeeName).HasMaxLength(300);
             e.Property(x => x.PayrollCapturerEmployeeId).HasMaxLength(64);
@@ -194,6 +205,7 @@ public class OvertimeDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.ActionedBy).HasMaxLength(200);
             e.Property(x => x.Comments).HasMaxLength(2000);
+            e.Property(x => x.ChainPositionNote).HasMaxLength(200);
             e.HasOne(x => x.OvertimeTransaction)
                 .WithMany(t => t.WorkflowHistory)
                 .HasForeignKey(x => x.OvertimeTransactionId)
@@ -364,7 +376,7 @@ public class OvertimeDbContext : DbContext
             e.Property(x => x.SkipInNewTaxYear).HasColumnName("SkipInNewTaxYear");
         });
 
-        // Legacy Const_Payroll_CycleMode_sys — read-only (1 = Normal, 2 = Special).
+        // Legacy Const_Payroll_CycleMode_sys — read-only.
         b.Entity<ConstPayrollCycleMode>(e =>
         {
             e.ToTable("Const_Payroll_CycleMode_sys", t => t.ExcludeFromMigrations());
@@ -533,6 +545,8 @@ public class OvertimeDbContext : DbContext
             e.HasIndex(x => x.UserId);
         });
 
+        // (Acting appointment invariant comment in SaveChanges region below)
+
         // Payroll_EmployeeOvertime — write target for "Send to Payroll".
         // ExcludeFromMigrations: in production owned by Platinum Payroll;
         // in dev PayrollEmployeeOvertimeSeeder creates the table.
@@ -542,11 +556,11 @@ public class OvertimeDbContext : DbContext
             e.HasKey(x => x.EmployeeOverTimeId);
             e.Property(x => x.EmployeeOverTimeId).HasColumnName("EmployeeOverTime_ID")
                 .ValueGeneratedOnAdd();
-            e.Property(x => x.EmployeeId).HasColumnName("Employee_ID");
+            e.Property(x => x.EmployeeId).HasColumnName("EmployeeID");
             e.Property(x => x.OverTimeDate).HasColumnName("OverTimeDate");
-            e.Property(x => x.OverTimeHour).HasColumnName("OverTimeHour").HasColumnType("decimal(18,4)");
+            e.Property(x => x.OverTimeHour).HasColumnName("OverTimeHour").HasColumnType("decimal(18,2)");
             e.Property(x => x.OverTimeFlag).HasColumnName("OverTimeFlag");
-            e.Property(x => x.FinancialYear).HasColumnName("FinancialYear").HasMaxLength(32);
+            e.Property(x => x.FinancialYear).HasColumnName("FinancialYear").HasMaxLength(10);
             e.Property(x => x.Enabled).HasColumnName("Enabled");
             e.Property(x => x.CapturerId).HasColumnName("CapturerID");
             e.Property(x => x.DateCaptured).HasColumnName("DateCaptured");
@@ -565,9 +579,14 @@ public class OvertimeDbContext : DbContext
             e.Property(x => x.TotalAmount).HasColumnName("TotalAmount").HasColumnType("decimal(18,2)");
             e.Property(x => x.SupportingDocsId).HasColumnName("SupportingDocsID");
             e.Property(x => x.IsCorrection).HasColumnName("IsCorrection");
-            e.Property(x => x.LinkId).HasColumnName("LinkID");
-            e.Property(x => x.MOCValue).HasColumnName("MOCValue").HasColumnType("decimal(18,4)");
-            e.Property(x => x.Rate).HasColumnName("Rate").HasColumnType("decimal(18,4)");
+            // LinkID and CapturedDuringPeriodID are excluded from EF INSERT because
+            // older production Payroll tables may not have these columns yet.
+            // PayrollProcessingService writes them via a separate raw-SQL UPDATE
+            // (wrapped in try-catch) after the main SaveChanges succeeds.
+            e.Ignore(x => x.LinkId);
+            e.Ignore(x => x.CapturedDuringPeriodId);
+            e.Property(x => x.MOCValue).HasColumnName("MOC_Value").HasColumnType("decimal(18,2)");
+            e.Property(x => x.Rate).HasColumnName("Rate").HasColumnType("decimal(18,2)");
             e.Property(x => x.SalaryHeadId).HasColumnName("SalaryHeadID");
             e.Property(x => x.IsBulk).HasColumnName("IsBulk");
             e.Property(x => x.ProcessedOnPeriodId).HasColumnName("ProcessedOnPeriodID");
@@ -575,8 +594,76 @@ public class OvertimeDbContext : DbContext
             e.Property(x => x.ExcludeFromPayment).HasColumnName("ExcludeFromPayment");
             e.Property(x => x.TerminationEscalated).HasColumnName("TerminationEscalated");
             e.Property(x => x.EscalatedDate).HasColumnName("EscalatedDate");
-            e.Property(x => x.CapturedDuringPeriodId).HasColumnName("CapturedDuringPeriodID");
             e.HasIndex(x => x.EmployeeId);
         });
+    }
+
+    // ── Acting appointment invariant — EF-level enforcement ──────────────────
+    //
+    // Invariant: every TemporaryActingAppointment.ActingInPositionId must equal
+    // the PositionId of the PositionApprovalConfig it is attached to via
+    // PositionApprovalConfigId.  A mismatch means the acting badge in the
+    // approver card will be invisible because AssigneeResolverService loads
+    // appointments through the FK navigation property.
+    //
+    // The same invariant is enforced at the database level by the composite FK
+    // added in migration 20260609120000/20260609120001.  This SaveChanges
+    // override acts as a belt-and-suspenders catch for any write path that
+    // might not go through the repository (e.g. direct DbSet manipulation in
+    // tests or seed code) so the error surfaces with a meaningful message
+    // rather than a raw DB constraint violation.
+    //
+    // The check only runs for entries in the change tracker whose parent config
+    // is also tracked (the normal repository path always loads the config via
+    // Include before saving).  When the parent is not tracked, the DB-level
+    // composite FK still catches the violation.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess = true)
+    {
+        ValidateActingAppointmentInvariant();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess = true,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateActingAppointmentInvariant();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void ValidateActingAppointmentInvariant()
+    {
+        // Build a lookup of tracked PositionApprovalConfig entries by Id so
+        // parent resolution is O(1) when many appointments are being saved.
+        var trackedConfigs = ChangeTracker
+            .Entries<PositionApprovalConfig>()
+            .ToDictionary(e => e.Entity.Id, e => e.Entity);
+
+        foreach (var entry in ChangeTracker.Entries<TemporaryActingAppointment>())
+        {
+            if (entry.State != EntityState.Added && entry.State != EntityState.Modified)
+                continue;
+
+            var appointment = entry.Entity;
+
+            // Only validate when the parent config is in the change tracker.
+            // If it is not tracked, the DB composite FK will enforce the rule.
+            if (!trackedConfigs.TryGetValue(appointment.PositionApprovalConfigId, out var parentConfig))
+                continue;
+
+            if (!string.Equals(
+                    appointment.ActingInPositionId,
+                    parentConfig.PositionId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"TemporaryActingAppointment.ActingInPositionId ('{appointment.ActingInPositionId}') " +
+                    $"does not match its parent PositionApprovalConfig.PositionId " +
+                    $"('{parentConfig.PositionId}'). The appointment must be attached to the config " +
+                    $"for the chain position being acted into.");
+            }
+        }
     }
 }

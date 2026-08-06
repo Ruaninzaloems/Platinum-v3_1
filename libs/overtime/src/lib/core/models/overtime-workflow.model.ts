@@ -25,6 +25,8 @@ export interface MeDto {
   canAccessCapture: boolean;
   canAccessPayroll: boolean;
   canAccessEnquiry: boolean;
+  /** True when this user holds the configured master-approver override position. */
+  isOverrideUser?: boolean;
   availableUsers?: MeDto[];
   actingForUserIds?: string[];
 }
@@ -89,6 +91,7 @@ export interface WorkflowEventDto {
   fromStatus: WorkflowStatus;
   toStatus: WorkflowStatus;
   actionedBy?: string | null;
+  actionedByEmployeeName?: string | null;
   comments?: string | null;
   actionedAt: string;
 }
@@ -99,6 +102,8 @@ export interface OvertimeTransactionDto {
   employeeName: string;
   departmentId: string;
   departmentName: string;
+  /** Division from the employee's position at capture time. Null for older rows. */
+  divisionName?: string | null;
   positionId: string;
   // Legacy payroll classification snapshots picked from the dropdowns.
   // Optional for back-compat with rows captured before the pickers shipped.
@@ -115,14 +120,30 @@ export interface OvertimeTransactionDto {
   salaryHeadId: number;
   salaryHeadName: string;
   formulaSnapshot: string;
+  /** Formula with variable names substituted by their captured values. Null for older rows. */
+  formulaWithValuesSnapshot?: string | null;
   amount: number;
   reason?: string | null;
   status: WorkflowStatus;
   statusLabel: string;
   recommenderEmployeeName?: string | null;
+  /** Approval-chain position label (e.g. "Dep Dir: Expenditure & SCM (681)"), not the home position. */
   recommenderPositionDescription?: string | null;
+  /** True when the snapshotted recommender was assigned via an acting appointment. */
+  recommenderIsActing?: boolean;
+  /** Name of the permanent position holder when recommenderIsActing is true. */
+  recommenderPrimaryHolderName?: string | null;
+  recommenderActingEmployeeId?: string | null;
+  recommenderActingEmployeeName?: string | null;
   approverEmployeeName?: string | null;
+  /** Approval-chain position label (e.g. "Dep Dir: Expenditure & SCM (681)"), not the home position. */
   approverPositionDescription?: string | null;
+  /** True when the snapshotted approver was assigned via an acting appointment. */
+  approverIsActing?: boolean;
+  /** Name of the permanent position holder when approverIsActing is true. */
+  approverPrimaryHolderName?: string | null;
+  approverActingEmployeeId?: string | null;
+  approverActingEmployeeName?: string | null;
   excessApproverEmployeeId?: string | null;
   excessApproverEmployeeName?: string | null;
   excessApproverPositionDescription?: string | null;

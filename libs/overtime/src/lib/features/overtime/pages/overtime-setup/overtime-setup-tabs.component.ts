@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { OvertimeSetupComponent } from './overtime-setup.component';
 import { PositionApprovalSetupComponent } from '../position-approval-setup/position-approval-setup.component';
+import { ApprovalChainOrganogramComponent } from './approval-chain-organogram.component';
 import { OvertimeConfigService } from '../../../../core/services/overtime-config.service';
 
-type SetupTab = 'config' | 'position';
+type SetupTab = 'config' | 'position' | 'organogram';
 
 @Component({
   selector: 'app-overtime-setup-tabs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OvertimeSetupComponent, PositionApprovalSetupComponent],
+  imports: [OvertimeSetupComponent, PositionApprovalSetupComponent, ApprovalChainOrganogramComponent],
   template: `
     <div class="page-content setup-shell">
       <header class="page-header">
@@ -42,6 +43,16 @@ type SetupTab = 'config' | 'position';
                 (click)="active.set('position')">
           Position Approval Setup
         </button>
+        <button type="button" role="tab"
+                id="os-tab-organogram"
+                class="tab" [class.active]="active() === 'organogram'"
+                [attr.aria-selected]="active() === 'organogram'"
+                aria-controls="os-tabpanel-organogram"
+                [attr.tabindex]="active() === 'organogram' ? 0 : -1"
+                (keydown)="onTabKeydown($event)"
+                (click)="active.set('organogram')">
+          Approval Chain
+        </button>
       </nav>
 
       <div class="tab-body">
@@ -53,6 +64,11 @@ type SetupTab = 'config' | 'position';
         @if (active() === 'position') {
           <div role="tabpanel" id="os-tabpanel-position" aria-labelledby="os-tab-position">
             <app-position-approval-setup />
+          </div>
+        }
+        @if (active() === 'organogram') {
+          <div role="tabpanel" id="os-tabpanel-organogram" aria-labelledby="os-tab-organogram">
+            <app-approval-chain-organogram />
           </div>
         }
       </div>
@@ -84,7 +100,7 @@ export class OvertimeSetupTabsComponent implements OnInit {
     const key = event.key;
     if (key !== 'ArrowLeft' && key !== 'ArrowRight') return;
     event.preventDefault();
-    const tabs: SetupTab[] = ['config', 'position'];
+    const tabs: SetupTab[] = ['config', 'position', 'organogram'];
     const currentIndex = tabs.indexOf(this.active());
     const nextIndex = key === 'ArrowRight'
       ? (currentIndex + 1) % tabs.length

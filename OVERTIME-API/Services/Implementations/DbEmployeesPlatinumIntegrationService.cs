@@ -26,7 +26,7 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _cache;
 
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(1);
 
     public DbEmployeesPlatinumIntegrationService(
         IPlatinumIntegrationService inner,
@@ -58,69 +58,67 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
 
     public async Task<List<EmployeeDto>> GetEmployeesAsync(string? search = null, CancellationToken ct = default)
     {
-        var cacheKey = $"employees:{(string.IsNullOrWhiteSpace(search) ? "all" : search.Trim().ToLowerInvariant())}";
-        if (_cache.TryGetValue(cacheKey, out List<EmployeeDto>? cached) && cached is not null)
-            return cached;
+        // Cache the FULL allowed list under a single key so that any change to
+        // AllowOverTime (or any other eligibility flag) is consistently visible
+        // across all search terms after at most CacheTtl.  Per-search-term
+        // caching caused stale results: e.g. searching "289" could still return
+        // a previously-cached hit even after AllowOverTime was set to false,
+        // because the name-based cache key had expired but the numeric one had not.
+        const string CacheKey = "employees:all";
 
-        // New scope so this singleton service can use the scoped DbContext.
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
-
-        var today = DateTime.UtcNow.Date;
-        var q = db.Set<PayrollEmployee>().AsNoTracking()
-            .Where(e => e.Enabled == true && (e.EndDate == null || e.EndDate > today));
-
-        var term = (search ?? string.Empty).Trim();
-        var numericQuery = !string.IsNullOrEmpty(term) && term.All(char.IsDigit);
-        if (!string.IsNullOrEmpty(term))
+        if (!_cache.TryGetValue(CacheKey, out List<EmployeeDto>? all) || all is null)
         {
-            // Tokenize on whitespace so a natural full-name query like
-            // "Rosemary Bredenkamp" matches a row whose FirstName contains
-            // one token AND Surname contains the other. Each token must
-            // independently hit some field. We deliberately match only the
-            // identifier we display in the picker (Employee_ID) and the
-            // visible name fields — EmpCode / IdNo / EmailAddress are not
-            // shown to the user and including them produced confusing
-            // "ghost" matches (e.g. typing "259" hitting a SA ID number).
-            var tokens = term.ToLowerInvariant()
-                .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var tok in tokens)
-            {
-                var t = tok;
-                q = q.Where(e =>
-                    e.EmployeeId.ToString().Contains(t) ||
-                    (e.PositionId != null && e.PositionId.ToString().Contains(t)) ||
-                    (e.Surname != null && e.Surname.ToLower().Contains(t)) ||
-                    (e.FirstName != null && e.FirstName.ToLower().Contains(t)) ||
-                    (e.KnownAsName != null && e.KnownAsName.ToLower().Contains(t)));
-            }
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
+
+            var today = DateTime.UtcNow.Date;
+
+            var joined =
+                from emp in db.Set<PayrollEmployee>().AsNoTracking()
+                    .Where(e => e.Enabled == true
+                             && (e.EndDate == null || e.EndDate > today)
+                             && e.AllowOverTime == true)
+                join pos in db.Set<PayrollPosition>().AsNoTracking()
+                    on emp.PositionId equals pos.PositionId into posJoin
+                from pos in posJoin.DefaultIfEmpty()
+                join dept in db.Set<ConstDepartment>().AsNoTracking()
+                    on pos.DepartmentId equals dept.DepartmentId into deptJoin
+                from dept in deptJoin.DefaultIfEmpty()
+                join div in db.Set<ConstDivision>().AsNoTracking()
+                    on pos.DivisionId equals div.DivisionId into divJoin
+                from div in divJoin.DefaultIfEmpty()
+                orderby emp.Surname, emp.FirstName
+                select new { emp, pos, dept, div };
+
+            var rows = await joined.ToListAsync(ct);
+            all = rows.Select(r => Map(r.emp, r.pos, r.dept, r.div)).ToList();
+            _cache.Set(CacheKey, all, CacheTtl);
         }
 
-        // Join Position → Department → Division in one query so the picker
-        // and employee card have department/division names without extra
-        // round-trips.
-        var joined =
-            from emp in q
-            join pos in db.Set<PayrollPosition>().AsNoTracking()
-                on emp.PositionId equals pos.PositionId into posJoin
-            from pos in posJoin.DefaultIfEmpty()
-            join dept in db.Set<ConstDepartment>().AsNoTracking()
-                on pos.DepartmentId equals dept.DepartmentId into deptJoin
-            from dept in deptJoin.DefaultIfEmpty()
-            join div in db.Set<ConstDivision>().AsNoTracking()
-                on pos.DivisionId equals div.DivisionId into divJoin
-            from div in divJoin.DefaultIfEmpty()
-            select new { emp, pos, dept, div };
+        // Filter and sort in memory — fast on ~3 500 rows, and ensures every
+        // search term sees the same consistent snapshot from the single cache entry.
+        var term = (search ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(term))
+            return all;
 
-        var ordered = numericQuery
-            ? joined.OrderBy(r => r.emp.EmployeeId)
-            : joined.OrderBy(r => r.emp.Surname).ThenBy(r => r.emp.FirstName);
+        var tokens = term.ToLowerInvariant()
+            .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
 
-        var rows = await ordered.ToListAsync(ct);
-        var result = rows.Select(r => Map(r.emp, r.pos, r.dept, r.div)).ToList();
+        var numericQuery = tokens.Length == 1 && tokens[0].All(char.IsDigit);
 
-        _cache.Set(cacheKey, result, CacheTtl);
-        return result;
+        IEnumerable<EmployeeDto> filtered = all;
+        foreach (var tok in tokens)
+        {
+            var t = tok;
+            filtered = filtered.Where(e =>
+                e.Id.Contains(t) ||
+                e.FullName.ToLowerInvariant().Contains(t) ||
+                e.PositionId.Contains(t));
+        }
+
+        return numericQuery
+            ? filtered.OrderBy(e => int.TryParse(e.Id, out var n) ? n : int.MaxValue).ToList()
+            : filtered.OrderBy(e => e.FullName).ToList();
     }
 
     public async Task<EmployeeDto?> GetEmployeeAsync(string employeeId, CancellationToken ct = default)
@@ -131,7 +129,7 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
 
         var row = await (
             from emp in db.Set<PayrollEmployee>().AsNoTracking()
-            where emp.EmployeeId == id
+            where emp.EmployeeId == id && emp.AllowOverTime == true
             join pos in db.Set<PayrollPosition>().AsNoTracking()
                 on emp.PositionId equals pos.PositionId into posJoin
             from pos in posJoin.DefaultIfEmpty()
@@ -170,7 +168,8 @@ public class DbEmployeesPlatinumIntegrationService : IPlatinumIntegrationService
             DivisionId     = p?.DivisionId?.ToString() ?? string.Empty,
             DivisionName   = div?.DivisionDesc ?? string.Empty,
             PositionId     = e.PositionId?.ToString() ?? string.Empty,
-            PositionDescription = p?.PositionDesc ?? string.Empty
+            PositionDescription = p?.PositionDesc ?? string.Empty,
+            AllowOverTime  = e.AllowOverTime ?? true
         };
     }
 }

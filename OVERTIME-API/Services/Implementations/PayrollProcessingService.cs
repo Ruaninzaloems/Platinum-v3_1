@@ -192,10 +192,12 @@ public class PayrollProcessingService : IPayrollProcessingService
 
         var currentUser = _user.Current;
 
-        // Capturer must be a valid legacy integer employee ID.
-        if (!int.TryParse(currentUser.EmployeeId, out var capturerId))
+        // Capturer ID is the logged-in user's integer UserId (User_UserDetail.User_id).
+        // Using UserId is consistent for both employee-linked and portal/super-user accounts.
+        if (!int.TryParse(currentUser.UserId, out var capturerId))
             return ApiResponse<int>.Failure(
-                $"Current user EmployeeId '{currentUser.EmployeeId}' is not a valid legacy employee ID.");
+                $"Your account has a non-integer user ID ('{currentUser.UserId}'). " +
+                $"Please contact your administrator.");
 
         // Pre-validate all selected transactions so the operation either fully
         // succeeds or fully fails — never partially writes.
@@ -211,12 +213,18 @@ public class PayrollProcessingService : IPayrollProcessingService
                 $"Cannot send to payroll: the following employees do not have valid legacy integer IDs: {detail}.");
         }
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         try
         {
             int written = 0;
+
+            // Collect inserted payroll rows so we can back-fill optional
+            // columns (LinkID, CapturedDuringPeriodID) after SaveChanges.
+            // Those two columns are Ignored by EF to avoid INSERT failures
+            // on older production tables that may not have them yet.
+            var payrollRows = new List<(PayrollEmployeeOvertime Row, int? LinkId, int? CapturedDuringPeriodId)>();
 
             foreach (var t in transactions)
             {
@@ -227,10 +235,10 @@ public class PayrollProcessingService : IPayrollProcessingService
                 var row = new PayrollEmployeeOvertime
                 {
                     EmployeeId = empId,
-                    OverTimeDate = t.OvertimeDate,
+                    OverTimeDate = DateTime.SpecifyKind(t.OvertimeDate, DateTimeKind.Unspecified),
                     OverTimeHour = t.Hours,
                     OverTimeFlag = false,
-                    FinancialYear = period.FinancialYear ?? period.TaxYear,
+                    FinancialYear = period.FinancialYear ?? period.TaxYear ?? string.Empty,
                     Enabled = true,
                     CapturerId = capturerId,
                     DateCaptured = now,
@@ -244,17 +252,16 @@ public class PayrollProcessingService : IPayrollProcessingService
                     Processed = false,
                     ExcludeFromPayment = false,
                     TerminationEscalated = false,
-                    CapturedDuringPeriodId = request.PeriodId,
                     IsApprovalRequired = true,
                     IsApproved = false,
                     RejectedReason = null,
-                    // TransactionNo is the DB-generated integer on the existing
-                    // OvertimeTransaction row; store it here so payroll can
-                    // trace this row back to the source transaction.
-                    LinkId = t.TransactionNo
                 };
 
                 _db.PayrollEmployeeOvertimes.Add(row);
+
+                // Store the optional-column values alongside the row reference
+                // so we can UPDATE them after EF assigns the generated PK.
+                payrollRows.Add((row, t.TransactionNo, request.PeriodId));
 
                 // Mark as captured and advance to Processed.
                 var previousStatus = t.Status;
@@ -285,7 +292,33 @@ public class PayrollProcessingService : IPayrollProcessingService
                 written++;
             }
 
+            // SaveChanges populates EmployeeOverTimeId (ValueGeneratedOnAdd)
+            // on every row so we can reference it in the back-fill UPDATE.
             await _db.SaveChangesAsync(ct);
+
+            // Back-fill LinkID and CapturedDuringPeriodID.  These columns are
+            // excluded from the EF INSERT (Ignore) so that the INSERT succeeds
+            // even when the production Payroll table predates these columns.
+            // If the columns don't exist the UPDATE will throw; we catch it,
+            // log a warning, and continue — the core data is already committed.
+            try
+            {
+                foreach (var (row, linkId, capturedDuringPeriodId) in payrollRows)
+                {
+                    await _db.Database.ExecuteSqlInterpolatedAsync(
+                        $@"UPDATE ""Payroll_EmployeeOvertime""
+                           SET    ""LinkID""                = {linkId},
+                                  ""CapturedDuringPeriodID"" = {capturedDuringPeriodId}
+                           WHERE  ""EmployeeOverTime_ID""   = {row.EmployeeOverTimeId}", ct);
+                }
+            }
+            catch (Exception bfEx)
+            {
+                _log.LogWarning(bfEx,
+                    "SendToPayroll: optional column back-fill (LinkID / CapturedDuringPeriodID) " +
+                    "failed — columns may not exist in this environment. Core data is intact.");
+            }
+
             await tx.CommitAsync(ct);
 
             _log.LogInformation(
@@ -298,7 +331,8 @@ public class PayrollProcessingService : IPayrollProcessingService
         {
             await tx.RollbackAsync(ct);
             _log.LogError(ex, "SendToPayroll failed for {Count} transactions.", transactions.Count);
-            return ApiResponse<int>.Failure("Send to payroll failed: " + ex.Message);
+            var detail = ex.InnerException?.Message ?? ex.Message;
+            return ApiResponse<int>.Failure("Send to payroll failed: " + detail);
         }
     }
 }

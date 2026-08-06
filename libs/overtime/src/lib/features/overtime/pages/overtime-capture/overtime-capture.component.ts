@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@a
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import * as XLSX from 'xlsx';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -11,7 +12,6 @@ import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angu
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
 import { forkJoin, filter, map, distinctUntilChanged, of, catchError } from 'rxjs';
 import { toObservable, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -93,7 +93,6 @@ function captureLevelLabel(status: WorkflowStatus): string {
     MatIconModule, MatPaginatorModule,
     MatProgressSpinnerModule, MatTooltipModule,
     MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule,
-    MatMenuModule
   ],
   template: `
     <div class="page-content overtime-page">
@@ -103,10 +102,10 @@ function captureLevelLabel(status: WorkflowStatus): string {
           <p class="page-subtitle">Capture and manage employee overtime transactions</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn" type="button" disabled
-                  matTooltip="Bulk Import is not part of this delivery">
-            <mat-icon>upload_file</mat-icon>
-            <span>Bulk Import</span>
+          <button class="btn" type="button" (click)="exportToExcel()"
+                  [matTooltip]="'Export ' + filteredRows().length + ' row(s) to Excel'">
+            <mat-icon>download</mat-icon>
+            <span>Export</span>
           </button>
           <a class="btn btn-primary" routerLink="new">
             <mat-icon>add</mat-icon>
@@ -141,8 +140,12 @@ function captureLevelLabel(status: WorkflowStatus): string {
           }
         </select>
 
-        <select class="filter-select" disabled>
-          <option>All Divisions</option>
+        <select class="filter-select"
+                (change)="setFilterDivision($event)">
+          <option value="">All Divisions</option>
+          @for (d of divisionOptions(); track d) {
+            <option [value]="d">{{ d }}</option>
+          }
         </select>
 
         <input class="filter-search"
@@ -205,12 +208,15 @@ function captureLevelLabel(status: WorkflowStatus): string {
                            (change)="toggleSelectAll($event)" />
                   </th>
                   <th>Employee</th>
+                  <th>Department</th>
+                  <th>Division</th>
                   <th>Salary Head Name</th>
                   <th class="num-col">Hours</th>
-                  <th class="num-col">Amount</th>
+                  @if (showAmount()) {
+                    <th class="num-col">Amount</th>
+                  }
                   <th>Date</th>
                   <th>Status</th>
-                  <th class="doc-col">Docs</th>
                   <th class="actions-col">Actions</th>
                 </tr>
               </thead>
@@ -227,10 +233,18 @@ function captureLevelLabel(status: WorkflowStatus): string {
                       <div class="cell-sub">{{ r.employeeId }}</div>
                     </td>
                     <td>
+                      <div class="cell-strong">{{ r.departmentName || '—' }}</div>
+                    </td>
+                    <td>
+                      <div class="cell-strong">{{ r.divisionName || r.legacyDivisionName || '—' }}</div>
+                    </td>
+                    <td>
                       <div class="cell-strong">{{ r.salaryHeadName || '—' }}</div>
                     </td>
                     <td class="num-col">{{ r.hours | number:'1.2-2' }}</td>
-                    <td class="num-col">R&nbsp;{{ r.amount | number:'1.2-2' }}</td>
+                    @if (showAmount()) {
+                      <td class="num-col">R&nbsp;{{ r.amount | number:'1.2-2' }}</td>
+                    }
                     <td class="date-col">{{ r.overtimeDate | date:'dd/MM/yyyy' }}</td>
                     <td>
                       <div class="status-cell">
@@ -242,27 +256,6 @@ function captureLevelLabel(status: WorkflowStatus): string {
                         }
                       </div>
                     </td>
-                    <td class="doc-col" (click)="$event.stopPropagation()">
-                      @if (!r.documents || r.documents.length === 0) {
-                        <span class="no-doc">—</span>
-                      } @else if (r.documents.length === 1) {
-                        <button class="action-btn doc-btn"
-                                type="button"
-                                [matTooltip]="r.documents[0].fileName"
-                                (click)="openDoc(r.id, r.documents[0].id)">
-                          <mat-icon>attach_file</mat-icon>
-                        </button>
-                      } @else {
-                        <button class="action-btn doc-btn"
-                                type="button"
-                                [matTooltip]="r.documents.length + ' documents attached'"
-                                [matMenuTriggerFor]="docMenu"
-                                [matMenuTriggerData]="{ tx: r }">
-                          <mat-icon>attach_file</mat-icon>
-                          <span class="doc-count">{{ r.documents.length }}</span>
-                        </button>
-                      }
-                    </td>
                     <td class="actions-col" (click)="$event.stopPropagation()">
                       <div class="action-bar">
                         <button class="action-btn info"
@@ -271,6 +264,13 @@ function captureLevelLabel(status: WorkflowStatus): string {
                                 [matTooltip]="r._canEdit ? 'Edit overtime' : 'View overtime'"
                                 (click)="view(r)">
                           <mat-icon>{{ r._canEdit ? 'edit' : 'visibility' }}</mat-icon>
+                        </button>
+                        <button class="action-btn secondary"
+                                type="button"
+                                aria-label="Capture another overtime for this employee"
+                                matTooltip="Capture another overtime for this employee"
+                                (click)="captureForEmployee(r)">
+                          <mat-icon>add</mat-icon>
                         </button>
                         @if ((r.status === 0 || r.status === 5) && r.capturedBy) {
                           <button class="action-btn primary"
@@ -306,6 +306,13 @@ function captureLevelLabel(status: WorkflowStatus): string {
                             <mat-icon>cancel</mat-icon>
                           </button>
                         }
+                        @if (r._isOverride) {
+                          <span class="override-badge"
+                                matTooltip="You can act on this transaction because you hold the master-approver override position">
+                            <mat-icon class="override-badge-icon">shield</mat-icon>
+                            Master Approver
+                          </span>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -325,17 +332,6 @@ function captureLevelLabel(status: WorkflowStatus): string {
       </div>
     </div>
 
-    <!-- Shared doc dropdown for rows with multiple documents -->
-    <mat-menu #docMenu="matMenu">
-      <ng-template matMenuContent let-tx="tx">
-        @for (doc of tx.documents; track doc.id) {
-          <button mat-menu-item (click)="openDoc(tx.id, doc.id)">
-            <mat-icon>description</mat-icon>
-            <span>{{ doc.fileName }}</span>
-          </button>
-        }
-      </ng-template>
-    </mat-menu>
   `,
   styles: [`
     /* ── Filter bar ── */
@@ -405,6 +401,8 @@ function captureLevelLabel(status: WorkflowStatus): string {
     .action-btn.danger:hover:not(:disabled)  { background:#fecaca; color:#b91c1c; border-color:#fca5a5; }
     .action-btn.primary { background:#e0e7ff; color:#4f46e5; border-color:#c7d2fe; }
     .action-btn.primary:hover:not(:disabled) { background:#c7d2fe; color:#4338ca; border-color:#a5b4fc; }
+    .action-btn.secondary { background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+    .action-btn.secondary:hover:not(:disabled) { background:#e2e8f0; color:#1e293b; border-color:#cbd5e1; }
 
     /* ── Status badge overrides (scoped) ── */
     .status-badge.status-pending  { background:#dbeafe; color:#2563eb; }
@@ -460,34 +458,27 @@ function captureLevelLabel(status: WorkflowStatus): string {
     .btn-bulk-danger mat-icon,
     .btn-bulk-clear mat-icon   { font-size:16px; width:16px; height:16px; }
 
-    /* ── Document indicator column ── */
-    .doc-col {
-      width: 60px;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .no-doc {
-      color: #cbd5e1;
-      font-size: 14px;
-    }
-    .doc-btn {
-      background: #f0fdf4;
-      color: #16a34a;
-      border-color: #bbf7d0;
+    /* ── Override / Master Approver badge ── */
+    .override-badge {
       display: inline-flex;
       align-items: center;
-      gap: 2px;
-      padding: 4px 6px;
-    }
-    .doc-btn:hover:not(:disabled) {
-      background: #dcfce7;
-      color: #15803d;
-      border-color: #86efac;
-    }
-    .doc-count {
+      gap: 3px;
+      padding: 2px 7px 2px 4px;
+      border-radius: 4px;
+      background: #f3e8ff;
+      color: #7c3aed;
+      border: 1px solid #ddd6fe;
       font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
+      font-weight: 600;
+      white-space: nowrap;
+      vertical-align: middle;
+      cursor: default;
+    }
+    .override-badge-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+      line-height: 13px;
     }
 
     @media (max-width: 720px) {
@@ -504,6 +495,12 @@ export class OvertimeCaptureComponent {
   private router    = inject(Router);
   private dialog    = inject(MatDialog);
 
+  /** Only approvers (direct, excess, and payroll-side) may see the calculated rand amount; recommenders and plain capturers may not. */
+  showAmount = computed(() => {
+    const me = this.user.me();
+    return !!(me?.isApprover || me?.isExcessApprover);
+  });
+
   // ── Raw data ──
   allRows  = signal<OvertimeTransactionDto[]>([]);
 
@@ -511,6 +508,7 @@ export class OvertimeCaptureComponent {
   private augmentedRows = computed(() => {
     const me             = this.user.me()?.userId ?? '';
     const actingForUsers = this.user.me()?.actingForUserIds ?? [];
+    const isOverrideUser = this.user.me()?.isOverrideUser ?? false;
     return this.allRows().map(r => ({
       ...r,
       _sc: captureStatusClass(r.status),
@@ -518,8 +516,17 @@ export class OvertimeCaptureComponent {
       _canEdit: r.status === WorkflowStatus.Requested
              || r.status === WorkflowStatus.Returned
              || (r.status === WorkflowStatus.Recommended && r.capturedBy === me),
-      _canAct:  (r.currentAssigneeUserId === me
+      // isOverrideUser: master-approver can act on any non-terminal, non-submit row
+      _canAct:  ((r.currentAssigneeUserId === me
              || (!!r.currentAssigneeUserId && actingForUsers.includes(r.currentAssigneeUserId)))
+             || isOverrideUser)
+             && r.status !== WorkflowStatus.Processed
+             && r.status !== WorkflowStatus.Rejected
+             && r.status !== WorkflowStatus.Returned,
+      // True when override is the SOLE reason canAct is true (not the normal assignee)
+      _isOverride: isOverrideUser
+             && r.currentAssigneeUserId !== me
+             && !(!!r.currentAssigneeUserId && actingForUsers.includes(r.currentAssigneeUserId))
              && r.status !== WorkflowStatus.Processed
              && r.status !== WorkflowStatus.Rejected
              && r.status !== WorkflowStatus.Returned,
@@ -537,6 +544,7 @@ export class OvertimeCaptureComponent {
   filterStatus     = signal<number | ''>('');
   filterSalaryHead = signal('');
   filterDepartment = signal('');
+  filterDivision   = signal('');
   filterSearch     = signal('');
 
   // ── Selection ──
@@ -548,11 +556,13 @@ export class OvertimeCaptureComponent {
     const status     = this.filterStatus();
     const salaryHead = this.filterSalaryHead();
     const dept       = this.filterDepartment();
+    const division   = this.filterDivision();
     const search     = this.filterSearch().toLowerCase().trim();
 
     if (status !== '') rows = rows.filter(r => r.status === +status);
     if (salaryHead)    rows = rows.filter(r => r.salaryHeadName === salaryHead);
     if (dept)          rows = rows.filter(r => r.departmentId === dept);
+    if (division)      rows = rows.filter(r => (r.divisionName || r.legacyDivisionName) === division);
     if (search)        rows = rows.filter(r =>
       r.employeeName.toLowerCase().includes(search) ||
       r.employeeId.includes(search));
@@ -589,6 +599,15 @@ export class OvertimeCaptureComponent {
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  divisionOptions = computed(() => {
+    const seen = new Set<string>();
+    for (const r of this.allRows()) {
+      const d = r.divisionName || r.legacyDivisionName;
+      if (d) seen.add(d);
+    }
+    return [...seen].sort();
+  });
+
   // ── Select-all for current page ──
   allOnPageSelected = computed(() => {
     const page = this.pagedRows();
@@ -617,11 +636,6 @@ export class OvertimeCaptureComponent {
         takeUntilDestroyed()
       )
       .subscribe(() => this.load());
-  }
-
-  // ── Documents ──
-  openDoc(transactionId: string, documentId: string): void {
-    window.open(this.txService.documentDownloadUrl(transactionId, documentId), '_blank');
   }
 
   // ── Load ──
@@ -668,6 +682,11 @@ export class OvertimeCaptureComponent {
 
   setFilterDepartment(e: Event): void {
     this.filterDepartment.set((e.target as HTMLSelectElement).value);
+    this.pageIndex.set(0);
+  }
+
+  setFilterDivision(e: Event): void {
+    this.filterDivision.set((e.target as HTMLSelectElement).value);
     this.pageIndex.set(0);
   }
 
@@ -746,6 +765,12 @@ export class OvertimeCaptureComponent {
     this.router.navigate(['/overtime/capture', r.id]);
   }
 
+  captureForEmployee(r: OvertimeTransactionDto): void {
+    this.router.navigate(['/overtime/capture/new'], {
+      queryParams: { employeeId: r.employeeId }
+    });
+  }
+
   // ── Bulk workflow actions ──
 
   /** Wraps a call so the forkJoin batch always settles; null = failed. */
@@ -788,11 +813,65 @@ export class OvertimeCaptureComponent {
     const sel = this.selectedIds();
     const targets = this.augmentedRows().filter(r => sel.has(r.id.toString()) && (r._canAct || r._canCapturerReject));
     if (!targets.length) return;
-    forkJoin(targets.map(r => this.bulkSettle(this.wf.reject(r.id, { comments: '' })))).subscribe(results => {
-      this.bulkSnack('rejected', results);
-      this.clearSelection();
-      this.load();
+    this.dialog.open(CommentDialogComponent, {
+      data: {
+        title: `Reject ${targets.length} Transaction${targets.length > 1 ? 's' : ''}`,
+        label: 'Reason for rejection',
+        confirmLabel: 'Reject All',
+        confirmColor: 'warn',
+        required: true
+      } as CommentDialogData,
+      width: '420px',
+      disableClose: false
+    }).afterClosed().pipe(filter(c => c !== null && c !== undefined)).subscribe((comment: string) => {
+      forkJoin(targets.map(r => this.bulkSettle(this.wf.reject(r.id, { comments: comment })))).subscribe(results => {
+        this.bulkSnack('rejected', results);
+        this.clearSelection();
+        this.load();
+      });
     });
+  }
+
+  // ── Export ──
+  exportToExcel(): void {
+    const rows = this.filteredRows();
+
+    const data = rows.map(r => ({
+      'Employee':      r.employeeName,
+      'Employee ID':   r.employeeId,
+      'Department':    r.departmentName,
+      'Division':      r.divisionName || r.legacyDivisionName || '',
+      'Salary Head':   r.salaryHeadName,
+      'Hours':         r.hours,
+      'Date':          r.overtimeDate ? r.overtimeDate.slice(0, 10) : '',
+      'Status':        r.statusLabel,
+      'Recommender':   r.recommenderEmployeeName || '',
+      'Approver':      r.approverEmployeeName || '',
+      'Captured By':   r.capturedByEmployeeName || r.capturedByName || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Set sensible column widths
+    ws['!cols'] = [
+      { wch: 28 }, // Employee
+      { wch: 12 }, // Employee ID
+      { wch: 22 }, // Department
+      { wch: 22 }, // Division
+      { wch: 18 }, // Salary Head
+      { wch: 8  }, // Hours
+      { wch: 12 }, // Date
+      { wch: 28 }, // Status
+      { wch: 28 }, // Recommender
+      { wch: 28 }, // Approver
+      { wch: 28 }, // Captured By
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Overtime_${today}.xlsx`);
   }
 
   // ── Workflow actions ──

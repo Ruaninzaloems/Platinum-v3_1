@@ -32,9 +32,11 @@ public class WorkflowService : IWorkflowService
     private readonly ICurrentUserService _user;
     private readonly DevUserDirectory _users;
     private readonly ILogger<WorkflowService> _log;
+    private readonly IAssigneeResolverService _resolver;
 
-    public WorkflowService(OvertimeDbContext db, ICurrentUserService user, DevUserDirectory users, ILogger<WorkflowService> log)
-    { _db = db; _user = user; _users = users; _log = log; }
+    public WorkflowService(OvertimeDbContext db, ICurrentUserService user, DevUserDirectory users,
+        ILogger<WorkflowService> log, IAssigneeResolverService resolver)
+    { _db = db; _user = user; _users = users; _log = log; _resolver = resolver; }
 
     // ---------- Public API ----------
 
@@ -58,7 +60,8 @@ public class WorkflowService : IWorkflowService
             .Select(w => new WorkflowEventDto
             {
                 Id = w.Id, FromStatus = w.FromStatus, ToStatus = w.ToStatus,
-                ActionedBy = w.ActionedBy, Comments = w.Comments, ActionedAt = w.ActionedAt
+                ActionedBy = w.ActionedBy, Comments = w.Comments, ActionedAt = w.ActionedAt,
+                ChainPositionNote = w.ChainPositionNote
             })
             .ToListAsync(ct);
         return ApiResponse<List<WorkflowEventDto>>.Success(rows);
@@ -90,9 +93,47 @@ public class WorkflowService : IWorkflowService
         var meId     = _user.Current.UserId;
         var isCapturer        = string.Equals(tx.CapturedBy, meId, StringComparison.OrdinalIgnoreCase);
         var isAssignee        = string.Equals(tx.CurrentAssigneeUserId, meId, StringComparison.OrdinalIgnoreCase);
+
+        // Also treat the current user as the assignee when they are an active
+        // acting deputy for whoever the transaction is currently assigned to.
+        if (!isAssignee && !string.IsNullOrWhiteSpace(tx.CurrentAssigneeUserId))
+        {
+            var meEmpId = _user.Current.EmployeeId;
+            if (!string.IsNullOrWhiteSpace(meEmpId))
+            {
+                var now = DateTime.UtcNow;
+                var actingConfigs = await _db.PositionApprovalConfigs
+                    .Include(c => c.ActingAppointments)
+                    .Where(c => c.ActingAppointments.Any(a =>
+                        a.ActingEmployeeId == meEmpId
+                        && a.StartDate <= now && a.EndDate >= now))
+                    .AsNoTracking()
+                    .ToListAsync(ct);
+
+                isAssignee = actingConfigs.Any(cfg =>
+                {
+                    var primary = _users.All.FirstOrDefault(u =>
+                        string.Equals(u.PositionId, cfg.PositionId, StringComparison.OrdinalIgnoreCase));
+                    return primary != null &&
+                           string.Equals(primary.UserId, tx.CurrentAssigneeUserId, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+        }
+
         var isPayrollOpenQueue = tx.Status == WorkflowStatus.AwaitingPayrollApproval
                                  && tx.CurrentAssigneeUserId is null
                                  && _user.Current.CanAccessPayroll;
+
+        // Master-approver override: when configured, the user holding the override
+        // position may recommend, approve, return, or reject any non-terminal
+        // transaction. Submit is intentionally excluded — only the original capturer
+        // may submit. This block runs after the acting-deputy check so acting deputies
+        // are still properly recognised for their normal transactions.
+        var overrideCfg      = isSubmit ? null : await _db.OvertimeConfig.AsNoTracking().FirstOrDefaultAsync(ct);
+        var isOverrideUser   = !isSubmit
+            && !string.IsNullOrWhiteSpace(overrideCfg?.OverridePositionId)
+            && !string.IsNullOrWhiteSpace(_user.Current.PositionId)
+            && string.Equals(_user.Current.PositionId, overrideCfg!.OverridePositionId, StringComparison.OrdinalIgnoreCase);
 
         if (isSubmit)
         {
@@ -100,6 +141,33 @@ public class WorkflowService : IWorkflowService
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only Requested / Returned transactions can be submitted.");
             if (!isCapturer)
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only the original capturer can submit this transaction.");
+
+            // Guard: live chain re-validation at submit time.
+            // Re-resolving here catches:
+            //   a) Legacy drafts created when the old fallback was still active
+            //      (those rows have non-null but incorrect recommender/approver IDs).
+            //   b) Drafts whose saved chain IDs were preserved because the update
+            //      path skipped a broken re-resolution.
+            // Using the transaction's overtime date (not today) keeps the resolution
+            // consistent with how it was done at create time.
+            {
+                var submitAsOf = DateTime.SpecifyKind(tx.OvertimeDate.Date, DateTimeKind.Utc);
+                var chainBundle = await _resolver.ResolveAsync(tx.PositionId, submitAsOf, ct);
+                if (chainBundle.ChainError is not null)
+                    return ApiResponse<OvertimeTransactionDto>.Failure(chainBundle.ChainError);
+
+                // If the chain is now valid and the saved snapshot is stale
+                // (e.g., the row was created with the old fallback), update it
+                // in-memory before advancing so the workflow routes correctly.
+                tx.RecommenderEmployeeId        = chainBundle.Recommender!.EmployeeId;
+                tx.RecommenderEmployeeName      = chainBundle.Recommender.EmployeeName;
+                tx.RecommenderChainPositionId   = chainBundle.RecommenderPositionId;
+                tx.RecommenderChainPositionName = chainBundle.RecommenderPositionDescription;
+                tx.ApproverEmployeeId           = chainBundle.Approver!.EmployeeId;
+                tx.ApproverEmployeeName         = chainBundle.Approver.EmployeeName;
+                tx.ApproverChainPositionId      = chainBundle.ApproverPositionId;
+                tx.ApproverChainPositionName    = chainBundle.ApproverPositionDescription;
+            }
 
             // Guard: block submission of an excess transaction whose position
             // has no excess approver configured. Without this check the
@@ -124,7 +192,7 @@ public class WorkflowService : IWorkflowService
                  || tx.Status == WorkflowStatus.Recommended
                  || tx.Status == WorkflowStatus.Returned);
 
-            if (!isAssignee && !isPayrollOpenQueue && !capturerCanReject)
+            if (!isAssignee && !isPayrollOpenQueue && !capturerCanReject && !isOverrideUser)
                 return ApiResponse<OvertimeTransactionDto>.Failure("Only the current assignee can action this transaction.");
         }
 
@@ -133,13 +201,13 @@ public class WorkflowService : IWorkflowService
             if (string.IsNullOrWhiteSpace(req.Comments))
                 return ApiResponse<OvertimeTransactionDto>.Failure("A reason is required when rejecting a transaction.");
 
-            RecordTransition(tx, tx.Status, WorkflowStatus.Rejected, req.Comments);
+            RecordTransition(tx, tx.Status, WorkflowStatus.Rejected, req.Comments, isOverrideUser);
             tx.Status = WorkflowStatus.Rejected;
             tx.CurrentAssigneeUserId = null;
         }
         else if (isReturn)
         {
-            RecordTransition(tx, tx.Status, WorkflowStatus.Returned, req.Comments);
+            RecordTransition(tx, tx.Status, WorkflowStatus.Returned, req.Comments, isOverrideUser);
             tx.Status = WorkflowStatus.Returned;
             tx.CurrentAssigneeUserId = tx.CapturedBy;     // back to capturer
         }
@@ -158,7 +226,7 @@ public class WorkflowService : IWorkflowService
                 // — but for the "stay in same status" hops (excess approver,
                 // payroll approver) we still want a history entry so the
                 // audit log shows the second sign-off.
-                RecordTransition(tx, tx.Status, next, req.Comments);
+                RecordTransition(tx, tx.Status, next, req.Comments, isOverrideUser);
 
                 // Update the tracking flags for the in-place hops BEFORE we
                 // mutate the status; this lets the next NextStage() call see
@@ -192,7 +260,7 @@ public class WorkflowService : IWorkflowService
         return ApiResponse<OvertimeTransactionDto>.Success(OvertimeTransactionsService.ToDto(tx, _user));
     }
 
-    private void RecordTransition(OvertimeTransaction tx, WorkflowStatus from, WorkflowStatus to, string? comments)
+    private void RecordTransition(OvertimeTransaction tx, WorkflowStatus from, WorkflowStatus to, string? comments, bool isOverrideUser = false)
     {
         // Add via the DbSet directly so EF marks the row as Added. Going
         // through the navigation collection invokes DetectChanges, which —
@@ -206,7 +274,10 @@ public class WorkflowService : IWorkflowService
             FromStatus = from, ToStatus = to,
             ActionedBy = _user.Current.UserId,
             Comments = comments,
-            ActionedAt = DateTime.UtcNow
+            ActionedAt = DateTime.UtcNow,
+            // Snapshot a recognisable label so the audit trail is clear when
+            // there is no chain-assigned position for the acting user.
+            ChainPositionNote = isOverrideUser ? "Override Approver" : null
         };
         _db.OvertimeWorkflowStates.Add(state);
         tx.WorkflowHistory.Add(state);

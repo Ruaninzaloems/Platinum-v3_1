@@ -93,6 +93,7 @@ public class OvertimeAmountService : IOvertimeAmountService
                 Formula = detail?.Formula
             };
         })
+        .Where(o => o.Formula != null)   // exclude heads with no active MOC/formula
         .OrderBy(o => o.SalaryHeadName)
         .ToList();
     }

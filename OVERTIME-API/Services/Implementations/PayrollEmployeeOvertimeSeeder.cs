@@ -42,14 +42,18 @@ public class PayrollEmployeeOvertimeSeeder
             return;
         }
 
+        // ---------------------------------------------------------------------------
+        // 1. Ensure table exists (no indexes here — column renames must run first
+        //    because the table might already exist with old column names).
+        // ---------------------------------------------------------------------------
         await _db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS ""Payroll_EmployeeOvertime"" (
                 ""EmployeeOverTime_ID""      serial PRIMARY KEY,
-                ""Employee_ID""             integer NOT NULL,
+                ""EmployeeID""              integer NOT NULL,
                 ""OverTimeDate""            timestamp NOT NULL,
-                ""OverTimeHour""            numeric(18,4) NOT NULL DEFAULT 0,
+                ""OverTimeHour""            numeric(18,2) NOT NULL DEFAULT 0,
                 ""OverTimeFlag""            boolean NOT NULL DEFAULT false,
-                ""FinancialYear""           varchar(32),
+                ""FinancialYear""           varchar(10) NOT NULL DEFAULT '',
                 ""Enabled""                 boolean NOT NULL DEFAULT true,
                 ""CapturerID""              integer NOT NULL,
                 ""DateCaptured""            timestamp NOT NULL,
@@ -58,19 +62,19 @@ public class PayrollEmployeeOvertimeSeeder
                 ""MOCID""                   integer,
                 ""EarDedTypeID""            integer,
                 ""PeriodID""                integer,
-                ""TaxYear""                 varchar(32),
+                ""TaxYear""                 varchar(10),
                 ""IsApprovalRequired""      boolean,
                 ""IsApproved""              boolean,
                 ""RejectedReason""          varchar(2000),
                 ""ApprovedOrRejectedBy""    integer,
                 ""ApprovedOrRejectedDate""  timestamp,
-                ""CostDesc""                varchar(500),
+                ""CostDesc""                varchar(50),
                 ""TotalAmount""             numeric(18,2),
                 ""SupportingDocsID""        integer,
                 ""IsCorrection""            boolean,
                 ""LinkID""                  integer,
-                ""MOCValue""                numeric(18,4),
-                ""Rate""                    numeric(18,4),
+                ""MOC_Value""               numeric(18,2),
+                ""Rate""                    numeric(18,2),
                 ""SalaryHeadID""            integer,
                 ""IsBulk""                  boolean,
                 ""ProcessedOnPeriodID""     integer,
@@ -79,9 +83,42 @@ public class PayrollEmployeeOvertimeSeeder
                 ""TerminationEscalated""    boolean NOT NULL DEFAULT false,
                 ""EscalatedDate""           timestamp,
                 ""CapturedDuringPeriodID""  integer
-            );
+            );", ct);
+
+        // ---------------------------------------------------------------------------
+        // 2. Migrate existing dev tables that were created before the column-name
+        //    alignment. These renames are idempotent — they only run when the old
+        //    column name still exists. Must run BEFORE the CREATE INDEX calls below.
+        //      Employee_ID  → EmployeeID  (SQL Server has no underscore)
+        //      MOCValue     → MOC_Value   (SQL Server uses underscore)
+        // ---------------------------------------------------------------------------
+        await _db.Database.ExecuteSqlRawAsync(@"
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Payroll_EmployeeOvertime'
+                      AND column_name = 'Employee_ID'
+                ) THEN
+                    ALTER TABLE ""Payroll_EmployeeOvertime""
+                        RENAME COLUMN ""Employee_ID"" TO ""EmployeeID"";
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Payroll_EmployeeOvertime'
+                      AND column_name = 'MOCValue'
+                ) THEN
+                    ALTER TABLE ""Payroll_EmployeeOvertime""
+                        RENAME COLUMN ""MOCValue"" TO ""MOC_Value"";
+                END IF;
+            END $$;", ct);
+
+        // ---------------------------------------------------------------------------
+        // 3. Create indexes — runs after renames so column names are final.
+        // ---------------------------------------------------------------------------
+        await _db.Database.ExecuteSqlRawAsync(@"
             CREATE INDEX IF NOT EXISTS ix_payroll_emp_ot_employee
-                ON ""Payroll_EmployeeOvertime"" (""Employee_ID"");
+                ON ""Payroll_EmployeeOvertime"" (""EmployeeID"");
             CREATE INDEX IF NOT EXISTS ix_payroll_emp_ot_period
                 ON ""Payroll_EmployeeOvertime"" (""PeriodID"");", ct);
 
