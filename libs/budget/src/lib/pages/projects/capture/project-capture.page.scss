@@ -54,58 +54,131 @@ $text-secondary: #64748b;
   margin-top: 2px;
 }
 
-/* ─── Wizard Tabs ─── */
-.wizard-tabs {
+/* ─── Wizard Stepper (matches New Virement stepper style) ─── */
+.wizard-stepper {
   display: flex;
+  align-items: center;
+  padding: 18px 28px;
   background: #fff;
-  border-bottom: 2px solid $border;
-  padding: 0 24px;
-  gap: 0;
+  border-bottom: 1px solid $border;
+  box-shadow: 0 1px 4px rgba(15,43,70,0.06);
 }
 
-.wizard-tab {
-  display: inline-flex;
+.wstep {
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 13px 22px;
+  gap: 10px;
   cursor: pointer;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  padding: 4px 0;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.85; }
+
+  &--active {
+    .wstep-num {
+      background: $gold;
+      box-shadow: 0 0 0 3px rgba(201,168,76,0.2);
+    }
+    .wstep-label { color: $navy; font-weight: 600; }
+  }
+
+  &--done {
+    .wstep-num { background: $navy; }
+    .wstep-label { color: $navy; font-weight: 500; }
+  }
+}
+
+.wstep-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ccc;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.wstep-label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.wstep-line {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 12px;
+  border-radius: 1px;
+  transition: background 0.2s;
+
+  &--done { background: $navy; }
+}
+
+.wstep--locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ─── Field validation ─── */
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+
+  &__field { width: 100%; }
+}
+
+::ng-deep .field-wrap--error .mdc-notched-outline__leading,
+::ng-deep .field-wrap--error .mdc-notched-outline__notch,
+::ng-deep .field-wrap--error .mdc-notched-outline__trailing {
+  border-color: #d32f2f !important;
+  border-width: 2px !important;
+}
+
+.field-error-msg {
+  font-size: 12px;
+  color: #d32f2f;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+.details-validation-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #b91c1c;
   font-size: 13px;
   font-weight: 500;
-  color: $text-secondary;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-  white-space: nowrap;
+  padding: 10px 16px;
+  margin: 8px 0 4px;
 
-  &.active {
-    color: $navy;
-    border-bottom-color: $navy;
-    font-weight: 600;
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
   }
+}
 
-  &.completed {
-    color: $navy;
-  }
+.footer-tab-banner {
+  margin-bottom: 12px;
+  margin-top: 0;
+}
 
-  &:hover:not(.active) {
-    color: $text;
-    background: $surface;
-  }
-
-  .tab-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-    opacity: 0.7;
-  }
-
-  &.active .tab-icon { opacity: 1; }
-
-  .tab-label {
-    white-space: nowrap;
-  }
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 /* ─── Wizard Body ─── */
@@ -549,48 +622,12 @@ $text-secondary: #64748b;
   }
 }
 
-/* ─── Register Panel ─── */
-.register-panel {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 40px 24px;
-}
-
-.register-card {
-  background: #fff;
-  border: 1px solid $border;
-  border-radius: 12px;
-  padding: 36px 44px;
-  max-width: 480px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  box-shadow: 0 1px 3px rgba(15,43,70,0.06);
-
-  &__icon {
-    font-size: 40px;
-    width: 40px;
-    height: 40px;
-    color: $navy;
-    margin-bottom: 4px;
-  }
-
-  &__title {
-    font-size: 18px;
-    font-weight: 700;
-    color: $text;
-    margin: 0;
-  }
-
-  &__sub {
-    font-size: 13px;
-    color: $text-secondary;
-    margin: 0 0 8px;
-    line-height: 1.5;
-  }
+/* ─── Register Intro ─── */
+.register-intro {
+  font-size: 13px;
+  color: $text-secondary;
+  margin: 0 0 16px;
+  line-height: 1.5;
 }
 
 .register-checkbox {
@@ -622,8 +659,8 @@ $text-secondary: #64748b;
 /* ─── Footer ─── */
 .wizard-footer {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 0;
   padding: 14px 28px;
   background: #fff;
   border-top: 1px solid $border;
@@ -1220,38 +1257,53 @@ $text-secondary: #64748b;
 }
 
 .scoa-drill-trigger {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 14px 14px 14px 14px;
   border: 1px solid $border;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
-  min-height: 52px;
+  min-height: 56px;
 
   &:hover { border-color: $navy; }
 
   &--open {
     border-color: $navy;
-    box-shadow: 0 0 0 2px rgba(15,43,70,.12);
-  }
-
-  &--selected {
-    border-color: #c5d5eb;
-    background: #f8fafc;
+    box-shadow: inset 0 0 0 1px $navy;
   }
 }
 
 .scoa-drill-trigger-label {
-  font-size: 11px;
-  font-weight: 600;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 400;
   color: $text-secondary;
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  text-transform: none;
+  letter-spacing: normal;
   white-space: nowrap;
-  flex-shrink: 0;
+  pointer-events: none;
+  transition: top 0.15s ease, transform 0.15s ease, color 0.15s ease, font-size 0.15s ease;
+}
+
+.scoa-drill-trigger--open .scoa-drill-trigger-label,
+.scoa-drill-trigger--selected .scoa-drill-trigger-label {
+  top: 0;
+  transform: translateY(-50%) scale(0.85);
+  transform-origin: left center;
+  color: $navy;
+}
+
+.scoa-drill-trigger--error .scoa-drill-trigger-label {
+  color: #c0392b;
 }
 
 .scoa-drill-trigger-value {
@@ -1267,6 +1319,12 @@ $text-secondary: #64748b;
   color: $text-secondary;
   font-size: 12px;
   margin-right: 2px;
+}
+
+.scoa-drill-selected-code {
+  font-size: 12px;
+  color: $text-secondary;
+  margin-left: 4px;
 }
 
 .scoa-drill-placeholder {
@@ -1309,6 +1367,12 @@ $text-secondary: #64748b;
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.12);
   overflow: hidden;
+
+  &--above {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.12);
+  }
 }
 
 .scoa-drill-nav {
@@ -1383,6 +1447,13 @@ $text-secondary: #64748b;
 }
 
 .scoa-drill-item-label { flex: 1; }
+
+.scoa-drill-item-code {
+  font-size: 11px;
+  color: $text-secondary;
+  margin-left: 4px;
+  font-weight: 400;
+}
 
 .scoa-drill-item-icon {
   font-size: 18px;

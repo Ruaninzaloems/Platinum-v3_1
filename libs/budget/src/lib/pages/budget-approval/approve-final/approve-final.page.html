@@ -1,0 +1,75 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1>Approve Budget</h1>
+  </div>
+
+  <div class="approval-card">
+
+    @if (loading) {
+      <div class="loading-row"><span>Loading...</span></div>
+    } @else {
+      <div class="section-body">
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Financial Year</mat-label>
+          <mat-select [(ngModel)]="selectedYearId" (ngModelChange)="onYearChange($event)">
+            @for (y of financialYears; track y.id) {
+              <mat-option [value]="y.id">{{ y.yearCode }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="checkbox-row">
+          <mat-checkbox [(ngModel)]="approved" color="primary">
+            Approve Budget <span class="req">*</span>
+          </mat-checkbox>
+        </div>
+
+        <div class="file-row">
+          <div class="file-wrap">
+            <input #fileInput type="file" class="hidden-input" (change)="onFileChange($event)">
+            <button class="btn-choose" (click)="fileInput.click()">Choose File</button>
+            <span class="file-name">{{ selectedFile ? selectedFile.name : 'No file chosen' }}</span>
+          </div>
+          <p class="file-warning">Restricted Extension: .exe, .dmg</p>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Council Approved Date <span class="req">*</span></mat-label>
+          <input matInput [matDatepicker]="picker" [(ngModel)]="councilApprovedDate">
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Version Name <span class="req">*</span></mat-label>
+          <input matInput [(ngModel)]="versionName">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Comments <span class="req">*</span></mat-label>
+          <textarea matInput [(ngModel)]="comments" rows="3"></textarea>
+        </mat-form-field>
+
+        @if (successMsg) {
+          <div class="alert-success">{{ successMsg }}</div>
+        }
+        @if (errorMsg) {
+          <div class="alert-error">{{ errorMsg }}</div>
+        }
+
+      </div>
+    }
+
+    <div class="card-footer">
+      <button class="btn-primary" [disabled]="submitting || !selectedYearId" (click)="onSubmit()">
+        @if (submitting) { <span class="spinner"></span> }
+        Submit
+      </button>
+      <button class="btn-outline" (click)="onCancel()">Cancel</button>
+    </div>
+
+  </div>
+
+</div>

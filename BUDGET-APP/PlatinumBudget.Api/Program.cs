@@ -18,7 +18,12 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Platinum Budget Management API", Version = "v1" });
 });
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "";
+// DATABASE_URL (Azure App Setting / env var) takes priority; falls back to
+// ConnectionStrings:BudgetDb in appsettings (Development only — mirrors OVERTIME-API's
+// pattern) so local dev doesn't need the env var set on every restart.
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("BudgetDb")
+    ?? "";
 string connectionString;
 if (databaseUrl.StartsWith("postgresql://") || databaseUrl.StartsWith("postgres://"))
 {
@@ -91,6 +96,10 @@ _ = Task.Run(async () =>
     var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
     await db.Database.EnsureCreatedAsync();
     await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""IsRegistered"" BOOLEAN NOT NULL DEFAULT FALSE;");
+    await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""FinancialYear"" TEXT;");
+    await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SingleMultiYear"" TEXT;");
+    await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""ProjectTypeName"" TEXT;");
+    await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""CostingProject"" BOOLEAN NOT NULL DEFAULT FALSE;");
 
     var createCreditorsTablesSql = @"
         CREATE TABLE IF NOT EXISTS ""ExpenditureCategories"" (
@@ -197,12 +206,12 @@ _ = Task.Run(async () =>
             ""Year1Amount"" NUMERIC NOT NULL DEFAULT 0,
             ""Year2Amount"" NUMERIC NOT NULL DEFAULT 0,
             ""Year3Amount"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month01"" NUMERIC NOT NULL DEFAULT 0, ""Month02"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month03"" NUMERIC NOT NULL DEFAULT 0, ""Month04"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month05"" NUMERIC NOT NULL DEFAULT 0, ""Month06"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month07"" NUMERIC NOT NULL DEFAULT 0, ""Month08"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month09"" NUMERIC NOT NULL DEFAULT 0, ""Month10"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month11"" NUMERIC NOT NULL DEFAULT 0, ""Month12"" NUMERIC NOT NULL DEFAULT 0,
+            ""M1"" NUMERIC NOT NULL DEFAULT 0, ""M2"" NUMERIC NOT NULL DEFAULT 0,
+            ""M3"" NUMERIC NOT NULL DEFAULT 0, ""M4"" NUMERIC NOT NULL DEFAULT 0,
+            ""M5"" NUMERIC NOT NULL DEFAULT 0, ""M6"" NUMERIC NOT NULL DEFAULT 0,
+            ""M7"" NUMERIC NOT NULL DEFAULT 0, ""M8"" NUMERIC NOT NULL DEFAULT 0,
+            ""M9"" NUMERIC NOT NULL DEFAULT 0, ""M10"" NUMERIC NOT NULL DEFAULT 0,
+            ""M11"" NUMERIC NOT NULL DEFAULT 0, ""M12"" NUMERIC NOT NULL DEFAULT 0,
             ""Status"" TEXT NOT NULL DEFAULT 'Draft',
             ""ScoaItemId"" INTEGER REFERENCES ""ScoaItems""(""Id""),
             ""ScoaFundId"" INTEGER REFERENCES ""ScoaFunds""(""Id""),
@@ -594,18 +603,18 @@ _ = Task.Run(async () =>
             ""Year1Amount"" NUMERIC NOT NULL DEFAULT 0,
             ""Year2Amount"" NUMERIC NOT NULL DEFAULT 0,
             ""Year3Amount"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month01"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month02"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month03"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month04"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month05"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month06"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month07"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month08"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month09"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month10"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month11"" NUMERIC NOT NULL DEFAULT 0,
-            ""Month12"" NUMERIC NOT NULL DEFAULT 0,
+            ""M1"" NUMERIC NOT NULL DEFAULT 0,
+            ""M2"" NUMERIC NOT NULL DEFAULT 0,
+            ""M3"" NUMERIC NOT NULL DEFAULT 0,
+            ""M4"" NUMERIC NOT NULL DEFAULT 0,
+            ""M5"" NUMERIC NOT NULL DEFAULT 0,
+            ""M6"" NUMERIC NOT NULL DEFAULT 0,
+            ""M7"" NUMERIC NOT NULL DEFAULT 0,
+            ""M8"" NUMERIC NOT NULL DEFAULT 0,
+            ""M9"" NUMERIC NOT NULL DEFAULT 0,
+            ""M10"" NUMERIC NOT NULL DEFAULT 0,
+            ""M11"" NUMERIC NOT NULL DEFAULT 0,
+            ""M12"" NUMERIC NOT NULL DEFAULT 0,
             ""Status"" TEXT NOT NULL DEFAULT 'Draft',
             ""FinancialYearId"" INTEGER NOT NULL REFERENCES ""FinancialYears""(""Id""),
             ""ScoaItemCode"" TEXT,
@@ -2630,6 +2639,37 @@ _ = Task.Run(async () =>
             ""DateModified"" TIMESTAMP,
             ""PreviousReferenceId"" INTEGER
         );
+        CREATE TABLE IF NOT EXISTS ""Plan_ProjectScoaFunds"" (
+            ""ProjectScoaFund_ID"" SERIAL NOT NULL PRIMARY KEY,
+            ""ProjectID"" INTEGER NOT NULL,
+            ""ScoaFundID"" INTEGER NOT NULL,
+            ""CapturerID"" INTEGER NOT NULL,
+            ""DateCaptured"" TIMESTAMP NOT NULL,
+            ""ModifierID"" INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""PreviousReferenceId"" INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS ""Plan_ProjectScoaRegions"" (
+            ""ProjectScoaRegion_ID"" SERIAL NOT NULL PRIMARY KEY,
+            ""ProjectID"" INTEGER NOT NULL,
+            ""ScoaRegionID"" INTEGER NOT NULL,
+            ""CapturerID"" INTEGER NOT NULL,
+            ""DateCaptured"" TIMESTAMP NOT NULL,
+            ""ModifierID"" INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""PreviousReferenceId"" INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS ""Plan_ProjectScoaItem"" (
+            ""ProjectScoaItem_ID"" SERIAL NOT NULL PRIMARY KEY,
+            ""ProjectID"" INTEGER NOT NULL,
+            ""ScoaItemID"" INTEGER NOT NULL,
+            ""CapturerID"" INTEGER NOT NULL,
+            ""DateCaptured"" TIMESTAMP NOT NULL,
+            ""ModifierID"" INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""PreviousReferenceId"" INTEGER
+        );
+        -- Monorepo-only tables below (not in the standalone) - used by ProjectFundingController.cs; do not remove on future syncs.
         CREATE TABLE IF NOT EXISTS ""Plan_ProjectFunctions"" (
             ""ProjectFunction_ID"" SERIAL NOT NULL PRIMARY KEY,
             ""ProjectID"" INTEGER NOT NULL,
@@ -2717,6 +2757,7 @@ _ = Task.Run(async () =>
             ""ZeroBudgetItem"" BOOLEAN,
             ""ZeroBudgetItemReason"" TEXT
         );
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""PlanProjectItemCode"" INTEGER;
         CREATE TABLE IF NOT EXISTS ""Plan_ProjectItemDocs"" (
             ""ProjectItemDocs_ID"" SERIAL NOT NULL PRIMARY KEY,
             ""SupportingDocsID"" INTEGER,
@@ -2864,6 +2905,106 @@ _ = Task.Run(async () =>
             ""ModifierID"" INTEGER,
             ""DateModified"" TIMESTAMP
         );
+        -- ── User_UserDetail ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""User_UserDetail"" (
+            ""User_ID""                 SERIAL PRIMARY KEY,
+            ""UserName""                VARCHAR(100) NOT NULL,
+            ""Password""                VARCHAR(100) NOT NULL,
+            ""Company""                 VARCHAR(100),
+            ""TelNo""                   VARCHAR(50),
+            ""eMail""                   VARCHAR(100),
+            ""FirstName""               VARCHAR(100) NOT NULL,
+            ""LastName""                VARCHAR(100) NOT NULL,
+            ""EmpID""                   INTEGER,
+            ""DepartmentID""            INTEGER,
+            ""Enabled""                 BOOLEAN NOT NULL DEFAULT TRUE,
+            ""TotalLogin""              INTEGER,
+            ""LastLoginDate""           TIMESTAMP,
+            ""sendSMS""                 BOOLEAN,
+            ""SuperUser""               BOOLEAN NOT NULL DEFAULT FALSE,
+            ""DateCaptured""            TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""              INTEGER NOT NULL DEFAULT 0,
+            ""PasswordNeverExpire""     BOOLEAN NOT NULL DEFAULT FALSE,
+            ""PasswordLastChangedDate"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""              INTEGER,
+            ""DateModified""            TIMESTAMP,
+            ""TemporaryPassword""       BOOLEAN,
+            ""CashFloat""               NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""StartDate""               TIMESTAMP,
+            ""EndDate""                 TIMESTAMP,
+            ""HistoricUser""            VARCHAR(100),
+            ""TransactionPassword""     VARCHAR(100),
+            ""SignatureFilePath""       VARCHAR(255),
+            ""SignatureUploadedOn""     TIMESTAMP,
+            ""SignatureImage""          BYTEA,
+            ""SignatureImageMimeType""  VARCHAR(50),
+            CONSTRAINT ""IX_User_UserDetails"" UNIQUE (""UserName"")
+        );
+
+        -- Bootstrap placeholder system users (User_ID 1, 2) — several downstream seed inserts
+        -- in this script hardcode CapturerID/ApproverID literals (e.g. 2) assuming a
+        -- User_UserDetail row already exists. On a fresh database that row is never otherwise
+        -- created here (real users come from the EMS/POS integration), so those inserts fail
+        -- with an FK violation. Idempotent: only runs while the table is empty.
+        INSERT INTO ""User_UserDetail"" (""UserName"", ""Password"", ""FirstName"", ""LastName"", ""SuperUser"")
+        SELECT v.""UserName"", 'placeholder', 'System', 'Bootstrap', TRUE
+        FROM (VALUES ('system.1'), ('system.2')) AS v(""UserName"")
+        WHERE NOT EXISTS (SELECT 1 FROM ""User_UserDetail"");
+
+        -- ── Const_VirementApprovalRangeHeader ────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_VirementApprovalRangeHeader"" (
+            ""VirementApprovalHeader_ID"" SERIAL PRIMARY KEY,
+            ""IsLocked""     BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CapturerID""   INTEGER NOT NULL REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateCaptured"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""   INTEGER REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateModified"" TIMESTAMP
+        );
+        INSERT INTO ""Const_VirementApprovalRangeHeader"" (""IsLocked"",""CapturerID"",""DateCaptured"")
+        SELECT FALSE, 2, NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM ""Const_VirementApprovalRangeHeader"");
+
+        -- ── Const_VirementApprovalRange ───────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_VirementApprovalRange"" (
+            ""Range_ID""     SERIAL PRIMARY KEY,
+            ""MinAmount""    NUMERIC(18,2) NOT NULL,
+            ""MaxAmount""    NUMERIC(18,2) NOT NULL,
+            ""CapturerID""   INTEGER NOT NULL REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateCaptured"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""   INTEGER REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateModified"" TIMESTAMP
+        );
+
+        -- ── Const_VirementApprovalRangeApprover ──────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_VirementApprovalRangeApprover"" (
+            ""Approver_ID""  SERIAL PRIMARY KEY,
+            ""RangeID""      INTEGER NOT NULL REFERENCES ""Const_VirementApprovalRange""(""Range_ID"") ON DELETE CASCADE,
+            ""ApproverID""   INTEGER NOT NULL REFERENCES ""User_UserDetail""(""User_ID""),
+            ""LevelID""      INTEGER NOT NULL,
+            ""CapturerID""   INTEGER NOT NULL REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateCaptured"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""   INTEGER REFERENCES ""User_UserDetail""(""User_ID""),
+            ""DateModified"" TIMESTAMP,
+            UNIQUE (""RangeID"", ""LevelID"", ""ApproverID"")
+        );
+        -- Backfill unique constraint on existing tables (idempotent)
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_virement_approver_range_level_user'
+            ) THEN
+                DELETE FROM ""Const_VirementApprovalRangeApprover""
+                WHERE ""Approver_ID"" NOT IN (
+                    SELECT MIN(""Approver_ID"")
+                    FROM ""Const_VirementApprovalRangeApprover""
+                    GROUP BY ""RangeID"", ""LevelID"", ""ApproverID""
+                );
+                ALTER TABLE ""Const_VirementApprovalRangeApprover""
+                    ADD CONSTRAINT ""uq_virement_approver_range_level_user""
+                    UNIQUE (""RangeID"", ""LevelID"", ""ApproverID"");
+            END IF;
+        END $$;
+
         CREATE TABLE IF NOT EXISTS ""Plan_VirementApprovalRejections"" (
             ""VirementApprovalRejectionId"" SERIAL NOT NULL PRIMARY KEY,
             ""VirementId"" INTEGER,
@@ -3348,6 +3489,1609 @@ _ = Task.Run(async () =>
             ""FinYear"" VARCHAR(20),
             ""PreviousReferenceId"" INTEGER
         );
+
+        CREATE TABLE IF NOT EXISTS ""Const_ProjectItem"" (
+            ""ProjectItem_ID"" SERIAL PRIMARY KEY,
+            ""Code"" VARCHAR(200),
+            ""Description"" VARCHAR(500),
+            ""FinYear"" VARCHAR(20),
+            ""Enabled"" BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured"" TIMESTAMP,
+            ""CapturerID"" INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID"" INTEGER
+        );
+
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M1"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M2"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M3"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M4"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M5"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M6"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M7"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M8"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M9"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M10"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M11"" NUMERIC(18,2);
+        ALTER TABLE ""Plan_ProjectItem"" ADD COLUMN IF NOT EXISTS ""M12"" NUMERIC(18,2);
+
+        -- ── AAAA_ConfigSettings ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""AAAA_ConfigSettings"" (
+            ""ConfigSetting_ID""          SERIAL PRIMARY KEY,
+            ""KeyName""                   VARCHAR(100),
+            ""KeyValue""                  VARCHAR(500),
+            ""KeyDescription""            VARCHAR(500),
+            ""Module""                    VARCHAR(100),
+            ""DateCaptured""              TIMESTAMP,
+            ""CapturerID""               INTEGER,
+            ""perMuni_SetupRequirements"" BOOLEAN NOT NULL DEFAULT FALSE
+        );
+        ALTER TABLE ""Plan_VirementPolicyVersion"" ADD COLUMN IF NOT EXISTS ""IsLocked"" BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE ""AAAA_ConfigSettings"" ADD COLUMN IF NOT EXISTS ""KeyDescription""            VARCHAR(500);
+        ALTER TABLE ""AAAA_ConfigSettings"" ADD COLUMN IF NOT EXISTS ""Module""                    VARCHAR(100);
+        ALTER TABLE ""AAAA_ConfigSettings"" ADD COLUMN IF NOT EXISTS ""DateCaptured""              TIMESTAMP;
+        ALTER TABLE ""AAAA_ConfigSettings"" ADD COLUMN IF NOT EXISTS ""CapturerID""               INTEGER;
+        ALTER TABLE ""AAAA_ConfigSettings"" ADD COLUMN IF NOT EXISTS ""perMuni_SetupRequirements"" BOOLEAN NOT NULL DEFAULT FALSE;
+        INSERT INTO ""AAAA_ConfigSettings"" (""KeyName"", ""KeyValue"")
+        SELECT 'MuniName', 'Demo Municipality'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ""AAAA_ConfigSettings"" WHERE ""KeyName"" = 'MuniName'
+        );
+
+
+        -- ── Const_AccountRelationship ───────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_AccountRelationship"" (
+            ""AccountRelationship_ID"" SERIAL PRIMARY KEY,
+            ""AccountRelationship""    VARCHAR(50) NOT NULL,
+            ""Enabled""                BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""           TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""             INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""           TIMESTAMP,
+            ""ModifierID""             INTEGER
+        );
+
+        -- ── Const_AddressType ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_AddressType"" (
+            ""AddressType_ID"" SERIAL PRIMARY KEY,
+            ""AddressType""    VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_Bank ──────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Bank"" (
+            ""Bank_ID""              SERIAL PRIMARY KEY,
+            ""BankDesc""             VARCHAR(200) NOT NULL,
+            ""Enabled""              BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""         TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""           INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""         TIMESTAMP,
+            ""ModifierID""           INTEGER,
+            ""BankLogo""             VARCHAR(500),
+            ""IsuseAccountStatment"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CSDCode""              VARCHAR(10)
+        );
+
+        -- ── Const_BankAccountType ───────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_BankAccountType"" (
+            ""BankAccountTypeID""   SERIAL PRIMARY KEY,
+            ""BankAccountType""     VARCHAR(200) NOT NULL,
+            ""Enabled""             BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""        TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""          INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""        TIMESTAMP,
+            ""ModifierID""          INTEGER,
+            ""BankAccountTypeCode"" VARCHAR(50)
+        );
+
+        -- ── Const_BankBranchCode ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_BankBranchCode"" (
+            ""BankBranchCode_ID"" SERIAL PRIMARY KEY,
+            ""BankID""            INTEGER NOT NULL,
+            ""BankBranchCode""    VARCHAR(50) NOT NULL,
+            ""DefaultCode""       BOOLEAN NOT NULL DEFAULT FALSE,
+            ""Enabled""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""      TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""        INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""      TIMESTAMP,
+            ""ModifierID""        INTEGER,
+            ""BranchCodeDesc""    VARCHAR(200),
+            CONSTRAINT ""FK_Const_BankBranchCode_Const_Bank"" FOREIGN KEY (""BankID"") REFERENCES ""Const_Bank"" (""Bank_ID"")
+        );
+
+        -- ── Const_Country ────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Country"" (
+            ""Country_ID""          SERIAL PRIMARY KEY,
+            ""CountryDesc""         VARCHAR(200) NOT NULL,
+            ""Enabled""             BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""        TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""          INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""        TIMESTAMP,
+            ""ModifierID""          INTEGER,
+            ""CountryCode""         VARCHAR(50),
+            ""PassportCountryCode"" VARCHAR(10)
+        );
+
+        -- ── Const_CycleType_sys ──────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_CycleType_sys"" (
+            ""CycleType_ID""   SERIAL PRIMARY KEY,
+            ""CycleTypeDesc""  VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_Cycle ──────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Cycle"" (
+            ""Cycle_ID""          SERIAL PRIMARY KEY,
+            ""CycleDesc""         VARCHAR(200) NOT NULL,
+            ""Enabled""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""      TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""        INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""      TIMESTAMP,
+            ""ModifierID""        INTEGER,
+            ""CycleTypeID""       INTEGER,
+            ""SkipInNewTaxYear""  BOOLEAN NOT NULL DEFAULT FALSE,
+            CONSTRAINT ""FK_Const_Cycle_Const_CycleType_sys"" FOREIGN KEY (""CycleTypeID"") REFERENCES ""Const_CycleType_sys"" (""CycleType_ID"")
+        );
+
+        -- ── Const_EntitlementType_sys ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_EntitlementType_sys"" (
+            ""EntitlementType_ID"" SERIAL PRIMARY KEY,
+            ""EntitlementType""    VARCHAR(50),
+            ""Enabled""            BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""       TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""         INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""       TIMESTAMP,
+            ""ModifierID""         INTEGER
+        );
+
+        -- ── Const_EmployeeType_sys ───────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_EmployeeType_sys"" (
+            ""EmployeeType_ID""                SERIAL PRIMARY KEY,
+            ""EmployeeTypeDescription""        VARCHAR(255),
+            ""Enabled""                        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""                   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""                   TIMESTAMP,
+            ""ModifierID""                     INTEGER,
+            ""SalaryProjectID""                INTEGER,
+            ""SalarySuspenseScoaItemID""       INTEGER,
+            ""SalarySuspenseScoaItemCreditID"" INTEGER,
+            ""FinYear""                        VARCHAR(10)
+        );
+
+        -- ── Const_Department ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Department"" (
+            ""Department_ID""    SERIAL PRIMARY KEY,
+            ""DepartmentDesc""   VARCHAR(200) NOT NULL,
+            ""Enabled""          BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""     TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""       INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER,
+            ""DepartmentCode""   VARCHAR(50),
+            ""StartDate""        TIMESTAMP,
+            ""EndDate""          TIMESTAMP,
+            ""VatApportionment"" INTEGER,
+            ""ManagerPositionID"" INTEGER,
+            ""ManagerStartDate"" TIMESTAMP,
+            ""ManagerEndDate""   TIMESTAMP,
+            ""FinYear""          VARCHAR(9)
+        );
+
+        -- ── Const_Division ───────────────────────────────────────────────────
+        -- NOTE: FKs to Payroll_Position, Payroll_ConditionOfService, Plan_Project,
+        --       Plan_ProjectFund deferred until those tables are created.
+        CREATE TABLE IF NOT EXISTS ""Const_Division"" (
+            ""Division_ID""          SERIAL PRIMARY KEY,
+            ""DivisionDesc""         VARCHAR(200) NOT NULL,
+            ""DivisionCode""         VARCHAR(50),
+            ""DepartmentID""         INTEGER NOT NULL REFERENCES ""Const_Department""(""Department_ID""),
+            ""DivisionParentID""     INTEGER REFERENCES ""Const_Division""(""Division_ID""),
+            ""Enabled""              BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""         TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""           INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""         TIMESTAMP,
+            ""ModifierID""           INTEGER,
+            ""SCOAFunctionID""       INTEGER,
+            ""HRPayrollSCOAFundID""  INTEGER,
+            ""StartDate""            TIMESTAMP,
+            ""EndDate""              TIMESTAMP,
+            ""RegionID""             INTEGER,
+            ""ProjectID""            INTEGER,
+            ""ManagerPositionID""    INTEGER,
+            ""ManagerStartDate""     TIMESTAMP,
+            ""ManagerEndDate""       TIMESTAMP,
+            ""ConditionOfServiceID"" INTEGER,
+            ""DirectorateLevel""     BOOLEAN,
+            ""FinYear""              VARCHAR(9)
+        );
+
+        -- ── Payroll_Position ─────────────────────────────────────────────────
+        -- NOTE: FKs to Const_SCOA_Regional_Structure, Payroll_ConditionOfService,
+        --       Payroll_DefinitionGroup, Payroll_Employee, Payroll_EmployeeSubtypes,
+        --       Plan_Project deferred until those tables are created.
+        CREATE TABLE IF NOT EXISTS ""Payroll_Position"" (
+            ""Position_ID""              SERIAL PRIMARY KEY,
+            ""PositionDesc""             VARCHAR(200) NOT NULL,
+            ""StartDate""               TIMESTAMP,
+            ""EndDate""                 TIMESTAMP,
+            ""HOD""                     INTEGER NOT NULL DEFAULT 0,
+            ""Funds""                   BOOLEAN NOT NULL DEFAULT FALSE,
+            ""Capacity""               NUMERIC(5,2),
+            ""DepartmentID""            INTEGER NOT NULL REFERENCES ""Const_Department""(""Department_ID""),
+            ""DivisionID""              INTEGER REFERENCES ""Const_Division""(""Division_ID""),
+            ""JobProfileID""            INTEGER REFERENCES ""Payroll_JobProfile""(""JobProfile_ID""),
+            ""Enabled""                 BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""            TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""              INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""            TIMESTAMP,
+            ""ModifierID""              INTEGER,
+            ""Status""                  INTEGER,
+            ""ParentID""                INTEGER,
+            ""RegionID""                INTEGER,
+            ""FunctionID""              INTEGER,
+            ""PayrollDefinitionGroupID"" INTEGER,
+            ""VacancyNo""               VARCHAR(50),
+            ""EmployeeID""              INTEGER,
+            ""ProjectID""               INTEGER,
+            ""EmployeeTypeID""          INTEGER REFERENCES ""Const_EmployeeType_sys""(""EmployeeType_ID""),
+            ""EmployeeSubtypeID""       INTEGER,
+            ""ConditionOfServiceID""    INTEGER,
+            ""ScoaCostingID""           INTEGER,
+            ""ScoaFundID""              INTEGER,
+            ""IsPerformanceAssessement"" BOOLEAN DEFAULT FALSE,
+            ""AdvertNo""                VARCHAR(50),
+            ""IsNonEmployee""           BOOLEAN DEFAULT FALSE,
+            ""ScoaExpenseID""           INTEGER,
+            ""LockFields""              BOOLEAN,
+            ""LockedDate""              TIMESTAMP,
+            ""UniqueId""                VARCHAR(20),
+            ""PositionCode""            VARCHAR(20),
+            ""HierarchyNo""             VARCHAR(20)
+        );
+
+        -- ── Payroll_TradeClassificationGroup ─────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_TradeClassificationGroup"" (
+            ""Id""           SERIAL PRIMARY KEY,
+            ""Code""         VARCHAR(2)   NOT NULL,
+            ""Description""  VARCHAR(250) NOT NULL,
+            ""Enabled""      BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CaptureId""    INTEGER NOT NULL DEFAULT 0,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierId""   INTEGER,
+            CONSTRAINT ""UK_Payroll_TradeClassificationGroup_Code_Enabled"" UNIQUE (""Code"",""Enabled"")
+        );
+
+        -- ── Payroll_TradeClassificationActivity ──────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_TradeClassificationActivity"" (
+            ""Id""                         SERIAL PRIMARY KEY,
+            ""TradeClassificationGroupId"" INTEGER NOT NULL REFERENCES ""Payroll_TradeClassificationGroup""(""Id""),
+            ""Code""                       VARCHAR(4)   NOT NULL,
+            ""Description""               VARCHAR(250) NOT NULL,
+            ""Enabled""                   BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""              TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CaptureId""                 INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""              TIMESTAMP,
+            ""ModifierId""                INTEGER,
+            CONSTRAINT ""UK_Payroll_TradeClassificationActivity_Code_Enabled"" UNIQUE (""Code"",""Enabled"")
+        );
+
+        -- ── Payroll_PayslipTempletes ──────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_PayslipTempletes"" (
+            ""PayslipTempletes_ID""      SERIAL PRIMARY KEY,
+            ""Name""                     VARCHAR(250),
+            ""StartDate""               TIMESTAMP NOT NULL,
+            ""EndDate""                 TIMESTAMP NOT NULL,
+            ""Enabled""                 BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""            TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""              INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""            TIMESTAMP,
+            ""ModifierID""              INTEGER,
+            ""TrialFileName""           VARCHAR(250),
+            ""FinalFileName""           VARCHAR(250),
+            ""ShowCompanyContributions"" BOOLEAN NOT NULL DEFAULT FALSE
+        );
+
+        -- ── CONST_SIC_Division ───────────────────────────────────────────────
+        -- NOTE: DivisionID and GroupID are plain integer PKs (no IDENTITY/SERIAL).
+        CREATE TABLE IF NOT EXISTS ""CONST_SIC_Division"" (
+            ""DivisionID""   INTEGER PRIMARY KEY,
+            ""Description""  VARCHAR(255),
+            ""Enabled""      BOOLEAN,
+            ""DateCaptured"" TIMESTAMP,
+            ""CapturerID""   INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER
+        );
+
+        -- ── CONST_SICCodeSubClass ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""CONST_SICCodeSubClass"" (
+            ""SubClassID""   INTEGER PRIMARY KEY,
+            ""Description""  VARCHAR(500),
+            ""Enabled""      BOOLEAN,
+            ""ClassId""      INTEGER REFERENCES ""CONST_SICCodeClass""(""ClassID""),
+            ""DateCaptured"" TIMESTAMP,
+            ""CapturerID""   INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER
+        );
+
+        -- ── Payroll_Municipality ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_Municipality"" (
+            ""Municipality_ID""                       SERIAL PRIMARY KEY,
+            ""MunicipalityNo""                        VARCHAR(100) NOT NULL,
+            ""MunicipalityName""                      VARCHAR(100) NOT NULL,
+            ""RegistrationNo""                        VARCHAR(100),
+            ""TaxRegistrationNo""                     VARCHAR(100),
+            ""TradeClassificationID""                 INTEGER,
+            ""SDLReferenceNo""                        VARCHAR(100),
+            ""UIFRegistrationNo""                     VARCHAR(100),
+            ""UIFReferenceNo""                        VARCHAR(100),
+            ""PrintOnPayslip""                        BOOLEAN,
+            ""MunicipalityImagePath""                 VARCHAR(100),
+            ""LeaveBased""                            INTEGER NOT NULL,
+            ""GradingID""                             INTEGER REFERENCES ""Const_MunicipalityGrading""(""GradingID""),
+            ""PhyAddress1""                           VARCHAR(100),
+            ""PhyAddress2""                           VARCHAR(100),
+            ""PhyPostalCode""                         VARCHAR(50),
+            ""City""                                  VARCHAR(50),
+            ""SameAsPhysical""                        BOOLEAN,
+            ""PosAddress1""                           VARCHAR(100),
+            ""PosAddress2""                           VARCHAR(100),
+            ""PosPostalCode""                         VARCHAR(50),
+            ""SARSPersonName""                        VARCHAR(100),
+            ""SARSEmailAddress""                      VARCHAR(100),
+            ""SARSContactNo""                         VARCHAR(100),
+            ""SameAsSARS""                            BOOLEAN,
+            ""UIFPersonName""                         VARCHAR(100),
+            ""UIFEmailAddress""                       VARCHAR(100),
+            ""UIFContactNo""                          VARCHAR(100),
+            ""Monday""                                BOOLEAN NOT NULL,
+            ""Tuesday""                               BOOLEAN NOT NULL,
+            ""Wednesday""                             BOOLEAN NOT NULL,
+            ""Thursday""                              BOOLEAN NOT NULL,
+            ""Friday""                                BOOLEAN NOT NULL,
+            ""Saturday""                              BOOLEAN NOT NULL,
+            ""Sunday""                                BOOLEAN NOT NULL,
+            ""Enabled""                               BOOLEAN NOT NULL,
+            ""DateCaptured""                          TIMESTAMP NOT NULL,
+            ""CapturerID""                            INTEGER NOT NULL,
+            ""DateModified""                          TIMESTAMP,
+            ""ModifierID""                            INTEGER,
+            ""ExcludeForUIF""                         BOOLEAN DEFAULT FALSE,
+            ""ExcludeForSDL""                         BOOLEAN DEFAULT FALSE,
+            ""CountryID""                             INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""AppraisalPeriod""                       INTEGER,
+            ""AppraisalNotificationDays""             INTEGER,
+            ""UnionFee""                              NUMERIC(18,2),
+            ""SARSFaxNo""                             VARCHAR(100),
+            ""UIFFaxNo""                              VARCHAR(100),
+            ""SendRouteFileReminderDays""             INTEGER,
+            ""SendRouteFileReminderFlag""             BOOLEAN,
+            ""WebServiceRequestedFlag""               BOOLEAN,
+            ""WebServiceRequestedDate""               TIMESTAMP,
+            ""WebServiceRetrivedFlag""                BOOLEAN,
+            ""WebServiceRetrivedDate""                TIMESTAMP,
+            ""BillingRunReminderDays""                INTEGER,
+            ""BillingRunReminderFlag""                BOOLEAN,
+            ""PayrollRunReminderDays""                INTEGER,
+            ""PayrollRunReminderFlag""                BOOLEAN,
+            ""EmailAddress""                          VARCHAR(50),
+            ""FirstName""                             VARCHAR(50),
+            ""LastName""                              VARCHAR(50),
+            ""GUID""                                  VARCHAR(50),
+            ""ContactName""                           VARCHAR(50),
+            ""ContactPhone""                          VARCHAR(50),
+            ""ContactEmail""                          VARCHAR(50),
+            ""ContactFax""                            VARCHAR(50),
+            ""VatPercentage""                         NUMERIC(18,2),
+            ""WorkingDaysOverTimeRate""               NUMERIC(18,2),
+            ""HolidayDaysOverTimeRate""               NUMERIC(18,2),
+            ""EasyPayCode""                           VARCHAR(50),
+            ""PostOfficeCode""                        VARCHAR(50),
+            ""TemplateType""                          INTEGER REFERENCES ""Payroll_PayslipTempletes""(""PayslipTempletes_ID""),
+            ""BillingTemplateType""                   INTEGER REFERENCES ""Const_BillingTemplate_sys""(""BillingTemplate_ID""),
+            ""ProRatingPrinciple""                    BOOLEAN,
+            ""PhyProvinceID""                         INTEGER REFERENCES ""Const_Province""(""Province_ID""),
+            ""PhyCityID""                             INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""VendorPrefix""                          VARCHAR(50),
+            ""MunicipalityAddress1""                  TEXT,
+            ""MunicipalityAddress2""                  TEXT,
+            ""MunicipalityAddress3""                  TEXT,
+            ""ManagerSignature""                      TEXT,
+            ""VATRegistrationNumber""                 VARCHAR(100),
+            ""BonusMonth""                            INTEGER REFERENCES ""Const_Month_sys""(""Month_ID""),
+            ""WebSite""                               VARCHAR(50),
+            ""PayeRegistrationNo""                    VARCHAR(50),
+            ""EscalationDuration""                    NUMERIC(18,2),
+            ""MetermanWebSite""                       VARCHAR(200),
+            ""IsSalaryIndicatorDefault""              BOOLEAN,
+            ""IsPensionIndicatorDefault""             BOOLEAN,
+            ""IsMedicalIndicatorDefault""             BOOLEAN,
+            ""IsThirdPartyIndicatorDefault""          BOOLEAN,
+            ""IsSARSIndicatorDefault""                BOOLEAN,
+            ""IsAdvanceIndicatorDefault""             BOOLEAN,
+            ""BillingBankID""                         INTEGER,
+            ""BillingBankBranchCodeID""               INTEGER,
+            ""BillingAccountType""                    INTEGER,
+            ""BillingAccountNo""                      VARCHAR(100),
+            ""AdvanceSuspenseScoaItemID""             INTEGER,
+            ""MedicalSuspenseScoaItemID""             INTEGER,
+            ""PensionSuspenseScoaItemID""             INTEGER,
+            ""SalarySuspenseScoaItemID""              INTEGER,
+            ""SARSSuspenseScoaItemID""                INTEGER,
+            ""ThirdpartySuspenseScoaItemID""          INTEGER,
+            ""TransferScoaItemID""                    INTEGER,
+            ""DemarcationCode""                       VARCHAR(50),
+            ""MunicipalityType""                      VARCHAR(50),
+            ""PhySuburb""                             INTEGER,
+            ""PosSuburb""                             INTEGER,
+            ""PosProvinceID""                         INTEGER REFERENCES ""Const_Province""(""Province_ID""),
+            ""PosCityID""                             INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""PosStreetID""                           INTEGER REFERENCES ""Const_Street""(""Street_ID""),
+            ""PosBoxBagNo""                           VARCHAR(200),
+            ""PosFlatUnitSuiteNo""                    VARCHAR(200),
+            ""PhyStreetID""                           INTEGER REFERENCES ""Const_Street""(""Street_ID""),
+            ""BonusPaymentDateID""                    INTEGER DEFAULT 1 REFERENCES ""Const_Payroll_BonusPaymentDate_sys""(""BonusPaymentDate_ID""),
+            ""CommissionScoaItemID""                  INTEGER,
+            ""AllowChequeSalaries""                   BOOLEAN,
+            ""AllowCashSalaries""                     BOOLEAN,
+            ""HideExcludeUIFSDL""                     BOOLEAN NOT NULL DEFAULT FALSE,
+            ""PhyUnitNumber""                         INTEGER,
+            ""IsTravelIndicatorDefault""              BOOLEAN,
+            ""IsLeaveIndicatorDefault""               BOOLEAN,
+            ""IsUIFIndicatorDefault""                 BOOLEAN,
+            ""IsSkillsIndicatorDefault""              BOOLEAN,
+            ""IsGroupLifeIndicatorDefault""           BOOLEAN,
+            ""IsUnionsIndicatorDefault""              BOOLEAN,
+            ""TravelSuspenseScoaItemID""              INTEGER,
+            ""LeaveSuspenseScoaItemID""               INTEGER,
+            ""UIFSuspenseScoaItemID""                 INTEGER,
+            ""SkillsSuspenseScoaItemID""              INTEGER,
+            ""GroupLifeSuspenseScoaItemID""           INTEGER,
+            ""UnionsSuspenseScoaItemID""              INTEGER,
+            ""EmployeeNetPayBondScoaItemID""          INTEGER,
+            ""GarnisheePaymentsScoaItemID""           INTEGER,
+            ""AllowPrimaryCostSplitting""             BOOLEAN NOT NULL DEFAULT FALSE,
+            ""PhyComplex""                            VARCHAR(155),
+            ""PhyStreetNumber""                       INTEGER,
+            ""SEZCodeId""                             INTEGER REFERENCES ""Const_SEZCode""(""SezCodeId""),
+            ""SICCodeId""                             INTEGER REFERENCES ""CONST_SICCodeSubClass""(""SubClassID""),
+            ""CashBookID""                            INTEGER,
+            ""EmployeeDeductionFICSScoaItemID""       INTEGER,
+            ""CommissionProjectID""                   INTEGER,
+            ""NettSalaryProjectID""                   INTEGER,
+            ""SalaryProjectID""                       INTEGER,
+            ""TravelProjectID""                       INTEGER,
+            ""LeaveProjectID""                        INTEGER,
+            ""TaxProjectID""                          INTEGER,
+            ""UIFProjectID""                          INTEGER,
+            ""SkillsProjectID""                       INTEGER,
+            ""PensionProjectID""                      INTEGER,
+            ""MedicalProjectID""                      INTEGER,
+            ""GroupLifeProjectID""                    INTEGER,
+            ""UnionProjectID""                        INTEGER,
+            ""EmployeeProjectID""                     INTEGER,
+            ""EmployeeNetPayBondProjectID""           INTEGER,
+            ""GarnisheePaymentsControlProjectID""     INTEGER,
+            ""SalarySuspenseScoaItemCreditID""        INTEGER,
+            ""TravelSuspenseScoaItemCreditID""        INTEGER,
+            ""LeaveSuspenseScoaItemCreditID""         INTEGER,
+            ""SARSSuspenseScoaItemCreditID""          INTEGER,
+            ""UIFSuspenseScoaItemCreditID""           INTEGER,
+            ""SkillsSuspenseScoaItemCreditID""        INTEGER,
+            ""PensionSuspenseScoaItemCreditID""       INTEGER,
+            ""MedicalSuspenseScoaItemCreditID""       INTEGER,
+            ""GroupLifeSuspenseScoaItemCreditID""     INTEGER,
+            ""UnionsSuspenseScoaItemCreditID""        INTEGER,
+            ""EmployeeDeductionFICSScoaItemCreditID"" INTEGER,
+            ""EmployeeNetPayBondScoaCreditID""        INTEGER,
+            ""GarnisheePaymentsScoaCreditID""         INTEGER,
+            ""CommDepartmentId""                      INTEGER,
+            ""CommDivisionId""                        INTEGER,
+            ""CommFunctionId""                        INTEGER,
+            ""CommRegionId""                          INTEGER,
+            ""FinYear""                               VARCHAR(9),
+            ""SARSPersonSurname""                     VARCHAR(100),
+            ""SARSPersonCellNo""                      VARCHAR(25),
+            ""SARSPersonPositionId""                  INTEGER REFERENCES ""Payroll_Position""(""Position_ID""),
+            ""UIFPersonSurname""                      VARCHAR(100),
+            ""UIFPersonCellNo""                       VARCHAR(25),
+            ""UIFPersonPositionId""                   INTEGER REFERENCES ""Payroll_Position""(""Position_ID""),
+            ""TradeClassificationActivityId""         INTEGER REFERENCES ""Payroll_TradeClassificationActivity""(""Id""),
+            ""EnableLeave""                           BOOLEAN DEFAULT FALSE,
+            ""UtilipayDistributionCode""              VARCHAR(10),
+            ""GroupTransactionsOnPayslip""            BOOLEAN,
+            ""CommFundId""                            INTEGER
+        );
+
+        -- ── Payroll_ReasonType_sys ────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ReasonType_sys"" (
+            ""ReasonType_ID""         SERIAL PRIMARY KEY,
+            ""ReasonTypeDescription"" VARCHAR(255) NOT NULL,
+            ""Enabled""               BOOLEAN NOT NULL,
+            ""DateCaptured""          TIMESTAMP NOT NULL,
+            ""CapturerID""            INTEGER NOT NULL,
+            ""DateModified""          TIMESTAMP,
+            ""ModifierID""            INTEGER
+        );
+
+        -- ── Payroll_ShiftRotation ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ShiftRotation"" (
+            ""ShiftRotation_ID""     SERIAL PRIMARY KEY,
+            ""RotationName""         VARCHAR(50) NOT NULL,
+            ""ShortDesc""            CHAR(5) NOT NULL,
+            ""ConditionOfServiceID"" INTEGER NOT NULL REFERENCES ""Payroll_ConditionOfService""(""ConditionOfService_ID""),
+            ""EmployeeSubtypeID""    INTEGER NOT NULL REFERENCES ""Payroll_EmployeeSubtypes""(""EmployeeSubtype_ID""),
+            ""StartDate""            TIMESTAMP NOT NULL,
+            ""EndDate""              TIMESTAMP NOT NULL,
+            ""NoOfWeeks""            INTEGER NOT NULL,
+            ""DateCaptured""         TIMESTAMP NOT NULL,
+            ""CapturerID""           INTEGER NOT NULL,
+            ""DateModified""         TIMESTAMP,
+            ""ModifierID""           INTEGER
+        );
+
+        -- ── Payroll_Employee ──────────────────────────────────────────────────
+        -- Note: SQL Server computed columns (WorkDuration, Years, Months, Days) omitted; handle at app layer.
+        CREATE TABLE IF NOT EXISTS ""Payroll_Employee"" (
+            ""Employee_ID""                        SERIAL PRIMARY KEY,
+            ""EmpCode""                            VARCHAR(50),
+            ""IdNo""                               VARCHAR(50) NOT NULL,
+            ""TitleID""                            INTEGER REFERENCES ""Const_Title""(""Title_ID""),
+            ""Initials""                           VARCHAR(50),
+            ""FirstName""                          VARCHAR(50) NOT NULL,
+            ""SecondName""                         VARCHAR(50),
+            ""Surname""                            VARCHAR(50) NOT NULL,
+            ""KnownAsName""                        VARCHAR(50),
+            ""DateOfBirth""                        TIMESTAMP NOT NULL,
+            ""GenderID""                           INTEGER NOT NULL REFERENCES ""Const_Gender""(""Gender_ID""),
+            ""LanguageID""                         INTEGER REFERENCES ""Const_Language""(""Language_ID""),
+            ""MarriedID""                          INTEGER REFERENCES ""Const_MarriedStatus""(""MarriedStatus_ID""),
+            ""Dependants""                         INTEGER,
+            ""PassportNumber""                     VARCHAR(50),
+            ""PassportCountryID""                  INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""EmailAddress""                       VARCHAR(100),
+            ""HomeNumber""                         VARCHAR(100),
+            ""WorkNumber""                         VARCHAR(100),
+            ""CellNumber""                         VARCHAR(100),
+            ""FaxNumber""                          VARCHAR(100),
+            ""JoiningDate""                        TIMESTAMP,
+            ""EndDate""                            TIMESTAMP,
+            ""WorkOutside""                        BOOLEAN,
+            ""IncomeTaxNumber""                    VARCHAR(100),
+            ""ExcludeUIF""                         BOOLEAN,
+            ""ExcludeSDL""                         BOOLEAN,
+            ""PhysicalAddress1""                   VARCHAR(100),
+            ""PhysicalAddress2""                   VARCHAR(100),
+            ""PhysicalPostalCode""                 VARCHAR(100),
+            ""PhysicalCountryID""                  INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""PhysicalProvinceID""                 INTEGER REFERENCES ""Const_Province""(""Province_ID""),
+            ""PhysicalTownID""                     INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""PostalSameAsPhysical""               BOOLEAN,
+            ""PostalAddress1""                     VARCHAR(100),
+            ""PostalAddress2""                     VARCHAR(100),
+            ""PostalPostalCode""                   VARCHAR(50),
+            ""PostalCountryID""                    INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""PostalProvinceID""                   INTEGER REFERENCES ""Const_Province""(""Province_ID""),
+            ""PostalTownID""                       INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""WorkSameAsPhysical""                 BOOLEAN,
+            ""WorkSameAsCompany""                  BOOLEAN,
+            ""WorkAddress1""                       VARCHAR(100),
+            ""WorkAddress2""                       VARCHAR(100),
+            ""WorkPostalCode""                     VARCHAR(50),
+            ""WorkCountryID""                      INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""WorkProvinceID""                     INTEGER REFERENCES ""Const_Province""(""Province_ID""),
+            ""WorkTownID""                         INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""PaymentTypeID""                      INTEGER REFERENCES ""Const_PaymentType""(""PaymentType_ID""),
+            ""AccountTypeID""                      INTEGER REFERENCES ""Const_BankAccountType""(""BankAccountTypeID""),
+            ""AccountHolderName""                  VARCHAR(100),
+            ""AccountHolderRelationshipID""        INTEGER REFERENCES ""Const_AccountRelationship""(""AccountRelationship_ID""),
+            ""AccountNumber""                      VARCHAR(50),
+            ""BankID""                             INTEGER REFERENCES ""Const_Bank""(""Bank_ID""),
+            ""BranchID""                           INTEGER REFERENCES ""Const_BankBranchCode""(""BankBranchCode_ID""),
+            ""WHPD_Other""                         NUMERIC(18,2),
+            ""WDPW_Other""                         NUMERIC(18,2),
+            ""RPD_Other""                          NUMERIC(18,2),
+            ""RPH_Other""                          NUMERIC(18,2),
+            ""RPW_Other""                          NUMERIC(18,2),
+            ""WHPM_Monthly""                       NUMERIC(18,2),
+            ""WDPM_Monthly""                       NUMERIC(18,2),
+            ""WHPD_Monthly""                       NUMERIC(18,2),
+            ""RPD_Monthly""                        NUMERIC(18,2),
+            ""RPH_Monthly""                        NUMERIC(18,2),
+            ""AnnualSalary""                       NUMERIC(18,2),
+            ""FixedSalary""                        NUMERIC(18,2),
+            ""Enabled""                            BOOLEAN,
+            ""CapturerID""                         INTEGER NOT NULL,
+            ""DateCaptured""                       TIMESTAMP NOT NULL,
+            ""ModifierID""                         INTEGER,
+            ""DateModified""                       TIMESTAMP,
+            ""IsDummy""                            BOOLEAN NOT NULL,
+            ""LeaveBased""                         INTEGER REFERENCES ""Const_LeaveBased_sys""(""LeaveBased_ID""),
+            ""Monday""                             BOOLEAN,
+            ""Tuesday""                            BOOLEAN,
+            ""Wednesday""                          BOOLEAN,
+            ""Thursday""                           BOOLEAN,
+            ""Friday""                             BOOLEAN,
+            ""Saturday""                           BOOLEAN,
+            ""Sunday""                             BOOLEAN,
+            ""ShiftID""                            INTEGER,
+            ""AllowOverTime""                      BOOLEAN,
+            ""MunicipalityID""                     INTEGER REFERENCES ""Payroll_Municipality""(""Municipality_ID""),
+            ""CycleID""                            INTEGER REFERENCES ""Const_Cycle""(""Cycle_ID""),
+            ""PayrollDefinitionGroupID""           INTEGER REFERENCES ""Payroll_DefinitionGroup""(""PayrollDefinitionGroup_ID""),
+            ""EthnicGroupID""                      INTEGER REFERENCES ""Const_EthnicGroup""(""Ethnic_ID""),
+            ""IsMarried""                          INTEGER,
+            ""IsYough""                            BOOLEAN,
+            ""ImagePath""                          VARCHAR(500),
+            ""MarriedIdNo""                        VARCHAR(50),
+            ""MarriedDateOfBirth""                 TIMESTAMP,
+            ""MarriedGenderID""                    INTEGER REFERENCES ""Const_Gender""(""Gender_ID""),
+            ""MarriedTitleID""                     INTEGER REFERENCES ""Const_Title""(""Title_ID""),
+            ""MarriedInitials""                    VARCHAR(50),
+            ""MarriedFirstName""                   VARCHAR(50),
+            ""MarriedSecondName""                  VARCHAR(50),
+            ""MarriedSurname""                     VARCHAR(50),
+            ""MarriedKnownAsName""                 VARCHAR(50),
+            ""MarriedPassportCountryID""           INTEGER REFERENCES ""Const_Country""(""Country_ID""),
+            ""MarriedPassportNumber""              VARCHAR(50),
+            ""KinContactRelationshipID""           INTEGER REFERENCES ""Const_KinRelationShip""(""KinRelation_ID""),
+            ""KinContactName""                     VARCHAR(50),
+            ""KinContactNo""                       VARCHAR(50),
+            ""JobProfileID""                       INTEGER REFERENCES ""Payroll_JobProfile""(""JobProfile_ID""),
+            ""TerminationReasonID""                INTEGER REFERENCES ""Payroll_ReasonEmployeeChange""(""Reason_ID""),
+            ""LeaveSchemeID""                      INTEGER,
+            ""ConditionOfServiceID""               INTEGER REFERENCES ""Payroll_ConditionOfService""(""ConditionOfService_ID""),
+            ""Isforeigner""                        BOOLEAN,
+            ""HowthePersonMarried""                VARCHAR(100),
+            ""MethodofCommunication""              INTEGER,
+            ""MaidenName""                         VARCHAR(50),
+            ""EquityDisabled""                     BOOLEAN,
+            ""NotchId""                            INTEGER REFERENCES ""Payroll_Notch""(""Notch_ID""),
+            ""TaxCalculationType""                 INTEGER REFERENCES ""Const_MethodOfTaxCalculation_sys""(""MethodOfTaxCalculation_ID""),
+            ""BonusCalculation""                   INTEGER REFERENCES ""Const_TaxBonusCalculation_sys""(""TaxBonusCalculation_ID""),
+            ""IsTemporary""                        BOOLEAN,
+            ""NatureOfPersonID""                   INTEGER REFERENCES ""Const_NatureOfPerson_Sys""(""NatureOfPerson_ID""),
+            ""PhysicalAddressTypeID""              INTEGER REFERENCES ""Const_AddressType""(""AddressType_ID""),
+            ""PostalAddressTypeID""                INTEGER REFERENCES ""Const_PostalAddressType_sys""(""AddressType_ID""),
+            ""PhysicalPOBoxNo""                    VARCHAR(50),
+            ""PostalPOBoxNo""                      VARCHAR(50),
+            ""PhysicalPostOffice""                 VARCHAR(50),
+            ""PostalPostOffice""                   VARCHAR(50),
+            ""QualificationID""                    INTEGER REFERENCES ""Const_Qualification_Sys""(""Qualification_ID""),
+            ""NewLabour""                          BOOLEAN,
+            ""Learners""                           BOOLEAN,
+            ""IsContractor""                       BOOLEAN,
+            ""BonusAmount""                        NUMERIC(18,2),
+            ""KinContactFullName""                 VARCHAR(50),
+            ""PhysicalSuburbID""                   INTEGER REFERENCES ""Const_Suburb""(""Suburb_ID""),
+            ""PostalSuburbID""                     INTEGER REFERENCES ""Const_Suburb""(""Suburb_ID""),
+            ""WorkSuburbID""                       INTEGER REFERENCES ""Const_Suburb""(""Suburb_ID""),
+            ""KinTownID""                          INTEGER REFERENCES ""Const_Town""(""Town_ID""),
+            ""KinSuburbID""                        INTEGER REFERENCES ""Const_Suburb""(""Suburb_ID""),
+            ""KinStreetID""                        INTEGER REFERENCES ""Const_Street""(""Street_ID""),
+            ""KinStreetNumber""                    VARCHAR(200),
+            ""KinTelephoneHome""                   VARCHAR(50),
+            ""PhysicalStreetID""                   INTEGER REFERENCES ""Const_Street""(""Street_ID""),
+            ""PhysicalComplexName""                VARCHAR(200),
+            ""PhysicalFlatUnitSuiteNo""            VARCHAR(200),
+            ""PostalStreetID""                     INTEGER REFERENCES ""Const_Street""(""Street_ID""),
+            ""PostalComplexName""                  VARCHAR(200),
+            ""PostalFlatUnitSuiteNo""              VARCHAR(200),
+            ""ERSID""                              INTEGER,
+            ""ERSFingerPrintCount""                INTEGER,
+            ""ERSStatusID""                        INTEGER REFERENCES ""Payroll_TA_Const_Status""(""Status_ID""),
+            ""ExcludeUIFNonContributorReasonID""   INTEGER REFERENCES ""Const_HR_UifDefinedNonContributorReason_sys""(""UifDefinedNonContributorReason_ID""),
+            ""PackageAmount""                      DOUBLE PRECISION,
+            ""PackageOverriden""                   BOOLEAN,
+            ""DisabilityTypeID""                   INTEGER REFERENCES ""Const_Payroll_WSP_DisabilityTypes_sys""(""DisabilityType_ID""),
+            ""EmailAddressSecondary""              VARCHAR(100),
+            ""FarmId""                             INTEGER REFERENCES ""Const_Farm""(""Farm_ID""),
+            ""PostalAddress3""                     VARCHAR(200),
+            ""PostalAddress4""                     VARCHAR(200),
+            ""AddressIndicator""                   INTEGER,
+            ""CareOfIntermediary""                 VARCHAR(21),
+            ""AlternateIDNumber""                  VARCHAR(30),
+            ""AlternateIDType""                    INTEGER REFERENCES ""Payroll_IdentityTypes""(""IdentityType_ID""),
+            ""PhyWorkUnit""                        VARCHAR(8),
+            ""PhyWorkComplex""                     VARCHAR(200),
+            ""PhyWorkStreetNo""                    VARCHAR(8),
+            ""PhyWorkStreetId""                    INTEGER,
+            ""PhyWorkSuburbId""                    INTEGER,
+            ""PhyWorkCountryId""                   INTEGER,
+            ""PhysicalStreetNo""                   VARCHAR(8),
+            ""PostalAddressNo""                    VARCHAR(8),
+            ""PostalStreetName""                   VARCHAR(100),
+            ""IsCareOfPostalAddress""              BOOLEAN,
+            ""PostalAddressIndId""                 INTEGER,
+            ""PoSpecialService""                   VARCHAR(21),
+            ""PostalAddressUnitNumber""            VARCHAR(21),
+            ""PositionID""                         INTEGER REFERENCES ""Payroll_Position""(""Position_ID""),
+            ""EmployeeTypeID""                     INTEGER REFERENCES ""Const_EmployeeType_sys""(""EmployeeType_ID""),
+            ""EmployeeSubtypeID""                  INTEGER REFERENCES ""Payroll_EmployeeSubtypes""(""EmployeeSubtype_ID""),
+            ""PhysicalAddress3""                   VARCHAR(35),
+            ""PhysicalAddress4""                   VARCHAR(35),
+            ""ShiftRotationID""                    INTEGER REFERENCES ""Payroll_ShiftRotation""(""ShiftRotation_ID""),
+            ""BonusValueMOCID""                    INTEGER,
+            ""BonusPaymentDateID""                 INTEGER REFERENCES ""Const_Payroll_BonusPaymentDate_sys""(""BonusPaymentDate_ID""),
+            ""BonusMonth""                         INTEGER REFERENCES ""Const_Month_sys""(""Month_ID""),
+            ""PhyAddressComplex""                  VARCHAR(200),
+            ""PhyAddressUnit""                     VARCHAR(8),
+            ""MarritalStatusDate""                 TIMESTAMP,
+            ""PayPointID""                         INTEGER REFERENCES ""Payroll_PayPoint""(""PayPoint_ID""),
+            ""RotationID""                         INTEGER REFERENCES ""Payroll_ShiftRotationDetail""(""Rotation_ID""),
+            ""ReasonID""                           INTEGER REFERENCES ""Payroll_ReasonEmployeeChange""(""Reason_ID""),
+            ""JointAccountEmployeeId""             INTEGER,
+            ""HasMuncipalAssets""                  BOOLEAN,
+            ""AssetReturnDate""                    TIMESTAMP,
+            ""NotchChangeReason""                  VARCHAR(200),
+            ""StartDays""                          SMALLINT NOT NULL DEFAULT 0,
+            ""UntilDays""                          SMALLINT NOT NULL DEFAULT 0,
+            ""SalaryBasedOn""                      INTEGER,
+            ""Rate""                               NUMERIC(18,2),
+            ""PrevSalary""                         NUMERIC(18,2)
+        );
+
+        -- ── Payroll_TA_Const_Status ───────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_TA_Const_Status"" (
+            ""Status_ID""    INTEGER PRIMARY KEY,
+            ""StatusDesc""   VARCHAR(200) NOT NULL,
+            ""Enabled""      BOOLEAN NOT NULL,
+            ""DateCaptured"" TIMESTAMP NOT NULL,
+            ""CapturerID""   INTEGER NOT NULL,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER
+        );
+
+        -- ── Payroll_ShiftRotationDetail ───────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ShiftRotationDetail"" (
+            ""Rotation_ID""     SERIAL PRIMARY KEY,
+            ""Description""     VARCHAR(50) NOT NULL,
+            ""ShiftRotationID"" INTEGER NOT NULL REFERENCES ""Payroll_ShiftRotation""(""ShiftRotation_ID""),
+            ""WeekNo""          INTEGER NOT NULL,
+            ""Monday""          INTEGER NOT NULL,
+            ""Tuesday""         INTEGER NOT NULL,
+            ""Wednesday""       INTEGER NOT NULL,
+            ""Thursday""        INTEGER NOT NULL,
+            ""Friday""          INTEGER NOT NULL,
+            ""Saturday""        INTEGER NOT NULL,
+            ""Sunday""          INTEGER NOT NULL,
+            ""DateCaptured""    TIMESTAMP NOT NULL,
+            ""CapturerID""      INTEGER NOT NULL,
+            ""DateModified""    TIMESTAMP,
+            ""ModifierID""      INTEGER,
+            ""Enabled""         BOOLEAN NOT NULL DEFAULT TRUE
+        );
+
+        -- ── Payroll_ReasonEmployeeChange ──────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ReasonEmployeeChange"" (
+            ""Reason_ID""              SERIAL PRIMARY KEY,
+            ""ReasonTypeID""           INTEGER NOT NULL,
+            ""ReasonDescription""      VARCHAR(255) NOT NULL,
+            ""TerminationTypeID""      INTEGER,
+            ""Enabled""                BOOLEAN NOT NULL,
+            ""DateCaptured""           TIMESTAMP NOT NULL,
+            ""CapturerID""             INTEGER NOT NULL,
+            ""DateModified""           TIMESTAMP,
+            ""ModifierID""             INTEGER,
+            ""ReasonSubtypeID""        INTEGER REFERENCES ""Payroll_ReasonSubtype_sys""(""ReasonSubtype_ID""),
+            ""UIFTerminationReasonID"" INTEGER REFERENCES ""Const_HR_UifDefinedTeminationReason_sys""(""UifDefinedTerminationReason_ID"")
+        );
+
+        -- ── Payroll_ReasonSubtype_sys ─────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ReasonSubtype_sys"" (
+            ""ReasonSubtype_ID"" SERIAL PRIMARY KEY,
+            ""ReasonID""         INTEGER NOT NULL REFERENCES ""Payroll_ReasonType_sys""(""ReasonType_ID""),
+            ""Description""      VARCHAR(256) NOT NULL,
+            ""Enabled""          BOOLEAN NOT NULL,
+            ""DateCaptured""     TIMESTAMP NOT NULL,
+            ""CapturerID""       INTEGER NOT NULL,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER
+        );
+
+        -- ── Const_HR_UifDefinedTeminationReason_sys ───────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_HR_UifDefinedTeminationReason_sys"" (
+            ""UifDefinedTerminationReason_ID"" SERIAL PRIMARY KEY,
+            ""Description""                    VARCHAR(200) NOT NULL,
+            ""UifCode""                        INTEGER,
+            ""Enabled""                        BOOLEAN,
+            ""DateCaptured""                   TIMESTAMP,
+            ""CapturerID""                     INTEGER,
+            ""DateModified""                   TIMESTAMP,
+            ""ModifierID""                     INTEGER
+        );
+
+        -- ── Payroll_PayPoint ──────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_PayPoint"" (
+            ""PayPoint_ID""      SERIAL PRIMARY KEY,
+            ""PayPointCode""     INTEGER NOT NULL,
+            ""PayPointDesc""     TEXT NOT NULL,
+            ""PayPointAddress""  TEXT NOT NULL,
+            ""PayPointLocation"" TEXT NOT NULL,
+            ""StartDate""        TIMESTAMP NOT NULL,
+            ""EndDate""          TIMESTAMP NOT NULL,
+            ""Enabled""          BOOLEAN NOT NULL,
+            ""DateCaptured""     TIMESTAMP NOT NULL,
+            ""CapturerID""       INTEGER NOT NULL,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER
+        );
+
+        -- ── Payroll_Notch ─────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_Notch"" (
+            ""Notch_ID""       SERIAL PRIMARY KEY,
+            ""MonthlySalary""  NUMERIC(18,4) NOT NULL DEFAULT 0,
+            ""Enabled""        BOOLEAN NOT NULL,
+            ""DateCaptured""   TIMESTAMP NOT NULL,
+            ""CapturerID""     INTEGER NOT NULL,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER,
+            ""Notch""          INTEGER,
+            ""TaskGradeId""    INTEGER REFERENCES ""Payroll_TaskGrade""(""TaskGrade_ID""),
+            ""MinimumSalary""  NUMERIC(18,4) NOT NULL DEFAULT 0,
+            ""MaximumSalary""  NUMERIC(18,4) NOT NULL DEFAULT 0,
+            ""OnAppointment""  BOOLEAN,
+            ""OnIncreaseDate"" BOOLEAN,
+            ""IncreaseDate""   TIMESTAMP,
+            ""AnnualIncrease"" NUMERIC(5,2),
+            ""MonthID""        INTEGER,
+            ""StartDate""      TIMESTAMP NOT NULL DEFAULT '2000-01-01',
+            ""EndDate""        TIMESTAMP NOT NULL DEFAULT '9999-12-31'
+        );
+
+        -- ── CONST_SICCodeClass ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""CONST_SICCodeClass"" (
+            ""ClassID""      INTEGER PRIMARY KEY,
+            ""Description""  VARCHAR(255),
+            ""Enabled""      BOOLEAN,
+            ""GroupId""      INTEGER REFERENCES ""CONST_SICCodeGroup""(""GroupID""),
+            ""DateCaptured"" TIMESTAMP,
+            ""CapturerID""   INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER
+        );
+
+        -- ── CONST_SICCodeGroup ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""CONST_SICCodeGroup"" (
+            ""GroupID""      INTEGER PRIMARY KEY,
+            ""Description""  VARCHAR(255),
+            ""Enabled""      BOOLEAN,
+            ""DivisionId""   INTEGER REFERENCES ""CONST_SIC_Division""(""DivisionID""),
+            ""DateCaptured"" TIMESTAMP,
+            ""CapturerID""   INTEGER,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER
+        );
+
+        -- ── Const_SEZCode ─────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_SEZCode"" (
+            ""SezCodeId"" SERIAL PRIMARY KEY,
+            ""SEZCode""   VARCHAR(7)
+        );
+
+        -- ── Const_BillingTemplate_sys ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_BillingTemplate_sys"" (
+            ""BillingTemplate_ID"" SERIAL PRIMARY KEY,
+            ""BillingTemplate""    VARCHAR(50),
+            ""Enabled""            BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""       TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""         INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""       TIMESTAMP,
+            ""ModifierID""         INTEGER,
+            ""UsedBy""             VARCHAR(50),
+            ""ReportFileName""     VARCHAR(100)
+        );
+
+        -- ── Const_MunicipalityGrading ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_MunicipalityGrading"" (
+            ""GradingID"" SERIAL PRIMARY KEY,
+            ""Points""    VARCHAR(50)
+        );
+
+        -- ── Payroll_JobProfile ───────────────────────────────────────────────
+        -- All parent FKs now enforced: Const_Department, Const_Division, Const_EmployeeType_sys.
+        CREATE TABLE IF NOT EXISTS ""Payroll_JobProfile"" (
+            ""JobProfile_ID""                              SERIAL PRIMARY KEY,
+            ""OccupationOFOCODE""                         VARCHAR(50),
+            ""Occupation""                                VARCHAR(500),
+            ""JobTitle""                                  VARCHAR(500),
+            ""JobFamily""                                 INTEGER REFERENCES ""Const_OccupationLevel_sys""(""OccupationLevel_ID""),
+            ""JobPurpose""                                VARCHAR(500),
+            ""JobResponsibility""                         VARCHAR(500),
+            ""ToWomDoesThisPositionReport""               VARCHAR(500),
+            ""WhoReportsToThisPosition""                  VARCHAR(500),
+            ""WhoArePeersInThisUnit""                     VARCHAR(500),
+            ""QualificationsRequiedForThisPosition""      VARCHAR(500),
+            ""ExperienceRequiredForThisPosition""         VARCHAR(500),
+            ""Knowledge""                                 VARCHAR(500),
+            ""Skills""                                    VARCHAR(500),
+            ""LiaiseWithInternal""                        VARCHAR(500),
+            ""InternalCommunicationPurpose""              VARCHAR(500),
+            ""Own""                                       VARCHAR(500),
+            ""Superior""                                  VARCHAR(500),
+            ""CanThisPositionDraftChangePolicies""        BOOLEAN,
+            ""Description""                              VARCHAR(500),
+            ""ContractualAgreements""                     BOOLEAN,
+            ""Expenditure""                               BOOLEAN,
+            ""PrecedingQuestions""                        VARCHAR(500),
+            ""ProblemSolvingJobThinkingChallanges""       VARCHAR(500),
+            ""Financial""                                 VARCHAR(500),
+            ""Planning""                                  VARCHAR(500),
+            ""ShortTerm""                                 VARCHAR(500),
+            ""MedTerm""                                   VARCHAR(500),
+            ""LongTerm""                                  VARCHAR(500),
+            ""DateCaptured""                              TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                                INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""                              TIMESTAMP,
+            ""ModifierID""                                INTEGER,
+            ""Amount""                                    NUMERIC(18,2),
+            ""CanEscalate""                               BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CanApprove""                                BOOLEAN NOT NULL DEFAULT FALSE,
+            ""MajorGroupID""                              INTEGER REFERENCES ""Const_MajorGroup""(""MajorGroup_ID""),
+            ""SubMajorGroupID""                           INTEGER REFERENCES ""Const_SubMajorGroup""(""SubMajorGroup_ID""),
+            ""MinorGroupID""                              INTEGER REFERENCES ""Const_MinorGroup""(""MinorGroup_ID""),
+            ""UnitGroupID""                               INTEGER REFERENCES ""Const_UnitGroup""(""UnitGroup_ID""),
+            ""OccupationsID""                             INTEGER REFERENCES ""Const_Occupations""(""Occupations_ID""),
+            ""SpecialistID""                              INTEGER REFERENCES ""Const_Specialist""(""Specialist_ID""),
+            ""CoreFunction""                              BOOLEAN,
+            ""LiaiseWithExternal""                        VARCHAR(500),
+            ""ExternalCommunicationPurpose""              VARCHAR(500),
+            ""EmploymentCategoryID""                      INTEGER REFERENCES ""Const_EmploymentCategory_Sys""(""EmploymentCategory_ID""),
+            ""EmploymentCodeID""                          INTEGER REFERENCES ""Const_EmploymentCode_Sys""(""EmploymentCode_ID""),
+            ""WorkAreaID""                                INTEGER REFERENCES ""Const_WorkArea_Sys""(""WorkArea_ID""),
+            ""NoOfPosition""                              INTEGER,
+            ""OfficeBound""                               BOOLEAN,
+            ""EmployeeTypeID""                            INTEGER,
+            ""Enabled""                                   BOOLEAN,
+            ""PayrollDefinitionGroupID""                  INTEGER,
+            ""ShiftID""                                   INTEGER,
+            ""AllowOverTime""                             BOOLEAN NOT NULL DEFAULT FALSE,
+            ""DepartmentID""                              INTEGER,
+            ""DivisionID""                                INTEGER,
+            ""RecommendedContractorRate""                 NUMERIC(18,2),
+            ""PercentageForCostingAllocationToSCOAFunction"" NUMERIC(5,2),
+            ""StartDate""                                 TIMESTAMP NOT NULL DEFAULT '1900-01-01',
+            ""EndDate""                                   TIMESTAMP NOT NULL DEFAULT '9999-12-31',
+            ""ParentID""                                  INTEGER,
+            ""Status""                                    INTEGER,
+            ""EmployeeSubtypeID""                         INTEGER REFERENCES ""Payroll_EmployeeSubtypes""(""EmployeeSubtype_ID""),
+            ""TaskGradeId""                               INTEGER REFERENCES ""Payroll_TaskGrade""(""TaskGrade_ID""),
+            ""JobDescriptionCode""                        VARCHAR(20),
+            ""LimitID""                                   INTEGER,
+            ""IsPerformanceAssessement""                  BOOLEAN NOT NULL DEFAULT FALSE,
+            ""ISActive""                                  BOOLEAN
+        );
+
+        -- ── Payroll_TaskGrade ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_TaskGrade"" (
+            ""TaskGrade_ID""        SERIAL PRIMARY KEY,
+            ""TaskGradeName""       VARCHAR(50) NOT NULL,
+            ""IsSalgacompliant""    BOOLEAN,
+            ""ToPhaseOut""          BOOLEAN,
+            ""MinSalary""           NUMERIC(18,4) NOT NULL DEFAULT 0,
+            ""MaxSalary""           NUMERIC(18,4) NOT NULL DEFAULT 0,
+            ""SkillLevelId""        INTEGER REFERENCES ""Payroll_TaskSkillLevel""(""TaskSkillLevel_ID""),
+            ""DateCaptured""        TIMESTAMP,
+            ""CapturerID""          INTEGER,
+            ""DateModified""        TIMESTAMP,
+            ""ModifierID""          INTEGER,
+            ""StartDate""           TIMESTAMP NOT NULL DEFAULT '2000-01-01',
+            ""EndDate""             TIMESTAMP NOT NULL DEFAULT '9999-12-31',
+            ""ExcludeFromIncrease"" BOOLEAN
+        );
+
+        -- ── Payroll_TaskSkillLevel ────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_TaskSkillLevel"" (
+            ""TaskSkillLevel_ID"" SERIAL PRIMARY KEY,
+            ""Description""       VARCHAR(100),
+            ""IsEnabled""         BOOLEAN,
+            ""DateCaptured""      TIMESTAMP,
+            ""CapturerID""        INTEGER,
+            ""DateModified""      TIMESTAMP,
+            ""ModifierID""        INTEGER
+        );
+
+        -- ── Const_WorkArea_Sys ───────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_WorkArea_Sys"" (
+            ""WorkArea_ID""       SERIAL PRIMARY KEY,
+            ""EmploymentCodeId""  INTEGER NOT NULL REFERENCES ""Const_EmploymentCode_Sys""(""EmploymentCode_ID""),
+            ""WorkArea""          VARCHAR(50) NOT NULL,
+            ""Enabled""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""      TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""        INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""      TIMESTAMP,
+            ""ModifierID""        INTEGER
+        );
+
+        -- ── Const_Specialist ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Specialist"" (
+            ""Specialist_ID""   SERIAL PRIMARY KEY,
+            ""OccupationsID""   INTEGER NOT NULL REFERENCES ""Const_Occupations""(""Occupations_ID""),
+            ""SpecialistDesc""  VARCHAR(1000) NOT NULL,
+            ""Enable""          BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""    TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""      INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""    TIMESTAMP,
+            ""ModifierID""      INTEGER,
+            ""SpecialistCodes"" TEXT
+        );
+
+        -- ── Const_Occupations ────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Occupations"" (
+            ""Occupations_ID""   SERIAL PRIMARY KEY,
+            ""UnitGroupID""      INTEGER NOT NULL REFERENCES ""Const_UnitGroup""(""UnitGroup_ID""),
+            ""OccupationsCode""  VARCHAR(20) NOT NULL,
+            ""OccupationsDesc""  VARCHAR(1000) NOT NULL,
+            ""Enable""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""     TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""       INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER
+        );
+
+        -- ── Const_UnitGroup ──────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_UnitGroup"" (
+            ""UnitGroup_ID""   SERIAL PRIMARY KEY,
+            ""MinorGroupID""   INTEGER NOT NULL REFERENCES ""Const_MinorGroup""(""MinorGroup_ID""),
+            ""UnitGroupCode""  VARCHAR(20) NOT NULL,
+            ""UnitGroupDesc""  VARCHAR(1000) NOT NULL,
+            ""Enable""         BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_OccupationLevel_sys ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_OccupationLevel_sys"" (
+            ""OccupationLevel_ID"" SERIAL PRIMARY KEY,
+            ""OccupationLevel""    VARCHAR(200),
+            ""Enabled""            BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""       TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""         INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""       TIMESTAMP,
+            ""ModifierID""         INTEGER
+        );
+
+        -- ── Const_MinorGroup ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_MinorGroup"" (
+            ""MinorGroup_ID""    SERIAL PRIMARY KEY,
+            ""SubMajorGroupID""  INTEGER NOT NULL,
+            ""MinorGroupCode""   VARCHAR(20) NOT NULL,
+            ""MinorGroupDesc""   VARCHAR(1000) NOT NULL,
+            ""Enable""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""     TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""       INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER
+        );
+
+        -- ── Const_SubMajorGroup ──────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_SubMajorGroup"" (
+            ""SubMajorGroup_ID""   SERIAL PRIMARY KEY,
+            ""MajorGroupID""       INTEGER NOT NULL REFERENCES ""Const_MajorGroup""(""MajorGroup_ID""),
+            ""SubMajorGroupCode""  VARCHAR(20) NOT NULL,
+            ""SubMajorGroupDesc""  VARCHAR(1000) NOT NULL,
+            ""Enable""             BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""       TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""         INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""       TIMESTAMP,
+            ""ModifierID""         INTEGER
+        );
+
+        -- ── Const_MajorGroup ─────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_MajorGroup"" (
+            ""MajorGroup_ID""   SERIAL PRIMARY KEY,
+            ""MajorGroupCode""  VARCHAR(20) NOT NULL,
+            ""MajorGroupDesc""  VARCHAR(1000) NOT NULL,
+            ""Enable""          BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""    TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""      INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""    TIMESTAMP,
+            ""ModifierID""      INTEGER
+        );
+
+        -- ── Const_EmploymentCode_Sys ─────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_EmploymentCode_Sys"" (
+            ""EmploymentCode_ID"" SERIAL PRIMARY KEY,
+            ""EmploymentCode""    VARCHAR(100) NOT NULL,
+            ""Enabled""           BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""      TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""        INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""      TIMESTAMP,
+            ""ModifierID""        INTEGER
+        );
+
+        -- ── Const_EmploymentCategory_Sys ─────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_EmploymentCategory_Sys"" (
+            ""EmploymentCategory_ID"" SERIAL PRIMARY KEY,
+            ""CategoryCode""          VARCHAR(50) NOT NULL,
+            ""Category""              VARCHAR(100) NOT NULL,
+            ""Enabled""               BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""          TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""            INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""          TIMESTAMP,
+            ""ModifierID""            INTEGER
+        );
+
+        -- ── Payroll_IdentityTypes ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_IdentityTypes"" (
+            ""IdentityType_ID"" SERIAL PRIMARY KEY,
+            ""IdentityType""    VARCHAR(64) NOT NULL,
+            ""Enabled""         BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CapturerID""      INTEGER NOT NULL DEFAULT 0,
+            ""DateCaptured""    TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""      INTEGER,
+            ""DateModified""    TIMESTAMP
+        );
+
+        -- ── Payroll_EmployeeSubtypes ──────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_EmployeeSubtypes"" (
+            ""EmployeeSubtype_ID""   SERIAL PRIMARY KEY,
+            ""EmployeeTypeID""       INTEGER NOT NULL,
+            ""EmployeeSubtypeDesc""  VARCHAR(255) NOT NULL,
+            ""CapturerID""           INTEGER NOT NULL DEFAULT 0,
+            ""DateCaptured""         TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""           INTEGER,
+            ""DateModified""         TIMESTAMP,
+            ""ApplyBonus""           BOOLEAN NOT NULL DEFAULT FALSE,
+            ""ExcludeUIF""           BOOLEAN NOT NULL DEFAULT FALSE,
+            ""UIFReasonID""          INTEGER,
+            ""ExcludeSDL""           BOOLEAN NOT NULL DEFAULT FALSE,
+            ""StartDate""            TIMESTAMP NOT NULL DEFAULT '2000-01-01',
+            ""EndDate""              TIMESTAMP NOT NULL DEFAULT '9999-12-31',
+            ""Enabled""              BOOLEAN NOT NULL DEFAULT TRUE,
+            CONSTRAINT ""FK_Payroll_EmployeeSubtypes_Const_EmployeeType_sys""
+                FOREIGN KEY (""EmployeeTypeID"") REFERENCES ""Const_EmployeeType_sys"" (""EmployeeType_ID""),
+            CONSTRAINT ""FK_Payroll_EmployeeSubtypes_Const_HR_UifDefinedNonContributorReason_sys""
+                FOREIGN KEY (""UIFReasonID"") REFERENCES ""Const_HR_UifDefinedNonContributorReason_sys"" (""UifDefinedNonContributorReason_ID"")
+        );
+
+        -- ── Payroll_DefinitionGroup ───────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_DefinitionGroup"" (
+            ""PayrollDefinitionGroup_ID""   SERIAL PRIMARY KEY,
+            ""PayrollDefinitionGroupName""  TEXT NOT NULL,
+            ""Enabled""                     BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""                TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                  INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""                TIMESTAMP,
+            ""ModifierID""                  INTEGER
+        );
+
+        -- ── Payroll_ConditionOfService ────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_ConditionOfService"" (
+            ""ConditionOfService_ID"" SERIAL PRIMARY KEY,
+            ""ConditionShortDesc""    VARCHAR(10) NOT NULL,
+            ""ConditionDesc""         VARCHAR(50) NOT NULL,
+            ""StartDate""             TIMESTAMP NOT NULL,
+            ""EndDate""               TIMESTAMP NOT NULL,
+            ""Enabled""               BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CapturerID""            INTEGER NOT NULL DEFAULT 0,
+            ""DateCaptured""          TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""            INTEGER,
+            ""DateModified""          TIMESTAMP
+        );
+
+        -- ── Const_Farm ───────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Farm"" (
+            ""Farm_ID""               SERIAL PRIMARY KEY,
+            ""RegistrationDivision""  VARCHAR(50),
+            ""FarmName""              VARCHAR(250),
+            ""Enabled""               BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""          TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""            INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""          TIMESTAMP,
+            ""ModifierID""            INTEGER,
+            ""AllotmentCodeID""       INTEGER,
+            CONSTRAINT ""FK_Const_Farm_Const_AllotmentCode"" FOREIGN KEY (""AllotmentCodeID"")
+                REFERENCES ""Const_AllotmentCode"" (""AllotmentCode_ID"")
+        );
+
+        -- ── Const_AllotmentCode ──────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_AllotmentCode"" (
+            ""AllotmentCode_ID""      SERIAL PRIMARY KEY,
+            ""AllotmentCode""         VARCHAR(50),
+            ""AllotmentDescription""  VARCHAR(200),
+            ""Enabled""               BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""          TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""            INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""          TIMESTAMP,
+            ""ModifierID""            INTEGER
+        );
+
+        -- ── Const_Title ──────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Title"" (
+            ""Title_ID""            SERIAL PRIMARY KEY,
+            ""Title""               VARCHAR(50) NOT NULL,
+            ""Enabled""             BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""        TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""          INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""        TIMESTAMP,
+            ""ModifierID""          INTEGER,
+            ""TitleAbbreviation""   VARCHAR(50),
+            ""UifDefinedTitleID""   INTEGER,
+            CONSTRAINT ""FK_Const_Title_Const_HR_UifDefinedTitle_sys"" FOREIGN KEY (""UifDefinedTitleID"")
+                REFERENCES ""Const_HR_UifDefinedTitle_sys"" (""UifDefinedTitle_ID"")
+        );
+
+        -- ── Const_HR_UifDefinedTitle_sys ─────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_HR_UifDefinedTitle_sys"" (
+            ""UifDefinedTitle_ID"" SERIAL PRIMARY KEY,
+            ""Title""              VARCHAR(200) NOT NULL,
+            ""UifCode""            INTEGER,
+            ""Enabled""            BOOLEAN,
+            ""DateCaptured""       TIMESTAMP,
+            ""CapturerID""         INTEGER,
+            ""DateModified""       TIMESTAMP,
+            ""ModifierID""         INTEGER
+        );
+
+        -- ── Const_TaxBonusCalculation_sys ────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_TaxBonusCalculation_sys"" (
+            ""TaxBonusCalculation_ID"" SERIAL PRIMARY KEY,
+            ""TaxBonusCalculation""    VARCHAR(50),
+            ""Enabled""                BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""           TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""             INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""           TIMESTAMP,
+            ""ModifierID""             INTEGER
+        );
+
+        -- ── Const_Street ─────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Street"" (
+            ""Street_ID""      SERIAL PRIMARY KEY,
+            ""StreetName""     VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER,
+            ""SuburbID""       INTEGER,
+            ""StreetSuffixID"" INTEGER,
+            ""SubSuburbID""    INTEGER,
+            CONSTRAINT ""FK_Const_Street_Const_Suburb"" FOREIGN KEY (""SuburbID"")
+                REFERENCES ""Const_Suburb"" (""Suburb_ID""),
+            CONSTRAINT ""FK_Const_Street_Const_SubSuburb"" FOREIGN KEY (""SubSuburbID"")
+                REFERENCES ""Const_SubSuburb"" (""SubSuburb_ID"")
+        );
+
+        -- ── Const_Suburb ─────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Suburb"" (
+            ""Suburb_ID""    SERIAL PRIMARY KEY,
+            ""SuburbName""   VARCHAR(200) NOT NULL,
+            ""Enabled""      BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured"" TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""   INTEGER NOT NULL DEFAULT 0,
+            ""DateModified"" TIMESTAMP,
+            ""ModifierID""   INTEGER,
+            ""TownID""       INTEGER,
+            ""SuburbCode""   VARCHAR(4),
+            ""PostalCode""   VARCHAR(50),
+            CONSTRAINT ""FK_Const_Suburb_Const_Town"" FOREIGN KEY (""TownID"")
+                REFERENCES ""Const_Town"" (""Town_ID"")
+        );
+
+        -- ── Const_Town ───────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Town"" (
+            ""Town_ID""                   SERIAL PRIMARY KEY,
+            ""Town""                      VARCHAR(200) NOT NULL,
+            ""Enabled""                   BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""              TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""              TIMESTAMP,
+            ""ModifierID""               INTEGER,
+            ""FallswithinMunicipality""  BOOLEAN,
+            ""TownCode""                 VARCHAR(6),
+            ""ProvinceID""               INTEGER NOT NULL DEFAULT 1,
+            ""Code""                     VARCHAR(50),
+            CONSTRAINT ""FK_Const_Town_Const_Province"" FOREIGN KEY (""ProvinceID"")
+                REFERENCES ""Const_Province"" (""Province_ID"")
+        );
+
+        -- ── Const_SubSuburb ──────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_SubSuburb"" (
+            ""SubSuburb_ID""   SERIAL PRIMARY KEY,
+            ""SuburbID""       INTEGER NOT NULL,
+            ""SubSuburbName""  VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_KinRelationShip ────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_KinRelationShip"" (
+            ""KinRelation_ID""  SERIAL PRIMARY KEY,
+            ""KinRelationShip"" VARCHAR(50) NOT NULL,
+            ""Enabled""         BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""    TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""      INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""    TIMESTAMP,
+            ""ModifierID""      INTEGER,
+            ""FamilyMember""    BOOLEAN
+        );
+
+        -- ── Const_Qualification_Sys ──────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Qualification_Sys"" (
+            ""Qualification_ID""               SERIAL PRIMARY KEY,
+            ""Qualification""                  VARCHAR(50) NOT NULL,
+            ""DateCaptured""                   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""                   TIMESTAMP,
+            ""ModifierID""                     INTEGER,
+            ""IsEducation""                    BOOLEAN NOT NULL DEFAULT FALSE,
+            ""IsProfessionalAccreditation""    BOOLEAN NOT NULL DEFAULT FALSE,
+            ""QualificationTypeID""            INTEGER,
+            ""QualificationShortCode""         VARCHAR(255),
+            ""QualificationShortDescription""  VARCHAR(400),
+            ""ProfessionalBodyCode""           VARCHAR(255),
+            ""ProfessionalBodyName""           VARCHAR(255),
+            ""FieldOfStudyID""                 INTEGER,
+            CONSTRAINT ""FK_Const_Qualification_Sys_Payroll_FieldOfStudy"" FOREIGN KEY (""FieldOfStudyID"") REFERENCES ""Payroll_FieldOfStudy"" (""FieldOfStudy_ID""),
+            CONSTRAINT ""FK_Const_Qualification_Sys_Payroll_QualificationTypes"" FOREIGN KEY (""QualificationTypeID"") REFERENCES ""Payroll_QualificationTypes"" (""QualificationTypeId"")
+        );
+
+        -- ── Payroll_QualificationTypes ───────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_QualificationTypes"" (
+            ""QualificationTypeId""   SERIAL PRIMARY KEY,
+            ""QualificationTypeName"" VARCHAR(50) NOT NULL,
+            ""Enabled""               BOOLEAN NOT NULL DEFAULT TRUE
+        );
+
+        -- ── Payroll_FieldOfStudy ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Payroll_FieldOfStudy"" (
+            ""FieldOfStudy_ID"" SERIAL PRIMARY KEY,
+            ""Name""            VARCHAR(150) NOT NULL,
+            ""Enabled""         BOOLEAN NOT NULL DEFAULT TRUE
+        );
+
+        -- ── Const_Province ───────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Province"" (
+            ""Province_ID""   SERIAL PRIMARY KEY,
+            ""ProvinceDesc""  VARCHAR(200) NOT NULL,
+            ""CountryID""     INTEGER NOT NULL,
+            ""Enabled""       BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""  TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""    INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""  TIMESTAMP,
+            ""ModifierID""    INTEGER,
+            ""ProvinceCode""  VARCHAR(50),
+            CONSTRAINT ""FK_Const_Province_Const_Country"" FOREIGN KEY (""CountryID"") REFERENCES ""Const_Country"" (""Country_ID"")
+        );
+
+        -- ── Const_PostalAddressType_sys ──────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_PostalAddressType_sys"" (
+            ""AddressType_ID"" SERIAL PRIMARY KEY,
+            ""AddressType""    VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT FALSE,
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""ModifierID""     INTEGER,
+            ""DateModified""   TIMESTAMP
+        );
+
+        -- ── Const_Payroll_WSP_DisabilityTypes_sys ────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Payroll_WSP_DisabilityTypes_sys"" (
+            ""DisabilityType_ID""      SERIAL PRIMARY KEY,
+            ""DisabilityDescription""  VARCHAR(200) NOT NULL,
+            ""Enabled""                INTEGER NOT NULL DEFAULT 1,
+            ""DateCaptured""           TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""             INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""           TIMESTAMP,
+            ""ModifierID""             INTEGER
+        );
+
+        -- ── Const_Payroll_BonusPaymentDate_sys ───────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Payroll_BonusPaymentDate_sys"" (
+            ""BonusPaymentDate_ID"" SERIAL PRIMARY KEY,
+            ""Description""         VARCHAR(200)
+        );
+
+        -- ── Const_PaymentType ────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_PaymentType"" (
+            ""PaymentType_ID""   SERIAL PRIMARY KEY,
+            ""PaymentTypeDesc""  VARCHAR(200) NOT NULL,
+            ""Enabled""          BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""     TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""       INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""     TIMESTAMP,
+            ""ModifierID""       INTEGER
+        );
+
+        -- ── Const_NatureOfPerson_Sys ─────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_NatureOfPerson_Sys"" (
+            ""NatureOfPerson_ID""   SERIAL PRIMARY KEY,
+            ""TaxYear""             VARCHAR(9) NOT NULL DEFAULT '2019/2020',
+            ""NatureOfPersonCode""  VARCHAR(10) NOT NULL,
+            ""NatureOfPersonDesc""  VARCHAR(100) NOT NULL,
+            ""Enabled""             BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""        TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""          INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""        TIMESTAMP,
+            ""ModifierID""          INTEGER,
+            ""NatureOfPersonType""  INTEGER NOT NULL DEFAULT 1,
+            ""StartDate""           DATE NOT NULL DEFAULT CURRENT_DATE,
+            ""EndDate""             DATE NOT NULL DEFAULT CURRENT_DATE
+        );
+
+        -- ── Const_Month_sys ──────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Month_sys"" (
+            ""Month_ID""      SERIAL PRIMARY KEY,
+            ""Month""         VARCHAR(50),
+            ""Enabled""       BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""  TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""    INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""  TIMESTAMP,
+            ""ModifierID""    INTEGER
+        );
+
+        -- ── Const_MethodOfTaxCalculation_sys ─────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_MethodOfTaxCalculation_sys"" (
+            ""MethodOfTaxCalculation_ID"" SERIAL PRIMARY KEY,
+            ""MethodOfTaxCalculation""    VARCHAR(50),
+            ""Enabled""                   BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""              TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""                INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""              TIMESTAMP,
+            ""ModifierID""                INTEGER
+        );
+
+        -- ── Const_MarriedStatus ──────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_MarriedStatus"" (
+            ""MarriedStatus_ID""        SERIAL PRIMARY KEY,
+            ""MarriedStatus""           VARCHAR(200) NOT NULL,
+            ""Enabled""                 BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""            TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""              INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""            TIMESTAMP,
+            ""ModifierID""              INTEGER,
+            ""RequiredDocumentTypeIds"" VARCHAR(500),
+            ""Code""                    VARCHAR(40)
+        );
+
+        -- ── Const_LeaveBased_sys ─────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_LeaveBased_sys"" (
+            ""LeaveBased_ID""  SERIAL PRIMARY KEY,
+            ""LeaveBased""     VARCHAR(50),
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_Language ───────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Language"" (
+            ""Language_ID""    SERIAL PRIMARY KEY,
+            ""Language""       VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_HR_UifDefinedNonContributorReason_sys ─────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_HR_UifDefinedNonContributorReason_sys"" (
+            ""UifDefinedNonContributorReason_ID"" SERIAL PRIMARY KEY,
+            ""Description""                       VARCHAR(200) NOT NULL,
+            ""UifCode""                            INTEGER,
+            ""Enabled""                            BOOLEAN,
+            ""DateCaptured""                       TIMESTAMP,
+            ""CapturerID""                         INTEGER,
+            ""DateModified""                       TIMESTAMP,
+            ""ModifierID""                         INTEGER
+        );
+
+        -- ── Const_Gender ─────────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_Gender"" (
+            ""Gender_ID""      SERIAL PRIMARY KEY,
+            ""GenderDesc""     VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Const_EthnicGroup ────────────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS ""Const_EthnicGroup"" (
+            ""Ethnic_ID""      SERIAL PRIMARY KEY,
+            ""EthnicDesc""     VARCHAR(200) NOT NULL,
+            ""Enabled""        BOOLEAN NOT NULL DEFAULT TRUE,
+            ""DateCaptured""   TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""CapturerID""     INTEGER NOT NULL DEFAULT 0,
+            ""DateModified""   TIMESTAMP,
+            ""ModifierID""     INTEGER
+        );
+
+        -- ── Plan_BudgetSign_fxn ──────────────────────────────────────────────
+        -- Returns 1 or -1 to indicate the sign for a budget amount.
+        -- Logic: municipality-specific rules first; falls back to year-based rules.
+        -- MonthID mapping mirrors SA financial year (Jul-Jun).
+        CREATE OR REPLACE FUNCTION ""Plan_BudgetSign_fxn""(
+            ""scoaItemCode""     VARCHAR(50),
+            ""capitalOperational"" INT,
+            ""creditDebit""      VARCHAR(1),
+            ""scoaItemShortDesc"" VARCHAR(200),
+            ""finYear""          VARCHAR(9)
+        )
+        RETURNS INT
+        LANGUAGE plpgsql
+        AS $func$
+        DECLARE
+            v_sign      INT := 1;
+            v_finYearEnd INT;
+            v_muniName  VARCHAR(1000);
+        BEGIN
+            -- Extract the ending calendar year from finYear (e.g. '2025/2026' → 2026)
+            v_finYearEnd := CAST(RIGHT(""finYear"", 4) AS INT);
+
+            SELECT ""KeyValue"" INTO v_muniName
+            FROM ""AAAA_ConfigSettings""
+            WHERE ""KeyName"" = 'MuniName'
+            LIMIT 1;
+
+            -- ── George municipality branch ─────────────────────────────────
+            IF v_muniName ILIKE '%George%' THEN
+                IF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" = 'Deposits' THEN
+                    v_sign := CASE WHEN ""creditDebit"" = 'C' THEN -1 ELSE 1 END;
+                ELSIF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" = 'Withdrawals' THEN
+                    v_sign := CASE WHEN ""creditDebit"" = 'D' THEN 1 ELSE -1 END;
+                ELSIF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" NOT IN ('Deposits', 'Withdrawals') THEN
+                    v_sign := CASE WHEN ""creditDebit"" = 'C' THEN -1 ELSE 1 END;
+                ELSE
+                    v_sign := CASE
+                        WHEN ((""scoaItemCode"" LIKE 'IL%' OR ""scoaItemCode"" LIKE 'IR%')
+                              AND ""capitalOperational"" IN (0,1,2))
+                             OR ""creditDebit"" = 'C'
+                        THEN -1 ELSE 1
+                    END;
+                END IF;
+
+            -- ── All other municipalities ───────────────────────────────────
+            ELSE
+                IF v_finYearEnd > 2026 THEN
+                    -- Detailed IL/IR logic (same as George) for years beyond 2026
+                    IF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" = 'Deposits' THEN
+                        v_sign := CASE WHEN ""creditDebit"" = 'C' THEN -1 ELSE 1 END;
+                    ELSIF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" = 'Withdrawals' THEN
+                        v_sign := CASE WHEN ""creditDebit"" = 'D' THEN 1 ELSE -1 END;
+                    ELSIF ""scoaItemCode"" LIKE 'IL%' AND ""scoaItemShortDesc"" NOT IN ('Deposits', 'Withdrawals') THEN
+                        v_sign := CASE WHEN ""creditDebit"" = 'C' THEN -1 ELSE 1 END;
+                    ELSE
+                        v_sign := CASE
+                            WHEN ((""scoaItemCode"" LIKE 'IL%' OR ""scoaItemCode"" LIKE 'IR%')
+                                  AND ""capitalOperational"" IN (0,1,2))
+                                 OR ""creditDebit"" = 'C'
+                            THEN -1 ELSE 1
+                        END;
+                    END IF;
+                ELSE
+                    -- Simplified rule for 2026 and earlier
+                    v_sign := CASE
+                        WHEN ((""scoaItemCode"" LIKE 'IL%' OR ""scoaItemCode"" LIKE 'IR%')
+                              AND ""capitalOperational"" IN (0,1,2))
+                             OR ""creditDebit"" = 'C'
+                        THEN -1 ELSE 1
+                    END;
+                END IF;
+            END IF;
+
+            RETURN v_sign;
+        END;
+        $func$;
     ");
 
     var seedSqlPath = Path.Combine(AppContext.BaseDirectory, "Data", "SeedSystemConstants.sql");
@@ -3406,6 +5150,65 @@ _ = Task.Run(async () =>
         }
         await FlushBatchAsync();
     }
+
+    // ── Helper: load any additional SQL seed file with the same batch logic ──
+    async Task LoadSeedFileAsync(string fileName)
+    {
+        var filePath = Path.Combine(AppContext.BaseDirectory, "Data", fileName);
+        if (!File.Exists(filePath))
+            filePath = Path.Combine(Directory.GetCurrentDirectory(), "Data", fileName);
+        if (!File.Exists(filePath)) return;
+
+        var conn2 = (Npgsql.NpgsqlConnection)db.Database.GetDbConnection();
+        if (conn2.State != System.Data.ConnectionState.Open)
+            await conn2.OpenAsync();
+
+        var batch2 = new System.Text.StringBuilder();
+        int batchCount2 = 0;
+        const int BatchSize2 = 500;
+
+        async Task Flush2()
+        {
+            if (batch2.Length == 0) return;
+            using var c = conn2.CreateCommand();
+            c.CommandText = batch2.ToString();
+            c.CommandTimeout = 300;
+            await c.ExecuteNonQueryAsync();
+            batch2.Clear();
+            batchCount2 = 0;
+        }
+
+        async Task<bool> HasData2(string table)
+        {
+            using var c = conn2.CreateCommand();
+            c.CommandText = $"SELECT EXISTS(SELECT 1 FROM \"{table}\" LIMIT 1)";
+            var r = await c.ExecuteScalarAsync();
+            return r is true;
+        }
+
+        bool skip2 = false;
+        using var sr2 = new StreamReader(filePath);
+        string? line2;
+        while ((line2 = await sr2.ReadLineAsync()) != null)
+        {
+            var t = line2.Trim();
+            if (t.StartsWith("-- "))
+            {
+                await Flush2();
+                var tbl = t.Substring(3).Trim();
+                skip2 = !string.IsNullOrEmpty(tbl) && await HasData2(tbl);
+                continue;
+            }
+            if (!t.StartsWith("INSERT") || skip2) continue;
+            batch2.AppendLine(t);
+            if (++batchCount2 >= BatchSize2) await Flush2();
+        }
+        await Flush2();
+    }
+
+    await LoadSeedFileAsync("SeedConstDepartment.sql");
+    await LoadSeedFileAsync("SeedConstDivision.sql");
+    await LoadSeedFileAsync("SeedConstProjectItem.sql");
 
     await SeedData.SeedAsync(db);
     Console.WriteLine("[budget] Startup DB init/seed complete.");

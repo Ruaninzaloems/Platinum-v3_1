@@ -1,10 +1,19 @@
 <div class="page-container">
   <div class="page-header">
     <h1>Virement Management</h1>
-    <button mat-raised-button color="primary" (click)="openCreateDialog()">
-      <mat-icon>swap_horiz</mat-icon> New Virement
+    <button mat-raised-button color="primary" (click)="openCreateDialog()" [disabled]="preflightChecking">
+      <mat-icon>{{ preflightChecking ? 'hourglass_empty' : 'swap_horiz' }}</mat-icon>
+      {{ preflightChecking ? 'Checking...' : 'New Virement' }}
     </button>
   </div>
+
+  @if (preflightError) {
+    <div class="preflight-error-banner">
+      <mat-icon>block</mat-icon>
+      <span>{{ preflightError }}</span>
+      <button mat-icon-button (click)="preflightError = null"><mat-icon>close</mat-icon></button>
+    </div>
+  }
 
   <div class="kpi-row">
     <div class="kpi-card">

@@ -78,22 +78,13 @@ public class ProjectItemsController : ControllerBase
     [HttpGet("fund-budget/{scoaFundId}")]
     public async Task<IActionResult> GetFundBudget(int projectId, int scoaFundId)
     {
-        var projectFunds = await _db.Plan_ProjectFund
-            .Where(x => x.ProjectID == projectId && x.ScoaFundID == scoaFundId)
-            .ToListAsync();
-
-        var fundIds = projectFunds.Select(f => f.ProjectFund_ID).ToList();
-        var yearAmounts = await _db.Plan_ProjectFundYear
-            .Where(y => fundIds.Contains(y.ProjectFundID))
-            .ToListAsync();
-
         var allocatedByYear = await _db.Plan_ProjectItem
             .Where(x => x.ProjectID == projectId && x.SCOAFundId == scoaFundId)
             .GroupBy(x => x.FinYear)
             .Select(g => new { FinYear = g.Key, Total = g.Sum(x => x.BudgetAmount ?? 0) })
             .ToListAsync();
 
-        var years = yearAmounts.Select(y => y.FinYear ?? "").Distinct().OrderBy(y => y).ToList();
+        var years = allocatedByYear.Select(a => a.FinYear ?? "").Distinct().OrderBy(y => y).ToList();
         if (!years.Any())
         {
             var finYears = await _db.FinancialYears.OrderByDescending(y => y.YearCode).Take(3).ToListAsync();
@@ -102,9 +93,8 @@ public class ProjectItemsController : ControllerBase
 
         var rows = years.Select(yr =>
         {
-            var available = yearAmounts.Where(y => y.FinYear == yr).Sum(y => y.YearFundAmount);
             var allocated = allocatedByYear.FirstOrDefault(a => a.FinYear == yr)?.Total ?? 0;
-            return new { finYear = yr, available, allocated, remaining = available - allocated };
+            return new { finYear = yr, available = (decimal)0, allocated, remaining = -allocated };
         }).ToList();
 
         return Ok(rows);
@@ -135,6 +125,8 @@ public class ProjectItemsController : ControllerBase
             DateCaptured = DateTime.UtcNow
         };
         _db.Plan_ProjectItem.Add(item);
+        await _db.SaveChangesAsync();
+        item.PlanProjectItemCode = item.PlanProjectItem_ID;
         await _db.SaveChangesAsync();
 
         if (dto.MonthlyAmounts != null && dto.MonthlyAmounts.Any())

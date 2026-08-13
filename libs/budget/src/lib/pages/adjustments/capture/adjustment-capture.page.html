@@ -1,0 +1,889 @@
+<div class="capture-page">
+
+  <!-- Header -->
+  <div class="capture-header">
+    <div class="capture-title-row">
+      <button class="btn-back" (click)="cancel()">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <div class="capture-title">{{ projectHeaderLabel }}</div>
+        <div class="capture-subtitle">Adjustments</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stepper -->
+  <div class="wizard-stepper">
+    <ng-container *ngFor="let tab of tabs; let i = index; let last = last">
+      <div
+        class="wstep"
+        [class.wstep--active]="isTabActive(tab.key)"
+        [class.wstep--done]="isTabCompleted(tab.key)"
+        [class.wstep--locked]="isTabLocked(tab.key)"
+        (click)="selectTab(tab.key)"
+      >
+        <div class="wstep-num">
+          <mat-icon *ngIf="isTabCompleted(tab.key)" class="wstep-check">check</mat-icon>
+          <span *ngIf="!isTabCompleted(tab.key)">{{ i + 1 }}</span>
+        </div>
+        <span class="wstep-label">{{ tab.label }}</span>
+      </div>
+      <div class="wstep-line" *ngIf="!last" [class.wstep-line--done]="isTabCompleted(tab.key)"></div>
+    </ng-container>
+  </div>
+
+  <!-- Loading overlay -->
+  <div class="tab-loading" *ngIf="loading">
+    <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+  </div>
+
+  <!-- ──────────────── Tab: Project Details ──────────────── -->
+  <div class="tab-panel" *ngIf="activeTab === 'details' && !loading">
+
+    <div class="form-section">
+      <h4 class="section-heading">Project Identification</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Financial Year</mat-label>
+          <mat-select [(ngModel)]="form.financialYear" (ngModelChange)="onFinancialYearChange()">
+            <mat-option *ngFor="let y of financialYears" [value]="y">{{ y }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="field-wrap" [class.field-wrap--error]="detailsErrors['projectStatus']">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+            <mat-label>Project Status *</mat-label>
+            <mat-select [(ngModel)]="form.projectStatus" (ngModelChange)="clearDetailError('projectStatus')">
+              <mat-option *ngFor="let s of statusOptions" [value]="s.status_ID">{{ s.statusDesc }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="field-error-msg" *ngIf="detailsErrors['projectStatus']">Project Status is required</div>
+        </div>
+
+        <div class="field-wrap details-grid__full" [class.field-wrap--error]="detailsErrors['projectName']">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+            <mat-label>Project Name *</mat-label>
+            <input matInput [(ngModel)]="form.projectName" (ngModelChange)="clearDetailError('projectName')" placeholder="Enter project name" />
+          </mat-form-field>
+          <div class="field-error-msg" *ngIf="detailsErrors['projectName']">Project Name is required</div>
+        </div>
+
+        <div class="field-wrap details-grid__full" [class.field-wrap--error]="detailsErrors['projectDescription']">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+            <mat-label>Project Description *</mat-label>
+            <textarea matInput [(ngModel)]="form.projectDescription" (ngModelChange)="clearDetailError('projectDescription')" rows="3" placeholder="Enter project description"></textarea>
+          </mat-form-field>
+          <div class="field-error-msg" *ngIf="detailsErrors['projectDescription']">Project Description is required</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">Budget Classification</h4>
+      <div class="details-grid">
+
+        <div class="field-wrap" [class.field-wrap--error]="detailsErrors['budgetType']">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+            <mat-label>Budget Type *</mat-label>
+            <mat-select [(ngModel)]="form.budgetType" (ngModelChange)="clearDetailError('budgetType')">
+              <mat-option *ngFor="let b of budgetTypeOptions" [value]="b.typeValue">{{ b.typeName }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="field-error-msg" *ngIf="detailsErrors['budgetType']">Budget Type is required</div>
+        </div>
+
+        <div class="field-wrap" [class.field-wrap--error]="detailsErrors['singleMultiYear']">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field-wrap__field">
+            <mat-label>Single/Multi-Year *</mat-label>
+            <mat-select [(ngModel)]="form.singleMultiYear" (ngModelChange)="clearDetailError('singleMultiYear')">
+              <mat-option *ngFor="let o of singleMultiYearOptions" [value]="o">{{ o }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="field-error-msg" *ngIf="detailsErrors['singleMultiYear']">Single/Multi-Year is required</div>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Project Type</mat-label>
+          <mat-select [(ngModel)]="form.projectType">
+            <mat-option [value]="null">default</mat-option>
+            <mat-option *ngFor="let t of projectTypeOptions" [value]="t.projectType_ID">{{ t.projectTypeDescrip }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="details-checkbox-field">
+          <mat-checkbox [(ngModel)]="form.costingProject" color="primary">Costing Project</mat-checkbox>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">SCOA Configuration</h4>
+
+      <div class="scoa-drill-wrap" (click)="$event.stopPropagation()">
+        <div class="scoa-drill-trigger" [class.scoa-drill-trigger--error]="detailsErrors['scoaProjectId']" (click)="toggleScoaDrill($event)">
+          <span class="scoa-drill-trigger-label">SCOA Project *</span>
+          <span class="scoa-drill-trigger-value">
+            <ng-container *ngIf="scoaDrillSelected">
+              <span class="scoa-drill-path-prefix" *ngIf="scoaDrillPathLabel">{{ scoaDrillPathLabel }} › </span>
+              <strong>{{ scoaDrillSelected.scoaShortDesc || scoaDrillSelected.scoaDesc }}</strong>
+              <span class="scoa-drill-selected-code" *ngIf="scoaDrillSelected.scoaCode">({{ scoaDrillSelected.scoaCode }})</span>
+            </ng-container>
+            <span *ngIf="!scoaDrillSelected" class="scoa-drill-placeholder">— Select SCOA Project —</span>
+          </span>
+          <span class="scoa-drill-trigger-icons">
+            <mat-icon *ngIf="scoaDrillSelected" class="scoa-drill-clear" (click)="clearScoaDrill($event)">close</mat-icon>
+            <mat-icon class="scoa-drill-arrow">{{ scoaDrillOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </span>
+        </div>
+
+        <div class="scoa-drill-panel" *ngIf="scoaDrillOpen" [class.scoa-drill-panel--above]="scoaDrillOpenAbove" (click)="$event.stopPropagation()">
+          <div class="scoa-drill-header" *ngIf="scoaDrillPath.length">
+            <button class="scoa-back-btn" (click)="scoaDrillBack()">
+              <mat-icon>arrow_back</mat-icon> Back
+            </button>
+            <span class="scoa-breadcrumb">{{ scoaDrillPathLabel }}</span>
+          </div>
+          <div class="scoa-drill-loading" *ngIf="scoaStructureLoading">
+            <mat-progress-spinner mode="indeterminate" diameter="24"></mat-progress-spinner>
+          </div>
+          <div class="scoa-drill-list" *ngIf="!scoaStructureLoading">
+            <div
+              *ngFor="let node of scoaDrillItems"
+              class="scoa-drill-item"
+              [class.scoa-drill-item--leaf]="node.postingLevel === 'Yes'"
+              (click)="onScoaDrillSelect(node, $event)"
+            >
+              <span class="scoa-drill-desc">
+                {{ node.scoaShortDesc || node.scoaDesc }}
+                <span class="scoa-drill-item-code" *ngIf="node.scoaCode">({{ node.scoaCode }})</span>
+              </span>
+              <mat-icon *ngIf="node.postingLevel !== 'Yes'" class="scoa-drill-chevron">chevron_right</mat-icon>
+            </div>
+            <div class="scoa-drill-empty" *ngIf="scoaDrillItems.length === 0">No items found</div>
+          </div>
+        </div>
+      </div>
+      <div class="field-error-msg" *ngIf="detailsErrors['scoaProjectId']">A lowest-level SCOA Project must be selected</div>
+    </div>
+
+    <div class="details-validation-banner" *ngIf="detailsHasErrors">
+      <mat-icon>error_outline</mat-icon>
+      <span>Please fill in all required fields before continuing.</span>
+    </div>
+
+    <div class="tab-nav-bar">
+      <span></span>
+      <button class="btn-next" (click)="next()" [disabled]="detailsSaving">
+        <mat-icon *ngIf="detailsSaving" class="btn-spinner-icon">hourglass_empty</mat-icon>
+        {{ detailsSaving ? 'Saving…' : 'Next' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ──────────────── Tab: IDP ──────────────── -->
+  <div class="tab-panel" *ngIf="activeTab === 'idp' && !loading">
+
+    <div *ngIf="idpPercentageWarning" class="tab-info-banner tab-info-banner--warn">
+      <mat-icon>warning</mat-icon> Sum of All IDP Percentage must equal 100
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">Add IDP Link</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline" class="details-grid__full">
+          <mat-label>IDP Item *</mat-label>
+          <mat-select [(ngModel)]="newIdpLink.idpItemId">
+            <mat-option [value]="null">— Select —</mat-option>
+            <mat-option *ngFor="let item of idpItems" [value]="item.item_ID">
+              {{ item.idpProgram || item.idpDescription || item.item_ID }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Percentage *</mat-label>
+          <input matInput type="number" [(ngModel)]="newIdpLink.percentage" placeholder="0.00" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Longitude (X)</mat-label>
+          <input matInput type="number" [(ngModel)]="newIdpLink.longitude" placeholder="0.00000000" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Latitude (Y)</mat-label>
+          <input matInput type="number" [(ngModel)]="newIdpLink.latitude" placeholder="0.00000000" />
+        </mat-form-field>
+
+        <div class="tab-add-action">
+          <button class="btn-primary" (click)="addIdpLink()">
+            <mat-icon>add</mat-icon> Add IDP Link
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- IDP Grid -->
+    <div class="form-section">
+      <h4 class="section-heading">IDP Links</h4>
+      <div class="grid-panel">
+        <table class="data-table">
+          <thead>
+            <tr class="header-row">
+              <th class="col-action">Edit</th>
+              <th class="col-action">Delete</th>
+              <th>National KPA</th>
+              <th>MTSF</th>
+              <th>IUDF</th>
+              <th>Strategic Objective</th>
+              <th>IDP Program</th>
+              <th class="col-num">Percentage</th>
+              <th class="col-num">Longitude</th>
+            </tr>
+            <tr class="filter-row">
+              <th></th>
+              <th></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['nationalKpa']" placeholder="&#9660;"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['mtsf']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['iudf']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['strategicObjective']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['idpProgram']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['percentage']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="idpFilters['longitude']"><span class="filter-icon">&#9660;</span></div></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let link of filteredIdpLinks; let i = index">
+              <ng-container *ngIf="editingIdpLink?.idpItemId !== link.idpItemId">
+                <td class="col-action"><button class="btn-icon" (click)="editIdpLink(link)"><mat-icon>edit</mat-icon></button></td>
+                <td class="col-action"><button class="btn-icon btn-icon--danger" (click)="deleteIdpLink(i)"><mat-icon>delete</mat-icon></button></td>
+                <td>{{ link.nationalKpa }}</td>
+                <td>{{ link.mtsf }}</td>
+                <td>{{ link.iudf }}</td>
+                <td>{{ link.strategicObjective }}</td>
+                <td>{{ link.idpProgram }}</td>
+                <td class="col-num">{{ link.percentage | number:'1.2-2' }}</td>
+                <td class="col-num">{{ link.longitude | number:'1.8-8' }}</td>
+              </ng-container>
+              <ng-container *ngIf="editingIdpLink?.idpItemId === link.idpItemId">
+                <td class="col-action"><button class="btn-icon btn-icon--success" (click)="saveEditIdpLink()"><mat-icon>check</mat-icon></button></td>
+                <td class="col-action"><button class="btn-icon" (click)="cancelEditIdpLink()"><mat-icon>close</mat-icon></button></td>
+                <td colspan="5">{{ link.idpProgram }}</td>
+                <td class="col-num"><input class="cell-input" type="number" [(ngModel)]="editingIdpLink!.percentage"></td>
+                <td class="col-num"><input class="cell-input" type="number" [(ngModel)]="editingIdpLink!.longitude"></td>
+              </ng-container>
+            </tr>
+            <tr *ngIf="filteredIdpLinks.length === 0">
+              <td colspan="9" class="empty-row">No IDP links added yet.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="7" class="total-label">TOTAL:</td>
+              <td class="col-num">{{ idpPercentageTotal | number:'1.2-2' }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="details-validation-banner" *ngIf="tabBannerError && activeTab === 'idp'">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ tabBannerError }}</span>
+    </div>
+    <div class="tab-nav-bar">
+      <button class="btn-prev" (click)="previous()">Previous</button>
+      <button class="btn-next" (click)="next()">Next</button>
+    </div>
+  </div>
+
+  <!-- ──────────────── Tab: SCOA Funding ──────────────── -->
+  <div class="tab-panel" *ngIf="activeTab === 'scoa-funding' && !loading">
+
+    <div class="tab-info-banner">
+      Funding list will be blank if the Manage Adjustment Budget Funding is not setup for the adjustment budget period or if the available funds have all been allocated.
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">Add Funding Line</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline" class="details-grid__full">
+          <mat-label>SCOA Fund *</mat-label>
+          <mat-select [(ngModel)]="newFunding.scoaFundId">
+            <mat-option [value]="null"></mat-option>
+            <mat-option *ngFor="let f of scoaFunds" [value]="f.scoaID">{{ f.scoaCode }} - {{ f.scoaShortDesc || f.scoaDesc }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ mtrefYears[0] }} *</mat-label>
+          <input matInput type="number" [(ngModel)]="newFunding.y1" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ mtrefYears[1] }} *</mat-label>
+          <input matInput type="number" [(ngModel)]="newFunding.y2" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ mtrefYears[2] }} *</mat-label>
+          <input matInput type="number" [(ngModel)]="newFunding.y3" />
+        </mat-form-field>
+
+        <div class="tab-add-action">
+          <button class="btn-primary" (click)="addFundingLine()">
+            <mat-icon>add</mat-icon> Add Fund
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">Funding Lines</h4>
+      <div class="grid-panel">
+        <table class="data-table">
+          <thead>
+            <tr class="header-row">
+              <th class="col-action-single">Action</th>
+              <th>Fund Code</th>
+              <th>Fund Description</th>
+              <th class="col-num">Fund Amount</th>
+              <th class="col-num">{{ mtrefYears[0] }}</th>
+              <th class="col-num">{{ mtrefYears[1] }}</th>
+              <th class="col-num">{{ mtrefYears[2] }}</th>
+            </tr>
+            <tr class="filter-row">
+              <th></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['fundCode']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['fundDescription']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['fundAmount']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['y1']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['y2']"><span class="filter-icon">&#9660;</span></div></th>
+              <th><div class="filter-wrap"><input class="filter-input" [(ngModel)]="fundingFilters['y3']"><span class="filter-icon">&#9660;</span></div></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of filteredFundingLines; let i = index">
+              <ng-container *ngIf="editingFunding?.scoaFundId !== line.scoaFundId">
+                <td class="col-action-single">
+                  <button class="btn-icon" (click)="editFundingLine(line)" title="Edit"><mat-icon>edit</mat-icon></button>
+                </td>
+                <td>{{ line.fundCode }}</td>
+                <td class="td-desc">{{ line.fundDescription }}</td>
+                <td class="col-num">{{ line.y1 | number:'1.0-0' }}</td>
+                <td class="col-num">{{ line.y1 | number:'1.0-0' }}</td>
+                <td class="col-num">{{ line.y2 | number:'1.0-0' }}</td>
+                <td class="col-num">{{ line.y3 | number:'1.0-0' }}</td>
+              </ng-container>
+              <ng-container *ngIf="editingFunding?.scoaFundId === line.scoaFundId">
+                <td class="col-action-single">
+                  <button class="btn-icon btn-icon--success" (click)="saveEditFunding()" title="Save"><mat-icon>check</mat-icon></button>
+                  <button class="btn-icon" (click)="cancelEditFunding()" title="Cancel"><mat-icon>close</mat-icon></button>
+                </td>
+                <td>{{ line.fundCode }}</td>
+                <td class="td-desc">{{ line.fundDescription }}</td>
+                <td class="col-num">{{ (editingFunding!.y1 || 0) | number:'1.0-0' }}</td>
+                <td class="col-num"><input class="cell-input" type="number" [(ngModel)]="editingFunding!.y1"></td>
+                <td class="col-num"><input class="cell-input" type="number" [(ngModel)]="editingFunding!.y2"></td>
+                <td class="col-num"><input class="cell-input" type="number" [(ngModel)]="editingFunding!.y3"></td>
+              </ng-container>
+            </tr>
+            <tr *ngIf="filteredFundingLines.length === 0">
+              <td colspan="7" class="empty-row">No funding lines added yet.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="3" class="total-label">TOTAL:</td>
+              <td class="col-num">{{ fundingTotals.y1 | number:'1.0-0' }}</td>
+              <td class="col-num">{{ fundingTotals.y1 | number:'1.0-0' }}</td>
+              <td class="col-num">{{ fundingTotals.y2 | number:'1.0-0' }}</td>
+              <td class="col-num">{{ fundingTotals.y3 | number:'1.0-0' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="grid-footer">
+          <span class="pagination-info">{{ filteredFundingLines.length }} items in 1 pages</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="details-validation-banner" *ngIf="tabBannerError && activeTab === 'scoa-funding'">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ tabBannerError }}</span>
+    </div>
+    <div class="tab-nav-bar">
+      <button class="btn-prev" (click)="previous()">Previous</button>
+      <button class="btn-next" (click)="next()">Next</button>
+    </div>
+  </div>
+
+  <!-- ──────────────── Tab: SCOA Items ──────────────── -->
+  <div class="tab-panel" *ngIf="activeTab === 'scoa-items' && !loading">
+
+    <div class="form-section">
+      <h4 class="section-heading">Item Configuration</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Project Item *</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.projectItem" />
+        </mat-form-field>
+
+        <!-- SCOA Item autocomplete -->
+        <div class="scoa-search-field">
+          <label class="scoa-search-label">SCOA Item *</label>
+          <div class="scoa-search-wrap" (click)="$event.stopPropagation()">
+            <input
+              class="scoa-search-input"
+              type="text"
+              [formControl]="scoaItemSearchCtrl"
+              (input)="onScoaItemInput($event)"
+              placeholder="— Search SCOA Item —"
+              autocomplete="off"
+            >
+            <div class="scoa-autocomplete" *ngIf="scoaItemResults.length">
+              <div *ngFor="let r of scoaItemResults" class="scoa-autocomplete-item" (click)="selectScoaItem(r)">
+                <span class="scoa-ac-code">{{ r.scoaCode }}</span>
+                <span class="scoa-ac-desc">{{ r.scoaShortDesc || r.scoaDesc }}</span>
+              </div>
+            </div>
+            <div class="costing-path-label" *ngIf="newItem.scoaCostingPath">{{ newItem.scoaCostingPath }}</div>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>SCOA Costing *</mat-label>
+          <mat-select [(ngModel)]="newItem.scoaCostingId">
+            <mat-option [value]="undefined">— Select —</mat-option>
+            <mat-option *ngFor="let c of scoaCostingItems" [value]="c.scoaID">
+              {{ (c.scoaShortDesc || c.scoaDesc) }} {{ c.scoaCode }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>SCOA Function *</mat-label>
+          <mat-select [(ngModel)]="newItem.scoaFunctionId">
+            <mat-option [value]="undefined">— Select —</mat-option>
+            <mat-option *ngFor="let f of scoaFunctionItems" [value]="f.scoaID">
+              {{ f.scoaShortDesc || f.scoaDesc }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+      </div>
+    </div>
+
+    <!-- SCOA Fund + Budget Details -->
+    <div class="form-section">
+      <h4 class="section-heading">SCOA Fund</h4>
+      <div class="fund-details-wrapper">
+        <div class="fund-details-left">
+          <mat-form-field appearance="outline" style="width:100%">
+            <mat-label>SCOA Fund *</mat-label>
+            <mat-select [(ngModel)]="newItem.scoaFundId" (ngModelChange)="onFundSelectChange()">
+              <mat-option [value]="undefined">— Select —</mat-option>
+              <mat-option *ngFor="let f of scoaFunds" [value]="f.scoaID">
+                {{ f.scoaCode }} - {{ f.scoaShortDesc || f.scoaDesc }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="fund-details-right" *ngIf="newItem.scoaFundId && selectedFundDetails.rows.length">
+          <div class="fund-budget-panel">
+            <div class="fund-budget-title">Budget Details of Selected SCOA Fund</div>
+            <table class="fund-budget-table">
+              <thead>
+                <tr>
+                  <th>Financial Year</th>
+                  <th class="text-right">Available Funds</th>
+                  <th class="text-right">Allocated Funds</th>
+                  <th class="text-right">Remaining Funds</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of selectedFundDetails.rows">
+                  <td>{{ row.year }}</td>
+                  <td class="text-right">{{ row.available | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ row.allocated | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ row.remaining | number:'1.0-0' }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td><strong>TOTAL:</strong></td>
+                  <td class="text-right">{{ selectedFundDetails.totals.available | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ selectedFundDetails.totals.allocated | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ selectedFundDetails.totals.remaining | number:'1.0-0' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Classification -->
+    <div class="form-section">
+      <h4 class="section-heading">Classification</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>SCOA Region *</mat-label>
+          <mat-select [(ngModel)]="newItem.scoaRegionId">
+            <mat-option [value]="undefined">— Select —</mat-option>
+            <mat-option *ngFor="let r of scoaRegionItems" [value]="r.scoaID">
+              {{ r.scoaShortDesc || r.scoaDesc }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Municipal Classification *</mat-label>
+          <mat-select [(ngModel)]="newItem.municipalClassification">
+            <mat-option value="">— Select —</mat-option>
+            <mat-option *ngFor="let o of municipalClassificationOptions" [value]="o">{{ o }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>GRAP Classification</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.grapClassification" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>GRAP Note Classification</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.grapNoteClassification" />
+        </mat-form-field>
+
+      </div>
+    </div>
+
+    <!-- Segment Reporting -->
+    <div class="form-section">
+      <h4 class="section-heading">Segment Reporting</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Main Segment Reporting</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.mainSegmentReporting" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Sub Segment Reporting</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.subSegmentReporting" />
+        </mat-form-field>
+
+      </div>
+    </div>
+
+    <!-- Adjustment Reasons -->
+    <div class="form-section">
+      <h4 class="section-heading">Adjustment Reasons</h4>
+      <div class="details-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Type of Adjustment *</mat-label>
+          <mat-select [(ngModel)]="newItem.typeOfAdjustment">
+            <mat-option value="">— Select —</mat-option>
+            <mat-option *ngFor="let o of typeOfAdjustmentOptions" [value]="o">{{ o }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Legislative Reason for Adjustment *</mat-label>
+          <mat-select [(ngModel)]="newItem.legislativeReasonForAdjustment">
+            <mat-option value="">— Select —</mat-option>
+            <mat-option *ngFor="let o of legislativeReasonOptions" [value]="o">{{ o }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="details-grid__full">
+          <mat-label>User Reason for Adjustment *</mat-label>
+          <input matInput type="text" [(ngModel)]="newItem.userReasonForAdjustment" />
+        </mat-form-field>
+
+      </div>
+    </div>
+
+    <!-- Document & SCM -->
+    <div class="form-section">
+      <h4 class="section-heading">Document &amp; SCM</h4>
+      <div class="details-grid">
+
+        <div class="document-upload-field">
+          <label class="document-upload-label">Supporting Document</label>
+          <div class="document-upload-row">
+            <input type="file" class="file-input" (change)="onDocumentFileChange($event)" #fileInput>
+            <button class="btn-upload" (click)="fileInput.click()">Choose File</button>
+            <span class="file-name-label">{{ selectedDocumentName || 'No file chosen' }}</span>
+            <button class="btn-add-idp btn-upload-submit" *ngIf="selectedDocumentFile">Upload</button>
+          </div>
+          <div class="restricted-ext">Restricted Extension: .exe, .dmg</div>
+        </div>
+
+        <div class="details-checkbox-field">
+          <mat-checkbox [(ngModel)]="newItem.activeForScm" color="primary">Active for SCM</mat-checkbox>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Split Budget ──────────────── -->
+    <div class="split-budget-section">
+      <div class="split-section-title">Split Budget</div>
+
+      <div class="split-panel">
+        <div class="split-panel-header">Split Type</div>
+        <div class="split-type-row">
+          <label class="split-radio-label">
+            <input type="radio" [(ngModel)]="newItem.splitType" value="Bi-Annually"> Bi-Annually
+          </label>
+          <label class="split-radio-label">
+            <input type="radio" [(ngModel)]="newItem.splitType" value="Manually"> Manually
+          </label>
+          <label class="split-radio-label">
+            <input type="radio" [(ngModel)]="newItem.splitType" value="Monthly"> Monthly
+          </label>
+          <label class="split-radio-label">
+            <input type="radio" [(ngModel)]="newItem.splitType" value="Quarterly"> Quarterly
+          </label>
+        </div>
+
+        <div class="split-year-rows">
+          <div class="split-year-row">
+            <label class="split-year-label">Budget</label>
+            <input class="plain-input split-input" type="number" [(ngModel)]="newItem.budget" placeholder="">
+          </div>
+          <div class="split-year-row">
+            <label class="split-year-label req">{{ mtrefYears[0] }}</label>
+            <input class="plain-input split-input" type="number" [(ngModel)]="newItem.budgetAmount" placeholder="">
+          </div>
+          <div class="split-year-row">
+            <label class="split-year-label req">{{ mtrefYears[1] }}</label>
+            <input class="plain-input split-input" type="number" [(ngModel)]="newItem.budgetAmountP1" placeholder="">
+          </div>
+          <div class="split-year-row">
+            <label class="split-year-label req">{{ mtrefYears[2] }}</label>
+            <input class="plain-input split-input" type="number" [(ngModel)]="newItem.budgetAmountP2" placeholder="">
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly / Manually -->
+      <div class="split-panel" *ngIf="newItem.splitType === 'Monthly' || newItem.splitType === 'Manually'">
+        <div class="split-panel-header">Split Details</div>
+        <div class="months-grid">
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">July</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![0]"></div>
+            <div class="month-field"><label class="month-label">August</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![1]"></div>
+            <div class="month-field"><label class="month-label">September</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![2]"></div>
+            <div class="month-field"><label class="month-label">October</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![3]"></div>
+          </div>
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">November</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![4]"></div>
+            <div class="month-field"><label class="month-label">December</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![5]"></div>
+            <div class="month-field"><label class="month-label">January</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![6]"></div>
+            <div class="month-field"><label class="month-label">February</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![7]"></div>
+          </div>
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">March</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![8]"></div>
+            <div class="month-field"><label class="month-label">April</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![9]"></div>
+            <div class="month-field"><label class="month-label">May</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![10]"></div>
+            <div class="month-field"><label class="month-label">June</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![11]"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bi-Annually -->
+      <div class="split-panel" *ngIf="newItem.splitType === 'Bi-Annually'">
+        <div class="split-panel-header">Split Details</div>
+        <div class="months-grid">
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">Period 1 (Jul–Dec)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![0]"></div>
+          </div>
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">Period 2 (Jan–Jun)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![1]"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quarterly -->
+      <div class="split-panel" *ngIf="newItem.splitType === 'Quarterly'">
+        <div class="split-panel-header">Split Details</div>
+        <div class="months-grid">
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">Q1 (Jul–Sep)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![0]"></div>
+            <div class="month-field"><label class="month-label">Q2 (Oct–Dec)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![1]"></div>
+          </div>
+          <div class="month-col">
+            <div class="month-field"><label class="month-label">Q3 (Jan–Mar)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![2]"></div>
+            <div class="month-field"><label class="month-label">Q4 (Apr–Jun)</label><input class="plain-input month-input" type="number" [(ngModel)]="newItem.monthlyAmounts![3]"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="split-add-row">
+        <button class="btn-primary" (click)="addAdjItem()">
+          <mat-icon>add</mat-icon> Add Item
+        </button>
+      </div>
+    </div>
+
+    <!-- Items Grid -->
+    <div class="form-section">
+      <div class="items-grid-outer">
+        <table class="items-grid">
+          <thead>
+            <tr class="items-filter-row">
+              <th class="ig-col-view"></th>
+              <th class="ig-col-action"></th>
+              <th class="ig-col-check"></th>
+              <th class="ig-col-desc">
+                <div class="filter-cell"><mat-icon class="filter-icon">filter_list</mat-icon><input class="col-filter" [(ngModel)]="adjItemsFilter['itemDescription']" placeholder=""></div>
+              </th>
+              <th class="ig-col-scoa">
+                <div class="filter-cell"><mat-icon class="filter-icon">filter_list</mat-icon><input class="col-filter" [(ngModel)]="adjItemsFilter['scoaItemDesc']" placeholder=""></div>
+              </th>
+              <th class="ig-col-fund">
+                <div class="filter-cell"><mat-icon class="filter-icon">filter_list</mat-icon><input class="col-filter" [(ngModel)]="adjItemsFilter['scoaFundDesc']" placeholder=""></div>
+              </th>
+            </tr>
+            <tr class="items-header-row">
+              <th class="ig-col-view">View Track<br>Changes/<br>Documents</th>
+              <th class="ig-col-action">Action</th>
+              <th class="ig-col-check">
+                <input type="checkbox" [checked]="selectAllAdjChecked" (change)="toggleSelectAllAdj()">
+                <span class="select-all-lbl">Select All</span>
+              </th>
+              <th class="ig-col-desc">Item Description</th>
+              <th class="ig-col-scoa">SCOA Item</th>
+              <th class="ig-col-fund">SCOA Fund</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of pagedAdjItems; let i = index" [class.editing-row]="editingItem === item">
+              <td class="ig-col-view">
+                <button class="btn-icon btn-icon--view" (click)="editAdjItem(item)" title="View / Edit"><mat-icon>visibility</mat-icon></button>
+              </td>
+              <td class="ig-col-action">
+                <ng-container *ngIf="editingItem !== item">
+                  <button class="btn-icon" (click)="editAdjItem(item)" title="Edit"><mat-icon>edit</mat-icon></button>
+                </ng-container>
+                <ng-container *ngIf="editingItem === item">
+                  <button class="btn-icon btn-icon--danger" (click)="deleteAdjItem(i)" title="Delete"><mat-icon>delete</mat-icon></button>
+                </ng-container>
+              </td>
+              <td class="ig-col-check">
+                <input type="checkbox"
+                  [checked]="selectedAdjItemIds.has((adjItemsPage - 1) * adjItemsPageSize + i)"
+                  (change)="toggleAdjItemSelect((adjItemsPage - 1) * adjItemsPageSize + i)">
+              </td>
+              <td class="ig-col-desc path-cell" [title]="item.scoaItemPath || item.scoaItemDesc || ''">
+                {{ item.scoaItemPath || item.scoaItemDesc || item.scoaItemCode }}
+              </td>
+              <td class="ig-col-scoa">
+                <span class="scoa-label">{{ item.scoaItemDesc }}</span>
+                <span class="scoa-code" *ngIf="item.scoaItemCode">{{ item.scoaItemCode }}</span>
+              </td>
+              <td class="ig-col-fund path-cell" [title]="item.scoaFundDesc || ''">
+                {{ item.scoaFundDesc || item.scoaFundCode }}
+              </td>
+            </tr>
+            <tr *ngIf="filteredAdjItems.length === 0">
+              <td colspan="6" class="no-data">No SCOA items added yet.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="items-total-row">
+              <td colspan="3" class="total-label">TOTAL:</td>
+              <td></td><td></td><td></td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="items-grid-footer">
+          <span class="items-page-info">
+            {{ filteredAdjItems.length }} item{{ filteredAdjItems.length !== 1 ? 's' : '' }}
+            in {{ totalAdjItemPages }} page{{ totalAdjItemPages !== 1 ? 's' : '' }}
+          </span>
+          <div class="items-pagination" *ngIf="totalAdjItemPages > 1">
+            <button class="page-btn" [disabled]="adjItemsPage === 1" (click)="adjItemsPage = adjItemsPage - 1">‹</button>
+            <span class="page-num">{{ adjItemsPage }} / {{ totalAdjItemPages }}</span>
+            <button class="page-btn" [disabled]="adjItemsPage === totalAdjItemPages" (click)="adjItemsPage = adjItemsPage + 1">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="details-validation-banner" *ngIf="tabBannerError && activeTab === 'scoa-items'">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ tabBannerError }}</span>
+    </div>
+    <div class="tab-nav-bar">
+      <button class="btn-prev" (click)="previous()">Previous</button>
+      <button class="btn-next" (click)="next()">Next</button>
+    </div>
+  </div>
+
+  <!-- ──────────────── Tab: Recommenders ──────────────── -->
+  <div class="tab-panel" *ngIf="activeTab === 'recommenders' && !loading">
+
+    <div class="recommender-warning" *ngIf="recommenderSameWarning">
+      <mat-icon>warning</mat-icon>
+      First, Second or Final Recommender cannot be Same
+    </div>
+
+    <div class="form-section">
+      <h4 class="section-heading">Select Recommenders</h4>
+      <div class="details-grid details-grid--3col">
+
+        <mat-form-field appearance="outline">
+          <mat-label>First Recommender *</mat-label>
+          <mat-select [(ngModel)]="firstRecommenderId">
+            <mat-option [value]="null">— Select —</mat-option>
+            <mat-option *ngFor="let u of budgetUsers" [value]="u.id">{{ u.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Second Recommender</mat-label>
+          <mat-select [(ngModel)]="secondRecommenderId">
+            <mat-option [value]="null">— Select —</mat-option>
+            <mat-option *ngFor="let u of budgetUsers" [value]="u.id">{{ u.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Final Recommender</mat-label>
+          <mat-select [(ngModel)]="finalRecommenderId">
+            <mat-option [value]="null">— Select —</mat-option>
+            <mat-option *ngFor="let u of budgetUsers" [value]="u.id">{{ u.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+      </div>
+    </div>
+
+    <div class="details-validation-banner" *ngIf="tabBannerError && activeTab === 'recommenders'">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ tabBannerError }}</span>
+    </div>
+    <div class="tab-nav-bar">
+      <button class="btn-prev" (click)="previous()">Previous</button>
+      <button class="btn-finish" (click)="save()" [disabled]="saving || recommenderSameWarning">
+        {{ saving ? 'Saving...' : 'Finish' }}
+      </button>
+    </div>
+  </div>
+
+</div>

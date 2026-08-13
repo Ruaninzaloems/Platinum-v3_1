@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace PlatinumBudget.Api.Models;
 
 public class ServiceCategory
@@ -53,9 +55,21 @@ public class TariffScenario
     public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
     public string? ApprovedBy { get; set; }
     public DateTime? ApprovedOn { get; set; }
+    public bool IsArchived { get; set; } = false;
 
     public FinancialYear FinancialYear { get; set; } = null!;
     public ICollection<TariffScenarioLine> Lines { get; set; } = new List<TariffScenarioLine>();
+    public ICollection<TariffScenarioServiceIncrease> ServiceIncreases { get; set; } = new List<TariffScenarioServiceIncrease>();
+}
+
+public class TariffScenarioServiceIncrease
+{
+    public int Id { get; set; }
+    public int TariffScenarioId { get; set; }
+    public string ServiceType { get; set; } = string.Empty;
+    public string ConsumerType { get; set; } = string.Empty;
+    public decimal IncreasePercentage { get; set; }
+    public TariffScenario Scenario { get; set; } = null!;
 }
 
 public class TariffScenarioLine
@@ -127,18 +141,18 @@ public class RevenueProjection
     public decimal Year1Amount { get; set; }
     public decimal Year2Amount { get; set; }
     public decimal Year3Amount { get; set; }
-    public decimal Month01 { get; set; }
-    public decimal Month02 { get; set; }
-    public decimal Month03 { get; set; }
-    public decimal Month04 { get; set; }
-    public decimal Month05 { get; set; }
-    public decimal Month06 { get; set; }
-    public decimal Month07 { get; set; }
-    public decimal Month08 { get; set; }
-    public decimal Month09 { get; set; }
-    public decimal Month10 { get; set; }
-    public decimal Month11 { get; set; }
-    public decimal Month12 { get; set; }
+    [Column("M1")]  public decimal Month01 { get; set; }
+    [Column("M2")]  public decimal Month02 { get; set; }
+    [Column("M3")]  public decimal Month03 { get; set; }
+    [Column("M4")]  public decimal Month04 { get; set; }
+    [Column("M5")]  public decimal Month05 { get; set; }
+    [Column("M6")]  public decimal Month06 { get; set; }
+    [Column("M7")]  public decimal Month07 { get; set; }
+    [Column("M8")]  public decimal Month08 { get; set; }
+    [Column("M9")]  public decimal Month09 { get; set; }
+    [Column("M10")] public decimal Month10 { get; set; }
+    [Column("M11")] public decimal Month11 { get; set; }
+    [Column("M12")] public decimal Month12 { get; set; }
     public BillingApprovalStatus Status { get; set; } = BillingApprovalStatus.Draft;
     public int? ScoaItemId { get; set; }
     public int? ScoaFundId { get; set; }

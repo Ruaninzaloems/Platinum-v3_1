@@ -1,0 +1,56 @@
+<div class="export-page">
+
+  <div class="page-header">
+    <h1>Export Adjustment Budget</h1>
+  </div>
+
+  <div class="table-card">
+    @if (loading) {
+      <div class="loading-row">
+        <mat-spinner diameter="24"></mat-spinner>
+        <span>Loading...</span>
+      </div>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Approver Name</th>
+            <th>Fin Year</th>
+            <th>Approval Date</th>
+            <th class="amount">Total Budget Y1</th>
+            <th class="amount">Total Budget Y2</th>
+            <th class="amount">Total Budget Y3</th>
+            <th class="center">Download File</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of records; track r.id) {
+            <tr>
+              <td>{{ approverName(r) }}</td>
+              <td>{{ r.financialYear }}</td>
+              <td>{{ approvalDate(r) | date:'dd/MM/yyyy' }}</td>
+              <td class="amount">{{ formatAmount(r.totalYear1) }}</td>
+              <td class="amount">{{ formatAmount(r.totalYear2) }}</td>
+              <td class="amount">{{ formatAmount(r.totalYear3) }}</td>
+              <td class="center">
+                <button class="btn-download" (click)="download(r)" title="Download CSV">
+                  <mat-icon>download</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+          @if (records.length === 0) {
+            <tr>
+              <td colspan="7" class="empty">No adjustment budget records found.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="table-footer">
+        <button class="btn-outline" (click)="onCancel()">Cancel</button>
+      </div>
+    }
+  </div>
+
+</div>

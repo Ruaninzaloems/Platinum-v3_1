@@ -1,0 +1,194 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1>Import Budget</h1>
+  </div>
+
+  @if (done) {
+    <div class="wizard-card">
+      <div class="step-content">
+        <div class="success-section">
+          <div class="success-icon"><mat-icon>check_circle</mat-icon></div>
+          <h2>Registration Complete</h2>
+          <p>Projects have been registered. Redirecting to Projects...</p>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <div class="wizard-card">
+
+      <div class="wizard-steps">
+        <div class="wstep" [class.active]="step === 0" [class.done]="step > 0">
+          <span class="wstep-num">1</span>
+          <span class="wstep-label">Import File</span>
+        </div>
+        <div class="wstep-line" [class.done]="step > 0"></div>
+        <div class="wstep" [class.active]="step === 1" [class.done]="step > 1">
+          <span class="wstep-num">2</span>
+          <span class="wstep-label">Import Results</span>
+        </div>
+        <div class="wstep-line" [class.done]="step > 1"></div>
+        <div class="wstep" [class.active]="step === 2">
+          <span class="wstep-num">3</span>
+          <span class="wstep-label">Register Projects</span>
+        </div>
+      </div>
+
+      <div class="step-content">
+
+        @if (step === 0) {
+          <div class="form-section">
+            @if (loading) {
+              <div class="loading-row"><mat-spinner diameter="20"></mat-spinner><span>Loading years...</span></div>
+            } @else {
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Financial Year</mat-label>
+                  <mat-select [(ngModel)]="selectedYear">
+                    @for (y of financialYears; track y.id) {
+                      <mat-option [value]="y.yearCode">{{ y.yearCode }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Budget Import Type</mat-label>
+                  <mat-select [(ngModel)]="selectedImportType">
+                    @for (t of importTypes; track t) {
+                      <mat-option [value]="t">{{ t }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="form-row">
+                <div class="file-pick-col">
+                  <div class="file-pick-wrap">
+                    <input #fileInput type="file" accept=".csv" class="hidden-input" (change)="onFileChange($event)">
+                    <button class="btn-choose" (click)="fileInput.click()">Choose File</button>
+                    <span class="file-name">{{ selectedFile ? selectedFile.name : 'No file chosen' }}</span>
+                  </div>
+                  <p class="file-hint">Allowed File Extension .csv</p>
+                </div>
+              </div>
+
+            }
+          </div>
+
+          <div class="step-footer">
+            <button class="btn-primary" [disabled]="uploading" (click)="onUpload()">
+              @if (uploading) { <mat-spinner diameter="16" class="btn-spinner"></mat-spinner> }
+              Next
+            </button>
+          </div>
+        }
+
+        @if (step === 1) {
+          <div class="results-section">
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Total Projects<br>Imported</th>
+                    <th class="amount">Total Budget Y1</th>
+                    <th class="amount">Total Budget Y2</th>
+                    <th class="amount">Total Budget Y3</th>
+                    <th class="center">Error Records</th>
+                    <th>File Name</th>
+                    <th>Status</th>
+                    <th class="center">File</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (summaryRow) {
+                    <tr>
+                      <td>{{ summaryRow.totalProjectsImported }}</td>
+                      <td class="amount">{{ formatAmount(summaryRow.totalBudgetY1) }}</td>
+                      <td class="amount">{{ formatAmount(summaryRow.totalBudgetY2) }}</td>
+                      <td class="amount">{{ formatAmount(summaryRow.totalBudgetY3) }}</td>
+                      <td class="center">
+                        <span class="error-badge" [class.has-errors]="summaryRow.errorRecords > 0">
+                          {{ summaryRow.errorRecords }}
+                        </span>
+                      </td>
+                      <td class="file-name-cell">{{ summaryRow.fileName }}</td>
+                      <td>
+                        <span class="status-badge" [class.ok]="summaryRow.errorRecords === 0" [class.warn]="summaryRow.errorRecords > 0">
+                          {{ statusLabel(summaryRow.status) }}
+                        </span>
+                      </td>
+                      <td class="center">
+                        <button class="btn-download" (click)="onDownload()" title="Download CSV">
+                          <mat-icon>download</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  } @else {
+                    <tr>
+                      <td colspan="8" class="empty">No records found</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <div class="step-footer">
+            <button class="btn-outline" (click)="step = 0">Back</button>
+            <button class="btn-primary" (click)="onGoToRegister()">Next</button>
+          </div>
+        }
+
+        @if (step === 2) {
+          <div class="register-section">
+
+            <div class="static-row">
+              <span class="static-label">Save All Projects In Registered Status</span>
+              <span class="static-value">Yes</span>
+            </div>
+
+            <div class="static-row">
+              <span class="static-label">Save Budget Version</span>
+              <span class="static-value">Yes</span>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Budget Version Number</mat-label>
+                <input matInput [value]="versionNumber" readonly>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Version Name</mat-label>
+                <input matInput [(ngModel)]="versionName">
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Comments</mat-label>
+                <textarea matInput [(ngModel)]="comments" rows="4"></textarea>
+              </mat-form-field>
+            </div>
+
+          </div>
+
+          <div class="step-footer">
+            <button class="btn-outline" (click)="step = 1">Back</button>
+            <button class="btn-primary" [disabled]="registering" (click)="onFinish()">
+              @if (registering) { <mat-spinner diameter="16" class="btn-spinner"></mat-spinner> }
+              Finish
+            </button>
+          </div>
+        }
+
+      </div>
+    </div>
+  }
+
+</div>

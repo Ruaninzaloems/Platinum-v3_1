@@ -8,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { HttpClient } from '@angular/common/http';
 import { ApiService } from '../../core/services/api.service';
 import { ProjectItem, ProjectBudgetLine, Department, ScoaSegment } from '../../core/models/budget.models';
 
@@ -45,6 +46,7 @@ export class ProjectsListPage implements OnInit {
 
   filterDept = 0;
   filterType = '';
+  projectsLoading = false;
   showCreateDialog = false;
   showDetailDialog = false;
   editingProject: ProjectItem | null = null;
@@ -66,7 +68,7 @@ export class ProjectsListPage implements OnInit {
   get scoaTotalYear2() { return this.budgetLines.reduce((s, l) => s + (l.year2Amount || 0), 0); }
   get scoaTotalYear3() { return this.budgetLines.reduce((s, l) => s + (l.year3Amount || 0), 0); }
 
-  constructor(private api: ApiService, private router: Router, private cdr: ChangeDetectorRef) {}
+  constructor(private api: ApiService, private router: Router, private http: HttpClient, private cdr: ChangeDetectorRef) {}
 
   captureNewProject() {
     this.router.navigate(['/projects/capture']);
@@ -77,17 +79,65 @@ export class ProjectsListPage implements OnInit {
   }
 
   ngOnInit() {
-    this.api.getDepartments().subscribe(d => { this.departments = d; this.cdr.markForCheck(); });
-    this.api.getScoaItems().subscribe(d => { this.scoaItems = d; this.cdr.markForCheck(); });
-    this.api.getScoaFunds().subscribe(d => { this.scoaFunds = d; this.cdr.markForCheck(); });
-    this.api.getScoaFunctions().subscribe(d => { this.scoaFunctions = d; this.cdr.markForCheck(); });
-    this.api.getScoaRegions().subscribe(d => { this.scoaRegions = d; this.cdr.markForCheck(); });
-    this.api.getScoaCostings().subscribe(d => { this.scoaCostings = d; this.cdr.markForCheck(); });
+    this.api.getDepartments().subscribe(d => this.departments = d);
+    this.api.getScoaItems().subscribe(d => this.scoaItems = d);
+    this.api.getScoaFunds().subscribe(d => this.scoaFunds = d);
+    this.api.getScoaFunctions().subscribe(d => this.scoaFunctions = d);
+    this.api.getScoaRegions().subscribe(d => this.scoaRegions = d);
+    this.api.getScoaCostings().subscribe(d => this.scoaCostings = d);
     this.loadProjects();
   }
 
   loadProjects() {
-    this.api.getProjects(this.filterDept || undefined, this.filterType || undefined).subscribe(p => { this.projects = p; this.cdr.markForCheck(); });
+    this.projectsLoading = true;
+    this.http.get<any[]>('/budget-app/api/ems/plan-project/plan-project', { params: { pageSize: '500' } }).subscribe({
+      next: (rows) => {
+        try {
+          const typeMap: Record<number, string> = { 1: 'Capital', 2: 'Operational', 3: 'Revenue', 4: 'Mixed' };
+          const statusMap: Record<number, string> = { 1: 'Capture', 2: 'Submitted', 3: 'Approved', 4: 'Rejected' };
+          const mapped: ProjectItem[] = (rows || []).map((r: any) => ({
+            id: r.project_ID ?? r.Project_ID ?? 0,
+            projectCode: String(r.projectCode ?? r.ProjectCode ?? ''),
+            projectName: r.projectName ?? r.ProjectName ?? '',
+            description: r.projectDesc ?? r.ProjectDesc ?? null,
+            idpLink: null,
+            idpPriorityArea: null,
+            idpStrategicObjective: null,
+            status: statusMap[r.projectStatus ?? r.ProjectStatus] ?? 'Capture',
+            type: typeMap[r.capitalOperation ?? r.CapitalOperation] ?? '—',
+            departmentId: null,
+            departmentName: null,
+            ward: null,
+            gpsCoordinates: null,
+            projectManager: null,
+            contractorName: null,
+            contractNumber: null,
+            fundingSource: null,
+            startDate: r.estimatedStartDate ?? r.EstimatedStartDate ?? null,
+            endDate: r.estimatedEndDate ?? r.EstimatedEndDate ?? null,
+            totalProjectCost: r.costEstimate ?? r.CostEstimate ?? null,
+            totalBudgetYear1: 0,
+            totalBudgetYear2: 0,
+            totalBudgetYear3: 0,
+            budgetLineCount: 0,
+            scoaLineCount: 0
+          } as ProjectItem));
+          this.projects = this.filterType
+            ? mapped.filter(m => m.type === this.filterType)
+            : mapped;
+        } catch (e) {
+          console.error('Error mapping plan projects', e);
+          this.projects = [];
+        }
+        this.projectsLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load projects', err);
+        this.projectsLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   formatCurrency(v: number | null | undefined): string {
@@ -101,7 +151,7 @@ export class ProjectsListPage implements OnInit {
 
   getEmptyProject() {
     return {
-      projectCode: '', projectName: '', description: '', type: 'Capital',
+      projectCode: '', projectName: '', description: '', type: '',
       departmentId: null, ward: '', idpLink: '', idpPriorityArea: '', idpStrategicObjective: '',
       gpsCoordinates: '', projectManager: '', contractorName: '', contractNumber: '',
       fundingSource: '', startDate: null, endDate: null, totalProjectCost: null

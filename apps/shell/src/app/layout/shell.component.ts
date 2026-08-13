@@ -1,4 +1,4 @@
-import { Component, signal, computed, OnInit, OnDestroy, isDevMode } from '@angular/core';
+import { Component, signal, computed, Injector, OnInit, OnDestroy, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,12 +8,15 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '@platinumv3/shared/auth';
 import { DatabaseToggleService, OrgSettingsService } from '@platinumv3/assets';
+import { UserContextService, type MeDto } from '@platinumv3/overtime';
 import { filter, Subscription } from 'rxjs';
 
 interface NavItem {
   label: string;
   icon: string;
   route: string;
+  /** When set, the item is hidden unless the Overtime MeDto flag with this key is true. */
+  flag?: keyof MeDto;
 }
 
 interface NavGroup {
@@ -385,7 +388,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
               </div>
             }
           } @else if (activeModule() === 'overtime') {
-            @for (item of overtimeNavItems; track item.label) {
+            @for (item of visibleOvertimeNavItems(); track item.label) {
               <a class="nav-link" [routerLink]="item.route" routerLinkActive="active-link">
                 <mat-icon class="nav-icon">{{item.icon}}</mat-icon>
                 <span>{{item.label}}</span>
@@ -635,7 +638,13 @@ export class ShellComponent implements OnInit, OnDestroy {
   private expandedGroups = signal<Set<string>>(new Set(['API Config']));
   private routeSub!: Subscription;
 
-  constructor(public authService: AuthService, private router: Router, public dbToggle: DatabaseToggleService, public orgSettings: OrgSettingsService) {}
+  constructor(
+    public authService: AuthService,
+    private router: Router,
+    public dbToggle: DatabaseToggleService,
+    public orgSettings: OrgSettingsService,
+    private injector: Injector,
+  ) {}
 
   ngOnInit() {
     this.syncModuleFromUrl(this.router.url);
@@ -1235,11 +1244,32 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   overtimeNavItems: NavItem[] = [
     { label: 'Dashboard', icon: 'dashboard', route: '/overtime/dashboard' },
-    { label: 'Overtime Capture', icon: 'edit_note', route: '/overtime/capture' },
-    { label: 'Overtime Enquiry', icon: 'search', route: '/overtime/enquiry' },
-    { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing' },
-    { label: 'Overtime Setup', icon: 'settings', route: '/overtime/setup' },
+    { label: 'Overtime Capture', icon: 'edit_note', route: '/overtime/capture', flag: 'canAccessCapture' },
+    { label: 'Overtime Enquiry', icon: 'search', route: '/overtime/enquiry', flag: 'canAccessEnquiry' },
+    { label: 'Payroll Processing', icon: 'payments', route: '/overtime/payroll-processing', flag: 'canAccessPayroll' },
+    { label: 'Overtime Setup', icon: 'settings', route: '/overtime/setup', flag: 'canAccessConfig' },
   ];
+
+  /**
+   * Overtime nav items filtered by the signed-in user's MeDto access flags — mirrors the access
+   * control enforced server-side by libs/overtime's permission.guard.ts (same flag names), so an
+   * item a user can't open is hidden instead of just being blocked on click.
+   *
+   * UserContextService is resolved lazily (via Injector, not a constructor param) so its
+   * constructor-triggered GET /overtime-app/api/auth/me only fires once the user actually opens
+   * the Overtime module — not on every app load regardless of module. Angular memoizes the
+   * root-provided singleton, so repeated calls are cheap and return the same instance/signal.
+   *
+   * While access is still resolving (me() === null), items are shown (fail open) to avoid a
+   * flash of "Dashboard only" — the underlying route guard still blocks/redirects if a user
+   * clicks through before resolution completes, so this is a display nicety, not the security
+   * boundary.
+   */
+  visibleOvertimeNavItems = computed(() => {
+    const userCtx = this.injector.get(UserContextService, null, { optional: true });
+    const me = userCtx?.me() ?? null;
+    return this.overtimeNavItems.filter(item => !item.flag || me === null || !!me[item.flag]);
+  });
 
   afsNavGroups: NavGroup[] = [
     {

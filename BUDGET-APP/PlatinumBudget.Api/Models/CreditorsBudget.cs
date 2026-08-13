@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace PlatinumBudget.Api.Models;
 
 public class ExpenditureCategory
@@ -133,18 +135,18 @@ public class ExpenditureProjection
     public decimal Year1Amount { get; set; }
     public decimal Year2Amount { get; set; }
     public decimal Year3Amount { get; set; }
-    public decimal Month01 { get; set; }
-    public decimal Month02 { get; set; }
-    public decimal Month03 { get; set; }
-    public decimal Month04 { get; set; }
-    public decimal Month05 { get; set; }
-    public decimal Month06 { get; set; }
-    public decimal Month07 { get; set; }
-    public decimal Month08 { get; set; }
-    public decimal Month09 { get; set; }
-    public decimal Month10 { get; set; }
-    public decimal Month11 { get; set; }
-    public decimal Month12 { get; set; }
+    [Column("M1")]  public decimal Month01 { get; set; }
+    [Column("M2")]  public decimal Month02 { get; set; }
+    [Column("M3")]  public decimal Month03 { get; set; }
+    [Column("M4")]  public decimal Month04 { get; set; }
+    [Column("M5")]  public decimal Month05 { get; set; }
+    [Column("M6")]  public decimal Month06 { get; set; }
+    [Column("M7")]  public decimal Month07 { get; set; }
+    [Column("M8")]  public decimal Month08 { get; set; }
+    [Column("M9")]  public decimal Month09 { get; set; }
+    [Column("M10")] public decimal Month10 { get; set; }
+    [Column("M11")] public decimal Month11 { get; set; }
+    [Column("M12")] public decimal Month12 { get; set; }
     public CreditorApprovalStatus Status { get; set; } = CreditorApprovalStatus.Draft;
     public int? ScoaItemId { get; set; }
     public int? ScoaFundId { get; set; }

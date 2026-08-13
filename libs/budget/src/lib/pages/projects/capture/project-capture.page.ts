@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, HostListener, ChangeDetectorRef } from '@
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
@@ -88,6 +88,14 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   projectId: number | null = null;
   loading = false;
   saving = false;
+  detailsSaving = false;
+  detailsErrors: Record<string, boolean> = {};
+  detailsHasErrors = false;
+  maxTabReached = 0;
+  tabBannerError: string | null = null;
+  planProjectId: number | null = null;
+
+  readonly tabOrder: WizardTab[] = ['details', 'idp', 'scoa-funding', 'scoa-items', 'register'];
 
   tabs: { key: WizardTab; label: string }[] = [
     { key: 'details', label: 'Project Details' },
@@ -104,6 +112,7 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   scoaDrillPath: any[] = [];
   scoaDrillSelected: any = null;
   scoaDrillOpen = false;
+  scoaDrillOpenAbove = false;
   scoaStructureLoading = false;
   idpItems: any[] = [];
 
@@ -230,6 +239,10 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       this.scoaDrillOpen = false;
       return;
     }
+    const trigger = event.currentTarget as HTMLElement;
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    this.scoaDrillOpenAbove = spaceBelow < 340 && rect.top > spaceBelow;
     this.scoaDrillOpen = true;
     if (this.scoaDrillItems.length === 0 && !this.scoaStructureLoading) {
       const fy = this.form.financialYear;
@@ -513,40 +526,59 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
 
   private loadIdpItems() {
     const fy = this.form.financialYear || '2025/2026';
-    this.constantsApi.getIdpItems(fy, 5).subscribe(items => {
-      this.idpItems = items;
+    this.http.get<any[]>(`/api/constants/idp-items/with-path`, { params: { financialYear: fy } }).subscribe({
+      next: items => { this.idpItems = items; this.cdr.detectChanges(); },
+      error: () => {
+        this.constantsApi.getIdpItems(fy, 5).subscribe(items => {
+          this.idpItems = items; this.cdr.detectChanges();
+        });
+      }
     });
   }
 
   private loadProject() {
     if (!this.projectId) return;
     this.loading = true;
-    this.api.getProject(this.projectId).subscribe({
+    this.http.get<any>(`/api/ems/plan-project/plan-project/${this.projectId}`).subscribe({
       next: (p: any) => {
+        this.planProjectId = p.project_ID ?? p.Project_ID ?? this.projectId;
+        const scoaId = p.scoaProjectID ?? p.ScoaProjectID ?? null;
         this.form = {
-          projectCode: p.projectCode || '',
-          projectName: p.projectName || '',
-          projectDescription: p.description || '',
-          financialYear: p.financialYear || '2025/2026',
-          projectStatus: this.statusOptions.find(s => s.statusDesc?.toLowerCase() === p.status?.toLowerCase())?.status_ID ?? p.status,
-          budgetType: this.budgetTypeNameToValue[p.type] ?? 1,
-          singleMultiYear: p.singleMultiYear || 'Multi-Year',
-          scoaProjectId: p.scoaProjectId || null,
-          costingProject: p.costingProject || false,
-          projectType: p.projectType ?? null,
-          isRegistered: p.isRegistered || false
+          projectCode: String(p.projectCode ?? p.ProjectCode ?? ''),
+          projectName: p.projectName ?? p.ProjectName ?? '',
+          projectDescription: p.projectDesc ?? p.ProjectDesc ?? '',
+          financialYear: p.finYear ?? p.FinYear ?? '2025/2026',
+          projectStatus: p.projectStatus ?? p.ProjectStatus ?? null,
+          budgetType: p.capitalOperation ?? p.CapitalOperation ?? null,
+          singleMultiYear: p.singleMultiYear ?? p.SingleMultiYear ?? '',
+          scoaProjectId: scoaId,
+          costingProject: p.costingProject ?? p.CostingProject ?? false,
+          projectType: p.projectTypeID ?? p.ProjectTypeID ?? null,
+          isRegistered: p.isRegistered ?? p.IsRegistered ?? false
         };
         this.loading = false;
-        if (p.scoaProjectId) {
-          this.restoreScoaStructurePath(p.scoaProjectId);
+        this.maxTabReached = this.tabOrder.length - 1;
+        if (scoaId) {
+          this.restoreScoaStructurePath(scoaId);
         } else {
           this.loadScoaStructureRoot();
         }
-        this.loadIdpLinks();
-        this.loadFundingLines();
-        this.loadProjectItems();
+        this.cdr.detectChanges();
       },
-      error: () => { this.loading = false; }
+      error: () => { this.loading = false; this.cdr.detectChanges(); }
+    });
+  }
+
+  private lookupPlanProjectId() {
+    const name = this.form.projectName?.trim();
+    const finYear = this.form.financialYear;
+    if (!name || !finYear) return;
+    this.http.get<{ project_ID: number; Project_ID?: number }>(
+      `/api/ems/plan-project/plan-project/by-name`,
+      { params: { finYear, name } }
+    ).subscribe({
+      next: (m: any) => { this.planProjectId = m?.Project_ID ?? m?.project_ID ?? null; },
+      error: () => { /* no matching plan-project yet */ }
     });
   }
 
@@ -919,8 +951,8 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
       projectDescription: '',
       financialYear: '2025/2026',
       projectStatus: 4 as number | null,
-      budgetType: 1,
-      singleMultiYear: 'Multi-Year',
+      budgetType: null as number | null,
+      singleMultiYear: '',
       scoaProjectId: null as number | null,
       costingProject: false,
       projectType: null as number | null,
@@ -931,26 +963,157 @@ export class ProjectCapturePage implements OnInit, OnDestroy {
   isTabActive(tab: WizardTab): boolean { return this.activeTab === tab; }
 
   isTabCompleted(tab: WizardTab): boolean {
-    const order = ['details', 'idp', 'scoa-funding', 'scoa-items', 'register'];
-    return order.indexOf(tab) < order.indexOf(this.activeTab);
+    return this.tabOrder.indexOf(tab) < this.tabOrder.indexOf(this.activeTab);
   }
 
-  selectTab(tab: WizardTab) { this.activeTab = tab; }
+  isTabLocked(tab: WizardTab): boolean {
+    return this.tabOrder.indexOf(tab) > this.maxTabReached;
+  }
+
+  selectTab(tab: WizardTab) {
+    const targetIdx = this.tabOrder.indexOf(tab);
+    if (targetIdx <= this.maxTabReached) {
+      this.tabBannerError = null;
+      this.activeTab = tab;
+    }
+  }
 
   next() {
-    const order: WizardTab[] = ['details', 'idp', 'scoa-funding', 'scoa-items', 'register'];
-    const idx = order.indexOf(this.activeTab);
-    if (idx < order.length - 1) this.activeTab = order[idx + 1];
+    this.tabBannerError = null;
+
+    if (this.activeTab === 'details') {
+      if (!this.validateDetailsTab()) return;
+      this.saveDetailsAndAdvance();
+      return;
+    }
+
+    if (this.activeTab === 'idp') {
+      if (this.idpLinks.length === 0) {
+        this.tabBannerError = 'At least one IDP Link must be added before continuing.';
+        return;
+      }
+      if (Math.abs(this.idpPercentageTotal - 100) > 0.001) {
+        this.tabBannerError = `IDP percentages must total 100%. Current total: ${this.idpPercentageTotal.toFixed(2)}%`;
+        return;
+      }
+    }
+
+    if (this.activeTab === 'scoa-funding') {
+      if (this.fundingLines.length === 0) {
+        this.tabBannerError = 'At least one Funding Line must be added before continuing.';
+        return;
+      }
+    }
+
+    if (this.activeTab === 'scoa-items') {
+      if (this.projectItems.length === 0) {
+        this.tabBannerError = 'At least one SCOA Item must be added before continuing.';
+        return;
+      }
+    }
+
+    const idx = this.tabOrder.indexOf(this.activeTab);
+    if (idx < this.tabOrder.length - 1) {
+      this.maxTabReached = Math.max(this.maxTabReached, idx + 1);
+      this.activeTab = this.tabOrder[idx + 1];
+    }
   }
 
   previous() {
-    const order: WizardTab[] = ['details', 'idp', 'scoa-funding', 'scoa-items', 'register'];
-    const idx = order.indexOf(this.activeTab);
-    if (idx > 0) this.activeTab = order[idx - 1];
+    this.tabBannerError = null;
+    const idx = this.tabOrder.indexOf(this.activeTab);
+    if (idx > 0) this.activeTab = this.tabOrder[idx - 1];
   }
 
   isLastTab(): boolean { return this.activeTab === 'register'; }
   isFirstTab(): boolean { return this.activeTab === 'details'; }
+
+  validateDetailsTab(): boolean {
+    const errors: Record<string, boolean> = {};
+    if (!this.form.projectName?.trim()) errors['projectName'] = true;
+    if (!this.form.projectDescription?.trim()) errors['projectDescription'] = true;
+    if (this.form.budgetType == null) errors['budgetType'] = true;
+    if (!this.form.singleMultiYear) errors['singleMultiYear'] = true;
+    if (!this.form.scoaProjectId) errors['scoaProjectId'] = true;
+    this.detailsErrors = { ...errors };
+    this.detailsHasErrors = Object.keys(errors).length > 0;
+    this.cdr.detectChanges();
+    return !this.detailsHasErrors;
+  }
+
+  clearDetailError(field: string) {
+    if (this.detailsErrors[field]) {
+      this.detailsErrors = { ...this.detailsErrors, [field]: false };
+      this.detailsHasErrors = Object.values(this.detailsErrors).some(v => v === true);
+      this.cdr.detectChanges();
+    }
+  }
+
+  saveDetailsAndAdvance() {
+    this.detailsSaving = true;
+    const payload: any = {
+      ProjectName: this.form.projectName?.trim(),
+      ProjectDesc: this.form.projectDescription?.trim(),
+      CapitalOperation: this.form.budgetType,
+      ScoaProjectID: this.form.scoaProjectId,
+      ProjectStatus: this.form.projectStatus,
+      FinYear: this.form.financialYear,
+      ProjectTypeID: this.form.projectType ?? null,
+      SingleMultiYear: this.form.singleMultiYear,
+      CapturerID: 1,
+      DateCaptured: new Date().toISOString()
+    };
+
+    const req = this.planProjectId
+      ? this.http.put(`/api/ems/plan-project/plan-project/${this.planProjectId}`, { ...payload, Project_ID: this.planProjectId })
+      : this.http.post<any>('/budget-app/api/ems/plan-project/plan-project', { ...payload, Project_ID: 0 });
+
+    req.subscribe({
+      next: (result: any) => {
+        this.detailsSaving = false;
+        if (!this.planProjectId && result?.Project_ID) {
+          this.planProjectId = result.Project_ID;
+        }
+        const idx = this.tabOrder.indexOf('details');
+        this.maxTabReached = Math.max(this.maxTabReached, idx + 1);
+        this.activeTab = this.tabOrder[idx + 1];
+        this.tabBannerError = null;
+        this.cdr.detectChanges();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.detailsSaving = false;
+        if (err.status === 409) {
+          // Name already exists — look up the existing Plan_Project ID and retry as PUT
+          const name = this.form.projectName?.trim() ?? '';
+          const finYear = this.form.financialYear ?? '';
+          this.http.get<any>('/budget-app/api/ems/plan-project/plan-project/by-name', { params: { finYear, name } })
+            .subscribe({
+              next: (m: any) => {
+                const foundId = m?.Project_ID ?? m?.project_ID ?? null;
+                if (foundId) {
+                  this.planProjectId = foundId;
+                  this.saveDetailsAndAdvance(); // retry as PUT — excludes self
+                } else {
+                  this.detailsErrors = { ...this.detailsErrors, projectName: true };
+                  this.detailsHasErrors = true;
+                  this.tabBannerError = 'A project with this name already exists for the selected financial year.';
+                  this.cdr.detectChanges();
+                }
+              },
+              error: () => {
+                this.detailsErrors = { ...this.detailsErrors, projectName: true };
+                this.detailsHasErrors = true;
+                this.tabBannerError = 'A project with this name already exists for the selected financial year.';
+                this.cdr.detectChanges();
+              }
+            });
+        } else {
+          this.tabBannerError = 'Failed to save project details. Please try again.';
+          this.cdr.detectChanges();
+        }
+      }
+    });
+  }
 
   save(silentNav = false, callback?: () => void) {
     this.saving = true;

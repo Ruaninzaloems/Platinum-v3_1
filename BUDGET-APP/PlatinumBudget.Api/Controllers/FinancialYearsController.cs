@@ -13,10 +13,41 @@ public class FinancialYearsController : ControllerBase
     public FinancialYearsController(BudgetDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll() =>
-        Ok(await _db.FinancialYears.OrderByDescending(f => f.StartDate).ToListAsync());
+    public async Task<IActionResult> GetAll()
+    {
+        var activeYearCode = await GetActiveYearCodeFromConfig();
+        var years = await _db.FinancialYears.AsNoTracking()
+            .OrderByDescending(f => f.StartDate)
+            .ToListAsync();
+
+        if (!string.IsNullOrEmpty(activeYearCode))
+            foreach (var y in years)
+                y.IsActive = y.YearCode == activeYearCode;
+
+        return Ok(years);
+    }
 
     [HttpGet("active")]
-    public async Task<IActionResult> GetActive() =>
-        Ok(await _db.FinancialYears.FirstOrDefaultAsync(f => f.IsActive));
+    public async Task<IActionResult> GetActive()
+    {
+        var activeYearCode = await GetActiveYearCodeFromConfig();
+
+        if (!string.IsNullOrEmpty(activeYearCode))
+        {
+            var fy = await _db.FinancialYears.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.YearCode == activeYearCode);
+            if (fy != null) return Ok(fy);
+        }
+
+        return Ok(await _db.FinancialYears.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.IsActive));
+    }
+
+    private async Task<string?> GetActiveYearCodeFromConfig()
+    {
+        var results = await _db.Database
+            .SqlQueryRaw<string>(@"SELECT ""KeyValue"" FROM ""AAAA_ConfigSettings"" WHERE ""KeyName"" = 'ActiveFinYear' LIMIT 1")
+            .ToListAsync();
+        return results.FirstOrDefault();
+    }
 }

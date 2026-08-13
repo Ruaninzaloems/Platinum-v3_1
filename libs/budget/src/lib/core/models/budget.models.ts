@@ -193,10 +193,76 @@ export interface ProjectItem {
   totalBudgetYear1: number;
   totalBudgetYear2: number;
   totalBudgetYear3: number;
+  budgetSplitId: number | null;
   budgetLineCount: number;
   scoaLineCount: number;
   createdOn: string;
   budgetLines: ProjectBudgetLine[] | null;
+  isRegistered: boolean;
+  financialYear: string | null;
+  singleMultiYear: string | null;
+  projectTypeName: string | null;
+  costingProject: boolean;
+  scoaProject: string | null;
+  scoaProjectPath: string | null;
+  scoaProjectNtId: string | null;
+  scoaProjectDesc: string | null;
+  scoaFunction: string | null;
+  scoaFunctionId: number | null;
+  scoaFunctionRecordId: number | null;
+  scoaFunctionPath: string | null;
+  scoaFunctionNtId: string | null;
+  scoaFunctionDesc: string | null;
+  municipalClassification: string | null;
+  municipalClassificationId: number | null;
+  municipalClassificationPath: string | null;
+  scoaFund: string | null;
+  scoaFundId: number | null;
+  scoaFundRecordId: number | null;
+  scoaFundPath: string | null;
+  scoaFundNtId: string | null;
+  scoaFundDesc: string | null;
+  scoaRegion: string | null;
+  scoaRegionId: number | null;
+  scoaRegionRecordId: number | null;
+  scoaRegionPath: string | null;
+  scoaRegionNtId: string | null;
+  scoaRegionDesc: string | null;
+  scoaCosting: string | null;
+  scoaCostingId: number | null;
+  scoaCostingRecordId: number | null;
+  scoaCostingPath: string | null;
+  scoaCostingNtId: string | null;
+  scoaCostingDesc: string | null;
+  planProjectItemCode: number | null;
+  scoaItem: string | null;
+  scoaItemId: number | null;
+  scoaItemRecordId: number | null;
+  scoaItemPath: string | null;
+  scoaItemCode: string | null;
+  scoaItemNtId: string | null;
+  scoaItemDesc: string | null;
+  projectItem: string | null;
+  projectItemId: number | null;
+  creditDebit: string | null;
+  isActiveForScm: boolean | null;
+  month01: number | null;
+  month02: number | null;
+  month03: number | null;
+  month04: number | null;
+  month05: number | null;
+  month06: number | null;
+  month07: number | null;
+  month08: number | null;
+  month09: number | null;
+  month10: number | null;
+  month11: number | null;
+  month12: number | null;
+  grapClassification: string | null;
+  grapClassificationNote: string | null;
+  mainSegmentReporting: string | null;
+  subSegmentReporting: string | null;
+  planProjectItemId: number | null;
 }
 
 export interface ProjectBudgetLine {
@@ -331,6 +397,7 @@ export interface TariffScenarioSummary {
   totalVariance: number;
   lineCount: number;
   createdOn: string;
+  isArchived: boolean;
 }
 
 export interface TariffScenario {
@@ -347,6 +414,7 @@ export interface TariffScenario {
   approvedBy: string | null;
   approvedOn: string | null;
   lines: TariffScenarioLine[];
+  serviceIncreases: { serviceType: string; consumerType: string; increasePercentage: number; }[];
 }
 
 export interface TariffScenarioLine {

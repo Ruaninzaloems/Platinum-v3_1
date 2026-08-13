@@ -290,7 +290,7 @@ export class TariffsPage implements OnInit {
     this.kpiCards = [
       { icon: 'category', label: 'Service Categories', value: this.serviceCategories.length.toString(), subtitle: 'Active services', colorClass: 'icon-blue' },
       { icon: 'receipt_long', label: 'Active Tariffs', value: this.tariffs.filter(t => t.isApproved).length.toString(), subtitle: 'Approved tariffs', colorClass: 'icon-green' },
-      { icon: 'attach_money', label: 'Avg Unit Rate', value: 'R ' + avgRate.toFixed(4), subtitle: 'Across all tariffs', colorClass: 'icon-amber' },
+      { icon: 'payments', label: 'Avg Unit Rate', value: 'R ' + avgRate.toFixed(4), subtitle: 'Across all tariffs', colorClass: 'icon-amber' },
       { icon: 'verified', label: 'Approved', value: this.tariffs.filter(t => t.isApproved).length + '/' + this.tariffs.length, subtitle: 'Tariff approval rate', colorClass: 'icon-teal' },
     ];
   }
