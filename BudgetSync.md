@@ -268,6 +268,44 @@ routes/pages/controllers are synced, always diff the **standalone's nav/menu tem
 structure (flat `items` vs `subGroups.children`), not just "does a route exist for this label." A route
 existing is necessary but not sufficient for a user to ever reach the page.
 
+### Third pass (2026-08-14): full nav audit found 3 more gaps in "Budget Management" — none in the other 4 groups
+
+After fixing Virements, a full group-by-group diff of every `budgetNavGroups` entry against
+`platinum-budget-ui/src/app/app.html` found the "Budget Management" group still had 3 more gaps (all
+inside its `subGroups`, none in its flat `items`). **"Billing Budgeting", "Creditors Budgeting", "HR &
+Payroll Budgeting", and "Monitoring" all matched the standalone exactly** — the nav-drift problem was
+concentrated entirely in "Budget Management", likely because it's the group that grew the most `subGroups`
+nesting during the original sync.
+
+1. **"Project Budgets Grid" missing from the `Projects` subGroup** — route `/projects/grid` and
+   `ProjectBudgetsGridPage` already existed (`routes.ts` L17); pure nav-wiring gap, fixed by adding the
+   item (icon `grid_on`, matching standalone).
+2. **Entire "Adjustments" subGroup missing** (`Request Adjustment` → `/adjustments/request`,
+   `Approve Adjustment Budget` → `/adjustments/approve`) — both routes/pages already existed; pure
+   nav-wiring gap, fixed by adding the subGroup. Note: `routes.ts` also has unused
+   `adjustments/capture` / `adjustments/capture/:id` routes with no nav entry in either app — left
+   as-is (not in standalone's nav either, so not a gap, just an unlinked page — leave alone unless a
+   future standalone diff shows it should be reachable).
+3. **"mSCOA Strings" was a flat single item** (`/budget-strings`) instead of the standalone's 7-child
+   sub-panel (Tabled Budget, Original Budget, Tabled IDP, Original IDP, Adjustment Budget, Adjustment
+   IDP, Virement). Initially looked like a deeper gap (6 of the 7 sub-routes didn't exist in
+   `routes.ts`), but turned out to be trivial: `StringsListPage`
+   (`libs/budget/src/lib/pages/budget-strings/strings-list.page.ts`) already derives which mSCOA string
+   type to show from **the last URL segment** (`STRING_TYPE_MAP` keyed by `tabled-budget`,
+   `original-budget`, etc. — `ngOnInit` reads `this.router.url.split('/')` L166-168), so it's a fully
+   generic single component. Fixed by adding 6 more `routes.ts` entries that all point at the same
+   `StringsListPage` with different path segments, then nesting all 7 under an `mSCOA Strings` subGroup
+   in the shell nav (removing the old flat `/budget-strings` item, which resolved to a useless
+   `STRING_TYPE_MAP` fallback since `'budget-strings'` isn't a key in that map).
+   **Lesson**: before concluding "page doesn't exist, needs to be built," check whether an existing page
+   already reads a route param / URL segment generically — the standalone's per-item routes and the
+   monorepo's consolidated component aren't necessarily in conflict.
+
+**Verification for this pass**: `tsc --noEmit` (0 errors) + live browser check — expanded each fixed
+subGroup via `document.querySelector('nav')` and confirmed all labels render, then clicked into
+"Tabled IDP (PRTA)" and confirmed the page renders `National Treasury - NT SCOA String (Tabled IDP
+(PRTA))` (i.e. `STRING_TYPE_MAP` resolved the new route segment correctly, not just "route exists").
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)

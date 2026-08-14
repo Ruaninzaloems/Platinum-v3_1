@@ -1176,6 +1176,7 @@ export class ShellComponent implements OnInit, OnDestroy {
           label: 'Projects', icon: 'folder_open',
           children: [
             { label: 'Project Budgets', icon: 'folder', route: '/projects' },
+            { label: 'Project Budgets Grid', icon: 'grid_on', route: '/projects/grid' },
             { label: 'Export Original Budget', icon: 'file_download', route: '/projects/export-original-budget' },
             { label: 'Export Adjustment Budget', icon: 'tune', route: '/projects/export-adjustment-budget' },
             { label: 'Import Projects', icon: 'file_upload', route: '/projects/import' },
@@ -1199,11 +1200,29 @@ export class ShellComponent implements OnInit, OnDestroy {
             { label: 'Virements', icon: 'swap_horiz', route: '/virements' },
             { label: 'Virement Approvals', icon: 'task_alt', route: '/virement-approvals' }
           ]
+        },
+        {
+          label: 'Adjustments', icon: 'tune',
+          children: [
+            { label: 'Request Adjustment', icon: 'request_page', route: '/adjustments/request' },
+            { label: 'Approve Adjustment Budget', icon: 'task_alt', route: '/adjustments/approve' }
+          ]
+        },
+        {
+          label: 'mSCOA Strings', icon: 'code',
+          children: [
+            { label: 'Tabled Budget', icon: 'table_chart', route: '/budget-strings/tabled-budget' },
+            { label: 'Original Budget', icon: 'description', route: '/budget-strings/original-budget' },
+            { label: 'Tabled IDP (PRTA)', icon: 'account_tree', route: '/budget-strings/tabled-idp' },
+            { label: 'Original IDP (PROR)', icon: 'account_tree', route: '/budget-strings/original-idp' },
+            { label: 'Adjustment Budget', icon: 'tune', route: '/budget-strings/adjustment-budget' },
+            { label: 'Adjustment IDP (PRAD)', icon: 'tune', route: '/budget-strings/adjustment-idp' },
+            { label: 'Virement', icon: 'swap_horiz', route: '/budget-strings/virement' }
+          ]
         }
       ],
       items: [
-        { label: 'Budget Versions', icon: 'history', route: '/budget-versions' },
-        { label: 'mSCOA Strings', icon: 'code', route: '/budget-strings' }
+        { label: 'Budget Versions', icon: 'history', route: '/budget-versions' }
       ]
     },
     {
