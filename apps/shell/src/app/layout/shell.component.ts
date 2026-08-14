@@ -1190,13 +1190,20 @@ export class ShellComponent implements OnInit, OnDestroy {
             { label: 'Approve Draft', icon: 'rate_review', route: '/budget-approval/approve-draft' },
             { label: 'Approve Final', icon: 'check_circle', route: '/budget-approval/approve-final' }
           ]
+        },
+        {
+          label: 'Virements', icon: 'swap_horiz',
+          children: [
+            { label: 'Virement Approval Levels', icon: 'layers', route: '/virement-approval-levels' },
+            { label: 'Virement Policy', icon: 'policy', route: '/virement-policy' },
+            { label: 'Virements', icon: 'swap_horiz', route: '/virements' },
+            { label: 'Virement Approvals', icon: 'task_alt', route: '/virement-approvals' }
+          ]
         }
       ],
       items: [
         { label: 'Budget Versions', icon: 'history', route: '/budget-versions' },
-        { label: 'mSCOA Strings', icon: 'code', route: '/budget-strings' },
-        { label: 'Virements', icon: 'swap_horiz', route: '/virements' },
-        { label: 'Virement Policy', icon: 'policy', route: '/virement-policy' }
+        { label: 'mSCOA Strings', icon: 'code', route: '/budget-strings' }
       ]
     },
     {

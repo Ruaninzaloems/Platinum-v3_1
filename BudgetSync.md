@@ -242,6 +242,32 @@ backend curl response against what the UI rendered.
 data-bearing page end-to-end (curl the backend endpoint directly, then confirm the same data renders in
 the browser through the shell proxy) — don't stop at "it builds."
 
+### Second gap found (2026-08-14): shell sidebar nav silently drops items even when routes/pages/backend are fully synced
+
+Found via a user screenshot of the standalone's sidebar: 4 nav items under a **"Virements"** sub-group
+(`Virement Approval Levels`, `Virement Policy`, `Virements`, `Virement Approvals`) were missing from the
+monorepo's Budget sidebar. Investigation showed this was **not** a sync gap in the module itself —
+`libs/budget/src/lib/routes.ts`, all 4 `pages/virement-*` components, and all 4
+`BUDGET-APP/PlatinumBudget.Api/Controllers/Virement*Controller.cs` backend controllers were already fully
+synced and correct. The only gap was `apps/shell/src/app/layout/shell.component.ts`'s `budgetNavGroups`
+array — 2 of the 4 items (`Virement Approval Levels`, `Virement Approvals`) were never added as nav
+entries at all, and the other 2 (`Virements`, `Virement Policy`) were added as flat top-level `items`
+instead of being nested under a `"Virements"` `subGroup`, unlike the standalone's collapsible sub-panel
+structure (`platinum-budget-ui/src/app/app.html`, `mat-expansion-panel` nested inside the outer panel).
+
+**Why this is easy to miss**: the shell's nav config lives entirely OUTSIDE `libs/budget` — in
+`apps/shell/src/app/layout/shell.component.ts`, a monorepo-only file with no standalone equivalent to
+diff against directly. A sync that only walks `libs/budget/**` and `BUDGET-APP/**` (routes, pages,
+controllers) will report 100% complete while whole nav sections are invisible in the UI. `tsc --noEmit`
+also stays green — a route/page/controller can be fully correct and unreachable from the sidebar.
+
+**Checklist addition for every future Budget sync (and every module sync in general)**: after confirming
+routes/pages/controllers are synced, always diff the **standalone's nav/menu template** (for Budget:
+`platinum-budget-ui/src/app/app.html`) against `apps/shell/src/app/layout/shell.component.ts`'s
+`budgetNavGroups` (or the equivalent nav array for other modules) item-by-item — including nesting
+structure (flat `items` vs `subGroups.children`), not just "does a route exist for this label." A route
+existing is necessary but not sufficient for a user to ever reach the page.
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)
@@ -260,6 +286,12 @@ the browser through the shell proxy) — don't stop at "it builds."
 - **Never bring in a standalone's session-cookie/global-auth-filter backend pattern**, if one
   is ever introduced upstream. Monorepo module APIs are called through the shell's proxy
   carrying the shared POS session — they are not meant to run their own login/session system.
+- **The shell's nav config is a separate sync surface from the module itself.** Routes, pages,
+  and backend controllers living inside `libs/<module>` / `<MODULE>-APP` can be 100% synced
+  while `apps/shell/src/app/layout/shell.component.ts`'s nav array is still missing items or
+  has the wrong nesting — there's no standalone file at that path to diff against automatically,
+  so it must be checked explicitly. Always diff the standalone's nav/menu template against the
+  shell's nav array item-by-item (including flat-vs-nested structure) as part of every sync.
 
 ---
 
