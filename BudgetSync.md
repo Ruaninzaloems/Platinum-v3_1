@@ -306,6 +306,43 @@ subGroup via `document.querySelector('nav')` and confirmed all labels render, th
 "Tabled IDP (PRTA)" and confirmed the page renders `National Treasury - NT SCOA String (Tabled IDP
 (PRTA))` (i.e. `STRING_TYPE_MAP` resolved the new route segment correctly, not just "route exists").
 
+### Fourth pass (2026-08-14): nested subGroup icons never rendered + icon/item mismatches vs standalone
+
+User compared screenshots of "Budget Management → Projects" side by side: standalone (green) showed a
+distinct `mat-icon` next to every item; monorepo (red) showed plain text with no icons at all, plus an
+extra "CP3 Project Sync" item the standalone doesn't have. Two separate bugs, both in
+`apps/shell/src/app/layout/shell.component.ts`:
+
+1. **Template bug, not a data bug**: the nested `subGroup.children` (the "sub-sub-item" level — i.e.
+   every item inside `Projects`, `Budget Approval`, `Virements`, `Adjustments`, `mSCOA Strings`) template
+   row never rendered a `<mat-icon>` at all — only the flat `group.items` and `subGroup` header levels
+   did. This was a **pre-existing gap**, not something introduced by this sync — `Projects` and `Budget
+   Approval` already had icon values set in the data array before this session touched anything, they
+   just silently never displayed. Fixed by adding `<mat-icon class="nav-icon">{{child.icon}}</mat-icon>`
+   to the child template (the interface already declared `icon: string` on `children[]`, so no data
+   model change needed — pure template fix).
+   **Lesson**: when a nav item "has no icon" in the UI, check whether the *data* has an icon (it may) before
+   assuming icons are missing from the config — the render template itself can be the actual gap, and a
+   correct-looking nav array can still render wrong.
+2. **Icon/item mismatches vs standalone**: several `Projects` icons didn't match
+   `platinum-budget-ui/src/app/app.html` at all — `Project Budgets` was `folder` (standalone: `table_chart`),
+   `Export Original/Adjustment Budget` were `file_download`/`tune` (standalone: `download` for both),
+   `Import Projects` was `file_upload` (standalone: `upload`), `Add Zero Budget Items` was `exposure_zero`
+   (standalone: `add_circle_outline`); `Budget Approval → Approve Final` was `check_circle` (standalone:
+   `verified`). All corrected to match exactly. Also removed **"CP3 Project Sync"** — present in a
+   *vendored copy* of the standalone at `BUDGET-APP/platinum-budget-ui/src/app/app.html` (leftover from
+   the original sync, not the live app) but absent from the real standalone at
+   `C:\Repos\Budget-Management\platinum-budget-ui\src\app\app.html` and from the user's own screenshot.
+   Left the `/projects/cp3-sync` route itself in `routes.ts` (harmless, unlinked) rather than deleting it,
+   consistent with how the unused `adjustments/capture` routes were already handled.
+   **Lesson**: `BUDGET-APP/platinum-budget-ui` in this repo is a **vendored snapshot**, not the
+   authoritative standalone — always diff against `C:\Repos\Budget-Management\platinum-budget-ui`
+   (the real, currently-maintained standalone) or the user's own screenshot when the two disagree.
+
+**Verification**: `tsc --noEmit` (0 errors) + live browser check — read each rendered
+`.nav-sub-group-items a.sub-sub-item`'s `mat-icon` text + label via `querySelectorAll` and confirmed all
+7 Projects children now show the correct icon and no "CP3 Project Sync" entry remains.
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)

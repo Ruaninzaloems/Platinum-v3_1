@@ -343,6 +343,7 @@ type AppModule = 'home' | 'assets' | 'scm' | 'pos' | 'payroll' | 'idp' | 'insigh
                             <div class="nav-sub-group-items">
                               @for (child of sub.children; track child.label) {
                                 <a class="nav-link sub-sub-item" [routerLink]="'/budget' + child.route" routerLinkActive="active-link">
+                                  <mat-icon class="nav-icon">{{child.icon}}</mat-icon>
                                   <span>{{child.label}}</span>
                                 </a>
                               }
@@ -1175,21 +1176,20 @@ export class ShellComponent implements OnInit, OnDestroy {
         {
           label: 'Projects', icon: 'folder_open',
           children: [
-            { label: 'Project Budgets', icon: 'folder', route: '/projects' },
+            { label: 'Project Budgets', icon: 'table_chart', route: '/projects' },
             { label: 'Project Budgets Grid', icon: 'grid_on', route: '/projects/grid' },
-            { label: 'Export Original Budget', icon: 'file_download', route: '/projects/export-original-budget' },
-            { label: 'Export Adjustment Budget', icon: 'tune', route: '/projects/export-adjustment-budget' },
-            { label: 'Import Projects', icon: 'file_upload', route: '/projects/import' },
+            { label: 'Export Original Budget', icon: 'download', route: '/projects/export-original-budget' },
+            { label: 'Export Adjustment Budget', icon: 'download', route: '/projects/export-adjustment-budget' },
+            { label: 'Import Projects', icon: 'upload', route: '/projects/import' },
             { label: 'Register Projects / Exception List', icon: 'app_registration', route: '/projects/register' },
-            { label: 'Add Zero Budget Items to Current Budget', icon: 'exposure_zero', route: '/projects/zero-budget' },
-            { label: 'CP3 Project Sync', icon: 'sync', route: '/projects/cp3-sync' }
+            { label: 'Add Zero Budget Items to Current Budget', icon: 'add_circle_outline', route: '/projects/zero-budget' }
           ]
         },
         {
           label: 'Budget Approval', icon: 'approval',
           children: [
             { label: 'Approve Draft', icon: 'rate_review', route: '/budget-approval/approve-draft' },
-            { label: 'Approve Final', icon: 'check_circle', route: '/budget-approval/approve-final' }
+            { label: 'Approve Final', icon: 'verified', route: '/budget-approval/approve-final' }
           ]
         },
         {
