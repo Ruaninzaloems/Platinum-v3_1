@@ -710,7 +710,7 @@ app.post('/api/platinum/sync/cancel', (_req, res) => res.json({ status: 'cancell
 
 // ────────────────────────────────────────────────────────────
 // ART (source-system) proxy  → /api/art/*   (art.ts, reads ART_API_URL/USER/PASS)
-// Platinum core financials proxy → /api/platinum/*  (platinum.ts, reads PLATINUM_API_URL)
+// Platinum core financials proxy → /api/platinum/*  (platinum.ts, reads AFS_PLATINUM_API_URL)
 // The /api/platinum/sync/* stubs above remain (mutation endpoints are not proxied).
 // ────────────────────────────────────────────────────────────
 app.use('/api/art', artRouter);

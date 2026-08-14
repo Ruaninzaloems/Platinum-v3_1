@@ -29,7 +29,8 @@ EXTERNAL APIs used by AFS (root .env):
   ART_API_URL      : https://platinum-art-api-ftd9ejdaefcpdrg0.southafricanorth-01.azurewebsites.net
   ART_API_USER     : admin
   ART_API_PASS     : ••••              (HTTP Basic for the ART proxy)
-  PLATINUM_API_URL : https://platinum-afs.azurewebsites.net
+  AFS_PLATINUM_API_URL : https://platinum-afs.azurewebsites.net   (renamed from PLATINUM_API_URL — that
+                                        name collides with POS-API's own PLATINUM_API_URL, a different backend)
   JWT_SECRET (AFS) : pltfm-afs-…       (NOT used in the monorepo — the shell handles auth;
                                         do NOT overwrite the global JWT_SECRET, which is Payroll's)
 
@@ -71,7 +72,7 @@ RULES
    The monorepo AFS backend is a simplified Express API. If the frontend calls endpoints
    it doesn't implement, port the source NestJS logic into these modules (keep the pattern):
      • art.ts      → /api/art/*        proxy to ART_API_URL (Basic auth, 30s cache); exports `art` client
-     • platinum.ts → /api/platinum/*   TB / GL reads → PLATINUM_API_URL (host-path helpers)
+     • platinum.ts → /api/platinum/*   TB / GL reads → AFS_PLATINUM_API_URL (host-path helpers)
      • ratios.ts   → /api/reports/ratios/:fyId   TB baseline (trial_balance_entries) + EMS enrichment via `art`
    Mount new routes in index.ts. Wire any new env vars into root .env.
 
@@ -117,7 +118,7 @@ OUTPUT
 | Backend files     | `index.ts`, `db.ts`, `demo.ts`, `art.ts`, `platinum.ts`, `ratios.ts`  |
 | Database          | `AFS` on `platinum-postgre-sql.postgres.database.azure.com` (`AZURE_POSTGRES_URL`) |
 | ART proxy         | `/api/art/*` → `ART_API_URL` (Basic `ART_API_USER`/`ART_API_PASS`)    |
-| Platinum proxy    | `/api/platinum/*` → `PLATINUM_API_URL`                                |
+| Platinum proxy    | `/api/platinum/*` → `AFS_PLATINUM_API_URL`                            |
 | Ratios endpoint   | `/api/reports/ratios/:financialYearId`                                |
 | Auth              | Handled by the shell — AFS login/auth files are SKIPPED               |
 

@@ -6,7 +6,7 @@
 // adapted to the monorepo's simplified Express API. The Angular frontend
 // (libs/afs PlatinumApiService) calls `/api/platinum/*`; these handlers proxy
 // trial-balance & general-ledger reads to the external Platinum API at
-// PLATINUM_API_URL.
+// AFS_PLATINUM_API_URL.
 //
 // Scope note: only the READ endpoints the frontend service actually calls are
 // ported. The source's sync/csv-import/tb-import-batch mutation endpoints depend
@@ -14,7 +14,10 @@
 // existing `/api/platinum/sync/*` stubs in index.ts remain).
 //
 // Env (read lazily so dotenv — loaded in db.ts — has run first):
-//   PLATINUM_API_URL  e.g. https://platinum-afs.azurewebsites.net
+//   AFS_PLATINUM_API_URL  e.g. https://platinum-afs.azurewebsites.net
+//   (named distinctly from POS-API's PLATINUM_API_URL, which points at a different
+//   backend — the George Platinum billing/auth API — to avoid collisions when both
+//   services read from the same shared root .env)
 // ────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 
@@ -52,7 +55,7 @@ class PlatinumApiClient {
   private readonly CACHE_TTL = 5 * 60 * 1000;
 
   private get baseUrl(): string {
-    return normalizeApiBaseUrl(process.env.PLATINUM_API_URL || 'https://platinum-afs.azurewebsites.net');
+    return normalizeApiBaseUrl(process.env.AFS_PLATINUM_API_URL || 'https://platinum-afs.azurewebsites.net');
   }
   private get tbPrefix(): string {
     return trialBalancePrefixFor(this.baseUrl);

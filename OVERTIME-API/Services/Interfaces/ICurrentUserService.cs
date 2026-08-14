@@ -12,6 +12,9 @@ public interface ICurrentUserService
 
     DevUser Current { get; }
     DevUser? FindByUserId(string userId);
+    /// <summary>Resolve by User_UserDetail.UserName (case-insensitive) — used to bridge the
+    /// shell's real POS-authenticated identity into Overtime's permission resolution.</summary>
+    DevUser? FindByUserName(string userName);
     IReadOnlyList<DevUser> AllUsers { get; }
 }
 
@@ -22,6 +25,8 @@ public interface ICurrentUserService
 public class DevUser
 {
     public string UserId { get; init; } = string.Empty;
+    /// <summary>User_UserDetail.UserName — the login name shared with the rest of Platinum.</summary>
+    public string UserName { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public string EmployeeId { get; init; } = string.Empty;
     public string EmployeeName { get; init; } = string.Empty;

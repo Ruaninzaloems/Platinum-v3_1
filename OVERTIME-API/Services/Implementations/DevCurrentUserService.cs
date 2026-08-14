@@ -15,6 +15,12 @@ namespace PlatinumOvertime_API.Services.Implementations;
 public class DevCurrentUserService : ICurrentUserService
 {
     private const string HeaderName = "X-User-Id";
+    // Identity bridge: the shell's auth interceptor attaches the real POS-authenticated user's
+    // userName to every /overtime-app/api/* call under this header (see
+    // libs/shared/auth/src/lib/auth.interceptor.ts). X-User-Id (above) keeps its original
+    // meaning — a numeric User_UserDetail.User_id / Payroll_Employee.Employee_ID for manual
+    // Swagger testing — and is checked first so that existing testing workflows are unaffected.
+    private const string UsernameHeaderName = "X-Username";
 
     private readonly IHttpContextAccessor _http;
     private readonly DevUserDirectory _directory;
@@ -35,11 +41,20 @@ public class DevCurrentUserService : ICurrentUserService
                 var user = _directory.FindByUserId(userId);
                 if (user != null) return user;
             }
+
+            var userName = _http.HttpContext?.Request.Headers[UsernameHeaderName].ToString();
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                var user = _directory.FindByUserName(userName);
+                if (user != null) return user;
+            }
+
             return _directory.Default;
         }
     }
 
     public DevUser? FindByUserId(string userId) => _directory.FindByUserId(userId);
+    public DevUser? FindByUserName(string userName) => _directory.FindByUserName(userName);
     public IReadOnlyList<DevUser> AllUsers => _directory.All;
 }
 
@@ -66,6 +81,7 @@ public class DevUserDirectory
     private List<DevUser>? _cache;
     private Dictionary<string, DevUser>? _byUserId;
     private Dictionary<string, DevUser>? _byEmployeeId;
+    private Dictionary<string, DevUser>? _byUserName;
 
     // When true, any overtime permission that has zero rows in Sys_RolePermission
     // is granted to all users (useful for local dev environments without seed data).
@@ -114,6 +130,10 @@ public class DevUserDirectory
         _byEmployeeId = list
             .GroupBy(u => u.EmployeeId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        _byUserName = list
+            .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
+            .GroupBy(u => u.UserName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         Volatile.Write(ref _cache, list);
     }
 
@@ -140,6 +160,16 @@ public class DevUserDirectory
         return byEmployeeId != null && byEmployeeId.TryGetValue(userId, out var u2) ? u2 : null;
     }
 
+    /// <summary>Resolve a user by User_UserDetail.UserName (case-insensitive) — the identity
+    /// bridge from the shell's real POS-authenticated session (see X-Username header above).</summary>
+    public DevUser? FindByUserName(string userName)
+    {
+        if (string.IsNullOrWhiteSpace(userName)) return null;
+        Load();
+        var byUserName = _byUserName;
+        return byUserName != null && byUserName.TryGetValue(userName, out var u) ? u : null;
+    }
+
     /// <summary>Drop the cached snapshot so the next read re-queries the DB.</summary>
     public void Invalidate()
     {
@@ -154,6 +184,7 @@ public class DevUserDirectory
             _cache = null;
             _byUserId = null;
             _byEmployeeId = null;
+            _byUserName = null;
         }
     }
 
@@ -176,6 +207,7 @@ public class DevUserDirectory
             _cache = null;
             _byUserId = null;
             _byEmployeeId = null;
+            _byUserName = null;
 
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<OvertimeDbContext>();
@@ -269,6 +301,7 @@ public class DevUserDirectory
                 return new DevUser
                 {
                     UserId = r.UserId.ToString(),
+                    UserName = r.UserName ?? string.Empty,
                     DisplayName = displayName,
                     EmployeeId = r.EmpId.ToString(),
                     EmployeeName = employeeName,
@@ -343,6 +376,7 @@ public class DevUserDirectory
                 return new DevUser
                 {
                     UserId = r.UserId.ToString(),
+                    UserName = r.UserName ?? string.Empty,
                     DisplayName = displayName,
                     EmployeeId = string.Empty,
                     EmployeeName = displayName,
@@ -378,6 +412,10 @@ public class DevUserDirectory
             _byUserId = users.ToDictionary(u => u.UserId, StringComparer.OrdinalIgnoreCase);
             _byEmployeeId = users
                 .GroupBy(u => u.EmployeeId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            _byUserName = users
+                .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
+                .GroupBy(u => u.UserName, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
             var expiryTicks = _neverExpires ? long.MaxValue : DateTime.UtcNow.Add(_cacheTtl).Ticks;
             Volatile.Write(ref _cacheExpiryTicks, expiryTicks);

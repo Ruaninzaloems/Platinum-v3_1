@@ -50,6 +50,17 @@ function isGeorgeTarget(url: string): boolean {
   return GEORGE_PREFIXES.some(p => url.startsWith(p)) || GEORGE_HOSTS.some(h => url.includes(h));
 }
 
+/** The Overtime module's own backend — reads the legacy Platinum permission tables
+ *  (Sys_RolePermission / User_UserRoles) keyed by User_UserDetail.UserName. It has no
+ *  concept of the shell's session; the shell must bridge its real POS-authenticated
+ *  identity in via X-Username so DevCurrentUserService resolves the right person
+ *  instead of falling back to an arbitrary default user. */
+const OVERTIME_PREFIXES = ['/overtime-app/api/'];
+
+function isOvertimeTarget(url: string): boolean {
+  return OVERTIME_PREFIXES.some(p => url.startsWith(p));
+}
+
 /** Token for the George API: a dedicated george_token if configured, else the session token. */
 function georgeToken(fallback: string | null): string | null {
   try {
@@ -85,6 +96,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (george) {
     const token = georgeToken(auth.getToken());
     if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (isOvertimeTarget(req.url)) {
+    const userName = auth.user()?.userName;
+    if (userName) headers['X-Username'] = userName;
   }
 
   const cloned = req.clone({

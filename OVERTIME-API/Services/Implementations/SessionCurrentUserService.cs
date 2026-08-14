@@ -80,5 +80,6 @@ public class SessionCurrentUserService : ICurrentUserService
     }
 
     public DevUser? FindByUserId(string userId) => _directory.FindByUserId(userId);
+    public DevUser? FindByUserName(string userName) => _directory.FindByUserName(userName);
     public IReadOnlyList<DevUser> AllUsers => _directory.All;
 }

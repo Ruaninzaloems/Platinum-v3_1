@@ -101,7 +101,7 @@ Loaded by Node backends (e.g. `AFS-UI/api/db.ts` loads the root `.env`).
 | `AZURE_DATABASE_URL`   | Payroll backend                      | `Payroll` database                |
 | `ART_API_URL`          | AFS API ART proxy (`art.ts`)         | external ART/EMS API              |
 | `ART_API_USER` / `ART_API_PASS` | AFS ART proxy (HTTP Basic)  | ART credentials                   |
-| `PLATINUM_API_URL`     | AFS API Platinum proxy (`platinum.ts`)| Platinum core financials API     |
+| `AFS_PLATINUM_API_URL` | AFS API Platinum proxy (`platinum.ts`)| Platinum core financials API — distinct from POS-API's `PLATINUM_API_URL` |
 | `EMS_API_BASE_URL`     | Payroll EMS lookups                  | live EMS/Platinum core API        |
 | `JWT_SECRET`           | Payroll API                          | (Payroll JWT — **not** AFS)       |
 
@@ -139,7 +139,7 @@ A simplified **Express** API (run with `tsx`) that backs the AFS module. Files:
 | `db.ts`       | Postgres pool; loads root `.env`; parses ADO-style `AZURE_POSTGRES_URL`         |
 | `demo.ts`     | Demo data returned when the DB is unreachable                                   |
 | `art.ts`      | **ART proxy** — `/api/art/*` → `ART_API_URL` (HTTP Basic, 30s cache). Exposes `art` client |
-| `platinum.ts` | **Platinum proxy** — `/api/platinum/*` (TB / GL reads) → `PLATINUM_API_URL`     |
+| `platinum.ts` | **Platinum proxy** — `/api/platinum/*` (TB / GL reads) → `AFS_PLATINUM_API_URL` |
 | `ratios.ts`   | **Financial ratios** — `/api/reports/ratios/:fyId`                              |
 
 ### Key endpoints
@@ -421,7 +421,7 @@ getToken() { return this.shell.getToken(); }
 - **Dashboard:** added the **Overtime** tile and a "No access granted" state when the user has no modules.
 - **AFS sync:** UI synced from source; added **ART proxy** (`art.ts`), **Platinum
   proxy** (`platinum.ts`), and **Ratios** endpoint (`ratios.ts`) to `AFS-UI/api`;
-  wired `ART_API_URL/USER/PASS`, `PLATINUM_API_URL`, `AZURE_POSTGRES_URL` in `.env`.
+  wired `ART_API_URL/USER/PASS`, `AFS_PLATINUM_API_URL`, `AZURE_POSTGRES_URL` in `.env`.
 - **AFS dashboard fix:** resolved the `.tab-content` global-CSS leak that hid the
   dashboard/tab content.
 - **AFS nav fix:** added the financial-year resolver so AFS Builder pages
