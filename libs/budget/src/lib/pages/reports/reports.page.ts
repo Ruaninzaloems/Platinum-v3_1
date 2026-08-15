@@ -329,7 +329,10 @@ import { BudgetVersionSummary, BudgetOverview, MtrefSummary } from '../../core/m
     .filter-field { width: 280px; }
     ::ng-deep .filters-bar .mat-mdc-form-field-subscript-wrapper { display: none; }
     ::ng-deep .report-tabs .mat-mdc-tab-header { background: white; border: 1px solid #e8ecf1; border-radius: 12px 12px 0 0; }
-    .tab-content { padding: 24px 0; }
+    /* display:block restores the pre-leak default — the global .tab-content{display:none}
+       rule leaked by libs/payroll/_payroll-global.css (unscoped, applies to every module)
+       otherwise hides this tab's entire content. Same fix pattern used across libs/afs. */
+    .tab-content { display: block; padding: 24px 0; }
     .overview-header { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
     .overview-card { padding: 20px; background: white; border: 1px solid #e8ecf1; border-radius: 12px; text-align: center; }
     .ov-label { font-size: 12px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.3px; }

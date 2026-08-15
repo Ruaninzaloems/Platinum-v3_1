@@ -1,4 +1,8 @@
 .page { padding: 24px; max-width: 1440px; margin: 0 auto; }
+// display:block restores the pre-leak default — the global `.tab-content{display:none}`
+// rule leaked by libs/payroll/_payroll-global.css (unscoped, applies to every module)
+// otherwise hides every tab's content on this page.
+.tab-content { display: block; }
 .page-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; }
 .page-title { font-size: 28px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
 .page-subtitle { font-size: 14px; color: #94a3b8; margin: 0; }

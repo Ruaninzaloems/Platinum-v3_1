@@ -343,6 +343,49 @@ extra "CP3 Project Sync" item the standalone doesn't have. Two separate bugs, bo
 `.nav-sub-group-items a.sub-sub-item`'s `mat-icon` text + label via `querySelectorAll` and confirmed all
 7 Projects children now show the correct icon and no "CP3 Project Sync" entry remains.
 
+### Fifth pass (2026-08-15): the known `.tab-content{display:none}` global CSS leak also hits Budget
+
+User screenshotted the Reports page's "Budget Overview" tab completely blank (no revenue/expenditure
+cards, no classification tables) next to the standalone showing full content. The version dropdown and
+tab labels were correct — only the tab body was empty. `get_page_text`/`innerText` showed nothing, but
+`textContent`/`outerHTML` showed the cards WERE in the DOM with correct data (`R 0` etc, matching the
+standalone's own zero values) — that mismatch (present in DOM, absent from rendered text) is the signature
+of a CSS visibility problem, not a data or `*ngIf` problem. `getComputedStyle` on `.tab-content` and its
+ancestor chain confirmed `display: none`.
+
+Root cause: this is the **same pre-existing global CSS leak already documented for AFS** —
+`libs/payroll/src/lib/_payroll-global.css` ships an unscoped `.tab-content { display: none; }` rule that
+applies to every module, not just Payroll (see `MASTER.md` L241, `AFS-SYNC-PROMPT.md` L80,
+`PAYROLL-SYNC-PROMPT.md` L99, and the several `libs/afs/**` component CSS files that already carry a
+`display: block` override with the same explanation comment). Budget was never patched for it. Found via
+`grep -rn "\.tab-content\s*{" libs/budget` — **4 files** were affected (all use a `.tab-content` class in
+their template but never override `display`):
+- `pages/reports/reports.page.ts` (inline `styles: []` — the one from the screenshot)
+- `pages/projects/projects-list.page.scss`
+- `pages/adjustments/request/request-adjustment.page.scss`
+- `pages/hr-payroll/variable-benefits/variable-benefits.page.scss` (had no `.tab-content` rule at all,
+  relying entirely on the global default)
+
+Fixed all 4 with the same `display: block` override pattern already established in `libs/afs`. **Gotcha
+hit while fixing `reports.page.ts` specifically**: it's a `.ts` file whose CSS lives inside a JS template
+literal (`` styles: [`...`] ``) — a backtick inside an explanatory comment (`` `.tab-content{display:none}` ``)
+silently closes the outer template literal early, producing a `TS1005: ',' expected` error one line later
+that looks unrelated to the actual mistake. Use plain-text backtick-free wording in comments inside any
+`styles: [`...`]` block.
+
+**Checklist addition for every future module sync**: `grep -rn "\.tab-content\s*{" libs/<module>` (or
+`class="tab-content"` in templates without a matching CSS rule) as a standing check — any hit needs a
+`display: block` override, since the payroll leak silently affects the whole monorepo regardless of which
+module a page belongs to. This is a structural gap in `libs/payroll/_payroll-global.css` itself (scoping it
+properly would fix every module at once instead of requiring a per-page patch), flagged here but out of
+scope to fix during a Budget sync.
+
+**Verification**: `tsc --noEmit` (0 errors) + live browser check on all 4 fixed pages — read
+`document.querySelector('main').innerText` (not just DOM presence) after each fix to confirm content is
+actually *visible*, not merely present. Reports now shows all 4 overview cards + both classification
+section headers; Projects, Adjustments/Request, and Variable Benefits & Travel all render their
+tab/KPI content correctly.
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)

@@ -84,7 +84,10 @@ $bg: #f4f6f9;
   }
 }
 
-.tab-content { padding: 22px; }
+// display:block restores the pre-leak default — the global `.tab-content{display:none}`
+// rule leaked by libs/payroll/_payroll-global.css (unscoped, applies to every module)
+// otherwise hides this tab's entire content.
+.tab-content { display: block; padding: 22px; }
 
 .form-section { margin-bottom: 24px; }
 .form-section h4 { font-size: 14px; font-weight: 600; color: $navy; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e8ecf1; }
