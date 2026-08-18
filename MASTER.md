@@ -110,12 +110,31 @@ Loaded by Node backends (e.g. `AFS-UI/api/db.ts` loads the root `.env`).
 > (user `Admin_Dev`), one database per module: `PlatinumV3_db` (Assets), `AFS`,
 > `Payroll`, `Overtime`.
 
-### 4.2 Azure PostgreSQL firewall ⚠️
-The Azure DB only accepts whitelisted client IPs. If DB-backed endpoints time out
-(`Connection terminated due to connection timeout`, `/api/health` → `db.ok:false`):
-add your **current outbound IP** to the server's firewall rules in the Azure Portal
-(Networking → Firewall rules). The AFS API re-checks the DB every 60s, so no restart
-is needed once the IP is allowed.
+### 4.2 Azure PostgreSQL firewall ⚠️ — expect this to recur constantly
+The Azure DB only accepts whitelisted client IPs, and in practice the local dev
+outbound IP is **highly dynamic** — it has been observed to change every session,
+sometimes multiple times within one working day (e.g. `102.37.125.100` →
+`156.155.9.219` → `156.155.12.222` → `156.155.14.241` across a handful of days).
+Treat "DB endpoints suddenly 500/timeout after previously working" as **firewall
+first, code bug second** — check `curl https://api.ipify.org` against the Azure
+Portal's current allowed list before debugging anything else.
+
+Symptoms: `Connection terminated due to connection timeout`, `/api/health` →
+`db.ok:false`, or (Node) `ECONNREFUSED`/`ETIMEDOUT`, or (.NET/Npgsql)
+`Failed to connect to <ip>:5432` / `SocketException 10060`. Fix: add the
+**current outbound IP** to the server's firewall rules in the Azure Portal
+(`platinum-postgre-sql` → Networking → Firewall rules).
+
+- **AFS** re-checks the DB every 60s and degrades to demo data — no restart needed
+  once the IP is allowed.
+- **Budget** wraps its startup DB init/seed in a non-fatal try/catch (`[budget]
+  Startup DB init/seed failed (non-fatal, API continues)`) — the API process stays
+  up and endpoints recover automatically once the IP is allowed; no restart needed.
+- **Overtime** does **not** currently have that protection — a DB-unreachable
+  migration at startup throws an **unhandled exception and the process exits**
+  (`Program.cs` around the `Database.Migrate()` call). If Overtime's port isn't
+  listening after a firewall-timing issue, it likely crashed rather than degraded —
+  whitelist the IP first, then restart the process (it does not self-recover).
 
 ### 4.3 Admin → Settings (`/admin-settings/:module`)
 A shell page (`admin-settings.component.ts`) that stores per-module config in
@@ -196,34 +215,73 @@ local file storage, controlled from **Admin → <module> → SharePoint**.
 
 ## 7. Running the project locally
 
-The dev server is Angular's `ng serve`. The Nx project is named **`shell`** and lives
-in `apps/shell/angular.json`.
+`apps/shell` is a **nested standalone Angular CLI project** (its own `angular.json`
+inside `apps/shell/`, project name `"shell"` — not registered as an Nx project at
+the workspace root). `npx nx serve shell` / `npm run serve` (which is just
+`nx serve shell` under the hood) **reliably fails** with `NX Cannot find project
+'shell'` in this workspace — don't spend time retrying it. Always start it via the
+Angular CLI directly from inside `apps/shell`.
 
 ### Shell (UI) — port 5000
 ```bash
-# from repo root (uses nx):
-npm run serve            # → nx serve shell --port=5000 --host=0.0.0.0
-# or directly (reliable if nx can't resolve the project):
 cd apps/shell
-npx ng serve --port 5000 --host 0.0.0.0 --proxy-config proxy.conf.json
+npx ng serve --port 5000 --host 0.0.0.0
 ```
+
+### POS-API (identity provider) — port 3003 ⚠️ env collision gotcha
+```bash
+cd POS-API
+set -a && source ../.env && set +a && unset PLATINUM_API_URL && PORT=3003 npx tsx index.ts
+```
+The repo-root `.env` defines `AFS_PLATINUM_API_URL` (correct, AFS-scoped) but older
+shells/history may still reference the pre-rename `PLATINUM_API_URL` for AFS —
+**never** let a `PLATINUM_API_URL` sourced from root `.env` reach POS-API's process.
+POS-API's own `PLATINUM_API_URL` (the George Platinum billing/auth API) must come
+from its profile file (`POS-API/env/grguat.env` / `localtest.env`) via
+`load-profile.ts`, whose precedence rule is "a real env var always wins over the
+profile file" — so if `PLATINUM_API_URL` is already set in the shell when POS-API
+starts, it silently overrides the profile's correct value and **every login 404s**
+("user not found") because it's hitting the wrong backend entirely. Always `unset
+PLATINUM_API_URL` right before starting POS-API if you've sourced root `.env` into
+that shell for other vars (`SESSION_SECRET`, `DATABASE_URL`, etc).
 
 ### AFS backend — port 9000
 ```bash
 cd AFS-UI/api
-npx tsx index.ts
+set -a && source ../../.env && set +a && PORT=9000 npx tsx index.ts
+```
+
+### Overtime backend (.NET) — port 8099
+```bash
+cd OVERTIME-API
+ASPNETCORE_ENVIRONMENT=Development dotnet run -c Release --no-build
+```
+See §4.2 — this one does **not** degrade gracefully if the Postgres firewall blocks
+it; it crashes on startup and needs a manual restart after the IP is whitelisted.
+
+### Budget backend (.NET) — port 3001
+```bash
+cd BUDGET-APP/PlatinumBudget.Api
+ASPNETCORE_ENVIRONMENT=Development dotnet run
 ```
 
 ### Other module backends
 Start the relevant `*-API` / `*-APP` on its port (see §3) only for modules you're
-testing. Run long-lived servers in their **own persistent terminals**.
+testing. Run long-lived servers in their **own persistent terminals** / background
+processes — `(cmd &)` inside a one-shot shell does not survive across tool calls.
 
 ### Health checks
 ```bash
 curl http://localhost:5000/                                   # shell → 200
-curl http://localhost:9000/api/health                         # AFS API → {db:{ok}}
+curl http://localhost:9000/api/platinum/health                # AFS API → {connected:true,...}
+curl http://localhost:8099/api/auth/me                        # Overtime → 200 + DevUser JSON
+curl http://localhost:3001/api/financialyears                 # Budget → 200 + array
+curl -X POST http://localhost:3003/api/auth/login \
+  -H "Content-Type: application/json" -d '{"username":"...","password":"..."}'  # POS-API login
 curl http://localhost:5000/afs-app/api/reports/dashboard      # proxy path → data
 ```
+A `500`/timeout from any DB-backed backend almost always means the Postgres
+firewall IP changed again — see §4.2 before assuming a code regression.
 
 ---
 
@@ -236,18 +294,49 @@ curl http://localhost:5000/afs-app/api/reports/dashboard      # proxy path → d
   (e.g. AFS `/afs-app`) to their base URL so requests hit the shell proxy. When
   porting a standalone service that hardcoded `/api`, adapt it (see AFS
   `api.service.ts`, `art-api.service.ts`, `platinum-api.service.ts`).
-- **Global CSS leak:** `libs/payroll/src/lib/_payroll-global.css` is registered as a
-  **global** style in `apps/shell/angular.json` and ships unscoped selectors (e.g.
-  `.tab-content { display:none }`). This can hide other modules' elements. AFS works
-  around it (renamed `.afs-tab-content` on the dashboard container; scoped
-  `display` overrides elsewhere). Prefer module-unique class names.
+- **Global CSS leak — `.tab-content { display: none }`:** `libs/payroll/src/lib/_payroll-global.css`
+  is registered as a **global** style in `apps/shell/angular.json` and ships this
+  unscoped selector, which silently hides the tab body of **any** page in **any**
+  module that uses a `.tab-content` class without its own `display` override — the
+  content still exists in the DOM (data loads fine) but never renders, which is a
+  distinctive symptom: `document.querySelector(...).textContent` shows the content
+  but `.innerText` doesn't. Confirmed hit so far: several **AFS** components (worked
+  around with scoped `display: block` overrides — see `libs/afs/**` component CSS
+  for the pattern and explanatory comments) and **5 Budget pages**
+  (`reports.page.ts`, `projects-list.page.scss`, `adjustments/request/*.scss`,
+  `hr-payroll/variable-benefits/*.scss`). Before ruling out other modules, grep for
+  `\.tab-content\s*{` under `libs/<module>` — any page using the class without a
+  `display` override needs the same one-line fix. Root cause has not been fixed at
+  the source (scoping `_payroll-global.css`'s selector) — every affected page has
+  instead been individually patched.
+  ⚠️ If patching this inside a component's inline `styles: [\`...\`]` template
+  literal, do not put a literal backtick inside an explanatory comment — it closes
+  the outer template literal early and produces a `TS1005` error on an unrelated
+  line.
+- **`PLATINUM_API_URL` naming collision (fixed 2026-08-14, but the shape of the bug
+  can recur with any shared-`.env` var):** two unrelated backends both read a var
+  named `PLATINUM_API_URL` for *different* things — POS-API (George Platinum
+  billing/auth API) and, until renamed, AFS (Platinum core financials proxy, now
+  `AFS_PLATINUM_API_URL`, see §4.1). Whenever a service's own env file/profile
+  should "win" but doesn't, suspect a same-named var already set in a shell that
+  also sourced the shared root `.env` — see §7's POS-API startup note.
 - **AFS financial-year context:** the AFS lib's standalone `layout/shell.component`
   is **not** mounted in the monorepo, so `AFS_ROUTES` uses a **resolver**
   (`afsContextResolver`) to load the current FY into `PeriodFilterService` before any
   AFS route activates. Without it, compilation-gated pages show "No Active Compilation".
-- **Nx project resolution:** `nx serve shell` may fail to resolve in some
-  environments (angular.json is nested in `apps/shell`); falling back to
-  `cd apps/shell && npx ng serve …` always works.
+- **Nx project resolution:** `apps/shell` is not a registered Nx project in this
+  workspace (it's a nested standalone Angular CLI app) — `nx serve shell` /
+  `npm run serve` **reliably fail** with `NX Cannot find project 'shell'` (also
+  tried the package.json-derived name `platinum-shell`, same failure). Always use
+  `cd apps/shell && npx ng serve …` — see §7.
+- **Shell nav config is its own sync surface:** for any module, routes/pages/backend
+  controllers can be 100% synced from a standalone source while
+  `apps/shell/src/app/layout/shell.component.ts`'s nav array (`budgetNavGroups`,
+  `overtimeNavItems`, etc.) is still missing items or has the wrong nesting — there
+  is no standalone file at that path to diff against automatically. Always diff the
+  standalone's nav/menu template against the shell's nav array item-by-item
+  (including flat-vs-nested structure) as an explicit sync step, not an afterthought.
+  See `BudgetSync.md` for the fullest write-up of this class of bug.
 - **Background processes:** `(cmd &)` inside one-shot shells does not survive across
   steps — run servers in persistent terminals (or a process manager).
 
@@ -403,10 +492,60 @@ getToken() { return this.shell.getToken(); }
 > **Boundary:** this unifies the **frontend** identity/token; each module **backend** still validates its own
 > auth (full backend token-trust / SSO is a separate, not-yet-done change).
 
+### 13.4 Overtime identity bridge (added 2026-08-14)
+
+Overtime's permission model reads the **legacy Platinum payroll tables**
+(`Sys_RolePermission` / `User_UserRoles`, `ExcludeFromMigrations()` — read-only,
+shared with the rest of Platinum, not owned by Overtime) keyed by
+`User_UserDetail.UserName`. Permission IDs: `3200` Config/Setup, `3201` Capture,
+`3202` Payroll Processing, `3203` Enquiry — exposed as boolean flags
+(`canAccessConfig/Capture/Payroll/Enquiry`) on `GET /overtime-app/api/auth/me`.
+
+Before the bridge, nothing in the monorepo ever told Overtime's backend *who* the
+shell's real POS-authenticated user was, so `DevCurrentUserService`'s `Current`
+getter always fell back to `Load().FirstOrDefault()` — whichever enabled user
+sorted first alphabetically by surname — meaning every Overtime nav/permission
+check reflected that arbitrary default user, not the actual signed-in person.
+
+Fix (frontend → backend):
+- `libs/shared/auth/src/lib/auth.interceptor.ts` attaches an `X-Username` header
+  (from `AuthService.user()?.userName`) to every `/overtime-app/api/*` request,
+  scoped the same way as the existing SCM/George host checks.
+- `OVERTIME-API/Services/Implementations/DevCurrentUserService.cs` /
+  `DevUserDirectory` resolve `DevUser` by `User_UserDetail.UserName`
+  (`FindByUserName`, case-insensitive) when `X-Username` is present, checked after
+  the pre-existing `X-User-Id` header (which keeps its original meaning — a numeric
+  ID for manual Swagger testing — and still takes precedence for that workflow).
+- `DevCurrentUserService` remains the dev-only header-shim implementation
+  (deliberately kept, per the "shared auth is the single source of identity"
+  principle) rather than adopting the standalone's real `SessionCurrentUserService`
+  cookie/session auth, which is unused in the monorepo but still had to implement
+  the same `FindByUserName` interface member to keep the project compiling.
+
 ---
 
 ## 14. Change log (recent integrations)
 
+- **Overtime identity bridge (2026-08-14):** see §13.4 — the shell's real
+  POS-authenticated user is now bridged into Overtime's permission resolution via
+  an `X-Username` header, instead of Overtime always resolving to an arbitrary
+  default user.
+- **`AFS_PLATINUM_API_URL` rename (2026-08-14):** AFS's Platinum financials-proxy
+  env var was renamed from `PLATINUM_API_URL` → `AFS_PLATINUM_API_URL` to stop
+  colliding with POS-API's own, differently-scoped `PLATINUM_API_URL` when both
+  read the shared root `.env` — see §7 and §8.
+- **Budget nav sync (2026-08-14 – 2026-08-15):** a full audit of `apps/shell`'s
+  `budgetNavGroups` against the standalone's nav template found the module's
+  routes/pages/backend controllers were already fully synced, but the shell's own
+  nav config had drifted independently — missing subgroups (Virements, Adjustments),
+  missing items (Project Budgets Grid), a flat item that should've been a 7-child
+  nested group (mSCOA Strings, fixed by adding routes for a component that already
+  read the string type generically from the URL rather than needing new pages),
+  never-rendered nested-item icons (a template bug, not a data bug), and icon/label
+  mismatches. Also found and fixed the `.tab-content` global CSS leak (see §8)
+  independently hitting 5 Budget pages. Full blow-by-blow, including the exact
+  bugs and lessons learned, is in `BudgetSync.md`'s pass-by-pass log — this entry
+  is a summary pointer, not the source of truth.
 - **Unified module auth:** overtime/afs/payroll/scm now source the displayed user + token from the shared
   `@platinumv3/shared/auth` `AuthService` instead of hardcoded/module-local identities (see §13.3). Added
   `Platinum-Auth-Config.docx` (standalone integration contract).

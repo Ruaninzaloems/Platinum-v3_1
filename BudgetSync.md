@@ -386,6 +386,18 @@ actually *visible*, not merely present. Reports now shows all 4 overview cards +
 section headers; Projects, Adjustments/Request, and Variable Benefits & Travel all render their
 tab/KPI content correctly.
 
+### Status as of 2026-08-19
+
+All 5 passes above are committed (`0a1ff6e`, `4eb5f82`, `15ae04c`, `f887490`); working tree is clean.
+Budget's frontend (`libs/budget`), backend (`BUDGET-APP/PlatinumBudget.Api`), and the shell's
+`budgetNavGroups` are believed fully in sync with the standalone as of this date — no further gaps found
+since the fifth pass. The only recurring issue since has been the **Azure Postgres firewall / dynamic
+outbound IP**, not a code gap — see `MASTER.md` §4.2 (now the canonical writeup, covering all modules,
+not just Budget) and §7 for the exact restart commands. Budget's own startup DB init/seed is already
+non-fatal (`[budget] Startup DB init/seed failed (non-fatal, API continues)`), so a firewall block never
+requires a Budget-specific restart — it self-recovers once the IP is whitelisted, unlike Overtime (see
+`MASTER.md` §4.2 for that asymmetry).
+
 ---
 
 ## General principles (apply to every module, every sync — carried over from the general playbook)
