@@ -196,3 +196,151 @@ stages:
           package: 'POS-API'
           startUpCommand: 'npm start'
           appSettings: '-NODE_ENV production -SCM_DO_BUILD_DURING_DEPLOYMENT true'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MBM customer stack (see Platinum-v3-deployment/docs/customer-onboarding.md)
+  # Same application code as the base fleet above, deployed to MBM's own
+  # App Services. MBM has no POS-API of its own - it authenticates through the
+  # shared Platinum-V3-POS-API job above, via its UI's POS_API_URL setting.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # ========== MBM: MAIN UI (Angular shell, Node runtime) ==========
+  - job: Shell_UI_MBM
+    displayName: 'Shell (MBM) → Platinum-V3-MBM-UI'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: npm ci --legacy-peer-deps
+        displayName: 'Install monorepo dependencies'
+      - script: |
+          cd apps/shell
+          npx ng build --configuration production
+        displayName: 'Build Angular shell (prod)'
+      - script: |
+          set -e
+          PKG="$(Build.ArtifactStagingDirectory)/shell-mbm"
+          mkdir -p "$PKG"
+          cp apps/shell/server.js "$PKG/"
+          cp apps/shell/package.json "$PKG/"
+          cp -r dist/shell/browser "$PKG/browser"
+          # bundle the 3 runtime deps so the app starts without an Oryx build
+          (cd "$PKG" && npm install --omit=dev)
+        displayName: 'Assemble shell deploy package'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-UI'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-UI'
+          runtimeStack: 'NODE|22-lts'
+          package: '$(Build.ArtifactStagingDirectory)/shell-mbm'
+          startUpCommand: 'node server.js'
+
+  # ========== MBM: .NET POSTGRES APIs ==========
+  - job: IDP_API_MBM
+    displayName: 'IDP (MBM) → Platinum-V3-MBM-IDP-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (IDP)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'IDP-UI/PlatinumIDP/PlatinumIDP.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/idp-mbm'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-IDP-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-IDP-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/idp-mbm/**/*.zip'
+
+  - job: Budget_API_MBM
+    displayName: 'Budget (MBM) → Platinum-V3-MBM-Budget-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (Budget)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'BUDGET-APP/PlatinumBudget.Api/PlatinumBudget.Api.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/budget-mbm'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-Budget-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-Budget-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/budget-mbm/**/*.zip'
+
+  - job: Overtime_API_MBM
+    displayName: 'Overtime (MBM) → Platinum-V3-MBM-Overtime-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: UseDotNet@2
+        inputs: { packageType: 'sdk', version: '10.0.x' }
+      - task: DotNetCoreCLI@2
+        displayName: 'dotnet publish (Overtime)'
+        inputs:
+          command: 'publish'
+          publishWebProjects: false
+          projects: 'OVERTIME-API/PlatinumOvertime-API.csproj'
+          arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/overtime-mbm'
+          zipAfterPublish: true
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-Overtime-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-Overtime-Postgres-API'
+          package: '$(Build.ArtifactStagingDirectory)/overtime-mbm/**/*.zip'
+
+  # ========== MBM: NODE POSTGRES APIs ==========
+  - job: AFS_API_MBM
+    displayName: 'AFS (MBM) → Platinum-V3-MBM-AFS-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          cd AFS-UI/api
+          npm ci --legacy-peer-deps    # installs tsx (runtime) + pg + express
+        displayName: 'Install AFS API deps'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-AFS-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-AFS-Postgres-API'
+          runtimeStack: 'NODE|22-lts'
+          package: 'AFS-UI/api'
+          startUpCommand: 'npx tsx index.ts'
+
+  - job: Payroll_API_MBM
+    displayName: 'Payroll (MBM) → Platinum-V3-MBM-Payroll-Postgres-API'
+    pool: { vmImage: $(vmImage) }
+    steps:
+      - task: NodeTool@0
+        inputs: { versionSpec: '22.x' }
+      - script: |
+          cd PAYROLL-APP
+          npm ci --legacy-peer-deps
+        displayName: 'Install Payroll API deps'
+      - task: AzureWebApp@1
+        displayName: 'Deploy to Platinum-V3-MBM-Payroll-Postgres-API'
+        inputs:
+          azureSubscription: $(azureSubscription)
+          appType: 'webAppLinux'
+          appName: 'Platinum-V3-MBM-Payroll-Postgres-API'
+          runtimeStack: 'NODE|22-lts'
+          package: 'PAYROLL-APP'
+          startUpCommand: 'node src/server/index.js'   # adjust to PAYROLL-APP's real entry
