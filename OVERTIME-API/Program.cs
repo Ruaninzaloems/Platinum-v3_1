@@ -308,6 +308,14 @@ app.MapGet("/api/health/db", async (OvertimeDbContext db) =>
 
 app.MapControllers();
 
+// Warm up the DevUserDirectory in the background so the first /api/me
+// request after startup doesn't pay the ~200ms initialisation cost.
+_ = Task.Run(() =>
+{
+    try { app.Services.GetRequiredService<DevUserDirectory>().All.Count.ToString(); }
+    catch { /* non-critical — directory will still load lazily on first request */ }
+});
+
 app.Run();
 
 /// <summary>Exposes the generated <c>Program</c> class so integration-test projects can reference it.</summary>
