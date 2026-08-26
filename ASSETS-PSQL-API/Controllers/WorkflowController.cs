@@ -319,7 +319,7 @@ public class WorkflowController : ControllerBase
             if (currentStep >= steps.Length)
             {
                 await conn.ExecuteAsync(@"
-                    UPDATE ""Asset_WorkflowInstances"" SET ""status"" = 'approved', ""completed_at"" = GETDATE(), ""current_step"" = @currentStep
+                    UPDATE ""Asset_WorkflowInstances"" SET ""status"" = 'approved', ""completed_at"" = NOW(), ""current_step"" = @currentStep
                     WHERE ""id"" = @id", new { id, currentStep });
 
                 string entityType = ((string)(instance.entity_type ?? "")).ToLower();
@@ -347,7 +347,7 @@ public class WorkflowController : ControllerBase
         else if (request.Action == "reject")
         {
             await conn.ExecuteAsync(@"
-                UPDATE ""Asset_WorkflowInstances"" SET ""status"" = 'rejected', ""completed_at"" = GETDATE() WHERE ""id"" = @id", new { id });
+                UPDATE ""Asset_WorkflowInstances"" SET ""status"" = 'rejected', ""completed_at"" = NOW() WHERE ""id"" = @id", new { id });
         }
         else if (request.Action == "return")
         {

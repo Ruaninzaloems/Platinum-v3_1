@@ -95,7 +95,7 @@ public class ImportController : ControllerBase
         if ((string)batch.status == "completed") return BadRequest(new { error = "Batch already imported" });
 
         await conn.ExecuteAsync(@"
-            UPDATE ""Asset_ImportBatches"" SET ""status"" = 'completed', ""committed_at"" = GETDATE(), ""committed_rows"" = ""valid_rows"" WHERE ""id"" = @batchId", new { batchId });
+            UPDATE ""Asset_ImportBatches"" SET ""status"" = 'completed', ""committed_at"" = NOW(), ""committed_rows"" = ""valid_rows"" WHERE ""id"" = @batchId", new { batchId });
 
         return Ok(new { success = 1, imported = (int)(batch.valid_rows ?? 0), batchId });
     }

@@ -42,7 +42,7 @@ public class InspectionConditionController : ControllerBase
         if (dup) return Conflict(new { error = $"Inspection condition '{model.InspectionConditionDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetInspectionConditions"" (""InspectionConditionDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@InspectionConditionDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@InspectionConditionDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""InspectionCondition_ID""", model);
         model.InspectionCondition_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class InspectionConditionController : ControllerBase
         if (dup) return Conflict(new { error = $"Inspection condition '{model.InspectionConditionDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetInspectionConditions""
-            SET ""InspectionConditionDesc"" = @InspectionConditionDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""InspectionConditionDesc"" = @InspectionConditionDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""InspectionCondition_ID"" = @id", new { model.InspectionConditionDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Inspection condition not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class InspectionConditionController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Inspection Condition", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_AssetInspectionConditions"" (""InspectionConditionDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

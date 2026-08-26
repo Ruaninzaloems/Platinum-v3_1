@@ -42,7 +42,7 @@ public class DisposalMethodController : ControllerBase
         if (dup) return Conflict(new { error = $"Disposal method '{model.AssetDisposalMethodDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetDisposalMethod"" (""AssetDisposalMethodDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@AssetDisposalMethodDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@AssetDisposalMethodDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""AssetDisposalMethod_ID""", model);
         model.AssetDisposalMethod_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class DisposalMethodController : ControllerBase
         if (dup) return Conflict(new { error = $"Disposal method '{model.AssetDisposalMethodDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetDisposalMethod""
-            SET ""AssetDisposalMethodDesc"" = @AssetDisposalMethodDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""AssetDisposalMethodDesc"" = @AssetDisposalMethodDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetDisposalMethod_ID"" = @id", new { model.AssetDisposalMethodDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Disposal method not found" }) : Ok(new { success = 1 });
     }

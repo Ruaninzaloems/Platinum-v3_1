@@ -42,7 +42,7 @@ public class ConditionRatingController : ControllerBase
         if (dup) return Conflict(new { error = $"Condition rating '{model.AssetConditionRatingDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetConditionRating_Sys"" (""ConditionRatingDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@AssetConditionRatingDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@AssetConditionRatingDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""ConditionRating_ID""", model);
         model.AssetConditionRating_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class ConditionRatingController : ControllerBase
         if (dup) return Conflict(new { error = $"Condition rating '{model.AssetConditionRatingDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetConditionRating_Sys""
-            SET ""ConditionRatingDesc"" = @AssetConditionRatingDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""ConditionRatingDesc"" = @AssetConditionRatingDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""ConditionRating_ID"" = @id", new { model.AssetConditionRatingDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Condition rating not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class ConditionRatingController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Condition Rating", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_AssetConditionRating_Sys"" (""ConditionRatingDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

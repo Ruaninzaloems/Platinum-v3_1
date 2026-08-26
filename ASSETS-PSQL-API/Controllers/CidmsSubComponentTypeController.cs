@@ -114,7 +114,7 @@ public class CidmsSubComponentTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS sub-component type '{model.AssetCIDMSSubComponentTypeDesc}' already exists under this component type" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_SubComponent_Type"" (""AssetCIDMSSubComponentTypeDesc"", ""AssetCIDMSComponentTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"", ""Infrastructure"", ""Nature"")
-            VALUES (@AssetCIDMSSubComponentTypeDesc, @AssetCIDMSComponentTypeID, @Enabled, GETDATE(), @CapturerID, @Default, @Infrastructure, @Nature)
+            VALUES (@AssetCIDMSSubComponentTypeDesc, @AssetCIDMSComponentTypeID, @Enabled, NOW(), @CapturerID, @Default, @Infrastructure, @Nature)
             RETURNING ""AssetCIDMSSubComponentTypeID""", model);
         model.AssetCIDMSSubComponentTypeID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -130,7 +130,7 @@ public class CidmsSubComponentTypeController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_SubComponent_Type""
             SET ""AssetCIDMSSubComponentTypeDesc"" = @AssetCIDMSSubComponentTypeDesc, ""AssetCIDMSComponentTypeID"" = @AssetCIDMSComponentTypeID,
-                ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(), ""Infrastructure"" = @Infrastructure, ""Nature"" = @Nature
+                ""Enabled"" = @Enabled, ""DateModified"" = NOW(), ""Infrastructure"" = @Infrastructure, ""Nature"" = @Nature
             WHERE ""AssetCIDMSSubComponentTypeID"" = @id", new { model.AssetCIDMSSubComponentTypeDesc, model.AssetCIDMSComponentTypeID, model.Enabled, model.Infrastructure, model.Nature, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Sub Component Type not found" }) : Ok(new { success = 1 });
     }
@@ -257,7 +257,7 @@ public class CidmsSubComponentTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "Sub Component Type", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_SubComponent_Type"" (""AssetCIDMSSubComponentTypeDesc"", ""AssetCIDMSComponentTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"", ""Infrastructure"", ""Nature"")
-                VALUES (@desc, @componentTypeId, 1, GETDATE(), 1, 1, @infrastructure, @nature)", new { desc, componentTypeId, infrastructure, nature }, txn);
+                VALUES (@desc, @componentTypeId, 1, NOW(), 1, 1, @infrastructure, @nature)", new { desc, componentTypeId, infrastructure, nature }, txn);
         }
 
         if (dbErrors.Count > 0)

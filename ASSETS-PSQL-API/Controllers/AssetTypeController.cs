@@ -46,7 +46,7 @@ public class AssetTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset type '{model.AssetTypeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetType_Sys"" (""AssetTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"", ""RequireStatus"", ""NoUsefuleLife"")
-            VALUES (@AssetTypeDesc, @Enabled, GETDATE(), @CapturerID, @Default, @RequireStatus, @NoUsefuleLife)
+            VALUES (@AssetTypeDesc, @Enabled, NOW(), @CapturerID, @Default, @RequireStatus, @NoUsefuleLife)
             RETURNING ""AssetType_ID""", model);
         model.AssetType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -61,7 +61,7 @@ public class AssetTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset type '{model.AssetTypeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetType_Sys""
-            SET ""AssetTypeDesc"" = @AssetTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(),
+            SET ""AssetTypeDesc"" = @AssetTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW(),
                 ""RequireStatus"" = @RequireStatus, ""NoUsefuleLife"" = @NoUsefuleLife
             WHERE ""AssetType_ID"" = @id", new { model.AssetTypeDesc, model.Enabled, model.RequireStatus, model.NoUsefuleLife, id });
         return rows == 0 ? NotFound(new { error = "Asset type not found" }) : Ok(new { success = 1 });
@@ -205,7 +205,7 @@ public class AssetTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Asset Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_AssetType_Sys"" (""AssetTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"", ""NoUsefuleLife"", ""RequireStatus"")
-                VALUES (@val, true, GETDATE(), 1, true, @noUsefulLife, @requireStatus)",
+                VALUES (@val, true, NOW(), 1, true, @noUsefulLife, @requireStatus)",
                 new { val, noUsefulLife, requireStatus }, txn);
         }
 

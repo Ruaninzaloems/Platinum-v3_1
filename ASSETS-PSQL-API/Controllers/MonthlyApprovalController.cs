@@ -25,7 +25,7 @@ public class MonthlyApprovalController : ControllerBase
             INSERT INTO ""Asset_MonthlyApproval""
                 (""Financial_Year"", ""Financial_Period"", ""User_Id"", ""IsApproved"", ""DateCreated"",
                  ""VerifiedRevaluation"", ""VerifiedImpairment"", ""VerifiedImpairmentReversal"", ""VerifiedDisposal"")
-            VALUES (@FinancialYear, @FinancialPeriod, @UserId, TRUE, GETDATE(),
+            VALUES (@FinancialYear, @FinancialPeriod, @UserId, TRUE, NOW(),
                     @VerifiedRevaluation, @VerifiedImpairment, @VerifiedImpairmentReversal, @VerifiedDisposal)
             RETURNING ""MonthlyApproval_ID""", request);
 

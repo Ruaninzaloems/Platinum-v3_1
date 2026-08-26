@@ -262,7 +262,7 @@ public class DisposalController : ControllerBase
                 ""SalePrice"", ""CarryingAmount"", ""AmountProfitLoss"", ""DisposalReason"", ""Status"", ""FinYear"",
                 ""DateCaptured"", ""CapturerID"")
             VALUES (@AssetRegisterItem_ID, @DisposalDate, @DisposalMethod_ID,
-                @SalePrice, @carryingAmount, @profitLoss, @Reason, 'Pending', @FinYear, GETDATE(), 1)
+                @SalePrice, @carryingAmount, @profitLoss, @Reason, 'Pending', @FinYear, NOW(), 1)
             RETURNING ""AssetDisposal_ID""",
             new { model.AssetRegisterItem_ID, model.DisposalDate, model.DisposalMethod_ID,
                   model.SalePrice, carryingAmount, profitLoss, model.Reason, model.FinYear });
@@ -297,7 +297,7 @@ public class DisposalController : ControllerBase
             UPDATE ""Asset_Disposal""
             SET ""DisposalDate"" = @DisposalDate, ""AssetDisposalMethodID"" = @DisposalMethod_ID,
                 ""SalePrice"" = @SalePrice, ""DisposalReason"" = @Reason, ""FinYear"" = @FinYear,
-                ""DateModified"" = GETDATE()
+                ""DateModified"" = NOW()
             WHERE ""AssetDisposal_ID"" = @id AND ""Status"" = 'Pending'",
             new { model.DisposalDate, model.DisposalMethod_ID, model.SalePrice, model.Reason, model.FinYear, id });
         return rows == 0 ? NotFound(new { error = "Disposal not found or already processed" }) : Ok(new { success = 1 });
@@ -319,7 +319,7 @@ public class DisposalController : ControllerBase
         await using var conn = _db.CreateConnection();
         await conn.OpenAsync();
         var rows = await conn.ExecuteAsync(@"
-            UPDATE ""Asset_Disposal"" SET ""Status"" = 'Submitted', ""DateModified"" = GETDATE()
+            UPDATE ""Asset_Disposal"" SET ""Status"" = 'Submitted', ""DateModified"" = NOW()
             WHERE ""AssetDisposal_ID"" = @id AND ""Status"" = 'Pending'", new { id });
         if (rows == 0) return NotFound(new { error = "Disposal not found or not in pending status" });
 
@@ -639,13 +639,13 @@ public class DisposalController : ControllerBase
                     ""CurrentAmount"" = CASE WHEN @carryingValue < 0 THEN 0 ELSE @carryingValue END,
                     ""CarryingAmountClosingBalance"" = 0,
                     ""RevaluationReserveClosingBalance"" = ""RevaluationReserveClosingBalance"" - @revaluationReserve,
-                    ""DateModified"" = GETDATE()
+                    ""DateModified"" = NOW()
                 WHERE ""AssetRegisterItem_ID"" = @assetRegId",
                 new { salePrice, disposalDate, profitLoss, accDepreciation, accImpairment, revaluationReserve, carryingValue, assetRegId }, txn);
 
             await conn.ExecuteAsync(@"
-                UPDATE ""Asset_Disposal"" SET ""Status"" = 'Approved', ""DateModified"" = GETDATE(),
-                    ""Approved"" = 1, ""ApprovedDate"" = GETDATE(), ""ApprovedBy"" = @approvedBy,
+                UPDATE ""Asset_Disposal"" SET ""Status"" = 'Approved', ""DateModified"" = NOW(),
+                    ""Approved"" = 1, ""ApprovedDate"" = NOW(), ""ApprovedBy"" = @approvedBy,
                     ""CatchUpDep"" = @catchUpDep, ""CatchUpDays"" = @catchUpDays
                 WHERE ""AssetDisposal_ID"" = @id",
                 new { id, approvedBy = request.ApprovedBy,
@@ -655,7 +655,7 @@ public class DisposalController : ControllerBase
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Asset_Disposal_Approval"" (""AssetDisposal_ID"", ""AssetItemID"", ""ApprovalDate"", ""ApprovedByID"",
                     ""Status"", ""Comments"", ""IsApprove"", ""ApprovedBy"", ""ApprovedDate"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@id, @assetRegId, GETDATE(), @approvedBy, 'Approved', @comments, 1, @approvedBy, GETDATE(), GETDATE(), 1)
+                VALUES (@id, @assetRegId, NOW(), @approvedBy, 'Approved', @comments, 1, @approvedBy, NOW(), NOW(), 1)
                 ON CONFLICT DO NOTHING",
                 new { id, assetRegId, approvedBy = request.ApprovedBy, comments = request.Comments ?? "" }, txn);
 
@@ -679,7 +679,7 @@ public class DisposalController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_WorkflowInstances""
-                SET ""status"" = 'approved', ""completed_at"" = GETDATE()
+                SET ""status"" = 'approved', ""completed_at"" = NOW()
                 WHERE ""entity_type"" = 'disposal' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
@@ -752,8 +752,8 @@ public class DisposalController : ControllerBase
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_Disposal""
-            SET ""Status"" = 'Rejected', ""DateModified"" = GETDATE(),
-                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = GETDATE(), ""RejectionReason"" = @reason
+            SET ""Status"" = 'Rejected', ""DateModified"" = NOW(),
+                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = NOW(), ""RejectionReason"" = @reason
             WHERE ""AssetDisposal_ID"" = @id",
             new { id, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "" });
 
@@ -763,14 +763,14 @@ public class DisposalController : ControllerBase
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Asset_Disposal_Approval"" (""AssetDisposal_ID"", ""AssetItemID"", ""ApprovalDate"", ""ApprovedByID"",
                     ""Status"", ""Comments"", ""IsApprove"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@id, @assetRegId, GETDATE(), @rejectedBy, 'Rejected', @reason, 0, GETDATE(), 1)
+                VALUES (@id, @assetRegId, NOW(), @rejectedBy, 'Rejected', @reason, 0, NOW(), 1)
                 ON CONFLICT DO NOTHING",
                 new { id, assetRegId, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "" });
         }
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_WorkflowInstances""
-            SET ""status"" = 'rejected', ""completed_at"" = GETDATE()
+            SET ""status"" = 'rejected', ""completed_at"" = NOW()
             WHERE ""entity_type"" = 'disposal' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
             new { refId = id.ToString() });
 
@@ -918,8 +918,8 @@ public class DisposalController : ControllerBase
         var scheduleId = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_DepreciationSchedule"" (""FinYear"", ""RunDate"", ""RunType_ID"", ""RunStatus_ID"",
                 ""DateCaptured"", ""CapturerID"", ""ScheduledDate"", ""StatusID"", ""TotalAssets"")
-            VALUES (@finYear, GETDATE(), 2, 2, GETDATE(), 1, @transactionDate, 2, 1)
-            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = GETDATE()
+            VALUES (@finYear, NOW(), 2, 2, NOW(), 1, @transactionDate, 2, 1)
+            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = NOW()
             RETURNING ""Asset_DepreciationSchedule_ID""",
             new { finYear, transactionDate }, txn);
 
@@ -948,7 +948,7 @@ public class DisposalController : ControllerBase
                 ""RunType_ID"", ""RunStatus_ID"", ""FinYear"", ""MonthID"",
                 ""Depreciation_ScheduledItemID"", ""DaysFromLastRun"", ""DateCaptured"", ""CapturerID"", ""IsApproved"")
             VALUES (@assetRegId, @transactionDate, @catchUpAmount, @newAccDep, @newCarrying,
-                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, GETDATE(), 1, 1)",
+                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, NOW(), 1, 1)",
             new { assetRegId, transactionDate, catchUpAmount, newAccDep, newCarrying,
                   finYear, fyPeriod, scheduleItemId, catchUpDays }, txn);
 

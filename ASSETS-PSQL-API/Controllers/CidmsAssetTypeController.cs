@@ -42,7 +42,7 @@ public class CidmsAssetTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS asset type '{model.AssetCIDMSAssetTypeDesc}' already exists under this group type" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Asset_Type"" (""AssetCIDMSAssetTypeDesc"", ""AssetCIDMSGroupTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetCIDMSAssetTypeDesc, @AssetCIDMSGroupTypeID, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetCIDMSAssetTypeDesc, @AssetCIDMSGroupTypeID, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetCIDMSAssetTypeID""", model);
         model.AssetCIDMSAssetTypeID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -58,7 +58,7 @@ public class CidmsAssetTypeController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Asset_Type""
             SET ""AssetCIDMSAssetTypeDesc"" = @AssetCIDMSAssetTypeDesc, ""AssetCIDMSGroupTypeID"" = @AssetCIDMSGroupTypeID,
-                ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+                ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetCIDMSAssetTypeID"" = @id", new { model.AssetCIDMSAssetTypeDesc, model.AssetCIDMSGroupTypeID, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Asset Type not found" }) : Ok(new { success = 1 });
     }
@@ -177,7 +177,7 @@ public class CidmsAssetTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "CIDMS Asset Type", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Asset_Type"" (""AssetCIDMSAssetTypeDesc"", ""AssetCIDMSGroupTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@desc, @groupTypeId, 1, GETDATE(), 1, 1)", new { desc, groupTypeId }, txn);
+                VALUES (@desc, @groupTypeId, 1, NOW(), 1, 1)", new { desc, groupTypeId }, txn);
         }
 
         if (dbErrors.Count > 0)

@@ -42,7 +42,7 @@ public class CidmsClassController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS class '{model.AssetCIDMSClassDesc}' already exists under this accounting sub-group" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Class"" (""AssetCIDMSClassDesc"", ""AssetAccountSubGroupID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetCIDMSClassDesc, @AssetAccountSubGroupID, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetCIDMSClassDesc, @AssetAccountSubGroupID, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetCIDMSClassID""", model);
         model.AssetCIDMSClassID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -58,7 +58,7 @@ public class CidmsClassController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Class""
             SET ""AssetCIDMSClassDesc"" = @AssetCIDMSClassDesc, ""AssetAccountSubGroupID"" = @AssetAccountSubGroupID,
-                ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+                ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetCIDMSClassID"" = @id", new { model.AssetCIDMSClassDesc, model.AssetAccountSubGroupID, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Class not found" }) : Ok(new { success = 1 });
     }
@@ -177,7 +177,7 @@ public class CidmsClassController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "CIDMS Class", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Class"" (""AssetCIDMSClassDesc"", ""AssetAccountSubGroupID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@desc, @subGroupId, 1, GETDATE(), 1, 1)", new { desc, subGroupId }, txn);
+                VALUES (@desc, @subGroupId, 1, NOW(), 1, 1)", new { desc, subGroupId }, txn);
         }
 
         if (dbErrors.Count > 0)

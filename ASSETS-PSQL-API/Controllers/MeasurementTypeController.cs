@@ -71,7 +71,7 @@ public class MeasurementTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Measurement type '{model.Name}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""AssetConfig_MeasurementType"" (""Name"", ""Default"", ""Enabled"", ""CreatedByID"", ""CreatedDate"", ""NoDepreciation"")
-            VALUES (@Name, @Default, @Enabled, @CreatedByID, GETDATE(), @NoDepreciation)
+            VALUES (@Name, @Default, @Enabled, @CreatedByID, NOW(), @NoDepreciation)
             RETURNING ""AssetConfig_MeasurementType_ID""", model);
         model.AssetConfig_MeasurementType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -86,7 +86,7 @@ public class MeasurementTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Measurement type '{model.Name}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""AssetConfig_MeasurementType""
-            SET ""Name"" = @Name, ""Enabled"" = @Enabled, ""ModiefiedDate"" = GETDATE(), ""NoDepreciation"" = @NoDepreciation
+            SET ""Name"" = @Name, ""Enabled"" = @Enabled, ""ModiefiedDate"" = NOW(), ""NoDepreciation"" = @NoDepreciation
             WHERE ""AssetConfig_MeasurementType_ID"" = @id", new { model.Name, model.Enabled, model.NoDepreciation, id });
         return rows == 0 ? NotFound(new { error = "Measurement type not found" }) : Ok(new { success = 1 });
     }
@@ -214,7 +214,7 @@ public class MeasurementTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Measurement Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""AssetConfig_MeasurementType"" (""Name"", ""Default"", ""Enabled"", ""CreatedByID"", ""CreatedDate"", ""NoDepreciation"")
-                VALUES (@val, true, true, 1, GETDATE(), @noDepreciation)",
+                VALUES (@val, true, true, 1, NOW(), @noDepreciation)",
                 new { val, noDepreciation }, txn);
         }
 

@@ -42,7 +42,7 @@ public class DepreciationRunTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Depreciation run type '{model.RunTypeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Run_Type"" (""RunTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@RunTypeDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@RunTypeDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""RunType_ID""", model);
         model.RunType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class DepreciationRunTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Depreciation run type '{model.RunTypeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Run_Type""
-            SET ""RunTypeDesc"" = @RunTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""RunTypeDesc"" = @RunTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""RunType_ID"" = @id", new { model.RunTypeDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Run type not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class DepreciationRunTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Depreciation Run Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Run_Type"" (""RunTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

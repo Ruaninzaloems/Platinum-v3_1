@@ -42,7 +42,7 @@ public class AssetConditionController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset condition '{model.AssetConditionDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Condition"" (""Description"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@AssetConditionDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@AssetConditionDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""Asset_Condition_ID""", model);
         model.AssetCondition_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class AssetConditionController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset condition '{model.AssetConditionDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Condition""
-            SET ""Description"" = @AssetConditionDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""Description"" = @AssetConditionDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""Asset_Condition_ID"" = @id", new { model.AssetConditionDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Asset condition not found" }) : Ok(new { success = 1 });
     }
@@ -161,7 +161,7 @@ public class AssetConditionController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "Asset Condition", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Condition"" (""Description"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@desc, 1, GETDATE(), 1)", new { desc }, txn);
+                VALUES (@desc, 1, NOW(), 1)", new { desc }, txn);
         }
 
         if (dbErrors.Count > 0)

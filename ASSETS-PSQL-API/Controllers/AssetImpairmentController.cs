@@ -174,7 +174,7 @@ public class AssetImpairmentController : ControllerBase
 
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_Impairment"" (""Asset_ItemID"", ""ImpairmentDate"", ""ImpairmentAmount"", ""PreviousCarryingAmount"", ""NewCarryingAmount"", ""RemainingUsefulLife"", ""Reason"", ""Status"", ""FinYear"", ""CatchUpDepreciation"", ""CatchUpDays"", ""IsReversal"", ""DateCaptured"", ""CapturerID"")
-            VALUES (COALESCE(@Asset_ItemID, @AssetRegisterItem_ID), @ImpairmentDate, @ImpairmentAmount, @PreviousCarryingAmount, @NewCarryingAmount, @RemainingUsefulLife, @Reason, COALESCE(@Status, 'Pending'), @FinYear, @CatchUpDepreciation, @CatchUpDays, COALESCE(@IsReversal, 0), GETDATE(), @CapturerID)
+            VALUES (COALESCE(@Asset_ItemID, @AssetRegisterItem_ID), @ImpairmentDate, @ImpairmentAmount, @PreviousCarryingAmount, @NewCarryingAmount, @RemainingUsefulLife, @Reason, COALESCE(@Status, 'Pending'), @FinYear, @CatchUpDepreciation, @CatchUpDays, COALESCE(@IsReversal, 0), NOW(), @CapturerID)
             RETURNING ""Impairment_ID""", model);
         model.AssetImpairment_ID = id;
 
@@ -205,7 +205,7 @@ public class AssetImpairmentController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Asset_Impairment""
             SET ""ImpairmentDate"" = @ImpairmentDate, ""ImpairmentAmount"" = @ImpairmentAmount, ""PreviousCarryingAmount"" = @PreviousCarryingAmount,
-                ""NewCarryingAmount"" = @NewCarryingAmount, ""RemainingUsefulLife"" = @RemainingUsefulLife, ""Reason"" = @Reason, ""Status"" = @Status, ""FinYear"" = @FinYear, ""DateModified"" = GETDATE(), ""ModifierID"" = @ModifierID
+                ""NewCarryingAmount"" = @NewCarryingAmount, ""RemainingUsefulLife"" = @RemainingUsefulLife, ""Reason"" = @Reason, ""Status"" = @Status, ""FinYear"" = @FinYear, ""DateModified"" = NOW(), ""ModifierID"" = @ModifierID
             WHERE ""Impairment_ID"" = @id", new { model.ImpairmentDate, model.ImpairmentAmount, model.PreviousCarryingAmount, model.NewCarryingAmount, model.RemainingUsefulLife, model.Reason, model.Status, model.FinYear, model.ModifierID, id });
         return rows == 0 ? NotFound(new { error = "Impairment record not found" }) : Ok(new { success = 1 });
     }
@@ -494,7 +494,7 @@ public class AssetImpairmentController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Impairment""
-                SET ""Approved"" = 1, ""ApprovedDate"" = GETDATE(), ""ApprovedBy"" = @approvedBy
+                SET ""Approved"" = 1, ""ApprovedDate"" = NOW(), ""ApprovedBy"" = @approvedBy
                 WHERE ""Impairment_ID"" = @id",
                 new { approvedBy = request.ApprovedBy, id }, txn);
 
@@ -515,7 +515,7 @@ public class AssetImpairmentController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_WorkflowInstances""
-                SET ""status"" = 'approved', ""completed_at"" = GETDATE()
+                SET ""status"" = 'approved', ""completed_at"" = NOW()
                 WHERE ""entity_type"" = 'impairment' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
@@ -651,8 +651,8 @@ public class AssetImpairmentController : ControllerBase
         var scheduleId = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_DepreciationSchedule"" (""FinYear"", ""RunDate"", ""RunType_ID"", ""RunStatus_ID"",
                 ""DateCaptured"", ""CapturerID"", ""ScheduledDate"", ""StatusID"", ""TotalAssets"")
-            VALUES (@finYear, GETDATE(), 2, 3, GETDATE(), 1, @transactionDate, 13, 1)
-            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = GETDATE()
+            VALUES (@finYear, NOW(), 2, 3, NOW(), 1, @transactionDate, 13, 1)
+            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = NOW()
             RETURNING ""Asset_DepreciationSchedule_ID""",
             new { finYear, transactionDate }, txn);
 
@@ -681,7 +681,7 @@ public class AssetImpairmentController : ControllerBase
                 ""RunType_ID"", ""RunStatus_ID"", ""FinYear"", ""MonthID"",
                 ""Depreciation_ScheduledItemID"", ""DaysFromLastRun"", ""DateCaptured"", ""CapturerID"", ""IsApproved"")
             VALUES (@assetRegId, @transactionDate, @catchUpAmount, @newAccDep, @newCarrying,
-                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, GETDATE(), 1, 1)",
+                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, NOW(), 1, 1)",
             new { assetRegId, transactionDate, catchUpAmount, newAccDep, newCarrying,
                   finYear, fyPeriod, scheduleItemId, catchUpDays }, txn);
 
@@ -758,7 +758,7 @@ public class AssetImpairmentController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Asset_Impairment""
             SET ""IsRejected"" = 1, ""Status"" = 'Rejected',
-                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = GETDATE(), ""RejectionReason"" = @reason
+                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = NOW(), ""RejectionReason"" = @reason
             WHERE ""Impairment_ID"" = @id",
             new { id, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "" });
 
@@ -772,7 +772,7 @@ public class AssetImpairmentController : ControllerBase
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_WorkflowInstances""
-            SET ""status"" = 'rejected', ""completed_at"" = GETDATE()
+            SET ""status"" = 'rejected', ""completed_at"" = NOW()
             WHERE ""entity_type"" = 'impairment' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
             new { refId = id.ToString() });
 
@@ -1022,7 +1022,7 @@ public class AssetImpairmentController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Impairment""
-                SET ""Approved"" = 1, ""ApprovedDate"" = GETDATE(), ""ApprovedBy"" = @approvedBy
+                SET ""Approved"" = 1, ""ApprovedDate"" = NOW(), ""ApprovedBy"" = @approvedBy
                 WHERE ""Impairment_ID"" = @id",
                 new { approvedBy = request.ApprovedBy, id }, txn);
 
@@ -1041,7 +1041,7 @@ public class AssetImpairmentController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_WorkflowInstances""
-                SET ""status"" = 'approved', ""completed_at"" = GETDATE()
+                SET ""status"" = 'approved', ""completed_at"" = NOW()
                 WHERE ""entity_type"" = 'impairment_reversal' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
@@ -1288,13 +1288,13 @@ public class AssetImpairmentController : ControllerBase
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_Impairment""
             SET ""IsRejected"" = 1, ""Status"" = 'Rejected',
-                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = GETDATE(), ""RejectionReason"" = @reason
+                ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = NOW(), ""RejectionReason"" = @reason
             WHERE ""Impairment_ID"" = @id",
             new { id, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "Reversal rejected" });
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_WorkflowInstances""
-            SET ""status"" = 'rejected', ""completed_at"" = GETDATE()
+            SET ""status"" = 'rejected', ""completed_at"" = NOW()
             WHERE ""entity_type"" = 'impairment_reversal' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
             new { refId = id.ToString() });
 

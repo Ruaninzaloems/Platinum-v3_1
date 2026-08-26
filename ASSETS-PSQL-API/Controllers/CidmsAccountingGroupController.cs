@@ -42,7 +42,7 @@ public class CidmsAccountingGroupController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS accounting group '{model.AssetAccountGroupDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Accounting_Group"" (""AssetAccountGroupDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetAccountGroupDesc, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetAccountGroupDesc, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetAccountGroupID""", model);
         model.AssetAccountGroupID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class CidmsAccountingGroupController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS accounting group '{model.AssetAccountGroupDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Accounting_Group""
-            SET ""AssetAccountGroupDesc"" = @AssetAccountGroupDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""AssetAccountGroupDesc"" = @AssetAccountGroupDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetAccountGroupID"" = @id", new { model.AssetAccountGroupDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Accounting Group not found" }) : Ok(new { success = 1 });
     }
@@ -159,7 +159,7 @@ public class CidmsAccountingGroupController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Accounting Group", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Accounting_Group"" (""AssetAccountGroupDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

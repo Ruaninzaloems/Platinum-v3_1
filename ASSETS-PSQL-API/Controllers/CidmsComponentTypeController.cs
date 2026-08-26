@@ -42,7 +42,7 @@ public class CidmsComponentTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS component type '{model.AssetCIDMSComponentTypeDesc}' already exists under this asset type" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Component_Type"" (""AssetCIDMSComponentTypeDesc"", ""AssetCIDMSAssetTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetCIDMSComponentTypeDesc, @AssetCIDMSAssetTypeID, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetCIDMSComponentTypeDesc, @AssetCIDMSAssetTypeID, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetCIDMSComponentTypeID""", model);
         model.AssetCIDMSComponentTypeID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -58,7 +58,7 @@ public class CidmsComponentTypeController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Component_Type""
             SET ""AssetCIDMSComponentTypeDesc"" = @AssetCIDMSComponentTypeDesc, ""AssetCIDMSAssetTypeID"" = @AssetCIDMSAssetTypeID,
-                ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+                ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetCIDMSComponentTypeID"" = @id", new { model.AssetCIDMSComponentTypeDesc, model.AssetCIDMSAssetTypeID, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Component Type not found" }) : Ok(new { success = 1 });
     }
@@ -177,7 +177,7 @@ public class CidmsComponentTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "CIDMS Component Type", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Component_Type"" (""AssetCIDMSComponentTypeDesc"", ""AssetCIDMSAssetTypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@desc, @assetTypeId, 1, GETDATE(), 1, 1)", new { desc, assetTypeId }, txn);
+                VALUES (@desc, @assetTypeId, 1, NOW(), 1, 1)", new { desc, assetTypeId }, txn);
         }
 
         if (dbErrors.Count > 0)

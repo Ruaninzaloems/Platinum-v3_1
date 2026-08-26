@@ -44,7 +44,7 @@ public class HealthGradeController : ControllerBase
         if (dup) return Conflict(new { error = $"Health grade '{model.HealthGradeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Health_Grade"" (""AssetHealthGradeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@HealthGradeDesc, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@HealthGradeDesc, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetHealthGradeID""", model);
         model.HealthGrade_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -59,7 +59,7 @@ public class HealthGradeController : ControllerBase
         if (dup) return Conflict(new { error = $"Health grade '{model.HealthGradeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Health_Grade""
-            SET ""AssetHealthGradeDesc"" = @HealthGradeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""AssetHealthGradeDesc"" = @HealthGradeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetHealthGradeID"" = @id", new { model.HealthGradeDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Health grade not found" }) : Ok(new { success = 1 });
     }
@@ -163,7 +163,7 @@ public class HealthGradeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Health Grade", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Health_Grade"" (""AssetHealthGradeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

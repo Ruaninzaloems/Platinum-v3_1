@@ -42,7 +42,7 @@ public class ComponentTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Component type '{model.Asset_Component_Description}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_ComponentType"" (""Asset_Component_Description"", ""Enabled"", ""DateCaptured"", ""Capturer_ID"", ""Default"")
-            VALUES (@Asset_Component_Description, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@Asset_Component_Description, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""Asset_ComponentType_ID""", model);
         model.Asset_Component_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class ComponentTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Component type '{model.Asset_Component_Description}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_ComponentType""
-            SET ""Asset_Component_Description"" = @Asset_Component_Description, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(), ""Default"" = @Default
+            SET ""Asset_Component_Description"" = @Asset_Component_Description, ""Enabled"" = @Enabled, ""DateModified"" = NOW(), ""Default"" = @Default
             WHERE ""Asset_ComponentType_ID"" = @id", new { model.Asset_Component_Description, model.Enabled, model.Default, id });
         return rows == 0 ? NotFound(new { error = "Component type not found" }) : Ok(new { success = 1 });
     }
@@ -161,7 +161,7 @@ public class ComponentTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Component Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_ComponentType"" (""Asset_Component_Description"", ""Enabled"", ""DateCaptured"", ""Capturer_ID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

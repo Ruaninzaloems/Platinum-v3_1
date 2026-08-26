@@ -44,7 +44,7 @@ public class UtilisationGradeController : ControllerBase
         if (dup) return Conflict(new { error = $"Utilisation grade '{model.UtilisationGradeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Utilisation_Grade"" (""AssetUtilisationGradeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@UtilisationGradeDesc, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@UtilisationGradeDesc, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetUtilisationGradeID""", model);
         model.UtilisationGrade_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -59,7 +59,7 @@ public class UtilisationGradeController : ControllerBase
         if (dup) return Conflict(new { error = $"Utilisation grade '{model.UtilisationGradeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Utilisation_Grade""
-            SET ""AssetUtilisationGradeDesc"" = @UtilisationGradeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""AssetUtilisationGradeDesc"" = @UtilisationGradeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetUtilisationGradeID"" = @id", new { model.UtilisationGradeDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Utilisation grade not found" }) : Ok(new { success = 1 });
     }
@@ -161,7 +161,7 @@ public class UtilisationGradeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Utilisation Grade", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Utilisation_Grade"" (""AssetUtilisationGradeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

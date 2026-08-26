@@ -42,7 +42,7 @@ public class RequestTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Request type '{model.RequestDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_RequestType_sys"" (""RequestDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@RequestDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@RequestDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""RequestType_ID""", model);
         model.RequestType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class RequestTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Request type '{model.RequestDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_RequestType_sys""
-            SET ""RequestDesc"" = @RequestDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""RequestDesc"" = @RequestDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""RequestType_ID"" = @id", new { model.RequestDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Request type not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class RequestTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Request Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_RequestType_sys"" (""RequestDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

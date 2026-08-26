@@ -73,7 +73,7 @@ public class AssetClassController : ControllerBase
             INSERT INTO ""Const_AssetClass_sys"" (""AssetClassDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"",
                 ""Asset_SubCategory_ID"", ""UsefulLifeInMonths"", ""AssetDepreciationMethod_ID"",
                 ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"", ""RevaluationMethod"")
-            VALUES (@AssetClassDesc, @Enabled, GETDATE(), @CapturerID,
+            VALUES (@AssetClassDesc, @Enabled, NOW(), @CapturerID,
                 @Asset_SubCategory_ID, @UsefulLifeInMonths, @AssetDepreciationMethod_ID,
                 @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID, @RevaluationMethod)
             RETURNING ""AssetClass_ID""", model);
@@ -93,7 +93,7 @@ public class AssetClassController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset class '{model.AssetClassDesc}' already exists for this type/category/sub-category" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetClass_sys""
-            SET ""AssetClassDesc"" = @AssetClassDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(),
+            SET ""AssetClassDesc"" = @AssetClassDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW(),
                 ""Asset_SubCategory_ID"" = @Asset_SubCategory_ID, ""UsefulLifeInMonths"" = @UsefulLifeInMonths,
                 ""AssetDepreciationMethod_ID"" = @AssetDepreciationMethod_ID,
                 ""TypeID"" = @TypeID, ""AssetCategoryID"" = @AssetCategoryID,
@@ -377,7 +377,7 @@ public class AssetClassController : ControllerBase
                         ""AssetDepreciationMethod_ID"" = @AssetDepreciationMethod_ID,
                         ""RevaluationByCostModel"" = @RevaluationByCostModel,
                         ""RevaluationByRevalutionModel"" = @RevaluationByRevalutionModel,
-                        ""DateModified"" = GETDATE()
+                        ""DateModified"" = NOW()
                     WHERE ""AssetClass_ID"" = @id",
                     new { item.AssetMeasurement_ID, item.AssetStatus_ID, item.UsefulLifeInMonths, item.AssetDepreciationMethod_ID, item.RevaluationByCostModel, item.RevaluationByRevalutionModel, id = existingId.Value }, txn);
                 updated++;
@@ -389,7 +389,7 @@ public class AssetClassController : ControllerBase
                         ""Asset_SubCategory_ID"", ""UsefulLifeInMonths"", ""AssetDepreciationMethod_ID"",
                         ""TypeID"", ""AssetCategoryID"", ""AssetStatus_ID"", ""AssetMeasurement_ID"",
                         ""RevaluationByCostModel"", ""RevaluationByRevalutionModel"")
-                    VALUES (@AssetClassDesc, @Enabled, GETDATE(), 1,
+                    VALUES (@AssetClassDesc, @Enabled, NOW(), 1,
                         @Asset_SubCategory_ID, @UsefulLifeInMonths, @AssetDepreciationMethod_ID,
                         @TypeID, @AssetCategoryID, @AssetStatus_ID, @AssetMeasurement_ID,
                         @RevaluationByCostModel, @RevaluationByRevalutionModel)", item, txn);

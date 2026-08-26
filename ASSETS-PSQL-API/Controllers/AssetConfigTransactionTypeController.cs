@@ -42,7 +42,7 @@ public class AssetConfigTransactionTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Transaction type '{model.Name}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""AssetConfig_TransactionType"" (""Name"", ""Enabled"", ""CreatedDate"", ""CreatedByID"", ""Default"")
-            VALUES (@Name, @Enabled, GETDATE(), @CreatedByID, @Default)
+            VALUES (@Name, @Enabled, NOW(), @CreatedByID, @Default)
             RETURNING ""AssetConfig_TransactionType_ID""", model);
         model.AssetConfig_TransactionType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class AssetConfigTransactionTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Transaction type '{model.Name}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""AssetConfig_TransactionType""
-            SET ""Name"" = @Name, ""Enabled"" = @Enabled, ""ModiefiedDate"" = GETDATE(), ""Default"" = @Default
+            SET ""Name"" = @Name, ""Enabled"" = @Enabled, ""ModiefiedDate"" = NOW(), ""Default"" = @Default
             WHERE ""AssetConfig_TransactionType_ID"" = @id", new { model.Name, model.Enabled, model.Default, id });
         return rows == 0 ? NotFound(new { error = "Transaction type not found" }) : Ok(new { success = 1 });
     }
@@ -161,7 +161,7 @@ public class AssetConfigTransactionTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Name", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""AssetConfig_TransactionType"" (""Name"", ""Enabled"", ""CreatedDate"", ""CreatedByID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

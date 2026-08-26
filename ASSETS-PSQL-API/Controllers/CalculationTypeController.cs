@@ -42,7 +42,7 @@ public class CalculationTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Calculation type '{model.CalculationTypeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Calculation_Type"" (""TypeDescription"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@CalculationTypeDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@CalculationTypeDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""Asset_Calculation_Type_ID""", model);
         model.CalculationType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class CalculationTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Calculation type '{model.CalculationTypeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Calculation_Type""
-            SET ""TypeDescription"" = @CalculationTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""TypeDescription"" = @CalculationTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""Asset_Calculation_Type_ID"" = @id", new { model.CalculationTypeDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Calculation type not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class CalculationTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Calculation Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Calculation_Type"" (""TypeDescription"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

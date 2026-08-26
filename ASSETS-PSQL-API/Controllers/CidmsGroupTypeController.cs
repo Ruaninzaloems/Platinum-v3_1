@@ -42,7 +42,7 @@ public class CidmsGroupTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS group type '{model.AssetCIDMSGroupTypeDesc}' already exists under this class" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Group_Type"" (""AssetCIDMSGroupTypeDesc"", ""AssetCIDMSClassID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetCIDMSGroupTypeDesc, @AssetCIDMSClassID, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetCIDMSGroupTypeDesc, @AssetCIDMSClassID, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetCIDMSGroupTypeID""", model);
         model.AssetCIDMSGroupTypeID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -58,7 +58,7 @@ public class CidmsGroupTypeController : ControllerBase
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Group_Type""
             SET ""AssetCIDMSGroupTypeDesc"" = @AssetCIDMSGroupTypeDesc, ""AssetCIDMSClassID"" = @AssetCIDMSClassID,
-                ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+                ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetCIDMSGroupTypeID"" = @id", new { model.AssetCIDMSGroupTypeDesc, model.AssetCIDMSClassID, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Group Type not found" }) : Ok(new { success = 1 });
     }
@@ -177,7 +177,7 @@ public class CidmsGroupTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(desc, out var rn) ? rn : 0, Column = "CIDMS Group Type", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Group_Type"" (""AssetCIDMSGroupTypeDesc"", ""AssetCIDMSClassID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@desc, @classId, 1, GETDATE(), 1, 1)", new { desc, classId }, txn);
+                VALUES (@desc, @classId, 1, NOW(), 1, 1)", new { desc, classId }, txn);
         }
 
         if (dbErrors.Count > 0)

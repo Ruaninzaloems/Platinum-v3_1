@@ -49,7 +49,7 @@ public class AssetCategoryController : ControllerBase
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_AssetCategory_sys"" (""AssetCategoryDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"",
                 ""RevaluationByCostModel"", ""RevaluationByRevalutionModel"", ""Default"", ""TypeID"", ""RequireStatus"")
-            VALUES (@AssetCategoryDesc, @Enabled, GETDATE(), @CapturerID,
+            VALUES (@AssetCategoryDesc, @Enabled, NOW(), @CapturerID,
                 @RevaluationByCostModel, @RevaluationByRevalutionModel, @Default, @TypeID, @RequireStatus)
             RETURNING ""AssetCategoryID""", model);
         model.AssetCategoryID = id;
@@ -65,7 +65,7 @@ public class AssetCategoryController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset category '{model.AssetCategoryDesc}' already exists for this asset type" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_AssetCategory_sys""
-            SET ""AssetCategoryDesc"" = @AssetCategoryDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(),
+            SET ""AssetCategoryDesc"" = @AssetCategoryDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW(),
                 ""RevaluationByCostModel"" = @RevaluationByCostModel, ""RevaluationByRevalutionModel"" = @RevaluationByRevalutionModel,
                 ""TypeID"" = @TypeID, ""RequireStatus"" = @RequireStatus
             WHERE ""AssetCategoryID"" = @id",
@@ -248,7 +248,7 @@ public class AssetCategoryController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNumMap.TryGetValue($"{typeId}|{categoryDesc}", out var rn) ? rn : 0, Column = "Asset Category", Value = categoryDesc, Message = $"Duplicate: '{categoryDesc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_AssetCategory_sys"" (""AssetCategoryDesc"", ""TypeID"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"", ""RequireStatus"", ""RevaluationByCostModel"", ""RevaluationByRevalutionModel"")
-                VALUES (@categoryDesc, @typeId, 1, GETDATE(), 1, 1, @requireStatus, @revalByCost, @revalByRevalution)",
+                VALUES (@categoryDesc, @typeId, 1, NOW(), 1, 1, @requireStatus, @revalByCost, @revalByRevalution)",
                 new { categoryDesc, typeId, requireStatus, revalByCost, revalByRevalution }, txn);
         }
         if (dbErrors.Count > 0)

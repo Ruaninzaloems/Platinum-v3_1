@@ -144,7 +144,7 @@ public class GlValidationController : ControllerBase
                 AND COALESCE(""MeasurementModel_ID"", 0) = 2
                 AND COALESCE(""RevaluationReserveClosingBalance"", 0) > 0
                 AND COALESCE(""RemainingUsefulLife"", ""UsefulLifeMonthComponent"", 0) > 0
-                AND COALESCE(""DateOfDisposal"", '9999-12-31') > GETDATE()
+                AND COALESCE(""DateOfDisposal"", '9999-12-31') > NOW()
                 AND COALESCE(""CarryingAmountClosingBalance"", 0) > COALESCE(""ResidualValue"", 0)",
                 new { typeId, categoryId, subCategoryId, measurementTypeId, assetStatusId, deptId, divId }) > 0;
 

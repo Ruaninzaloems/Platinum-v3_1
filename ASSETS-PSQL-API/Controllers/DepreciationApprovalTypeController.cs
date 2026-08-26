@@ -42,7 +42,7 @@ public class DepreciationApprovalTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Depreciation approval type '{model.DepreciationApprovalTypeDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_Depreciation_Approval_Type"" (""ApprovalTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-            VALUES (@DepreciationApprovalTypeDesc, @Enabled, GETDATE(), @CapturerID)
+            VALUES (@DepreciationApprovalTypeDesc, @Enabled, NOW(), @CapturerID)
             RETURNING ""Asset_Depreciation_Approval_Type_ID""", model);
         model.DepreciationApprovalType_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class DepreciationApprovalTypeController : ControllerBase
         if (dup) return Conflict(new { error = $"Depreciation approval type '{model.DepreciationApprovalTypeDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_Depreciation_Approval_Type""
-            SET ""ApprovalTypeDesc"" = @DepreciationApprovalTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""ApprovalTypeDesc"" = @DepreciationApprovalTypeDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""Asset_Depreciation_Approval_Type_ID"" = @id", new { model.DepreciationApprovalTypeDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "Depreciation approval type not found" }) : Ok(new { success = 1 });
     }
@@ -132,7 +132,7 @@ public class DepreciationApprovalTypeController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Depreciation Approval Type", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_Depreciation_Approval_Type"" (""ApprovalTypeDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"")
-                VALUES (@val, 1, GETDATE(), 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)

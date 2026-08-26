@@ -52,7 +52,7 @@ public class AssetSubCategoryController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset sub-category '{model.Asset_SubCategoryDescription}' already exists under this category" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_SubCategory"" (""Asset_SubCategoryDescription"", ""Enabled"", ""DateCaptured"", ""Capturer_ID"", ""AssetCategoryID"", ""TypeID"", ""Default"")
-            VALUES (@Asset_SubCategoryDescription, @Enabled, GETDATE(), @Capturer_ID, @AssetCategoryID, @TypeID, @Default)
+            VALUES (@Asset_SubCategoryDescription, @Enabled, NOW(), @Capturer_ID, @AssetCategoryID, @TypeID, @Default)
             RETURNING ""Asset_SubCategory_ID""", model);
         model.Asset_SubCategory_ID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -67,7 +67,7 @@ public class AssetSubCategoryController : ControllerBase
         if (dup) return Conflict(new { error = $"Asset sub-category '{model.Asset_SubCategoryDescription}' already exists under this category" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_SubCategory""
-            SET ""Asset_SubCategoryDescription"" = @Asset_SubCategoryDescription, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE(),
+            SET ""Asset_SubCategoryDescription"" = @Asset_SubCategoryDescription, ""Enabled"" = @Enabled, ""DateModified"" = NOW(),
                 ""AssetCategoryID"" = @AssetCategoryID, ""TypeID"" = @TypeID
             WHERE ""Asset_SubCategory_ID"" = @id",
             new { model.Asset_SubCategoryDescription, model.Enabled, model.AssetCategoryID, model.TypeID, id });
@@ -221,7 +221,7 @@ public class AssetSubCategoryController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNumMap.TryGetValue($"{categoryId}|{desc}", out var rn) ? rn : 0, Column = "Sub Category Description", Value = desc, Message = $"Duplicate: '{desc}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_SubCategory"" (""Asset_SubCategoryDescription"", ""TypeID"", ""AssetCategoryID"", ""Enabled"", ""DateCaptured"", ""Capturer_ID"", ""Default"")
-                VALUES (@desc, NULLIF(@typeId, 0), NULLIF(@categoryId, 0), 1, GETDATE(), 1, 1)", new { desc, typeId, categoryId }, txn);
+                VALUES (@desc, NULLIF(@typeId, 0), NULLIF(@categoryId, 0), 1, NOW(), 1, 1)", new { desc, typeId, categoryId }, txn);
         }
         if (dbErrors.Count > 0)
         {

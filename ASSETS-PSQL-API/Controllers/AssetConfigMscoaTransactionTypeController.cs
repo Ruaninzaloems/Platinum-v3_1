@@ -69,7 +69,7 @@ public class AssetConfigMscoaTransactionTypeController : ControllerBase
         await conn.OpenAsync();
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""AssetConfig_mSCOA_TransactionType"" (""AssetConfig_mSCOA_ID"", ""TransactionTypeID"", ""Enabled"", ""CreatedByID"", ""CreatedDate"")
-            VALUES (@AssetConfigMscoaId, @TransactionTypeID, @Enabled, @CreatedByID, GETDATE())
+            VALUES (@AssetConfigMscoaId, @TransactionTypeID, @Enabled, @CreatedByID, NOW())
             RETURNING ""AssetConfig_mSCOA_TransactionType_ID""",
             new { model.AssetConfigMscoaId, TransactionTypeID = model.TransactionTypeId, model.Enabled, CreatedByID = model.CreatedById });
         return Ok(new { id });

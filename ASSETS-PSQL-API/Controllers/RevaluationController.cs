@@ -543,7 +543,7 @@ public class RevaluationController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_Revaluations""
-                SET ""PostDateTime"" = GETDATE(), ""Approved"" = TRUE, ""ApprovedBy"" = @approvedBy, ""ApprovedDate"" = GETDATE()
+                SET ""PostDateTime"" = NOW(), ""Approved"" = TRUE, ""ApprovedBy"" = @approvedBy, ""ApprovedDate"" = NOW()
                 WHERE ""AssetRegisterID"" = @assetRegId AND (""Approved"" IS NULL OR ""Approved"" = FALSE)",
                 new { approvedBy = request.ApprovedBy, assetRegId }, txn);
 
@@ -558,7 +558,7 @@ public class RevaluationController : ControllerBase
 
             await conn.ExecuteAsync(@"
                 UPDATE ""Asset_WorkflowInstances""
-                SET ""status"" = 'approved', ""completed_at"" = GETDATE()
+                SET ""status"" = 'approved', ""completed_at"" = NOW()
                 WHERE ""entity_type"" = 'revaluation' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
                 new { refId = id.ToString() });
 
@@ -752,8 +752,8 @@ public class RevaluationController : ControllerBase
         var scheduleId = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Asset_DepreciationSchedule"" (""FinYear"", ""RunDate"", ""RunType_ID"", ""RunStatus_ID"",
                 ""DateCaptured"", ""CapturerID"", ""ScheduledDate"", ""StatusID"", ""TotalAssets"")
-            VALUES (@finYear, GETDATE(), 2, 2, GETDATE(), 1, @transactionDate, 2, 1)
-            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = GETDATE()
+            VALUES (@finYear, NOW(), 2, 2, NOW(), 1, @transactionDate, 2, 1)
+            ON CONFLICT (""FinYear"") DO UPDATE SET ""RunDate"" = NOW()
             RETURNING ""Asset_DepreciationSchedule_ID""",
             new { finYear, transactionDate }, txn);
 
@@ -782,7 +782,7 @@ public class RevaluationController : ControllerBase
                 ""RunType_ID"", ""RunStatus_ID"", ""FinYear"", ""MonthID"",
                 ""Depreciation_ScheduledItemID"", ""DaysFromLastRun"", ""DateCaptured"", ""CapturerID"", ""IsApproved"")
             VALUES (@assetRegId, @transactionDate, @catchUpAmount, @newAccDep, @newCarrying,
-                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, GETDATE(), 1, 1)",
+                2, 2, @finYear, @fyPeriod, @scheduleItemId, @catchUpDays, NOW(), 1, 1)",
             new { assetRegId, transactionDate, catchUpAmount, newAccDep, newCarrying,
                   finYear, fyPeriod, scheduleItemId, catchUpDays }, txn);
 
@@ -807,14 +807,14 @@ public class RevaluationController : ControllerBase
         await conn.OpenAsync();
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Asset_Revaluations""
-            SET ""Approved"" = FALSE, ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = GETDATE(), ""RejectionReason"" = @reason
+            SET ""Approved"" = FALSE, ""RejectedBy"" = @rejectedBy, ""RejectedDate"" = NOW(), ""RejectionReason"" = @reason
             WHERE ""Asset_RevaluationsID"" = @id AND (""Approved"" IS NULL OR ""Approved"" = FALSE) AND ""PostDateTime"" IS NULL",
             new { id, rejectedBy = request?.RejectedBy ?? 0, reason = request?.Reason ?? "" });
         if (rows == 0) return NotFound(new { error = "Revaluation record not found or already processed" });
 
         await conn.ExecuteAsync(@"
             UPDATE ""Asset_WorkflowInstances""
-            SET ""status"" = 'rejected', ""completed_at"" = GETDATE()
+            SET ""status"" = 'rejected', ""completed_at"" = NOW()
             WHERE ""entity_type"" = 'revaluation' AND ""mssql_reference_id"" = @refId AND ""status"" IN ('pending', 'in_progress')",
             new { refId = id.ToString() });
 

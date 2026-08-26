@@ -42,7 +42,7 @@ public class CidmsMunicipalServicesController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS municipal service '{model.AssetMunicipalServicesDesc}' already exists" });
         var id = await conn.QuerySingleAsync<int>(@"
             INSERT INTO ""Const_Asset_CIDMS_Municipal_Services"" (""AssetMunicipalServicesDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-            VALUES (@AssetMunicipalServicesDesc, @Enabled, GETDATE(), @CapturerID, @Default)
+            VALUES (@AssetMunicipalServicesDesc, @Enabled, NOW(), @CapturerID, @Default)
             RETURNING ""AssetMunicipalServicesID""", model);
         model.AssetMunicipalServicesID = id;
         return CreatedAtAction(nameof(GetById), new { id }, model);
@@ -57,7 +57,7 @@ public class CidmsMunicipalServicesController : ControllerBase
         if (dup) return Conflict(new { error = $"CIDMS municipal service '{model.AssetMunicipalServicesDesc}' already exists" });
         var rows = await conn.ExecuteAsync(@"
             UPDATE ""Const_Asset_CIDMS_Municipal_Services""
-            SET ""AssetMunicipalServicesDesc"" = @AssetMunicipalServicesDesc, ""Enabled"" = @Enabled, ""DateModified"" = GETDATE()
+            SET ""AssetMunicipalServicesDesc"" = @AssetMunicipalServicesDesc, ""Enabled"" = @Enabled, ""DateModified"" = NOW()
             WHERE ""AssetMunicipalServicesID"" = @id", new { model.AssetMunicipalServicesDesc, model.Enabled, id });
         return rows == 0 ? NotFound(new { error = "CIDMS Municipal Service not found" }) : Ok(new { success = 1 });
     }
@@ -159,7 +159,7 @@ public class CidmsMunicipalServicesController : ControllerBase
             if (exists) { dbErrors.Add(new ImportError { Row = rowNums.TryGetValue(val, out var rn) ? rn : 0, Column = "Municipal Services", Value = val, Message = $"Duplicate: '{val}' already exists in the database" }); continue; }
             await conn.ExecuteAsync(@"
                 INSERT INTO ""Const_Asset_CIDMS_Municipal_Services"" (""AssetMunicipalServicesDesc"", ""Enabled"", ""DateCaptured"", ""CapturerID"", ""Default"")
-                VALUES (@val, 1, GETDATE(), 1, 1)", new { val }, txn);
+                VALUES (@val, 1, NOW(), 1, 1)", new { val }, txn);
         }
 
         if (dbErrors.Count > 0)
