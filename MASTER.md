@@ -265,6 +265,24 @@ cd BUDGET-APP/PlatinumBudget.Api
 ASPNETCORE_ENVIRONMENT=Development dotnet run
 ```
 
+### Performance backend + frontend (vendored standalone app) — ports 8080 + 18156
+Unlike every other module, Performance's standalone app is vendored **wholesale**
+(not reimplemented into `libs/ins`) and embedded into the shell via an `<iframe>`
+— see `PerformanceSync.md` for the full architecture writeup. It needs **two**
+separate dev servers, not one:
+```bash
+cd Insight-Performance-Hub/artifacts/api-server
+APP_DATABASE_URL="<Performance DB Azure connection string>" PORT=8080 NODE_ENV=development npx tsx ./src/index.ts
+```
+```bash
+cd Insight-Performance-Hub/artifacts/perf-app
+npx ng serve --host=0.0.0.0 --port=18156
+```
+`perf-app`'s dev-mode `baseHref` (`/perf-app/`, required for the iframe embed to
+resolve its own assets instead of the shell's) comes from `angular.json`'s
+`development` build configuration — `ng serve --base-href` does **not** exist on
+the modern `@angular/build:dev-server` builder, don't try to pass it as a CLI flag.
+
 ### Other module backends
 Start the relevant `*-API` / `*-APP` on its port (see §3) only for modules you're
 testing. Run long-lived servers in their **own persistent terminals** / background
@@ -279,6 +297,7 @@ curl http://localhost:3001/api/financialyears                 # Budget → 200 +
 curl -X POST http://localhost:3003/api/auth/login \
   -H "Content-Type: application/json" -d '{"username":"...","password":"..."}'  # POS-API login
 curl http://localhost:5000/afs-app/api/reports/dashboard      # proxy path → data
+curl http://localhost:5000/insights-app/api/auth/me           # Performance proxy path → data
 ```
 A `500`/timeout from any DB-backed backend almost always means the Postgres
 firewall IP changed again — see §4.2 before assuming a code regression.
@@ -526,6 +545,18 @@ Fix (frontend → backend):
 
 ## 14. Change log (recent integrations)
 
+- **Performance module vendored + brought to life (2026-08-26):** the ~100-file
+  standalone-only diff cataloged in Pass 1 (see `PerformanceSync.md`) was vendored
+  via a wholesale directory mirror (this module isn't reimplemented into `libs/ins`
+  like other modules — it's the standalone app embedded via iframe). Found and
+  fixed a second routing bug beyond the `apiBaseUrl` one Pass 1 caught: a hardcoded
+  `<base href="/">` made the iframe bootstrap the **shell's own app** instead of
+  perf-app's when proxied — fixed via `angular.json`'s `development` build
+  config (`ng serve --base-href` doesn't exist on the modern builder). Stood up
+  local dev tooling for both `api-server` (:8080) and `perf-app` (:18156) for the
+  first time and did the platform's first live verification of this module — see
+  §7. `USE_REPLIT_BUILTIN_DB` flipped to `false`; the `Performance` Azure Postgres
+  database already had all 51 tables migrated, no `drizzle-kit push` needed.
 - **Overtime identity bridge (2026-08-14):** see §13.4 — the shell's real
   POS-authenticated user is now bridged into Overtime's permission resolution via
   an `X-Username` header, instead of Overtime always resolving to an arbitrary
