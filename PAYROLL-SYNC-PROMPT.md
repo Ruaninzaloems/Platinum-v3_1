@@ -22,10 +22,12 @@ get it running end-to-end. Focus ONLY on the Payroll module — do not touch any
 
 CONTEXT
 - SOURCE REPO:        C:\Repos\Platinum-Payroll-Dev   (Replit project: Node/Express api + Angular client; the COMPLETE codebase — use this, NOT Platinum-Payroll-1 whose HEAD stripped the code)
-- SOURCE ANGULAR UI:  the client app (e.g. client/src/app or src/app — CONFIRM at run time,
-                      see Rule 2; structure may use pages/ + services/ + models/, may NOT
-                      match the monorepo lib's folders — map paths carefully)
-- SOURCE BACKEND:     the Express/Node API (e.g. api/ or server/ — CONFIRM at run time)
+- SOURCE ANGULAR UI:  client/src/app (confirmed 2026-08-25 — core/, features/, layout/, shared/,
+                      matching libs/payroll/src/lib's own top-level structure 1:1, no path
+                      remapping needed)
+- SOURCE BACKEND:     src/server (confirmed 2026-08-25 — NOT the top-level `api` file, which is
+                      a 0-byte leftover placeholder in BOTH the standalone and the monorepo copy;
+                      the real entry is `require('./src/server/index.js')` from root index.js)
 - MONOREPO LIB:       libs/payroll/src/lib   (core/services/: api.service.ts,
                       notification.service.ts, ui.service.ts; plus core/models/, features/,
                       layout/, shared/)
